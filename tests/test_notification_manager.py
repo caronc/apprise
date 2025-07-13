@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,18 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-import pytest
-import types
-import threading
 from inspect import cleandoc
-
-from apprise import Apprise
-from apprise import NotificationManager
-from apprise.plugins import NotifyBase
 
 # Disable logging for a cleaner testing output
 import logging
+import re
+import threading
+import types
+
+import pytest
+
+from apprise import Apprise, NotificationManager
+from apprise.plugins import NotifyBase
+
 logging.disable(logging.CRITICAL)
 
 # Grant access to our Notification Manager Singleton
@@ -66,19 +66,19 @@ def test_notification_manager_general():
 
     N_MGR.unload_modules()
     assert bool(N_MGR) is False
-    assert len([x for x in iter(N_MGR)]) > 0
+    assert len(list(iter(N_MGR))) > 0
     assert bool(N_MGR)
 
     N_MGR.unload_modules()
     assert isinstance(N_MGR.plugins(), types.GeneratorType)
-    assert len([x for x in N_MGR.plugins()]) > 0
+    assert len(list(N_MGR.plugins())) > 0
     N_MGR.unload_modules(disable_native=True)
     assert isinstance(N_MGR.plugins(), types.GeneratorType)
-    assert len([x for x in N_MGR.plugins()]) == 0
+    assert len(list(N_MGR.plugins())) == 0
     N_MGR.unload_modules()
-    assert isinstance(N_MGR['json'](host='localhost'), NotifyBase)
+    assert isinstance(N_MGR["json"](host="localhost"), NotifyBase)
     N_MGR.unload_modules()
-    assert 'json' in N_MGR
+    assert "json" in N_MGR
 
     # Define our good:// url
     class DisabledNotification(NotifyBase):
@@ -94,12 +94,12 @@ def test_notification_manager_general():
 
         def url(self, **kwargs):
             # Support url() function
-            return ''
+            return ""
 
     # Define our good:// url
     class GoodNotification(NotifyBase):
 
-        secure_protocol = ('good', 'goods')
+        secure_protocol = ("good", "goods")
 
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
@@ -110,29 +110,29 @@ def test_notification_manager_general():
 
         def url(self, **kwargs):
             # Support url() function
-            return ''
+            return ""
 
     N_MGR.unload_modules()
     assert N_MGR.add(GoodNotification)
-    assert 'good' in N_MGR
-    assert 'goods' in N_MGR
-    assert 'abcd' not in N_MGR
-    assert 'xyz' not in N_MGR
+    assert "good" in N_MGR
+    assert "goods" in N_MGR
+    assert "abcd" not in N_MGR
+    assert "xyz" not in N_MGR
 
     N_MGR.unload_modules()
-    assert N_MGR.add(GoodNotification, 'abcd')
-    assert 'good' in N_MGR
-    assert 'goods' in N_MGR
-    assert 'abcd' in N_MGR
-    assert 'xyz' not in N_MGR
+    assert N_MGR.add(GoodNotification, "abcd")
+    assert "good" in N_MGR
+    assert "goods" in N_MGR
+    assert "abcd" in N_MGR
+    assert "xyz" not in N_MGR
 
     N_MGR.unload_modules()
-    assert N_MGR.add(GoodNotification, ['abcd', 'xYz'])
-    assert 'good' in N_MGR
-    assert 'goods' in N_MGR
-    assert 'abcd' in N_MGR
+    assert N_MGR.add(GoodNotification, ["abcd", "xYz"])
+    assert "good" in N_MGR
+    assert "goods" in N_MGR
+    assert "abcd" in N_MGR
     # Lower case
-    assert 'xyz' in N_MGR
+    assert "xyz" in N_MGR
 
     N_MGR.unload_modules()
     # Not going to work; schemas must be a list of string
@@ -140,103 +140,103 @@ def test_notification_manager_general():
 
     N_MGR.unload_modules()
     with pytest.raises(KeyError):
-        del N_MGR['good']
-    N_MGR['good'] = GoodNotification
-    del N_MGR['good']
+        del N_MGR["good"]
+    N_MGR["good"] = GoodNotification
+    del N_MGR["good"]
 
     N_MGR.unload_modules()
-    N_MGR['good'] = GoodNotification
-    assert N_MGR['good'].enabled is True
-    N_MGR.enable_only('json', 'xml')
-    assert N_MGR['good'].enabled is False
-    assert N_MGR['json'].enabled is True
-    assert N_MGR['jsons'].enabled is True
-    assert N_MGR['xml'].enabled is True
-    assert N_MGR['xmls'].enabled is True
+    N_MGR["good"] = GoodNotification
+    assert N_MGR["good"].enabled is True
+    N_MGR.enable_only("json", "xml")
+    assert N_MGR["good"].enabled is False
+    assert N_MGR["json"].enabled is True
+    assert N_MGR["jsons"].enabled is True
+    assert N_MGR["xml"].enabled is True
+    assert N_MGR["xmls"].enabled is True
 
     # Only two plugins are enabled
-    assert len([p for p in N_MGR.plugins(include_disabled=False)]) == 2
+    assert len(list(N_MGR.plugins(include_disabled=False))) == 2
 
-    N_MGR.enable_only('good')
-    assert N_MGR['good'].enabled is True
-    assert N_MGR['json'].enabled is False
-    assert N_MGR['jsons'].enabled is False
-    assert N_MGR['xml'].enabled is False
-    assert N_MGR['xmls'].enabled is False
+    N_MGR.enable_only("good")
+    assert N_MGR["good"].enabled is True
+    assert N_MGR["json"].enabled is False
+    assert N_MGR["jsons"].enabled is False
+    assert N_MGR["xml"].enabled is False
+    assert N_MGR["xmls"].enabled is False
 
-    assert len([p for p in N_MGR.plugins(include_disabled=False)]) == 1
+    assert len(list(N_MGR.plugins(include_disabled=False))) == 1
 
     N_MGR.unload_modules()
-    N_MGR['disabled'] = DisabledNotification
-    assert N_MGR['disabled'].enabled is False
-    N_MGR.enable_only('disabled')
+    N_MGR["disabled"] = DisabledNotification
+    assert N_MGR["disabled"].enabled is False
+    N_MGR.enable_only("disabled")
     # Can't enable items that aren't supposed to be:
-    assert N_MGR['disabled'].enabled is False
+    assert N_MGR["disabled"].enabled is False
 
-    N_MGR['good'] = GoodNotification
-    assert N_MGR['good'].enabled is True
+    N_MGR["good"] = GoodNotification
+    assert N_MGR["good"].enabled is True
 
     # You can't disable someething already disabled
-    N_MGR.disable('disabled')
-    assert N_MGR['disabled'].enabled is False
+    N_MGR.disable("disabled")
+    assert N_MGR["disabled"].enabled is False
 
     N_MGR.unload_modules()
-    N_MGR.enable_only('form', 'xml')
+    N_MGR.enable_only("form", "xml")
     for schema in N_MGR.schemas(include_disabled=False):
-        assert re.match(r'^(form|xml)s?$', schema, re.IGNORECASE) is not None
+        assert re.match(r"^(form|xml)s?$", schema, re.IGNORECASE) is not None
 
     N_MGR.unload_modules()
-    assert N_MGR['form'].enabled is True
-    assert N_MGR['xml'].enabled is True
-    assert N_MGR['json'].enabled is True
-    N_MGR.enable_only('form', 'xml')
-    assert N_MGR['form'].enabled is True
-    assert N_MGR['xml'].enabled is True
-    assert N_MGR['json'].enabled is False
+    assert N_MGR["form"].enabled is True
+    assert N_MGR["xml"].enabled is True
+    assert N_MGR["json"].enabled is True
+    N_MGR.enable_only("form", "xml")
+    assert N_MGR["form"].enabled is True
+    assert N_MGR["xml"].enabled is True
+    assert N_MGR["json"].enabled is False
 
-    N_MGR.disable('invalid', 'xml')
-    assert N_MGR['form'].enabled is True
-    assert N_MGR['xml'].enabled is False
-    assert N_MGR['json'].enabled is False
+    N_MGR.disable("invalid", "xml")
+    assert N_MGR["form"].enabled is True
+    assert N_MGR["xml"].enabled is False
+    assert N_MGR["json"].enabled is False
 
     # Detect that our json object is enabled
     with pytest.raises(KeyError):
         # The below can not be indexed
-        N_MGR['invalid']
+        N_MGR["invalid"]
 
     N_MGR.unload_modules()
-    N_MGR.disable('invalid', 'xml')
+    N_MGR.disable("invalid", "xml")
 
     N_MGR.unload_modules()
-    assert N_MGR['json'].enabled is True
+    assert N_MGR["json"].enabled is True
 
     # Work with an empty module tree
     N_MGR.unload_modules(disable_native=True)
     with pytest.raises(KeyError):
         # The below can not be indexed
-        N_MGR['good']
+        N_MGR["good"]
 
     N_MGR.unload_modules()
-    assert 'hello' not in N_MGR
-    assert 'good' not in N_MGR
-    assert 'goods' not in N_MGR
+    assert "hello" not in N_MGR
+    assert "good" not in N_MGR
+    assert "goods" not in N_MGR
 
-    N_MGR['hello'] = GoodNotification
-    assert 'hello' in N_MGR
-    assert 'good' in N_MGR
-    assert 'goods' in N_MGR
+    N_MGR["hello"] = GoodNotification
+    assert "hello" in N_MGR
+    assert "good" in N_MGR
+    assert "goods" in N_MGR
 
     N_MGR.unload_modules()
-    N_MGR['good'] = GoodNotification
+    N_MGR["good"] = GoodNotification
 
     with pytest.raises(KeyError):
         # Can not assign the value again without getting a Conflict
-        N_MGR['good'] = GoodNotification
+        N_MGR["good"] = GoodNotification
 
     N_MGR.unload_modules()
-    N_MGR.remove('good', 'invalid')
-    assert 'good' not in N_MGR
-    assert 'goods' not in N_MGR
+    N_MGR.remove("good", "invalid")
+    assert "good" not in N_MGR
+    assert "goods" not in N_MGR
 
 
 def test_notification_manager_module_loading(tmpdir):
@@ -263,13 +263,13 @@ def test_notification_manager_module_loading(tmpdir):
     thread_count = 10
 
     def thread_test(result, no):
-        """
-        Load our apprise object with valid URLs and store our result
-        """
+        """Load our apprise object with valid URLs and store our result."""
         apobj = Apprise()
-        result[no] = apobj.add('json://localhost') and \
-            apobj.add('form://localhost') and \
-            apobj.add('xml://localhost')
+        result[no] = (
+            apobj.add("json://localhost")
+            and apobj.add("form://localhost")
+            and apobj.add("xml://localhost")
+        )
 
     # Unload our modules
     N_MGR.unload_modules()
@@ -300,7 +300,7 @@ def test_notification_manager_decorators(tmpdir):
     """
 
     # Prepare ourselves a file to work with
-    notify_hook = tmpdir.mkdir('goodmodule').join('__init__.py')
+    notify_hook = tmpdir.mkdir("goodmodule").join("__init__.py")
     notify_hook.write(cleandoc("""
     from apprise.decorators import notify
 
@@ -323,25 +323,25 @@ def test_notification_manager_decorators(tmpdir):
 
     N_MGR.module_detection(str(notify_hook))
 
-    assert 'clihooka' in N_MGR
-    assert 'clihookb' in N_MGR
+    assert "clihooka" in N_MGR
+    assert "clihookb" in N_MGR
     N_MGR.unload_modules()
-    assert 'clihooka' not in N_MGR
-    assert 'clihookb' not in N_MGR
+    assert "clihooka" not in N_MGR
+    assert "clihookb" not in N_MGR
 
     N_MGR.module_detection(str(notify_hook))
-    assert 'clihooka' in N_MGR
-    assert 'clihookb' in N_MGR
-    del N_MGR['clihookb']
-    assert 'clihooka' in N_MGR
-    assert 'clihookb' not in N_MGR
-    del N_MGR['clihooka']
-    assert 'clihooka' not in N_MGR
-    assert 'clihookb' not in N_MGR
+    assert "clihooka" in N_MGR
+    assert "clihookb" in N_MGR
+    del N_MGR["clihookb"]
+    assert "clihooka" in N_MGR
+    assert "clihookb" not in N_MGR
+    del N_MGR["clihooka"]
+    assert "clihooka" not in N_MGR
+    assert "clihookb" not in N_MGR
 
     # Prepare ourselves a file to work with
-    notify_base = tmpdir.mkdir('plugins')
-    notify_test = notify_base.join('NotifyTest.py')
+    notify_base = tmpdir.mkdir("plugins")
+    notify_test = notify_base.join("NotifyTest.py")
     notify_test.write(cleandoc("""
     #
     # Bare Minimum Valid Object
@@ -376,25 +376,25 @@ def test_notification_manager_decorators(tmpdir):
         def url(self):
             return 'mytest://'
     """))
-    assert 'mytest' not in N_MGR
+    assert "mytest" not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
-    assert 'mytest' in N_MGR
-    del N_MGR['mytest']
-    assert 'mytest' not in N_MGR
+    assert "mytest" in N_MGR
+    del N_MGR["mytest"]
+    assert "mytest" not in N_MGR
 
-    assert 'mytest' not in N_MGR
+    assert "mytest" not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
 
     # It's still not loaded because the path has already been scanned
-    assert 'mytest' not in N_MGR
+    assert "mytest" not in N_MGR
     N_MGR.load_modules(path=str(notify_base), force=True)
-    assert 'mytest' in N_MGR
+    assert "mytest" in N_MGR
 
     # Double load will test section of code that prevents a notification
     # From reloading if previously already loaded
     N_MGR.load_modules(path=str(notify_base))
     # Our item is still loaded as expected
-    assert 'mytest' in N_MGR
+    assert "mytest" in N_MGR
 
     # Simple test to make sure we can handle duplicate entries loaded
     N_MGR.load_modules(path=str(notify_base), force=True)

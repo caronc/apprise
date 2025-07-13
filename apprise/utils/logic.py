@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,16 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 from itertools import chain
+
 from .. import common
 from .parse import parse_list
 
 
-def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
-                       match_always=common.MATCH_ALWAYS_TAG):
-    """
-
-    The data variable should always be a set of strings that the logic can be
-    compared against. It should be a set.  If it isn't already, then it will
+def is_exclusive_match(
+    logic,
+    data,
+    match_all=common.MATCH_ALL_TAG,
+    match_always=common.MATCH_ALWAYS_TAG,
+):
+    """The data variable should always be a set of strings that the logic can
+    be compared against. It should be a set.  If it isn't already, then it will
     be converted as such. These identify the tags themselves.
 
     Our logic should be a list as well:
@@ -102,17 +104,20 @@ def is_exclusive_match(logic, data, match_all=common.MATCH_ALL_TAG,
 
 
 def dict_full_update(dict1, dict2):
-    """
-    Takes 2 dictionaries (dict1 and dict2) that contain sub-dictionaries and
+    """Takes 2 dictionaries (dict1 and dict2) that contain sub-dictionaries and
     gracefully merges them into dict1.
 
     This is similar to: dict1.update(dict2) except that internal dictionaries
     are also recursively applied.
     """
+
     def _merge(dict1, dict2):
         for k in dict2:
-            if k in dict1 and isinstance(dict1[k], dict) \
-                    and isinstance(dict2[k], dict):
+            if (
+                k in dict1
+                and isinstance(dict1[k], dict)
+                and isinstance(dict2[k], dict)
+            ):
                 _merge(dict1[k], dict2[k])
             else:
                 dict1[k] = dict2[k]

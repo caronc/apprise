@@ -1,6 +1,4 @@
 import types
-import typing as t
-
 
 class NotifyType:
     INFO: NotifyType
@@ -18,5 +16,4 @@ class ContentLocation:
     HOSTED: ContentLocation
     INACCESSIBLE: ContentLocation
 
-
-NOTIFY_MODULE_MAP: t.Dict[str, t.Dict[str, t.Union[t.Type["NotifyBase"], types.ModuleType]]]
+NOTIFY_MODULE_MAP: dict[str, dict[str, type[NotifyBase] | types.ModuleType]]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,36 +25,36 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import pytest
-from apprise import Apprise
-from apprise import NotifyBase
-from apprise import NotifyFormat
-from apprise import NotificationManager
-
 # Disable logging for a cleaner testing output
 import logging
+import sys
+
+import pytest
+
+from apprise import Apprise, NotificationManager, NotifyBase, NotifyFormat
+
 logging.disable(logging.CRITICAL)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
 
-@pytest.mark.skipif(sys.version_info >= (3, 7),
-                    reason="Requires Python 3.0 to 3.6")
+@pytest.mark.skipif(
+    sys.version_info >= (3, 7), reason="Requires Python 3.0 to 3.6"
+)
 def test_apprise_asyncio_runtime_error():
     """
     API: Apprise() AsyncIO RuntimeError handling
 
     """
+
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super().__init__(
-                notify_format=NotifyFormat.HTML, **kwargs)
+            super().__init__(notify_format=NotifyFormat.HTML, **kwargs)
 
         def url(self, **kwargs):
             # Support URL
-            return ''
+            return ""
 
         def send(self, **kwargs):
             # Pretend everything is okay
@@ -67,14 +66,14 @@ def test_apprise_asyncio_runtime_error():
             return NotifyBase.parse_url(url, verify_host=False)
 
     # Store our good notification in our schema map
-    N_MGR['good'] = GoodNotification
+    N_MGR["good"] = GoodNotification
 
     # Create ourselves an Apprise object
     a = Apprise()
 
     # Add a few entries
     for _ in range(25):
-        a.add('good://')
+        a.add("good://")
 
     # Python v3.6 and lower can't handle situations gracefully when an
     # event_loop isn't already established(). Test that Apprise can handle

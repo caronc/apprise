@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,112 +25,145 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import pytest
-from unittest import mock
-
-import requests
-from apprise import NotifyType
-from apprise.plugins.ifttt import NotifyIFTTT
-from helpers import AppriseURLTester
-
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
+
+from helpers import AppriseURLTester
+import pytest
+import requests
+
+from apprise import NotifyType
+from apprise.plugins.ifttt import NotifyIFTTT
+
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('ifttt://', {
-        'instance': TypeError,
-    }),
-    ('ifttt://:@/', {
-        'instance': TypeError,
-    }),
+    (
+        "ifttt://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "ifttt://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
     # No User
-    ('ifttt://EventID/', {
-        'instance': TypeError,
-    }),
+    (
+        "ifttt://EventID/",
+        {
+            "instance": TypeError,
+        },
+    ),
     # A nicely formed ifttt url with 1 event and a new key/value store
-    ('ifttt://WebHookID@EventID/?+TemplateKey=TemplateVal', {
-        'instance': NotifyIFTTT,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'ifttt://W...D',
-    }),
+    (
+        "ifttt://WebHookID@EventID/?+TemplateKey=TemplateVal",
+        {
+            "instance": NotifyIFTTT,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "ifttt://W...D",
+        },
+    ),
     # Test to= in which case we set the host to the webhook id
-    ('ifttt://WebHookID?to=EventID,EventID2', {
-        'instance': NotifyIFTTT,
-    }),
+    (
+        "ifttt://WebHookID?to=EventID,EventID2",
+        {
+            "instance": NotifyIFTTT,
+        },
+    ),
     # Removing certain keys:
-    ('ifttt://WebHookID@EventID/?-Value1=&-Value2', {
-        'instance': NotifyIFTTT,
-    }),
+    (
+        "ifttt://WebHookID@EventID/?-Value1=&-Value2",
+        {
+            "instance": NotifyIFTTT,
+        },
+    ),
     # A nicely formed ifttt url with 2 events defined:
-    ('ifttt://WebHookID@EventID/EventID2/', {
-        'instance': NotifyIFTTT,
-    }),
+    (
+        "ifttt://WebHookID@EventID/EventID2/",
+        {
+            "instance": NotifyIFTTT,
+        },
+    ),
     # Support Native URL references
-    ('https://maker.ifttt.com/use/WebHookID/', {
-        # No EventID specified
-        'instance': TypeError,
-    }),
-    ('https://maker.ifttt.com/use/WebHookID/EventID/', {
-        'instance': NotifyIFTTT,
-    }),
+    (
+        "https://maker.ifttt.com/use/WebHookID/",
+        {
+            # No EventID specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "https://maker.ifttt.com/use/WebHookID/EventID/",
+        {
+            "instance": NotifyIFTTT,
+        },
+    ),
     #  Native URL with arguments
-    ('https://maker.ifttt.com/use/WebHookID/EventID/?-Value1=', {
-        'instance': NotifyIFTTT,
-    }),
+    (
+        "https://maker.ifttt.com/use/WebHookID/EventID/?-Value1=",
+        {
+            "instance": NotifyIFTTT,
+        },
+    ),
     # Test website connection failures
-    ('ifttt://WebHookID@EventID', {
-        'instance': NotifyIFTTT,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('ifttt://WebHookID@EventID', {
-        'instance': NotifyIFTTT,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('ifttt://WebHookID@EventID', {
-        'instance': NotifyIFTTT,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "ifttt://WebHookID@EventID",
+        {
+            "instance": NotifyIFTTT,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "ifttt://WebHookID@EventID",
+        {
+            "instance": NotifyIFTTT,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "ifttt://WebHookID@EventID",
+        {
+            "instance": NotifyIFTTT,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_ifttt_urls():
-    """
-    NotifyIFTTT() Apprise URLs
-
-    """
+    """NotifyIFTTT() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.get')
-@mock.patch('requests.post')
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_ifttt_edge_cases(mock_post, mock_get):
-    """
-    NotifyIFTTT() Edge Cases
-
-    """
+    """NotifyIFTTT() Edge Cases."""
 
     # Initialize some generic (but valid) tokens
-    webhook_id = 'webhook_id'
-    events = ['event1', 'event2']
+    webhook_id = "webhook_id"
+    events = ["event1", "event2"]
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
-    mock_get.return_value.content = '{}'
-    mock_post.return_value.content = '{}'
+    mock_get.return_value.content = "{}"
+    mock_post.return_value.content = "{}"
 
     # No webhook_id specified
     with pytest.raises(TypeError):
@@ -152,55 +184,69 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     obj = NotifyIFTTT(webhook_id=webhook_id, events=events)
     assert isinstance(obj, NotifyIFTTT)
 
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # Test the addition of tokens
     obj = NotifyIFTTT(
-        webhook_id=webhook_id, events=events,
-        add_tokens={'Test': 'ValueA', 'Test2': 'ValueB'})
+        webhook_id=webhook_id,
+        events=events,
+        add_tokens={"Test": "ValueA", "Test2": "ValueB"},
+    )
 
     assert isinstance(obj, NotifyIFTTT)
 
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # Invalid del_tokens entry
     with pytest.raises(TypeError):
         NotifyIFTTT(
-            webhook_id=webhook_id, events=events,
-            del_tokens=NotifyIFTTT.ifttt_default_title_key)
+            webhook_id=webhook_id,
+            events=events,
+            del_tokens=NotifyIFTTT.ifttt_default_title_key,
+        )
 
     assert isinstance(obj, NotifyIFTTT)
 
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # Test removal of tokens by a list
     obj = NotifyIFTTT(
-        webhook_id=webhook_id, events=events,
-        add_tokens={
-            'MyKey': 'MyValue'
-        },
+        webhook_id=webhook_id,
+        events=events,
+        add_tokens={"MyKey": "MyValue"},
         del_tokens=(
             NotifyIFTTT.ifttt_default_title_key,
             NotifyIFTTT.ifttt_default_body_key,
-            NotifyIFTTT.ifttt_default_type_key))
+            NotifyIFTTT.ifttt_default_type_key,
+        ),
+    )
 
     assert isinstance(obj, NotifyIFTTT)
 
-    assert obj.notify(
-        body='body', title='title', notify_type=NotifyType.INFO) is True
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # Test removal of tokens as dict
     obj = NotifyIFTTT(
-        webhook_id=webhook_id, events=events,
-        add_tokens={
-            'MyKey': 'MyValue'
-        },
+        webhook_id=webhook_id,
+        events=events,
+        add_tokens={"MyKey": "MyValue"},
         del_tokens={
             NotifyIFTTT.ifttt_default_title_key: None,
             NotifyIFTTT.ifttt_default_body_key: None,
-            NotifyIFTTT.ifttt_default_type_key: None})
+            NotifyIFTTT.ifttt_default_type_key: None,
+        },
+    )
 
     assert isinstance(obj, NotifyIFTTT)

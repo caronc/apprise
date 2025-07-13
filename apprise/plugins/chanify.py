@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -35,36 +34,32 @@
 
 import requests
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 class NotifyChanify(NotifyBase):
-    """
-    A wrapper for Chanify Notifications
-    """
+    """A wrapper for Chanify Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = _('Chanify')
+    service_name = _("Chanify")
 
     # The services URL
-    service_url = 'https://chanify.net/'
+    service_url = "https://chanify.net/"
 
     # The default secure protocol
-    secure_protocol = 'chanify'
+    secure_protocol = "chanify"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_chanify'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_chanify"
 
     # Notification URL
-    notify_url = 'https://api.chanify.net/v1/sender/{token}/'
+    notify_url = "https://api.chanify.net/v1/sender/{token}/"
 
     # Define object templates
-    templates = (
-        '{schema}://{token}',
-    )
+    templates = ("{schema}://{token}",)
 
     # The title is not used
     title_maxlen = 0
@@ -72,58 +67,60 @@ class NotifyChanify(NotifyBase):
     # Define our tokens; these are the minimum tokens required required to
     # be passed into this function (as arguments). The syntax appends any
     # previously defined in the base package and builds onto them
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[A-Z0-9._-]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[A-Z0-9._-]+$", "i"),
+            },
         },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'token': {
-            'alias_of': 'token',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "token": {
+                "alias_of": "token",
+            },
         },
-    })
+    )
 
     def __init__(self, token, **kwargs):
-        """
-        Initialize Chanify Object
-        """
+        """Initialize Chanify Object."""
         super().__init__(**kwargs)
 
         self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+            token, *self.template_tokens["token"]["regex"]
+        )
         if not self.token:
-            msg = 'The Chanify token specified ({}) is invalid.'\
-                .format(token)
+            msg = f"The Chanify token specified ({token}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Send our notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Send our notification."""
 
         # prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded",
         }
 
         # Our Message
-        payload = {
-            'text': body
-        }
+        payload = {"text": body}
 
-        self.logger.debug('Chanify GET URL: %s (cert_verify=%r)' % (
-            self.notify_url, self.verify_certificate))
-        self.logger.debug('Chanify Payload: %s' % str(payload))
+        self.logger.debug(
+            "Chanify GET URL:"
+            f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Chanify Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -138,29 +135,30 @@ class NotifyChanify(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyChanify.http_response_code_lookup(r.status_code)
+                status_str = NotifyChanify.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Chanify notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Chanify notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Chanify notification.')
+                self.logger.info("Sent Chanify notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Chanify '
-                'notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Chanify notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -168,35 +166,30 @@ class NotifyChanify(NotifyBase):
         return True
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Prepare our parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{token}/?{params}'.format(
+        return "{schema}://{token}/?{params}".format(
             schema=self.secure_protocol,
-            token=self.pprint(self.token, privacy, safe=''),
+            token=self.pprint(self.token, privacy, safe=""),
             params=NotifyChanify.urlencode(params),
         )
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.token)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         # parse_url already handles getting the `user` and `password` fields
         # populated.
@@ -206,10 +199,10 @@ class NotifyChanify(NotifyBase):
             return results
 
         # Allow over-ride
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = NotifyChanify.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = NotifyChanify.unquote(results["qsd"]["token"])
 
         else:
-            results['token'] = NotifyChanify.unquote(results['host'])
+            results["token"] = NotifyChanify.unquote(results["host"])
 
         return results

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,183 +25,234 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import os
-from unittest import mock
-
-import pytest
-import requests
 from json import dumps
-from apprise import Apprise
-from apprise import AppriseAttachment
-from apprise.plugins.pushbullet import NotifyPushBullet
-from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
+import os
+from unittest import mock
+
+from helpers import AppriseURLTester
+import pytest
+import requests
+
+from apprise import Apprise, AppriseAttachment
+from apprise.plugins.pushbullet import NotifyPushBullet
+
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
-TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('pbul://', {
-        'instance': TypeError,
-    }),
-    ('pbul://:@/', {
-        'instance': TypeError,
-    }),
+    (
+        "pbul://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "pbul://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
     # APIkey
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # APIkey; but support attachment response
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-
-        # Test what happens if a batch send fails to return a messageCount
-        'requests_response_text': {
-            'file_name': 'cat.jpeg',
-            'file_type': 'image/jpeg',
-            'file_url': 'http://file_url',
-            'upload_url': 'http://upload_url',
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # Test what happens if a batch send fails to return a messageCount
+            "requests_response_text": {
+                "file_name": "cat.jpeg",
+                "file_type": "image/jpeg",
+                "file_url": "http://file_url",
+                "upload_url": "http://upload_url",
+            },
         },
-    }),
+    ),
     # APIkey; attachment testing that isn't an image type
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-
-        # Test what happens if a batch send fails to return a messageCount
-        'requests_response_text': {
-            'file_name': 'test.pdf',
-            'file_type': 'application/pdf',
-            'file_url': 'http://file_url',
-            'upload_url': 'http://upload_url',
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # Test what happens if a batch send fails to return a messageCount
+            "requests_response_text": {
+                "file_name": "test.pdf",
+                "file_type": "application/pdf",
+                "file_url": "http://file_url",
+                "upload_url": "http://upload_url",
+            },
         },
-    }),
+    ),
     # APIkey; attachment testing were expected entry in payload is missing
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-
-        # Test what happens if a batch send fails to return a messageCount
-        'requests_response_text': {
-            'file_name': 'test.pdf',
-            'file_type': 'application/pdf',
-            'file_url': 'http://file_url',
-            # upload_url missing
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # Test what happens if a batch send fails to return a messageCount
+            "requests_response_text": {
+                "file_name": "test.pdf",
+                "file_type": "application/pdf",
+                "file_url": "http://file_url",
+                # upload_url missing
+            },
+            # Our Notification calls associated with attachments will fail:
+            "attach_response": False,
         },
-        # Our Notification calls associated with attachments will fail:
-        'attach_response': False,
-    }),
+    ),
     # API Key + channel
-    ('pbul://%s/#channel/' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/#channel/" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # API Key + channel (via to=
-    ('pbul://%s/?to=#channel' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/?to=#channel" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # API Key + 2 channels
-    ('pbul://%s/#channel1/#channel2' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pbul://a...a/',
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/#channel1/#channel2" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pbul://a...a/",
+            "check_attachments": False,
+        },
+    ),
     # API Key + device
-    ('pbul://%s/device/' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/device/" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # API Key + 2 devices
-    ('pbul://%s/device1/device2/' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/device1/device2/" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # API Key + email
-    ('pbul://%s/user@example.com/' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/user@example.com/" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # API Key + 2 emails
-    ('pbul://%s/user@example.com/abc@def.com/' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/user@example.com/abc@def.com/" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # API Key + Combo
-    ('pbul://%s/device/#channel/user@example.com/' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s/device/#channel/user@example.com/" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            "check_attachments": False,
+        },
+    ),
     # ,
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-        'check_attachments': False,
-    }),
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-        'check_attachments': False,
-    }),
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-        'check_attachments': False,
-    }),
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-        'check_attachments': False,
-    }),
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-        'check_attachments': False,
-    }),
-    ('pbul://%s' % ('a' * 32), {
-        'instance': NotifyPushBullet,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-        'check_attachments': False,
-    }),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+            "check_attachments": False,
+        },
+    ),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+            "check_attachments": False,
+        },
+    ),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+            "check_attachments": False,
+        },
+    ),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+            "check_attachments": False,
+        },
+    ),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+            "check_attachments": False,
+        },
+    ),
+    (
+        "pbul://%s" % ("a" * 32),
+        {
+            "instance": NotifyPushBullet,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+            "check_attachments": False,
+        },
+    ),
 )
 
 
 def test_plugin_pushbullet_urls():
-    """
-    NotifyPushBullet() Apprise URLs
-
-    """
+    """NotifyPushBullet() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_pushbullet_attachments(mock_post):
-    """
-    NotifyPushBullet() Attachment Checks
-
-    """
+    """NotifyPushBullet() Attachment Checks."""
 
     # Initialize some generic (but valid) tokens
-    access_token = 't' * 32
+    access_token = "t" * 32
 
     # Prepare Mock return object
     response = mock.Mock()
@@ -216,11 +266,10 @@ def test_plugin_pushbullet_attachments(mock_post):
     mock_post.return_value = response
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Test our markdown
-    obj = Apprise.instantiate(
-        'pbul://{}/?format=markdown'.format(access_token))
+    obj = Apprise.instantiate(f"pbul://{access_token}/?format=markdown")
 
     # Send a good attachment
     assert obj.notify(body="test", attach=attach) is True
@@ -228,23 +277,31 @@ def test_plugin_pushbullet_attachments(mock_post):
     # Test our call count
     assert mock_post.call_count == 4
     # Image Prep
-    assert mock_post.call_args_list[0][0][0] == \
-        'https://api.pushbullet.com/v2/upload-request'
-    assert mock_post.call_args_list[1][0][0] == \
-        'https://upload.pushbullet.com/abcd123'
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "https://api.pushbullet.com/v2/upload-request"
+    )
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == "https://upload.pushbullet.com/abcd123"
+    )
     # Message
-    assert mock_post.call_args_list[2][0][0] == \
-        'https://api.pushbullet.com/v2/pushes'
+    assert (
+        mock_post.call_args_list[2][0][0]
+        == "https://api.pushbullet.com/v2/pushes"
+    )
     # Image Send
-    assert mock_post.call_args_list[3][0][0] == \
-        'https://api.pushbullet.com/v2/pushes'
+    assert (
+        mock_post.call_args_list[3][0][0]
+        == "https://api.pushbullet.com/v2/pushes"
+    )
 
     # Reset our mock object
     mock_post.reset_mock()
 
     # Add another attachment so we drop into the area of the PushBullet code
     # that sends remaining attachments (if more detected)
-    attach.add(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Send our attachments
     assert obj.notify(body="test", attach=attach) is True
@@ -252,28 +309,42 @@ def test_plugin_pushbullet_attachments(mock_post):
     # Test our call count
     assert mock_post.call_count == 7
     # Image Prep
-    assert mock_post.call_args_list[0][0][0] == \
-        'https://api.pushbullet.com/v2/upload-request'
-    assert mock_post.call_args_list[1][0][0] == \
-        'https://upload.pushbullet.com/abcd123'
-    assert mock_post.call_args_list[2][0][0] == \
-        'https://api.pushbullet.com/v2/upload-request'
-    assert mock_post.call_args_list[3][0][0] == \
-        'https://upload.pushbullet.com/abcd123'
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "https://api.pushbullet.com/v2/upload-request"
+    )
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == "https://upload.pushbullet.com/abcd123"
+    )
+    assert (
+        mock_post.call_args_list[2][0][0]
+        == "https://api.pushbullet.com/v2/upload-request"
+    )
+    assert (
+        mock_post.call_args_list[3][0][0]
+        == "https://upload.pushbullet.com/abcd123"
+    )
     # Message
-    assert mock_post.call_args_list[4][0][0] == \
-        'https://api.pushbullet.com/v2/pushes'
+    assert (
+        mock_post.call_args_list[4][0][0]
+        == "https://api.pushbullet.com/v2/pushes"
+    )
     # Image Send
-    assert mock_post.call_args_list[5][0][0] == \
-        'https://api.pushbullet.com/v2/pushes'
-    assert mock_post.call_args_list[6][0][0] == \
-        'https://api.pushbullet.com/v2/pushes'
+    assert (
+        mock_post.call_args_list[5][0][0]
+        == "https://api.pushbullet.com/v2/pushes"
+    )
+    assert (
+        mock_post.call_args_list[6][0][0]
+        == "https://api.pushbullet.com/v2/pushes"
+    )
 
     # Reset our mock object
     mock_post.reset_mock()
 
     # An invalid attachment will cause a failure
-    path = os.path.join(TEST_VAR_DIR, '/invalid/path/to/an/invalid/file.jpg')
+    path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert obj.notify(body="test", attach=attach) is False
 
@@ -281,7 +352,7 @@ def test_plugin_pushbullet_attachments(mock_post):
     assert mock_post.call_count == 0
 
     # prepare our attachment
-    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Prepare a bad response
     bad_response = mock.Mock()
@@ -295,7 +366,7 @@ def test_plugin_pushbullet_attachments(mock_post):
 
     # Prepare a bad response
     bad_json_response = mock.Mock()
-    bad_json_response.content = '}'
+    bad_json_response.content = "}"
     bad_json_response.status_code = requests.codes.ok
 
     # Throw an exception on the first call to requests.post()
@@ -334,19 +405,16 @@ def test_plugin_pushbullet_attachments(mock_post):
     assert obj.send(body="test", attach=attach) is False
 
 
-@mock.patch('requests.get')
-@mock.patch('requests.post')
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
-    """
-    NotifyPushBullet() Edge Cases
-
-    """
+    """NotifyPushBullet() Edge Cases."""
 
     # Initialize some generic (but valid) tokens
-    accesstoken = 'a' * 32
+    accesstoken = "a" * 32
 
     # Support strings
-    recipients = '#chan1,#chan2,device,user@example.com,,,'
+    recipients = "#chan1,#chan2,device,user@example.com,,,"
 
     # Prepare Mock
     mock_get.return_value = requests.Request()
@@ -360,8 +428,7 @@ def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
     with pytest.raises(TypeError):
         NotifyPushBullet(accesstoken="     ")
 
-    obj = NotifyPushBullet(
-        accesstoken=accesstoken, targets=recipients)
+    obj = NotifyPushBullet(accesstoken=accesstoken, targets=recipients)
     assert isinstance(obj, NotifyPushBullet) is True
     assert len(obj.targets) == 4
 

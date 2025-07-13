@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,84 +25,107 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import requests
 
 from apprise.plugins.pushme import NotifyPushMe
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('pushme://', {
-        'instance': TypeError,
-    }),
-    ('pushme://:@/', {
-        'instance': TypeError,
-    }),
+    (
+        "pushme://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "pushme://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
     # Token specified
-    ('pushme://%s' % ('a' * 6), {
-        'instance': NotifyPushMe,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pushme://a...a/',
-    }),
+    (
+        "pushme://%s" % ("a" * 6),
+        {
+            "instance": NotifyPushMe,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pushme://a...a/",
+        },
+    ),
     # Token specified
-    ('pushme://?token=%s&status=yes' % ('b' * 6), {
-        'instance': NotifyPushMe,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pushme://b...b/',
-    }),
+    (
+        "pushme://?token=%s&status=yes" % ("b" * 6),
+        {
+            "instance": NotifyPushMe,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pushme://b...b/",
+        },
+    ),
     # Status setting
-    ('pushme://?token=%s&status=no' % ('b' * 6), {
-        'instance': NotifyPushMe,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pushme://b...b/',
-    }),
+    (
+        "pushme://?token=%s&status=no" % ("b" * 6),
+        {
+            "instance": NotifyPushMe,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pushme://b...b/",
+        },
+    ),
     # Status setting
-    ('pushme://?token=%s&status=True' % ('b' * 6), {
-        'instance': NotifyPushMe,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pushme://b...b/',
-    }),
+    (
+        "pushme://?token=%s&status=True" % ("b" * 6),
+        {
+            "instance": NotifyPushMe,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pushme://b...b/",
+        },
+    ),
     # Token specified
-    ('pushme://?push_key=%s&status=no' % ('p' * 6), {
-        'instance': NotifyPushMe,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pushme://p...p/',
-    }),
-    ('pushme://%s' % ('c' * 6), {
-        'instance': NotifyPushMe,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('pushme://%s' % ('d' * 7), {
-        'instance': NotifyPushMe,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushme://%s' % ('e' * 8), {
-        'instance': NotifyPushMe,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "pushme://?push_key=%s&status=no" % ("p" * 6),
+        {
+            "instance": NotifyPushMe,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pushme://p...p/",
+        },
+    ),
+    (
+        "pushme://%s" % ("c" * 6),
+        {
+            "instance": NotifyPushMe,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "pushme://%s" % ("d" * 7),
+        {
+            "instance": NotifyPushMe,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushme://%s" % ("e" * 8),
+        {
+            "instance": NotifyPushMe,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_pushme_urls():
-    """
-    NotifyPushMe() Apprise URLs
-
-    """
+    """NotifyPushMe() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

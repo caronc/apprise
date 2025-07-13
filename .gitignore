@@ -18,6 +18,8 @@ env/
 .venv*
 build/
 BUILDROOT/
+SOURCES/
+SRPMS/
 develop-eggs/
 dist/
 downloads/

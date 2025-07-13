@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,28 +25,28 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import os
-from json import loads
 from inspect import cleandoc
-
-import pytest
-import requests
-from apprise import Apprise
-from apprise.config import ConfigBase
+from json import loads
 
 # Disable logging for a cleaner testing output
 import logging
+import os
+
+import pytest
+import requests
+
+from apprise import Apprise
+from apprise.config import ConfigBase
+
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
-TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 
 @pytest.fixture
 def request_mock(mocker):
-    """
-    Prepare requests mock.
-    """
+    """Prepare requests mock."""
     mock_post = mocker.patch("requests.post")
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
@@ -56,10 +55,7 @@ def request_mock(mocker):
 
 
 def test_plugin_title_maxlen(request_mock):
-    """
-    plugin title maxlen blending support
-
-    """
+    """Plugin title maxlen blending support."""
     # Load our configuration
     result, config = ConfigBase.config_parse_yaml(cleandoc("""
     urls:
@@ -87,18 +83,20 @@ def test_plugin_title_maxlen(request_mock):
     assert request_mock.call_count == 2
 
     details = request_mock.call_args_list[0]
-    assert details[0][0] == 'http://example.ca'
-    payload = loads(details[1]['data'])
-    assert payload['message'] == body
-    assert payload['title'] == "Hello World"
+    assert details[0][0] == "http://example.ca"
+    payload = loads(details[1]["data"])
+    assert payload["message"] == body
+    assert payload["title"] == "Hello World"
 
     details = request_mock.call_args_list[1]
-    assert details[0][0] == \
-        'https://api.telegram.org/bot123456789:' \
-        'AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage'
-    payload = loads(details[1]['data'])
+    assert (
+        details[0][0]
+        == "https://api.telegram.org/bot123456789:"
+        "AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage"
+    )
+    payload = loads(details[1]["data"])
     # HTML in Title is escaped
-    assert payload['text'] == "<b>Hello World</b>\r\nFoo Bar"
+    assert payload["text"] == "<b>Hello World</b>\r\nFoo Bar"
 
     # Reset our mock object
     request_mock.reset_mock()
@@ -131,16 +129,18 @@ def test_plugin_title_maxlen(request_mock):
     assert request_mock.call_count == 2
 
     details = request_mock.call_args_list[0]
-    assert details[0][0] == \
-        'https://api.telegram.org/bot123456789:' \
-        'AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage'
-    payload = loads(details[1]['data'])
+    assert (
+        details[0][0]
+        == "https://api.telegram.org/bot123456789:"
+        "AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage"
+    )
+    payload = loads(details[1]["data"])
 
     # HTML in Title is escaped
-    assert payload['text'] == "<b>Hello World</b>\r\nFoo Bar"
+    assert payload["text"] == "<b>Hello World</b>\r\nFoo Bar"
 
     details = request_mock.call_args_list[1]
-    assert details[0][0] == 'http://example.ca'
-    payload = loads(details[1]['data'])
-    assert payload['message'] == body
-    assert payload['title'] == "Hello World"
+    assert details[0][0] == "http://example.ca"
+    payload = loads(details[1]["data"])
+    assert payload["message"] == body
+    assert payload["title"] == "Hello World"

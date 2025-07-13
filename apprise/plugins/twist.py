@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -30,48 +29,47 @@
 # All of the documentation needed to work with the Twist API can be found
 # here: https://developer.twist.com/v3/
 
-import re
-import requests
-from json import loads
 from itertools import chain
+from json import loads
+import re
 
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyFormat
-from ..common import NotifyType
-from ..utils.parse import parse_list, is_email
+import requests
+
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
-
+from ..url import PrivacyMode
+from ..utils.parse import is_email, parse_list
+from .base import NotifyBase
 
 # A workspace can also be interpreted as a team name too!
 IS_CHANNEL = re.compile(
-    r'^#?(?P<name>((?P<workspace>[A-Za-z0-9_-]+):)?'
-    r'(?P<channel>[^\s]{1,64}))$')
+    r"^#?(?P<name>((?P<workspace>[A-Za-z0-9_-]+):)?"
+    r"(?P<channel>[^\s]{1,64}))$"
+)
 
 IS_CHANNEL_ID = re.compile(
-    r'^(?P<name>((?P<workspace>[0-9]+):)?(?P<channel>[0-9]+))$')
+    r"^(?P<name>((?P<workspace>[0-9]+):)?(?P<channel>[0-9]+))$"
+)
 
 # Used to break apart list of potential tags by their delimiter
 # into a usable list.
-LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
+LIST_DELIM = re.compile(r"[ \t\r\n,\\/]+")
 
 
 class NotifyTwist(NotifyBase):
-    """
-    A wrapper for Notify Twist Notifications
-    """
+    """A wrapper for Notify Twist Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Twist'
+    service_name = "Twist"
 
     # The services URL
-    service_url = 'https://twist.com'
+    service_url = "https://twist.com"
 
     # The default secure protocol
-    secure_protocol = 'twist'
+    secure_protocol = "twist"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_twist'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_twist"
 
     # The maximum size of the message
     body_maxlen = 1000
@@ -80,62 +78,66 @@ class NotifyTwist(NotifyBase):
     notify_format = NotifyFormat.MARKDOWN
 
     # The default Notification URL to use
-    api_url = 'https://api.twist.com/api/v3/'
+    api_url = "https://api.twist.com/api/v3/"
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
     request_rate_per_sec = 0.2
 
     # The default channel to notify if no targets are specified
-    default_notification_channel = 'general'
+    default_notification_channel = "general"
 
     # Define object templates
     templates = (
-        '{schema}://{password}:{email}',
-        '{schema}://{password}:{email}/{targets}',
+        "{schema}://{password}:{email}",
+        "{schema}://{password}:{email}/{targets}",
     )
 
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "email": {
+                "name": _("Email"),
+                "type": "string",
+                "required": True,
+            },
+            "target_channel": {
+                "name": _("Target Channel"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
+            "target_channel_id": {
+                "name": _("Target Channel ID"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'email': {
-            'name': _('Email'),
-            'type': 'string',
-            'required': True,
-        },
-        'target_channel': {
-            'name': _('Target Channel'),
-            'type': 'string',
-            'prefix': '#',
-            'map_to': 'targets',
-        },
-        'target_channel_id': {
-            'name': _('Target Channel ID'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
         },
-    })
+    )
 
     def __init__(self, email=None, targets=None, **kwargs):
-        """
-        Initialize Notify Twist Object
-        """
+        """Initialize Notify Twist Object."""
         super().__init__(**kwargs)
 
         # Initialize channels list
@@ -168,36 +170,31 @@ class NotifyTwist(NotifyBase):
         #          ...
         #     },
         #  }
-        self._cached_channels = dict()
+        self._cached_channels = {}
 
         # Initialize our Email Object
-        self.email = email if email else '{}@{}'.format(
-            self.user,
-            self.host,
-        )
+        self.email = email if email else f"{self.user}@{self.host}"
 
         # Check if it is valid
         result = is_email(self.email)
         if not result:
             # let outer exception handle this
-            msg = 'The Twist Auth email specified ({}) is invalid.'\
-                .format(self.email)
+            msg = f"The Twist Auth email specified ({self.email}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Re-assign email based on what was parsed
-        self.email = result['full_email']
+        self.email = result["full_email"]
         if email:
             # Force user/host to be that of the defined email for
             # consistency. This is very important for those initializing
             # this object with the the email object would could potentially
             # cause inconsistency to contents in the NotifyBase() object
-            self.user = result['user']
-            self.host = result['domain']
+            self.user = result["user"]
+            self.host = result["domain"]
 
         if not self.password:
-            msg = 'No Twist password was specified with account: {}'\
-                .format(self.email)
+            msg = f"No Twist password was specified with account: {self.email}"
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -206,80 +203,81 @@ class NotifyTwist(NotifyBase):
             result = IS_CHANNEL_ID.match(recipient)
             if result:
                 # store valid channel id
-                self.channel_ids.add(result.group('name'))
+                self.channel_ids.add(result.group("name"))
                 continue
 
             result = IS_CHANNEL.match(recipient)
             if result:
                 # store valid device
-                self.channels.add(result.group('name').lower())
+                self.channels.add(result.group("name").lower())
                 continue
 
             self.logger.warning(
-                'Dropped invalid channel/id '
-                '({}) specified.'.format(recipient),
+                f"Dropped invalid channel/id ({recipient}) specified.",
             )
 
         if len(self.channels) + len(self.channel_ids) == 0:
             # Notify our default channel
             self.channels.add(self.default_notification_channel)
             self.logger.warning(
-                'Added default notification channel {}'.format(
-                    self.default_notification_channel))
+                "Added default notification channel "
+                f"{self.default_notification_channel}"
+            )
         return
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host, self.port,
+            self.user,
+            self.password,
+            self.host,
+            self.port,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{password}:{user}@{host}/{targets}/' \
-            '?{params}'.format(
+        return (
+            "{schema}://{password}:{user}@{host}/{targets}/?{params}".format(
                 schema=self.secure_protocol,
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-                user=self.quote(self.user, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
+                user=self.quote(self.user, safe=""),
                 host=self.host,
-                targets='/'.join(
-                    [NotifyTwist.quote(x, safe='') for x in chain(
+                targets="/".join([
+                    NotifyTwist.quote(x, safe="")
+                    for x in chain(
                         # Channels are prefixed with a pound/hashtag symbol
-                        ['#{}'.format(x) for x in self.channels],
+                        [f"#{x}" for x in self.channels],
                         # Channel IDs
                         self.channel_ids,
-                    )]),
+                    )
+                ]),
                 params=NotifyTwist.urlencode(params),
             )
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.channels) + len(self.channel_ids)
 
     def login(self):
-        """
-        A simple wrapper to authenticate with the Twist Server
-        """
+        """A simple wrapper to authenticate with the Twist Server."""
 
         # Prepare our payload
         payload = {
-            'email': self.email,
-            'password': self.password,
+            "email": self.email,
+            "password": self.password,
         }
 
         # Reset our default workspace
@@ -287,11 +285,11 @@ class NotifyTwist(NotifyBase):
 
         # Reset our cached objects
         self._cached_workspaces = set()
-        self._cached_channels = dict()
+        self._cached_channels = {}
 
         # Send Login Information
         postokay, response = self._fetch(
-            'users/login',
+            "users/login",
             payload=payload,
             # We set this boolean so internal recursion doesn't take place.
             login=True,
@@ -355,25 +353,23 @@ class NotifyTwist(NotifyBase):
         # }
 
         # Store our default workspace
-        self.default_workspace = response.get('default_workspace')
+        self.default_workspace = response.get("default_workspace")
 
         # Acquire our token
-        self.token = response.get('token')
+        self.token = response.get("token")
 
-        self.logger.info('Authenticated to Twist as {}'.format(self.email))
+        self.logger.info(f"Authenticated to Twist as {self.email}")
         return True
 
     def logout(self):
-        """
-        A simple wrapper to log out of the server
-        """
+        """A simple wrapper to log out of the server."""
 
         if not self.token:
             # Nothing more to do
             return True
 
         # Send Logout Message
-        postokay, response = self._fetch('users/logout')
+        postokay, response = self._fetch("users/logout")
 
         # reset our token
         self.token = None
@@ -382,8 +378,7 @@ class NotifyTwist(NotifyBase):
         return True
 
     def get_workspaces(self):
-        """
-        Returns all workspaces associated with this user account as a set
+        """Returns all workspaces associated with this user account as a set.
 
         This returned object is either an empty dictionary or one that
         looks like this:
@@ -397,12 +392,12 @@ class NotifyTwist(NotifyBase):
         """
         if not self.token and not self.login():
             # Nothing more to do
-            return dict()
+            return {}
 
-        postokay, response = self._fetch('workspaces/get')
+        postokay, response = self._fetch("workspaces/get")
         if not postokay or not response:
             # We failed to retrieve
-            return dict()
+            return {}
 
         # The response object looks like so:
         #   [
@@ -422,13 +417,12 @@ class NotifyTwist(NotifyBase):
         # object
         result = {}
         for entry in response:
-            result[entry.get('name', '').lower()] = entry.get('id', '')
+            result[entry.get("name", "").lower()] = entry.get("id", "")
 
         return result
 
     def get_channels(self, wid):
-        """
-        Simply returns the channel objects associated with the specified
+        """Simply returns the channel objects associated with the specified
         workspace id.
 
         This returned object is either an empty dictionary or one that
@@ -445,9 +439,8 @@ class NotifyTwist(NotifyBase):
             # Nothing more to do
             return {}
 
-        payload = {'workspace_id': wid}
-        postokay, response = self._fetch(
-            'channels/get', payload=payload)
+        payload = {"workspace_id": wid}
+        postokay, response = self._fetch("channels/get", payload=payload)
 
         if not postokay or not isinstance(response, list):
             # We failed to retrieve
@@ -475,18 +468,17 @@ class NotifyTwist(NotifyBase):
         # object
         result = {}
         for entry in response:
-            result[entry.get('name', '').lower()] = entry.get('id', '')
+            result[entry.get("name", "").lower()] = entry.get("id", "")
 
         return result
 
     def _channel_migration(self):
-        """
-        A simple wrapper to get all of the current workspaces including
-        the default one.  This plays a role in what channel(s) get notified
-        and where.
+        """A simple wrapper to get all of the current workspaces including the
+        default one.  This plays a role in what channel(s) get notified and
+        where.
 
-        A cache lookup has overhead, and is only required to be preformed
-        if the user specified channels by their string value
+        A cache lookup has overhead, and is only required to be preformed if
+        the user specified channels by their string value
         """
 
         if not self.token and not self.login():
@@ -497,11 +489,14 @@ class NotifyTwist(NotifyBase):
             # Nothing to do; take an early exit
             return True
 
-        if self.default_workspace \
-                and self.default_workspace not in self._cached_channels:
+        if (
+            self.default_workspace
+            and self.default_workspace not in self._cached_channels
+        ):
             # Get our default workspace entries
-            self._cached_channels[self.default_workspace] = \
-                self.get_channels(self.default_workspace)
+            self._cached_channels[self.default_workspace] = self.get_channels(
+                self.default_workspace
+            )
 
         # initialize our error tracking
         has_error = False
@@ -511,8 +506,8 @@ class NotifyTwist(NotifyBase):
             result = IS_CHANNEL.match(self.channels.pop())
 
             # Populate our key variables
-            workspace = result.group('workspace')
-            channel = result.group('channel').lower()
+            workspace = result.group("workspace")
+            channel = result.group("channel").lower()
 
             # Acquire our workspace_id if we can
             if workspace:
@@ -527,8 +522,9 @@ class NotifyTwist(NotifyBase):
                 if workspace not in self._cached_workspaces:
                     # not found
                     self.logger.warning(
-                        'The Twist User {} is not associated with the '
-                        'Team {}'.format(self.email, workspace))
+                        f"The Twist User {self.email} is not associated "
+                        f"with the Team {workspace}"
+                    )
 
                     # Toggle our return flag
                     has_error = True
@@ -542,22 +538,24 @@ class NotifyTwist(NotifyBase):
                 workspace_id = self.default_workspace
 
             # Check to see if our channel exists in our default workspace
-            if workspace_id in self._cached_channels \
-                    and channel in self._cached_channels[workspace_id]:
+            if (
+                workspace_id in self._cached_channels
+                and channel in self._cached_channels[workspace_id]
+            ):
                 # Store our channel ID
-                self.channel_ids.add('{}:{}'.format(
-                    workspace_id,
-                    self._cached_channels[workspace_id][channel],
-                ))
+                self.channel_ids.add(
+                    f"{workspace_id}"
+                    f":{self._cached_channels[workspace_id][channel]}"
+                )
                 continue
 
             # if we reach here, we failed to add our channel
             self.logger.warning(
-                'The Channel #{} was not found{}.'.format(
+                "The Channel #{} was not found{}.".format(
                     channel,
-                    '' if not workspace
-                    else ' with Team {}'.format(workspace),
-                ))
+                    "" if not workspace else f" with Team {workspace}",
+                )
+            )
 
             # Toggle our return flag
             has_error = True
@@ -566,10 +564,8 @@ class NotifyTwist(NotifyBase):
         # There is no need to handling failed log out attempts at this time
         return not has_error
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Twist Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Twist Notification."""
 
         # error tracking (used for function return)
         has_error = False
@@ -585,7 +581,7 @@ class NotifyTwist(NotifyBase):
 
         if not len(self.channel_ids):
             # We have nothing to notify
-            self.logger.warning('There are no Twist targets to notify')
+            self.logger.warning("There are no Twist targets to notify")
             return False
 
         # Notify all of our identified channels
@@ -595,17 +591,17 @@ class NotifyTwist(NotifyBase):
             result = IS_CHANNEL_ID.match(ids.pop())
 
             # We need both the workspace/team id and channel id
-            channel_id = int(result.group('channel'))
+            channel_id = int(result.group("channel"))
 
             # Prepare our payload
             payload = {
-                'channel_id': channel_id,
-                'title': title,
-                'content': body,
+                "channel_id": channel_id,
+                "title": title,
+                "content": body,
             }
 
             postokay, response = self._fetch(
-                'threads/add',
+                "threads/add",
                 payload=payload,
             )
 
@@ -617,35 +613,36 @@ class NotifyTwist(NotifyBase):
 
             # If we reach here, we were successful
             self.logger.info(
-                'Sent Twist notification to {}.'.format(
-                    result.group('name')))
+                "Sent Twist notification to {}.".format(result.group("name"))
+            )
 
         return not has_error
 
-    def _fetch(self, url, payload=None, method='POST', login=False):
-        """
-        Wrapper to Twist API requests object
-        """
+    def _fetch(self, url, payload=None, method="POST", login=False):
+        """Wrapper to Twist API requests object."""
 
         # use what was specified, otherwise build headers dynamically
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
-        headers['Content-Type'] = \
-            'application/x-www-form-urlencoded; charset=utf-8'
+        headers["Content-Type"] = (
+            "application/x-www-form-urlencoded; charset=utf-8"
+        )
 
         if self.token:
             # Set our token
-            headers['Authorization'] = 'Bearer {}'.format(self.token)
+            headers["Authorization"] = f"Bearer {self.token}"
 
         # Prepare our api url
-        api_url = '{}{}'.format(self.api_url, url)
+        api_url = f"{self.api_url}{url}"
 
         # Some Debug Logging
-        self.logger.debug('Twist {} URL: {} (cert_verify={})'.format(
-            method, api_url, self.verify_certificate))
-        self.logger.debug('Twist Payload: %s' % str(payload))
+        self.logger.debug(
+            f"Twist {method} URL: {api_url} "
+            f"(cert_verify={self.verify_certificate})"
+        )
+        self.logger.debug(f"Twist Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made;
         self.throttle()
@@ -654,7 +651,7 @@ class NotifyTwist(NotifyBase):
         content = {}
 
         # acquire our request mode
-        fn = requests.post if method == 'POST' else requests.get
+        fn = requests.post if method == "POST" else requests.get
         try:
             r = fn(
                 api_url,
@@ -691,54 +688,57 @@ class NotifyTwist(NotifyBase):
             #
             #  We attempt to login again and retry the original request
             #  if we aren't in the process of handling a login already
-            if r.status_code != requests.codes.ok and login is False \
-                    and isinstance(content, dict) and \
-                    content.get('error_code') in (120, 200):
-                # We failed to authenticate with our token; login one more
-                # time and retry this original request
-                if self.login():
-                    r = fn(
-                        api_url,
-                        data=payload,
-                        headers=headers,
-                        verify=self.verify_certificate,
-                        timeout=self.request_timeout
-                    )
+            if (
+                r.status_code != requests.codes.ok
+                and login is False
+                and isinstance(content, dict)
+                and content.get("error_code") in (120, 200)
+                and self.login()
+            ):
 
-                    # Get our JSON content if it's possible
-                    try:
-                        content = loads(r.content)
+                r = fn(
+                    api_url,
+                    data=payload,
+                    headers=headers,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                )
 
-                    except (TypeError, ValueError, AttributeError):
-                        # TypeError = r.content is not a String
-                        # ValueError = r.content is Unparsable
-                        # AttributeError = r.content is None
-                        content = {}
+                # Get our JSON content if it's possible
+                try:
+                    content = loads(r.content)
+
+                except (TypeError, ValueError, AttributeError):
+                    # TypeError = r.content is not a String
+                    # ValueError = r.content is Unparsable
+                    # AttributeError = r.content is None
+                    content = {}
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyTwist.http_response_code_lookup(r.status_code)
+                status_str = NotifyTwist.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Twist {} to {}: '
-                    '{}error={}.'.format(
+                    "Failed to send Twist {} to {}: {}error={}.".format(
                         method,
                         api_url,
-                        ', ' if status_str else '',
-                        r.status_code))
+                        ", " if status_str else "",
+                        r.status_code,
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Mark our failure
                 return (False, content)
 
         except requests.RequestException as e:
             self.logger.warning(
-                'Exception received when sending Twist {} to {}: '.
-                format(method, api_url))
-            self.logger.debug('Socket Exception: %s' % str(e))
+                f"Exception received when sending Twist {method} to {api_url}"
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Mark our failure
             return (False, content)
@@ -747,27 +747,24 @@ class NotifyTwist(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        if not results.get('user'):
+        if not results.get("user"):
             # A username is required
             return None
 
         # Acquire our targets
-        results['targets'] = NotifyTwist.split_path(results['fullpath'])
+        results["targets"] = NotifyTwist.split_path(results["fullpath"])
 
-        if not results.get('password'):
+        if not results.get("password"):
             # Password is required; we will accept the very first entry on the
             # path as a password instead
-            if len(results['targets']) == 0:
+            if len(results["targets"]) == 0:
                 # No targets to get our password from
                 return None
 
@@ -775,8 +772,9 @@ class NotifyTwist(NotifyBase):
             # unquoted later on in the process.  This step appears a bit
             # hacky, but it allows us to support the password in this location
             #   - twist://user@example.com/password
-            results['password'] = NotifyTwist.quote(
-                results['targets'].pop(0), safe='')
+            results["password"] = NotifyTwist.quote(
+                results["targets"].pop(0), safe=""
+            )
 
         else:
             # Now we handle our format:
@@ -795,61 +793,16 @@ class NotifyTwist(NotifyBase):
             # For the purpose of apprise simplifying this for us, we need to
             # swap these arguments when we prepare the email.
 
-            _password = results['user']
-            results['user'] = results['password']
-            results['password'] = _password
+            _password = results["user"]
+            results["user"] = results["password"]
+            results["password"] = _password
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyTwist.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyTwist.parse_list(results["qsd"]["to"])
 
         return results
 
     def __del__(self):
-        """
-        Destructor
-        """
-        try:
-            self.logout()
-
-        except LookupError:  # pragma: no cover
-            # Python v3.5 call to requests can sometimes throw the exception
-            #   "/usr/lib64/python3.7/socket.py", line 748, in getaddrinfo
-            #   LookupError: unknown encoding: idna
-            #
-            # This occurs every time when running unit-tests against Apprise:
-            # LANG=C.UTF-8 PYTHONPATH=$(pwd) py.test-3.7
-            #
-            # There has been an open issue on this since Jan 2017.
-            #   - https://bugs.python.org/issue29288
-            #
-            # A ~similar~ issue can be identified here in the requests
-            # ticket system as unresolved and has provided work-arounds
-            #   - https://github.com/kennethreitz/requests/issues/3578
-            pass
-
-        except ImportError:  # pragma: no cover
-            # The actual exception is `ModuleNotFoundError` however ImportError
-            # grants us backwards compatibility with versions of Python older
-            # than v3.6
-
-            # Python code that makes early calls to sys.exit() can cause
-            # the __del__() code to run. However, in some newer versions of
-            # Python, this causes the `sys` library to no longer be
-            # available. The stack overflow also goes on to suggest that
-            # it's not wise to use the __del__() as a destructor
-            # which is the case here.
-
-            # https://stackoverflow.com/questions/67218341/\
-            #       modulenotfounderror-import-of-time-halted-none-in-sys-\
-            #           modules-occured-when-obj?noredirect=1&lq=1
-            #
-            #
-            # Also see: https://stackoverflow.com/questions\
-            #       /1481488/what-is-the-del-method-and-how-do-i-call-it
-
-            # At this time it seems clean to try to log out (if we can)
-            # but not throw any unnecessary exceptions (like this one) to
-            # the end user if we don't have to.
-            pass
+        """Destructor."""
+        self.logout()

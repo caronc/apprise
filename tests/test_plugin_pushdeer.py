@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,90 +25,109 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from unittest import mock
-
-import requests
-from apprise import Apprise
-from apprise.plugins.pushdeer import NotifyPushDeer
-from helpers import AppriseURLTester
-
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
+
+from helpers import AppriseURLTester
+import requests
+
+from apprise import Apprise
+from apprise.plugins.pushdeer import NotifyPushDeer
+
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('pushdeer://', {
-        'instance': TypeError,
-    }),
-    ('pushdeers://', {
-        'instance': TypeError,
-    }),
-    ('pushdeer://localhost/{}'.format('a' * 8), {
-        'instance': NotifyPushDeer,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushdeer://localhost/{}'.format('a' * 8), {
-        'instance': NotifyPushDeer,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-    ('pushdeer://localhost:80/{}'.format('a' * 8), {
-        'instance': NotifyPushDeer,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushdeer://localhost:80/{}'.format('a' * 8), {
-        'instance': NotifyPushDeer,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-    ('pushdeer://{}'.format('a' * 8), {
-        'instance': NotifyPushDeer,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('pushdeer://{}'.format('a' * 8), {
-        'instance': NotifyPushDeer,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "pushdeer://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "pushdeers://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "pushdeer://localhost/{}".format("a" * 8),
+        {
+            "instance": NotifyPushDeer,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushdeer://localhost/{}".format("a" * 8),
+        {
+            "instance": NotifyPushDeer,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        "pushdeer://localhost:80/{}".format("a" * 8),
+        {
+            "instance": NotifyPushDeer,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushdeer://localhost:80/{}".format("a" * 8),
+        {
+            "instance": NotifyPushDeer,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        "pushdeer://{}".format("a" * 8),
+        {
+            "instance": NotifyPushDeer,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "pushdeer://{}".format("a" * 8),
+        {
+            "instance": NotifyPushDeer,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_pushdeer_urls():
-    """
-    NotifyPushDeer() Apprise URLs
-
-    """
+    """NotifyPushDeer() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_pushdeer_general(mock_post):
-    """
-    NotifyPushDeer() General Checks
-
-    """
+    """NotifyPushDeer() General Checks."""
 
     response = mock.Mock()
-    response.content = ''
+    response.content = ""
     response.status_code = requests.codes.ok
 
     # Prepare Mock
     mock_post.return_value = response
 
     # Variation Initializations
-    obj = Apprise.instantiate('pushdeer://localhost/pushKey')
+    obj = Apprise.instantiate("pushdeer://localhost/pushKey")
     assert isinstance(obj, NotifyPushDeer)
     assert isinstance(obj.url(), str)
 
@@ -117,5 +135,7 @@ def test_plugin_pushdeer_general(mock_post):
     assert obj.send(body="test") is True
 
     assert mock_post.call_count == 1
-    assert mock_post.call_args_list[0][0][0] == \
-        'http://localhost:80/message/push?pushkey=pushKey'
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "http://localhost:80/message/push?pushkey=pushKey"
+    )

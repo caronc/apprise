@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -35,7 +34,8 @@
 #
 import os
 import re
-from setuptools import setup, find_packages
+
+from setuptools import find_packages, setup
 
 
 def read_version() -> str:
@@ -54,24 +54,22 @@ def read_version() -> str:
 setup(
     name="apprise",
     version=read_version(),
-    packages=find_packages(
-        exclude=["tests*", "packaging*"]
-    ),
+    packages=find_packages(exclude=["tests*", "packaging*"]),
     entry_points={
-        'console_scripts': [
-            'apprise = apprise.cli:main',
+        "console_scripts": [
+            "apprise = apprise.cli:main",
         ],
     },
     package_data={
-        'apprise': [
-            'assets/NotifyXML-*.xsd',
-            'assets/themes/default/*.png',
-            'assets/themes/default/*.ico',
-            'i18n/*.py',
-            'i18n/*/LC_MESSAGES/*.mo',
-            'py.typed',
-            '*.pyi',
-            '*/*.pyi'
+        "apprise": [
+            "assets/NotifyXML-*.xsd",
+            "assets/themes/default/*.png",
+            "assets/themes/default/*.ico",
+            "i18n/*.py",
+            "i18n/*/LC_MESSAGES/*.mo",
+            "py.typed",
+            "*.pyi",
+            "*/*.pyi",
         ],
     },
 )

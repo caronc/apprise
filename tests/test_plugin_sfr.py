@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,15 +25,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from unittest import mock
-import pytest
-import requests
 import json
-from apprise.plugins.sfr import NotifySFR
-from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
+
+from helpers import AppriseURLTester
+import pytest
+import requests
+
+from apprise.plugins.sfr import NotifySFR
+
 logging.disable(logging.CRITICAL)
 
 SFR_GOOD_RESPONSE = json.dumps({
@@ -43,135 +45,186 @@ SFR_GOOD_RESPONSE = json.dumps({
 })
 
 SFR_BAD_RESPONSE = json.dumps({
-    'success': False,
-    'errorCode': 'THIS_IS_AN_ERROR',
-    'errorDetail': 'Appel api en erreur',
-    'fatal': True,
-    'invalidParams': True,
+    "success": False,
+    "errorCode": "THIS_IS_AN_ERROR",
+    "errorDetail": "Appel api en erreur",
+    "fatal": True,
+    "invalidParams": True,
 })
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('sfr://', {
-        # No host specified
-        'instance': TypeError,
-    }),
-    ('sfr://:@/', {
-        # Invalid host
-        'instance': TypeError,
-    }),
-    ('sfr://:service_password', {
-        # No user specified
-        'instance': TypeError,
-    }),
-    ('sfr://testing:serv@ice_password', {
-        # Invalid Password
-        'instance': TypeError,
-    }),
-    ('sfr://testing:service_password@/5555555555', {
-        # No spaceId provided
-        'instance': TypeError,
-    }),
-    ('sfr://testing:service_password@12345/', {
-        # No target provided
-        'instance': TypeError,
-    }),
-    ('sfr://:service_password@12345/{}'.format(3 * 13), {
-        # No host but everything else provided
-        'instance': TypeError,
-    }),
-    ('sfr://:service_password@space_id/targets?media=TEST', {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:', {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:@', {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:@{}'.format(
-        '0' * 3), {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:@{}/'.format(
-        '0' * 3), {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:@{}/targets'.format(
-        '0' * 3), {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:@{}/targets?media=TEST'.format(
-        '0' * 3), {
-        'instance': TypeError,
-    }),
-    ('sfr://service_id:service_password@{}/{}?from=MyApp&timeout=30'.format(
-        '0' * 3, '0' * 10), {
-        # a valid group
-        'instance': NotifySFR,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': (
-            'sfr://service_id:****@0...0/0000000000?'
-            'from=MyApp&timeout=30&voice=claire08s&'
-            'lang=fr_FR&media=SMSUnicode'),
-        # Our response expected server response
-        'requests_response_text': SFR_GOOD_RESPONSE,
-    }),
-    ('sfr://service_id:service_password@{}/{}?voice=laura8k&lang=en_US'.format(
-        '0' * 3, '0' * 10), {
-        # a valid group
-        'instance': NotifySFR,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': (
-            'sfr://service_id:****@0...0/0000000000?'
-            'from=&timeout=2880&voice=laura8k&'
-            'lang=en_US&media=SMSUnicode'),
-        # Our response expected server response
-        'requests_response_text': SFR_GOOD_RESPONSE,
-    }),
-    ('sfr://service_id:service_password@{}/{}?media=SMS'.format(
-        '0' * 3, '0' * 10), {
-        # a valid group
-        'instance': NotifySFR,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': (
-            'sfr://service_id:****@0...0/0000000000?'
-            'from=&timeout=2880&voice=claire08s&'
-            'lang=fr_FR&media=SMS'),
-        # Our response expected server response
-        'requests_response_text': SFR_GOOD_RESPONSE,
-    }),
-    ('sfr://service_id:service_password@{}/{}'.format(
-        '0' * 3, '0' * 10), {
-        # Test case where we get a bad response
-        'instance': NotifySFR,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': (
-            'sfr://service_id:****@0...0/0000000000?'
-            'from=&timeout=2880&voice=claire08s&'
-            'lang=fr_FR&media=SMSUnicode'),
-        # Our failed notification expected server response
-        'requests_response_text': SFR_BAD_RESPONSE,
-        'requests_response_code': requests.codes.ok,
-        # as a result, we expect a failed notification
-        'response': False,
-    }),
+    (
+        "sfr://",
+        {
+            # No host specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://:@/",
+        {
+            # Invalid host
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://:service_password",
+        {
+            # No user specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://testing:serv@ice_password",
+        {
+            # Invalid Password
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://testing:service_password@/5555555555",
+        {
+            # No spaceId provided
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://testing:service_password@12345/",
+        {
+            # No target provided
+            "instance": TypeError,
+        },
+    ),
+    (
+        f"sfr://:service_password@12345/{3 * 13}",
+        {
+            # No host but everything else provided
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://:service_password@space_id/targets?media=TEST",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:@",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:@{}".format("0" * 3),
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:@{}/".format("0" * 3),
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:@{}/targets".format("0" * 3),
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:@{}/targets?media=TEST".format("0" * 3),
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "sfr://service_id:service_password@{}/{}?from=MyApp&timeout=30".format(
+            "0" * 3, "0" * 10
+        ),
+        {
+            # a valid group
+            "instance": NotifySFR,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": (
+                "sfr://service_id:****@0...0/0000000000?"
+                "from=MyApp&timeout=30&voice=claire08s&"
+                "lang=fr_FR&media=SMSUnicode"
+            ),
+            # Our response expected server response
+            "requests_response_text": SFR_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "sfr://service_id:service_password@{}/{}?voice=laura8k&lang=en_US"
+        .format("0" * 3, "0" * 10),
+        {
+            # a valid group
+            "instance": NotifySFR,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": (
+                "sfr://service_id:****@0...0/0000000000?"
+                "from=&timeout=2880&voice=laura8k&"
+                "lang=en_US&media=SMSUnicode"
+            ),
+            # Our response expected server response
+            "requests_response_text": SFR_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "sfr://service_id:service_password@{}/{}?media=SMS".format(
+            "0" * 3, "0" * 10
+        ),
+        {
+            # a valid group
+            "instance": NotifySFR,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": (
+                "sfr://service_id:****@0...0/0000000000?"
+                "from=&timeout=2880&voice=claire08s&"
+                "lang=fr_FR&media=SMS"
+            ),
+            # Our response expected server response
+            "requests_response_text": SFR_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "sfr://service_id:service_password@{}/{}".format("0" * 3, "0" * 10),
+        {
+            # Test case where we get a bad response
+            "instance": NotifySFR,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": (
+                "sfr://service_id:****@0...0/0000000000?"
+                "from=&timeout=2880&voice=claire08s&"
+                "lang=fr_FR&media=SMSUnicode"
+            ),
+            # Our failed notification expected server response
+            "requests_response_text": SFR_BAD_RESPONSE,
+            "requests_response_code": requests.codes.ok,
+            # as a result, we expect a failed notification
+            "response": False,
+        },
+    ),
 )
 
 
 def test_plugin_sfr_urls():
-    """
-    NotifySFR() Apprise URLs
-    """
+    """NotifySFR() Apprise URLs."""
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_notification_ok(mock_post):
-    """
-    NotifySFR() Notifications Ok response
-    """
+    """NotifySFR() Notifications Ok response."""
     # Prepare Mock
     # Create a mock response object
     response = mock.Mock()
@@ -181,25 +234,26 @@ def test_plugin_sfr_notification_ok(mock_post):
 
     # Test our URL parsing
     results = NotifySFR.parse_url(
-        'sfr://srv:pwd@{}/{}?media=SMSLong'.format('1' * 8, '0' * 10))
+        "sfr://srv:pwd@{}/{}?media=SMSLong".format("1" * 8, "0" * 10)
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == 'srv'
-    assert results['password'] == 'pwd'
-    assert results['space_id'] == '11111111'
-    assert results['targets'] == ['0000000000']
-    assert results['media'] == 'SMSLong'
-    assert results['timeout'] == ''
-    assert results['voice'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == ''
+    assert results["user"] == "srv"
+    assert results["password"] == "pwd"
+    assert results["space_id"] == "11111111"
+    assert results["targets"] == ["0000000000"]
+    assert results["media"] == "SMSLong"
+    assert results["timeout"] == ""
+    assert results["voice"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == ""
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 1
-    assert instance.lang == 'fr_FR'
-    assert instance.lang == 'fr_FR'
-    assert instance.sender == ''
+    assert instance.lang == "fr_FR"
+    assert instance.lang == "fr_FR"
+    assert instance.sender == ""
     assert isinstance(instance.targets, list)
     assert isinstance(instance.timeout, int)
     assert isinstance(instance.voice, str)
@@ -210,11 +264,9 @@ def test_plugin_sfr_notification_ok(mock_post):
     assert mock_post.call_count == 1
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_notification_multiple_targets_ok(mock_post):
-    """
-    NotifySFR() Notifications ko response
-    """
+    """NotifySFR() Notifications ko response."""
     # Reset our object
     mock_post.reset_mock()
     # Prepare Mock
@@ -226,29 +278,31 @@ def test_plugin_sfr_notification_multiple_targets_ok(mock_post):
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:other_fjv&8password@{}/?to={},{}&from=MyCustomUser'.format(
-            '4' * 6, '1' * 8, '6' * 10, '8' * 10))
+        "sfr://{}:other_fjv&8password@{}/?to={},{}&from=MyCustomUser".format(
+            "4" * 6, "1" * 8, "6" * 10, "8" * 10
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '444444'
-    assert results['password'] == 'other_fjv&8password'
-    assert results['space_id'] == '11111111'
-    assert results['targets'] == ['6666666666', '8888888888']
-    assert results['media'] == ''
-    assert results['timeout'] == ''
-    assert results['voice'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == 'MyCustomUser'
+    assert results["user"] == "444444"
+    assert results["password"] == "other_fjv&8password"
+    assert results["space_id"] == "11111111"
+    assert results["targets"] == ["6666666666", "8888888888"]
+    assert results["media"] == ""
+    assert results["timeout"] == ""
+    assert results["voice"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == "MyCustomUser"
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 2
-    assert instance.lang == 'fr_FR'
-    assert instance.sender == 'MyCustomUser'
-    assert instance.media == 'SMSUnicode'
+    assert instance.lang == "fr_FR"
+    assert instance.sender == "MyCustomUser"
+    assert instance.media == "SMSUnicode"
     assert isinstance(instance.targets, list)
     assert instance.timeout == 2880
-    assert instance.voice == 'claire08s'
+    assert instance.voice == "claire08s"
     assert isinstance(instance.space_id, str)
 
     response = instance.send(body="test")
@@ -256,11 +310,9 @@ def test_plugin_sfr_notification_multiple_targets_ok(mock_post):
     assert mock_post.call_count == 2
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_notification_ko(mock_post):
-    """
-    NotifySFR() Notifications ko response
-    """
+    """NotifySFR() Notifications ko response."""
     # Reset our object
     mock_post.reset_mock()
     # Prepare Mock
@@ -272,29 +324,31 @@ def test_plugin_sfr_notification_ko(mock_post):
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:other_fjv&8password@{}/{}?timeout=30&media=SMS'.format(
-            '4' * 6, '1' * 8, '2' * 10))
+        "sfr://{}:other_fjv&8password@{}/{}?timeout=30&media=SMS".format(
+            "4" * 6, "1" * 8, "2" * 10
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '444444'
-    assert results['password'] == 'other_fjv&8password'
-    assert results['space_id'] == '11111111'
-    assert results['media'] == 'SMS'
-    assert results['targets'] == ['2222222222']
-    assert results['timeout'] == '30'
-    assert results['voice'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == ''
+    assert results["user"] == "444444"
+    assert results["password"] == "other_fjv&8password"
+    assert results["space_id"] == "11111111"
+    assert results["media"] == "SMS"
+    assert results["targets"] == ["2222222222"]
+    assert results["timeout"] == "30"
+    assert results["voice"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == ""
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 1
-    assert instance.lang == 'fr_FR'
-    assert instance.sender == ''
-    assert instance.media == 'SMS'
+    assert instance.lang == "fr_FR"
+    assert instance.sender == ""
+    assert instance.media == "SMS"
     assert isinstance(instance.targets, list)
     assert instance.timeout == 30
-    assert instance.voice == 'claire08s'
+    assert instance.voice == "claire08s"
     assert isinstance(instance.space_id, str)
 
     response = instance.send(body="test")
@@ -302,11 +356,9 @@ def test_plugin_sfr_notification_ko(mock_post):
     assert mock_post.call_count == 1
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_notification_multiple_targets_all_ko(mock_post):
-    """
-    NotifySFR() Notifications ko response
-    """
+    """NotifySFR() Notifications ko response."""
     # Reset our object
     mock_post.reset_mock()
     # Prepare Mock
@@ -318,30 +370,30 @@ def test_plugin_sfr_notification_multiple_targets_all_ko(mock_post):
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:other_fjv&8password@{}/?to={},{}&voice=laura8k'.format(
-            '4' * 6, '1' * 8, '6' * 4, '8' * 4))
+        "sfr://{}:other_fjv&8password@{}/?to={},{}&voice=laura8k".format(
+            "4" * 6, "1" * 8, "6" * 4, "8" * 4
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '444444'
-    assert results['password'] == 'other_fjv&8password'
-    assert results['space_id'] == '11111111'
-    assert results['targets'] == ['6666', '8888']
-    assert results['voice'] == 'laura8k'
-    assert results['media'] == ''
-    assert results['timeout'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == ''
+    assert results["user"] == "444444"
+    assert results["password"] == "other_fjv&8password"
+    assert results["space_id"] == "11111111"
+    assert results["targets"] == ["6666", "8888"]
+    assert results["voice"] == "laura8k"
+    assert results["media"] == ""
+    assert results["timeout"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == ""
 
     # No valid phone number provided
     with pytest.raises(TypeError):
         NotifySFR(**results)
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_notification_multiple_targets_one_ko(mock_post):
-    """
-    NotifySFR() Notifications ko response
-    """
+    """NotifySFR() Notifications ko response."""
     # Reset our object
     mock_post.reset_mock()
     # Prepare Mock
@@ -353,29 +405,31 @@ def test_plugin_sfr_notification_multiple_targets_one_ko(mock_post):
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:&pass@{}/?to={},{}&media=SMSUnicodeLong&lang=en_US'.format(
-            '4' * 6, '1' * 8, '6' * 10, '8' * 4))
+        "sfr://{}:&pass@{}/?to={},{}&media=SMSUnicodeLong&lang=en_US".format(
+            "4" * 6, "1" * 8, "6" * 10, "8" * 4
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '444444'
-    assert results['password'] == '&pass'
-    assert results['space_id'] == '11111111'
-    assert results['targets'] == ['6666666666', '8888']
-    assert results['voice'] == ''
-    assert results['media'] == 'SMSUnicodeLong'
-    assert results['timeout'] == ''
-    assert results['lang'] == 'en_US'
-    assert results['sender'] == ''
+    assert results["user"] == "444444"
+    assert results["password"] == "&pass"
+    assert results["space_id"] == "11111111"
+    assert results["targets"] == ["6666666666", "8888"]
+    assert results["voice"] == ""
+    assert results["media"] == "SMSUnicodeLong"
+    assert results["timeout"] == ""
+    assert results["lang"] == "en_US"
+    assert results["sender"] == ""
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 1
-    assert instance.lang == 'en_US'
-    assert instance.sender == ''
-    assert instance.media == 'SMSUnicodeLong'
+    assert instance.lang == "en_US"
+    assert instance.sender == ""
+    assert instance.media == "SMSUnicodeLong"
     assert isinstance(instance.targets, list)
     assert instance.timeout == 2880
-    assert instance.voice == 'claire08s'
+    assert instance.voice == "claire08s"
     assert isinstance(instance.space_id, str)
 
     # One phone number failed to be parsed, therefore notify fails
@@ -384,11 +438,9 @@ def test_plugin_sfr_notification_multiple_targets_one_ko(mock_post):
     assert mock_post.call_count == 1
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_notification_exceptions(mock_post):
-    """
-    NotifySFR() Notifications exceptions
-    """
+    """NotifySFR() Notifications exceptions."""
     mock_post.reset_mock()
     # Prepare Mock
     # Create a mock response object
@@ -399,28 +451,30 @@ def test_plugin_sfr_notification_exceptions(mock_post):
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:str0*fn_ppw0rd@{}/{}'.format(
-            "404ghwo89144", '9993384', '0959290404'))
+        "sfr://{}:str0*fn_ppw0rd@{}/{}".format(
+            "404ghwo89144", "9993384", "0959290404"
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '404ghwo89144'
-    assert results['password'] == 'str0*fn_ppw0rd'
-    assert results['space_id'] == '9993384'
-    assert results['targets'] == ['0959290404']
-    assert results['media'] == ''
-    assert results['timeout'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == ''
+    assert results["user"] == "404ghwo89144"
+    assert results["password"] == "str0*fn_ppw0rd"
+    assert results["space_id"] == "9993384"
+    assert results["targets"] == ["0959290404"]
+    assert results["media"] == ""
+    assert results["timeout"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == ""
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 1
-    assert instance.lang == 'fr_FR'
-    assert instance.sender == ''
-    assert instance.media == 'SMSUnicode'
+    assert instance.lang == "fr_FR"
+    assert instance.sender == ""
+    assert instance.media == "SMSUnicode"
     assert isinstance(instance.targets, list)
     assert instance.timeout == 2880
-    assert instance.voice == 'claire08s'
+    assert instance.voice == "claire08s"
     assert isinstance(instance.space_id, str)
 
     response = instance.send(body="test")
@@ -432,33 +486,35 @@ def test_plugin_sfr_notification_exceptions(mock_post):
     mock_post.reset_mock()
     response = mock.Mock()
     response.status_code = requests.codes.ok
-    response.content = b'Invalid JSON Content'
+    response.content = b"Invalid JSON Content"
     mock_post.return_value = response
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:str0*fn_ppw0rd@{}/{}'.format(
-            "404ghwo89144", '9993384', '0959290404'))
+        "sfr://{}:str0*fn_ppw0rd@{}/{}".format(
+            "404ghwo89144", "9993384", "0959290404"
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '404ghwo89144'
-    assert results['password'] == 'str0*fn_ppw0rd'
-    assert results['space_id'] == '9993384'
-    assert results['targets'] == ['0959290404']
-    assert results['media'] == ''
-    assert results['timeout'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == ''
+    assert results["user"] == "404ghwo89144"
+    assert results["password"] == "str0*fn_ppw0rd"
+    assert results["space_id"] == "9993384"
+    assert results["targets"] == ["0959290404"]
+    assert results["media"] == ""
+    assert results["timeout"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == ""
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 1
-    assert instance.lang == 'fr_FR'
-    assert instance.sender == ''
-    assert instance.media == 'SMSUnicode'
+    assert instance.lang == "fr_FR"
+    assert instance.sender == ""
+    assert instance.media == "SMSUnicode"
     assert isinstance(instance.targets, list)
     assert instance.timeout == 2880
-    assert instance.voice == 'claire08s'
+    assert instance.voice == "claire08s"
     assert isinstance(instance.space_id, str)
 
     response = instance.send(body="test")
@@ -468,46 +524,46 @@ def test_plugin_sfr_notification_exceptions(mock_post):
 
 
 @mock.patch(
-    'requests.post',
+    "requests.post",
     side_effect=requests.RequestException("Connection error"),
 )
 def test_plugin_sfr_notification_exceptions_requests(mock_post):
-    """
-    NotifySFR() Notifications requests exceptions
-    """
+    """NotifySFR() Notifications requests exceptions."""
     # Test requests socket error return
     mock_post.reset_mock()
     # Prepare Mock
     # Create a mock response object
     response = mock.Mock()
     response.status_code = requests.codes.internal_server_error
-    response.content = b'Invalid content'
+    response.content = b"Invalid content"
     mock_post.return_value = response
 
     # Test "real" parameters
     results = NotifySFR.parse_url(
-        'sfr://{}:str0*fn_ppw0rd@{}/{}'.format(
-            "404ghwo89144", '9993384', '0959290404'))
+        "sfr://{}:str0*fn_ppw0rd@{}/{}".format(
+            "404ghwo89144", "9993384", "0959290404"
+        )
+    )
 
     assert isinstance(results, dict)
-    assert results['user'] == '404ghwo89144'
-    assert results['password'] == 'str0*fn_ppw0rd'
-    assert results['space_id'] == '9993384'
-    assert results['targets'] == ['0959290404']
-    assert results['media'] == ''
-    assert results['timeout'] == ''
-    assert results['lang'] == ''
-    assert results['sender'] == ''
+    assert results["user"] == "404ghwo89144"
+    assert results["password"] == "str0*fn_ppw0rd"
+    assert results["space_id"] == "9993384"
+    assert results["targets"] == ["0959290404"]
+    assert results["media"] == ""
+    assert results["timeout"] == ""
+    assert results["lang"] == ""
+    assert results["sender"] == ""
 
     instance = NotifySFR(**results)
     assert isinstance(instance, NotifySFR)
     assert len(instance) == 1
-    assert instance.lang == 'fr_FR'
-    assert instance.sender == ''
-    assert instance.media == 'SMSUnicode'
+    assert instance.lang == "fr_FR"
+    assert instance.sender == ""
+    assert instance.media == "SMSUnicode"
     assert isinstance(instance.targets, list)
     assert instance.timeout == 2880
-    assert instance.voice == 'claire08s'
+    assert instance.voice == "claire08s"
     assert isinstance(instance.space_id, str)
 
     response = instance.send(body="test")
@@ -516,11 +572,9 @@ def test_plugin_sfr_notification_exceptions_requests(mock_post):
     assert mock_post.call_count == 1
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_sfr_failure(mock_post):
-    """
-    NotifySFR() Failure Cases
-    """
+    """NotifySFR() Failure Cases."""
     mock_post.reset_mock()
     # Prepare Mock
     # Create a mock response object
@@ -533,8 +587,8 @@ def test_plugin_sfr_failure(mock_post):
         NotifySFR(
             user=None,
             password="service_password",
-            space_id=int('8' * 10),
-            targets=int('8' * 10),
+            space_id=int("8" * 10),
+            targets=int("8" * 10),
         )
 
     # Invalid service_password
@@ -542,8 +596,8 @@ def test_plugin_sfr_failure(mock_post):
         NotifySFR(
             user="service_id",
             password=None,
-            space_id=int('8' * 10),
-            targets=int('8' * 10),
+            space_id=int("8" * 10),
+            targets=int("8" * 10),
         )
 
     # Invalid space_id
@@ -552,7 +606,7 @@ def test_plugin_sfr_failure(mock_post):
             user="service_id",
             password="service_password",
             space_id=None,
-            targets=int('8' * 10),
+            targets=int("8" * 10),
         )
 
     # Invalid targets
@@ -560,6 +614,6 @@ def test_plugin_sfr_failure(mock_post):
         NotifySFR(
             user="service_id",
             password="service_password",
-            space_id=int('8' * 10),
+            space_id=int("8" * 10),
             targets=None,
         )

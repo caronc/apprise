@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -45,45 +44,43 @@
 #  the email will be transmitted from.  If no email address is specified
 #  then it will also become the 'to' address as well.
 #
-import requests
-from json import dumps
 from email.utils import formataddr
-from .base import NotifyBase
+from json import dumps
+
+import requests
+
 from .. import exception
-from ..common import NotifyType
-from ..common import NotifyFormat
-from ..utils.parse import (
-    parse_emails, parse_bool, is_email, validate_regex)
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
+from .base import NotifyBase
 
 SMTP2GO_HTTP_ERROR_MAP = {
-    429: 'To many requests.',
+    429: "To many requests.",
 }
 
 
 class NotifySMTP2Go(NotifyBase):
-    """
-    A wrapper for SMTP2Go Notifications
-    """
+    """A wrapper for SMTP2Go Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'SMTP2Go'
+    service_name = "SMTP2Go"
 
     # The services URL
-    service_url = 'https://www.smtp2go.com/'
+    service_url = "https://www.smtp2go.com/"
 
     # All notification requests are secure
-    secure_protocol = 'smtp2go'
+    secure_protocol = "smtp2go"
 
     # SMTP2Go advertises they allow 300 requests per minute.
     # 60/300 = 0.2
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_smtp2go'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_smtp2go"
 
     # Notify URL
-    notify_url = 'https://api.smtp2go.com/v3/email/send'
+    notify_url = "https://api.smtp2go.com/v3/email/send"
 
     # Support attachments
     attachment_support = True
@@ -97,90 +94,102 @@ class NotifySMTP2Go(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}@{host}:{apikey}/',
-        '{schema}://{user}@{host}:{apikey}/{targets}',
+        "{schema}://{user}@{host}:{apikey}/",
+        "{schema}://{user}@{host}:{apikey}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'user': {
-            'name': _('User Name'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "user": {
+                "name": _("User Name"),
+                "type": "string",
+                "required": True,
+            },
+            "host": {
+                "name": _("Domain"),
+                "type": "string",
+                "required": True,
+            },
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "targets": {
+                "name": _("Target Emails"),
+                "type": "list:string",
+            },
         },
-        'host': {
-            'name': _('Domain'),
-            'type': 'string',
-            'required': True,
-        },
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'targets': {
-            'name': _('Target Emails'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'name': {
-            'name': _('From Name'),
-            'type': 'string',
-            'map_to': 'from_name',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "name": {
+                "name": _("From Name"),
+                "type": "string",
+                "map_to": "from_name",
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "cc": {
+                "name": _("Carbon Copy"),
+                "type": "list:string",
+            },
+            "bcc": {
+                "name": _("Blind Carbon Copy"),
+                "type": "list:string",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
         },
-        'to': {
-            'alias_of': 'targets',
-        },
-        'cc': {
-            'name': _('Carbon Copy'),
-            'type': 'list:string',
-        },
-        'bcc': {
-            'name': _('Blind Carbon Copy'),
-            'type': 'list:string',
-        },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('Email Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("Email Header"),
+            "prefix": "+",
         },
     }
 
-    def __init__(self, apikey, targets, cc=None, bcc=None, from_name=None,
-                 headers=None, batch=False, **kwargs):
-        """
-        Initialize SMTP2Go Object
-        """
+    def __init__(
+        self,
+        apikey,
+        targets,
+        cc=None,
+        bcc=None,
+        from_name=None,
+        headers=None,
+        batch=False,
+        **kwargs,
+    ):
+        """Initialize SMTP2Go Object."""
         super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(apikey)
         if not self.apikey:
-            msg = 'An invalid SMTP2Go API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid SMTP2Go API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Validate our username
         if not self.user:
-            msg = 'No SMTP2Go username was specified.'
+            msg = "No SMTP2Go username was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Acquire Email 'To'
-        self.targets = list()
+        self.targets = []
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -203,11 +212,11 @@ class NotifySMTP2Go(NotifyBase):
         self.from_name = from_name
 
         # Get our from email address
-        self.from_addr = '{user}@{host}'.format(user=self.user, host=self.host)
+        self.from_addr = f"{self.user}@{self.host}"
 
         if not is_email(self.from_addr):
             # Parse Source domain based on from_addr
-            msg = 'Invalid ~From~ email format: {}'.format(self.from_addr)
+            msg = f"Invalid ~From~ email format: {self.from_addr}"
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -216,63 +225,68 @@ class NotifySMTP2Go(NotifyBase):
             for recipient in parse_emails(targets):
                 result = is_email(recipient)
                 if result:
-                    self.targets.append(
-                        (result['name'] if result['name'] else False,
-                            result['full_email']))
+                    self.targets.append((
+                        result["name"] if result["name"] else False,
+                        result["full_email"],
+                    ))
                     continue
 
                 self.logger.warning(
-                    'Dropped invalid To email '
-                    '({}) specified.'.format(recipient),
+                    f"Dropped invalid To email ({recipient}) specified.",
                 )
 
         else:
             # If our target email list is empty we want to add ourselves to it
             self.targets.append(
-                (self.from_name if self.from_name else False, self.from_addr))
+                (self.from_name if self.from_name else False, self.from_addr)
+            )
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
             email = is_email(recipient)
             if email:
-                self.cc.add(email['full_email'])
+                self.cc.add(email["full_email"])
 
                 # Index our name (if one exists)
-                self.names[email['full_email']] = \
-                    email['name'] if email['name'] else False
+                self.names[email["full_email"]] = (
+                    email["name"] if email["name"] else False
+                )
                 continue
 
             self.logger.warning(
-                'Dropped invalid Carbon Copy email '
-                '({}) specified.'.format(recipient),
+                f"Dropped invalid Carbon Copy email ({recipient}) specified.",
             )
 
         # Validate recipients (bcc:) and drop bad ones:
         for recipient in parse_emails(bcc):
             email = is_email(recipient)
             if email:
-                self.bcc.add(email['full_email'])
+                self.bcc.add(email["full_email"])
 
                 # Index our name (if one exists)
-                self.names[email['full_email']] = \
-                    email['name'] if email['name'] else False
+                self.names[email["full_email"]] = (
+                    email["name"] if email["name"] else False
+                )
                 continue
 
             self.logger.warning(
-                'Dropped invalid Blind Carbon Copy email '
-                '({}) specified.'.format(recipient),
+                "Dropped invalid Blind Carbon Copy email "
+                f"({recipient}) specified.",
             )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform SMTP2Go Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform SMTP2Go Notification."""
 
         if not self.targets:
             # There is no one to email; we're done
-            self.logger.warning(
-                'There are no Email recipients to notify')
+            self.logger.warning("There are no Email recipients to notify")
             return False
 
         # error tracking (used for function return)
@@ -283,9 +297,9 @@ class NotifySMTP2Go(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
         }
 
         # Track our potential attachments
@@ -297,113 +311,127 @@ class NotifySMTP2Go(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access SMTP2Go attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access SMTP2Go attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 try:
                     # Format our attachment
                     attachments.append({
-                        'filename': attachment.name
-                        if attachment.name else f'file{no:03}.dat',
-                        'fileblob': attachment.base64(),
-                        'mimetype': attachment.mimetype,
+                        "filename": (
+                            attachment.name
+                            if attachment.name
+                            else f"file{no:03}.dat"
+                        ),
+                        "fileblob": attachment.base64(),
+                        "mimetype": attachment.mimetype,
                     })
 
                 except exception.AppriseException:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access SMTP2Go attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access SMTP2Go attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 self.logger.debug(
-                    'Appending SMTP2Go attachment {}'.format(
-                        attachment.url(privacy=True)))
+                    "Appending SMTP2Go attachment"
+                    f" {attachment.url(privacy=True)}"
+                )
 
         sender = formataddr(
-            (self.from_name if self.from_name else False,
-             self.from_addr), charset='utf-8')
+            (self.from_name if self.from_name else False, self.from_addr),
+            charset="utf-8",
+        )
 
         # Prepare our payload
         payload = {
             # API Key
-            'api_key': self.apikey,
-
+            "api_key": self.apikey,
             # Base payload options
-            'sender': sender,
-            'subject': title,
-
+            "sender": sender,
+            "subject": title,
             # our To array
-            'to': [],
+            "to": [],
         }
 
         if attachments:
-            payload['attachments'] = attachments
+            payload["attachments"] = attachments
 
         if self.notify_format == NotifyFormat.HTML:
-            payload['html_body'] = body
+            payload["html_body"] = body
 
         else:
-            payload['text_body'] = body
+            payload["text_body"] = body
 
         # Create a copy of the targets list
         emails = list(self.targets)
 
         for index in range(0, len(emails), batch_size):
             # Initialize our cc list
-            cc = (self.cc - self.bcc)
+            cc = self.cc - self.bcc
 
             # Initialize our bcc list
             bcc = set(self.bcc)
 
             # Initialize our to list
-            to = list()
+            to = []
 
-            for to_addr in self.targets[index:index + batch_size]:
+            for to_addr in self.targets[index : index + batch_size]:
                 # Strip target out of cc list if in To
-                cc = (cc - set([to_addr[1]]))
+                cc = cc - {to_addr[1]}
 
                 # Strip target out of bcc list if in To
-                bcc = (bcc - set([to_addr[1]]))
+                bcc = bcc - {to_addr[1]}
 
                 # Prepare our `to`
-                to.append(formataddr(to_addr, charset='utf-8'))
+                to.append(formataddr(to_addr, charset="utf-8"))
 
             # Prepare our To
-            payload['to'] = to
+            payload["to"] = to
 
             if cc:
                 # Format our cc addresses to support the Name field
-                payload['cc'] = [formataddr(
-                    (self.names.get(addr, False), addr), charset='utf-8')
-                    for addr in cc]
+                payload["cc"] = [
+                    formataddr(
+                        (self.names.get(addr, False), addr), charset="utf-8"
+                    )
+                    for addr in cc
+                ]
 
             # Format our bcc addresses to support the Name field
             if bcc:
                 # set our bcc variable (convert to list first so it's
                 # JSON serializable)
-                payload['bcc'] = list(bcc)
+                payload["bcc"] = list(bcc)
 
             # Store our header entries if defined into the payload
             # in their payload
             if self.headers:
-                payload['custom_headers'] = \
-                    [{'header': k, 'value': v}
-                     for k, v in self.headers.items()]
+                payload["custom_headers"] = [
+                    {"header": k, "value": v} for k, v in self.headers.items()
+                ]
 
             # Some Debug Logging
-            self.logger.debug('SMTP2Go POST URL: {} (cert_verify={})'.format(
-                self.notify_url, self.verify_certificate))
-            self.logger.debug('SMTP2Go Payload: {}' .format(payload))
+            self.logger.debug(
+                "SMTP2Go POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"SMTP2Go Payload: {payload}")
 
             # For logging output of success and errors; we get a head count
             # of our outbound details:
-            verbose_dest = ', '.join(
-                [x[1] for x in self.targets[index:index + batch_size]]) \
-                if len(self.targets[index:index + batch_size]) <= 3 \
-                else '{} recipients'.format(
-                    len(self.targets[index:index + batch_size]))
+            verbose_dest = (
+                ", ".join(
+                    [x[1] for x in self.targets[index : index + batch_size]]
+                )
+                if len(self.targets[index : index + batch_size]) <= 3
+                else (
+                    f"{len(self.targets[index:index + batch_size])} recipients"
+                )
+            )
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -418,20 +446,21 @@ class NotifySMTP2Go(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(
-                            r.status_code, SMTP2GO_HTTP_ERROR_MAP)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code, SMTP2GO_HTTP_ERROR_MAP
+                    )
 
                     self.logger.warning(
-                        'Failed to send SMTP2Go notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send SMTP2Go notification to {}: "
+                        "{}{}error={}.".format(
                             verbose_dest,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -439,24 +468,26 @@ class NotifySMTP2Go(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent SMTP2Go notification to {}.'.format(
-                            verbose_dest))
+                        f"Sent SMTP2Go notification to {verbose_dest}."
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending SMTP2Go:%s ' % (
-                        verbose_dest) + 'notification.'
+                    "A Connection error occurred sending"
+                    f" SMTP2Go:{verbose_dest} "
+                    + "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
                 continue
 
-            except (OSError, IOError) as e:
+            except OSError as e:
                 self.logger.warning(
-                    'An I/O error occurred while reading attachments')
-                self.logger.debug('I/O Exception: %s' % str(e))
+                    "An I/O error occurred while reading attachments"
+                )
+                self.logger.debug(f"I/O Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -466,83 +497,88 @@ class NotifySMTP2Go(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.user, self.host, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'batch': 'yes' if self.batch else 'no',
+            "batch": "yes" if self.batch else "no",
         }
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.from_name is not None:
             # from_name specified; pass it back on the url
-            params['name'] = self.from_name
+            params["name"] = self.from_name
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params['cc'] = ','.join(
-                ['{}{}'.format(
-                    '' if not e not in self.names
-                    else '{}:'.format(self.names[e]), e) for e in self.cc])
+            params["cc"] = ",".join([
+                "{}{}".format(
+                    "" if not e not in self.names else f"{self.names[e]}:",
+                    e,
+                )
+                for e in self.cc
+            ])
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
-            params['bcc'] = ','.join(self.bcc)
+            params["bcc"] = ",".join(self.bcc)
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = \
-            not (len(self.targets) == 1
-                 and self.targets[0][1] == self.from_addr)
+        has_targets = not (
+            len(self.targets) == 1 and self.targets[0][1] == self.from_addr
+        )
 
-        return '{schema}://{user}@{host}/{apikey}/{targets}?{params}'.format(
+        return "{schema}://{user}@{host}/{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
             host=self.host,
-            user=NotifySMTP2Go.quote(self.user, safe=''),
-            apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='' if not has_targets else '/'.join(
-                [NotifySMTP2Go.quote('{}{}'.format(
-                    '' if not e[0] else '{}:'.format(e[0]), e[1]),
-                    safe='') for e in self.targets]),
-            params=NotifySMTP2Go.urlencode(params))
+            user=NotifySMTP2Go.quote(self.user, safe=""),
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets=(
+                ""
+                if not has_targets
+                else "/".join([
+                    NotifySMTP2Go.quote(
+                        "{}{}".format("" if not e[0] else f"{e[0]}:", e[1]),
+                        safe="",
+                    )
+                    for e in self.targets
+                ])
+            ),
+            params=NotifySMTP2Go.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         #
         # Factor batch into calculation
         #
         batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
         if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
 
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
@@ -550,41 +586,46 @@ class NotifySMTP2Go(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = NotifySMTP2Go.split_path(results['fullpath'])
+        results["targets"] = NotifySMTP2Go.split_path(results["fullpath"])
 
         # Our very first entry is reserved for our api key
         try:
-            results['apikey'] = results['targets'].pop(0)
+            results["apikey"] = results["targets"].pop(0)
 
         except IndexError:
             # We're done - no API Key found
-            results['apikey'] = None
+            results["apikey"] = None
 
-        if 'name' in results['qsd'] and len(results['qsd']['name']):
+        if "name" in results["qsd"] and len(results["qsd"]["name"]):
             # Extract from name to associate with from address
-            results['from_name'] = \
-                NotifySMTP2Go.unquote(results['qsd']['name'])
+            results["from_name"] = NotifySMTP2Go.unquote(
+                results["qsd"]["name"]
+            )
 
         # Handle 'to' email address
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'].append(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"].append(results["qsd"]["to"])
 
         # Handle Carbon Copy Addresses
-        if 'cc' in results['qsd'] and len(results['qsd']['cc']):
-            results['cc'] = results['qsd']['cc']
+        if "cc" in results["qsd"] and len(results["qsd"]["cc"]):
+            results["cc"] = results["qsd"]["cc"]
 
         # Handle Blind Carbon Copy Addresses
-        if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
-            results['bcc'] = results['qsd']['bcc']
+        if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
+            results["bcc"] = results["qsd"]["bcc"]
 
         # Add our Meta Headers that the user can provide with their outbound
         # emails
-        results['headers'] = {NotifyBase.unquote(x): NotifyBase.unquote(y)
-                              for x, y in results['qsd+'].items()}
+        results["headers"] = {
+            NotifyBase.unquote(x): NotifyBase.unquote(y)
+            for x, y in results["qsd+"].items()
+        }
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get(
-                'batch', NotifySMTP2Go.template_args['batch']['default']))
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch", NotifySMTP2Go.template_args["batch"]["default"]
+            )
+        )
 
         return results

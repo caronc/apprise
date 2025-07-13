@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,57 +25,76 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import requests
 
 from apprise.plugins.freemobile import NotifyFreeMobile
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('freemobile://', {
-        'instance': TypeError,
-    }),
-    ('freemobile://:@/', {
-        'instance': TypeError,
-    }),
-    ('freemobile://user@password', {
-        # Minimum requirements met
-        'instance': NotifyFreeMobile,
-    }),
-    ('freemobile://?user=user&pass=password', {
-        # Test ?user= and pass=
-        'instance': NotifyFreeMobile,
-    }),
-    ('freemobile://user@password', {
-        'instance': NotifyFreeMobile,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('freemobile://user@password', {
-        'instance': NotifyFreeMobile,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('freemobile://user@password', {
-        'instance': NotifyFreeMobile,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "freemobile://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "freemobile://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "freemobile://user@password",
+        {
+            # Minimum requirements met
+            "instance": NotifyFreeMobile,
+        },
+    ),
+    (
+        "freemobile://?user=user&pass=password",
+        {
+            # Test ?user= and pass=
+            "instance": NotifyFreeMobile,
+        },
+    ),
+    (
+        "freemobile://user@password",
+        {
+            "instance": NotifyFreeMobile,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "freemobile://user@password",
+        {
+            "instance": NotifyFreeMobile,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "freemobile://user@password",
+        {
+            "instance": NotifyFreeMobile,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_freemobile_urls():
-    """
-    NotifyFreeMobile() Apprise URLs
-
-    """
+    """NotifyFreeMobile() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

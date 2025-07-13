@@ -18,7 +18,7 @@ dynamic = ["version"]
 # Not supported yet for all Distributions
 license = { text = "BSD-2-Clause" }
 
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 classifiers = [
     "Development Status :: 5 - Production/Stable",
     "Intended Audience :: Developers",
@@ -26,7 +26,6 @@ classifiers = [
     "Operating System :: OS Independent",
     "Natural Language :: English",
     "Programming Language :: Python",
-    "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
@@ -211,7 +210,7 @@ all-plugins = [
     #  - https://github.com/eclipse/paho.mqtt.python/issues/814
     "paho-mqtt != 2.0.*",
 
-	 # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
+     # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
     "PGPy",
 
     # Provides smpp:// support
@@ -261,7 +260,7 @@ version = {attr = "apprise.__version__"}
 [tool.ruff]
 line-length = 79  # Respecting BSD-style 79-char limit
 extend-select = ["I"]  # Automatically sort imports with isort logic
-target-version = "py38"
+target-version = "py39"
 exclude = [
   "tests/data",
   "bin",
@@ -274,11 +273,31 @@ exclude = [
   "venv",
 ]
 
+[tool.black]
+# Added for backwards support and alternative cleanup
+# when needed
+line-length = 79  # Respecting BSD-style 79-char limit
+target-version = ['py39']
+extend-exclude = '''
+/(
+  tests/data \
+  bin \
+  build \
+  dist \
+  .eggs \
+  .tox \
+  .local \
+  .venv \
+  venv
+)
+'''
+
 [tool.ruff.lint]
 select = [
   "E",    # pycodestyle errors
   "F",    # pyflakes
   "W",    # pycodestyle warnings
+  "Q",    # Quote handling ' -> "
   "I",    # isort
   "UP",   # pyupgrade
   "B",    # flake8-bugbear
@@ -288,8 +307,12 @@ select = [
   "RUF",  # Ruff-native rules
 ]
 
+extend-select = [
+   "E501",   # Spacing
+   "Q000",   # Quoting
+]
+
 ignore = [
-  "E501",    # line length
   "ANN101",  # missing type on `self`
   "D100",    # missing docstring in public module
   "D104",    # missing docstring in public package
@@ -297,7 +320,22 @@ ignore = [
   "E722",    # bare except (Apprise uses it reasonably)
   "E741",    # Ambiguous variable name (e.g., l, O, I)
   "W605",    # Invalid escape sequence
+  "B026",    # Star-arg play a big part of Apprise; must be accepted for now
+
+  # The following needs to be supported at some point and is of great value
+  "RUF012",  # typing.ClassVar implimentation
+  "E501",    # Enforcing wordrap at 79 characters per BSD should be enforced
+            # it broke when ruff-autofixed over 600+ entries to accomodate
+            # other PEP styles.
+  "SIM105",  # leverage contextlib.supress() so signifigantly simply the
+            # readability of the code
+  "UP032",   # This is a massive undertaking and requires a massive rewrite
+            # of test cases; this will take a while to fix, so turning off
+            # for now
 ]
+
+[tool.ruff.flake8-quotes]
+inline-quotes = "double"
 
 [tool.ruff.isort]
 known-first-party = ["apprise"]

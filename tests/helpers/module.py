@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,13 +25,16 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from itertools import chain
 from importlib import import_module, reload
-from apprise import NotificationManager
-from apprise import AttachmentManager
-from apprise import ConfigurationManager
-import sys
+from itertools import chain
 import re
+import sys
+
+from apprise import (
+    AttachmentManager,
+    ConfigurationManager,
+    NotificationManager,
+)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -48,52 +50,54 @@ C_MGR = ConfigurationManager()
 # directly copy around between our modules.  This should only
 # catch class/function/variables we want to allow explicity
 # copy/paste access with
-module_filter_re = \
-    re.compile(r'^(?P<name>(Notify|Config|Attach)[A-Za-z0-9]+)$')
+module_filter_re = re.compile(
+    r"^(?P<name>(Notify|Config|Attach)[A-Za-z0-9]+)$"
+)
 
 
 def reload_plugin(name):
-    """
-    Reload built-in plugin module, e.g. `NotifyGnome`.
+    """Reload built-in plugin module, e.g. `NotifyGnome`.
 
     Reloading plugin modules is needed when testing module-level code of
     notification plugins.
 
-    See also https://stackoverflow.com/questions/31363311.
+    See also
+    https://stackoverflow.com/questions/31363311.
     """
 
     A_MGR.unload_modules()
 
-    reload(sys.modules['apprise.apprise_attachment'])
-    reload(sys.modules['apprise.attachment.base'])
-    new_apprise_attachment_mod = import_module('apprise.apprise_attachment')
-    new_apprise_attach_base_mod = import_module('apprise.attachment.base')
-    reload(sys.modules['apprise.manager_attachment'])
+    reload(sys.modules["apprise.apprise_attachment"])
+    reload(sys.modules["apprise.attachment.base"])
+    new_apprise_attachment_mod = import_module("apprise.apprise_attachment")
+    new_apprise_attach_base_mod = import_module("apprise.attachment.base")
+    reload(sys.modules["apprise.manager_attachment"])
 
-    module_pyname = '{}.{}'.format(N_MGR.module_name_prefix, name)
+    module_pyname = f"{N_MGR.module_name_prefix}.{name}"
     if module_pyname in sys.modules:
         reload(sys.modules[module_pyname])
     new_notify_mod = import_module(module_pyname)
 
     A_MGR.unload_modules()
 
-    reload(sys.modules['apprise.apprise_config'])
-    reload(sys.modules['apprise.config.base'])
-    new_apprise_configuration_mod = import_module('apprise.apprise_config')
-    new_apprise_config_base_mod = import_module('apprise.config.base')
-    reload(sys.modules['apprise.manager_config'])
+    reload(sys.modules["apprise.apprise_config"])
+    reload(sys.modules["apprise.config.base"])
+    new_apprise_configuration_mod = import_module("apprise.apprise_config")
+    new_apprise_config_base_mod = import_module("apprise.config.base")
+    reload(sys.modules["apprise.manager_config"])
 
     C_MGR.unload_modules()
 
-    module_pyname = '{}.{}'.format(N_MGR.module_name_prefix, name)
+    module_pyname = f"{N_MGR.module_name_prefix}.{name}"
     if module_pyname in sys.modules:
         reload(sys.modules[module_pyname])
     new_notify_mod = import_module(module_pyname)
 
     # Detect our class object
     class_matches = {}
-    for class_name in [obj for obj in dir(new_notify_mod)
-                       if module_filter_re.match(obj)]:
+    for class_name in [
+        obj for obj in dir(new_notify_mod) if module_filter_re.match(obj)
+    ]:
 
         # Store our entry
         class_matches[class_name] = getattr(new_notify_mod, class_name)
@@ -104,23 +108,26 @@ def reload_plugin(name):
     if not class_matches:
         raise AttributeError(f"Module {name} has no URLBase defined in it!")
 
-    reload(sys.modules['apprise.manager_plugins'])
-    reload(sys.modules['apprise.apprise'])
-    reload(sys.modules['apprise.utils'])
-    reload(sys.modules['apprise.locale'])
-    reload(sys.modules['apprise'])
+    reload(sys.modules["apprise.manager_plugins"])
+    reload(sys.modules["apprise.apprise"])
+    reload(sys.modules["apprise.utils"])
+    reload(sys.modules["apprise.locale"])
+    reload(sys.modules["apprise"])
 
     # Acquire all of the test files we have
-    tests = [k for k in sys.modules.keys() if re.match(r'^test_.+$', k)]
+    tests = [k for k in sys.modules if re.match(r"^test_.+$", k)]
 
     # Iterate over all of our test modules
     for module_name in tests:
         # Filter the test files by only those using the class_name we found
         # within our module
-        possible_matches = \
-            [m for m in dir(sys.modules[module_name])
-             if re.match('^(?P<name>{})$'.format(
-                 '|'.join(class_matches.keys())), m)]
+        possible_matches = [
+            m
+            for m in dir(sys.modules[module_name])
+            if re.match(
+                "^(?P<name>{})$".format("|".join(class_matches.keys())), m
+            )
+        ]
         if not possible_matches:
             continue
 
@@ -140,23 +147,27 @@ def reload_plugin(name):
     #
     # Detect our Apprise Modules (include helpers)
     #
-    apprise_modules = \
-        sorted([k for k in sys.modules.keys()
-                if re.match(r'^(apprise|helpers)(\.|.+)$', k)], reverse=True)
+    apprise_modules = sorted(
+        [k for k in sys.modules if re.match(r"^(apprise|helpers)(\.|.+)$", k)],
+        reverse=True,
+    )
 
     #
     # This section below reloads our attachment classes
     #
 
     for entry in A_MGR:
-        reload(sys.modules[entry['path']])
+        reload(sys.modules[entry["path"]])
         for module_pyname in chain(apprise_modules, tests):
             detect = re.compile(
-                r'^(?P<name>(AppriseAttachment|AttachBase|' +
-                entry['path'].split('.')[-1] + r'))$')
+                r"^(?P<name>(AppriseAttachment|AttachBase|"
+                + entry["path"].split(".")[-1]
+                + r"))$"
+            )
 
-            possible_matches = \
-                [m for m in dir(sys.modules[module_pyname]) if detect.match(m)]
+            possible_matches = [
+                m for m in dir(sys.modules[module_pyname]) if detect.match(m)
+            ]
             if not possible_matches:
                 continue
 
@@ -168,29 +179,36 @@ def reload_plugin(name):
             # We reload NotifyABCDE and place it back in its spot
             # new_attach = import_module(entry['path'])
             for name in possible_matches:
-                if name == 'AppriseAttachment':
+                if name == "AppriseAttachment":
                     setattr(
-                        apprise_mod, name,
-                        getattr(new_apprise_attachment_mod, name))
+                        apprise_mod,
+                        name,
+                        getattr(new_apprise_attachment_mod, name),
+                    )
 
-                elif name == 'AttachBase':
+                elif name == "AttachBase":
                     setattr(
-                        apprise_mod, name,
-                        getattr(new_apprise_attach_base_mod, name))
+                        apprise_mod,
+                        name,
+                        getattr(new_apprise_attach_base_mod, name),
+                    )
 
                 else:
-                    module_pyname = '{}.{}'.format(
-                        A_MGR.module_name_prefix, name)
+                    module_pyname = f"{A_MGR.module_name_prefix}.{name}"
                     new_attach_mod = import_module(module_pyname)
 
                     # Detect our class object
                     class_matches = {}
-                    for class_name in [obj for obj in dir(new_attach_mod)
-                                       if module_filter_re.match(obj)]:
+                    for class_name in [
+                        obj
+                        for obj in dir(new_attach_mod)
+                        if module_filter_re.match(obj)
+                    ]:
 
                         # Store our entry
-                        class_matches[class_name] = \
-                            getattr(new_attach_mod, class_name)
+                        class_matches[class_name] = getattr(
+                            new_attach_mod, class_name
+                        )
 
                     for class_name, class_plugin in class_matches.items():
                         if hasattr(apprise_mod, class_name):
@@ -201,14 +219,17 @@ def reload_plugin(name):
     #
 
     for entry in C_MGR:
-        reload(sys.modules[entry['path']])
+        reload(sys.modules[entry["path"]])
         for module_pyname in chain(apprise_modules, tests):
             detect = re.compile(
-                r'^(?P<name>(AppriseConfig|ConfigBase|' +
-                entry['path'].split('.')[-1] + r'))$')
+                r"^(?P<name>(AppriseConfig|ConfigBase|"
+                + entry["path"].split(".")[-1]
+                + r"))$"
+            )
 
-            possible_matches = \
-                [m for m in dir(sys.modules[module_pyname]) if detect.match(m)]
+            possible_matches = [
+                m for m in dir(sys.modules[module_pyname]) if detect.match(m)
+            ]
             if not possible_matches:
                 continue
 
@@ -220,29 +241,36 @@ def reload_plugin(name):
             # We reload NotifyABCDE and place it back in its spot
             # new_attach = import_module(entry['path'])
             for name in possible_matches:
-                if name == 'AppriseConfig':
+                if name == "AppriseConfig":
                     setattr(
-                        apprise_mod, name,
-                        getattr(new_apprise_configuration_mod, name))
+                        apprise_mod,
+                        name,
+                        getattr(new_apprise_configuration_mod, name),
+                    )
 
-                elif name == 'ConfigBase':
+                elif name == "ConfigBase":
                     setattr(
-                        apprise_mod, name,
-                        getattr(new_apprise_config_base_mod, name))
+                        apprise_mod,
+                        name,
+                        getattr(new_apprise_config_base_mod, name),
+                    )
 
                 else:
-                    module_pyname = '{}.{}'.format(
-                        A_MGR.module_name_prefix, name)
+                    module_pyname = f"{A_MGR.module_name_prefix}.{name}"
                     new_config_mod = import_module(module_pyname)
 
                     # Detect our class object
                     class_matches = {}
-                    for class_name in [obj for obj in dir(new_config_mod)
-                                       if module_filter_re.match(obj)]:
+                    for class_name in [
+                        obj
+                        for obj in dir(new_config_mod)
+                        if module_filter_re.match(obj)
+                    ]:
 
                         # Store our entry
-                        class_matches[class_name] = \
-                            getattr(new_config_mod, class_name)
+                        class_matches[class_name] = getattr(
+                            new_config_mod, class_name
+                        )
 
                     for class_name, class_plugin in class_matches.items():
                         if hasattr(apprise_mod, class_name):

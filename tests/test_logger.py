@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,22 +25,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
 import os
+import re
 import sys
+from unittest import mock
 
 import pytest
 import requests
-from unittest import mock
 
-from apprise import Apprise
-from apprise import AppriseAsset
-from apprise import URLBase
-from apprise.logger import LogCapture
+from apprise import Apprise, AppriseAsset, URLBase
 
 # Disable logging for a cleaner testing output
-from apprise.logger import logging
-from apprise.logger import logger
+from apprise.logger import LogCapture, logger, logging
 
 
 def test_apprise_logger():
@@ -57,19 +52,19 @@ def test_apprise_logger():
     URLBase.logger.setLevel(logging.DEPRECATE + 1)
 
     # Deprication will definitely not trigger
-    URLBase.logger.deprecate('test')
+    URLBase.logger.deprecate("test")
 
     # Verbose Debugging is not on at this point
-    URLBase.logger.trace('test')
+    URLBase.logger.trace("test")
 
     # Set both logging entries on
     URLBase.logger.setLevel(logging.TRACE)
 
     # Deprication will definitely trigger
-    URLBase.logger.deprecate('test')
+    URLBase.logger.deprecate("test")
 
     # Verbose Debugging will activate
-    URLBase.logger.trace('test')
+    URLBase.logger.trace("test")
 
     # Disable Logging
     logging.disable(logging.CRITICAL)
@@ -93,15 +88,15 @@ def test_apprise_log_memory_captures():
         logger.error("error")
         logger.deprecate("deprecate")
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
 
         # We have a log entry for each of the 6 logs we generated above
-        assert 'trace' in stream.getvalue()
-        assert 'debug' in stream.getvalue()
-        assert 'info' in stream.getvalue()
-        assert 'warning' in stream.getvalue()
-        assert 'error' in stream.getvalue()
-        assert 'deprecate' in stream.getvalue()
+        assert "trace" in stream.getvalue()
+        assert "debug" in stream.getvalue()
+        assert "info" in stream.getvalue()
+        assert "warning" in stream.getvalue()
+        assert "error" in stream.getvalue()
+        assert "deprecate" in stream.getvalue()
         assert len(logs) == 6
 
     # Verify that we did not lose our effective log level even though
@@ -119,14 +114,14 @@ def test_apprise_log_memory_captures():
 
         # We have a log entry for 5 of the log entries we generated above
         # There will be no 'trace' entry
-        assert 'trace' not in stream.getvalue()
-        assert 'debug' in stream.getvalue()
-        assert 'info' in stream.getvalue()
-        assert 'warning' in stream.getvalue()
-        assert 'error' in stream.getvalue()
-        assert 'deprecate' in stream.getvalue()
+        assert "trace" not in stream.getvalue()
+        assert "debug" in stream.getvalue()
+        assert "info" in stream.getvalue()
+        assert "warning" in stream.getvalue()
+        assert "error" in stream.getvalue()
+        assert "deprecate" in stream.getvalue()
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
         assert len(logs) == 5
 
     # Verify that we did not lose our effective log level even though
@@ -144,14 +139,14 @@ def test_apprise_log_memory_captures():
 
         # We have a log entry for 3 of the log entries we generated above
         # There will be no 'trace', 'debug', or 'info' entry
-        assert 'trace' not in stream.getvalue()
-        assert 'debug' not in stream.getvalue()
-        assert 'info' not in stream.getvalue()
-        assert 'warning' in stream.getvalue()
-        assert 'error' in stream.getvalue()
-        assert 'deprecate' in stream.getvalue()
+        assert "trace" not in stream.getvalue()
+        assert "debug" not in stream.getvalue()
+        assert "info" not in stream.getvalue()
+        assert "warning" in stream.getvalue()
+        assert "error" in stream.getvalue()
+        assert "deprecate" in stream.getvalue()
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
         assert len(logs) == 3
 
     # Set a global level of ERROR
@@ -167,14 +162,14 @@ def test_apprise_log_memory_captures():
         logger.error("error")
         logger.deprecate("deprecate")
 
-        assert 'trace' not in stream.getvalue()
-        assert 'debug' not in stream.getvalue()
-        assert 'info' not in stream.getvalue()
-        assert 'warning' not in stream.getvalue()
-        assert 'error' in stream.getvalue()
-        assert 'deprecate' in stream.getvalue()
+        assert "trace" not in stream.getvalue()
+        assert "debug" not in stream.getvalue()
+        assert "info" not in stream.getvalue()
+        assert "warning" not in stream.getvalue()
+        assert "error" in stream.getvalue()
+        assert "deprecate" in stream.getvalue()
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
         assert len(logs) == 2
 
     # Verify that we did not lose our effective log level
@@ -189,14 +184,14 @@ def test_apprise_log_memory_captures():
         logger.deprecate("deprecate")
 
         # We have a log entry for each of the 6 logs we generated above
-        assert 'trace' in stream.getvalue()
-        assert 'debug' in stream.getvalue()
-        assert 'info' in stream.getvalue()
-        assert 'warning' in stream.getvalue()
-        assert 'error' in stream.getvalue()
-        assert 'deprecate' in stream.getvalue()
+        assert "trace" in stream.getvalue()
+        assert "debug" in stream.getvalue()
+        assert "info" in stream.getvalue()
+        assert "warning" in stream.getvalue()
+        assert "error" in stream.getvalue()
+        assert "deprecate" in stream.getvalue()
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
         assert len(logs) == 6
 
     # Verify that we did not lose our effective log level even though
@@ -204,14 +199,16 @@ def test_apprise_log_memory_captures():
     assert logger.getEffectiveLevel() == logging.ERROR
 
     # Test capture where our notification throws an unhandled exception
-    obj = Apprise.instantiate('json://user:password@example.com')
-    with mock.patch('requests.post', side_effect=NotImplementedError()):
-        with pytest.raises(NotImplementedError):
-            # Our exception gets caught in side our with() block
-            # and although raised, all graceful handling of the log
-            # is reverted as it was
-            with LogCapture(level=logging.TRACE) as stream:
-                obj.send("hello world")
+    obj = Apprise.instantiate("json://user:password@example.com")
+    with (
+        mock.patch("requests.post", side_effect=NotImplementedError()),
+        pytest.raises(NotImplementedError),
+        # Our exception gets caught in side our with() block
+        # and although raised, all graceful handling of the log
+        # is reverted as it was
+        LogCapture(level=logging.TRACE) as stream,
+    ):
+        obj.send("hello world")
 
     # Disable Logging
     logging.disable(logging.CRITICAL)
@@ -226,7 +223,7 @@ def test_apprise_log_file_captures(tmpdir):
     # Ensure we're not running in a disabled state
     logging.disable(logging.NOTSET)
 
-    log_file = tmpdir.join('capture.log')
+    log_file = tmpdir.join("capture.log")
     assert not os.path.isfile(str(log_file))
 
     logger.setLevel(logging.CRITICAL)
@@ -242,15 +239,15 @@ def test_apprise_log_file_captures(tmpdir):
         logger.deprecate("deprecate")
 
         content = fp.read().rstrip()
-        logs = re.split(r'\r*\n', content)
+        logs = re.split(r"\r*\n", content)
 
         # We have a log entry for each of the 6 logs we generated above
-        assert 'trace' in content
-        assert 'debug' in content
-        assert 'info' in content
-        assert 'warning' in content
-        assert 'error' in content
-        assert 'deprecate' in content
+        assert "trace" in content
+        assert "debug" in content
+        assert "info" in content
+        assert "warning" in content
+        assert "error" in content
+        assert "deprecate" in content
         assert len(logs) == 6
 
     # The file is automatically cleaned up afterwards
@@ -273,16 +270,16 @@ def test_apprise_log_file_captures(tmpdir):
         logger.deprecate("deprecate")
 
         content = fp.read().rstrip()
-        logs = re.split(r'\r*\n', content)
+        logs = re.split(r"\r*\n", content)
 
         # We have a log entry for 5 of the log entries we generated above
         # There will be no 'trace' entry
-        assert 'trace' not in content
-        assert 'debug' in content
-        assert 'info' in content
-        assert 'warning' in content
-        assert 'error' in content
-        assert 'deprecate' in content
+        assert "trace" not in content
+        assert "debug" in content
+        assert "info" in content
+        assert "warning" in content
+        assert "error" in content
+        assert "deprecate" in content
 
         assert len(logs) == 5
 
@@ -302,8 +299,9 @@ def test_apprise_log_file_captures(tmpdir):
     assert logger.getEffectiveLevel() == logging.TRACE
 
     logger.setLevel(logging.ERROR)
-    with LogCapture(path=str(log_file), delete=False,
-                    level=logging.WARNING) as fp:
+    with LogCapture(
+        path=str(log_file), delete=False, level=logging.WARNING
+    ) as fp:
 
         # Verify exists
         assert os.path.isfile(str(log_file))
@@ -316,16 +314,16 @@ def test_apprise_log_file_captures(tmpdir):
         logger.deprecate("deprecate")
 
         content = fp.read().rstrip()
-        logs = re.split(r'\r*\n', content)
+        logs = re.split(r"\r*\n", content)
 
         # We have a log entry for 3 of the log entries we generated above
         # There will be no 'trace', 'debug', or 'info' entry
-        assert 'trace' not in content
-        assert 'debug' not in content
-        assert 'info' not in content
-        assert 'warning' in content
-        assert 'error' in content
-        assert 'deprecate' in content
+        assert "trace" not in content
+        assert "debug" not in content
+        assert "info" not in content
+        assert "warning" in content
+        assert "error" in content
+        assert "deprecate" in content
 
         assert len(logs) == 3
 
@@ -342,19 +340,22 @@ def test_apprise_log_file_captures(tmpdir):
     logger.setLevel(logging.ERROR)
 
     # Test case where we can't open the file
-    with mock.patch('builtins.open', side_effect=OSError()):
+    with (
+        mock.patch("builtins.open", side_effect=OSError()),
         # Use the default level of None (by not specifying one); we then
         # use whatever has been defined globally
-        with pytest.raises(OSError):
-            with LogCapture(path=str(log_file)) as fp:
-                # we'll never get here because we'll fail to open the file
-                pass
+        pytest.raises(OSError),
+        LogCapture(path=str(log_file)) as fp,
+    ):
+
+        # we'll never get here because we'll fail to open the file
+        pass
 
     # Disable Logging
     logging.disable(logging.CRITICAL)
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_apprise_secure_logging(mock_post):
     """
     API: Apprise() secure logging tests
@@ -383,13 +384,14 @@ def test_apprise_secure_logging(mock_post):
         # Our servers should carry this flag
         assert a[0].asset.secure_logging is True
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
         assert len(logs) == 1
-        entry = re.split(r'\s-\s', logs[0])
+        entry = re.split(r"\s-\s", logs[0])
         assert len(entry) == 3
-        assert entry[1] == 'DEBUG'
+        assert entry[1] == "DEBUG"
         assert entry[2].startswith(
-            'Loaded JSON URL: json://user:****@localhost/')
+            "Loaded JSON URL: json://user:****@localhost/"
+        )
 
     # Send notification
     assert a.notify("test") is True
@@ -415,18 +417,19 @@ def test_apprise_secure_logging(mock_post):
         assert a.add("json://user:pass1$-3!@localhost") is True
 
         # Our servers should carry this flag
-        a[0].asset.secure_logging is False
+        assert a[0].asset.secure_logging is False
 
-        logs = re.split(r'\r*\n', stream.getvalue().rstrip())
+        logs = re.split(r"\r*\n", stream.getvalue().rstrip())
         assert len(logs) == 1
-        entry = re.split(r'\s-\s', logs[0])
+        entry = re.split(r"\s-\s", logs[0])
         assert len(entry) == 3
-        assert entry[1] == 'DEBUG'
+        assert entry[1] == "DEBUG"
 
         # Note that our password is no longer escaped (it is however
         # url encoded)
         assert entry[2].startswith(
-            'Loaded JSON URL: json://user:pass1%24-3%21@localhost/')
+            "Loaded JSON URL: json://user:pass1%24-3%21@localhost/"
+        )
 
     # Disable Logging
     logging.disable(logging.CRITICAL)

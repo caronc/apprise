@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -37,6 +36,7 @@ class AppriseEmailException(ApprisePluginException):
     """
     Thrown when there is an error with the Email Attachment
     """
+
     def __init__(self, message, error_code=601):
         super().__init__(message, error_code=error_code)
 
@@ -46,11 +46,12 @@ class WebBaseLogin:
     This class is just used in conjunction of the default emailers
     to best formulate a login to it using the data detected
     """
+
     # User Login must be Email Based
-    EMAIL = 'Email'
+    EMAIL = "Email"
 
     # User Login must UserID Based
-    USERID = 'UserID'
+    USERID = "UserID"
 
 
 # Secure Email Modes
@@ -63,13 +64,13 @@ class SecureMailMode:
 # Define all of the secure modes (used during validation)
 SECURE_MODES = {
     SecureMailMode.STARTTLS: {
-        'default_port': 587,
+        "default_port": 587,
     },
     SecureMailMode.SSL: {
-        'default_port': 465,
+        "default_port": 465,
     },
     SecureMailMode.INSECURE: {
-        'default_port': 25,
+        "default_port": 25,
     },
 }
 
@@ -79,6 +80,7 @@ class EmailMessage:
     """
     Our message structure
     """
+
     recipient: str
     to_addrs: t.List[str]
     body: str

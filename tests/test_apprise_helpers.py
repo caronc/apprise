@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,12 +25,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import sys
-import helpers
-
 # Disable logging for a cleaner testing output
 import logging
+import os
+import sys
+
+import helpers
+
 logging.disable(logging.CRITICAL)
 
 # Ensure we don't create .pyc files for these tests
@@ -39,18 +39,17 @@ sys.dont_write_bytecode = True
 
 
 def test_environ_temporary_change():
-    """helpers: environ() testing
-    """
+    """helpers: environ() testing"""
     # This is a helper function; but it does enough that we want to verify
     # our usage of it works correctly; yes... we're testing a test
 
-    e_key1 = 'APPRISE_TEMP1'
-    e_key2 = 'APPRISE_TEMP2'
-    e_key3 = 'APPRISE_TEMP3'
+    e_key1 = "APPRISE_TEMP1"
+    e_key2 = "APPRISE_TEMP2"
+    e_key3 = "APPRISE_TEMP3"
 
-    e_val1 = 'ABCD'
-    e_val2 = 'DEFG'
-    e_val3 = 'HIJK'
+    e_val1 = "ABCD"
+    e_val2 = "DEFG"
+    e_val3 = "HIJK"
 
     os.environ[e_key1] = e_val1
     os.environ[e_key2] = e_val2
@@ -79,9 +78,9 @@ def test_environ_temporary_change():
     assert e_key3 in os.environ
     assert e_val3 in os.environ[e_key3]
 
-    d_key = 'APPRISE_NOT_SET'
-    n_key = 'APPRISE_NEW_KEY'
-    n_val = 'NEW_VAL'
+    d_key = "APPRISE_NOT_SET"
+    n_key = "APPRISE_NEW_KEY"
+    n_val = "NEW_VAL"
 
     # Verify that our temporary variables (defined above) are not pre-existing
     # environemnt variables as we'll be setting them below

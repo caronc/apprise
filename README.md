@@ -207,7 +207,7 @@ Apprise have some email services built right into it (such as yahoo, fastmail, h
 
 # Installation
 
-The easiest way is to install this package is from pypi:
+The easiest way is to install Apprise from PyPI:
 ```bash
 pip install apprise
 ```
@@ -223,7 +223,7 @@ yum install apprise
 dnf install apprise
 ```
 
-You can also check out the [Graphical version of Apprise](https://github.com/caronc/apprise-api) to centralize your configuration and notifications through a managable webpage.
+You can also check out the [Graphical version of Apprise](https://github.com/caronc/apprise-api) to centralize your configuration and notifications through a manageable webpage.
 
 # Command Line Usage
 
@@ -356,7 +356,7 @@ apprise -vv --title 'custom override' \
         --body 'the body of my message' \
         foobar:\\
 
-# However you can over-ride the path like so
+# However you can override the path like so
 apprise -vv --title 'custom override' \
         --body 'the body of my message' \
         --plugin-path /path/to/my/plugin.py \
@@ -371,10 +371,10 @@ Those using the Command Line Interface (CLI) can also leverage environment varia
 
 | Variable                | Description       |
 |------------------------ | ----------------- |
-| `APPRISE_URLS`          |  Specify the default URLs to notify IF none are otherwise specified on the command line explicitly. If the `--config` (`-c`) is specified, then this will over-rides any reference to this variable. Use white space and/or a comma (`,`) to delimit multiple entries.
-|  `APPRISE_CONFIG_PATH`  | Explicitly specify the config search path to use (over-riding the default). The path(s) defined here must point to the absolute filename to open/reference. Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
-|  `APPRISE_PLUGIN_PATH`  | Explicitly specify the custom plugin search path to use (over-riding the default). Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
-|  `APPRISE_STORAGE_PATH` | Explicitly specify the persistent storage path to use (over-riding the default).
+| `APPRISE_URLS`          |  Specify the default URLs to notify IF none are otherwise specified on the command line explicitly. If the `--config` (`-c`) is specified, then this will overrides any reference to this variable. Use white space and/or a comma (`,`) to delimit multiple entries.
+|  `APPRISE_CONFIG_PATH`  | Explicitly specify the config search path to use (overriding the default). The path(s) defined here must point to the absolute filename to open/reference. Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
+|  `APPRISE_PLUGIN_PATH`  | Explicitly specify the custom plugin search path to use (overriding the default). Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
+|  `APPRISE_STORAGE_PATH` | Explicitly specify the persistent storage path to use (overriding the default).
 
 # Developer API Usage
 
@@ -447,7 +447,7 @@ apobj.notify(
 apobj.notify(
     body='send a notification to our admin group',
     title='Attention Admins',
-    # notify absolutely everything loaded, regardless on wether
+    # notify absolutely everything loaded, regardless on whether
     # it has a tag associated with it or not:
     tag='all',
 )

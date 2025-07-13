@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,12 +25,14 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import pytest
-from unittest import mock
-from apprise.attachment.base import AttachBase
-
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
+
+import pytest
+
+from apprise.attachment.base import AttachBase
+
 logging.disable(logging.CRITICAL)
 
 
@@ -40,15 +41,19 @@ def test_mimetype_initialization():
     API: AttachBase() mimetype initialization
 
     """
-    with mock.patch('mimetypes.init') as mock_init:
-        with mock.patch('mimetypes.inited', True):
-            AttachBase()
-            assert mock_init.call_count == 0
+    with (
+        mock.patch("mimetypes.init") as mock_init,
+        mock.patch("mimetypes.inited", True),
+    ):
+        AttachBase()
+        assert mock_init.call_count == 0
 
-    with mock.patch('mimetypes.init') as mock_init:
-        with mock.patch('mimetypes.inited', False):
-            AttachBase()
-            assert mock_init.call_count == 1
+    with (
+        mock.patch("mimetypes.init") as mock_init,
+        mock.patch("mimetypes.inited", False),
+    ):
+        AttachBase()
+        assert mock_init.call_count == 1
 
 
 def test_attach_base():
@@ -58,10 +63,10 @@ def test_attach_base():
     """
     # an invalid mime-type
     with pytest.raises(TypeError):
-        AttachBase(**{'mimetype': 'invalid'})
+        AttachBase(**{"mimetype": "invalid"})
 
     # a valid mime-type does not cause an exception to throw
-    AttachBase(**{'mimetype': 'image/png'})
+    AttachBase(**{"mimetype": "image/png"})
 
     # Create an object with no mimetype over-ride
     obj = AttachBase()
@@ -74,18 +79,18 @@ def test_attach_base():
         obj.download()
 
     # Unsupported URLs are not parsed
-    assert AttachBase.parse_url(url='invalid://') is None
+    assert AttachBase.parse_url(url="invalid://") is None
 
     # Valid URL & Valid Format
-    results = AttachBase.parse_url(url='file://relative/path')
+    results = AttachBase.parse_url(url="file://relative/path")
     assert isinstance(results, dict)
     # No mime is defined
-    assert results.get('mimetype') is None
+    assert results.get("mimetype") is None
 
     # Valid URL & Valid Format with mime type set
-    results = AttachBase.parse_url(url='file://relative/path?mime=image/jpeg')
+    results = AttachBase.parse_url(url="file://relative/path?mime=image/jpeg")
     assert isinstance(results, dict)
     # mime defined
-    assert results.get('mimetype') == 'image/jpeg'
+    assert results.get("mimetype") == "image/jpeg"
     # We can retrieve our url
     assert str(results)

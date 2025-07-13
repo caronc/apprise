@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,60 +25,82 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import requests
 
 from apprise.plugins.feishu import NotifyFeishu
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('feishu://', {
-        'instance': TypeError,
-    }),
-    ('feishu://:@/', {
-        'instance': TypeError,
-    }),
-    ('feishu://%badtoken%', {
-        'instance': TypeError,
-    }),
-    ('feishu://abc123', {
-        # Test token
-        'instance': NotifyFeishu,
-    }),
-    ('feishu://?token=abc123', {
-        # Test token
-        'instance': NotifyFeishu,
-    }),
-    ('feishu://token', {
-        'instance': NotifyFeishu,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('feishu://token', {
-        'instance': NotifyFeishu,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('feishu://token', {
-        'instance': NotifyFeishu,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "feishu://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "feishu://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "feishu://%badtoken%",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "feishu://abc123",
+        {
+            # Test token
+            "instance": NotifyFeishu,
+        },
+    ),
+    (
+        "feishu://?token=abc123",
+        {
+            # Test token
+            "instance": NotifyFeishu,
+        },
+    ),
+    (
+        "feishu://token",
+        {
+            "instance": NotifyFeishu,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "feishu://token",
+        {
+            "instance": NotifyFeishu,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "feishu://token",
+        {
+            "instance": NotifyFeishu,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_feishu_urls():
-    """
-    NotifyFeishu() Apprise URLs
-
-    """
+    """NotifyFeishu() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

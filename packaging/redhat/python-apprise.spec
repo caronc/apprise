@@ -191,17 +191,27 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 
 %files -n python%{python3_pkgversion}-%{pypi_name}
 %license LICENSE
-%doc README.md
+%doc README.md ACKNOWLEDGEMENTS.md CONTRIBUTING.md
 %{python3_sitelib}/%{pypi_name}/
-%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/messages.mo
+# Exclude i18n as it is handled below with the lang(spoken) tag below
+%exclude %{python3_sitelib}/%{pypi_name}/i18n/
 %exclude %{python3_sitelib}/%{pypi_name}/cli.*
-%{python3_sitelib}/*.egg-info
+
+# Handle egg-info to dist-info transfer
+%if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
+%{python3_sitelib}/apprise-*.dist-info/
+%else
+%{python3_sitelib}/apprise-*.egg-info
+%endif
+
+# Localised Files
+%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/messages.mo
 
 %files -n %{pypi_name}
 %{_bindir}/%{pypi_name}
 %{_mandir}/man1/%{pypi_name}.1*
 %{python3_sitelib}/%{pypi_name}/cli.*
-%{python3_sitelib}/%{pypi_name}/__pycache__/cli*.pyc
+%{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
 * Sun Mar 30 2025 Chris Caron <lead2gold@gmail.com> - 1.9.3

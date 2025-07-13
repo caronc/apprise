@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,65 +25,83 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import requests
 
 from apprise.plugins.techuluspush import NotifyTechulusPush
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # a test UUID we can use
-UUID4 = '8b799edf-6f98-4d3a-9be7-2862fb4e5752'
+UUID4 = "8b799edf-6f98-4d3a-9be7-2862fb4e5752"
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('push://', {
-        # Missing API Key
-        'instance': TypeError,
-    }),
+    (
+        "push://",
+        {
+            # Missing API Key
+            "instance": TypeError,
+        },
+    ),
     # Invalid API Key
-    ('push://%s' % ('+' * 24), {
-        'instance': TypeError,
-    }),
+    (
+        "push://%s" % ("+" * 24),
+        {
+            "instance": TypeError,
+        },
+    ),
     # APIkey
-    ('push://%s' % UUID4, {
-        'instance': NotifyTechulusPush,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'push://8...2/',
-    }),
+    (
+        f"push://{UUID4}",
+        {
+            "instance": NotifyTechulusPush,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "push://8...2/",
+        },
+    ),
     # API Key + bad url
-    ('push://:@/', {
-        'instance': TypeError,
-    }),
-    ('push://%s' % UUID4, {
-        'instance': NotifyTechulusPush,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('push://%s' % UUID4, {
-        'instance': NotifyTechulusPush,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('push://%s' % UUID4, {
-        'instance': NotifyTechulusPush,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "push://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        f"push://{UUID4}",
+        {
+            "instance": NotifyTechulusPush,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        f"push://{UUID4}",
+        {
+            "instance": NotifyTechulusPush,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        f"push://{UUID4}",
+        {
+            "instance": NotifyTechulusPush,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_techulus_push_urls():
-    """
-    NotifyTechulusPush() Apprise URLs
-
-    """
+    """NotifyTechulusPush() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

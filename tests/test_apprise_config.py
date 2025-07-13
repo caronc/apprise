@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,24 +25,27 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import pytest
-from unittest import mock
-from apprise import NotifyFormat
-from apprise import ConfigFormat
-from apprise import ContentIncludeMode
-from apprise import Apprise
-from apprise import AppriseConfig
-from apprise import AppriseAsset
-from apprise.config import ConfigBase
-from apprise.plugins import NotifyBase
-from apprise import NotificationManager
-from apprise import ConfigurationManager
-
-from apprise.config.file import ConfigFile
-
 # Disable logging for a cleaner testing output
 import logging
+import sys
+from unittest import mock
+
+import pytest
+
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseConfig,
+    ConfigFormat,
+    ConfigurationManager,
+    ContentIncludeMode,
+    NotificationManager,
+    NotifyFormat,
+)
+from apprise.config import ConfigBase
+from apprise.config.file import ConfigFile
+from apprise.plugins import NotifyBase
+
 logging.disable(logging.CRITICAL)
 
 # Grant access to our Notification Manager Singleton
@@ -130,17 +132,25 @@ def test_apprise_config(tmpdir):
     cb = ConfigBase()
 
     # Test adding of all entries
-    assert ac.add(configs=cb, asset=AppriseAsset(), tag='test') is True
+    assert ac.add(configs=cb, asset=AppriseAsset(), tag="test") is True
 
     # Test adding of all entries
-    assert ac.add(
-        configs=['file://?', ], asset=AppriseAsset(), tag='test') is False
+    assert (
+        ac.add(
+            configs=[
+                "file://?",
+            ],
+            asset=AppriseAsset(),
+            tag="test",
+        )
+        is False
+    )
 
     # Test the adding of garbage
     assert ac.add(configs=object()) is False
 
     # Try again but enforce our format
-    ac = AppriseConfig(paths='file://{}?format=text'.format(str(t)))
+    ac = AppriseConfig(paths=f"file://{t!s}?format=text")
 
     # One configuration file should have been found
     assert len(ac) == 1
@@ -157,8 +167,8 @@ def test_apprise_config(tmpdir):
 
     # Write our content to our file
     t = tmpdir.mkdir("internationalization").join("apprise")
-    with open(str(t), 'wb') as f:
-        f.write(istr.encode('latin-1'))
+    with open(str(t), "wb") as f:
+        f.write(istr.encode("latin-1"))
 
     # Create ourselves a config object
     ac = AppriseConfig(paths=str(t))
@@ -172,12 +182,12 @@ def test_apprise_config(tmpdir):
 
     # Test iterator
     count = 0
-    for entry in ac:
+    for _entry in ac:
         count += 1
     assert len(ac) == count
 
     # We can fix this though; set our encoding to latin-1
-    ac = AppriseConfig(paths='file://{}?encoding=latin-1'.format(str(t)))
+    ac = AppriseConfig(paths=f"file://{t!s}?encoding=latin-1")
 
     # One configuration file should have been found
     assert len(ac) == 1
@@ -241,8 +251,7 @@ def test_apprise_multi_config_entries(tmpdir):
     # Define our good:// url
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super().__init__(
-                notify_format=NotifyFormat.HTML, **kwargs)
+            super().__init__(notify_format=NotifyFormat.HTML, **kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -250,10 +259,10 @@ def test_apprise_multi_config_entries(tmpdir):
 
         def url(self, **kwargs):
             # support url()
-            return ''
+            return ""
 
     # Store our good notification in our schema map
-    N_MGR._schema_map['good'] = GoodNotification
+    N_MGR._schema_map["good"] = GoodNotification
 
     # Create ourselves a config object
     ac = AppriseConfig()
@@ -263,8 +272,10 @@ def test_apprise_multi_config_entries(tmpdir):
 
     # Support adding of muilt strings and objects:
     assert ac.add(configs=(str(t), str(t))) is True
-    assert ac.add(configs=(
-        ConfigFile(path=str(te)), ConfigFile(path=str(t)))) is True
+    assert (
+        ac.add(configs=(ConfigFile(path=str(te)), ConfigFile(path=str(t))))
+        is True
+    )
 
     # don't support the adding of invalid content
     assert ac.add(configs=(object(), object())) is False
@@ -276,15 +287,11 @@ def test_apprise_multi_config_entries(tmpdir):
 
     # Pop our elements
     while len(ac.servers()) > 0:
-        assert isinstance(
-            ac.server_pop(len(ac.servers()) - 1), NotifyBase)
+        assert isinstance(ac.server_pop(len(ac.servers()) - 1), NotifyBase)
 
 
 def test_apprise_add_config():
-    """
-    API AppriseConfig.add_config()
-
-    """
+    """API AppriseConfig.add_config()"""
     content = """
     # A comment line over top of a URL
     mailto://usera:pass@gmail.com
@@ -329,8 +336,9 @@ def test_apprise_add_config():
     assert len(ac) == 1
 
     # Test having a pre-defined asset object and tag created
-    assert ac.add_config(
-        content=content, asset=AppriseAsset(), tag='a') is True
+    assert (
+        ac.add_config(content=content, asset=AppriseAsset(), tag="a") is True
+    )
 
     # Now there are 2 servers loaded
     assert len(ac) == 2
@@ -397,47 +405,47 @@ def test_apprise_config_tagging(tmpdir):
     ac = AppriseConfig()
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="a") is True
     # Add an item associated with tag b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="b") is True
     # Add an item associated with tag a or b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,b') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="a,b") is True
 
     # Now filter: a:
-    assert len(ac.servers(tag='a')) == 2
+    assert len(ac.servers(tag="a")) == 2
     # Now filter: a or b:
-    assert len(ac.servers(tag='a,b')) == 3
+    assert len(ac.servers(tag="a,b")) == 3
     # Now filter: a and b
-    assert len(ac.servers(tag=[('a', 'b')])) == 1
+    assert len(ac.servers(tag=[("a", "b")])) == 1
     # all matches everything
-    assert len(ac.servers(tag='all')) == 3
+    assert len(ac.servers(tag="all")) == 3
 
     # Test cases using the `always` keyword
     # Create ourselves a config object
     ac = AppriseConfig()
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a,always') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="a,always") is True
     # Add an item associated with tag b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='b') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="b") is True
     # Add an item associated with tag a or b
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='c,d') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="c,d") is True
 
     # Now filter: a:
-    assert len(ac.servers(tag='a')) == 1
+    assert len(ac.servers(tag="a")) == 1
     # Now filter: a or b:
-    assert len(ac.servers(tag='a,b')) == 2
+    assert len(ac.servers(tag="a,b")) == 2
     # Now filter: e
     # we'll match the `always'
-    assert len(ac.servers(tag='e')) == 1
-    assert len(ac.servers(tag='e', match_always=False)) == 0
+    assert len(ac.servers(tag="e")) == 1
+    assert len(ac.servers(tag="e", match_always=False)) == 0
     # all matches everything
-    assert len(ac.servers(tag='all')) == 3
+    assert len(ac.servers(tag="all")) == 3
 
     # Now filter: d
     # we'll match the `always' tag
-    assert len(ac.servers(tag='d')) == 2
-    assert len(ac.servers(tag='d', match_always=False)) == 1
+    assert len(ac.servers(tag="d")) == 2
+    assert len(ac.servers(tag="d", match_always=False)) == 1
 
 
 def test_apprise_config_instantiate():
@@ -445,11 +453,14 @@ def test_apprise_config_instantiate():
     API: AppriseConfig.instantiate()
 
     """
-    assert AppriseConfig.instantiate(
-        'file://?', suppress_exceptions=True) is None
+    assert (
+        AppriseConfig.instantiate("file://?", suppress_exceptions=True) is None
+    )
 
-    assert AppriseConfig.instantiate(
-        'invalid://?', suppress_exceptions=True) is None
+    assert (
+        AppriseConfig.instantiate("invalid://?", suppress_exceptions=True)
+        is None
+    )
 
     class BadConfig(ConfigBase):
         # always allow incusion
@@ -467,22 +478,20 @@ def test_apprise_config_instantiate():
             return ConfigBase.parse_url(url, verify_host=False)
 
     # Store our bad configuration in our schema map
-    C_MGR['bad'] = BadConfig
+    C_MGR["bad"] = BadConfig
 
     with pytest.raises(TypeError):
-        AppriseConfig.instantiate(
-            'bad://path', suppress_exceptions=False)
+        AppriseConfig.instantiate("bad://path", suppress_exceptions=False)
 
     # Same call but exceptions suppressed
-    assert AppriseConfig.instantiate(
-        'bad://path', suppress_exceptions=True) is None
+    assert (
+        AppriseConfig.instantiate("bad://path", suppress_exceptions=True)
+        is None
+    )
 
 
 def test_invalid_apprise_config(tmpdir):
-    """
-    Parse invalid configuration includes
-
-    """
+    """Parse invalid configuration includes."""
 
     class BadConfig(ConfigBase):
         # always allow incusion
@@ -500,11 +509,11 @@ def test_invalid_apprise_config(tmpdir):
             return ConfigBase.parse_url(url, verify_host=False)
 
     # Store our bad configuration in our schema map
-    C_MGR['bad'] = BadConfig
+    C_MGR["bad"] = BadConfig
 
     # temporary file to work with
     t = tmpdir.mkdir("apprise-bad-obj").join("invalid")
-    buf = """
+    buf = f"""
     # Include an invalid schema
     include invalid://
 
@@ -515,9 +524,9 @@ def test_invalid_apprise_config(tmpdir):
     include bad://
 
     # Include ourselves (So our recursive includes fails as well)
-    include {}
+    include {t!s}
 
-    """.format(str(t))
+    """
     t.write(buf)
 
     # Create ourselves a config object with caching disbled
@@ -553,8 +562,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     # Define our good:// url
     class GoodNotification(NotifyBase):
         def __init__(self, **kwargs):
-            super().__init__(
-                notify_format=NotifyFormat.HTML, **kwargs)
+            super().__init__(notify_format=NotifyFormat.HTML, **kwargs)
 
         def notify(self, **kwargs):
             # Pretend everything is okay
@@ -562,10 +570,10 @@ def test_apprise_config_with_apprise_obj(tmpdir):
 
         def url(self, **kwargs):
             # support url()
-            return ''
+            return ""
 
     # Store our good notification in our schema map
-    N_MGR._schema_map['good'] = GoodNotification
+    N_MGR._schema_map["good"] = GoodNotification
 
     # Create ourselves a config object
     ac = AppriseConfig(cache=False)
@@ -574,7 +582,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(ac) == 0
 
     # Add an item associated with tag a
-    assert ac.add(configs=str(t), asset=AppriseAsset(), tag='a') is True
+    assert ac.add(configs=str(t), asset=AppriseAsset(), tag="a") is True
 
     # One configuration file
     assert len(ac) == 1
@@ -598,11 +606,12 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(a) == 1
 
     # Notify our service
-    assert a.notify(body='apprise configuration power!') is True
+    assert a.notify(body="apprise configuration power!") is True
 
     # Add our configuration object
-    assert a.add(
-        servers=[AppriseConfig(str(t)), AppriseConfig(str(t))]) is True
+    assert (
+        a.add(servers=[AppriseConfig(str(t)), AppriseConfig(str(t))]) is True
+    )
 
     # Detect our 5 loaded entries now; 1 from first config, and another
     # 2x2 based on adding our list above
@@ -671,11 +680,16 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     # Now we'll test adding another element to the list so that it mixes up
     # our response object.
     # Below we add 3 different types, a ConfigBase, NotifyBase, and URL
-    assert a.add(
-        servers=[
-            ConfigFile(path=(str(t))),
-            'good://another.host',
-            GoodNotification(**{'host': 'nuxref.com'})]) is True
+    assert (
+        a.add(
+            servers=[
+                ConfigFile(path=(str(t))),
+                "good://another.host",
+                GoodNotification(**{"host": "nuxref.com"}),
+            ]
+        )
+        is True
+    )
 
     # Our length increases by 4 (2 entries in the config file, + 2 others)
     assert len(a) == 7
@@ -712,48 +726,42 @@ def test_recursive_config_inclusion(tmpdir):
 
     # To test our config classes, we make three dummy configs
     class ConfigCrossPostAlways(ConfigFile):
-        """
-        A dummy config that is set to always allow inclusion
-        """
+        """A dummy config that is set to always allow inclusion."""
 
-        service_name = 'always'
+        service_name = "always"
 
         # protocol
-        protocol = 'always'
+        protocol = "always"
 
         # Always type
         allow_cross_includes = ContentIncludeMode.ALWAYS
 
     class ConfigCrossPostStrict(ConfigFile):
-        """
-        A dummy config that is set to strict inclusion
-        """
+        """A dummy config that is set to strict inclusion."""
 
-        service_name = 'strict'
+        service_name = "strict"
 
         # protocol
-        protocol = 'strict'
+        protocol = "strict"
 
         # Always type
         allow_cross_includes = ContentIncludeMode.STRICT
 
     class ConfigCrossPostNever(ConfigFile):
-        """
-        A dummy config that is set to never allow inclusion
-        """
+        """A dummy config that is set to never allow inclusion."""
 
-        service_name = 'never'
+        service_name = "never"
 
         # protocol
-        protocol = 'never'
+        protocol = "never"
 
         # Always type
         allow_cross_includes = ContentIncludeMode.NEVER
 
     # store our entries
-    C_MGR['never'] = ConfigCrossPostNever
-    C_MGR['strict'] = ConfigCrossPostStrict
-    C_MGR['always'] = ConfigCrossPostAlways
+    C_MGR["never"] = ConfigCrossPostNever
+    C_MGR["strict"] = ConfigCrossPostStrict
+    C_MGR["always"] = ConfigCrossPostAlways
 
     # Make our new path valid
     suite = tmpdir.mkdir("apprise_config_recursion")
@@ -764,12 +772,12 @@ def test_recursive_config_inclusion(tmpdir):
     cfg04 = suite.mkdir("dir3").join("cfg04.cfg")
 
     # Populate our files with valid configuration include lines
-    cfg01.write("""
+    cfg01.write(f"""
 # json entry
 json://localhost:8080
 
 # absolute path inclusion to ourselves
-include {}""".format(str(cfg01)))
+include {cfg01!s}""")
 
     cfg02.write("""
 # json entry
@@ -791,18 +799,18 @@ include invalid://entry
 # Include non includable type
 include memory://""")
 
-    cfg04.write("""
+    cfg04.write(f"""
 # xml entry
 xml://localhost:8080
 
 # always include of our file
-include always://{}
+include always://{cfg04!s}
 
 # never include of our file
-include never://{}
+include never://{cfg04!s}
 
 # strict include of our file
-include strict://{}""".format(str(cfg04), str(cfg04), str(cfg04)))
+include strict://{cfg04!s}""")
 
     # Create ourselves a config object
     ac = AppriseConfig()
@@ -908,7 +916,7 @@ def test_apprise_config_file_loading(tmpdir):
 
     # Flow from README.md
     ap = Apprise()
-    ap.add('xml://localhost')
+    ap.add("xml://localhost")
     config = AppriseConfig()
     config.add(str(config_path))
     ap.add(config)
@@ -926,55 +934,47 @@ def test_apprise_config_matrix_load():
     import apprise
 
     class ConfigDummy(ConfigBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
+        """A dummy wrapper for testing the different options in the load_matrix
+        function."""
 
         # The default descriptive name associated with the Notification
-        service_name = 'dummy'
+        service_name = "dummy"
 
         # protocol as tuple
-        protocol = ('uh', 'oh')
+        protocol = ("uh", "oh")
 
         # secure protocol as tuple
-        secure_protocol = ('no', 'yes')
+        secure_protocol = ("no", "yes")
 
     class ConfigDummy2(ConfigBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
+        """A dummy wrapper for testing the different options in the load_matrix
+        function."""
 
         # The default descriptive name associated with the Notification
-        service_name = 'dummy2'
+        service_name = "dummy2"
 
         # secure protocol as tuple
-        secure_protocol = ('true', 'false')
+        secure_protocol = ("true", "false")
 
     class ConfigDummy3(ConfigBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
+        """A dummy wrapper for testing the different options in the load_matrix
+        function."""
 
         # The default descriptive name associated with the Notification
-        service_name = 'dummy3'
+        service_name = "dummy3"
 
         # secure protocol as string
-        secure_protocol = 'true'
+        secure_protocol = "true"
 
     class ConfigDummy4(ConfigBase):
-        """
-        A dummy wrapper for testing the different options in the load_matrix
-        function
-        """
+        """A dummy wrapper for testing the different options in the load_matrix
+        function."""
 
         # The default descriptive name associated with the Notification
-        service_name = 'dummy4'
+        service_name = "dummy4"
 
         # protocol as string
-        protocol = 'true'
+        protocol = "true"
 
     # Generate ourselves a fake entry
     apprise.config.ConfigDummy = ConfigDummy
@@ -991,35 +991,32 @@ def test_configmatrix_dynamic_importing(tmpdir):
 
     # Make our new path valid
     suite = tmpdir.mkdir("apprise_config_test_suite")
-    suite.join("__init__.py").write('')
+    suite.join("__init__.py").write("")
 
-    module_name = 'badconfig'
+    module_name = "badconfig"
 
     # Update our path to point to our new test suite
     sys.path.insert(0, str(suite))
 
     # Create a base area to work within
     base = suite.mkdir(module_name)
-    base.join("__init__.py").write('')
+    base.join("__init__.py").write("")
 
     # Test no app_id
-    base.join('ConfigBadFile1.py').write(
-        """
+    base.join("ConfigBadFile1.py").write("""
 class ConfigBadFile1:
     pass""")
 
     # No class of the same name
-    base.join('ConfigBadFile2.py').write(
-        """
+    base.join("ConfigBadFile2.py").write("""
 class BadClassName:
     pass""")
 
     # Exception thrown
-    base.join('ConfigBadFile3.py').write("""raise ImportError()""")
+    base.join("ConfigBadFile3.py").write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join('ConfigGoober.py').write(
-        """
+    base.join("ConfigGoober.py").write("""
 from apprise.config import ConfigBase
 class ConfigGoober(ConfigBase):
     # This class tests the fact we have a new class name, but we're
@@ -1037,7 +1034,7 @@ class ConfigGoober(ConfigBase):
         return ConfigBase.parse_url(url, verify_host=False)""")
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join('ConfigBugger.py').write("""
+    base.join("ConfigBugger.py").write("""
 from apprise.config import ConfigBase
 class ConfigBugger(ConfigBase):
     # This class tests the fact we have a new class name, but we're
@@ -1056,7 +1053,7 @@ class ConfigBugger(ConfigBase):
         return ConfigBase.parse_url(url, verify_host=False)""")
 
 
-@mock.patch('os.path.getsize')
+@mock.patch("os.path.getsize")
 def test_config_base_parse_inaccessible_text_file(mock_getsize, tmpdir):
     """
     API: ConfigBase.parse_inaccessible_text_file
@@ -1134,17 +1131,17 @@ def test_config_base_parse_yaml_file02(tmpdir):
     assert len(a) == 3
 
     # No match
-    assert sum(1 for _ in a.find('no-match')) == 0
+    assert sum(1 for _ in a.find("no-match")) == 0
     # Match everything
-    assert sum(1 for _ in a.find('all')) == 3
+    assert sum(1 for _ in a.find("all")) == 3
     # Match test1 entry
-    assert sum(1 for _ in a.find('test1')) == 1
+    assert sum(1 for _ in a.find("test1")) == 1
     # Match test2 entry
-    assert sum(1 for _ in a.find('test2')) == 1
+    assert sum(1 for _ in a.find("test2")) == 1
     # Match test3 entry
-    assert sum(1 for _ in a.find('test3')) == 1
+    assert sum(1 for _ in a.find("test3")) == 1
     # Match test1 or test3 entry
-    assert sum(1 for _ in a.find('test1, test3')) == 2
+    assert sum(1 for _ in a.find("test1, test3")) == 2
 
 
 def test_config_base_parse_yaml_file03(tmpdir):
@@ -1185,17 +1182,17 @@ def test_config_base_parse_yaml_file03(tmpdir):
     assert len(a) == 3
 
     # No match
-    assert sum(1 for _ in a.find('no-match')) == 0
+    assert sum(1 for _ in a.find("no-match")) == 0
     # Match everything
-    assert sum(1 for _ in a.find('all')) == 3
+    assert sum(1 for _ in a.find("all")) == 3
     # No match for bad entry
-    assert sum(1 for _ in a.find('test1')) == 0
+    assert sum(1 for _ in a.find("test1")) == 0
     # Match test2 entry
-    assert sum(1 for _ in a.find('test2')) == 1
+    assert sum(1 for _ in a.find("test2")) == 1
     # Match test3 entry
-    assert sum(1 for _ in a.find('test3')) == 1
+    assert sum(1 for _ in a.find("test3")) == 1
     # Match test1 or test3 entry; (only matches test3)
-    assert sum(1 for _ in a.find('test1, test3')) == 1
+    assert sum(1 for _ in a.find("test1, test3")) == 1
 
 
 def test_config_base_parse_yaml_file04(tmpdir):
@@ -1233,22 +1230,22 @@ def test_config_base_parse_yaml_file04(tmpdir):
     assert len(a) == 3
 
     # No match still matches `always` keyword
-    assert sum(1 for _ in a.find('no-match')) == 1
+    assert sum(1 for _ in a.find("no-match")) == 1
     # Unless we explicitly do not look for that file
-    assert sum(1 for _ in a.find('no-match', match_always=False)) == 0
+    assert sum(1 for _ in a.find("no-match", match_always=False)) == 0
     # Match everything
-    assert sum(1 for _ in a.find('all')) == 3
+    assert sum(1 for _ in a.find("all")) == 3
     # Match test1 entry (also has `always` keyword
-    assert sum(1 for _ in a.find('test1')) == 1
-    assert sum(1 for _ in a.find('test1', match_always=False)) == 1
+    assert sum(1 for _ in a.find("test1")) == 1
+    assert sum(1 for _ in a.find("test1", match_always=False)) == 1
     # Match test2 entry (and test1 due to always keyword)
-    assert sum(1 for _ in a.find('test2')) == 2
-    assert sum(1 for _ in a.find('test2', match_always=False)) == 1
+    assert sum(1 for _ in a.find("test2")) == 2
+    assert sum(1 for _ in a.find("test2", match_always=False)) == 1
     # Match test3 entry (and test1 due to always keyword)
-    assert sum(1 for _ in a.find('test3')) == 2
-    assert sum(1 for _ in a.find('test3', match_always=False)) == 1
+    assert sum(1 for _ in a.find("test3")) == 2
+    assert sum(1 for _ in a.find("test3", match_always=False)) == 1
     # Match test1 or test3 entry
-    assert sum(1 for _ in a.find('test1, test3')) == 2
+    assert sum(1 for _ in a.find("test1, test3")) == 2
 
 
 def test_apprise_config_template_parse(tmpdir):
@@ -1284,46 +1281,46 @@ def test_apprise_config_template_parse(tmpdir):
 
     # The below checks are very customized for NotifyMail but just
     # test that the content got passed correctly
-    assert (False, 'user1@gmail.com') in ac[0][0].targets
-    assert 'test@hotmail.com' in ac[0][0].cc
-    assert 'company' in ac[0][1].tags
+    assert (False, "user1@gmail.com") in ac[0][0].targets
+    assert "test@hotmail.com" in ac[0][0].cc
+    assert "company" in ac[0][1].tags
 
-    assert (False, 'user2@gmail.com') in ac[0][1].targets
-    assert 'company' in ac[0][1].tags
-    assert 'co-worker' in ac[0][1].tags
+    assert (False, "user2@gmail.com") in ac[0][1].targets
+    assert "company" in ac[0][1].tags
+    assert "co-worker" in ac[0][1].tags
 
     #
     # Specifically test _special_token_handler()
     #
     tokens = {
         # This maps to itself (bcc); no change here
-        'bcc': 'user@test.com',
+        "bcc": "user@test.com",
         # This should get mapped to 'targets'
-        'to': 'user1@abc.com',
+        "to": "user1@abc.com",
         # white space and tab is intentionally added to the end to verify we
         # do not play/tamper with information
-        'targets': 'user2@abc.com, user3@abc.com   \t',
+        "targets": "user2@abc.com, user3@abc.com   \t",
         # If the end user provides a configuration for data we simply don't use
         # this isn't a proble... we simply don't touch it either; we leave it
         # as is.
-        'ignore': 'not-used'
+        "ignore": "not-used",
     }
 
-    result = ConfigBase._special_token_handler('mailto', tokens)
+    result = ConfigBase._special_token_handler("mailto", tokens)
     # to gets mapped to targets
-    assert 'to' not in result
+    assert "to" not in result
 
     # bcc is allowed here
-    assert 'bcc' in result
-    assert 'targets' in result
+    assert "bcc" in result
+    assert "targets" in result
     # Not used, but also not touched; this entry should still be in our result
     # set
-    assert 'ignore' in result
+    assert "ignore" in result
     # We'll concatinate all of our targets together
-    assert len(result['targets']) == 2
-    assert 'user1@abc.com' in result['targets']
+    assert len(result["targets"]) == 2
+    assert "user1@abc.com" in result["targets"]
     # Content is passed as is
-    assert 'user2@abc.com, user3@abc.com   \t' in result['targets']
+    assert "user2@abc.com, user3@abc.com   \t" in result["targets"]
 
     # We re-do the simmiar test above.  The very key difference is the
     # `targets` is a list already (it's expected type) so `to` can properly be
@@ -1331,35 +1328,35 @@ def test_apprise_config_template_parse(tmpdir):
     # situation)
     tokens = {
         # This maps to itself (bcc); no change here
-        'bcc': 'user@test.com',
+        "bcc": "user@test.com",
         # This should get mapped to 'targets'
-        'to': 'user1@abc.com',
+        "to": "user1@abc.com",
         # similar to the above test except targets is now a proper
         # dictionary allowing the `to` (when translated to `targets`) to get
         # appended to it
-        'targets': ['user2@abc.com', 'user3@abc.com'],
+        "targets": ["user2@abc.com", "user3@abc.com"],
         # If the end user provides a configuration for data we simply don't use
         # this isn't a proble... we simply don't touch it either; we leave it
         # as is.
-        'ignore': 'not-used'
+        "ignore": "not-used",
     }
 
-    result = ConfigBase._special_token_handler('mailto', tokens)
+    result = ConfigBase._special_token_handler("mailto", tokens)
     # to gets mapped to targets
-    assert 'to' not in result
+    assert "to" not in result
 
     # bcc is allowed here
-    assert 'bcc' in result
-    assert 'targets' in result
+    assert "bcc" in result
+    assert "targets" in result
     # Not used, but also not touched; this entry should still be in our result
     # set
-    assert 'ignore' in result
+    assert "ignore" in result
 
     # Now we'll see the new user added as expected (concatinated into our list)
-    assert len(result['targets']) == 3
-    assert 'user1@abc.com' in result['targets']
-    assert 'user2@abc.com' in result['targets']
-    assert 'user3@abc.com' in result['targets']
+    assert len(result["targets"]) == 3
+    assert "user1@abc.com" in result["targets"]
+    assert "user2@abc.com" in result["targets"]
+    assert "user3@abc.com" in result["targets"]
 
     # Test providing a list
     t.write("""
@@ -1403,26 +1400,26 @@ def test_apprise_config_template_parse(tmpdir):
 
     # Verify our users got placed into the to
     assert len(ac[0][0].targets) == 3
-    assert ("John Smith", 'user1@gmail.com') in ac[0][0].targets
-    assert ("Jason Tater", 'user2@gmail.com') in ac[0][0].targets
-    assert (False, 'user3@gmail.com') in ac[0][0].targets
-    assert ac[0][0].smtp_host == 'smtp3-dev.google.gmail.com'
+    assert ("John Smith", "user1@gmail.com") in ac[0][0].targets
+    assert ("Jason Tater", "user2@gmail.com") in ac[0][0].targets
+    assert (False, "user3@gmail.com") in ac[0][0].targets
+    assert ac[0][0].smtp_host == "smtp3-dev.google.gmail.com"
 
     assert len(ac[0][1].targets) == 2
-    assert ("Henry Fisher", 'user4@gmail.com') in ac[0][1].targets
-    assert ("Jason Archie", 'user5@gmail.com') in ac[0][1].targets
-    assert 'drinking-buddy' in ac[0][1].tags
-    assert ac[0][1].smtp_host == 'smtp5-dev.google.gmail.com'
+    assert ("Henry Fisher", "user4@gmail.com") in ac[0][1].targets
+    assert ("Jason Archie", "user5@gmail.com") in ac[0][1].targets
+    assert "drinking-buddy" in ac[0][1].tags
+    assert ac[0][1].smtp_host == "smtp5-dev.google.gmail.com"
 
     # Our third test tests cases where some variables are defined inline
     # and additional ones are defined below that share the same token space
     assert len(ac[0][2].targets) == 1
     assert len(ac[0][2].cc) == 1
-    assert (False, 'override01@gmail.com') in ac[0][2].targets
-    assert 'override02@gmail.com' in ac[0][2].cc
+    assert (False, "override01@gmail.com") in ac[0][2].targets
+    assert "override02@gmail.com" in ac[0][2].cc
 
     # Test our Since configuration now:
     assert len(ac[0][3].targets) == 1
-    assert ac[0][3].service_plan_id == 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'
-    assert ac[0][3].source == '+10005243890'
-    assert ac[0][3].targets[0] == '+11235551234'
+    assert ac[0][3].service_plan_id == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    assert ac[0][3].source == "+10005243890"
+    assert ac[0][3].targets[0] == "+11235551234"

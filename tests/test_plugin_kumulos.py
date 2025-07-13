@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,85 +25,98 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import pytest
 import requests
 
 from apprise.plugins.kumulos import NotifyKumulos
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # a test UUID we can use
-UUID4 = '8b799edf-6f98-4d3a-9be7-2862fb4e5752'
+UUID4 = "8b799edf-6f98-4d3a-9be7-2862fb4e5752"
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('kumulos://', {
-        # No API or Server Key specified
-        'instance': TypeError,
-    }),
-    ('kumulos://:@/', {
-        # No API or Server Key specified
-        # We don't have strict host checking on for kumulos, so this URL
-        # actually becomes parseable and :@ becomes a hostname.
-        # The below errors because a second token wasn't found
-        'instance': TypeError,
-    }),
-    ('kumulos://{}/'.format(UUID4), {
-        # No server key was specified
-        'instance': TypeError,
-    }),
-    ('kumulos://{}/{}/'.format(UUID4, 'w' * 36), {
-        # Everything is okay
-        'instance': NotifyKumulos,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'kumulos://8...2/w...w/',
-    }),
-    ('kumulos://{}/{}/'.format(UUID4, 'x' * 36), {
-        'instance': NotifyKumulos,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'kumulos://8...2/x...x/',
-    }),
-    ('kumulos://{}/{}/'.format(UUID4, 'y' * 36), {
-        'instance': NotifyKumulos,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'kumulos://8...2/y...y/',
-    }),
-    ('kumulos://{}/{}/'.format(UUID4, 'z' * 36), {
-        'instance': NotifyKumulos,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "kumulos://",
+        {
+            # No API or Server Key specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "kumulos://:@/",
+        {
+            # No API or Server Key specified
+            # We don't have strict host checking on for kumulos, so this URL
+            # actually becomes parseable and :@ becomes a hostname.
+            # The below errors because a second token wasn't found
+            "instance": TypeError,
+        },
+    ),
+    (
+        f"kumulos://{UUID4}/",
+        {
+            # No server key was specified
+            "instance": TypeError,
+        },
+    ),
+    (
+        "kumulos://{}/{}/".format(UUID4, "w" * 36),
+        {
+            # Everything is okay
+            "instance": NotifyKumulos,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "kumulos://8...2/w...w/",
+        },
+    ),
+    (
+        "kumulos://{}/{}/".format(UUID4, "x" * 36),
+        {
+            "instance": NotifyKumulos,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "kumulos://8...2/x...x/",
+        },
+    ),
+    (
+        "kumulos://{}/{}/".format(UUID4, "y" * 36),
+        {
+            "instance": NotifyKumulos,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "kumulos://8...2/y...y/",
+        },
+    ),
+    (
+        "kumulos://{}/{}/".format(UUID4, "z" * 36),
+        {
+            "instance": NotifyKumulos,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_kumulos_urls():
-    """
-    NotifyKumulos() Apprise URLs
-
-    """
+    """NotifyKumulos() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 def test_plugin_kumulos_edge_cases():
-    """
-    NotifyKumulos() Edge Cases
-
-    """
+    """NotifyKumulos() Edge Cases."""
 
     # Invalid API Key
     with pytest.raises(TypeError):

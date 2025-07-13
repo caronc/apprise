@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,25 +25,25 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import pytest
-import json
-import requests
-from unittest import mock
-from os.path import getsize
-from os.path import join
-from os.path import dirname
 from inspect import cleandoc
-from apprise import Apprise, AppriseAsset
-from apprise import AttachmentManager
+import json
+
+# Disable logging for a cleaner testing output
+import logging
+from os.path import dirname, getsize, join
+from unittest import mock
+
+import pytest
+import requests
+
+from apprise import Apprise, AppriseAsset, AttachmentManager
 from apprise.apprise_attachment import AppriseAttachment
 from apprise.attachment import AttachBase
 from apprise.common import ContentLocation
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
-TEST_VAR_DIR = join(dirname(__file__), 'var')
+TEST_VAR_DIR = join(dirname(__file__), "var")
 
 # Grant access to our Attachment Manager Singleton
 A_MGR = AttachmentManager()
@@ -74,7 +73,7 @@ def test_apprise_attachment():
     assert len(aa) == 0
 
     # Add a file by it's path
-    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    path = join(TEST_VAR_DIR, "apprise-test.gif")
     assert aa.add(path)
 
     # There is now 1 attachment
@@ -103,9 +102,10 @@ def test_apprise_attachment():
     # We can add by lists as well in a variety of formats
     attachments = (
         path,
-        'file://{}?name=newfilename.gif?cache=120'.format(path),
+        f"file://{path}?name=newfilename.gif?cache=120",
         AppriseAttachment.instantiate(
-            'file://{}?name=anotherfilename.gif'.format(path), cache=100),
+            f"file://{path}?name=anotherfilename.gif", cache=100
+        ),
     )
 
     # Add them
@@ -129,8 +129,8 @@ def test_apprise_attachment():
     assert attachment
     assert len(aa) == 2
     assert attachment.path == path
-    assert attachment.name == 'anotherfilename.gif'
-    assert attachment.mimetype == 'image/gif'
+    assert attachment.name == "anotherfilename.gif"
+    assert attachment.mimetype == "image/gif"
 
     # elements can also be directly indexed
     assert isinstance(aa[0], AttachBase)
@@ -164,14 +164,24 @@ def test_apprise_attachment():
     assert len(aa) == 0
     assert not aa
 
-    assert aa.add(AppriseAttachment.instantiate(
-        'file://{}?name=andanother.png&cache=Yes'.format(path)))
-    assert aa.add(AppriseAttachment.instantiate(
-        'file://{}?name=andanother.png&cache=No'.format(path)))
+    assert aa.add(
+        AppriseAttachment.instantiate(
+            f"file://{path}?name=andanother.png&cache=Yes"
+        )
+    )
+    assert aa.add(
+        AppriseAttachment.instantiate(
+            f"file://{path}?name=andanother.png&cache=No"
+        )
+    )
     AppriseAttachment.instantiate(
-        'file://{}?name=andanother.png&cache=600'.format(path))
-    assert aa.add(AppriseAttachment.instantiate(
-        'file://{}?name=andanother.png&cache=600'.format(path)))
+        f"file://{path}?name=andanother.png&cache=600"
+    )
+    assert aa.add(
+        AppriseAttachment.instantiate(
+            f"file://{path}?name=andanother.png&cache=600"
+        )
+    )
 
     assert len(aa) == 3
     assert aa[0].cache is True
@@ -179,12 +189,18 @@ def test_apprise_attachment():
     assert aa[2].cache == 600
 
     # Negative cache are not allowed
-    assert not aa.add(AppriseAttachment.instantiate(
-        'file://{}?name=andanother.png&cache=-600'.format(path)))
+    assert not aa.add(
+        AppriseAttachment.instantiate(
+            f"file://{path}?name=andanother.png&cache=-600"
+        )
+    )
 
     # Invalid cache value
-    assert not aa.add(AppriseAttachment.instantiate(
-        'file://{}?name=andanother.png'.format(path), cache='invalid'))
+    assert not aa.add(
+        AppriseAttachment.instantiate(
+            f"file://{path}?name=andanother.png", cache="invalid"
+        )
+    )
 
     # No length change
     assert len(aa) == 3
@@ -205,7 +221,7 @@ def test_apprise_attachment():
         None,
         object(),
         42,
-        'garbage://',
+        "garbage://",
     )
 
     # Add our attachments
@@ -217,7 +233,7 @@ def test_apprise_attachment():
     # if instantiating attachments from the class, it will throw a TypeError
     # if attachments couldn't be loaded
     with pytest.raises(TypeError):
-        AppriseAttachment('garbage://')
+        AppriseAttachment("garbage://")
 
     # Load our other attachment types
     aa = AppriseAttachment(location=ContentLocation.LOCAL)
@@ -248,7 +264,7 @@ def test_apprise_attachment():
         AppriseAttachment(location="invalid")
 
     # test cases when file simply doesn't exist
-    aa = AppriseAttachment('file://non-existant-file.png')
+    aa = AppriseAttachment("file://non-existant-file.png")
     # Our length is still 1
     assert len(aa) == 1
     # Our object will still return a True
@@ -264,7 +280,7 @@ def test_apprise_attachment():
     assert aa.size() == 0
 
 
-@mock.patch('requests.get')
+@mock.patch("requests.get")
 def test_apprise_attachment_truncate(mock_get):
     """
     API: AppriseAttachment when truncation in place
@@ -282,7 +298,7 @@ def test_apprise_attachment_truncate(mock_get):
     ap_obj = Apprise()
 
     # Add ourselves an object set to truncate
-    ap_obj.add('json://localhost/?method=GET&overflow=truncate')
+    ap_obj.add("json://localhost/?method=GET&overflow=truncate")
 
     # Create ourselves an attachment object
     aa = AppriseAttachment()
@@ -295,18 +311,18 @@ def test_apprise_attachment_truncate(mock_get):
     assert not aa
 
     # Add 2 attachments
-    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.gif'))
-    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.png'))
+    assert aa.add(join(TEST_VAR_DIR, "apprise-test.gif"))
+    assert aa.add(join(TEST_VAR_DIR, "apprise-test.png"))
 
     assert mock_get.call_count == 0
-    assert ap_obj.notify(body='body', title='title', attach=aa)
+    assert ap_obj.notify(body="body", title="title", attach=aa)
 
     assert mock_get.call_count == 1
 
     # Our first item was truncated, so only 1 attachment
     details = mock_get.call_args_list[0]
-    dataset = json.loads(details[1]['data'])
-    assert len(dataset['attachments']) == 1
+    dataset = json.loads(details[1]["data"])
+    assert len(dataset["attachments"]) == 1
 
     # Reset our object
     mock_get.reset_mock()
@@ -315,24 +331,24 @@ def test_apprise_attachment_truncate(mock_get):
     ap_obj = Apprise()
 
     # Add ourselves an object set to upstream
-    ap_obj.add('json://localhost/?method=GET&overflow=upstream')
+    ap_obj.add("json://localhost/?method=GET&overflow=upstream")
 
     # Create ourselves an attachment object
     aa = AppriseAttachment()
 
     # Add 2 attachments
-    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.gif'))
-    assert aa.add(join(TEST_VAR_DIR, 'apprise-test.png'))
+    assert aa.add(join(TEST_VAR_DIR, "apprise-test.gif"))
+    assert aa.add(join(TEST_VAR_DIR, "apprise-test.png"))
 
     assert mock_get.call_count == 0
-    assert ap_obj.notify(body='body', title='title', attach=aa)
+    assert ap_obj.notify(body="body", title="title", attach=aa)
 
     assert mock_get.call_count == 1
 
     # Our item was not truncated, so all attachments
     details = mock_get.call_args_list[0]
-    dataset = json.loads(details[1]['data'])
-    assert len(dataset['attachments']) == 2
+    dataset = json.loads(details[1]["data"])
+    assert len(dataset["attachments"]) == 2
 
 
 def test_apprise_attachment_instantiate():
@@ -340,11 +356,15 @@ def test_apprise_attachment_instantiate():
     API: AppriseAttachment.instantiate()
 
     """
-    assert AppriseAttachment.instantiate(
-        'file://?', suppress_exceptions=True) is None
+    assert (
+        AppriseAttachment.instantiate("file://?", suppress_exceptions=True)
+        is None
+    )
 
-    assert AppriseAttachment.instantiate(
-        'invalid://?', suppress_exceptions=True) is None
+    assert (
+        AppriseAttachment.instantiate("invalid://?", suppress_exceptions=True)
+        is None
+    )
 
     class BadAttachType(AttachBase):
         def __init__(self, **kwargs):
@@ -354,15 +374,16 @@ def test_apprise_attachment_instantiate():
             raise TypeError()
 
     # Store our bad attachment type in our schema map
-    A_MGR['bad'] = BadAttachType
+    A_MGR["bad"] = BadAttachType
 
     with pytest.raises(TypeError):
-        AppriseAttachment.instantiate(
-            'bad://path', suppress_exceptions=False)
+        AppriseAttachment.instantiate("bad://path", suppress_exceptions=False)
 
     # Same call but exceptions suppressed
-    assert AppriseAttachment.instantiate(
-        'bad://path', suppress_exceptions=True) is None
+    assert (
+        AppriseAttachment.instantiate("bad://path", suppress_exceptions=True)
+        is None
+    )
 
 
 def test_attachment_matrix_dynamic_importing(tmpdir):
@@ -373,34 +394,31 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
 
     # Make our new path valid
     suite = tmpdir.mkdir("apprise_attach_test_suite")
-    suite.join("__init__.py").write('')
+    suite.join("__init__.py").write("")
 
-    module_name = 'badattach'
+    module_name = "badattach"
 
     # Create a base area to work within
     base = suite.mkdir(module_name)
-    base.join("__init__.py").write('')
+    base.join("__init__.py").write("")
 
     # Test no app_id
-    base.join('AttachBadFile1.py').write(cleandoc(
-        """
+    base.join("AttachBadFile1.py").write(cleandoc("""
         class AttachBadFile1:
             pass
         """))
 
     # No class of the same name
-    base.join('AttachBadFile2.py').write(cleandoc(
-        """
+    base.join("AttachBadFile2.py").write(cleandoc("""
         class BadClassName:
             pass
         """))
 
     # Exception thrown
-    base.join('AttachBadFile3.py').write("""raise ImportError()""")
+    base.join("AttachBadFile3.py").write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join('AttachGoober.py').write(cleandoc(
-        """
+    base.join("AttachGoober.py").write(cleandoc("""
         from apprise import AttachBase
         class AttachGoober(AttachBase):
             # This class tests the fact we have a new class name, but we're
@@ -414,8 +432,7 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
         """))
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join('AttachBugger.py').write(cleandoc(
-        """
+    base.join("AttachBugger.py").write(cleandoc("""
         from apprise import AttachBase
         class AttachBugger(AttachBase):
             # This class tests the fact we have a new class name, but we're

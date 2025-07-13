@@ -37,7 +37,7 @@
 # advance and just force them.
 #
 # Base
-FROM fedora:39
+FROM fedora:42
 ENV container=docker
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=2216807 workaround
@@ -53,19 +53,19 @@ RUN \
 	rm -f /usr/lib/systemd/system/basic.target.wants/*;\
 	rm -f /usr/lib/systemd/system/anaconda.target.wants/*; \
    echo "assumeyes=1" >> /etc/dnf/dnf.conf; \
-   dnf install -y \
-        rpm-build rpmlint python3-pip rubygem-ronn \
-        dnf-plugins-core 'dnf-command(config-manager)' \
-        'dnf-command(builddep)' sudo rsync rpmdevtools;
+   dnf install -y epel-release; \
+   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
+                  dnf-plugins-core 'dnf-command(config-manager)' \
+                 'dnf-command(builddep)' sudo rsync rpmdevtools
 
-COPY packaging/redhat/python-apprise.spec /
 # Place our build file into the path
 COPY bin/build-rpm.sh /usr/bin
+COPY packaging/redhat/python-apprise.spec /
 RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y && dnf clean all
 
 # RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=f39
+ENV FLAVOR=rpmbuild OS=centos DIST=f42
 RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
     echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 

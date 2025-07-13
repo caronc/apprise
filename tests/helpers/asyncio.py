@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
@@ -25,11 +24,9 @@
 import asyncio
 
 
-class OuterEventLoop():
-    """
-    An event loop that is easy to put up and tear down from synchronous test
-    code.
-    """
+class OuterEventLoop:
+    """An event loop that is easy to put up and tear down from synchronous test
+    code."""
 
     def __init__(self):
         self._loop = None

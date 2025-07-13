@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,142 +25,193 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
 from unittest import mock
 
+from helpers import AppriseURLTester
 import pytest
 import requests
 
 from apprise.plugins.pushed import NotifyPushed
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('pushed://', {
-        'instance': TypeError,
-    }),
+    (
+        "pushed://",
+        {
+            "instance": TypeError,
+        },
+    ),
     # Application Key Only
-    ('pushed://%s' % ('a' * 32), {
-        'instance': TypeError,
-    }),
+    (
+        "pushed://%s" % ("a" * 32),
+        {
+            "instance": TypeError,
+        },
+    ),
     # Invalid URL
-    ('pushed://:@/', {
-        'instance': TypeError,
-    }),
+    (
+        "pushed://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
     # Application Key+Secret
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-    }),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+        },
+    ),
     # Application Key+Secret + channel
-    ('pushed://%s/%s/#channel/' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-    }),
+    (
+        "pushed://{}/{}/#channel/".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+        },
+    ),
     # Application Key+Secret + channel (via to=)
-    ('pushed://%s/%s?to=channel' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pushed://a...a/****/',
-    }),
+    (
+        "pushed://{}/{}?to=channel".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pushed://a...a/****/",
+        },
+    ),
     # Application Key+Secret + dropped entry
-    ('pushed://%s/%s/dropped_value/' % ('a' * 32, 'a' * 64), {
-        # No entries validated is a fail
-        'instance': TypeError,
-    }),
+    (
+        "pushed://{}/{}/dropped_value/".format("a" * 32, "a" * 64),
+        {
+            # No entries validated is a fail
+            "instance": TypeError,
+        },
+    ),
     # Application Key+Secret + 2 channels
-    ('pushed://%s/%s/#channel1/#channel2' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-    }),
+    (
+        "pushed://{}/{}/#channel1/#channel2".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+        },
+    ),
     # Application Key+Secret + User Pushed ID
-    ('pushed://%s/%s/@ABCD/' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-    }),
+    (
+        "pushed://{}/{}/@ABCD/".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+        },
+    ),
     # Application Key+Secret + 2 devices
-    ('pushed://%s/%s/@ABCD/@DEFG/' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-    }),
+    (
+        "pushed://{}/{}/@ABCD/@DEFG/".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+        },
+    ),
     # Application Key+Secret + Combo
-    ('pushed://%s/%s/@ABCD/#channel' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-    }),
+    (
+        "pushed://{}/{}/@ABCD/#channel".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+        },
+    ),
     # ,
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushed://%s/%s/#channel' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushed://%s/%s/@user' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushed://%s/%s' % ('a' * 32, 'a' * 64), {
-        'instance': NotifyPushed,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushed://{}/{}/#channel".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushed://{}/{}/@user".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushed://{}/{}".format("a" * 32, "a" * 64),
+        {
+            "instance": NotifyPushed,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_pushed_urls():
-    """
-    NotifyPushed() Apprise URLs
-
-    """
+    """NotifyPushed() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.get')
-@mock.patch('requests.post')
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_pushed_edge_cases(mock_post, mock_get):
-    """
-    NotifyPushed() Edge Cases
-
-    """
+    """NotifyPushed() Edge Cases."""
 
     # Chat ID
-    recipients = '@ABCDEFG, @DEFGHIJ, #channel, #channel2'
+    recipients = "@ABCDEFG, @DEFGHIJ, #channel, #channel2"
 
     # Some required input
-    app_key = 'ABCDEFG'
-    app_secret = 'ABCDEFG'
+    app_key = "ABCDEFG"
+    app_secret = "ABCDEFG"
 
     # Prepare Mock
     mock_get.return_value = requests.Request()

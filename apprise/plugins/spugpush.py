@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # BSD 2-Clause License
 #
@@ -30,97 +29,88 @@
 # Details at:
 # https://docs.spug.dev/push/
 
-import re
-import requests
 import json
+import re
 
-from ..utils.parse import validate_regex
-from ..url import PrivacyMode
-from .base import NotifyBase
-from ..locale import gettext_lazy as _
+import requests
+
 from ..common import NotifyType
+from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 class NotifySpugpush(NotifyBase):
-    """
-    A wrapper for SpugPush Notifications
-    """
+    """A wrapper for SpugPush Notifications."""
+
     # The default descriptive name associated with the Notification
-    service_name = _('SpugPush')
+    service_name = _("SpugPush")
 
     # The services URL
-    service_url = 'https://docs.spug.dev/push/'
+    service_url = "https://docs.spug.dev/push/"
 
     # The default secure protocol
-    secure_protocol = 'spugpush'
+    secure_protocol = "spugpush"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_spugpush'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_spugpush"
 
     # URL used to send notifications with
-    notify_url = 'https://push.spug.dev/send/'
+    notify_url = "https://push.spug.dev/send/"
 
-    templates = (
-        '{schema}://{token}',
+    templates = ("{schema}://{token}",)
+
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Access Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-zA-Z0-9_-]{32,64}$", "i"),
+            },
+        },
     )
 
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Access Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-zA-Z0-9_-]{32,64}$', 'i'),
-        },
-    })
-
     def __init__(self, token, **kwargs):
-        """
-        Initialize SpugPush Object
-        """
+        """Initialize SpugPush Object."""
         super().__init__(**kwargs)
 
         self.token = validate_regex(
-            token, *self.template_tokens['token']['regex']
+            token, *self.template_tokens["token"]["regex"]
         )
         if not self.token:
-            msg = 'The SpugPush token ({}) is invalid.'.format(token)
+            msg = f"The SpugPush token ({token}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.webhook_url = f'{self.notify_url}{self.token}'
+        self.webhook_url = f"{self.notify_url}{self.token}"
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
-        return '{schema}://{token}/?{params}'.format(
-            schema=self.secure_protocol,
-            token=self.pprint(self.token, privacy, mode=PrivacyMode.Secret),
-            params=self.urlencode(params),
+        return (
+            f"{self.secure_protocol}://{self.pprint(self.token, privacy, mode=PrivacyMode.Secret)}/?{self.urlencode(params)}"
         )
 
     @property
     def url_identifier(self):
-        """
-        Returns a unique identifier for this plugin instance
-        """
+        """Returns a unique identifier for this plugin instance."""
         return (self.secure_protocol, self.token)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Send a SpugPush Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Send a SpugPush Notification."""
 
         payload = {
-            'title': title if title else body,
-            'content': body,
+            "title": title if title else body,
+            "content": body,
         }
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         self.throttle()
@@ -135,44 +125,43 @@ class NotifySpugpush(NotifyBase):
 
             if response.status_code != requests.codes.ok:
                 self.logger.warning(
-                    'SpugPush notification failed: %d - %s',
-                    response.status_code, response.text)
+                    "SpugPush notification failed: %d - %s",
+                    response.status_code,
+                    response.text,
+                )
                 return False
 
         except requests.RequestException as e:
-            self.logger.warning(f'SpugPush Exception: {e}')
+            self.logger.warning(f"SpugPush Exception: {e}")
             return False
 
-        self.logger.info('SpugPush notification sent successfully.')
+        self.logger.info("SpugPush notification sent successfully.")
         return True
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns arguments to re-instantiate the object
-        """
+        """Parses the URL and returns arguments to re-instantiate the
+        object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             return results
 
-        if 'token' in results['qsd'] and results['qsd']['token']:
-            results['token'] = NotifySpugpush.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and results["qsd"]["token"]:
+            results["token"] = NotifySpugpush.unquote(results["qsd"]["token"])
         else:
-            results['token'] = NotifySpugpush.unquote(results['host'])
+            results["token"] = NotifySpugpush.unquote(results["host"])
 
         return results
 
     @staticmethod
     def parse_native_url(url):
-        """
-        Parse native SpugPush webhook URL into Apprise format
-        """
+        """Parse native SpugPush webhook URL into Apprise format."""
         match = re.match(
-            r'^https://push\.spug\.dev/send/([a-z0-9_-]+)$', url, re.I)
+            r"^https://push\.spug\.dev/send/([a-z0-9_-]+)$", url, re.I
+        )
         if not match:
             return None
 
         return NotifySpugpush.parse_url(
-            '{schema}://{token}'.format(
-                schema=NotifySpugpush.secure_protocol,
-                token=match.group(1)))
+            f"{NotifySpugpush.secure_protocol}://{match.group(1)}"
+        )

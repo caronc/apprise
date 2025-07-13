@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,138 +25,187 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
 import os
 from unittest import mock
 
+from helpers import AppriseURLTester
 import pytest
 import requests
 
 from apprise.plugins.guilded import NotifyGuilded
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
-TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('guilded://', {
-        'instance': TypeError,
-    }),
+    (
+        "guilded://",
+        {
+            "instance": TypeError,
+        },
+    ),
     # An invalid url
-    ('guilded://:@/', {
-        'instance': TypeError,
-    }),
+    (
+        "guilded://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
     # No webhook_token specified
-    ('guilded://%s' % ('i' * 24), {
-        'instance': TypeError,
-    }),
+    (
+        "guilded://%s" % ("i" * 24),
+        {
+            "instance": TypeError,
+        },
+    ),
     # Provide both an webhook id and a webhook token
-    ('guilded://%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': NotifyGuilded,
-        'requests_response_code': requests.codes.no_content,
-    }),
+    (
+        "guilded://{}/{}".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     # Provide a temporary username
-    ('guilded://l2g@%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': NotifyGuilded,
-        'requests_response_code': requests.codes.no_content,
-    }),
+    (
+        "guilded://l2g@{}/{}".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     # test image= field
-    ('guilded://%s/%s?format=markdown&footer=Yes&image=Yes' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyGuilded,
-            'requests_response_code': requests.codes.no_content,
+    (
+        "guilded://{}/{}?format=markdown&footer=Yes&image=Yes".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
             # don't include an image by default
-            'include_image': False,
-    }),
-    ('guilded://%s/%s?format=markdown&footer=Yes&image=No&fields=no' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyGuilded,
-            'requests_response_code': requests.codes.no_content,
-    }),
-    ('guilded://%s/%s?format=markdown&footer=Yes&image=Yes' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyGuilded,
-            'requests_response_code': requests.codes.no_content,
-    }),
-    ('https://media.guilded.gg/webhooks/{}/{}'.format(
-        '0' * 10, 'B' * 40), {
+            "include_image": False,
+        },
+    ),
+    (
+        "guilded://{}/{}?format=markdown&footer=Yes&image=No&fields=no".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    (
+        "guilded://{}/{}?format=markdown&footer=Yes&image=Yes".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    (
+        "https://media.guilded.gg/webhooks/{}/{}".format("0" * 10, "B" * 40),
+        {
             # Native URL Support, support the provided guilded URL from their
             # webpage.
-            'instance': NotifyGuilded,
-            'requests_response_code': requests.codes.no_content,
-    }),
-    ('guilded://%s/%s?format=markdown&avatar=No&footer=No' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyGuilded,
-            'requests_response_code': requests.codes.no_content,
-    }),
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    (
+        "guilded://{}/{}?format=markdown&avatar=No&footer=No".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     # different format support
-    ('guilded://%s/%s?format=markdown' % ('i' * 24, 't' * 64), {
-        'instance': NotifyGuilded,
-        'requests_response_code': requests.codes.no_content,
-    }),
-    ('guilded://%s/%s?format=text' % ('i' * 24, 't' * 64), {
-        'instance': NotifyGuilded,
-        'requests_response_code': requests.codes.no_content,
-    }),
+    (
+        "guilded://{}/{}?format=markdown".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    (
+        "guilded://{}/{}?format=text".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     # Test with avatar URL
-    ('guilded://%s/%s?avatar_url=http://localhost/test.jpg' % (
-        'i' * 24, 't' * 64), {
-            'instance': NotifyGuilded,
-            'requests_response_code': requests.codes.no_content,
-    }),
+    (
+        "guilded://{}/{}?avatar_url=http://localhost/test.jpg".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     # Test without image set
-    ('guilded://%s/%s' % ('i' * 24, 't' * 64), {
-        'instance': NotifyGuilded,
-        'requests_response_code': requests.codes.no_content,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    ('guilded://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': NotifyGuilded,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('guilded://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': NotifyGuilded,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('guilded://%s/%s/' % ('a' * 24, 'b' * 64), {
-        'instance': NotifyGuilded,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "guilded://{}/{}".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyGuilded,
+            "requests_response_code": requests.codes.no_content,
+            # don't include an image by default
+            "include_image": False,
+        },
+    ),
+    (
+        "guilded://{}/{}/".format("a" * 24, "b" * 64),
+        {
+            "instance": NotifyGuilded,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "guilded://{}/{}/".format("a" * 24, "b" * 64),
+        {
+            "instance": NotifyGuilded,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "guilded://{}/{}/".format("a" * 24, "b" * 64),
+        {
+            "instance": NotifyGuilded,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_guilded_urls():
-    """
-    NotifyGuilded() Apprise URLs
-
-    """
+    """NotifyGuilded() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_guilded_general(mock_post):
-    """
-    NotifyGuilded() General Checks
-
-    """
+    """NotifyGuilded() General Checks."""
 
     # Initialize some generic (but valid) tokens
-    webhook_id = 'A' * 24
-    webhook_token = 'B' * 64
+    webhook_id = "A" * 24
+    webhook_token = "B" * 64
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -180,7 +228,9 @@ def test_plugin_guilded_general(mock_post):
     obj = NotifyGuilded(
         webhook_id=webhook_id,
         webhook_token=webhook_token,
-        footer=True, thumbnail=False)
+        footer=True,
+        thumbnail=False,
+    )
 
     # Test that we get a string response
     assert isinstance(obj.url(), str)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,12 +25,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import pickle
-from apprise import Apprise, AppriseAsset, AppriseLocale
-
 # Disable logging for a cleaner testing output
 import logging
+import pickle
+import sys
+
+from apprise import Apprise, AppriseAsset, AppriseLocale
+
 logging.disable(logging.CRITICAL)
 
 # Ensure we don't create .pyc files for these tests
@@ -39,19 +39,30 @@ sys.dont_write_bytecode = True
 
 
 def test_apprise_pickle_asset(tmpdir):
-    """pickle: AppriseAsset
-    """
+    """pickle: AppriseAsset"""
     asset = AppriseAsset()
     serialized = pickle.dumps(asset)
     new_asset = pickle.loads(serialized)
 
     # iterate over some keys to verify they're still the same:
     keys = (
-        'app_id', 'app_desc', 'app_url', 'html_notify_map',
-        'ascii_notify_map', 'default_html_color', 'default_extension',
-        'theme', 'image_url_mask', 'image_url_logo', 'image_path_mask',
-        'body_format', 'async_mode', 'interpret_escapes', 'encoding',
-        'secure_logging', '_recursion',
+        "app_id",
+        "app_desc",
+        "app_url",
+        "html_notify_map",
+        "ascii_notify_map",
+        "default_html_color",
+        "default_extension",
+        "theme",
+        "image_url_mask",
+        "image_url_logo",
+        "image_path_mask",
+        "body_format",
+        "async_mode",
+        "interpret_escapes",
+        "encoding",
+        "secure_logging",
+        "_recursion",
     )
 
     for key in keys:
@@ -59,8 +70,7 @@ def test_apprise_pickle_asset(tmpdir):
 
 
 def test_apprise_pickle_locale(tmpdir):
-    """pickle: AppriseLocale
-    """
+    """pickle: AppriseLocale"""
     _locale = AppriseLocale()
     serialized = pickle.dumps(_locale)
     new_locale = pickle.loads(serialized)
@@ -72,8 +82,7 @@ def test_apprise_pickle_locale(tmpdir):
 
 
 def test_apprise_pickle_core(tmpdir):
-    """pickle: Apprise
-    """
+    """pickle: Apprise"""
     asset = AppriseAsset(app_id="default")
     apobj = Apprise(asset=asset)
 

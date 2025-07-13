@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,18 +25,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import os
 import gc
+import mimetypes
+import os
+import sys
 
 import pytest
-import mimetypes
 
-from apprise import NotificationManager
-from apprise import ConfigurationManager
-from apprise import AttachmentManager
+from apprise import (
+    AttachmentManager,
+    ConfigurationManager,
+    NotificationManager,
+)
 
-sys.path.append(os.path.join(os.path.dirname(__file__), 'helpers'))
+sys.path.append(os.path.join(os.path.dirname(__file__), "helpers"))
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -49,18 +50,16 @@ A_MGR = AttachmentManager()
 
 @pytest.fixture(scope="function", autouse=True)
 def mimetypes_always_available():
-    """
-    A pytest session fixture which ensures mimetypes is set correctly
-    pointing to our temporary mime.types file
-    """
-    files = (os.path.join(os.path.dirname(__file__), 'var', 'mime.types'), )
+    """A pytest session fixture which ensures mimetypes is set correctly
+    pointing to our temporary mime.types file."""
+    files = (os.path.join(os.path.dirname(__file__), "var", "mime.types"),)
     mimetypes.init(files=files)
 
 
 @pytest.fixture(scope="function", autouse=True)
 def no_throttling_everywhere(session_mocker):
-    """
-    A pytest session fixture which disables throttling on all notifiers.
+    """A pytest session fixture which disables throttling on all notifiers.
+
     It is automatically enabled.
     """
     # Ensure we're working with a clean slate for each test
@@ -74,10 +73,10 @@ def no_throttling_everywhere(session_mocker):
 
 @pytest.fixture(scope="function", autouse=True)
 def collect_all_garbage(session_mocker):
-    """
-    A pytest session fixture to ensure no __del__ cleanup call from
-    one plugin will cause testing issues with another.  Run garbage
-    collection after every test
+    """A pytest session fixture to ensure no __del__ cleanup call from one
+    plugin will cause testing issues with another.
+
+    Run garbage collection after every test
     """
     # Force garbage collection
     gc.collect()

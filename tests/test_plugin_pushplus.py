@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # BSD 2-Clause License
 #
@@ -27,45 +26,71 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
-from apprise.plugins.pushplus import NotifyPushplus
-from helpers import AppriseURLTester
-
 import logging
+
+from helpers import AppriseURLTester
+import requests
+
+from apprise.plugins.pushplus import NotifyPushplus
+
 logging.disable(logging.CRITICAL)
 
 apprise_url_tests = (
-    ('pushplus://', {
-        'instance': TypeError,
-    }),
-    ('pushplus://invalid!', {
-        'instance': TypeError,
-    }),
-    ('pushplus://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyPushplus,
-        'privacy_url': 'pushplus://****/',
-    }),
-    ('pushplus://?token=abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyPushplus,
-        'privacy_url': 'pushplus://****/',
-    }),
-    ('https://www.pushplus.plus/send?token=abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyPushplus,
-    }),
-    ('pushplus://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyPushplus,
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('pushplus://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyPushplus,
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pushplus://ffffffffffffffffffffffffffffffff', {
-        'instance': NotifyPushplus,
-        'test_requests_exceptions': True,
-    }),
+    (
+        "pushplus://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "pushplus://invalid!",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "pushplus://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyPushplus,
+            "privacy_url": "pushplus://****/",
+        },
+    ),
+    (
+        "pushplus://?token=abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyPushplus,
+            "privacy_url": "pushplus://****/",
+        },
+    ),
+    (
+        "https://www.pushplus.plus/send?token=abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyPushplus,
+        },
+    ),
+    (
+        "pushplus://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyPushplus,
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "pushplus://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyPushplus,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "pushplus://ffffffffffffffffffffffffffffffff",
+        {
+            "instance": NotifyPushplus,
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 

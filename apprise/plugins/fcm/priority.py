@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -32,8 +31,8 @@
 
 # Legacy priorities are defined here:
 # - https://firebase.google.com/docs/cloud-messaging/http-server-ref
-from .common import (FCMMode, FCM_MODES)
 from ...logger import logger
+from .common import FCM_MODES, FCMMode
 
 
 class NotificationPriority:
@@ -62,14 +61,13 @@ class NotificationPriority:
             more to battery drain compared with normal priority messages.
     """
 
-    NORMAL = 'NORMAL'
-    HIGH = 'HIGH'
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
 
 
 class FCMPriority:
-    """
-    Defines our accepted priorites
-    """
+    """Defines our accepted priorites."""
+
     MIN = "min"
 
     LOW = "low"
@@ -91,161 +89,110 @@ FCM_PRIORITIES = (
 
 
 class FCMPriorityManager:
-    """
-    A Simple object to make it easier to work with FCM set priorities
-    """
+    """A Simple object to make it easier to work with FCM set priorities."""
 
     priority_map = {
         FCMPriority.MIN: {
             FCMMode.OAuth2: {
-                'message': {
-                    'android': {
-                        'priority': NotificationPriority.NORMAL
-                    },
-                    'apns': {
-                        'headers': {
-                            'apns-priority': "5"
-                        }
-                    },
-                    'webpush': {
-                        'headers': {
-                            'Urgency': 'very-low'
-                        }
-                    },
+                "message": {
+                    "android": {"priority": NotificationPriority.NORMAL},
+                    "apns": {"headers": {"apns-priority": "5"}},
+                    "webpush": {"headers": {"Urgency": "very-low"}},
                 }
             },
             FCMMode.Legacy: {
-                'priority': 'normal',
-            }
+                "priority": "normal",
+            },
         },
         FCMPriority.LOW: {
             FCMMode.OAuth2: {
-                'message': {
-                    'android': {
-                        'priority': NotificationPriority.NORMAL
-                    },
-                    'apns': {
-                        'headers': {
-                            'apns-priority': "5"
-                        }
-                    },
-                    'webpush': {
-                        'headers': {
-                            'Urgency': 'low'
-                        }
-                    }
+                "message": {
+                    "android": {"priority": NotificationPriority.NORMAL},
+                    "apns": {"headers": {"apns-priority": "5"}},
+                    "webpush": {"headers": {"Urgency": "low"}},
                 }
             },
             FCMMode.Legacy: {
-                'priority': 'normal',
-            }
+                "priority": "normal",
+            },
         },
         FCMPriority.NORMAL: {
             FCMMode.OAuth2: {
-                'message': {
-                    'android': {
-                        'priority': NotificationPriority.NORMAL
-                    },
-                    'apns': {
-                        'headers': {
-                            'apns-priority': "5"
-                        }
-                    },
-                    'webpush': {
-                        'headers': {
-                            'Urgency': 'normal'
-                        }
-                    }
+                "message": {
+                    "android": {"priority": NotificationPriority.NORMAL},
+                    "apns": {"headers": {"apns-priority": "5"}},
+                    "webpush": {"headers": {"Urgency": "normal"}},
                 }
             },
             FCMMode.Legacy: {
-                'priority': 'normal',
-            }
+                "priority": "normal",
+            },
         },
         FCMPriority.HIGH: {
             FCMMode.OAuth2: {
-                'message': {
-                    'android': {
-                        'priority': NotificationPriority.HIGH
-                    },
-                    'apns': {
-                        'headers': {
-                            'apns-priority': "10"
-                        }
-                    },
-                    'webpush': {
-                        'headers': {
-                            'Urgency': 'high'
-                        }
-                    }
+                "message": {
+                    "android": {"priority": NotificationPriority.HIGH},
+                    "apns": {"headers": {"apns-priority": "10"}},
+                    "webpush": {"headers": {"Urgency": "high"}},
                 }
             },
             FCMMode.Legacy: {
-                'priority': 'high',
-            }
+                "priority": "high",
+            },
         },
         FCMPriority.MAX: {
             FCMMode.OAuth2: {
-                'message': {
-                    'android': {
-                        'priority': NotificationPriority.HIGH
-                    },
-                    'apns': {
-                        'headers': {
-                            'apns-priority': "10"
-                        }
-                    },
-                    'webpush': {
-                        'headers': {
-                            'Urgency': 'high'
-                        }
-                    }
+                "message": {
+                    "android": {"priority": NotificationPriority.HIGH},
+                    "apns": {"headers": {"apns-priority": "10"}},
+                    "webpush": {"headers": {"Urgency": "high"}},
                 }
             },
             FCMMode.Legacy: {
-                'priority': 'high',
-            }
-        }
+                "priority": "high",
+            },
+        },
     }
 
     def __init__(self, mode, priority=None):
-        """
-        Takes a FCMMode and Priority
-        """
+        """Takes a FCMMode and Priority."""
 
         self.mode = mode
         if self.mode not in FCM_MODES:
-            msg = 'The FCM mode specified ({}) is invalid.'.format(mode)
+            msg = f"The FCM mode specified ({mode}) is invalid."
             logger.warning(msg)
             raise TypeError(msg)
 
         self.priority = None
         if priority:
-            self.priority = \
-                next((p for p in FCM_PRIORITIES
-                      if p.startswith(priority[:2].lower())), None)
+            self.priority = next(
+                (
+                    p
+                    for p in FCM_PRIORITIES
+                    if p.startswith(priority[:2].lower())
+                ),
+                None,
+            )
             if not self.priority:
-                msg = 'An invalid FCM Priority ' \
-                      '({}) was specified.'.format(priority)
+                msg = f"An invalid FCM Priority ({priority}) was specified."
                 logger.warning(msg)
                 raise TypeError(msg)
 
     def payload(self):
-        """
-        Returns our payload depending on our mode
-        """
-        return self.priority_map[self.priority][self.mode] \
-            if self.priority else {}
+        """Returns our payload depending on our mode."""
+        return (
+            self.priority_map[self.priority][self.mode]
+            if self.priority
+            else {}
+        )
 
     def __str__(self):
-        """
-        our priority representation
-        """
-        return self.priority if self.priority else ''
+        """Our priority representation."""
+        return self.priority if self.priority else ""
 
     def __bool__(self):
-        """
-        Allows this object to be wrapped in an 'if statement'.
+        """Allows this object to be wrapped in an 'if statement'.
+
         True is returned if a priority was loaded
         """
-        return True if self.priority else False
+        return bool(self.priority)

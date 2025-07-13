@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # BSD 2-Clause License
 #
@@ -27,45 +26,71 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
-from apprise.plugins.spugpush import NotifySpugpush
-from helpers import AppriseURLTester
-
 import logging
+
+from helpers import AppriseURLTester
+import requests
+
+from apprise.plugins.spugpush import NotifySpugpush
+
 logging.disable(logging.CRITICAL)
 
 apprise_url_tests = (
-    ('spugpush://', {
-        'instance': TypeError,
-    }),
-    ('spugpush://invalid!', {
-        'instance': TypeError,
-    }),
-    ('spugpush://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifySpugpush,
-        'privacy_url': 'spugpush://****/',
-    }),
-    ('spugpush://?token=abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifySpugpush,
-        'privacy_url': 'spugpush://****/',
-    }),
-    ('https://push.spug.dev/send/abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifySpugpush,
-    }),
-    ('spugpush://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifySpugpush,
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('spugpush://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifySpugpush,
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('spugpush://ffffffffffffffffffffffffffffffff', {
-        'instance': NotifySpugpush,
-        'test_requests_exceptions': True,
-    }),
+    (
+        "spugpush://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "spugpush://invalid!",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "spugpush://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifySpugpush,
+            "privacy_url": "spugpush://****/",
+        },
+    ),
+    (
+        "spugpush://?token=abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifySpugpush,
+            "privacy_url": "spugpush://****/",
+        },
+    ),
+    (
+        "https://push.spug.dev/send/abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifySpugpush,
+        },
+    ),
+    (
+        "spugpush://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifySpugpush,
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "spugpush://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifySpugpush,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "spugpush://ffffffffffffffffffffffffffffffff",
+        {
+            "instance": NotifySpugpush,
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 

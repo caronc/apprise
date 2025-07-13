@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,45 +25,71 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
-from apprise.plugins.qq import NotifyQQ
-from helpers import AppriseURLTester
-
 import logging
+
+from helpers import AppriseURLTester
+import requests
+
+from apprise.plugins.qq import NotifyQQ
+
 logging.disable(logging.CRITICAL)
 
 apprise_url_tests = (
-    ('qq://', {
-        'instance': TypeError,
-    }),
-    ('qq://invalid!', {
-        'instance': TypeError,
-    }),
-    ('qq://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyQQ,
-        'privacy_url': 'qq://****/',
-    }),
-    ('qq://?token=abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyQQ,
-        'privacy_url': 'qq://****/',
-    }),
-    ('https://qmsg.zendee.cn/send/abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyQQ,
-    }),
-    ('qq://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyQQ,
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('qq://abc123def456ghi789jkl012mno345pq', {
-        'instance': NotifyQQ,
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('qq://ffffffffffffffffffffffffffffffff', {
-        'instance': NotifyQQ,
-        'test_requests_exceptions': True,
-    }),
+    (
+        "qq://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "qq://invalid!",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "qq://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyQQ,
+            "privacy_url": "qq://****/",
+        },
+    ),
+    (
+        "qq://?token=abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyQQ,
+            "privacy_url": "qq://****/",
+        },
+    ),
+    (
+        "https://qmsg.zendee.cn/send/abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyQQ,
+        },
+    ),
+    (
+        "qq://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyQQ,
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "qq://abc123def456ghi789jkl012mno345pq",
+        {
+            "instance": NotifyQQ,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "qq://ffffffffffffffffffffffffffffffff",
+        {
+            "instance": NotifyQQ,
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 

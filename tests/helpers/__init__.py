@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,14 +25,14 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .rest import AppriseURLTester
 from .asyncio import OuterEventLoop
-from .module import reload_plugin
 from .environment import environ
+from .module import reload_plugin
+from .rest import AppriseURLTester
 
 __all__ = [
-    'AppriseURLTester',
-    'OuterEventLoop',
-    'reload_plugin',
-    'environ',
+    "AppriseURLTester",
+    "OuterEventLoop",
+    "environ",
+    "reload_plugin",
 ]

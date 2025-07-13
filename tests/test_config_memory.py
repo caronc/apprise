@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,10 +25,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from apprise.config.memory import ConfigMemory
-
 # Disable logging for a cleaner testing output
 import logging
+
+from apprise.config.memory import ConfigMemory
+
 logging.disable(logging.CRITICAL)
 
 
@@ -39,10 +39,10 @@ def test_config_memory():
 
     """
 
-    assert ConfigMemory.parse_url('garbage://') is None
+    assert ConfigMemory.parse_url("garbage://") is None
 
     # Initialize our object
-    cm = ConfigMemory(content="json://localhost", format='text')
+    cm = ConfigMemory(content="json://localhost", format="text")
 
     # one entry added
     assert len(cm) == 1

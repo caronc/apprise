@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,18 +25,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-import urllib
-import pytest
-
-from apprise import exception
-from apprise.attachment.base import AttachBase
-from apprise.attachment.memory import AttachMemory
-from apprise import AppriseAttachment
-from apprise.common import ContentLocation
-
 # Disable logging for a cleaner testing output
 import logging
+import re
+import urllib
+
+import pytest
+
+from apprise import AppriseAttachment, exception
+from apprise.attachment.base import AttachBase
+from apprise.attachment.memory import AttachMemory
+from apprise.common import ContentLocation
+
 logging.disable(logging.CRITICAL)
 
 
@@ -51,14 +50,14 @@ def test_attach_memory_parse_url():
     assert AttachMemory.parse_url(object) is None
 
     # Our filename is detected automatically
-    assert AttachMemory.parse_url('memory://')
+    assert AttachMemory.parse_url("memory://")
 
     # pass our content in as a string
-    mem = AttachMemory(content='string')
+    mem = AttachMemory(content="string")
     # it loads a string type by default
-    mem.mimetype == 'text/plain'
+    assert mem.mimetype == "text/plain"
     # Our filename is automatically generated (with .txt)
-    assert re.match(r'^[a-z0-9-]+\.txt$', mem.name, re.I)
+    assert re.match(r"^[a-z0-9-]+\.txt$", mem.name, re.I)
 
     # open our file
     with mem as fp:
@@ -66,10 +65,11 @@ def test_attach_memory_parse_url():
 
     # pass our content in as a string
     mem = AttachMemory(
-        content='<html/>', name='test.html', mimetype='text/html')
+        content="<html/>", name="test.html", mimetype="text/html"
+    )
     # it loads a string type by default
-    mem.mimetype == 'text/html'
-    mem.name == 'test.html'
+    assert mem.mimetype == "text/html"
+    assert mem.name == "test.html"
 
     # Stub function
     assert mem.download()
@@ -80,20 +80,20 @@ def test_attach_memory_parse_url():
 
     # pointer to our data
     pointer = mem.open()
-    assert pointer.read() == b'<html/>'
+    assert pointer.read() == b"<html/>"
 
     # pass our content in as a string
-    mem = AttachMemory(content=b'binary-data', name='raw.dat')
+    mem = AttachMemory(content=b"binary-data", name="raw.dat")
     # it loads a string type by default
-    assert mem.mimetype == 'application/octet-stream'
-    mem.name == 'raw'
+    assert mem.mimetype == "application/octet-stream"
+    assert mem.name == "raw.dat"
 
     # pass our content in as a string
-    mem = AttachMemory(content=b'binary-data')
+    mem = AttachMemory(content=b"binary-data")
     # it loads a string type by default
-    assert mem.mimetype == 'application/octet-stream'
+    assert mem.mimetype == "application/octet-stream"
     # Our filename is automatically generated (with .dat)
-    assert re.match(r'^[a-z0-9-]+\.dat$', mem.name, re.I)
+    assert re.match(r"^[a-z0-9-]+\.dat$", mem.name, re.I)
 
 
 def test_attach_memory():
@@ -102,8 +102,8 @@ def test_attach_memory():
 
     """
     # A url we can test with
-    fname = 'testfile'
-    url = 'memory:///ignored/path/{fname}'.format(fname=fname)
+    fname = "testfile"
+    url = f"memory:///ignored/path/{fname}"
 
     # Simple gif test
     response = AppriseAttachment.instantiate(url)
@@ -115,20 +115,20 @@ def test_attach_memory():
     assert bool(response) is False
 
     with response as memobj:
-        memobj.write(b'content')
+        memobj.write(b"content")
 
     # Memory object defaults
     assert response.name == fname
     assert response.path == response.name
-    assert response.mimetype == 'application/octet-stream'
+    assert response.mimetype == "application/octet-stream"
     assert bool(response) is True
 
     #
     fname_in_url = urllib.parse.quote(response.name)
-    assert response.url().startswith('memory://{}'.format(fname_in_url))
+    assert response.url().startswith(f"memory://{fname_in_url}")
 
     # Mime is always part of url
-    assert re.search(r'[?&]mime=', response.url()) is not None
+    assert re.search(r"[?&]mime=", response.url()) is not None
 
     # Test case where location is simply set to INACCESSIBLE
     # Below is a bad example, but it proves the section of code properly works.
@@ -143,7 +143,7 @@ def test_attach_memory():
     response = AppriseAttachment.instantiate(url)
     assert isinstance(response, AttachMemory)
     with response as memobj:
-        memobj.write(b'content')
+        memobj.write(b"content")
 
     response.location = ContentLocation.INACCESSIBLE
     assert response.path is None
@@ -154,13 +154,13 @@ def test_attach_memory():
     response = AppriseAttachment.instantiate(url)
     assert isinstance(response, AttachMemory)
     with response as memobj:
-        memobj.write(b'content')
+        memobj.write(b"content")
 
     # Memory handling when size is to large
     response = AppriseAttachment.instantiate(url)
     assert isinstance(response, AttachMemory)
     with response as memobj:
-        memobj.write(b'content')
+        memobj.write(b"content")
 
     # Test case where we exceed our defined max_file_size in memory
     prev_value = AttachBase.max_file_size
@@ -173,33 +173,36 @@ def test_attach_memory():
     AttachBase.max_file_size = prev_value
 
     response = AppriseAttachment.instantiate(
-        'memory://apprise-file.gif?mime=image/gif')
+        "memory://apprise-file.gif?mime=image/gif"
+    )
     assert isinstance(response, AttachMemory)
     with response as memobj:
-        memobj.write(b'content')
+        memobj.write(b"content")
 
-    assert response.name == 'apprise-file.gif'
+    assert response.name == "apprise-file.gif"
     assert response.path == response.name
-    assert response.mimetype == 'image/gif'
+    assert response.mimetype == "image/gif"
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
-    assert re.search(r'[?&]mime=', response.url()) is not None
-    assert 'image/gif' in response.url()
+    assert re.search(r"[?&]mime=", response.url()) is not None
+    assert "image/gif" in response.url()
 
     # Force a mime-type and new name
     response = AppriseAttachment.instantiate(
-        'memory://{}?mime={}&name={}'.format(
-            'ignored.gif', 'image/jpeg', 'test.jpeg'))
+        "memory://{}?mime={}&name={}".format(
+            "ignored.gif", "image/jpeg", "test.jpeg"
+        )
+    )
     assert isinstance(response, AttachMemory)
     with response as memobj:
-        memobj.write(b'content')
+        memobj.write(b"content")
 
-    assert response.name == 'test.jpeg'
+    assert response.name == "test.jpeg"
     assert response.path == response.name
-    assert response.mimetype == 'image/jpeg'
+    assert response.mimetype == "image/jpeg"
     # We will match on mime type now  (%2F = /)
-    assert re.search(r'[?&]mime=image/jpeg', response.url(), re.I)
-    assert response.url().startswith('memory://test.jpeg')
+    assert re.search(r"[?&]mime=image/jpeg", response.url(), re.I)
+    assert response.url().startswith("memory://test.jpeg")
 
     # Test hosted configuration and that we can't add a valid memory file
     aa = AppriseAttachment(location=ContentLocation.HOSTED)

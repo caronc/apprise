@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -32,27 +31,27 @@
 #
 # API is documented here:
 #   - https://www.bulksms.com/developer/json/v1/#tag/Message
-import re
-import requests
-import json
 from itertools import chain
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no, parse_bool
-from ..locale import gettext_lazy as _
+import json
+import re
 
+import requests
+
+from ..common import NotifyType
+from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
+from .base import NotifyBase
 
 IS_GROUP_RE = re.compile(
-    r'^(@?(?P<group>[A-Z0-9_-]+))$',
+    r"^(@?(?P<group>[A-Z0-9_-]+))$",
     re.IGNORECASE,
 )
 
 
-class BulkSMSRoutingGroup(object):
-    """
-    The different categories of routing
-    """
+class BulkSMSRoutingGroup:
+    """The different categories of routing."""
+
     ECONOMY = "ECONOMY"
     STANDARD = "STANDARD"
     PREMIUM = "PREMIUM"
@@ -66,34 +65,31 @@ BULKSMS_ROUTING_GROUPS = (
 )
 
 
-class BulkSMSEncoding(object):
-    """
-    The different categories of routing
-    """
+class BulkSMSEncoding:
+    """The different categories of routing."""
+
     TEXT = "TEXT"
     UNICODE = "UNICODE"
     BINARY = "BINARY"
 
 
 class NotifyBulkSMS(NotifyBase):
-    """
-    A wrapper for BulkSMS Notifications
-    """
+    """A wrapper for BulkSMS Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'BulkSMS'
+    service_name = "BulkSMS"
 
     # The services URL
-    service_url = 'https://bulksms.com/'
+    service_url = "https://bulksms.com/"
 
     # All notification requests are secure
-    secure_protocol = 'bulksms'
+    secure_protocol = "bulksms"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_bulksms'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_bulksms"
 
     # BulkSMS uses the http protocol with JSON requests
-    notify_url = 'https://api.bulksms.com/v1/messages'
+    notify_url = "https://api.bulksms.com/v1/messages"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -106,147 +102,165 @@ class NotifyBulkSMS(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{user}:{password}@{targets}',
-    )
+    templates = ("{schema}://{user}:{password}@{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'user': {
-            'name': _('User Name'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "user": {
+                "name": _("User Name"),
+                "type": "string",
+                "required": True,
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "target_group": {
+                "name": _("Target Group"),
+                "type": "string",
+                "prefix": "@",
+                "regex": (r"^[A-Z0-9 _-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'target_group': {
-            'name': _('Target Group'),
-            'type': 'string',
-            'prefix': '@',
-            'regex': (r'^[A-Z0-9 _-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "name": _("From Phone No"),
+                "type": "string",
+                "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
+                "map_to": "source",
+            },
+            "route": {
+                "name": _("Route Group"),
+                "type": "choice:string",
+                "values": BULKSMS_ROUTING_GROUPS,
+                "default": BulkSMSRoutingGroup.STANDARD,
+            },
+            "unicode": {
+                # Unicode characters
+                "name": _("Unicode Characters"),
+                "type": "bool",
+                "default": True,
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
         },
-        'from': {
-            'name': _('From Phone No'),
-            'type': 'string',
-            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
-            'map_to': 'source',
-        },
-        'route': {
-            'name': _('Route Group'),
-            'type': 'choice:string',
-            'values': BULKSMS_ROUTING_GROUPS,
-            'default': BulkSMSRoutingGroup.STANDARD,
-        },
-        'unicode': {
-            # Unicode characters
-            'name': _('Unicode Characters'),
-            'type': 'bool',
-            'default': True,
-        },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-    })
+    )
 
-    def __init__(self, source=None, targets=None, unicode=None, batch=None,
-                 route=None, **kwargs):
-        """
-        Initialize BulkSMS Object
-        """
-        super(NotifyBulkSMS, self).__init__(**kwargs)
+    def __init__(
+        self,
+        source=None,
+        targets=None,
+        unicode=None,
+        batch=None,
+        route=None,
+        **kwargs,
+    ):
+        """Initialize BulkSMS Object."""
+        super().__init__(**kwargs)
 
         self.source = None
         if source:
             result = is_phone_no(source)
             if not result:
-                msg = 'The Account (From) Phone # specified ' \
-                      '({}) is invalid.'.format(source)
+                msg = (
+                    "The Account (From) Phone # specified "
+                    f"({source}) is invalid."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             # Tidy source
-            self.source = '+{}'.format(result['full'])
+            self.source = "+{}".format(result["full"])
 
         # Setup our route
-        self.route = self.template_args['route']['default'] \
-            if not isinstance(route, str) else route.upper()
+        self.route = (
+            self.template_args["route"]["default"]
+            if not isinstance(route, str)
+            else route.upper()
+        )
         if self.route not in BULKSMS_ROUTING_GROUPS:
-            msg = 'The route specified ({}) is invalid.'.format(route)
+            msg = f"The route specified ({route}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Define whether or not we should set the unicode flag
-        self.unicode = self.template_args['unicode']['default'] \
-            if unicode is None else bool(unicode)
+        self.unicode = (
+            self.template_args["unicode"]["default"]
+            if unicode is None
+            else bool(unicode)
+        )
 
         # Define whether or not we should operate in a batch mode
-        self.batch = self.template_args['batch']['default'] \
-            if batch is None else bool(batch)
+        self.batch = (
+            self.template_args["batch"]["default"]
+            if batch is None
+            else bool(batch)
+        )
 
         # Parse our targets
-        self.targets = list()
-        self.groups = list()
+        self.targets = []
+        self.groups = []
 
         for target in parse_phone_no(targets):
             # Parse each phone number we found
             result = is_phone_no(target)
             if result:
-                self.targets.append('+{}'.format(result['full']))
+                self.targets.append("+{}".format(result["full"]))
                 continue
 
             group_re = IS_GROUP_RE.match(target)
             if group_re and not target.isdigit():
                 # If the target specified is all digits, it MUST have a @
                 # in front of it to eliminate any ambiguity
-                self.groups.append(group_re.group('group'))
+                self.groups.append(group_re.group("group"))
                 continue
 
             self.logger.warning(
-                'Dropped invalid phone # and/or Group '
-                '({}) specified.'.format(target),
+                f"Dropped invalid phone # and/or Group ({target}) specified.",
             )
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform BulkSMS Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform BulkSMS Notification."""
 
         if not (self.password and self.user):
             self.logger.warning(
-                'There were no valid login credentials provided')
+                "There were no valid login credentials provided"
+            )
             return False
 
         if not (self.targets or self.groups):
             # We have nothing to notify
-            self.logger.warning('There are no BulkSMS targets to notify')
+            self.logger.warning("There are no BulkSMS targets to notify")
             return False
 
         # Send in batches if identified to do so
@@ -257,34 +271,42 @@ class NotifyBulkSMS(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         # Prepare our payload
         payload = {
             # The To gets populated in the loop below
-            'to': None,
-            'body': body,
-            'routingGroup': self.route,
-            'encoding': BulkSMSEncoding.UNICODE
-            if self.unicode else BulkSMSEncoding.TEXT,
+            "to": None,
+            "body": body,
+            "routingGroup": self.route,
+            "encoding": (
+                BulkSMSEncoding.UNICODE
+                if self.unicode
+                else BulkSMSEncoding.TEXT
+            ),
             # Options are NONE, ALL and ERRORS
-            'deliveryReports': "ERRORS"
+            "deliveryReports": "ERRORS",
         }
 
         if self.source:
             payload.update({
-                'from': self.source,
+                "from": self.source,
             })
 
         # Authentication
         auth = (self.user, self.password)
 
         # Prepare our targets
-        targets = list(self.targets) if batch_size == 1 else \
-            [self.targets[index:index + batch_size]
-             for index in range(0, len(self.targets), batch_size)]
+        targets = (
+            list(self.targets)
+            if batch_size == 1
+            else [
+                self.targets[index : index + batch_size]
+                for index in range(0, len(self.targets), batch_size)
+            ]
+        )
         targets += [{"type": "GROUP", "name": g} for g in self.groups]
 
         while len(targets):
@@ -292,22 +314,24 @@ class NotifyBulkSMS(NotifyBase):
             target = targets.pop(0)
 
             # Prepare our user
-            payload['to'] = target
+            payload["to"] = target
 
             # Printable reference
             if isinstance(target, dict):
-                p_target = target['name']
+                p_target = target["name"]
 
             elif isinstance(target, list):
-                p_target = '{} targets'.format(len(target))
+                p_target = f"{len(target)} targets"
 
             else:
                 p_target = target
 
             # Some Debug Logging
-            self.logger.debug('BulkSMS POST URL: {} (cert_verify={})'.format(
-                self.notify_url, self.verify_certificate))
-            self.logger.debug('BulkSMS Payload: {}' .format(payload))
+            self.logger.debug(
+                "BulkSMS POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"BulkSMS Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -342,24 +366,28 @@ class NotifyBulkSMS(NotifyBase):
                 # ]
 
                 if r.status_code not in (
-                        requests.codes.created, requests.codes.ok):
+                    requests.codes.created,
+                    requests.codes.ok,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     # set up our status code to use
                     status_code = r.status_code
 
                     self.logger.warning(
-                        'Failed to send BulkSMS notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send BulkSMS notification to {}: "
+                        "{}{}error={}.".format(
                             p_target,
                             status_str,
-                            ', ' if status_str else '',
-                            status_code))
+                            ", " if status_str else "",
+                            status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -367,13 +395,15 @@ class NotifyBulkSMS(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent BulkSMS notification to {}.'.format(p_target))
+                        f"Sent BulkSMS notification to {p_target}."
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending BulkSMS: to %s ',
-                    p_target)
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending BulkSMS: to %s ",
+                    p_target,
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -382,41 +412,48 @@ class NotifyBulkSMS(NotifyBase):
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'unicode': 'yes' if self.unicode else 'no',
-            'batch': 'yes' if self.batch else 'no',
-            'route': self.route,
+            "unicode": "yes" if self.unicode else "no",
+            "batch": "yes" if self.batch else "no",
+            "route": self.route,
         }
 
         if self.source:
-            params['from'] = self.source
+            params["from"] = self.source
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{user}:{password}@{targets}/?{params}'.format(
+        return "{schema}://{user}:{password}@{targets}/?{params}".format(
             schema=self.secure_protocol,
-            user=self.pprint(self.user, privacy, safe=''),
+            user=self.pprint(self.user, privacy, safe=""),
             password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
-            targets='/'.join(chain(
-                [NotifyBulkSMS.quote('{}'.format(x), safe='+')
-                 for x in self.targets],
-                [NotifyBulkSMS.quote('@{}'.format(x), safe='@')
-                 for x in self.groups])),
-            params=NotifyBulkSMS.urlencode(params))
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
+            targets="/".join(
+                chain(
+                    [
+                        NotifyBulkSMS.quote(f"{x}", safe="+")
+                        for x in self.targets
+                    ],
+                    [
+                        NotifyBulkSMS.quote(f"@{x}", safe="@")
+                        for x in self.groups
+                    ],
+                )
+            ),
+            params=NotifyBulkSMS.urlencode(params),
+        )
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol,
@@ -425,9 +462,7 @@ class NotifyBulkSMS(NotifyBase):
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
 
         #
         # Factor batch into calculation
@@ -437,18 +472,16 @@ class NotifyBulkSMS(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
         if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
 
         return targets + len(self.groups)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
@@ -456,36 +489,40 @@ class NotifyBulkSMS(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = [
-            NotifyBulkSMS.unquote(results['host']),
-            *NotifyBulkSMS.split_path(results['fullpath'])]
+        results["targets"] = [
+            NotifyBulkSMS.unquote(results["host"]),
+            *NotifyBulkSMS.split_path(results["fullpath"]),
+        ]
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifyBulkSMS.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifyBulkSMS.unquote(results["qsd"]["from"])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyBulkSMS.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyBulkSMS.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         # Unicode Characters
-        results['unicode'] = \
-            parse_bool(results['qsd'].get(
-                'unicode', NotifyBulkSMS.template_args['unicode']['default']))
+        results["unicode"] = parse_bool(
+            results["qsd"].get(
+                "unicode", NotifyBulkSMS.template_args["unicode"]["default"]
+            )
+        )
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get(
-                'batch', NotifyBulkSMS.template_args['batch']['default']))
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch", NotifyBulkSMS.template_args["batch"]["default"]
+            )
+        )
 
         # Allow one to define a route group
-        if 'route' in results['qsd'] and len(results['qsd']['route']):
-            results['route'] = \
-                NotifyBulkSMS.unquote(results['qsd']['route'])
+        if "route" in results["qsd"] and len(results["qsd"]["route"]):
+            results["route"] = NotifyBulkSMS.unquote(results["qsd"]["route"])
 
         return results

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,65 +25,90 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import requests
 
 from apprise.plugins.wecombot import NotifyWeComBot
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('wecombot://', {
-        'instance': TypeError,
-    }),
-    ('wecombot://:@/', {
-        'instance': TypeError,
-    }),
-    ('wecombot://botkey', {
-        # Minimum requirements met
-        'instance': NotifyWeComBot,
-    }),
-    ('wecombot://?key=botkey', {
-        # Test ?key=
-        'instance': NotifyWeComBot,
-    }),
+    (
+        "wecombot://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "wecombot://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "wecombot://botkey",
+        {
+            # Minimum requirements met
+            "instance": NotifyWeComBot,
+        },
+    ),
+    (
+        "wecombot://?key=botkey",
+        {
+            # Test ?key=
+            "instance": NotifyWeComBot,
+        },
+    ),
     # Support Native URLs
-    ('https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=BOTKEY', {
-        'instance': NotifyWeComBot,
-    }),
-    ('https://qyapi.weixin.qq.com/cgi-bin/webhook/send/?key=BOTKEY&data=123', {
-        # another variation (more parameters don't obstruct our key)
-        'instance': NotifyWeComBot,
-    }),
-    ('wecombot://botkey', {
-        'instance': NotifyWeComBot,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('wecombot://botkey', {
-        'instance': NotifyWeComBot,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('wecombot://botkey', {
-        'instance': NotifyWeComBot,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=BOTKEY",
+        {
+            "instance": NotifyWeComBot,
+        },
+    ),
+    (
+        "https://qyapi.weixin.qq.com/cgi-bin/webhook/send/?key=BOTKEY&data=123",
+        {
+            # another variation (more parameters don't obstruct our key)
+            "instance": NotifyWeComBot,
+        },
+    ),
+    (
+        "wecombot://botkey",
+        {
+            "instance": NotifyWeComBot,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "wecombot://botkey",
+        {
+            "instance": NotifyWeComBot,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "wecombot://botkey",
+        {
+            "instance": NotifyWeComBot,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_wecombot_urls():
-    """
-    NotifyWeComBot() Apprise URLs
-
-    """
+    """NotifyWeComBot() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

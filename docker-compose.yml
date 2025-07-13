@@ -34,17 +34,10 @@ services:
     volumes:
       - ./:/apprise
 
-  rpmbuild.f37:
+  rpmbuild.f42:
     build:
       context: .
-      dockerfile: tests/docker/Dockerfile.f37
-    volumes:
-      - ./:/apprise
-
-  rpmbuild.f39:
-    build:
-      context: .
-      dockerfile: tests/docker/Dockerfile.f39
+      dockerfile: tests/docker/Dockerfile.f42
     volumes:
       - ./:/apprise
 
@@ -58,39 +51,24 @@ services:
 #
 # Every Day testing
 #
-# Connect to web and create a new project using the manage script
-# -> docker-compose run --rm test.py311 bash
+# Sample testing:
+# -> docker-compose run --rm test.py312 bash
 # bin/apprise -
-# bin/checkdone.sh
-
-#
-# Other Testing
-#
-# Connect to web and create a new project using the manage script
-# -> docker-compose run --rm test.py311 bash
-# bin/apprise -
-# bin/checkdone.sh
+# tox -e checkdone
 #
 # Run a set of tests for just a certain section
-#  docker-compose run --rm test.py311 bin/test.sh fcm
+#  docker-compose run --rm test.py312 tox -e qa -- -k fcm
 #
-# Or just run all the tests in python 3.11
-#  docker-compose run --rm test.py311 bin/test.sh
+# Or just run all the tests in python 3.12
+#  docker-compose run --rm test.py312 tox -e qa
 #
 # Want to run the whole test suite:
 #
-# [ -f .coverage ] && rm -f .coverage
-# docker-compose run --rm test.py311 coverage run --append -m pytest -vv
-# docker-compose run --rm test.py310 coverage run --append -m pytest -vv
-#
-# # Now produce a report
-# docker-compose run --rm test.py310 coverage report --show-missing
-
 #
 # RPM Building
 #
 
 # el9
 #  - docker-compose run --rm rpmbuild.el9 build-rpm.sh
-# f39 (Fedora)
-#  - docker-compose run --rm rpmbuild.f39 build-rpm.sh
+# f42 (Fedora)
+#  - docker-compose run --rm rpmbuild.f42 build-rpm.sh

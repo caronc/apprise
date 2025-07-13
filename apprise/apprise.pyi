@@ -1,11 +1,19 @@
-from typing import Any, Dict, List, Iterable, Iterator, Optional
+from collections.abc import Iterable, Iterator
+from typing import Any
 
-from . import (AppriseAsset, AppriseAttachment, AppriseConfig, ConfigBase,
-               NotifyBase, NotifyFormat, NotifyType)
+from . import (
+    AppriseAsset,
+    AppriseAttachment,
+    AppriseConfig,
+    ConfigBase,
+    NotifyBase,
+    NotifyFormat,
+    NotifyType,
+)
 from .common import ContentLocation
 
 _Server = Union[str, ConfigBase, NotifyBase, AppriseConfig]
-_Servers = Union[_Server, Dict[Any, _Server], Iterable[_Server]]
+_Servers = Union[_Server, dict[Any, _Server], Iterable[_Server]]
 # Can't define this recursively as mypy doesn't support recursive types:
 # https://github.com/python/mypy/issues/731
 _Tag = Union[str, Iterable[Union[str, Iterable[str]]]]
@@ -14,22 +22,22 @@ class Apprise:
     def __init__(
         self,
         servers: _Servers = ...,
-        asset: Optional[AppriseAsset] = ...,
-        location: Optional[ContentLocation] = ...,
-        debug: bool = ...
+        asset: AppriseAsset | None = ...,
+        location: ContentLocation | None = ...,
+        debug: bool = ...,
     ) -> None: ...
     @staticmethod
     def instantiate(
-        url: Union[str, Dict[str, NotifyBase]],
-        asset: Optional[AppriseAsset] = ...,
-        tag: Optional[_Tag] = ...,
-        suppress_exceptions: bool = ...
+        url: Union[str, dict[str, NotifyBase]],
+        asset: AppriseAsset | None = ...,
+        tag: _Tag | None = ...,
+        suppress_exceptions: bool = ...,
     ) -> NotifyBase: ...
     def add(
         self,
         servers: _Servers = ...,
-        asset: Optional[AppriseAsset] = ...,
-        tag: Optional[_Tag] = ...
+        asset: AppriseAsset | None = ...,
+        tag: _Tag | None = ...,
     ) -> bool: ...
     def clear(self) -> None: ...
     def find(self, tag: str = ...) -> Iterator[Apprise]: ...
@@ -40,8 +48,8 @@ class Apprise:
         notify_type: NotifyType = ...,
         body_format: NotifyFormat = ...,
         tag: _Tag = ...,
-        attach: Optional[AppriseAttachment] = ...,
-        interpret_escapes: Optional[bool] = ...
+        attach: AppriseAttachment | None = ...,
+        interpret_escapes: bool | None = ...,
     ) -> bool: ...
     async def async_notify(
         self,
@@ -50,10 +58,10 @@ class Apprise:
         notify_type: NotifyType = ...,
         body_format: NotifyFormat = ...,
         tag: _Tag = ...,
-        attach: Optional[AppriseAttachment] = ...,
-        interpret_escapes: Optional[bool] = ...
+        attach: AppriseAttachment | None = ...,
+        interpret_escapes: bool | None = ...,
     ) -> bool: ...
-    def details(self, lang: Optional[str] = ...) -> Dict[str, Any]: ...
+    def details(self, lang: str | None = ...) -> dict[str, Any]: ...
     def urls(self, privacy: bool = ...) -> Iterable[str]: ...
     def pop(self, index: int) -> ConfigBase: ...
     def __getitem__(self, index: int) -> ConfigBase: ...

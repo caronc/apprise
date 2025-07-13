@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # BSD 2-Clause License
 #
@@ -26,45 +25,71 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import requests
-from apprise.plugins.spike import NotifySpike
-from helpers import AppriseURLTester
-
 import logging
+
+from helpers import AppriseURLTester
+import requests
+
+from apprise.plugins.spike import NotifySpike
+
 logging.disable(logging.CRITICAL)
 
 apprise_url_tests = (
-    ('spike://', {
-        'instance': TypeError,
-    }),
-    ('spike://invalid-key', {
-        'instance': TypeError,
-    }),
-    ('spike://1234567890abcdef1234567890abcdef', {
-        'instance': NotifySpike,
-        'privacy_url': 'spike://****/',
-    }),
-    ('spike://?token=1234567890abcdef1234567890abcdef', {
-        'instance': NotifySpike,
-        'privacy_url': 'spike://****/',
-    }),
-    ('https://api.spike.sh/v1/alerts/1234567890abcdef1234567890abcdef', {
-        'instance': NotifySpike,
-    }),
-    ('spike://1234567890abcdef1234567890abcdef', {
-        'instance': NotifySpike,
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('spike://1234567890abcdef1234567890abcdef', {
-        'instance': NotifySpike,
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('spike://ffffffffffffffffffffffffffffffff', {
-        'instance': NotifySpike,
-        'test_requests_exceptions': True,
-    }),
+    (
+        "spike://",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "spike://invalid-key",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "spike://1234567890abcdef1234567890abcdef",
+        {
+            "instance": NotifySpike,
+            "privacy_url": "spike://****/",
+        },
+    ),
+    (
+        "spike://?token=1234567890abcdef1234567890abcdef",
+        {
+            "instance": NotifySpike,
+            "privacy_url": "spike://****/",
+        },
+    ),
+    (
+        "https://api.spike.sh/v1/alerts/1234567890abcdef1234567890abcdef",
+        {
+            "instance": NotifySpike,
+        },
+    ),
+    (
+        "spike://1234567890abcdef1234567890abcdef",
+        {
+            "instance": NotifySpike,
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "spike://1234567890abcdef1234567890abcdef",
+        {
+            "instance": NotifySpike,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "spike://ffffffffffffffffffffffffffffffff",
+        {
+            "instance": NotifySpike,
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 

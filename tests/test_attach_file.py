@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,25 +25,24 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-import time
-import urllib
-import pytest
-from unittest import mock
-
-from os.path import dirname
-from os.path import join
-from apprise.attachment.base import AttachBase
-from apprise.attachment.file import AttachFile
-from apprise import AppriseAttachment
-from apprise.common import ContentLocation
-from apprise import exception
-
 # Disable logging for a cleaner testing output
 import logging
+from os.path import dirname, join
+import re
+import time
+from unittest import mock
+import urllib
+
+import pytest
+
+from apprise import AppriseAttachment, exception
+from apprise.attachment.base import AttachBase
+from apprise.attachment.file import AttachFile
+from apprise.common import ContentLocation
+
 logging.disable(logging.CRITICAL)
 
-TEST_VAR_DIR = join(dirname(__file__), 'var')
+TEST_VAR_DIR = join(dirname(__file__), "var")
 
 
 def test_attach_file_parse_url():
@@ -54,19 +52,19 @@ def test_attach_file_parse_url():
     """
 
     # bad entry
-    assert AttachFile.parse_url('garbage://') is None
+    assert AttachFile.parse_url("garbage://") is None
 
     # no file path specified
-    assert AttachFile.parse_url('file://') is None
+    assert AttachFile.parse_url("file://") is None
 
 
 def test_file_expiry(tmpdir):
     """
     API: AttachFile Expiry
     """
-    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    path = join(TEST_VAR_DIR, "apprise-test.gif")
     image = tmpdir.mkdir("apprise_file").join("test.jpg")
-    with open(path, 'rb') as data:
+    with open(path, "rb") as data:
         image.write(data)
 
     aa = AppriseAttachment.instantiate(str(image), cache=30)
@@ -79,12 +77,12 @@ def test_file_expiry(tmpdir):
     # under 30 seconds here (our set value), so this will succeed
     assert aa.exists()
 
-    with mock.patch('time.time', return_value=time.time() + 31):
+    with mock.patch("time.time", return_value=time.time() + 31):
         # This will force a re-download as our cache will have
         # expired
         assert aa.exists()
 
-    with mock.patch('time.time', side_effect=OSError):
+    with mock.patch("time.time", side_effect=OSError):
         # We will throw an exception
         assert aa.exists()
 
@@ -95,23 +93,23 @@ def test_attach_mimetype():
 
     """
     # Simple gif test
-    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    path = join(TEST_VAR_DIR, "apprise-test.gif")
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
     assert response.path == path
-    assert response.name == 'apprise-test.gif'
-    assert response.mimetype == 'image/gif'
+    assert response.name == "apprise-test.gif"
+    assert response.mimetype == "image/gif"
 
     # Force mimetype
     response._mimetype = None
     response.detected_mimetype = None
 
-    assert response.mimetype == 'image/gif'
+    assert response.mimetype == "image/gif"
 
     response._mimetype = None
     response.detected_mimetype = None
-    with mock.patch('mimetypes.guess_type', side_effect=TypeError):
-        assert response.mimetype == 'application/octet-stream'
+    with mock.patch("mimetypes.guess_type", side_effect=TypeError):
+        assert response.mimetype == "application/octet-stream"
 
 
 def test_attach_file():
@@ -120,20 +118,20 @@ def test_attach_file():
 
     """
     # Simple gif test
-    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    path = join(TEST_VAR_DIR, "apprise-test.gif")
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
     assert response.path == path
-    assert response.name == 'apprise-test.gif'
-    assert response.mimetype == 'image/gif'
+    assert response.name == "apprise-test.gif"
+    assert response.mimetype == "image/gif"
     # Download is successful and has already been called by now; below pulls
     # results from cache
     assert response.download()
 
-    with mock.patch('os.path.isfile', side_effect=OSError):
+    with mock.patch("os.path.isfile", side_effect=OSError):
         assert response.exists() is False
 
-    with mock.patch('os.path.isfile', return_value=False):
+    with mock.patch("os.path.isfile", return_value=False):
         assert response.exists() is False
 
     # Test that our file exists
@@ -142,15 +140,15 @@ def test_attach_file():
     # Leverage always-cached flag
     assert response.exists() is True
 
-    # On Windows, it is `file://D%3A%5Ca%5Capprise%5Capprise%5Ctest%5Cvar%5Capprise-test.gif`.  # noqa E501
-    # TODO: Review - is this correct?
+    # On Windows, it is:
+    #  `file://D%3A%5Ca%5Capprise%5Capprise%5Ctest%5Cvar%5Capprise-test.gif`
     path_in_url = urllib.parse.quote(path)
-    assert response.url().startswith('file://{}'.format(path_in_url))
+    assert response.url().startswith(f"file://{path_in_url}")
 
     # No mime-type and/or filename over-ride was specified, so it
     # won't show up in the generated URL
-    assert re.search(r'[?&]mime=', response.url()) is None
-    assert re.search(r'[?&]name=', response.url()) is None
+    assert re.search(r"[?&]mime=", response.url()) is None
+    assert re.search(r"[?&]name=", response.url()) is None
 
     # Test case where location is simply set to INACCESSIBLE
     # Below is a bad example, but it proves the section of code properly works.
@@ -172,7 +170,7 @@ def test_attach_file():
     # File handling (even if image is set to maxium allowable)
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
-    with mock.patch('os.path.getsize', return_value=AttachBase.max_file_size):
+    with mock.patch("os.path.getsize", return_value=AttachBase.max_file_size):
         # It will still work
         assert response.path == path
 
@@ -180,14 +178,15 @@ def test_attach_file():
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
     with mock.patch(
-            'os.path.getsize', return_value=AttachBase.max_file_size + 1):
+        "os.path.getsize", return_value=AttachBase.max_file_size + 1
+    ):
         # We can't work in this case
         assert response.path is None
 
     # File handling when image is not available
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
-    with mock.patch('os.path.isfile', return_value=False):
+    with mock.patch("os.path.isfile", return_value=False):
         # This triggers a full check and will fail the isfile() check
         assert response.path is None
 
@@ -196,19 +195,19 @@ def test_attach_file():
     # test cases reference 'path' right after instantiation; here we reference
     # 'name'
     response = AppriseAttachment.instantiate(path)
-    assert response.name == 'apprise-test.gif'
+    assert response.name == "apprise-test.gif"
     assert response.path == path
-    assert response.mimetype == 'image/gif'
+    assert response.mimetype == "image/gif"
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
-    assert re.search(r'[?&]mime=', response.url()) is None
-    assert re.search(r'[?&]name=', response.url()) is None
+    assert re.search(r"[?&]mime=", response.url()) is None
+    assert re.search(r"[?&]name=", response.url()) is None
 
     # continuation to cheking 'name' instead of 'path' first where our call
     # to download() fails
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
-    with mock.patch('os.path.isfile', return_value=False):
+    with mock.patch("os.path.isfile", return_value=False):
         # This triggers a full check and will fail the isfile() check
         assert response.name is None
 
@@ -217,19 +216,19 @@ def test_attach_file():
     # test cases reference 'path' right after instantiation; here we reference
     # 'mimetype'
     response = AppriseAttachment.instantiate(path)
-    assert response.mimetype == 'image/gif'
-    assert response.name == 'apprise-test.gif'
+    assert response.mimetype == "image/gif"
+    assert response.name == "apprise-test.gif"
     assert response.path == path
     # No mime-type and/or filename over-ride was specified, so therefore it
     # won't show up in the generated URL
-    assert re.search(r'[?&]mime=', response.url()) is None
-    assert re.search(r'[?&]name=', response.url()) is None
+    assert re.search(r"[?&]mime=", response.url()) is None
+    assert re.search(r"[?&]name=", response.url()) is None
 
     # continuation to cheking 'name' instead of 'path' first where our call
     # to download() fails
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
-    with mock.patch('os.path.isfile', return_value=False):
+    with mock.patch("os.path.isfile", return_value=False):
         # download() fails so we don't have a mimetpe
         assert response.mimetype is None
         assert response.name is None
@@ -238,13 +237,14 @@ def test_attach_file():
 
     # Force a mime-type and new name
     response = AppriseAttachment.instantiate(
-        'file://{}?mime={}&name={}'.format(path, 'image/jpeg', 'test.jpeg'))
+        "file://{}?mime={}&name={}".format(path, "image/jpeg", "test.jpeg")
+    )
     assert isinstance(response, AttachFile)
     assert response.path == path
-    assert response.name == 'test.jpeg'
-    assert response.mimetype == 'image/jpeg'
-    assert re.search(r'[?&]mime=image/jpeg', response.url(), re.I)
-    assert re.search(r'[?&]name=test\.jpeg', response.url(), re.I)
+    assert response.name == "test.jpeg"
+    assert response.mimetype == "image/jpeg"
+    assert re.search(r"[?&]mime=image/jpeg", response.url(), re.I)
+    assert re.search(r"[?&]name=test\.jpeg", response.url(), re.I)
 
     # Test hosted configuration and that we can't add a valid file
     aa = AppriseAttachment(location=ContentLocation.HOSTED)
@@ -263,14 +263,14 @@ def test_attach_file():
     assert response.download()
 
     # Test the inability to get our file size
-    with mock.patch('os.path.getsize', side_effect=(0, OSError)):
+    with mock.patch("os.path.getsize", side_effect=(0, OSError)):
         assert len(response) == 0
 
     # get file again
     assert response.download()
-    with mock.patch('os.path.isfile', return_value=True):
+    with mock.patch("os.path.isfile", return_value=True):
         response.cache = True
-        with mock.patch('os.path.getsize', side_effect=OSError):
+        with mock.patch("os.path.getsize", side_effect=OSError):
             assert len(response) == 0
 
 
@@ -281,11 +281,11 @@ def test_attach_file_base64():
     """
 
     # Simple gif test
-    path = join(TEST_VAR_DIR, 'apprise-test.gif')
+    path = join(TEST_VAR_DIR, "apprise-test.gif")
     response = AppriseAttachment.instantiate(path)
     assert isinstance(response, AttachFile)
-    assert response.name == 'apprise-test.gif'
-    assert response.mimetype == 'image/gif'
+    assert response.name == "apprise-test.gif"
+    assert response.mimetype == "image/gif"
 
     # now test our base64 output
     assert isinstance(response.base64(), str)
@@ -293,12 +293,17 @@ def test_attach_file_base64():
     assert isinstance(response.base64(encoding=None), bytes)
 
     # Error cases:
-    with mock.patch('os.path.isfile', return_value=False):
-        with pytest.raises(exception.AppriseFileNotFound):
-            response.base64()
+    with (
+        mock.patch("os.path.isfile", return_value=False),
+        pytest.raises(exception.AppriseFileNotFound),
+    ):
+        response.base64()
 
-    with mock.patch("builtins.open", new_callable=mock.mock_open,
-                    read_data="mocked file content") as mock_file:
+    with mock.patch(
+        "builtins.open",
+        new_callable=mock.mock_open,
+        read_data="mocked file content",
+    ) as mock_file:
         mock_file.side_effect = FileNotFoundError
         with pytest.raises(exception.AppriseFileNotFound):
             response.base64()

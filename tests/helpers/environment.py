@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,19 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import os
 import contextlib
 import locale
 
 # Disable logging for a cleaner testing output
 import logging
+import os
+
 logging.disable(logging.CRITICAL)
 
 
 @contextlib.contextmanager
 def environ(*remove, **update):
-    """
-    Temporarily updates the ``os.environ`` dictionary in-place.
+    """Temporarily updates the ``os.environ`` dictionary in-place.
 
     The ``os.environ`` dictionary is updated in-place so that the modification
     is sure to work in all situations.
@@ -47,22 +46,15 @@ def environ(*remove, **update):
     :param update: Dictionary of environment variables and values to
                    add/update.
     """
-
-    # Create a backup of our environment for restoration purposes
     env_orig = os.environ.copy()
     loc_orig = locale.getlocale()
     try:
         os.environ.update(update)
-        [os.environ.pop(k, None) for k in remove]
+        for k in remove:
+            os.environ.pop(k, None)
         yield
-
     finally:
-        # Restore our snapshot
-        os.environ = env_orig.copy()
-        try:
-            # Restore locale
+        os.environ.clear()
+        os.environ.update(env_orig)
+        with contextlib.suppress(locale.Error):
             locale.setlocale(locale.LC_ALL, loc_orig)
-
-        except locale.Error:
-            # Handle this case
-            pass

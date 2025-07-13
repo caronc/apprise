@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,17 +25,16 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import pytest
-from apprise import AppriseAsset
-from apprise.config import ConfigBase
-from apprise import Apprise
-from apprise import ConfigFormat
 from inspect import cleandoc
-import yaml
 
 # Disable logging for a cleaner testing output
 import logging
 
+import pytest
+import yaml
+
+from apprise import Apprise, AppriseAsset, ConfigFormat
+from apprise.config import ConfigBase
 from apprise.plugins.email import NotifyEmail
 
 logging.disable(logging.CRITICAL)
@@ -50,20 +48,20 @@ def test_config_base():
 
     # invalid types throw exceptions
     with pytest.raises(TypeError):
-        ConfigBase(**{'format': 'invalid'})
+        ConfigBase(**{"format": "invalid"})
 
     # Config format types are not the same as ConfigBase ones
     with pytest.raises(TypeError):
-        ConfigBase(**{'format': 'markdown'})
+        ConfigBase(**{"format": "markdown"})
 
-    cb = ConfigBase(**{'format': 'yaml'})
+    cb = ConfigBase(**{"format": "yaml"})
     assert isinstance(cb, ConfigBase)
 
-    cb = ConfigBase(**{'format': 'text'})
+    cb = ConfigBase(**{"format": "text"})
     assert isinstance(cb, ConfigBase)
 
     # Set encoding
-    cb = ConfigBase(encoding='utf-8', format='text')
+    cb = ConfigBase(encoding="utf-8", format="text")
     assert isinstance(cb, ConfigBase)
 
     # read is not supported in the base object; only the children
@@ -73,33 +71,35 @@ def test_config_base():
     assert len(cb.servers()) == 0
 
     # Unsupported URLs are not parsed
-    assert ConfigBase.parse_url(url='invalid://') is None
+    assert ConfigBase.parse_url(url="invalid://") is None
 
     # Valid URL & Valid Format
     results = ConfigBase.parse_url(
-        url='file://relative/path?format=yaml&encoding=latin-1')
+        url="file://relative/path?format=yaml&encoding=latin-1"
+    )
     assert isinstance(results, dict)
     # These are moved into the root
-    assert results.get('format') == 'yaml'
-    assert results.get('encoding') == 'latin-1'
+    assert results.get("format") == "yaml"
+    assert results.get("encoding") == "latin-1"
 
     # But they also exist in the qsd location
-    assert isinstance(results.get('qsd'), dict)
-    assert results['qsd'].get('encoding') == 'latin-1'
-    assert results['qsd'].get('format') == 'yaml'
+    assert isinstance(results.get("qsd"), dict)
+    assert results["qsd"].get("encoding") == "latin-1"
+    assert results["qsd"].get("format") == "yaml"
 
     # Valid URL & Invalid Format
     results = ConfigBase.parse_url(
-        url='file://relative/path?format=invalid&encoding=latin-1')
+        url="file://relative/path?format=invalid&encoding=latin-1"
+    )
     assert isinstance(results, dict)
     # Only encoding is moved into the root
-    assert 'format' not in results
-    assert results.get('encoding') == 'latin-1'
+    assert "format" not in results
+    assert results.get("encoding") == "latin-1"
 
     # But they will always exist in the qsd location
-    assert isinstance(results.get('qsd'), dict)
-    assert results['qsd'].get('encoding') == 'latin-1'
-    assert results['qsd'].get('format') == 'invalid'
+    assert isinstance(results.get("qsd"), dict)
+    assert results["qsd"].get("encoding") == "latin-1"
+    assert results["qsd"].get("format") == "invalid"
 
 
 def test_config_base_detect_config_format():
@@ -114,7 +114,7 @@ def test_config_base_detect_config_format():
         assert ConfigBase.detect_config_format(garbage) is None
 
     # Empty files are valid
-    assert ConfigBase.detect_config_format('') is ConfigFormat.TEXT
+    assert ConfigBase.detect_config_format("") is ConfigFormat.TEXT
 
     # Valid Text Configuration
     assert ConfigBase.detect_config_format("""
@@ -136,7 +136,7 @@ def test_config_base_detect_config_format():
     """) is ConfigFormat.YAML
 
     # Just a whole lot of blank lines...
-    assert ConfigBase.detect_config_format('\n\n\n') is ConfigFormat.TEXT
+    assert ConfigBase.detect_config_format("\n\n\n") is ConfigFormat.TEXT
 
     # Invalid Config
     assert ConfigBase.detect_config_format("3") is None
@@ -157,13 +157,16 @@ def test_config_base_config_parse():
         # containing 2 items (plugins, config)
         assert len(result) == 2
         # In the case of garbage in, we get garbage out; both lists are empty
-        assert result == (list(), list())
+        assert result == ([], [])
 
     # Valid Text Configuration
-    result = ConfigBase.config_parse("""
+    result = ConfigBase.config_parse(
+        """
     # A comment line over top of a URL
     mailto://userb:pass@gmail.com
-    """, asset=AppriseAsset())
+    """,
+        asset=AppriseAsset(),
+    )
     # We expect to parse 1 entry from the above
     assert isinstance(result, tuple)
     assert len(result) == 2
@@ -177,7 +180,8 @@ def test_config_base_config_parse():
     assert len(result[1]) == 0
 
     # Valid Configuration
-    result = ConfigBase.config_parse("""
+    result = ConfigBase.config_parse(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -189,7 +193,9 @@ urls:
   - mailto://test:password@gmail.com
   - json://localhost:
       - tag: devops, admin
-    """, asset=AppriseAsset())
+    """,
+        asset=AppriseAsset(),
+    )
 
     # We expect to parse 2 entries from the above
     assert isinstance(result, tuple)
@@ -201,20 +207,26 @@ urls:
     assert len(result[0][2].tags) == 2
 
     # Test case where we pass in a bad format
-    result = ConfigBase.config_parse("""
+    result = ConfigBase.config_parse(
+        """
     ; A comment line over top of a URL
     mailto://userb:pass@gmail.com
-    """, config_format='invalid-format')
+    """,
+        config_format="invalid-format",
+    )
 
     # This is not parseable despite the valid text
     assert isinstance(result, tuple)
     assert isinstance(result[0], list)
     assert len(result[0]) == 0
 
-    result, _ = ConfigBase.config_parse("""
+    result, _ = ConfigBase.config_parse(
+        """
     ; A comment line over top of a URL
     mailto://userb:pass@gmail.com
-    """, config_format=ConfigFormat.TEXT)
+    """,
+        config_format=ConfigFormat.TEXT,
+    )
 
     # Parseable
     assert isinstance(result, list)
@@ -232,19 +244,22 @@ def test_config_base_discord_bug_report_01():
            - tag: test
              userid: test
     """
-    result, config = ConfigBase.config_parse("""
+    result, config = ConfigBase.config_parse(
+        """
     urls:
       - json://myhost:
         - tag: test
           userid: test
-    """, asset=AppriseAsset())
+    """,
+        asset=AppriseAsset(),
+    )
 
     # We expect to parse 4 entries from the above
     assert isinstance(result, list)
     assert isinstance(config, list)
     assert len(result) == 1
     assert len(result[0].tags) == 1
-    assert 'test' in result[0].tags
+    assert "test" in result[0].tags
 
 
 def test_config_base_config_parse_text():
@@ -262,10 +277,11 @@ def test_config_base_config_parse_text():
         # containing 2 items (plugins, config)
         assert len(result) == 2
         # In the case of garbage in, we get garbage out; both lists are empty
-        assert result == (list(), list())
+        assert result == ([], [])
 
     # Valid Configuration
-    result, config = ConfigBase.config_parse_text("""
+    result, config = ConfigBase.config_parse_text(
+        """
     # A completely invalid token on json string (it gets ignored)
     # but the URL is still valid
     json://localhost?invalid-token=nodashes
@@ -287,7 +303,9 @@ def test_config_base_config_parse_text():
     include http://localhost:8080/notify/apprise
 
     # A relative include statement (with trailing spaces)
-    include apprise.cfg     """, asset=AppriseAsset())
+    include apprise.cfg     """,
+        asset=AppriseAsset(),
+    )
 
     # We expect to parse 4 entries from the above
     assert isinstance(result, list)
@@ -297,12 +315,12 @@ def test_config_base_config_parse_text():
 
     # Our last element will have 2 tags associated with it
     assert len(result[-1].tags) == 2
-    assert 'taga' in result[-1].tags
-    assert 'tagb' in result[-1].tags
+    assert "taga" in result[-1].tags
+    assert "tagb" in result[-1].tags
 
     assert len(config) == 2
-    assert 'http://localhost:8080/notify/apprise' in config
-    assert 'apprise.cfg' in config
+    assert "http://localhost:8080/notify/apprise" in config
+    assert "apprise.cfg" in config
 
     # Here is a similar result set however this one has an invalid line
     # in it which invalidates the entire file
@@ -375,9 +393,9 @@ def test_config_base_config_parse_text():
     assert isinstance(result, list)
     assert len(result) == 1
     assert len(result[0].tags) == 3
-    assert 'tag1' in result[0].tags
-    assert 'tag2' in result[0].tags
-    assert 'tag3' in result[0].tags
+    assert "tag1" in result[0].tags
+    assert "tag2" in result[0].tags
+    assert "tag3" in result[0].tags
 
 
 def test_config_base_config_tag_groups_text():
@@ -387,7 +405,8 @@ def test_config_base_config_tag_groups_text():
     """
 
     # Valid Configuration
-    result, config = ConfigBase.config_parse_text("""
+    result, config = ConfigBase.config_parse_text(
+        """
     # Tag assignments
     groupA, groupB = tagB, tagC
 
@@ -433,7 +452,9 @@ def test_config_base_config_tag_groups_text():
     # More Tag Assignments
     groupD=form://localhost
 
-    """, asset=AppriseAsset())
+    """,
+        asset=AppriseAsset(),
+    )
 
     # We expect to parse 4 entries from the above
     assert isinstance(result, list)
@@ -442,8 +463,8 @@ def test_config_base_config_tag_groups_text():
 
     # Our first element is our group tags
     assert len(result[0].tags) == 2
-    assert 'groupB' in result[0].tags
-    assert '4' in result[0].tags
+    assert "groupB" in result[0].tags
+    assert "4" in result[0].tags
 
     # No additional configuration is loaded
     assert len(config) == 0
@@ -451,12 +472,12 @@ def test_config_base_config_tag_groups_text():
     apobj = Apprise()
     assert apobj.add(result)
     # We match against 1 entry
-    assert len([x for x in apobj.find('tagA')]) == 1
-    assert len([x for x in apobj.find('tagB')]) == 0
-    assert len([x for x in apobj.find('groupA')]) == 1
-    assert len([x for x in apobj.find('groupB')]) == 3
-    assert len([x for x in apobj.find('groupC')]) == 2
-    assert len([x for x in apobj.find('groupD')]) == 3
+    assert len(list(apobj.find("tagA"))) == 1
+    assert len(list(apobj.find("tagB"))) == 0
+    assert len(list(apobj.find("groupA"))) == 1
+    assert len(list(apobj.find("groupB"))) == 3
+    assert len(list(apobj.find("groupC"))) == 2
+    assert len(list(apobj.find("groupD"))) == 3
 
     # Invalid Assignment
     result, config = ConfigBase.config_parse_text("""
@@ -491,7 +512,7 @@ def test_config_base_config_tag_groups_text():
 
     # Our first element is our group tags
     assert len(result[0].tags) == 1
-    assert 'group' in result[0].tags
+    assert "group" in result[0].tags
 
     # There were no include entries defined
     assert len(config) == 0
@@ -542,8 +563,8 @@ def test_config_base_config_parse_text_with_url():
     assert len(result[0].tags) == 0
 
     # Verify our URL is correctly captured
-    assert '%2Barg=http%3A%2F%2Fexample.com%3Farg2%3D1' in result[0].url()
-    assert 'json://user:pass@localhost/' in result[0].url()
+    assert "%2Barg=http%3A%2F%2Fexample.com%3Farg2%3D1" in result[0].url()
+    assert "json://user:pass@localhost/" in result[0].url()
 
     # There were no include entries defined
     assert len(config) == 0
@@ -555,8 +576,8 @@ def test_config_base_config_parse_text_with_url():
     assert isinstance(result, list)
     assert len(result) == 1
     assert len(result[0].tags) == 0
-    assert '%2Barg=http%3A%2F%2Fexample.com%3Farg2%3D1' in result[0].url()
-    assert 'json://user:pass@localhost/' in result[0].url()
+    assert "%2Barg=http%3A%2F%2Fexample.com%3Farg2%3D1" in result[0].url()
+    assert "json://user:pass@localhost/" in result[0].url()
 
     assert len(config) == 0
 
@@ -571,7 +592,7 @@ def test_config_base_config_parse_yaml():
     asset = AppriseAsset()
 
     # Garbage Handling
-    for garbage in (object(), None, '', 42):
+    for garbage in (object(), None, "", 42):
         # A response is always correctly returned
         result = ConfigBase.config_parse_yaml(garbage)
         # response is a tuple...
@@ -579,7 +600,7 @@ def test_config_base_config_parse_yaml():
         # containing 2 items (plugins, config)
         assert len(result) == 2
         # In the case of garbage in, we get garbage out; both lists are empty
-        assert result == (list(), list())
+        assert result == ([], [])
 
     # Invalid Version
     result, config = ConfigBase.config_parse_yaml("version: 2a", asset=asset)
@@ -592,12 +613,15 @@ def test_config_base_config_parse_yaml():
     assert len(config) == 0
 
     # Invalid Syntax (throws a ScannerError)
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
 urls
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -607,11 +631,14 @@ urls
     assert len(config) == 0
 
     # Missing url token
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -621,12 +648,15 @@ version: 1
     assert len(config) == 0
 
     # No urls defined
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
 urls:
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -636,13 +666,16 @@ urls:
     assert len(config) == 0
 
     # Invalid url defined
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
 # Invalid URL definition; yet the answer to life at the same time
 urls: 43
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -652,14 +685,17 @@ urls: 43
     assert len(config) == 0
 
     # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
 urls:
   - invalid://
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -669,7 +705,8 @@ urls:
     assert len(config) == 0
 
     # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -677,7 +714,9 @@ urls:
   - invalid://:
     - a: b
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -687,7 +726,8 @@ urls:
     assert len(config) == 0
 
     # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # Include entry with nothing associated with it
 include:
 
@@ -695,7 +735,9 @@ urls:
   - just some free text that isn't valid:
     - a garbage entry to go with it
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -705,14 +747,17 @@ urls:
     assert len(config) == 0
 
     # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
 urls:
   - not even a proper url
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -722,7 +767,8 @@ urls:
     assert len(config) == 0
 
     # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 urls:
   # a very invalid sns entry
   - sns://T1JJ3T3L2/
@@ -737,7 +783,9 @@ urls:
     -
       - test
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -747,7 +795,8 @@ urls:
     assert len(config) == 0
 
     # Valid Configuration
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -780,7 +829,9 @@ urls:
     # but the URL is still valid
   - json://localhost?invalid-token=nodashes
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 4 entries from the above
     # The Ryver one is in a native form and the 4th one is invalid
@@ -790,12 +841,13 @@ urls:
 
     # There were 3 include entries
     assert len(config) == 3
-    assert 'file:///absolute/path/' in config
-    assert 'relative/path' in config
-    assert 'http://test.com' in config
+    assert "file:///absolute/path/" in config
+    assert "relative/path" in config
+    assert "http://test.com" in config
 
     # Valid Configuration
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # A single line include is supported
 include: http://localhost:8080/notify/apprise
 
@@ -829,7 +881,9 @@ urls:
   # A telegram entry (returns a None in parse_url())
   - tgram://invalid
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 6 entries from the above because the tgram:// entry
     # would have failed to be loaded
@@ -839,10 +893,11 @@ urls:
 
     # Our single line included
     assert len(config) == 1
-    assert 'http://localhost:8080/notify/apprise' in config
+    assert "http://localhost:8080/notify/apprise" in config
 
     # Global Tags
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # Global Tags stacked as a list
 tag:
   - admin
@@ -851,7 +906,9 @@ tag:
 urls:
   - json://localhost
   - dbus://
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 2 entries from the above
     assert isinstance(result, list)
@@ -862,11 +919,12 @@ urls:
 
     # all entries will have our global tags defined in them
     for entry in result:
-        assert 'admin' in entry.tags
-        assert 'devops' in entry.tags
+        assert "admin" in entry.tags
+        assert "devops" in entry.tags
 
     # Global Tags
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # Global Tags
 tag: admin, devops
 
@@ -880,12 +938,14 @@ urls:
     - tag:
       - list-tag
       - dbus
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # all entries will have our global tags defined in them
     for entry in result:
-        assert 'admin' in entry.tags
-        assert 'devops' in entry.tags
+        assert "admin" in entry.tags
+        assert "devops" in entry.tags
 
     # We expect to parse 2 entries from the above
     assert isinstance(result, list)
@@ -893,24 +953,27 @@ urls:
 
     # json:// has 2 globals + 3 defined
     assert len(result[0].tags) == 5
-    assert 'text' in result[0].tags
+    assert "text" in result[0].tags
 
     # json:// has 2 globals + 2 defined
     assert len(result[1].tags) == 4
-    assert 'list-tag' in result[1].tags
+    assert "list-tag" in result[1].tags
 
     # There were no include entries defined
     assert len(config) == 0
 
     # An invalid set of entries
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 urls:
   # The following tags will get added to the global set
   - json://localhost:
     -
       -
         - entry
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 0 entries from the above
     assert isinstance(result, list)
@@ -923,7 +986,8 @@ urls:
     asset = AppriseAsset(_uid="abc123", _recursion=1)
 
     # Global Tags
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # Test the creation of our apprise asset object
 asset:
   app_id: AppriseTest
@@ -956,7 +1020,9 @@ asset:
 
 urls:
   - json://localhost:
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 1 entries from the above
     assert isinstance(result, list)
@@ -988,7 +1054,8 @@ urls:
     # For on-lookers looking through this file; here is a perfectly formatted
     # YAML configuration file for your reference so you can see it without
     # all of the errors like the ones identified above
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed. Thus this is a
 # completely optional field. It's a good idea to just add this line because it
 # will help with future ambiguity (if it ever occurs).
@@ -1036,7 +1103,9 @@ urls:
 
      - to: chris@yahoo.com
        tag: chris, customer
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # okay, here is how we get our total based on the above (read top-down)
     # +1  json:// entry
@@ -1048,8 +1117,8 @@ urls:
 
     # all six entries will have our global tags defined in them
     for entry in result:
-        assert 'admin' in entry.tags
-        assert 'devops' in entry.tags
+        assert "admin" in entry.tags
+        assert "devops" in entry.tags
 
     # Entries can be directly accessed as they were added
 
@@ -1060,7 +1129,7 @@ urls:
 
     # our xml:// object has 1 tag added (customer)
     assert len(result[1].tags) == 3
-    assert 'customer' in result[1].tags
+    assert "customer" in result[1].tags
 
     # You get the idea, here is just a direct mapping to the remaining entries
     # in the same order they appear above
@@ -1068,23 +1137,26 @@ urls:
     assert len(result[3].tags) == 2
 
     assert len(result[4].tags) == 4
-    assert 'customer' in result[4].tags
-    assert 'jeff' in result[4].tags
+    assert "customer" in result[4].tags
+    assert "jeff" in result[4].tags
 
     assert len(result[5].tags) == 4
-    assert 'customer' in result[5].tags
-    assert 'chris' in result[5].tags
+    assert "customer" in result[5].tags
+    assert "chris" in result[5].tags
 
     # There were no include entries defined
     assert len(config) == 0
 
     # Valid Configuration (multi inline configuration entries)
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # A configuration file that contains 2 includes separated by a comma and/or
 # space:
 include: http://localhost:8080/notify/apprise, http://localhost/apprise/cfg
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We will have loaded no results
     assert isinstance(result, list)
@@ -1092,11 +1164,12 @@ include: http://localhost:8080/notify/apprise, http://localhost/apprise/cfg
 
     # But our two configuration files will be present:
     assert len(config) == 2
-    assert 'http://localhost:8080/notify/apprise' in config
-    assert 'http://localhost/apprise/cfg' in config
+    assert "http://localhost:8080/notify/apprise" in config
+    assert "http://localhost/apprise/cfg" in config
 
     # Valid Configuration (another way of specifying more then one include)
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # A configuration file that contains 4 includes on their own
 # lines beneath the keyword `include`:
 include:
@@ -1105,7 +1178,9 @@ include:
    http://localhost/apprise/cfg02
    http://localhost/apprise/cfg03
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We will have loaded no results
     assert isinstance(result, list)
@@ -1113,20 +1188,23 @@ include:
 
     # But our 4 configuration files will be present:
     assert len(config) == 4
-    assert 'http://localhost:8080/notify/apprise' in config
-    assert 'http://localhost/apprise/cfg01' in config
-    assert 'http://localhost/apprise/cfg02' in config
-    assert 'http://localhost/apprise/cfg03' in config
+    assert "http://localhost:8080/notify/apprise" in config
+    assert "http://localhost/apprise/cfg01" in config
+    assert "http://localhost/apprise/cfg02" in config
+    assert "http://localhost/apprise/cfg03" in config
 
     # Test a configuration with an invalid schema with options
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
     urls:
       - invalid://:
           tag: 'invalid'
           :name: 'Testing2'
           :body: 'test body2'
           :title: 'test title2'
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We will have loaded no results
     assert isinstance(result, list)
@@ -1134,7 +1212,8 @@ include:
 
     # Valid Configuration (we allow comma separated entries for
     # each defined bullet)
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # A configuration file that contains 4 includes on their own
 # lines beneath the keyword `include`:
 include:
@@ -1142,7 +1221,9 @@ include:
      http://localhost/apprise/cfg02
    - http://localhost/apprise/cfg03
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We will have loaded no results
     assert isinstance(result, list)
@@ -1150,10 +1231,10 @@ include:
 
     # But our 4 configuration files will be present:
     assert len(config) == 4
-    assert 'http://localhost:8080/notify/apprise' in config
-    assert 'http://localhost/apprise/cfg01' in config
-    assert 'http://localhost/apprise/cfg02' in config
-    assert 'http://localhost/apprise/cfg03' in config
+    assert "http://localhost:8080/notify/apprise" in config
+    assert "http://localhost/apprise/cfg01" in config
+    assert "http://localhost/apprise/cfg02" in config
+    assert "http://localhost/apprise/cfg03" in config
 
 
 def test_yaml_vs_text_tagging():
@@ -1177,8 +1258,8 @@ def test_yaml_vs_text_tagging():
     assert len(yaml_result) == len(text_result)
     assert isinstance(yaml_result[0], NotifyEmail)
     assert isinstance(text_result[0], NotifyEmail)
-    assert 'mytag' in text_result[0]
-    assert 'mytag' in yaml_result[0]
+    assert "mytag" in text_result[0]
+    assert "mytag" in yaml_result[0]
 
 
 def test_config_base_config_tag_groups_yaml_01():
@@ -1191,7 +1272,8 @@ def test_config_base_config_tag_groups_yaml_01():
     asset = AppriseAsset()
 
     # Valid Configuration
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -1257,7 +1339,9 @@ urls:
   - json://localhost:
      - tag: tagD, tagA
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 4 entries from the above
     assert isinstance(result, list)
@@ -1266,11 +1350,11 @@ urls:
 
     # Our first element is our group tags
     assert len(result[0].tags) == 5
-    assert 'group2' in result[0].tags
-    assert 'group3' in result[0].tags
-    assert 'groupL' in result[0].tags
-    assert 'groupM' in result[0].tags
-    assert 'tagA' in result[0].tags
+    assert "group2" in result[0].tags
+    assert "group3" in result[0].tags
+    assert "groupL" in result[0].tags
+    assert "groupM" in result[0].tags
+    assert "tagA" in result[0].tags
 
     # No additional configuration is loaded
     assert len(config) == 0
@@ -1278,20 +1362,20 @@ urls:
     apobj = Apprise()
     assert apobj.add(result)
     # We match against 1 entry
-    assert len([x for x in apobj.find('tagA')]) == 2
-    assert len([x for x in apobj.find('tagB')]) == 1
-    assert len([x for x in apobj.find('tagC')]) == 1
-    assert len([x for x in apobj.find('tagD')]) == 1
-    assert len([x for x in apobj.find('group1')]) == 2
-    assert len([x for x in apobj.find('group2')]) == 3
-    assert len([x for x in apobj.find('group3')]) == 2
-    assert len([x for x in apobj.find('group4')]) == 0
-    assert len([x for x in apobj.find('group5')]) == 0
+    assert len(list(apobj.find("tagA"))) == 2
+    assert len(list(apobj.find("tagB"))) == 1
+    assert len(list(apobj.find("tagC"))) == 1
+    assert len(list(apobj.find("tagD"))) == 1
+    assert len(list(apobj.find("group1"))) == 2
+    assert len(list(apobj.find("group2"))) == 3
+    assert len(list(apobj.find("group3"))) == 2
+    assert len(list(apobj.find("group4"))) == 0
+    assert len(list(apobj.find("group5"))) == 0
     # json:// -- group6 -> 4 -> TagA
     # xml://  -- group6 -> TagC
-    assert len([x for x in apobj.find('group6')]) == 2
-    assert len([x for x in apobj.find('4')]) == 1
-    assert len([x for x in apobj.find('groupN')]) == 1
+    assert len(list(apobj.find("group6"))) == 2
+    assert len(list(apobj.find("4"))) == 1
+    assert len(list(apobj.find("groupN"))) == 1
 
 
 def test_config_base_config_tag_groups_yaml_02():
@@ -1304,7 +1388,8 @@ def test_config_base_config_tag_groups_yaml_02():
     asset = AppriseAsset()
 
     # Valid Configuration
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # if no version is specified then version 1 is presumed
 version: 1
 
@@ -1369,7 +1454,9 @@ urls:
   - json://localhost:
      - tag: tagD, tagA
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # We expect to parse 4 entries from the above
     assert isinstance(result, list)
@@ -1378,11 +1465,11 @@ urls:
 
     # Our first element is our group tags
     assert len(result[0].tags) == 5
-    assert 'group2' in result[0].tags
-    assert 'group3' in result[0].tags
-    assert 'groupL' in result[0].tags
-    assert 'groupM' in result[0].tags
-    assert 'tagA' in result[0].tags
+    assert "group2" in result[0].tags
+    assert "group3" in result[0].tags
+    assert "groupL" in result[0].tags
+    assert "groupM" in result[0].tags
+    assert "tagA" in result[0].tags
 
     # No additional configuration is loaded
     assert len(config) == 0
@@ -1390,15 +1477,15 @@ urls:
     apobj = Apprise()
     assert apobj.add(result)
     # We match against 1 entry
-    assert len([x for x in apobj.find('tagA')]) == 2
-    assert len([x for x in apobj.find('tagB')]) == 1
-    assert len([x for x in apobj.find('tagC')]) == 1
-    assert len([x for x in apobj.find('tagD')]) == 1
-    assert len([x for x in apobj.find('group1')]) == 2
-    assert len([x for x in apobj.find('group2')]) == 3
-    assert len([x for x in apobj.find('group3')]) == 2
-    assert len([x for x in apobj.find('group4')]) == 0
-    assert len([x for x in apobj.find('group5')]) == 0
+    assert len(list(apobj.find("tagA"))) == 2
+    assert len(list(apobj.find("tagB"))) == 1
+    assert len(list(apobj.find("tagC"))) == 1
+    assert len(list(apobj.find("tagD"))) == 1
+    assert len(list(apobj.find("group1"))) == 2
+    assert len(list(apobj.find("group2"))) == 3
+    assert len(list(apobj.find("group3"))) == 2
+    assert len(list(apobj.find("group4"))) == 0
+    assert len(list(apobj.find("group5"))) == 0
     # NOT json:// -- group6 -> 4 -> TagA (not appended because dict storage)
     #                          ^
     #                          |
@@ -1407,10 +1494,10 @@ urls:
     #                 prevail; previous assignments are lost
     #
     # xml://  -- group6 -> TagC
-    assert len([x for x in apobj.find('group6')]) == 1
-    assert len([x for x in apobj.find('4')]) == 1
-    assert len([x for x in apobj.find('groupN')]) == 1
-    assert len([x for x in apobj.find('groupK')]) == 0
+    assert len(list(apobj.find("group6"))) == 1
+    assert len(list(apobj.find("4"))) == 1
+    assert len(list(apobj.find("groupN"))) == 1
+    assert len(list(apobj.find("groupK"))) == 0
 
 
 def test_config_base_config_parse_yaml_globals():
@@ -1423,7 +1510,8 @@ def test_config_base_config_parse_yaml_globals():
     asset = AppriseAsset()
 
     # Invalid Syntax (throws a ScannerError)
-    results, config = ConfigBase.config_parse_yaml(cleandoc("""
+    results, config = ConfigBase.config_parse_yaml(
+        cleandoc("""
     urls:
       - jsons://localhost1:
          - to: jeff@gmail.com
@@ -1435,7 +1523,9 @@ def test_config_base_config_parse_yaml_globals():
       - jsons://localhost2?cto=30&rto=30&verify=no:
          - to: json@gmail.com
            tag: json, customer
-    """), asset=asset)
+    """),
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(results, list)
@@ -1455,8 +1545,10 @@ def test_config_base_config_parse_yaml_globals():
 # so it could be bypassed. The ability to use lists in YAML files didn't
 # appear to happen until later on; it's certainly not available in v3.12
 # which was what shipped with CentOS v8 at the time.
-@pytest.mark.skipif(int(yaml.__version__.split('.')[0]) <= 3,
-                    reason="requires pyaml v4.x or higher.")
+@pytest.mark.skipif(
+    int(yaml.__version__.split(".")[0]) <= 3,
+    reason="requires pyaml v4.x or higher.",
+)
 def test_config_base_config_parse_yaml_list():
     """
     API: ConfigBase.config_parse_yaml list parsing
@@ -1467,14 +1559,17 @@ def test_config_base_config_parse_yaml_list():
     asset = AppriseAsset()
 
     # Invalid url/schema
-    result, config = ConfigBase.config_parse_yaml("""
+    result, config = ConfigBase.config_parse_yaml(
+        """
 # no lists... just no
 urls: [milk, pumpkin pie, eggs, juice]
 
 # Including by list is okay
 include: [file:///absolute/path/, relative/path, http://test.com]
 
-""", asset=asset)
+""",
+        asset=asset,
+    )
 
     # Invalid data gets us an empty result set
     assert isinstance(result, list)
@@ -1482,6 +1577,6 @@ include: [file:///absolute/path/, relative/path, http://test.com]
 
     # There were 3 include entries
     assert len(config) == 3
-    assert 'file:///absolute/path/' in config
-    assert 'relative/path' in config
-    assert 'http://test.com' in config
+    assert "file:///absolute/path/" in config
+    assert "relative/path" in config
+    assert "http://test.com" in config

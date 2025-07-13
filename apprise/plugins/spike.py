@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # BSD 2-Clause License
 #
@@ -30,103 +29,93 @@
 # Details at:
 # https://www.spike.sh/docs/alerts/send-alerts-to-spike/
 
-import re
-import requests
 import json
+import re
 
-from ..utils.parse import validate_regex
-from ..url import PrivacyMode
-from .base import NotifyBase
-from ..locale import gettext_lazy as _
+import requests
+
 from ..common import NotifyType
+from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 class NotifySpike(NotifyBase):
-    """
-    A wrapper for Spike.sh Notifications
-    """
+    """A wrapper for Spike.sh Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = _('Spike.sh')
+    service_name = _("Spike.sh")
 
     # The services URL
-    service_url = 'https://www.spike.sh/'
+    service_url = "https://www.spike.sh/"
 
     # The default secure protocol
-    secure_protocol = 'spike'
+    secure_protocol = "spike"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_spike'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_spike"
 
     # URL used to send notifications with
-    notify_url = 'https://api.spike.sh/v1/alerts/'
+    notify_url = "https://api.spike.sh/v1/alerts/"
 
-    templates = (
-        '{schema}://{token}',
+    templates = ("{schema}://{token}",)
+
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Integration Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9]{32}$", "i"),
+            },
+        },
     )
 
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Integration Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9]{32}$', 'i'),
-        },
-    })
-
     def __init__(self, token, **kwargs):
-        """
-        Initialize Spike.sh Object
-        """
+        """Initialize Spike.sh Object."""
         super().__init__(**kwargs)
 
         self.token = validate_regex(
-            token,
-            *self.template_tokens['token']['regex']
+            token, *self.template_tokens["token"]["regex"]
         )
         if not self.token:
-            msg = 'The Spike.sh integration key ({}) is invalid.'.format(
-                token)
+            msg = f"The Spike.sh integration key ({token}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.webhook_url = f'{self.notify_url}{self.token}'
+        self.webhook_url = f"{self.notify_url}{self.token}"
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.token)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
-        return '{schema}://{key}/?{params}'.format(
-            schema=self.secure_protocol,
-            key=self.pprint(self.token, privacy, mode=PrivacyMode.Secret),
-            params=self.urlencode(params),
+        return (
+            f"{self.secure_protocol}://{self.pprint(self.token, privacy, mode=PrivacyMode.Secret)}/?{self.urlencode(params)}"
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Send Spike.sh Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Send Spike.sh Notification."""
         self.throttle()
 
         payload = {
-            'message': title if title else body,
-            'description': body,
+            "message": title if title else body,
+            "description": body,
         }
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         try:
@@ -139,48 +128,47 @@ class NotifySpike(NotifyBase):
             )
             if response.status_code != requests.codes.ok:
                 self.logger.warning(
-                    'Spike.sh notification failed: %d - %s',
-                    response.status_code, response.text)
+                    "Spike.sh notification failed: %d - %s",
+                    response.status_code,
+                    response.text,
+                )
                 return False
 
         except requests.RequestException as e:
-            self.logger.warning(f'Spike.sh Exception: {e}')
+            self.logger.warning(f"Spike.sh Exception: {e}")
             return False
 
-        self.logger.info('Spike.sh notification sent successfully.')
+        self.logger.info("Spike.sh notification sent successfully.")
         return True
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns arguments to re-instantiate the object
-        """
+        """Parses the URL and returns arguments to re-instantiate the
+        object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             return results
 
         # Access token
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
             # Extract the account sid from an argument
-            results['token'] = \
-                NotifySpike.unquote(results['qsd']['token'])
+            results["token"] = NotifySpike.unquote(results["qsd"]["token"])
         else:
             # Retrieve the token from the host
-            results['token'] = NotifySpike.unquote(results['host'])
+            results["token"] = NotifySpike.unquote(results["host"])
 
         return results
 
     @staticmethod
     def parse_native_url(url):
-        """
-        Supports reverse-parsing a Spike.sh native URL into an Apprise one
-        """
+        """Supports reverse-parsing a Spike.sh native URL into an Apprise
+        one."""
         match = re.match(
-            r'^https://api\.spike\.sh/v1/alerts/([a-z0-9]{32})$', url, re.I)
+            r"^https://api\.spike\.sh/v1/alerts/([a-z0-9]{32})$", url, re.I
+        )
         if not match:
             return None
 
         return NotifySpike.parse_url(
-            '{schema}://{token}'.format(
-                schema=NotifySpike.secure_protocol,
-                token=match.group(1)))
+            f"{NotifySpike.secure_protocol}://{match.group(1)}"
+        )

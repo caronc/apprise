@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,112 +25,152 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
+
+from helpers import AppriseURLTester
 import pytest
 import requests
 
 from apprise.plugins.ryver import NotifyRyver
-from helpers import AppriseURLTester
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('ryver://', {
-        'instance': TypeError,
-    }),
-    ('ryver://:@/', {
-        'instance': TypeError,
-    }),
-    ('ryver://apprise', {
-        # Just org provided (no token)
-        'instance': TypeError,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG?mode=invalid', {
-        # invalid mode provided
-        'instance': TypeError,
-    }),
-    ('ryver://x/ckhrjW8w672m6HG?mode=slack', {
-        # Invalid org
-        'instance': TypeError,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG?mode=slack', {
-        # No username specified; this is still okay as we use whatever
-        # the user told the webhook to use; set our slack mode
-        'instance': NotifyRyver,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG?mode=ryver', {
-        # No username specified; this is still okay as we use whatever
-        # the user told the webhook to use; set our ryver mode
-        'instance': NotifyRyver,
-    }),
-    # Legacy webhook mode setting:
-    # Legacy webhook mode setting:
-    ('ryver://apprise/ckhrjW8w672m6HG?webhook=slack', {
-        # No username specified; this is still okay as we use whatever
-        # the user told the webhook to use; set our slack mode
-        'instance': NotifyRyver,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG?webhook=ryver', {
-        # No username specified; this is still okay as we use whatever
-        # the user told the webhook to use; set our ryver mode
-        'instance': NotifyRyver,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'ryver://apprise/c...G',
-    }),
-    # Support Native URLs
-    ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG', {
-        'instance': NotifyRyver,
-    }),
-    # Support Native URLs with arguments
-    ('https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG'
-     '?webhook=ryver',
+    (
+        "ryver://",
         {
-            'instance': NotifyRyver,
-        }),
-    ('ryver://caronc@apprise/ckhrjW8w672m6HG', {
-        'instance': NotifyRyver,
-        # don't include an image by default
-        'include_image': False,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG', {
-        'instance': NotifyRyver,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG', {
-        'instance': NotifyRyver,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('ryver://apprise/ckhrjW8w672m6HG', {
-        'instance': NotifyRyver,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+            "instance": TypeError,
+        },
+    ),
+    (
+        "ryver://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        "ryver://apprise",
+        {
+            # Just org provided (no token)
+            "instance": TypeError,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG?mode=invalid",
+        {
+            # invalid mode provided
+            "instance": TypeError,
+        },
+    ),
+    (
+        "ryver://x/ckhrjW8w672m6HG?mode=slack",
+        {
+            # Invalid org
+            "instance": TypeError,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG?mode=slack",
+        {
+            # No username specified; this is still okay as we use whatever
+            # the user told the webhook to use; set our slack mode
+            "instance": NotifyRyver,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG?mode=ryver",
+        {
+            # No username specified; this is still okay as we use whatever
+            # the user told the webhook to use; set our ryver mode
+            "instance": NotifyRyver,
+        },
+    ),
+    # Legacy webhook mode setting:
+    # Legacy webhook mode setting:
+    (
+        "ryver://apprise/ckhrjW8w672m6HG?webhook=slack",
+        {
+            # No username specified; this is still okay as we use whatever
+            # the user told the webhook to use; set our slack mode
+            "instance": NotifyRyver,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG?webhook=ryver",
+        {
+            # No username specified; this is still okay as we use whatever
+            # the user told the webhook to use; set our ryver mode
+            "instance": NotifyRyver,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "ryver://apprise/c...G",
+        },
+    ),
+    # Support Native URLs
+    (
+        "https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG",
+        {
+            "instance": NotifyRyver,
+        },
+    ),
+    # Support Native URLs with arguments
+    (
+        (
+            "https://apprise.ryver.com/application/webhook/ckhrjW8w672m6HG"
+            "?webhook=ryver"
+        ),
+        {
+            "instance": NotifyRyver,
+        },
+    ),
+    (
+        "ryver://caronc@apprise/ckhrjW8w672m6HG",
+        {
+            "instance": NotifyRyver,
+            # don't include an image by default
+            "include_image": False,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG",
+        {
+            "instance": NotifyRyver,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG",
+        {
+            "instance": NotifyRyver,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "ryver://apprise/ckhrjW8w672m6HG",
+        {
+            "instance": NotifyRyver,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_ryver_urls():
-    """
-    NotifyRyver() Apprise URLs
-
-    """
+    """NotifyRyver() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 def test_plugin_ryver_edge_cases():
-    """
-    NotifyRyver() Edge Cases
-
-    """
+    """NotifyRyver() Edge Cases."""
 
     # No token
     with pytest.raises(TypeError):

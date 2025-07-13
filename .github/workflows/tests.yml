@@ -13,56 +13,42 @@ on:
 jobs:
   test:
     name: Python ${{ matrix.python-version }} – ${{ matrix.tox_env }} on ${{ matrix.os }}
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os || 'ubuntu-latest' }}
 
     strategy:
       fail-fast: false  # Let all jobs run, even if one fails
       matrix:
         include:
-          - python-version: "3.8"
-            tox_env: qa
-            setup_python: true
-
-          # Modern Python versions (can rely on default runner environment)
           - python-version: "3.9"
             tox_env: qa
-            setup_python: false
           - python-version: "3.10"
             tox_env: qa
-            setup_python: false
           - python-version: "3.11"
             tox_env: qa
-            setup_python: false
           - python-version: "3.12"
             tox_env: qa
-            setup_python: false
+
+          # Pre-release testing (won't fail entire workflow if this fails)
+          - python-version: "3.13-dev"
+            tox_env: qa
+            continue-on-error: true
 
           # Platform validation only (one version)
           - os: windows-latest
-            python-version: "3.11"
+            python-version: "3.12"
             tox_env: qa
 
           - os: macos-latest
-            python-version: "3.11"
+            python-version: "3.12"
             tox_env: qa
 
           # Minimal test run on latest Python only
           # this verifies Apprise still works when extra libraries are not available
           - python-version: "3.12"
             tox_env: minimal
-            setup_python: false
-
 
     steps:
       - uses: actions/checkout@v4
-
-      # Legacy Python versions 3.8 are no longer on GitHub-hosted runners
-      # Use setup-python to install them explicitly
-      - name: Set up Python (legacy)
-        if: matrix.setup_python
-        uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.python-version }}
 
       # Install tox for isolated environment and plugin test orchestration
       - name: Install tox
@@ -71,13 +57,6 @@ jobs:
       # Run tox with the specified environment (qa, minimal, etc.)
       - name: Run tox for ${{ matrix.tox_env }}
         run: tox -e ${{ matrix.tox_env }}
-
-      - name: Verify .coverage file existence
-        if: always()
-        run: |
-          echo "::group::Looking for .coverage file"
-          ls -alh .
-          echo "::endgroup::"
 
       - name: Upload coverage report
         if: always()

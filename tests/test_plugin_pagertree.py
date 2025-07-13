@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,113 +25,147 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
-from unittest import mock
-import pytest
-
-from apprise.plugins.pagertree import NotifyPagerTree
-from helpers import AppriseURLTester
-
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
+
+from helpers import AppriseURLTester
+import pytest
+import requests
+
+from apprise.plugins.pagertree import NotifyPagerTree
+
 logging.disable(logging.CRITICAL)
 
 # a test UUID we can use
-INTEGRATION_ID = 'int_xxxxxxxxxxx'
+INTEGRATION_ID = "int_xxxxxxxxxxx"
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('pagertree://', {
-        # Missing Integration ID
-        'instance': TypeError,
-    }),
+    (
+        "pagertree://",
+        {
+            # Missing Integration ID
+            "instance": TypeError,
+        },
+    ),
     # Invalid Integration ID
-    ('pagertree://%s' % ('+' * 24), {
-        'instance': TypeError,
-    }),
+    (
+        "pagertree://%s" % ("+" * 24),
+        {
+            "instance": TypeError,
+        },
+    ),
     # Minimum requirements met
-    ('pagertree://%s' % INTEGRATION_ID, {
-        'instance': NotifyPagerTree,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pagertree://i...x?',
-    }),
+    (
+        f"pagertree://{INTEGRATION_ID}",
+        {
+            "instance": NotifyPagerTree,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pagertree://i...x?",
+        },
+    ),
     # change the integration id
-    ('pagertree://%s?integration=int_yyyyyyyyyy' % INTEGRATION_ID, {
-        'instance': NotifyPagerTree,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pagertree://i...y?',
-    }),
+    (
+        f"pagertree://{INTEGRATION_ID}?integration=int_yyyyyyyyyy",
+        {
+            "instance": NotifyPagerTree,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pagertree://i...y?",
+        },
+    ),
     # entries specified on the URL will over-ride the host (integration id)
-    ('pagertree://%s?id=int_zzzzzzzzzz' % INTEGRATION_ID, {
-        'instance': NotifyPagerTree,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'pagertree://i...z?',
-    }),
+    (
+        f"pagertree://{INTEGRATION_ID}?id=int_zzzzzzzzzz",
+        {
+            "instance": NotifyPagerTree,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "pagertree://i...z?",
+        },
+    ),
     # Integration ID + bad url
-    ('pagertree://:@/', {
-        'instance': TypeError,
-    }),
-    ('pagertree://%s' % INTEGRATION_ID, {
-        'instance': NotifyPagerTree,
-        # force a failure
-        'response': False,
-        'requests_response_code': requests.codes.internal_server_error,
-    }),
-    ('pagertree://%s' % INTEGRATION_ID, {
-        'instance': NotifyPagerTree,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('pagertree://%s' % INTEGRATION_ID, {
-        'instance': NotifyPagerTree,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
-    ('pagertree://%s?urgency=low' % INTEGRATION_ID, {
-        # urgency override
-        'instance': NotifyPagerTree,
-    }),
-    ('pagertree://?id=%s&urgency=low' % INTEGRATION_ID, {
-        # urgency override and id= (for integration)
-        'instance': NotifyPagerTree,
-    }),
-    ('pagertree://%s?tags=production,web' % INTEGRATION_ID, {
-        # tags
-        'instance': NotifyPagerTree,
-    }),
-    ('pagertree://%s?action=resolve&thirdparty=123' % INTEGRATION_ID, {
-        # test resolve
-        'instance': NotifyPagerTree,
-    }),
+    (
+        "pagertree://:@/",
+        {
+            "instance": TypeError,
+        },
+    ),
+    (
+        f"pagertree://{INTEGRATION_ID}",
+        {
+            "instance": NotifyPagerTree,
+            # force a failure
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        f"pagertree://{INTEGRATION_ID}",
+        {
+            "instance": NotifyPagerTree,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        f"pagertree://{INTEGRATION_ID}",
+        {
+            "instance": NotifyPagerTree,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        f"pagertree://{INTEGRATION_ID}?urgency=low",
+        {
+            # urgency override
+            "instance": NotifyPagerTree,
+        },
+    ),
+    (
+        f"pagertree://?id={INTEGRATION_ID}&urgency=low",
+        {
+            # urgency override and id= (for integration)
+            "instance": NotifyPagerTree,
+        },
+    ),
+    (
+        f"pagertree://{INTEGRATION_ID}?tags=production,web",
+        {
+            # tags
+            "instance": NotifyPagerTree,
+        },
+    ),
+    (
+        f"pagertree://{INTEGRATION_ID}?action=resolve&thirdparty=123",
+        {
+            # test resolve
+            "instance": NotifyPagerTree,
+        },
+    ),
     # Custom values
-    ('pagertree://%s?+pagertree-token=123&:env=prod&-m=v' % INTEGRATION_ID, {
-        # minimum requirements and support custom key/value pairs
-        'instance': NotifyPagerTree,
-    }),
+    (
+        f"pagertree://{INTEGRATION_ID}?+pagertree-token=123&:env=prod&-m=v",
+        {
+            # minimum requirements and support custom key/value pairs
+            "instance": NotifyPagerTree,
+        },
+    ),
 )
 
 
 def test_plugin_pagertree_urls():
-    """
-    NotifyPagerTree() Apprise URLs
-
-    """
+    """NotifyPagerTree() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_plugin_pagertree_general(mock_post):
-    """
-    NotifyPagerTree() General Checks
-
-    """
+    """NotifyPagerTree() General Checks."""
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -140,4 +173,4 @@ def test_plugin_pagertree_general(mock_post):
 
     # Invalid thirdparty id
     with pytest.raises(TypeError):
-        NotifyPagerTree(integration=INTEGRATION_ID, thirdparty='   ')
+        NotifyPagerTree(integration=INTEGRATION_ID, thirdparty="   ")

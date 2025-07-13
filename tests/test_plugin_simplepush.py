@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,119 +25,135 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-from unittest import mock
-
-import pytest
-import requests
 import json
-from apprise import Apprise
-from apprise.plugins.simplepush import NotifySimplePush
-from helpers import AppriseURLTester
 
 # Disable logging for a cleaner testing output
 import logging
+import sys
+from unittest import mock
+
+from helpers import AppriseURLTester
+import pytest
+import requests
+
+from apprise import Apprise
+from apprise.plugins.simplepush import NotifySimplePush
+
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('spush://', {
-        # No api key
-        'instance': TypeError,
-    }),
-    ('spush://{}'.format('A' * 14), {
-        # API Key specified however expected server response
-        # didn't have 'OK' in JSON response
-        'instance': NotifySimplePush,
-        # Expected notify() response
-        'notify_response': False,
-    }),
-    ('spush://{}'.format('Y' * 14), {
-        # API Key valid and expected response was valid
-        'instance': NotifySimplePush,
-        # Set our response to OK
-        'requests_response_text': {
-            'status': 'OK',
+    (
+        "spush://",
+        {
+            # No api key
+            "instance": TypeError,
         },
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'spush://Y...Y/',
-    }),
-    ('spush://{}?event=Not%20So%20Good'.format('X' * 14), {
-        # API Key valid and expected response was valid
-        'instance': NotifySimplePush,
-        # Set our response to something that is not okay
-        'requests_response_text': {
-            'status': 'NOT-OK',
+    ),
+    (
+        "spush://{}".format("A" * 14),
+        {
+            # API Key specified however expected server response
+            # didn't have 'OK' in JSON response
+            "instance": NotifySimplePush,
+            # Expected notify() response
+            "notify_response": False,
         },
-        # Expected notify() response
-        'notify_response': False,
-    }),
-    ('spush://salt:pass@{}'.format('X' * 14), {
-        # Now we'll test encrypted messages with new salt
-        'instance': NotifySimplePush,
-        # Set our response to OK
-        'requests_response_text': {
-            'status': 'OK',
+    ),
+    (
+        "spush://{}".format("Y" * 14),
+        {
+            # API Key valid and expected response was valid
+            "instance": NotifySimplePush,
+            # Set our response to OK
+            "requests_response_text": {
+                "status": "OK",
+            },
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "spush://Y...Y/",
         },
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'spush://****:****@X...X/',
-    }),
-    ('spush://{}'.format('Y' * 14), {
-        'instance': NotifySimplePush,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-        # Set a failing message too
-        'requests_response_text': {
-            'status': 'BadRequest',
-            'message': 'Title or message too long',
+    ),
+    (
+        "spush://{}?event=Not%20So%20Good".format("X" * 14),
+        {
+            # API Key valid and expected response was valid
+            "instance": NotifySimplePush,
+            # Set our response to something that is not okay
+            "requests_response_text": {
+                "status": "NOT-OK",
+            },
+            # Expected notify() response
+            "notify_response": False,
         },
-    }),
-    ('spush://{}'.format('Z' * 14), {
-        'instance': NotifySimplePush,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    ),
+    (
+        "spush://salt:pass@{}".format("X" * 14),
+        {
+            # Now we'll test encrypted messages with new salt
+            "instance": NotifySimplePush,
+            # Set our response to OK
+            "requests_response_text": {
+                "status": "OK",
+            },
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "spush://****:****@X...X/",
+        },
+    ),
+    (
+        "spush://{}".format("Y" * 14),
+        {
+            "instance": NotifySimplePush,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+            # Set a failing message too
+            "requests_response_text": {
+                "status": "BadRequest",
+                "message": "Title or message too long",
+            },
+        },
+    ),
+    (
+        "spush://{}".format("Z" * 14),
+        {
+            "instance": NotifySimplePush,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 @pytest.mark.skipif(
-    'cryptography' not in sys.modules, reason="Requires cryptography")
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
 def test_plugin_simplepush_urls():
-    """
-    NotifySimplePush() Apprise URLs
-
-    """
+    """NotifySimplePush() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
 @pytest.mark.skipif(
-    'cryptography' in sys.modules,
-    reason="Requires that cryptography NOT be installed")
+    "cryptography" in sys.modules,
+    reason="Requires that cryptography NOT be installed",
+)
 def test_plugin_fcm_cryptography_import_error():
-    """
-    NotifySimplePush() Cryptography loading failure
-    """
+    """NotifySimplePush() Cryptography loading failure."""
 
     # Attempt to instantiate our object
-    obj = Apprise.instantiate('spush://{}'.format('Y' * 14))
+    obj = Apprise.instantiate("spush://{}".format("Y" * 14))
 
     # It's not possible because our cryptography depedancy is missing
     assert obj is None
 
 
 @pytest.mark.skipif(
-    'cryptography' not in sys.modules, reason="Requires cryptography")
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
 def test_plugin_simplepush_edge_cases():
-    """
-    NotifySimplePush() Edge Cases
-
-    """
+    """NotifySimplePush() Edge Cases."""
 
     # No token
     with pytest.raises(TypeError):
@@ -156,22 +171,21 @@ def test_plugin_simplepush_edge_cases():
 
 
 @pytest.mark.skipif(
-    'cryptography' not in sys.modules, reason="Requires cryptography")
-@mock.patch('requests.post')
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+@mock.patch("requests.post")
 def test_plugin_simplepush_general(mock_post):
-    """
-    NotifySimplePush() General Tests
-    """
+    """NotifySimplePush() General Tests."""
 
     # Prepare a good response
     response = mock.Mock()
     response.content = json.dumps({
-        'status': 'OK',
+        "status": "OK",
     })
     response.status_code = requests.codes.ok
     mock_post.return_value = response
 
-    obj = Apprise.instantiate('spush://{}'.format('Y' * 14))
+    obj = Apprise.instantiate("spush://{}".format("Y" * 14))
 
     # Verify our content works as expected
     assert obj.notify(title="test", body="test") is True

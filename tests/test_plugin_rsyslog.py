@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,27 +25,25 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
 import re
+import socket
 from unittest import mock
+
 import pytest
 
 import apprise
-import socket
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 from apprise.plugins.rsyslog import NotifyRSyslog  # noqa E402
 
 
-@mock.patch('socket.socket')
-@mock.patch('os.getpid')
+@mock.patch("socket.socket")
+@mock.patch("os.getpid")
 def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
-    """
-    NotifyRSyslog() Apprise URLs
-
-    """
+    """NotifyRSyslog() Apprise URLs."""
     payload = "test"
     mock_connection = mock.Mock()
 
@@ -65,29 +62,31 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
 
     # localhost does not lookup to any of the facility codes so this
     # gets interpreted as a host
-    obj = apprise.Apprise.instantiate('rsyslog://localhost')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     assert obj.notify(body=payload) is True
 
     mock_connection.sendto.return_value = 18
-    obj = apprise.Apprise.instantiate('rsyslog://localhost/?facility=local5')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost/?facility=local5")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost/local5') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost/local5") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     assert obj.notify(body=payload) is True
 
     # Invalid instantiation
-    assert apprise.Apprise.instantiate(
-        'rsyslog://localhost/?facility=invalid') is None
+    assert (
+        apprise.Apprise.instantiate("rsyslog://localhost/?facility=invalid")
+        is None
+    )
 
     mock_connection.sendto.return_value = 17
     # j will cause a search to take place and match to daemon
-    obj = apprise.Apprise.instantiate('rsyslog://localhost/?facility=d')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost/?facility=d")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost/daemon') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost/daemon") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     assert obj.notify(body=payload) is True
 
     # Test bad return count
@@ -96,10 +95,10 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
 
     # Test with port
     mock_connection.sendto.return_value = 17
-    obj = apprise.Apprise.instantiate('rsyslog://localhost:518')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost:518")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost:518') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost:518") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     assert obj.notify(body=payload) is True
 
     # Set length to include title (for test)
@@ -110,32 +109,32 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     mock_connection.sendto.return_value = 16
 
     # Test with default port
-    obj = apprise.Apprise.instantiate('rsyslog://localhost:514')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost:514")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     assert obj.notify(body=payload) is True
 
     # Specify a facility
-    obj = apprise.Apprise.instantiate('rsyslog://localhost/kern')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost/kern")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost/kern') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost/kern") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     assert obj.notify(body=payload) is True
 
     # Specify a facility requiring a lookup and having the port identified
     # resolves any ambiguity
-    obj = apprise.Apprise.instantiate('rsyslog://localhost:514/d')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost:514/d")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost/daemon') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost/daemon") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
     mock_connection.sendto.return_value = 17  # daemon is one more byte in size
     assert obj.notify(body=payload) is True
 
-    obj = apprise.Apprise.instantiate('rsyslog://localhost:9000/d?logpid=no')
+    obj = apprise.Apprise.instantiate("rsyslog://localhost:9000/d?logpid=no")
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost:9000/daemon') is True
-    assert re.search(r'logpid=no', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost:9000/daemon") is True
+    assert re.search(r"logpid=no", obj.url()) is not None
 
     # Verify our URL ID is generated
     assert isinstance(obj.url_id(), str)
@@ -143,8 +142,9 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     # Test notifications
     # + 1 byte in size due to user
     # + length of pid returned
-    mock_connection.sendto.return_value = len(payload) + 5 \
-        + len(str(mock_getpid.return_value))
+    mock_connection.sendto.return_value = (
+        len(payload) + 5 + len(str(mock_getpid.return_value))
+    )
     assert obj.notify(body=payload) is True
     # This only fails because the underlining sendto() will return a
     # length different then what was expected
@@ -160,20 +160,17 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
 
 
 def test_plugin_rsyslog_edge_cases():
-    """
-    NotifyRSyslog() Edge Cases
-
-    """
+    """NotifyRSyslog() Edge Cases."""
 
     # Default
     obj = NotifyRSyslog(host="localhost", facility=None)
     assert isinstance(obj, NotifyRSyslog)
-    assert obj.url().startswith('rsyslog://localhost/user') is True
-    assert re.search(r'logpid=yes', obj.url()) is not None
+    assert obj.url().startswith("rsyslog://localhost/user") is True
+    assert re.search(r"logpid=yes", obj.url()) is not None
 
     # Exception should be thrown about the fact no bot token was specified
     with pytest.raises(TypeError):
-        NotifyRSyslog(host="localhost", facility='invalid')
+        NotifyRSyslog(host="localhost", facility="invalid")
 
     with pytest.raises(TypeError):
         NotifyRSyslog(host="localhost", facility=object)

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,26 +25,28 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-import os
-import requests
-from unittest import mock
-
 from json import dumps
-from random import choice
-from string import ascii_uppercase as str_alpha
-from string import digits as str_num
-
-from apprise import NotifyBase
-from apprise import PersistentStoreMode
-from apprise import NotifyType
-from apprise import Apprise
-from apprise import AppriseAsset
-from apprise import AppriseAttachment
-from apprise.common import OverflowMode
 
 # Disable logging for a cleaner testing output
 import logging
+import os
+from random import choice
+import re
+from string import ascii_uppercase as str_alpha, digits as str_num
+from unittest import mock
+
+import requests
+
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseAttachment,
+    NotifyBase,
+    NotifyType,
+    PersistentStoreMode,
+)
+from apprise.common import OverflowMode
+
 logging.disable(logging.CRITICAL)
 
 
@@ -53,21 +54,21 @@ class AppriseURLTester:
 
     # Some exception handling we'll use
     req_exceptions = (
-        requests.ConnectionError(
-            0, 'requests.ConnectionError() not handled'),
+        requests.ConnectionError(0, "requests.ConnectionError() not handled"),
         requests.RequestException(
-            0, 'requests.RequestException() not handled'),
-        requests.HTTPError(
-            0, 'requests.HTTPError() not handled'),
-        requests.ReadTimeout(
-            0, 'requests.ReadTimeout() not handled'),
+            0, "requests.RequestException() not handled"
+        ),
+        requests.HTTPError(0, "requests.HTTPError() not handled"),
+        requests.ReadTimeout(0, "requests.ReadTimeout() not handled"),
         requests.TooManyRedirects(
-            0, 'requests.TooManyRedirects() not handled'),
+            0, "requests.TooManyRedirects() not handled"
+        ),
     )
 
     # Attachment Testing Directory
     __test_var_dir = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), 'var')
+        os.path.dirname(os.path.dirname(__file__)), "var"
+    )
 
     # Our URLs we'll test against
     __tests = []
@@ -80,79 +81,80 @@ class AppriseURLTester:
     title_len = 1024
 
     def __init__(self, tests=None, *args, **kwargs):
-        """
-        Our initialization
-        """
+        """Our initialization."""
         # Create a large body and title with random data
-        self.body = ''.join(
-            choice(str_alpha + str_num + ' ') for _ in range(self.body_len))
-        self.body = '\r\n'.join(
-            [self.body[i: i + self.row]
-             for i in range(0, len(self.body), self.row)])
+        self.body = "".join(
+            choice(str_alpha + str_num + " ") for _ in range(self.body_len)
+        )
+        self.body = "\r\n".join([
+            self.body[i : i + self.row]
+            for i in range(0, len(self.body), self.row)
+        ])
 
         # Create our title using random data
-        self.title = ''.join(
-            choice(str_alpha + str_num) for _ in range(self.title_len))
+        self.title = "".join(
+            choice(str_alpha + str_num) for _ in range(self.title_len)
+        )
 
         if tests:
             self.__tests = tests
 
     def add(self, url, meta):
-        """
-        Adds a test suite to our object
-        """
+        """Adds a test suite to our object."""
         self.__tests.append({
-            'url': url,
-            'meta': meta,
+            "url": url,
+            "meta": meta,
         })
 
     def run_all(self, tmpdir=None):
-        """
-        Run all of our tests
-        """
+        """Run all of our tests."""
         # iterate over our dictionary and test it out
-        for (url, meta) in self.__tests:
+        for url, meta in self.__tests:
             self.run(url, meta, tmpdir)
 
-    @mock.patch('requests.get')
-    @mock.patch('requests.post')
-    @mock.patch('requests.request')
+    @mock.patch("requests.get")
+    @mock.patch("requests.post")
+    @mock.patch("requests.request")
     def run(self, url, meta, tmpdir, mock_request, mock_post, mock_get):
-        """
-        Run a specific test
-        """
+        """Run a specific test."""
 
         # Our expected instance
-        instance = meta.get('instance', None)
+        instance = meta.get("instance", None)
 
         # Our expected server objects
-        _self = meta.get('self', None)
+        _self = meta.get("self", None)
 
         # Our expected privacy url
         # Don't set this if don't need to check it's value
-        privacy_url = meta.get('privacy_url')
+        privacy_url = meta.get("privacy_url")
 
         # Our regular expression
-        url_matches = meta.get('url_matches')
+        url_matches = meta.get("url_matches")
 
         # Detect our storage path (used to set persistent storage
         # mode
-        storage_path = \
-            tmpdir if tmpdir and isinstance(tmpdir, str) and \
-            os.path.isdir(tmpdir) else None
+        storage_path = (
+            tmpdir
+            if tmpdir and isinstance(tmpdir, str) and os.path.isdir(tmpdir)
+            else None
+        )
 
         # Our storage mode to set
         storage_mode = meta.get(
-            'storage_mode',
-            PersistentStoreMode.MEMORY
-            if not storage_path else PersistentStoreMode.AUTO)
+            "storage_mode",
+            (
+                PersistentStoreMode.MEMORY
+                if not storage_path
+                else PersistentStoreMode.AUTO
+            ),
+        )
 
         # Debug Mode
-        pdb = meta.get('pdb', False)
+        pdb = meta.get("pdb", False)
 
         # Whether or not we should include an image with our request; unless
         # otherwise specified, we assume that images are to be included
-        include_image = meta.get('include_image', True)
+        include_image = meta.get("include_image", True)
         if include_image:
             # a default asset
             asset = AppriseAsset(
@@ -163,7 +165,8 @@ class AppriseURLTester:
         else:
             # Disable images
             asset = AppriseAsset(
-                image_path_mask=False, image_url_mask=False,
+                image_path_mask=False,
+                image_url_mask=False,
                 storage_mode=storage_mode,
                 storage_path=storage_path,
             )
@@ -171,7 +174,7 @@ class AppriseURLTester:
 
         # Mock our request object
         robj = mock.Mock()
-        robj.content = u''
+        robj.content = ""
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_request.return_value = robj
@@ -180,21 +183,21 @@ class AppriseURLTester:
             # Makes it easier to debug with this peice of code
             # just add `pdb': True to the call that is failing
             import pdb
+
             pdb.set_trace()
 
         try:
             # We can now instantiate our object:
             obj = Apprise.instantiate(
-                url, asset=asset, suppress_exceptions=False)
+                url, asset=asset, suppress_exceptions=False
+            )
 
         except Exception as e:
             # Handle our exception
             if instance is None:
-                print('%s %s' % (url, str(e)))
                 raise e
 
             if not isinstance(e, instance):
-                print('%s %s' % (url, str(e)))
                 raise e
 
             # We're okay if we get here
@@ -204,23 +207,16 @@ class AppriseURLTester:
             if instance is not None:
                 # We're done (assuming this is what we were
                 # expecting)
-                print("{} didn't instantiate itself "
-                      "(we expected it to be a {})".format(
-                          url, instance))
-                assert False
+                raise AssertionError()
             # We're done because we got the results we expected
             return
 
         if instance is None:
             # Expected None but didn't get it
-            print('%s instantiated %s (but expected None)' % (
-                url, type(obj)))
-            assert False
+            raise AssertionError()
 
         if not isinstance(obj, instance):
-            print('%s instantiated %s (but expected %s)' % (
-                url, type(obj), instance))
-            assert False
+            raise AssertionError()
 
         if isinstance(obj, NotifyBase):
             # Ensure we are not performing any type of thorttling
@@ -234,29 +230,30 @@ class AppriseURLTester:
             url_id = obj.url_id()
 
             # It can be either disabled or a string; nothing else
-            assert isinstance(url_id, str) or \
-                (url_id is None and obj.url_identifier is False)
+            assert isinstance(url_id, str) or (
+                url_id is None and obj.url_identifier is False
+            )
 
             # Verify we can acquire a target count as an integer
             assert isinstance(len(obj), int)
 
             # Test url() with privacy=True
-            assert isinstance(
-                obj.url(privacy=True), str) is True
+            assert isinstance(obj.url(privacy=True), str) is True
 
             # Some Simple Invalid Instance Testing
             assert instance.parse_url(None) is None
             assert instance.parse_url(object) is None
             assert instance.parse_url(42) is None
 
-            if privacy_url:
-                # Assess that our privacy url is as expected
-                if not obj.url(privacy=True).startswith(privacy_url):
-                    print('Provided %s' % url)
-                    raise AssertionError(
-                        "Privacy URL: '{}' != expected '{}'".format(
-                            obj.url(privacy=True)[:len(privacy_url)],
-                            privacy_url))
+            # Assess that our privacy url is as expected
+            if privacy_url and not obj.url(privacy=True).startswith(
+                privacy_url
+            ):
+                raise AssertionError(
+                    "Privacy URL:"
+                    f" '{obj.url(privacy=True)[:len(privacy_url)]}' !="
+                    f" expected '{privacy_url}'"
+                )
 
             if url_matches:
                 # Assess that our URL matches a set regex
@@ -268,17 +265,17 @@ class AppriseURLTester:
 
             # Our new object should produce the same url identifier
             if obj.url_identifier != obj_cmp.url_identifier:
-                print('Provided %s' % url)
                 raise AssertionError(
-                    "URL Identifier: '{}' != expected '{}'".format(
-                        obj_cmp.url_identifier, obj.url_identifier))
+                    f"URL Identifier: '{obj_cmp.url_identifier}' != expected"
+                    f" '{obj.url_identifier}'"
+                )
 
             # Back our check up
             if obj.url_id() != obj_cmp.url_id():
-                print('Provided %s' % url)
                 raise AssertionError(
-                    "URL ID(): '{}' != expected '{}'".format(
-                        obj_cmp.url_id(), obj.url_id()))
+                    f"URL ID(): '{obj_cmp.url_id()}' != expected"
+                    f" '{obj.url_id()}'"
+                )
 
             # Our object should be the same instance as what we had
             # originally expected above.
@@ -287,17 +284,13 @@ class AppriseURLTester:
                 # way these tests work. Just printing before
                 # throwing our assertion failure makes things
                 # easier to debug later on
-                print('TEST FAIL: {} regenerated as {}'.format(
-                    url, obj.url()))
-                assert False
+                raise AssertionError()
 
             # Verify there is no change from the old and the new
             if len(obj) != len(obj_cmp):
-                print('%d targets found in %s' % (
-                    len(obj), obj.url(privacy=True)))
-                print('But %d targets found in %s' % (
-                    len(obj_cmp), obj_cmp.url(privacy=True)))
-                raise AssertionError("Target miscount %d != %d")
+                raise AssertionError(
+                    f"Target miscount {len(obj)} != {len(obj_cmp)}"
+                )
 
             # Tidy our object
             del obj_cmp
@@ -316,20 +309,19 @@ class AppriseURLTester:
 
         except AssertionError:
             # Don't mess with these entries
-            print('%s AssertionError' % url)
             raise
 
         # Tidy our object and allow any possible defined destructors to
         # be executed.
         del obj
 
-    @mock.patch('requests.get')
-    @mock.patch('requests.post')
-    @mock.patch('requests.head')
-    @mock.patch('requests.put')
-    @mock.patch('requests.delete')
-    @mock.patch('requests.patch')
-    @mock.patch('requests.request')
+    @mock.patch("requests.get")
+    @mock.patch("requests.post")
+    @mock.patch("requests.head")
+    @mock.patch("requests.put")
+    @mock.patch("requests.delete")
+    @mock.patch("requests.patch")
+    @mock.patch("requests.request")
     def __notify(
         self,
         url,
@@ -342,66 +334,64 @@ class AppriseURLTester:
         mock_put,
         mock_head,
         mock_post,
-        mock_get
+        mock_get,
     ):
-        """
-        Perform notification testing against object specified
-        """
+        """Perform notification testing against object specified."""
         #
         # Prepare our options
         #
 
         # Allow notification type override, otherwise default to INFO
-        notify_type = meta.get('notify_type', NotifyType.INFO)
+        notify_type = meta.get("notify_type", NotifyType.INFO)
 
         # Whether or not we're testing exceptions or not
-        test_requests_exceptions = meta.get('test_requests_exceptions', False)
+        test_requests_exceptions = meta.get("test_requests_exceptions", False)
 
         # Our expected Query response (True, False, or exception type)
-        response = meta.get('response', True)
+        response = meta.get("response", True)
 
         # Our expected Notify response (True or False)
-        notify_response = meta.get('notify_response', response)
+        notify_response = meta.get("notify_response", response)
 
         # Our expected Notify Attachment response (True or False)
-        attach_response = meta.get('attach_response', notify_response)
+        attach_response = meta.get("attach_response", notify_response)
 
         # Test attachments
         # Don't set this if don't need to check it's value
-        check_attachments = meta.get('check_attachments', True)
+        check_attachments = meta.get("check_attachments", True)
 
         # Allow us to force the server response code to be something other then
         # the defaults
         requests_response_code = meta.get(
-            'requests_response_code',
+            "requests_response_code",
             requests.codes.ok if response else requests.codes.not_found,
         )
 
         # Allow us to force the server response text to be something other then
         # the defaults
-        requests_response_text = meta.get('requests_response_text')
+        requests_response_text = meta.get("requests_response_text")
         requests_response_content = None
 
         if isinstance(requests_response_text, str):
-            requests_response_content = requests_response_text.encode('utf-8')
+            requests_response_content = requests_response_text.encode("utf-8")
 
         elif isinstance(requests_response_text, bytes):
             requests_response_content = requests_response_text
-            requests_response_text = requests_response_text.decode('utf-8')
+            requests_response_text = requests_response_text.decode("utf-8")
 
         elif not isinstance(requests_response_text, str):
             # Convert to string
             requests_response_text = dumps(requests_response_text)
-            requests_response_content = requests_response_text.encode('utf-8')
+            requests_response_content = requests_response_text.encode("utf-8")
 
         else:
-            requests_response_content = u''
-            requests_response_text = ''
+            requests_response_content = ""
+            requests_response_text = ""
 
         # A request
         robj = mock.Mock()
-        robj.content = u''
-        robj.text = ''
+        robj.content = ""
+        robj.text = ""
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_head.return_value = robj
@@ -459,12 +449,10 @@ class AppriseURLTester:
 
                 # check that we're as expected
                 _resp = obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type)
+                    body=self.body, title=self.title, notify_type=notify_type
+                )
                 if _resp != notify_response:
-                    print('%s notify() returned %s (but expected %s)' % (
-                        url, _resp, notify_response))
-                    assert False
+                    raise AssertionError()
 
                 if notify_response:
                     # If we successfully got a response, there must have been
@@ -473,18 +461,33 @@ class AppriseURLTester:
 
                 # check that this doesn't change using different overflow
                 # methods
-                assert obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type,
-                    overflow=OverflowMode.UPSTREAM) == notify_response
-                assert obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type,
-                    overflow=OverflowMode.TRUNCATE) == notify_response
-                assert obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type,
-                    overflow=OverflowMode.SPLIT) == notify_response
+                assert (
+                    obj.notify(
+                        body=self.body,
+                        title=self.title,
+                        notify_type=notify_type,
+                        overflow=OverflowMode.UPSTREAM,
+                    )
+                    == notify_response
+                )
+                assert (
+                    obj.notify(
+                        body=self.body,
+                        title=self.title,
+                        notify_type=notify_type,
+                        overflow=OverflowMode.TRUNCATE,
+                    )
+                    == notify_response
+                )
+                assert (
+                    obj.notify(
+                        body=self.body,
+                        title=self.title,
+                        notify_type=notify_type,
+                        overflow=OverflowMode.SPLIT,
+                    )
+                    == notify_response
+                )
 
                 #
                 # Handle varations of the Asset Object missing fields
@@ -499,27 +502,42 @@ class AppriseURLTester:
                 asset.app_desc = None
 
                 # Notify should still work
-                assert obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type) == notify_response
+                assert (
+                    obj.notify(
+                        body=self.body,
+                        title=self.title,
+                        notify_type=notify_type,
+                    )
+                    == notify_response
+                )
 
                 # App ID only
                 asset.app_id = app_id
                 asset.app_desc = None
 
                 # Notify should still work
-                assert obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type) == notify_response
+                assert (
+                    obj.notify(
+                        body=self.body,
+                        title=self.title,
+                        notify_type=notify_type,
+                    )
+                    == notify_response
+                )
 
                 # App Desc only
                 asset.app_id = None
                 asset.app_desc = app_desc
 
                 # Notify should still work
-                assert obj.notify(
-                    body=self.body, title=self.title,
-                    notify_type=notify_type) == notify_response
+                assert (
+                    obj.notify(
+                        body=self.body,
+                        title=self.title,
+                        notify_type=notify_type,
+                    )
+                    == notify_response
+                )
 
                 # Restore
                 asset.app_id = app_id
@@ -530,23 +548,34 @@ class AppriseURLTester:
                     # doesn't support attachments, it should still
                     # gracefully ignore the data
                     attach = os.path.join(
-                        self.__test_var_dir, 'apprise-test.gif')
-                    assert obj.notify(
-                        body=self.body, title=self.title,
-                        notify_type=notify_type,
-                        attach=attach) == attach_response
+                        self.__test_var_dir, "apprise-test.gif"
+                    )
+                    assert (
+                        obj.notify(
+                            body=self.body,
+                            title=self.title,
+                            notify_type=notify_type,
+                            attach=attach,
+                        )
+                        == attach_response
+                    )
 
                     # Same results should apply to a list of attachments
                     attach = AppriseAttachment((
-                        os.path.join(self.__test_var_dir, 'apprise-test.gif'),
-                        os.path.join(self.__test_var_dir, 'apprise-test.png'),
-                        os.path.join(self.__test_var_dir, 'apprise-test.jpeg'),
+                        os.path.join(self.__test_var_dir, "apprise-test.gif"),
+                        os.path.join(self.__test_var_dir, "apprise-test.png"),
+                        os.path.join(self.__test_var_dir, "apprise-test.jpeg"),
                     ))
 
-                    assert obj.notify(
-                        body=self.body, title=self.title,
-                        notify_type=notify_type,
-                        attach=attach) == attach_response
+                    assert (
+                        obj.notify(
+                            body=self.body,
+                            title=self.title,
+                            notify_type=notify_type,
+                            attach=attach,
+                        )
+                        == attach_response
+                    )
 
                     if obj.attachment_support:
                         #
@@ -554,10 +583,15 @@ class AppriseURLTester:
                         # sending a attachment (or more) without a body or
                         # title specified:
                         #
-                        assert obj.notify(
-                            body=None, title=None,
-                            notify_type=notify_type,
-                            attach=attach) == attach_response
+                        assert (
+                            obj.notify(
+                                body=None,
+                                title=None,
+                                notify_type=notify_type,
+                                attach=attach,
+                            )
+                            == attach_response
+                        )
 
                         # Turn off attachment support on the notifications
                         # that support it so we can test that any logic we
@@ -568,19 +602,29 @@ class AppriseURLTester:
                         # Notifications should still transmit as normal if
                         # Attachment support is flipped off
                         #
-                        assert obj.notify(
-                            body=self.body, title=self.title,
-                            notify_type=notify_type,
-                            attach=attach) == notify_response
+                        assert (
+                            obj.notify(
+                                body=self.body,
+                                title=self.title,
+                                notify_type=notify_type,
+                                attach=attach,
+                            )
+                            == notify_response
+                        )
 
                         #
                         # We should not be able to send a message without a
                         # body or title in this circumstance
                         #
-                        assert obj.notify(
-                            body=None, title=None,
-                            notify_type=notify_type,
-                            attach=attach) is False
+                        assert (
+                            obj.notify(
+                                body=None,
+                                title=None,
+                                notify_type=notify_type,
+                                attach=attach,
+                            )
+                            is False
+                        )
 
                         # Toggle Back
                         obj.attachment_support = True
@@ -590,10 +634,15 @@ class AppriseURLTester:
                         # We should not be able to send a message without a
                         # body or title in this circumstance
                         #
-                        assert obj.notify(
-                            body=None, title=None,
-                            notify_type=notify_type,
-                            attach=attach) is False
+                        assert (
+                            obj.notify(
+                                body=None,
+                                title=None,
+                                notify_type=notify_type,
+                                attach=attach,
+                            )
+                            is False
+                        )
             else:
 
                 for _exception in self.req_exceptions:
@@ -606,9 +655,14 @@ class AppriseURLTester:
                     mock_request.side_effect = _exception
 
                     try:
-                        assert obj.notify(
-                            body=self.body, title=self.title,
-                            notify_type=notify_type) is False
+                        assert (
+                            obj.notify(
+                                body=self.body,
+                                title=self.title,
+                                notify_type=notify_type,
+                            )
+                            is False
+                        )
 
                     except AssertionError:
                         # Don't mess with these entries
@@ -629,8 +683,7 @@ class AppriseURLTester:
                     raise e
 
             except TypeError:
-                print('%s Unhandled response %s' % (url, type(e)))
-                raise e
+                raise e  # noqa: B904 - re-raising in test helper context is intentional
 
         #
         # Do the test again but without a title defined
@@ -638,8 +691,10 @@ class AppriseURLTester:
         try:
             if test_requests_exceptions is False:
                 # check that we're as expected
-                assert obj.notify(body='body', notify_type=notify_type) \
+                assert (
+                    obj.notify(body="body", notify_type=notify_type)
                     == notify_response
+                )
 
             else:
                 for _exception in self.req_exceptions:
@@ -652,9 +707,10 @@ class AppriseURLTester:
                     mock_request.side_effect = _exception
 
                     try:
-                        assert obj.notify(
-                            body=self.body,
-                            notify_type=notify_type) is False
+                        assert (
+                            obj.notify(body=self.body, notify_type=notify_type)
+                            is False
+                        )
 
                     except AssertionError:
                         # Don't mess with these entries

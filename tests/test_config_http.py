@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,18 +25,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+# Disable logging for a cleaner testing output
+import logging
 import time
-import pytest
+from typing import ClassVar
 from unittest import mock
 
+import pytest
 import requests
+
+from apprise import NotificationManager
 from apprise.common import ConfigFormat
 from apprise.config.http import ConfigHTTP
 from apprise.plugins import NotifyBase
-from apprise import NotificationManager
 
-# Disable logging for a cleaner testing output
-import logging
 logging.disable(logging.CRITICAL)
 
 # Grant access to our Notification Manager Singleton
@@ -45,20 +46,15 @@ N_MGR = NotificationManager()
 
 # Some exception handling we'll use
 REQUEST_EXCEPTIONS = (
-    requests.ConnectionError(
-        0, 'requests.ConnectionError() not handled'),
-    requests.RequestException(
-        0, 'requests.RequestException() not handled'),
-    requests.HTTPError(
-        0, 'requests.HTTPError() not handled'),
-    requests.ReadTimeout(
-        0, 'requests.ReadTimeout() not handled'),
-    requests.TooManyRedirects(
-        0, 'requests.TooManyRedirects() not handled'),
+    requests.ConnectionError(0, "requests.ConnectionError() not handled"),
+    requests.RequestException(0, "requests.RequestException() not handled"),
+    requests.HTTPError(0, "requests.HTTPError() not handled"),
+    requests.ReadTimeout(0, "requests.ReadTimeout() not handled"),
+    requests.TooManyRedirects(0, "requests.TooManyRedirects() not handled"),
 )
 
 
-@mock.patch('requests.post')
+@mock.patch("requests.post")
 def test_config_http(mock_post):
     """
     API: ConfigHTTP() object
@@ -76,22 +72,21 @@ def test_config_http(mock_post):
 
         def url(self, **kwargs):
             # Support url() function
-            return ''
+            return ""
 
     # Store our good notification in our schema map
-    N_MGR['good'] = GoodNotification
+    N_MGR["good"] = GoodNotification
 
     # Our default content
     default_content = """taga,tagb=good://server01"""
 
     class DummyResponse:
-        """
-        A dummy response used to manage our object
-        """
+        """A dummy response used to manage our object."""
+
         status_code = requests.codes.ok
-        headers = {
-            'Content-Length': len(default_content),
-            'Content-Type': 'text/plain',
+        headers: ClassVar[dict[str, str]] = {
+            "Content-Length": str(len(default_content)),
+            "Content-Type": "text/plain",
         }
 
         text = default_content
@@ -115,9 +110,9 @@ def test_config_http(mock_post):
     dummy_response = DummyResponse()
     mock_post.return_value = dummy_response
 
-    assert ConfigHTTP.parse_url('garbage://') is None
+    assert ConfigHTTP.parse_url("garbage://") is None
 
-    results = ConfigHTTP.parse_url('http://user:pass@localhost?+key=value')
+    results = ConfigHTTP.parse_url("http://user:pass@localhost?+key=value")
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert isinstance(ch.url(), str) is True
@@ -126,7 +121,7 @@ def test_config_http(mock_post):
     # one entry added
     assert len(ch) == 1
 
-    results = ConfigHTTP.parse_url('http://localhost:8080/path/')
+    results = ConfigHTTP.parse_url("http://localhost:8080/path/")
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert isinstance(ch.url(), str) is True
@@ -139,7 +134,7 @@ def test_config_http(mock_post):
     mock_post.reset_mock()
 
     # Cache Handling; cache each request for 30 seconds
-    results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=30')
+    results = ConfigHTTP.parse_url("http://localhost:8080/path/?cache=30")
     assert mock_post.call_count == 0
     assert isinstance(ch.url(), str) is True
 
@@ -182,7 +177,7 @@ def test_config_http(mock_post):
     # No remote post has been made
     assert mock_post.call_count == 0
 
-    with mock.patch('time.time', return_value=time.time() + 10):
+    with mock.patch("time.time", return_value=time.time() + 10):
         # even with 10 seconds elapsed, no fetch will be made
         assert ch.expired() is False
         assert ch
@@ -192,7 +187,7 @@ def test_config_http(mock_post):
     # No remote post has been made
     assert mock_post.call_count == 0
 
-    with mock.patch('time.time', return_value=time.time() + 31):
+    with mock.patch("time.time", return_value=time.time() + 31):
         # but 30+ seconds from now is considered expired
         assert ch.expired() is True
         assert ch
@@ -206,16 +201,16 @@ def test_config_http(mock_post):
     assert len(ch) == 1
 
     # Invalid cache
-    results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=False')
+    results = ConfigHTTP.parse_url("http://localhost:8080/path/?cache=False")
     assert isinstance(results, dict)
     assert isinstance(ch.url(), str) is True
 
-    results = ConfigHTTP.parse_url('http://localhost:8080/path/?cache=-10')
+    results = ConfigHTTP.parse_url("http://localhost:8080/path/?cache=-10")
     assert isinstance(results, dict)
     with pytest.raises(TypeError):
         ch = ConfigHTTP(**results)
 
-    results = ConfigHTTP.parse_url('http://user@localhost?format=text')
+    results = ConfigHTTP.parse_url("http://user@localhost?format=text")
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert isinstance(ch.url(), str) is True
@@ -224,7 +219,7 @@ def test_config_http(mock_post):
     # one entry added
     assert len(ch) == 1
 
-    results = ConfigHTTP.parse_url('https://localhost')
+    results = ConfigHTTP.parse_url("https://localhost")
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
     assert isinstance(ch.url(), str) is True
@@ -267,44 +262,48 @@ def test_config_http(mock_post):
 
     # Test YAML detection
     yaml_supported_types = (
-        'text/yaml', 'text/x-yaml', 'application/yaml', 'application/x-yaml')
+        "text/yaml",
+        "text/x-yaml",
+        "application/yaml",
+        "application/x-yaml",
+    )
 
     for st in yaml_supported_types:
-        dummy_response.headers['Content-Type'] = st
+        dummy_response.headers["Content-Type"] = st
         ch.default_config_format = None
         assert isinstance(ch.read(), str) is True
         # Set to YAML
         assert ch.default_config_format == ConfigFormat.YAML
 
     # Test TEXT detection
-    text_supported_types = ('text/plain', 'text/html')
+    text_supported_types = ("text/plain", "text/html")
 
     for st in text_supported_types:
-        dummy_response.headers['Content-Type'] = st
+        dummy_response.headers["Content-Type"] = st
         ch.default_config_format = None
         assert isinstance(ch.read(), str) is True
         # Set to TEXT
         assert ch.default_config_format == ConfigFormat.TEXT
 
     # The type is never adjusted to mime types we don't understand
-    ukwn_supported_types = ('text/css', 'application/zip')
+    ukwn_supported_types = ("text/css", "application/zip")
 
     for st in ukwn_supported_types:
-        dummy_response.headers['Content-Type'] = st
+        dummy_response.headers["Content-Type"] = st
         ch.default_config_format = None
         assert isinstance(ch.read(), str) is True
         # Remains unchanged
         assert ch.default_config_format is None
 
     # When the entry is missing; we handle this too
-    del dummy_response.headers['Content-Type']
+    del dummy_response.headers["Content-Type"]
     ch.default_config_format = None
     assert isinstance(ch.read(), str) is True
     # Remains unchanged
     assert ch.default_config_format is None
 
     # Restore our content type object for lower tests
-    dummy_response.headers['Content-Type'] = 'text/plain'
+    dummy_response.headers["Content-Type"] = "text/plain"
 
     # Take a snapshot
     max_buffer_size = ch.max_buffer_size
@@ -317,21 +316,21 @@ def test_config_http(mock_post):
 
     # Test erroneous Content-Length
     # Our content is still within the limits, so we're okay
-    dummy_response.headers['Content-Length'] = 'garbage'
+    dummy_response.headers["Content-Length"] = "garbage"
 
     assert isinstance(ch.read(), str) is True
 
-    dummy_response.headers['Content-Length'] = 'None'
+    dummy_response.headers["Content-Length"] = "None"
     # Our content is still within the limits, so we're okay
     assert isinstance(ch.read(), str) is True
 
     # Handle cases where the content length is exactly at our limit
-    dummy_response.text = 'a' * ch.max_buffer_size
+    dummy_response.text = "a" * ch.max_buffer_size
     # This is acceptable
     assert isinstance(ch.read(), str) is True
 
     # If we are over our limit though..
-    dummy_response.text = 'b' * (ch.max_buffer_size + 1)
+    dummy_response.text = "b" * (ch.max_buffer_size + 1)
     assert ch.read() is None
 
     # Test an invalid return code

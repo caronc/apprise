@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,82 +25,113 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import os
-
-from apprise.plugins.misskey import NotifyMisskey
-from helpers import AppriseURLTester
-
 # Disable logging for a cleaner testing output
 import logging
+import os
+
+from helpers import AppriseURLTester
+
+from apprise.plugins.misskey import NotifyMisskey
+
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
-TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), 'var')
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 # Our Testing URLs
 apprise_url_tests = (
     ##################################
     # NotifyMisskey
     ##################################
-    ('misskey://', {
-        # Missing Everything :)
-        'instance': None,
-    }),
-    ('misskey://:@/', {
-        'instance': None,
-    }),
-    ('misskey://hostname', {
-        # Missing Access Token
-        'instance': TypeError,
-    }),
-    ('misskey://access_token@hostname', {
-        # We're good; it's a simple notification
-        'instance': NotifyMisskey,
-    }),
-    ('misskeys://access_token@hostname', {
-        # We're good; it's another simple notification
-        'instance': NotifyMisskey,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'misskeys://a...n@hostname/'
-    }),
-    ('misskey://hostname/?token=abcd123', {
-        # Our access token can be provided as a token= variable
-        'instance': NotifyMisskey,
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'misskey://a...3@hostname'
-    }),
-    ('misskeys://access_token@hostname:8443', {
-        # A custom port specified
-        'instance': NotifyMisskey,
-    }),
-    ('misskey://access_token@hostname?visibility=invalid', {
-        # An invalid visibility
-        'instance': TypeError,
-    }),
-    ('misskeys://access_token@hostname?visibility=specified', {
-        # Specified a different visiblity
-        'instance': NotifyMisskey,
-    }),
-    ('misskeys://access_token@hostname', {
-        'instance': NotifyMisskey,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('misskeys://access_token@hostname', {
-        'instance': NotifyMisskey,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "misskey://",
+        {
+            # Missing Everything :)
+            "instance": None,
+        },
+    ),
+    (
+        "misskey://:@/",
+        {
+            "instance": None,
+        },
+    ),
+    (
+        "misskey://hostname",
+        {
+            # Missing Access Token
+            "instance": TypeError,
+        },
+    ),
+    (
+        "misskey://access_token@hostname",
+        {
+            # We're good; it's a simple notification
+            "instance": NotifyMisskey,
+        },
+    ),
+    (
+        "misskeys://access_token@hostname",
+        {
+            # We're good; it's another simple notification
+            "instance": NotifyMisskey,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "misskeys://a...n@hostname/",
+        },
+    ),
+    (
+        "misskey://hostname/?token=abcd123",
+        {
+            # Our access token can be provided as a token= variable
+            "instance": NotifyMisskey,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "misskey://a...3@hostname",
+        },
+    ),
+    (
+        "misskeys://access_token@hostname:8443",
+        {
+            # A custom port specified
+            "instance": NotifyMisskey,
+        },
+    ),
+    (
+        "misskey://access_token@hostname?visibility=invalid",
+        {
+            # An invalid visibility
+            "instance": TypeError,
+        },
+    ),
+    (
+        "misskeys://access_token@hostname?visibility=specified",
+        {
+            # Specified a different visiblity
+            "instance": NotifyMisskey,
+        },
+    ),
+    (
+        "misskeys://access_token@hostname",
+        {
+            "instance": NotifyMisskey,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "misskeys://access_token@hostname",
+        {
+            "instance": NotifyMisskey,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_misskey_urls():
-    """
-    NotifyMisskey() Apprise URLs
-
-    """
+    """NotifyMisskey() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

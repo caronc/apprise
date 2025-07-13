@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -25,19 +24,16 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+import base64
+import binascii
 import copy
 import json
-import binascii
-import typing
-import base64
 
 
 def base64_urlencode(data: bytes) -> str:
-    """
-    URL Safe Base64 Encoding
-    """
+    """URL Safe Base64 Encoding."""
     try:
-        return base64.urlsafe_b64encode(data).rstrip(b'=').decode('utf-8')
+        return base64.urlsafe_b64encode(data).rstrip(b"=").decode("utf-8")
 
     except TypeError:
         # data is not supported; avoid raising exception
@@ -45,13 +41,11 @@ def base64_urlencode(data: bytes) -> str:
 
 
 def base64_urldecode(data: str) -> bytes:
-    """
-    URL Safe Base64 Encoding
-    """
+    """URL Safe Base64 Encoding."""
 
     try:
         # Normalize base64url string (remove padding, add it back)
-        padding = '=' * (-len(data) % 4)
+        padding = "=" * (-len(data) % 4)
         return base64.urlsafe_b64decode(data + padding)
 
     except TypeError:
@@ -60,8 +54,7 @@ def base64_urldecode(data: str) -> bytes:
 
 
 def decode_b64_dict(di: dict) -> dict:
-    """
-    decodes base64 dictionary previously encoded
+    """Decodes base64 dictionary previously encoded.
 
     string entries prefixed with `b64:` are targeted
     """
@@ -74,8 +67,12 @@ def decode_b64_dict(di: dict) -> dict:
             parsed_v = base64.b64decode(v[4:])
             parsed_v = json.loads(parsed_v)
 
-        except (ValueError, TypeError, binascii.Error,
-                json.decoder.JSONDecodeError):
+        except (
+            ValueError,
+            TypeError,
+            binascii.Error,
+            json.decoder.JSONDecodeError,
+        ):
             # ValueError: the length of altchars is not 2.
             # TypeError: invalid input
             # binascii.Error: not base64 (bad padding)
@@ -86,9 +83,9 @@ def decode_b64_dict(di: dict) -> dict:
     return di
 
 
-def encode_b64_dict(di: dict, encoding='utf-8') -> typing.Tuple[dict, bool]:
-    """
-    Encodes dictionary entries containing binary types (int, float) into base64
+def encode_b64_dict(di: dict, encoding="utf-8") -> tuple[dict, bool]:
+    """Encodes dictionary entries containing binary types (int, float) into
+    base64.
 
     Final product is always string based values
     """
@@ -100,7 +97,7 @@ def encode_b64_dict(di: dict, encoding='utf-8') -> typing.Tuple[dict, bool]:
 
         try:
             encoded = base64.urlsafe_b64encode(json.dumps(v).encode(encoding))
-            encoded = "b64:{}".format(encoded.decode(encoding))
+            encoded = f"b64:{encoded.decode(encoding)}"
             needs_decoding = True
 
         except (ValueError, TypeError):

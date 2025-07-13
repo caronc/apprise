@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,11 +25,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from apprise import emojis
-import sys
-
 # Disable logging for a cleaner testing output
 import logging
+import sys
+
+from apprise import emojis
+
 logging.disable(logging.CRITICAL)
 
 # Ensure we don't create .pyc files for these tests
@@ -38,19 +38,19 @@ sys.dont_write_bytecode = True
 
 
 def test_emojis():
-    "emojis: apply_emojis() testing """
+    "emojis: apply_emojis() testing"
 
-    assert emojis.apply_emojis('') == ''
-    assert emojis.apply_emojis('no change') == 'no change'
-    assert emojis.apply_emojis(':smile:') == '😄'
-    assert emojis.apply_emojis(':smile::smile:') == '😄😄'
+    assert emojis.apply_emojis("") == ""
+    assert emojis.apply_emojis("no change") == "no change"
+    assert emojis.apply_emojis(":smile:") == "😄"
+    assert emojis.apply_emojis(":smile::smile:") == "😄😄"
 
     # Missing Delimiters
-    assert emojis.apply_emojis(':smile') == ':smile'
-    assert emojis.apply_emojis('smile:') == 'smile:'
+    assert emojis.apply_emojis(":smile") == ":smile"
+    assert emojis.apply_emojis("smile:") == "smile:"
 
     # Bad data
-    assert emojis.apply_emojis(None) == ''
-    assert emojis.apply_emojis(object) == ''
-    assert emojis.apply_emojis(True) == ''
-    assert emojis.apply_emojis(4.0) == ''
+    assert emojis.apply_emojis(None) == ""
+    assert emojis.apply_emojis(object) == ""
+    assert emojis.apply_emojis(True) == ""
+    assert emojis.apply_emojis(4.0) == ""

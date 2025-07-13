@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,72 +25,95 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from apprise.plugins.line import NotifyLine
-from helpers import AppriseURLTester
-
 # Disable logging for a cleaner testing output
 import logging
+
+from helpers import AppriseURLTester
+
+from apprise.plugins.line import NotifyLine
+
 logging.disable(logging.CRITICAL)
 
 # Our Testing URLs
 apprise_url_tests = (
-    ('line://', {
-        # No Access Token
-        'instance': TypeError,
-    }),
-    ('line://%20/', {
-        # invalid Access Token; no Integration/Routing Key
-        'instance': TypeError,
-    }),
-    ('line://token', {
-        # no target specified
-        'instance': NotifyLine,
-        # Expected notify() response
-        'notify_response': False,
-
-    }),
-    ('line://token=/target', {
-        # minimum requirements met
-        'instance': NotifyLine,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'line://****/t...t?',
-    }),
-    ('line://token/target?image=no', {
-        # minimum requirements met; no icon display
-        'instance': NotifyLine,
-    }),
-    ('line://a/very/long/token=/target?image=no', {
-        # minimum requirements met; no icon display
-        'instance': NotifyLine,
-    }),
-    ('line://?token=token&to=target1', {
-        # minimum requirements met
-        'instance': NotifyLine,
-
-        # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'line://****/t...1?',
-    }),
-    ('line://token/target', {
-        'instance': NotifyLine,
-        # throw a bizzare code forcing us to fail to look it up
-        'response': False,
-        'requests_response_code': 999,
-    }),
-    ('line://token/target', {
-        'instance': NotifyLine,
-        # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
-        'test_requests_exceptions': True,
-    }),
+    (
+        "line://",
+        {
+            # No Access Token
+            "instance": TypeError,
+        },
+    ),
+    (
+        "line://%20/",
+        {
+            # invalid Access Token; no Integration/Routing Key
+            "instance": TypeError,
+        },
+    ),
+    (
+        "line://token",
+        {
+            # no target specified
+            "instance": NotifyLine,
+            # Expected notify() response
+            "notify_response": False,
+        },
+    ),
+    (
+        "line://token=/target",
+        {
+            # minimum requirements met
+            "instance": NotifyLine,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "line://****/t...t?",
+        },
+    ),
+    (
+        "line://token/target?image=no",
+        {
+            # minimum requirements met; no icon display
+            "instance": NotifyLine,
+        },
+    ),
+    (
+        "line://a/very/long/token=/target?image=no",
+        {
+            # minimum requirements met; no icon display
+            "instance": NotifyLine,
+        },
+    ),
+    (
+        "line://?token=token&to=target1",
+        {
+            # minimum requirements met
+            "instance": NotifyLine,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "line://****/t...1?",
+        },
+    ),
+    (
+        "line://token/target",
+        {
+            "instance": NotifyLine,
+            # throw a bizzare code forcing us to fail to look it up
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        "line://token/target",
+        {
+            "instance": NotifyLine,
+            # Throws a series of i/o exceptions with this flag
+            # is set and tests that we gracfully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
 )
 
 
 def test_plugin_line_urls():
-    """
-    NotifyLine() Apprise URLs
-
-    """
+    """NotifyLine() Apprise URLs."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()

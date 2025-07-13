@@ -1,4 +1,4 @@
-# Contributions to the apprise project
+# Contributions to the Apprise Project
 
 ## Creator & Maintainer
 

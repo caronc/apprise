@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,89 +25,86 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from os.path import abspath, dirname, isfile, join
 import re
 from uuid import uuid4
-from os.path import join
-from os.path import dirname
-from os.path import isfile
-from os.path import abspath
-from .common import NotifyType
-from .common import PersistentStoreMode
-from .manager_plugins import NotificationManager
 
+from .common import NotifyType, PersistentStoreMode
+from .manager_plugins import NotificationManager
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
 
 class AppriseAsset:
-    """
-    Provides a supplimentary class that can be used to provide extra
-    information and details that can be used by Apprise such as providing
-    an alternate location to where images/icons can be found and the
-    URL masks.
+    """Provides a supplimentary class that can be used to provide extra
+    information and details that can be used by Apprise such as providing an
+    alternate location to where images/icons can be found and the URL masks.
 
-    Any variable that starts with an underscore (_) can only be initialized
-    by this class manually and will/can not be parsed from a configuration
-    file.
-
+    Any variable that starts with an underscore (_) can only be initialized by
+    this class manually and will/can not be parsed from a configuration file.
     """
+
     # Application Identifier
-    app_id = 'Apprise'
+    app_id = "Apprise"
 
     # Application Description
-    app_desc = 'Apprise Notifications'
+    app_desc = "Apprise Notifications"
 
     # Provider URL
-    app_url = 'https://github.com/caronc/apprise'
+    app_url = "https://github.com/caronc/apprise"
 
     # A Simple Mapping of Colors; For every NOTIFY_TYPE identified,
     # there should be a mapping to it's color here:
     html_notify_map = {
-        NotifyType.INFO: '#3AA3E3',
-        NotifyType.SUCCESS: '#3AA337',
-        NotifyType.FAILURE: '#A32037',
-        NotifyType.WARNING: '#CACF29',
+        NotifyType.INFO: "#3AA3E3",
+        NotifyType.SUCCESS: "#3AA337",
+        NotifyType.FAILURE: "#A32037",
+        NotifyType.WARNING: "#CACF29",
     }
 
     # The default color to return if a mapping isn't found in our table above
-    default_html_color = '#888888'
+    default_html_color = "#888888"
 
     # Ascii Notification
     ascii_notify_map = {
-        NotifyType.INFO: '[i]',
-        NotifyType.SUCCESS: '[+]',
-        NotifyType.FAILURE: '[!]',
-        NotifyType.WARNING: '[~]',
+        NotifyType.INFO: "[i]",
+        NotifyType.SUCCESS: "[+]",
+        NotifyType.FAILURE: "[!]",
+        NotifyType.WARNING: "[~]",
     }
 
     # The default ascii to return if a mapping isn't found in our table above
-    default_ascii_chars = '[?]'
+    default_ascii_chars = "[?]"
 
     # The default image extension to use
-    default_extension = '.png'
+    default_extension = ".png"
 
     # The default theme
-    theme = 'default'
+    theme = "default"
 
     # Image URL Mask
-    image_url_mask = \
-        'https://github.com/caronc/apprise/raw/master/apprise/assets/' \
-        'themes/{THEME}/apprise-{TYPE}-{XY}{EXTENSION}'
+    image_url_mask = (
+        "https://github.com/caronc/apprise/raw/master/apprise/assets/"
+        "themes/{THEME}/apprise-{TYPE}-{XY}{EXTENSION}"
+    )
 
     # Application Logo
-    image_url_logo = \
-        'https://github.com/caronc/apprise/raw/master/apprise/assets/' \
-        'themes/{THEME}/apprise-logo.png'
+    image_url_logo = (
+        "https://github.com/caronc/apprise/raw/master/apprise/assets/"
+        "themes/{THEME}/apprise-logo.png"
+    )
 
     # Image Path Mask
-    image_path_mask = abspath(join(
-        dirname(__file__),
-        'assets',
-        'themes',
-        '{THEME}',
-        'apprise-{TYPE}-{XY}{EXTENSION}',
-    ))
+    image_path_mask = abspath(
+        join(
+            dirname(__file__),
+            "assets",
+            "themes",
+            "{THEME}",
+            "apprise-{TYPE}-{XY}{EXTENSION}",
+        )
+    )
 
     # This value can also be set on calls to Apprise.notify(). This allows
     # you to let Apprise upfront the type of data being passed in.  This
@@ -141,7 +137,7 @@ class AppriseAsset:
     interpret_escapes = False
 
     # Defines the encoding of the content passed into Apprise
-    encoding = 'utf-8'
+    encoding = "utf-8"
 
     # Automatically generate our Pretty Good Privacy (PGP) keys if one isn't
     # present and our environment configuration allows for it.
@@ -176,7 +172,7 @@ class AppriseAsset:
 
     # Optionally define the default salt to apply to all persistent storage
     # namespace generation (unless over-ridden)
-    __storage_salt = b''
+    __storage_salt = b""
 
     # Optionally define the namespace length of the directories created by
     # the storage. If this is set to zero, then the length is pre-determined
@@ -200,19 +196,22 @@ class AppriseAsset:
     # A unique identifer we can use to associate our calling source
     _uid = str(uuid4())
 
-    def __init__(self, plugin_paths=None, storage_path=None,
-                 storage_mode=None, storage_salt=None,
-                 storage_idlen=None, **kwargs):
-        """
-        Asset Initialization
-
-        """
+    def __init__(
+        self,
+        plugin_paths=None,
+        storage_path=None,
+        storage_mode=None,
+        storage_salt=None,
+        storage_idlen=None,
+        **kwargs,
+    ):
+        """Asset Initialization."""
         # Assign default arguments if specified
         for key, value in kwargs.items():
             if not hasattr(AppriseAsset, key):
                 raise AttributeError(
-                    'AppriseAsset init(): '
-                    'An invalid key {} was specified.'.format(key))
+                    f"AppriseAsset init(): An invalid key {key} was specified."
+                )
 
             setattr(self, key, value)
 
@@ -234,8 +233,9 @@ class AppriseAsset:
             if storage_idlen < 0:
                 # Unsupported type
                 raise ValueError(
-                    'AppriseAsset storage_idlen(): Value must '
-                    'be an integer and > 0')
+                    "AppriseAsset storage_idlen(): Value must "
+                    "be an integer and > 0"
+                )
 
             # Store value
             self.__storage_idlen = storage_idlen
@@ -253,17 +253,18 @@ class AppriseAsset:
                 except UnicodeEncodeError:
                     # Bad data; don't pass it along
                     raise ValueError(
-                        'AppriseAsset namespace_salt(): '
-                        'Value provided could not be encoded')
+                        "AppriseAsset namespace_salt(): "
+                        "Value provided could not be encoded"
+                    )
 
             else:  # Unsupported
                 raise ValueError(
-                    'AppriseAsset namespace_salt(): Value provided must be '
-                    'string or bytes object')
+                    "AppriseAsset namespace_salt(): Value provided must be "
+                    "string or bytes object"
+                )
 
     def color(self, notify_type, color_type=None):
-        """
-        Returns an HTML mapped color based on passed in notify type
+        """Returns an HTML mapped color based on passed in notify type.
 
         if color_type is:
            None    then a standard hex string is returned as
@@ -271,7 +272,6 @@ class AppriseAsset:
 
            int     then the integer representation is returned
            tuple   then the the red, green, blue is returned in a tuple
-
         """
 
         # Attempt to get the type, otherwise return a default grey
@@ -291,22 +291,18 @@ class AppriseAsset:
 
         # Unsupported type
         raise ValueError(
-            'AppriseAsset html_color(): An invalid color_type was specified.')
+            "AppriseAsset html_color(): An invalid color_type was specified."
+        )
 
     def ascii(self, notify_type):
-        """
-        Returns an ascii representation based on passed in notify type
-
-        """
+        """Returns an ascii representation based on passed in notify type."""
         # look our response up
         return self.ascii_notify_map.get(notify_type, self.default_ascii_chars)
 
     def image_url(self, notify_type, image_size, logo=False, extension=None):
-        """
-        Apply our mask to our image URL
+        """Apply our mask to our image URL.
 
         if logo is set to True, then the logo_url is used instead
-
         """
 
         url_mask = self.image_url_logo if logo else self.image_url_mask
@@ -318,26 +314,24 @@ class AppriseAsset:
             extension = self.default_extension
 
         re_map = {
-            '{THEME}': self.theme if self.theme else '',
-            '{TYPE}': notify_type,
-            '{XY}': image_size,
-            '{EXTENSION}': extension,
+            "{THEME}": self.theme if self.theme else "",
+            "{TYPE}": notify_type,
+            "{XY}": image_size,
+            "{EXTENSION}": extension,
         }
 
         # Iterate over above list and store content accordingly
         re_table = re.compile(
-            r'(' + '|'.join(re_map.keys()) + r')',
+            r"(" + "|".join(re_map.keys()) + r")",
             re.IGNORECASE,
         )
 
         return re_table.sub(lambda x: re_map[x.group()], url_mask)
 
-    def image_path(self, notify_type, image_size, must_exist=True,
-                   extension=None):
-        """
-        Apply our mask to our image file path
-
-        """
+    def image_path(
+        self, notify_type, image_size, must_exist=True, extension=None
+    ):
+        """Apply our mask to our image file path."""
 
         if not self.image_path_mask:
             # No image to return
@@ -347,15 +341,15 @@ class AppriseAsset:
             extension = self.default_extension
 
         re_map = {
-            '{THEME}': self.theme if self.theme else '',
-            '{TYPE}': notify_type,
-            '{XY}': image_size,
-            '{EXTENSION}': extension,
+            "{THEME}": self.theme if self.theme else "",
+            "{TYPE}": notify_type,
+            "{XY}": image_size,
+            "{EXTENSION}": extension,
         }
 
         # Iterate over above list and store content accordingly
         re_table = re.compile(
-            r'(' + '|'.join(re_map.keys()) + r')',
+            r"(" + "|".join(re_map.keys()) + r")",
             re.IGNORECASE,
         )
 
@@ -368,10 +362,8 @@ class AppriseAsset:
         return path
 
     def image_raw(self, notify_type, image_size, extension=None):
-        """
-        Returns the raw image if it can (otherwise the function returns None)
-
-        """
+        """Returns the raw image if it can (otherwise the function returns
+        None)"""
 
         path = self.image_path(
             notify_type=notify_type,
@@ -380,88 +372,72 @@ class AppriseAsset:
         )
         if path:
             try:
-                with open(path, 'rb') as fd:
+                with open(path, "rb") as fd:
                     return fd.read()
 
-            except (OSError, IOError):
+            except OSError:
                 # We can't access the file
                 return None
 
         return None
 
     def details(self):
-        """
-        Returns the details associated with the AppriseAsset object
-
-        """
+        """Returns the details associated with the AppriseAsset object."""
         return {
-            'app_id': self.app_id,
-            'app_desc': self.app_desc,
-            'default_extension': self.default_extension,
-            'theme': self.theme,
-            'image_path_mask': self.image_path_mask,
-            'image_url_mask': self.image_url_mask,
-            'image_url_logo': self.image_url_logo,
+            "app_id": self.app_id,
+            "app_desc": self.app_desc,
+            "default_extension": self.default_extension,
+            "theme": self.theme,
+            "image_path_mask": self.image_path_mask,
+            "image_url_mask": self.image_url_mask,
+            "image_url_logo": self.image_url_logo,
         }
 
     @staticmethod
     def hex_to_rgb(value):
-        """
-        Takes a hex string (such as #00ff00) and returns a tuple in the form
+        """Takes a hex string (such as #00ff00) and returns a tuple in the form
         of (red, green, blue)
 
         eg: #00ff00 becomes : (0, 65535, 0)
-
         """
-        value = value.lstrip('#')
+        value = value.lstrip("#")
         lv = len(value)
-        return tuple(int(value[i:i + lv // 3], 16)
-                     for i in range(0, lv, lv // 3))
+        return tuple(
+            int(value[i : i + lv // 3], 16) for i in range(0, lv, lv // 3)
+        )
 
     @staticmethod
     def hex_to_int(value):
-        """
-        Takes a hex string (such as #00ff00) and returns its integer
-        equivalent
+        """Takes a hex string (such as #00ff00) and returns its integer
+        equivalent.
 
         eg: #00000f becomes : 15
-
         """
-        return int(value.lstrip('#'), 16)
+        return int(value.lstrip("#"), 16)
 
     @property
     def plugin_paths(self):
-        """
-        Return the plugin paths defined
-        """
+        """Return the plugin paths defined."""
         return self.__plugin_paths
 
     @property
     def storage_path(self):
-        """
-        Return the persistent storage path defined
-        """
+        """Return the persistent storage path defined."""
         return self.__storage_path
 
     @property
     def storage_mode(self):
-        """
-        Return the persistent storage mode defined
-        """
+        """Return the persistent storage mode defined."""
 
         return self.__storage_mode
 
     @property
     def storage_salt(self):
-        """
-        Return the provided namespace salt; this is always of type bytes
-        """
+        """Return the provided namespace salt; this is always of type bytes."""
         return self.__storage_salt
 
     @property
     def storage_idlen(self):
-        """
-        Return the persistent storage id length
-        """
+        """Return the persistent storage id length."""
 
         return self.__storage_idlen

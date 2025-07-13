@@ -1,4 +1,5 @@
-from typing import Any, Iterable, Iterator, List, Optional, Union
+from collections.abc import Iterable, Iterator
+from typing import Any, Union
 
 from . import AppriseAsset, NotifyBase
 from .config import ConfigBase
@@ -8,36 +9,38 @@ _Configs = Union[ConfigBase, str, Iterable[str]]
 class AppriseConfig:
     def __init__(
         self,
-        paths: Optional[_Configs] = ...,
-        asset: Optional[AppriseAsset] = ...,
+        paths: _Configs | None = ...,
+        asset: AppriseAsset | None = ...,
         cache: bool = ...,
         recursion: int = ...,
         insecure_includes: bool = ...,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None: ...
     def add(
         self,
         configs: _Configs,
-        asset: Optional[AppriseAsset] = ...,
+        asset: AppriseAsset | None = ...,
         cache: bool = ...,
-        recursion: Optional[bool] = ...,
-        insecure_includes: Optional[bool] = ...
+        recursion: bool | None = ...,
+        insecure_includes: bool | None = ...,
     ) -> bool: ...
     def add_config(
         self,
         content: str,
-        asset: Optional[AppriseAsset] = ...,
-        tag: Optional[str] = ...,
-        format: Optional[str] = ...,
-        recursion: Optional[int] = ...,
-        insecure_includes: Optional[bool] = ...
+        asset: AppriseAsset | None = ...,
+        tag: str | None = ...,
+        format: str | None = ...,
+        recursion: int | None = ...,
+        insecure_includes: bool | None = ...,
     ) -> bool: ...
-    def servers(self, tag: str = ..., *args: Any, **kwargs: Any) -> List[ConfigBase]: ...
+    def servers(
+        self, tag: str = ..., *args: Any, **kwargs: Any
+    ) -> list[ConfigBase]: ...
     def instantiate(
         url: str,
-        asset: Optional[AppriseAsset] = ...,
-        tag: Optional[str] = ...,
-        cache: Optional[bool] = ...
+        asset: AppriseAsset | None = ...,
+        tag: str | None = ...,
+        cache: bool | None = ...,
     ) -> NotifyBase: ...
     def clear(self) -> None: ...
     def server_pop(self, index: int) -> ConfigBase: ...
