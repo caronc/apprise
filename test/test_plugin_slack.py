@@ -761,6 +761,103 @@ def test_plugin_slack_markdown(mock_get, mock_request):
 
 
 @mock.patch('requests.request')
+@mock.patch('requests.get')
+def test_plugin_slack_template_simple_success(mock_get, mock_request, tmpdir):
+    """
+    NotifySlack() Markdown Template with token
+
+    """
+    template_str = """
+{{ app_body }}
+Token: `{{ token1 }}`
+"""
+    template = tmpdir.join("simple.txt")
+    template.write(template_str)
+
+    request = mock.Mock()
+    request.content = b'ok'
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_request.return_value = request
+    mock_get.return_value = request
+
+    body = "This is body"
+    token = "EGG"
+
+    # Variation Initializations
+    aobj = Apprise()
+    assert aobj.add(
+        'slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+        f'?template={template}&:token1={token}')
+
+    # Send our notification
+    assert aobj.notify(
+        body=body, title='title', notify_type=NotifyType.INFO)
+
+    data = loads(mock_request.call_args_list[0][1]['data'])
+    assert data['attachments'][0]['text'] == "\n"\
+        f"{body}\n"\
+        f"Token: `{token}`\n"
+
+
+@mock.patch('requests.request')
+@mock.patch('requests.get')
+def test_plugin_slack_template_blocks_success(mock_get, mock_request, tmpdir):
+    """
+    NotifySlack() Markdown Template with token
+
+    """
+    template_str = """
+{
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "{{ app_body }}"
+      }
+    },
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "{{ token1 }}"
+      }
+    }
+  ]
+}
+"""
+    template = tmpdir.join("simple.json")
+    template.write(template_str)
+
+    request = mock.Mock()
+    request.content = b'ok'
+    request.status_code = requests.codes.ok
+
+    # Prepare Mock
+    mock_request.return_value = request
+    mock_get.return_value = request
+
+    body = "This is body"
+    token = "EGG"
+
+    # Variation Initializations
+    aobj = Apprise()
+    assert aobj.add(
+        'slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/'
+        f'?template={template}&:token1={token}&blocks=yes')
+
+    # Send our notification
+    assert aobj.notify(
+        body=body, title='title', notify_type=NotifyType.INFO)
+
+    data = loads(mock_request.call_args_list[0][1]['data'])
+    assert data['attachments'][0]['blocks'][0]['text']['text'] == body
+    assert data['attachments'][0]['blocks'][1]['text']['text'] == token
+
+
+@mock.patch('requests.request')
 def test_plugin_slack_single_thread_reply(mock_request):
     """
     NotifySlack() Send Notification as a Reply
