@@ -43,71 +43,79 @@ apprise_url_tests = (
     ('notifico://:@/', {
         'instance': TypeError,
     }),
-    ('notifico://1234', {
+    ('notifico://example.com/1234', {
         # Just a project id provided (no message token)
         'instance': TypeError,
     }),
-    ('notifico://abcd/ckhrjW8w672m6HG', {
+    ('notifico://example.com/abcd/ckhrjW8w672m6HG', {
         # an invalid project id provided
         'instance': TypeError,
     }),
-    ('notifico://1234/ckhrjW8w672m6HG', {
+    ('notifico://example.com/1234/%34^j$', {
+        # A project id and invalid message hook provided
+        'instance': TypeError,
+    }),
+    ('notifico://example.com/1234/ckhrjW8w672m6HG', {
         # A project id and message hook provided
         'instance': NotifyNotifico,
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?prefix=no', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG?prefix=no', {
         # Disable our prefix
         'instance': NotifyNotifico,
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
+    ('notifico://user@example.com:20/1234/ckhrjW8w672m6HG?color=yes', {
         'instance': NotifyNotifico,
         'notify_type': 'info',
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
+    ('notificos://user:pass@example.com/1234/ckhrjW8w672m6HG?color=yes', {
         'instance': NotifyNotifico,
         'notify_type': 'success',
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
+    ('notificos://user:pass@example.com/'
+     '?project=1234&token=ckhrjW8w672m6HG&color=yes', {
+         'instance': NotifyNotifico,
+         'notify_type': 'success',
+
+         # Our expected url(privacy=True) startswith() response:
+         'privacy_url': 'notificos://user:****@example.com/1...4/c...G'}),
+
+    ('notifico://example.com/1234/ckhrjW8w672m6HG?color=yes', {
         'instance': NotifyNotifico,
         'notify_type': 'warning',
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
+    ('notificos://example.com/1234/ckhrjW8w672m6HG?color=yes', {
         'instance': NotifyNotifico,
         'notify_type': 'failure',
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?color=yes', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG?color=yes', {
         'instance': NotifyNotifico,
         'notify_type': 'invalid',
     }),
-    ('notifico://1234/ckhrjW8w672m6HG?color=no', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG?color=no', {
         # Test our color flag by having it set to off
         'instance': NotifyNotifico,
 
         # Our expected url(privacy=True) startswith() response:
-        'privacy_url': 'notifico://1...4/c...G',
+        'privacy_url': 'notifico://example.com/1...4/c...G',
     }),
-    # Support Native URLs
-    ('https://n.tkte.ch/h/2144/uJmKaBW9WFk42miB146ci3Kj', {
-        'instance': NotifyNotifico,
-    }),
-    ('notifico://1234/ckhrjW8w672m6HG', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG', {
         'instance': NotifyNotifico,
         # don't include an image by default
         'include_image': False,
     }),
-    ('notifico://1234/ckhrjW8w672m6HG', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG', {
         'instance': NotifyNotifico,
         # force a failure
         'response': False,
         'requests_response_code': requests.codes.internal_server_error,
     }),
-    ('notifico://1234/ckhrjW8w672m6HG', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG', {
         'instance': NotifyNotifico,
         # throw a bizzare code forcing us to fail to look it up
         'response': False,
         'requests_response_code': 999,
     }),
-    ('notifico://1234/ckhrjW8w672m6HG', {
+    ('notifico://example.com/1234/ckhrjW8w672m6HG', {
         'instance': NotifyNotifico,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them

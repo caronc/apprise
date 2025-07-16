@@ -26,7 +26,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Notifico allows you to relay notifications into IRC channels.
+# Notifico has since gone offline, but became an open source project.
+
+# Legacy instructions would identify the following:
 #
 # 1. visit https://n.tkte.ch and sign up for an account
 # 2. create a project; either manually or sync with github
@@ -40,6 +42,8 @@
 #
 # This plugin also supports taking the URL (as identified above) directly
 # as well.
+#
+# Today, the service can be self hosted: https://notifico.tech/
 
 import re
 import requests
@@ -47,6 +51,7 @@ import requests
 from .base import NotifyBase
 from ..common import NotifyType
 from ..utils.parse import parse_bool, validate_regex
+from ..url import PrivacyMode
 from ..locale import gettext_lazy as _
 
 
@@ -93,19 +98,16 @@ class NotifyNotifico(NotifyBase):
     service_name = 'Notifico'
 
     # The services URL
-    service_url = 'https://n.tkte.ch'
+    service_url = 'https://notifico.tech/'
 
     # The default protocol
     protocol = 'notifico'
 
     # The default secure protocol
-    secure_protocol = 'notifico'
+    secure_protocol = 'notificos'
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = 'https://github.com/caronc/apprise/wiki/Notify_notifico'
-
-    # Plain Text Notification URL
-    notify_url = 'https://n.tkte.ch/h/{proj}/{hook}'
 
     # The title is not used
     title_maxlen = 0
@@ -115,11 +117,36 @@ class NotifyNotifico(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{project_id}/{msghook}',
+        '{schema}://{host}/{project_id}/{msghook}',
+        '{schema}://{host}:{port}/{project_id}/{msghook}',
+        '{schema}://{user}@{host}/{project_id}/{msghook}',
+        '{schema}://{user}@{host}:{port}/{project_id}/{msghook}',
+        '{schema}://{user}:{password}@{host}/{project_id}/{msghook}',
+        '{schema}://{user}:{password}@{host}:{port}/{project_id}/{msghook}',
     )
 
     # Define our template arguments
     template_tokens = dict(NotifyBase.template_tokens, **{
+        'host': {
+            'name': _('Hostname'),
+            'type': 'string',
+            'required': True,
+        },
+        'port': {
+            'name': _('Port'),
+            'type': 'int',
+            'min': 1,
+            'max': 65535,
+        },
+        'user': {
+            'name': _('Username'),
+            'type': 'string',
+        },
+        'password': {
+            'name': _('Password'),
+            'type': 'string',
+            'private': True,
+        },
         # The Project ID is found as the first part of the URL
         #  /1234/........................
         'project_id': {
@@ -155,6 +182,13 @@ class NotifyNotifico(NotifyBase):
             'type': 'bool',
             'default': True,
         },
+
+        'token': {
+            'alias_of': 'msghook',
+        },
+        'project': {
+            'alias_of': 'project_id',
+        },
     })
 
     def __init__(self, project_id, msghook, color=True, prefix=True,
@@ -189,11 +223,6 @@ class NotifyNotifico(NotifyBase):
         # Send colors
         self.color = color
 
-        # Prepare our notification URL now:
-        self.api_url = self.notify_url.format(
-            proj=self.project_id,
-            hook=self.msghook,
-        )
         return
 
     @property
@@ -219,8 +248,28 @@ class NotifyNotifico(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{proj}/{hook}/?{params}'.format(
-            schema=self.secure_protocol,
+        # Determine Authentication
+        auth = ''
+        if self.user and self.password:
+            auth = '{user}:{password}@'.format(
+                user=NotifyNotifico.quote(self.user, safe=''),
+                password=self.pprint(
+                    self.password, privacy, mode=PrivacyMode.Secret,
+                    safe=''),
+            )
+        elif self.user:
+            auth = '{user}@'.format(
+                user=NotifyNotifico.quote(self.user, safe=''),
+            )
+
+        default_port = 443 if self.secure else 80
+
+        return '{schema}://{auth}{host}{port}/{proj}/{hook}/?{params}'.format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            host=self.host,
+            port='' if self.port is None or self.port == default_port
+            else ':{}'.format(self.port),
             proj=self.pprint(self.project_id, privacy, safe=''),
             hook=self.pprint(self.msghook, privacy, safe=''),
             params=NotifyNotifico.urlencode(params),
@@ -286,8 +335,22 @@ class NotifyNotifico(NotifyBase):
             ),
         }
 
+        auth = None
+        if self.user:
+            auth = (self.user, self.password)
+
+        # Set our schema
+        schema = 'https' if self.secure else 'http'
+
+        url = '%s://%s' % (schema, self.host)
+        if isinstance(self.port, int):
+            url += ':%d' % self.port
+
+        # Prepare our URL
+        url += f'/h/{self.project_id}/{self.msghook}'
+
         self.logger.debug('Notifico GET URL: %s (cert_verify=%r)' % (
-            self.api_url, self.verify_certificate))
+            url, self.verify_certificate))
         self.logger.debug('Notifico Payload: %s' % str(payload))
 
         # Always call throttle before any remote server i/o is made
@@ -295,7 +358,8 @@ class NotifyNotifico(NotifyBase):
 
         try:
             r = requests.get(
-                self.api_url,
+                self.url,
+                auth=auth,
                 params=payload,
                 headers=headers,
                 verify=self.verify_certificate,
@@ -345,16 +409,22 @@ class NotifyNotifico(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # The first token is stored in the hostname
-        results['project_id'] = NotifyNotifico.unquote(results['host'])
+        # Acquire our path
+        tokens = NotifyNotifico.split_path(results['fullpath'])
 
-        # Get Message Hook
-        try:
-            results['msghook'] = NotifyNotifico.split_path(
-                results['fullpath'])[0]
+        # The last token is our message hook
+        if 'token' in results['qsd'] and len(results['qsd']['token']):
+            results['msghook'] = results['qsd']['token']
 
-        except IndexError:
-            results['msghook'] = None
+        elif tokens:
+            results['msghook'] = tokens.pop()
+
+        # Now acquire our project_id
+        if 'project' in results['qsd'] and len(results['qsd']['project']):
+            results['project_id'] = results['qsd']['project']
+
+        elif tokens:
+            results['project_id'] = tokens.pop()
 
         # Include Color
         results['color'] = \
@@ -365,26 +435,3 @@ class NotifyNotifico(NotifyBase):
             parse_bool(results['qsd'].get('prefix', True))
 
         return results
-
-    @staticmethod
-    def parse_native_url(url):
-        """
-        Support https://n.tkte.ch/h/PROJ_ID/MESSAGE_HOOK/
-        """
-
-        result = re.match(
-            r'^https?://n\.tkte\.ch/h/'
-            r'(?P<proj>[0-9]+)/'
-            r'(?P<hook>[A-Z0-9]+)/?'
-            r'(?P<params>\?.+)?$', url, re.I)
-
-        if result:
-            return NotifyNotifico.parse_url(
-                '{schema}://{proj}/{hook}/{params}'.format(
-                    schema=NotifyNotifico.secure_protocol,
-                    proj=result.group('proj'),
-                    hook=result.group('hook'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
-
-        return None
