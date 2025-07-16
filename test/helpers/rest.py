@@ -266,23 +266,11 @@ class AppriseURLTester:
             # from the one that was already created properly
             obj_cmp = Apprise.instantiate(obj.url())
 
-            # Our new object should produce the same url identifier
-            if obj.url_identifier != obj_cmp.url_identifier:
-                print('Provided %s' % url)
-                raise AssertionError(
-                    "URL Identifier: '{}' != expected '{}'".format(
-                        obj_cmp.url_identifier, obj.url_identifier))
-
-            # Back our check up
-            if obj.url_id() != obj_cmp.url_id():
-                print('Provided %s' % url)
-                raise AssertionError(
-                    "URL ID(): '{}' != expected '{}'".format(
-                        obj_cmp.url_id(), obj.url_id()))
-
             # Our object should be the same instance as what we had
             # originally expected above.
             if not isinstance(obj_cmp, NotifyBase):
+                import pdb
+                pdb.set_trace()
                 # Assert messages are hard to trace back with the
                 # way these tests work. Just printing before
                 # throwing our assertion failure makes things
@@ -298,6 +286,20 @@ class AppriseURLTester:
                 print('But %d targets found in %s' % (
                     len(obj_cmp), obj_cmp.url(privacy=True)))
                 raise AssertionError("Target miscount %d != %d")
+
+            # Our new object should produce the same url identifier
+            if obj.url_identifier != obj_cmp.url_identifier:
+                print('Provided %s' % url)
+                raise AssertionError(
+                    "URL Identifier: '{}' != expected '{}'".format(
+                        obj_cmp.url_identifier, obj.url_identifier))
+
+            # Back our check up
+            if obj.url_id() != obj_cmp.url_id():
+                print('Provided %s' % url)
+                raise AssertionError(
+                    "URL ID(): '{}' != expected '{}'".format(
+                        obj_cmp.url_id(), obj.url_id()))
 
             # Tidy our object
             del obj_cmp
