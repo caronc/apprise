@@ -216,7 +216,7 @@ class NotifyStreamlabs(NotifyBase):
             msg = f"The streamlabs call specified ({call}) is invalid."
             self.logger.warning(msg)
             self.logger.debug(f"Socket Exception: {e!s}")
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # Store the alert_type
         # only applicable when calling /alerts
@@ -231,7 +231,7 @@ class NotifyStreamlabs(NotifyBase):
             msg = f"The streamlabs alert type specified ({call}) is invalid."
             self.logger.warning(msg)
             self.logger.debug(f"Socket Exception: {e!s}")
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # params only applicable when calling /alerts
         self.image_href = image_href

@@ -158,7 +158,7 @@ class NotifyEmby(NotifyBase):
         # Prepare our login url
         url = f"{self.schema}://{self.host}"
         if self.port:
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += "/Users/AuthenticateByName"
 
@@ -345,7 +345,7 @@ class NotifyEmby(NotifyBase):
         # Prepare our login url
         url = f"{self.schema}://{self.host}"
         if self.port:
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += "/Sessions"
 
@@ -433,7 +433,7 @@ class NotifyEmby(NotifyBase):
         # Prepare our login url
         url = f"{self.schema}://{self.host}"
         if self.port:
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += "/Sessions/Logout"
 
@@ -515,7 +515,7 @@ class NotifyEmby(NotifyBase):
 
         url = f"{self.schema}://{self.host}"
         if self.port:
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         # Append our remaining path
         url += "/Sessions/%s/Message"

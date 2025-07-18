@@ -199,7 +199,7 @@ class NotifyGotify(NotifyBase):
 
         url = f"{self.schema}://{self.host}"
         if self.port:
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         # Append our remaining path
         url += f"{self.fullpath}message"

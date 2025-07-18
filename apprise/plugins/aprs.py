@@ -286,7 +286,7 @@ class NotifyAprs(NotifyBase):
             except (TypeError, ValueError):
                 msg = f"Unsupported APRS-IS delay ({delay}) specified. "
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
         # Bump up our request_rate
         self.request_rate_per_sec += self.delay

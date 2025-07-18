@@ -279,7 +279,7 @@ class NotifyMailgun(NotifyBase):
             # Invalid region specified
             msg = f"The Mailgun region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # Get our From username (if specified)
         self.from_addr = [self.app_id, f"{self.user}@{self.host}"]
@@ -408,7 +408,9 @@ class NotifyMailgun(NotifyBase):
                 try:
                     files[f"attachment[{idx}]"] = (
                         filename,
-                        open(attachment.path, "rb"),
+                        # file handle is safely closed through this code
+                        # ignoring of SIM115 is intentional
+                        open(attachment.path, "rb"),  # noqa: SIM115
                     )
 
                 except OSError as e:

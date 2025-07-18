@@ -266,7 +266,7 @@ class NotifySynology(NotifyBase):
 
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         # Prepare our Synology API URL
         url += self.fullpath + "/webapi/entry.cgi"
@@ -353,7 +353,7 @@ class NotifySynology(NotifyBase):
 
                 # Update our fullpath to not include our token
                 results["fullpath"] = results["fullpath"][
-                    len(results["token"]) + 1 :
+                    len(results["token"]) + 1:
                 ]
 
         # Set upload/file_url if not otherwise set

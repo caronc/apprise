@@ -241,19 +241,18 @@ class NotifyRevolt(NotifyBase):
         wait = None
 
         now = datetime.now(timezone.utc).replace(tzinfo=None)
-        if self.ratelimit_remaining <= 0.0:
+        if self.ratelimit_remaining <= 0.0 and now < self.ratelimit_reset:
             # Determine how long we should wait for or if we should wait at
             # all. This isn't fool-proof because we can't be sure the client
             # time (calling this script) is completely synced up with the
             # Discord server.  One would hope we're on NTP and our clocks are
-            # the same allowing this to role smoothly:
-            if now < self.ratelimit_reset:
-                # We need to throttle for the difference in seconds
-                wait = abs(
-                    (
-                        self.ratelimit_reset - now + self.clock_skew
-                    ).total_seconds()
-                )
+            # the same allowing this to role smoothly and set our throttle
+            # accordingly
+            wait = abs(
+                (
+                    self.ratelimit_reset - now + self.clock_skew
+                ).total_seconds()
+            )
 
         # Default content response object
         content = {}

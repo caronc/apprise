@@ -208,9 +208,9 @@ class NotifyDBus(NotifyBase):
                 "default": DBusUrgency.NORMAL,
             },
             "priority": {
-                # Apprise uses 'priority' everywhere; it's just a nice consistent
-                # feel to be able to use it here as well. Just map the
-                # value back to 'priority'
+                # Apprise uses 'priority' everywhere; it's just a nice
+                # consistent feel to be able to use it here as well. Just map
+                # the value back to 'priority'
                 "alias_of": "urgency",
             },
             "x": {
@@ -284,7 +284,7 @@ class NotifyDBus(NotifyBase):
                     " invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
         else:
             self.x_axis = None
             self.y_axis = None

@@ -712,7 +712,7 @@ class NotifyBase(URLBase):
 
                 # Detect padding and prepare template
                 digits = len(str(count))
-                template = " [{:0%d}/{:0%d}]" % (digits, digits)
+                template = f" [{{:0{digits}d}}/{{:0{digits}d}}]"
 
                 # Update our counter
                 overflow_display_count_width = 4 + (digits * 2)

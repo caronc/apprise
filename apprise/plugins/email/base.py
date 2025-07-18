@@ -34,6 +34,7 @@ from email.mime.text import MIMEText
 from email.utils import formataddr, make_msgid
 import re
 import smtplib
+from typing import Optional
 
 from ...common import NotifyFormat, NotifyType
 from ...conversion import convert_between
@@ -229,7 +230,7 @@ class NotifyEmail(NotifyBase):
         super().__init__(**kwargs)
 
         # Acquire Email 'To'
-        self.targets = list()
+        self.targets = []
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -457,14 +458,13 @@ class NotifyEmail(NotifyBase):
 
         for i in range(len(templates.EMAIL_TEMPLATES)):  # pragma: no branch
             self.logger.trace(
-                "Scanning %s against %s"
-                % (from_addr, templates.EMAIL_TEMPLATES[i][0])
-            )
+                f"Scanning {from_addr} "
+                f"against {templates.EMAIL_TEMPLATES[i][0]}")
             match = templates.EMAIL_TEMPLATES[i][1].match(from_addr)
             if match:
                 self.logger.info(
-                    "Applying %s Defaults" % templates.EMAIL_TEMPLATES[i][0],
-                )
+                    f"Applying {templates.EMAIL_TEMPLATES[i][0]} Defaults")
+
                 # the secure flag can not be altered if defined in the template
                 self.secure = templates.EMAIL_TEMPLATES[i][2].get(
                     "secure", self.secure
@@ -692,7 +692,7 @@ class NotifyEmail(NotifyBase):
             # Handle our Carbon Copy Addresses
             params["cc"] = ",".join([
                 formataddr(
-                    (self.names[e] if e in self.names else False, e),
+                    (self.names.get(e, False), e),
                     # Swap comma for it's escaped url code (if detected) since
                     # we're using that as a delimiter
                     charset="utf-8",
@@ -704,7 +704,7 @@ class NotifyEmail(NotifyBase):
             # Handle our Blind Carbon Copy Addresses
             params["bcc"] = ",".join([
                 formataddr(
-                    (self.names[e] if e in self.names else False, e),
+                    (self.names.get(e, False), e),
                     # Swap comma for it's escaped url code (if detected) since
                     # we're using that as a delimiter
                     charset="utf-8",
@@ -716,8 +716,8 @@ class NotifyEmail(NotifyBase):
             # Handle our Reply-To Addresses
             params["reply"] = ",".join([
                 formataddr(
-                    (self.names[e] if e in self.names else False, e),
-                    # Swap comma for it's escaped url code (if detected) since
+                    (self.names.get(e, False), e),
+                    # Swap comma for its escaped url code (if detected) since
                     # we're using that as a delimiter
                     charset="utf-8",
                 ).replace(",", "%2C")
@@ -927,16 +927,16 @@ class NotifyEmail(NotifyBase):
         body,
         from_addr,
         to,
-        cc=set(),
-        bcc=set(),
-        reply_to=set(),
+        cc: Optional[set] = None,
+        bcc: Optional[set] = None,
+        reply_to: Optional[set] = None,
         # Providing an SMTP Host helps improve Email Message-ID
         # and avoids getting flagged as spam
         smtp_host=None,
         # Can be either 'html' or 'text'
         notify_format=NotifyFormat.HTML,
         attach=None,
-        headers=dict(),
+        headers: Optional[dict] = None,
         # Names can be a dictionary
         names=None,
         # Pretty Good Privacy Support; Pass in an
@@ -970,17 +970,28 @@ class NotifyEmail(NotifyBase):
 
                    Pass in an ApprisePGPController() if you wish to use this
         """
-
         if not to:
             # There is no one to email; we're done
             msg = "There are no Email recipients to notify"
             logger.warning(msg)
-            raise AppriseEmailException(msg)
+            raise AppriseEmailException(msg) from None
 
         elif pgp and not _pgp.PGP_SUPPORT:
             msg = "PGP Support unavailable; install PGPy library"
             logger.warning(msg)
-            raise AppriseEmailException(msg)
+            raise AppriseEmailException(msg) from None
+
+        if headers is None:
+            headers = {}
+
+        if cc is None:
+            cc = set()
+
+        if bcc is None:
+            bcc = set()
+
+        if reply_to is None:
+            reply_to = set()
 
         if not names:
             # Prepare a empty dictionary to prevent errors/warnings
@@ -999,13 +1010,13 @@ class NotifyEmail(NotifyBase):
             to_name, to_addr = emails.pop(0)
 
             # Strip target out of cc list if in To or Bcc
-            _cc = cc - bcc - set([to_addr])
+            _cc = cc - bcc - {to_addr}
 
             # Strip target out of bcc list if in To
-            _bcc = bcc - set([to_addr])
+            _bcc = bcc - {to_addr}
 
             # Strip target out of reply_to list if in To
-            _reply_to = reply_to - set([to_addr])
+            _reply_to = reply_to - {to_addr}
 
             # Format our cc addresses to support the Name field
             _cc = [
@@ -1124,8 +1135,8 @@ class NotifyEmail(NotifyBase):
                 # Store Autocrypt header (DeltaChat Support)
                 base.add_header(
                     "Autocrypt",
-                    "addr=%s; prefer-encrypt=mutual"
-                    % formataddr((False, to_addr), charset="utf-8"),
+                    f"addr={formataddr((False, to_addr), charset='utf-8')}; "
+                    "prefer-encrypt=mutual"
                 )
 
                 # Set Encryption Info Part
@@ -1159,6 +1170,6 @@ class NotifyEmail(NotifyBase):
 
             yield EmailMessage(
                 recipient=to_addr,
-                to_addrs=[to_addr] + list(_cc) + list(_bcc),
+                to_addrs=[to_addr, *list(_cc), *list(_bcc)],
                 body=base.as_string(),
             )

@@ -544,7 +544,7 @@ class NotifyNtfy(NotifyBase):
 
             notify_url = f"{schema}://{self.host}"
             if isinstance(self.port, int):
-                notify_url += ":%d" % self.port
+                notify_url += f":{self.port}"
 
         if not attach:
             headers["Content-Type"] = "application/json"

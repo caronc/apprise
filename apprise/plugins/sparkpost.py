@@ -278,7 +278,7 @@ class NotifySparkPost(NotifyBase):
             # Invalid region specified
             msg = f"The SparkPost region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # Get our From username (if specified)
         self.from_name = from_name

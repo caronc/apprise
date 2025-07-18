@@ -45,14 +45,14 @@ SCRIPTPATH=$(dirname "$SCRIPT")
 
 PYTHONPATH=""
 
-if [ -f "$(dirname $SCRIPTPATH)/setup.cfg" ]; then
+if [ -f "$(dirname $SCRIPTPATH)/pyproject.toml" ]; then
    PYTHONPATH="$(dirname $SCRIPTPATH)"
 
-elif [ -f "$SCRIPTPATH/setup.cfg" ]; then
+elif [ -f "$SCRIPTPATH/pyproject.toml" ]; then
    PYTHONPATH="$SCRIPTPATH"
 
 else
-   echo "Error: Could not locate apprise setup.cfg file."
+   echo "Error: Could not locate apprise pyproject.toml file."
    exit 1
 fi
 

@@ -302,7 +302,7 @@ class NotifyMastodon(NotifyBase):
         self.api_url = f"{self.schema}://{self.host}"
 
         if isinstance(self.port, int):
-            self.api_url += ":%d" % self.port
+            self.api_url += f":{self.port}"
 
         # Set Cache Flag
         self.cache = cache
@@ -869,7 +869,9 @@ class NotifyMastodon(NotifyBase):
             files = {
                 "file": (
                     payload.name,
-                    open(payload.path, "rb"),
+                    # file handle is safely closed in `finally`; inline open
+                    # is intentional
+                    open(payload.path, "rb"),  # noqa: SIM115
                     "application/octet-stream",
                 )
             }

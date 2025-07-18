@@ -226,7 +226,7 @@ class NotifyBurstSMS(NotifyBase):
                     " invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
         # Prepare Batch Mode Flag
         self.batch = (
@@ -343,15 +343,17 @@ class NotifyBurstSMS(NotifyBase):
 
                 else:
                     self.logger.info(
-                        "Sent Burst SMS notification to %d target(s)."
-                        % len(self.targets[index : index + batch_size])
+                        "Sent Burst SMS notification to "
+                        f"{len(self.targets[index : index + batch_size])} "
+                        "target(s)."
                     )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred sending Burst SMS "
-                    "notification to %d target(s)."
-                    % len(self.targets[index : index + batch_size])
+                    f"A Connection error occurred sending Burst SMS "
+                    "notification to "
+                    f"{len(self.targets[index : index + batch_size])} "
+                    "target(s)."
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
 

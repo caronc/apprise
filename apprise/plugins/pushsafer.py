@@ -456,7 +456,7 @@ class NotifyPushSafer(NotifyBase):
                     f"({priority}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
             # store our successfully looked up priority
             self.priority = PUSHSAFER_PRIORITY_MAP[match]
@@ -467,7 +467,7 @@ class NotifyPushSafer(NotifyBase):
         ):
             msg = f"An invalid PushSafer priority ({priority}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         #
         # Sound
@@ -507,7 +507,7 @@ class NotifyPushSafer(NotifyBase):
             if not match:
                 msg = f"An invalid PushSafer sound ({sound}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
             # store our successfully looked up sound
             self.sound = PUSHSAFER_SOUND_MAP[match]
@@ -518,7 +518,7 @@ class NotifyPushSafer(NotifyBase):
         ):
             msg = f"An invalid PushSafer sound ({sound}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         #
         # Vibration
@@ -537,14 +537,14 @@ class NotifyPushSafer(NotifyBase):
                 f"An invalid PushSafer vibration ({vibration}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         if self.vibration and self.vibration not in PUSHSAFER_VIBRATIONS:
             msg = (
                 f"An invalid PushSafer vibration ({vibration}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         #
         # Private Key (associated with project)

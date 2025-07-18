@@ -385,7 +385,7 @@ class NotifyOpsgenie(NotifyBase):
             # Invalid region specified
             msg = f"The Opsgenie region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         if action and isinstance(action, str):
             self.action = next(

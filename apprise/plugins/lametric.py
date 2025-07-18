@@ -570,7 +570,7 @@ class NotifyLametric(NotifyBase):
                     f"({app_id}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
             # Detect our Access Token
             self.lametric_app_access_token = validate_regex(

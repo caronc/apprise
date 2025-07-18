@@ -281,7 +281,7 @@ class NotifyJSON(NotifyBase):
 
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 

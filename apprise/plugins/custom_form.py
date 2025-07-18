@@ -318,7 +318,9 @@ class NotifyForm(NotifyBase):
                                 if attachment.name
                                 else f"file{no:03}.dat"
                             ),
-                            open(attachment.path, "rb"),
+                            # file handle is safely closed in `finally`; inline
+                            # open is intentional
+                            open(attachment.path, "rb"),  # noqa: SIM115
                             attachment.mimetype,
                         ),
                     ))
@@ -365,7 +367,7 @@ class NotifyForm(NotifyBase):
 
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 

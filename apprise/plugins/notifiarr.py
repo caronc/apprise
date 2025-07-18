@@ -181,7 +181,7 @@ class NotifyNotifiarr(NotifyBase):
                     f"({event}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
         # Prepare our targets
         self.targets = {

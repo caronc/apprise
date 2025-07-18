@@ -64,7 +64,7 @@ SENDGRID_HTTP_ERROR_MAP = {
     ),
     429: (
         "Too Many Requests - The number of requests you have made exceeds "
-        "SendGrid’s rate limitations."
+        "SendGrid's rate limitations."
     ),
 }
 
