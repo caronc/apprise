@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -33,38 +32,38 @@
 # 4. Assemble your Apprise URL like:
 #       bluesky://handle@you-token-here
 #
-import re
-import requests
+from datetime import datetime, timedelta, timezone
 import json
-from datetime import (datetime, timezone, timedelta)
+import re
+
+import requests
+
 from ..attachment.base import AttachBase
-from .base import NotifyBase
-from ..url import PrivacyMode
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import NotifyBase
 
 # For parsing handles
-HANDLE_HOST_PARSE_RE = re.compile(r'(?P<handle>[^.]+)\.+(?P<host>.+)$')
+HANDLE_HOST_PARSE_RE = re.compile(r"(?P<handle>[^.]+)\.+(?P<host>.+)$")
 
-IS_USER = re.compile(r'^\s*@?(?P<user>[A-Z0-9_]+)(\.+(?P<host>.+))?$', re.I)
+IS_USER = re.compile(r"^\s*@?(?P<user>[A-Z0-9_]+)(\.+(?P<host>.+))?$", re.I)
 
 
 class NotifyBlueSky(NotifyBase):
-    """
-    A wrapper for BlueSky Notifications
-    """
+    """A wrapper for BlueSky Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'BlueSky'
+    service_name = "BlueSky"
 
     # The services URL
-    service_url = 'https://bluesky.us/'
+    service_url = "https://bluesky.us/"
 
     # Protocol
-    secure_protocol = ('bsky', 'bluesky')
+    secure_protocol = ("bsky", "bluesky")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_bluesky'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_bluesky"
 
     # Support attachments
     attachment_support = True
@@ -84,7 +83,7 @@ class NotifyBlueSky(NotifyBase):
     xrpc_suffix_session = "/xrpc/com.atproto.server.createSession"
     xrpc_suffix_record = "/xrpc/com.atproto.repo.createRecord"
     xrpc_suffix_blob = "/xrpc/com.atproto.repo.uploadBlob"
-    plc_directory = 'https://plc.directory/{did}'
+    plc_directory = "https://plc.directory/{did}"
 
     # BlueSky is kind enough to return how many more requests we're allowed to
     # continue to make within it's header response as:
@@ -101,7 +100,7 @@ class NotifyBlueSky(NotifyBase):
     ratelimit_remaining = 1
 
     # The default BlueSky host to use if one isn't specified
-    bluesky_default_host = 'bsky.social'
+    bluesky_default_host = "bsky.social"
 
     # Our message body size
     body_maxlen = 280
@@ -110,60 +109,64 @@ class NotifyBlueSky(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{user}@{password}',
-    )
+    templates = ("{schema}://{user}@{password}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+                "required": True,
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
         },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-    })
+    )
 
     def __init__(self, **kwargs):
-        """
-        Initialize BlueSky Object
-        """
+        """Initialize BlueSky Object."""
         super().__init__(**kwargs)
 
         # Our access token
-        self.__access_token = self.store.get('access_token')
+        self.__access_token = self.store.get("access_token")
         self.__refresh_token = None
         self.__access_token_expiry = datetime.now(timezone.utc)
-        self.__endpoint = self.store.get('endpoint')
+        self.__endpoint = self.store.get("endpoint")
 
         if not self.user:
-            msg = 'A BlueSky UserID/Handle must be specified.'
+            msg = "A BlueSky UserID/Handle must be specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Set our default host
         self.host = self.bluesky_default_host
-        self.__endpoint = f'https://{self.host}' \
-            if not self.host else self.__endpoint
+        self.__endpoint = (
+            f"https://{self.host}" if not self.host else self.__endpoint
+        )
 
         # Identify our Handle (if define)
         results = HANDLE_HOST_PARSE_RE.match(self.user)
         if results:
-            self.user = results.group('handle').strip()
-            self.host = results.group('host').strip()
+            self.user = results.group("handle").strip()
+            self.host = results.group("host").strip()
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform BlueSky Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform BlueSky Notification."""
 
         if not self.__access_token and not self.login():
             # We failed to authenticate - we're done
@@ -173,7 +176,7 @@ class NotifyBlueSky(NotifyBase):
         blobs = []
 
         if attach and self.attachment_support:
-            url = f'{self.__endpoint}{self.xrpc_suffix_blob}'
+            url = f"{self.__endpoint}{self.xrpc_suffix_blob}"
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for no, attachment in enumerate(attach, start=1):
@@ -182,20 +185,23 @@ class NotifyBlueSky(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
-                if not re.match(r'^image/.*', attachment.mimetype, re.I):
+                if not re.match(r"^image/.*", attachment.mimetype, re.I):
                     # Only support images at this time
                     self.logger.warning(
-                        'Ignoring unsupported BlueSky attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Ignoring unsupported BlueSky attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     continue
 
                 self.logger.debug(
-                    'Preparing BlueSky attachment {}'.format(
-                        attachment.url(privacy=True)))
+                    "Preparing BlueSky attachment"
+                    f" {attachment.url(privacy=True)}"
+                )
 
                 # Upload our image and get our blob associated with it
                 postokay, response = self._fetch(
@@ -208,21 +214,23 @@ class NotifyBlueSky(NotifyBase):
                     return False
 
                 # Prepare our filename
-                filename = attachment.name \
-                    if attachment.name else f'file{no:03}.dat'
+                filename = (
+                    attachment.name if attachment.name else f"file{no:03}.dat"
+                )
 
-                if not (isinstance(response, dict)
-                        and response.get('blob')):
+                if not (isinstance(response, dict) and response.get("blob")):
                     self.logger.debug(
-                        'Could not attach the file to BlueSky: %s (mime=%s)',
-                        filename, attachment.mimetype)
+                        "Could not attach the file to BlueSky: %s (mime=%s)",
+                        filename,
+                        attachment.mimetype,
+                    )
                     continue
 
-                blobs.append((response.get('blob'), filename))
+                blobs.append((response.get("blob"), filename))
 
         # Prepare our URL
         did, endpoint = self.get_identifier()
-        url = f'{endpoint}{self.xrpc_suffix_record}'
+        url = f"{endpoint}{self.xrpc_suffix_record}"
 
         # prepare our batch of payloads to create
         payloads = []
@@ -233,10 +241,9 @@ class NotifyBlueSky(NotifyBase):
             "record": {
                 "text": body,
                 # 'YYYY-mm-ddTHH:MM:SSZ'
-                "createdAt": datetime.now(
-                    tz=timezone.utc).strftime('%FT%XZ'),
-                "$type": "app.bsky.feed.post"
-            }
+                "createdAt": datetime.now(tz=timezone.utc).strftime("%FT%XZ"),
+                "$type": "app.bsky.feed.post",
+            },
         }
 
         if blobs:
@@ -248,19 +255,17 @@ class NotifyBlueSky(NotifyBase):
                     #
                     # 1. update createdAt time
                     # 2. Change text to identify image no
-                    _payload['record']['createdAt'] = \
-                        datetime.now(tz=timezone.utc).strftime('%FT%XZ')
-                    _payload['record']['text'] = \
-                        '{:02d}/{:02d}'.format(no, len(blobs))
+                    _payload["record"]["createdAt"] = datetime.now(
+                        tz=timezone.utc
+                    ).strftime("%FT%XZ")
+                    _payload["record"]["text"] = f"{no:02d}/{len(blobs):02d}"
 
-                _payload['record']['embed'] = {
-                    "images": [
-                        {
-                            "image": blob[0],
-                            "alt": blob[1],
-                        }
-                    ],
-                    "$type": "app.bsky.embed.images"
+                _payload["record"]["embed"] = {
+                    "images": [{
+                        "image": blob[0],
+                        "alt": blob[1],
+                    }],
+                    "$type": "app.bsky.embed.images",
                 }
                 payloads.append(_payload)
         else:
@@ -283,16 +288,14 @@ class NotifyBlueSky(NotifyBase):
         return True
 
     def get_identifier(self, user=None, login=False):
-        """
-        Performs a Decentralized User Lookup and returns the identifier
-        """
+        """Performs a Decentralized User Lookup and returns the identifier."""
 
         if user is None:
             user = self.user
 
-        user = f'{user}.{self.host}' if '.' not in user else f'{user}'
-        did_key = f'did.{user}'
-        endpoint_key = f'endpoint.{user}'
+        user = f"{user}.{self.host}" if "." not in user else f"{user}"
+        did_key = f"did.{user}"
+        endpoint_key = f"endpoint.{user}"
 
         did = self.store.get(did_key)
         endpoint = self.store.get(endpoint_key)
@@ -301,24 +304,24 @@ class NotifyBlueSky(NotifyBase):
             return did, endpoint
 
         # Step 1: Acquire DID from bsky.app
-        url = f'https://public.api.bsky.app{self.xrpc_suffix_did}'
-        params = {'handle': user}
+        url = f"https://public.api.bsky.app{self.xrpc_suffix_did}"
+        params = {"handle": user}
 
         # Send Login Information
         postokay, response = self._fetch(
             url,
             params=params,
-            method='GET',
+            method="GET",
             # We set this boolean so internal recursion doesn't take place.
             login=login,
         )
 
-        if not postokay or not response or 'did' not in response:
+        if not postokay or not response or "did" not in response:
             # We failed
             return (False, False)
 
         # Store our DID
-        did = response.get('did')
+        did = response.get("did")
 
         # Step 2: Use DID to find the PDS
         if did.startswith("did:plc:"):
@@ -327,19 +330,24 @@ class NotifyBlueSky(NotifyBase):
             # PDS Query
             postokay, service_response = self._fetch(
                 pds_url,
-                method='GET',
+                method="GET",
                 # We set this boolean so internal recursion doesn't take place.
                 login=login,
             )
-            if not postokay or not service_response or \
-                    'service' not in service_response:
+            if (
+                not postokay
+                or not service_response
+                or "service" not in service_response
+            ):
                 # We failed
                 return (False, False)
 
             endpoint = next(
-                (s["serviceEndpoint"]
-                 for s in service_response.get("service", [])
-                 if s["type"] == "AtprotoPersonalDataServer"),
+                (
+                    s["serviceEndpoint"]
+                    for s in service_response.get("service", [])
+                    if s["type"] == "AtprotoPersonalDataServer"
+                ),
                 None,
             )
 
@@ -349,35 +357,40 @@ class NotifyBlueSky(NotifyBase):
             web_did_url = f"https://{domain}/.well-known/did.json"
             postokay, service_response = self._fetch(
                 web_did_url,
-                method='GET',
+                method="GET",
                 # We set this boolean so internal recursion doesn't take place.
                 login=login,
             )
-            if not postokay or not service_response or \
-                    'service' not in service_response:
+            if (
+                not postokay
+                or not service_response
+                or "service" not in service_response
+            ):
                 # We failed
                 self.logger.warning(
-                    'Could not fetch DID document for did:web identity '
-                    '{}; ensure {} is available.'.format(did, web_did_url)
+                    "Could not fetch DID document for did:web identity "
+                    f"{did}; ensure {web_did_url} is available."
                 )
                 return (False, False)
 
             endpoint = next(
-                (s["serviceEndpoint"]
-                 for s in service_response.get("service", [])
-                 if s["type"] == "AtprotoPersonalDataServer"),
+                (
+                    s["serviceEndpoint"]
+                    for s in service_response.get("service", [])
+                    if s["type"] == "AtprotoPersonalDataServer"
+                ),
                 None,
             )
 
         else:
             self.logger.warning(
-                'Unknown BlueSky DID scheme detected in {}'.format(did))
+                f"Unknown BlueSky DID scheme detected in {did}"
+            )
             return (False, False)
 
         # Step 3: Send to correct endpoint
         if not endpoint:
-            self.logger.warning(
-                'Failed to resolve BlueSky PDS endpoint')
+            self.logger.warning("Failed to resolve BlueSky PDS endpoint")
             return (False, False)
 
         self.store.set(did_key, did)
@@ -385,16 +398,14 @@ class NotifyBlueSky(NotifyBase):
         return (did, endpoint)
 
     def login(self):
-        """
-        A simple wrapper to authenticate with the BlueSky Server
-        """
+        """A simple wrapper to authenticate with the BlueSky Server."""
 
         # Acquire our Decentralized Identitifer
         did, self.__endpoint = self.get_identifier(self.user, login=True)
         if not did:
             return False
 
-        url = f'{self.__endpoint}{self.xrpc_suffix_session}'
+        url = f"{self.__endpoint}{self.xrpc_suffix_session}"
 
         payload = {
             "identifier": did,
@@ -452,50 +463,72 @@ class NotifyBlueSky(NotifyBase):
             return False
 
         # Acquire our Token
-        self.__access_token = response.get('accessJwt')
+        self.__access_token = response.get("accessJwt")
 
         # Handle other optional arguments we can use
-        self.__access_token_expiry = self.access_token_lifetime_sec + \
-            datetime.now(timezone.utc) - self.clock_skew
+        self.__access_token_expiry = (
+            self.access_token_lifetime_sec
+            + datetime.now(timezone.utc)
+            - self.clock_skew
+        )
 
         # The Refresh Token
-        self.__refresh_token = response.get('refreshJwt', self.__refresh_token)
+        self.__refresh_token = response.get("refreshJwt", self.__refresh_token)
         self.store.set(
-            'access_token', self.__access_token, self.__access_token_expiry)
+            "access_token", self.__access_token, self.__access_token_expiry
+        )
         self.store.set(
-            'refresh_token', self.__refresh_token, self.__access_token_expiry)
-        self.store.set('endpoint', self.__endpoint)
+            "refresh_token", self.__refresh_token, self.__access_token_expiry
+        )
+        self.store.set("endpoint", self.__endpoint)
 
-        self.logger.info('Authenticated to BlueSky as {}.{}'.format(
-            self.user, self.host))
+        self.logger.info(
+            f"Authenticated to BlueSky as {self.user}.{self.host}"
+        )
         return True
 
-    def _fetch(self, url, payload=None, params=None, method='POST',
-               content_type=None, login=False):
-        """
-        Wrapper to BlueSky API requests object
-        """
+    def _fetch(
+        self,
+        url,
+        payload=None,
+        params=None,
+        method="POST",
+        content_type=None,
+        login=False,
+    ):
+        """Wrapper to BlueSky API requests object."""
 
         # use what was specified, otherwise build headers dynamically
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type':
-            payload.mimetype if isinstance(payload, AttachBase) else (
-                'application/x-www-form-urlencoded; charset=utf-8'
-                if method == 'GET' else 'application/json')
+            "User-Agent": self.app_id,
+            "Content-Type": (
+                payload.mimetype
+                if isinstance(payload, AttachBase)
+                else (
+                    "application/x-www-form-urlencoded; charset=utf-8"
+                    if method == "GET"
+                    else "application/json"
+                )
+            ),
         }
 
         if self.__access_token:
             # Set our token
-            headers['Authorization'] = 'Bearer {}'.format(self.__access_token)
+            headers["Authorization"] = f"Bearer {self.__access_token}"
 
         # Some Debug Logging
-        self.logger.debug('BlueSky {} URL: {} (cert_verify={})'.format(
-            method, url, self.verify_certificate))
         self.logger.debug(
-            'BlueSky Payload: %s', str(payload)
-            if not isinstance(payload, AttachBase)
-            else 'attach: ' + payload.name)
+            f"BlueSky {method} URL:"
+            f" {url} (cert_verify={self.verify_certificate})"
+        )
+        self.logger.debug(
+            "BlueSky Payload: %s",
+            (
+                str(payload)
+                if not isinstance(payload, AttachBase)
+                else "attach: " + payload.name
+            ),
+        )
 
         # By default set wait to None
         wait = None
@@ -521,12 +554,15 @@ class NotifyBlueSky(NotifyBase):
         content = {}
 
         # acquire our request mode
-        fn = requests.post if method == 'POST' else requests.get
+        fn = requests.post if method == "POST" else requests.get
         try:
             r = fn(
                 url,
-                data=payload if not isinstance(payload, AttachBase)
-                else payload.open(),
+                data=(
+                    payload
+                    if not isinstance(payload, AttachBase)
+                    else payload.open()
+                ),
                 params=params,
                 headers=headers,
                 verify=self.verify_certificate,
@@ -550,10 +586,11 @@ class NotifyBlueSky(NotifyBase):
             # 'RateLimit-Policy': '10;w=86400' # NoEntries;w=<window>
             try:
                 # Capture rate limiting if possible
-                self.ratelimit_remaining = \
-                    int(r.headers.get('ratelimit-remaining'))
+                self.ratelimit_remaining = int(
+                    r.headers.get("ratelimit-remaining")
+                )
                 self.ratelimit_reset = datetime.fromtimestamp(
-                    int(r.headers.get('ratelimit-reset')), timezone.utc
+                    int(r.headers.get("ratelimit-reset")), timezone.utc
                 ).replace(tzinfo=None)
 
             except (TypeError, ValueError):
@@ -563,90 +600,88 @@ class NotifyBlueSky(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyBlueSky.http_response_code_lookup(r.status_code)
+                status_str = NotifyBlueSky.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send BlueSky {} to {}: '
-                    '{}error={}.'.format(
-                        method,
-                        url,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send BlueSky {} to {}: {}error={}.".format(
+                        method, url, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Mark our failure
                 return (False, content)
 
         except requests.RequestException as e:
             self.logger.warning(
-                'Exception received when sending BlueSky {} to {}: '.
-                format(method, url))
-            self.logger.debug('Socket Exception: %s' % str(e))
+                f"Exception received when sending BlueSky {method} to {url}: "
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Mark our failure
             return (False, content)
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             self.logger.warning(
-                'An I/O error occurred while handling {}.'.format(
-                    payload.name if isinstance(payload, AttachBase)
-                    else payload))
-            self.logger.debug('I/O Exception: %s' % str(e))
+                "An I/O error occurred while handling {}.".format(
+                    payload.name
+                    if isinstance(payload, AttachBase)
+                    else payload
+                )
+            )
+            self.logger.debug(f"I/O Exception: {e!s}")
             return (False, content)
 
         return (True, content)
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol[0],
-            self.user, self.password,
+            self.user,
+            self.password,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Apply our other parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         user = self.user
         if self.host != self.bluesky_default_host:
-            user += f'.{self.host}'
+            user += f".{self.host}"
 
         # our URL
-        return '{schema}://{user}@{password}?{params}'.format(
+        return "{schema}://{user}@{password}?{params}".format(
             schema=self.secure_protocol[0],
-            user=NotifyBlueSky.quote(user, safe=''),
+            user=NotifyBlueSky.quote(user, safe=""),
             password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
             params=NotifyBlueSky.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        if not results.get('password') and results['host']:
-            results['password'] = NotifyBlueSky.unquote(results['host'])
+        if not results.get("password") and results["host"]:
+            results["password"] = NotifyBlueSky.unquote(results["host"])
 
         # Do not use host field
-        results['host'] = None
+        results["host"] = None
         return results

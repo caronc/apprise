@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -28,34 +27,33 @@
 
 import syslog
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import parse_bool
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool
+from .base import NotifyBase
 
 
 class SyslogFacility:
-    """
-    All of the supported facilities
-    """
-    KERN = 'kern'
-    USER = 'user'
-    MAIL = 'mail'
-    DAEMON = 'daemon'
-    AUTH = 'auth'
-    SYSLOG = 'syslog'
-    LPR = 'lpr'
-    NEWS = 'news'
-    UUCP = 'uucp'
-    CRON = 'cron'
-    LOCAL0 = 'local0'
-    LOCAL1 = 'local1'
-    LOCAL2 = 'local2'
-    LOCAL3 = 'local3'
-    LOCAL4 = 'local4'
-    LOCAL5 = 'local5'
-    LOCAL6 = 'local6'
-    LOCAL7 = 'local7'
+    """All of the supported facilities."""
+
+    KERN = "kern"
+    USER = "user"
+    MAIL = "mail"
+    DAEMON = "daemon"
+    AUTH = "auth"
+    SYSLOG = "syslog"
+    LPR = "lpr"
+    NEWS = "news"
+    UUCP = "uucp"
+    CRON = "cron"
+    LOCAL0 = "local0"
+    LOCAL1 = "local1"
+    LOCAL2 = "local2"
+    LOCAL3 = "local3"
+    LOCAL4 = "local4"
+    LOCAL5 = "local5"
+    LOCAL6 = "local6"
+    LOCAL7 = "local7"
 
 
 SYSLOG_FACILITY_MAP = {
@@ -110,21 +108,19 @@ SYSLOG_PUBLISH_MAP = {
 
 
 class NotifySyslog(NotifyBase):
-    """
-    A wrapper for Syslog Notifications
-    """
+    """A wrapper for Syslog Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Syslog'
+    service_name = "Syslog"
 
     # The services URL
-    service_url = 'https://tools.ietf.org/html/rfc5424'
+    service_url = "https://tools.ietf.org/html/rfc5424"
 
     # The default protocol
-    protocol = 'syslog'
+    protocol = "syslog"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_syslog'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_syslog"
 
     # No URL Identifier will be defined for this service as there simply isn't
     # enough details to uniquely identify one dbus:// from another.
@@ -136,45 +132,50 @@ class NotifySyslog(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://',
-        '{schema}://{facility}',
+        "{schema}://",
+        "{schema}://{facility}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'facility': {
-            'name': _('Facility'),
-            'type': 'choice:string',
-            'values': [k for k in SYSLOG_FACILITY_MAP.keys()],
-            'default': SyslogFacility.USER,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "facility": {
+                "name": _("Facility"),
+                "type": "choice:string",
+                "values": list(SYSLOG_FACILITY_MAP),
+                "default": SyslogFacility.USER,
+            },
         },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'facility': {
-            # We map back to the same element defined in template_tokens
-            'alias_of': 'facility',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "facility": {
+                # We map back to the same element defined in template_tokens
+                "alias_of": "facility",
+            },
+            "logpid": {
+                "name": _("Log PID"),
+                "type": "bool",
+                "default": True,
+                "map_to": "log_pid",
+            },
+            "logperror": {
+                "name": _("Log to STDERR"),
+                "type": "bool",
+                "default": False,
+                "map_to": "log_perror",
+            },
         },
-        'logpid': {
-            'name': _('Log PID'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'log_pid',
-        },
-        'logperror': {
-            'name': _('Log to STDERR'),
-            'type': 'bool',
-            'default': False,
-            'map_to': 'log_perror',
-        },
-    })
+    )
 
-    def __init__(self, facility=None, log_pid=True, log_perror=False,
-                 **kwargs):
-        """
-        Initialize Syslog Object
-        """
+    def __init__(
+        self, facility=None, log_pid=True, log_perror=False, **kwargs
+    ):
+        """Initialize Syslog Object."""
         super().__init__(**kwargs)
 
         if facility:
@@ -182,14 +183,13 @@ class NotifySyslog(NotifyBase):
                 self.facility = SYSLOG_FACILITY_MAP[facility]
 
             except KeyError:
-                msg = 'An invalid syslog facility ' \
-                      '({}) was specified.'.format(facility)
+                msg = f"An invalid syslog facility ({facility}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
         else:
-            self.facility = \
-                SYSLOG_FACILITY_MAP[
-                    self.template_tokens['facility']['default']]
+            self.facility = SYSLOG_FACILITY_MAP[
+                self.template_tokens["facility"]["default"]
+            ]
 
         # Logging Options
         self.logoptions = 0
@@ -211,13 +211,12 @@ class NotifySyslog(NotifyBase):
 
         # Initialize our logging
         syslog.openlog(
-            self.app_id, logoption=self.logoptions, facility=self.facility)
+            self.app_id, logoption=self.logoptions, facility=self.facility
+        )
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Syslog Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Syslog Notification."""
 
         SYSLOG_PUBLISH_MAP = {
             NotifyType.INFO: syslog.LOG_INFO,
@@ -228,7 +227,7 @@ class NotifySyslog(NotifyBase):
 
         if title:
             # Format title
-            body = '{}: {}'.format(title, body)
+            body = f"{title}: {body}"
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -238,54 +237,51 @@ class NotifySyslog(NotifyBase):
         except KeyError:
             # An invalid notification type was specified
             self.logger.warning(
-                'An invalid notification type '
-                '({}) was specified.'.format(notify_type))
+                f"An invalid notification type ({notify_type}) was specified."
+            )
             return False
 
-        self.logger.info('Sent Syslog notification.')
+        self.logger.info("Sent Syslog notification.")
 
         return True
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'logperror': 'yes' if self.log_perror else 'no',
-            'logpid': 'yes' if self.log_pid else 'no',
+            "logperror": "yes" if self.log_perror else "no",
+            "logpid": "yes" if self.log_pid else "no",
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{facility}/?{params}'.format(
-            facility=self.template_tokens['facility']['default']
-            if self.facility not in SYSLOG_FACILITY_RMAP
-            else SYSLOG_FACILITY_RMAP[self.facility],
+        return "{schema}://{facility}/?{params}".format(
+            facility=(
+                self.template_tokens["facility"]["default"]
+                if self.facility not in SYSLOG_FACILITY_RMAP
+                else SYSLOG_FACILITY_RMAP[self.facility]
+            ),
             schema=self.protocol,
             params=NotifySyslog.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         tokens = []
-        if results['host']:
-            tokens.append(NotifySyslog.unquote(results['host']))
+        if results["host"]:
+            tokens.append(NotifySyslog.unquote(results["host"]))
 
         # Get our path values
-        tokens.extend(NotifySyslog.split_path(results['fullpath']))
+        tokens.extend(NotifySyslog.split_path(results["fullpath"]))
 
         # Initialization
         facility = None
@@ -296,8 +292,8 @@ class NotifySyslog(NotifyBase):
 
         # However if specified on the URL, that will over-ride what was
         # identified
-        if 'facility' in results['qsd'] and len(results['qsd']['facility']):
-            facility = results['qsd']['facility'].lower()
+        if "facility" in results["qsd"] and len(results["qsd"]["facility"]):
+            facility = results["qsd"]["facility"].lower()
 
         if facility and facility not in SYSLOG_FACILITY_MAP:
             # Find first match; if no match is found we set the result
@@ -305,23 +301,27 @@ class NotifySyslog(NotifyBase):
             # during the __init__() call. The benifit of doing this
             # check here is if we do have a valid match, we can support
             # short form matches like 'u' which will match against user
-            facility = next((f for f in SYSLOG_FACILITY_MAP.keys()
-                             if f.startswith(facility)), facility)
+            facility = next(
+                (f for f in SYSLOG_FACILITY_MAP if f.startswith(facility)),
+                facility,
+            )
 
         # Save facility if set
         if facility:
-            results['facility'] = facility
+            results["facility"] = facility
 
         # Include PID as part of the message logged
-        results['log_pid'] = parse_bool(
-            results['qsd'].get(
-                'logpid',
-                NotifySyslog.template_args['logpid']['default']))
+        results["log_pid"] = parse_bool(
+            results["qsd"].get(
+                "logpid", NotifySyslog.template_args["logpid"]["default"]
+            )
+        )
 
         # Print to stderr as well.
-        results['log_perror'] = parse_bool(
-            results['qsd'].get(
-                'logperror',
-                NotifySyslog.template_args['logperror']['default']))
+        results["log_perror"] = parse_bool(
+            results["qsd"].get(
+                "logperror", NotifySyslog.template_args["logperror"]["default"]
+            )
+        )
 
         return results

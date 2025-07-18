@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -35,64 +34,65 @@
 # This provider does not accept +1 (for example) as a country code. You need
 # to specify 001 instead.
 #
-import requests
 from json import loads
 
-from .base import NotifyBase
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from .base import NotifyBase
 
 # Extend HTTP Error Messages
 # Based on https://kavenegar.com/rest.html
 KAVENEGAR_HTTP_ERROR_MAP = {
-    200: 'The request was approved',
-    400: 'Parameters are incomplete',
-    401: 'Account has been disabled',
-    402: 'The operation failed',
-    403: 'The API Key is invalid',
-    404: 'The method is unknown',
-    405: 'The GET/POST request is wrong',
-    406: 'Invalid mandatory parameters sent',
-    407: 'You canot access the information you want',
-    409: 'The server is unable to response',
-    411: 'The recipient is invalid',
-    412: 'The sender is invalid',
-    413: 'Message empty or message length exceeded',
-    414: 'The number of recipients is more than 200',
-    415: 'The start index is larger then the total',
-    416: 'The source IP of the service does not match the settings',
-    417: 'The submission date is incorrect, '
-         'either expired or not in the correct format',
-    418: 'Your account credit is insufficient',
-    422: 'Data cannot be processed due to invalid characters',
-    501: 'SMS can only be sent to the account holder number',
+    200: "The request was approved",
+    400: "Parameters are incomplete",
+    401: "Account has been disabled",
+    402: "The operation failed",
+    403: "The API Key is invalid",
+    404: "The method is unknown",
+    405: "The GET/POST request is wrong",
+    406: "Invalid mandatory parameters sent",
+    407: "You canot access the information you want",
+    409: "The server is unable to response",
+    411: "The recipient is invalid",
+    412: "The sender is invalid",
+    413: "Message empty or message length exceeded",
+    414: "The number of recipients is more than 200",
+    415: "The start index is larger then the total",
+    416: "The source IP of the service does not match the settings",
+    417: (
+        "The submission date is incorrect, "
+        "either expired or not in the correct format"
+    ),
+    418: "Your account credit is insufficient",
+    422: "Data cannot be processed due to invalid characters",
+    501: "SMS can only be sent to the account holder number",
 }
 
 
 class NotifyKavenegar(NotifyBase):
-    """
-    A wrapper for Kavenegar Notifications
-    """
+    """A wrapper for Kavenegar Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Kavenegar'
+    service_name = "Kavenegar"
 
     # The services URL
-    service_url = 'https://kavenegar.com/'
+    service_url = "https://kavenegar.com/"
 
     # All notification requests are secure
-    secure_protocol = 'kavenegar'
+    secure_protocol = "kavenegar"
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_kavenegar'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_kavenegar"
 
     # Kavenegar single notification URL
-    notify_url = 'http://api.kavenegar.com/v1/{apikey}/sms/send.json'
+    notify_url = "http://api.kavenegar.com/v1/{apikey}/sms/send.json"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -103,61 +103,65 @@ class NotifyKavenegar(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{apikey}/{targets}',
-        '{schema}://{source}@{apikey}/{targets}',
+        "{schema}://{apikey}/{targets}",
+        "{schema}://{source}@{apikey}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[a-z0-9]+$", "i"),
+            },
+            "source": {
+                "name": _("Source Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'source': {
-            'name': _('Source Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "alias_of": "source",
+            },
         },
-        'from': {
-            'alias_of': 'source',
-        },
-    })
+    )
 
     def __init__(self, apikey, source=None, targets=None, **kwargs):
-        """
-        Initialize Kavenegar Object
-        """
+        """Initialize Kavenegar Object."""
         super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'An invalid Kavenegar API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid Kavenegar API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -165,40 +169,36 @@ class NotifyKavenegar(NotifyBase):
         if source is not None:
             result = is_phone_no(source)
             if not result:
-                msg = 'The Kavenegar source specified ({}) is invalid.'\
-                    .format(source)
+                msg = f"The Kavenegar source specified ({source}) is invalid."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             # Store our source
-            self.source = result['full']
+            self.source = result["full"]
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
 
             # store valid phone number
-            self.targets.append(result['full'])
+            self.targets.append(result["full"])
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Sends SMS Message
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Sends SMS Message."""
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no Kavenegar targets to notify.')
+            self.logger.warning("There were no Kavenegar targets to notify.")
             return False
 
         # error tracking (used for function return)
@@ -206,8 +206,8 @@ class NotifyKavenegar(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Accept': 'application/json',
+            "User-Agent": self.app_id,
+            "Accept": "application/json",
         }
 
         # Our URL
@@ -222,19 +222,20 @@ class NotifyKavenegar(NotifyBase):
 
             # Prepare our payload
             payload = {
-                'receptor': target,
-                'message': body,
+                "receptor": target,
+                "message": body,
             }
 
             if self.source:
                 # Only set source if specified
-                payload['sender'] = self.source
+                payload["sender"] = self.source
 
             # Some Debug Logging
             self.logger.debug(
-                'Kavenegar POST URL: {} (cert_verify={})'.format(
-                    url, self.verify_certificate))
-            self.logger.debug('Kavenegar Payload: {}' .format(payload))
+                "Kavenegar POST URL:"
+                f" {url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"Kavenegar Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -248,16 +249,18 @@ class NotifyKavenegar(NotifyBase):
                 )
 
                 if r.status_code not in (
-                        requests.codes.created, requests.codes.ok):
+                    requests.codes.created,
+                    requests.codes.ok,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(
-                            r.status_code, KAVENEGAR_HTTP_ERROR_MAP)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code, KAVENEGAR_HTTP_ERROR_MAP
+                    )
 
                     try:
                         # Update our status response if we can
                         json_response = loads(r.content)
-                        status_str = json_response.get('message', status_str)
+                        status_str = json_response.get("message", status_str)
 
                     except (AttributeError, TypeError, ValueError):
                         # ValueError = r.content is Unparsable
@@ -269,15 +272,16 @@ class NotifyKavenegar(NotifyBase):
                         pass
 
                     self.logger.warning(
-                        'Failed to send Kavenegar SMS notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Kavenegar SMS notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -285,17 +289,19 @@ class NotifyKavenegar(NotifyBase):
 
                 # If we reach here; the message was sent
                 self.logger.info(
-                    'Sent Kavenegar SMS notification to {}.'.format(target))
+                    f"Sent Kavenegar SMS notification to {target}."
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Kavenegar:%s ' % (
-                        ', '.join(self.targets)) + 'notification.'
+                    "A Connection error occurred sending Kavenegar:{} ".format(
+                        ", ".join(self.targets)
+                    )
+                    + "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
                 # Mark our failure
                 has_error = True
                 continue
@@ -304,66 +310,61 @@ class NotifyKavenegar(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.source, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{source}{apikey}/{targets}?{params}'.format(
+        return "{schema}://{source}{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
-            source='' if not self.source else '{}@'.format(self.source),
-            apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='/'.join(
-                [NotifyKavenegar.quote(x, safe='') for x in self.targets]),
-            params=NotifyKavenegar.urlencode(params))
+            source="" if not self.source else f"{self.source}@",
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets="/".join(
+                [NotifyKavenegar.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifyKavenegar.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.targets)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # Store the source if specified
-        if results.get('user', None):
-            results['source'] = results['user']
+        if results.get("user", None):
+            results["source"] = results["user"]
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = NotifyKavenegar.split_path(results['fullpath'])
+        results["targets"] = NotifyKavenegar.split_path(results["fullpath"])
 
         # The hostname is our authentication key
-        results['apikey'] = NotifyKavenegar.unquote(results['host'])
+        results["apikey"] = NotifyKavenegar.unquote(results["host"])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyKavenegar.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyKavenegar.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifyKavenegar.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifyKavenegar.unquote(results["qsd"]["from"])
 
         return results

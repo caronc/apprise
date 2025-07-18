@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -42,70 +41,69 @@
 # as well.
 
 import re
+
 import requests
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import parse_bool, validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool, validate_regex
+from .base import NotifyBase
 
 
 class NotificoFormat:
     # Resets all formatting
-    Reset = '\x0F'
+    Reset = "\x0f"
 
     # Formatting
-    Bold = '\x02'
-    Italic = '\x1D'
-    Underline = '\x1F'
-    BGSwap = '\x16'
+    Bold = "\x02"
+    Italic = "\x1d"
+    Underline = "\x1f"
+    BGSwap = "\x16"
 
 
 class NotificoColor:
     # Resets Color
-    Reset = '\x03'
+    Reset = "\x03"
 
     # Colors
-    White = '\x0300'
-    Black = '\x0301'
-    Blue = '\x0302'
-    Green = '\x0303'
-    Red = '\x0304'
-    Brown = '\x0305'
-    Purple = '\x0306'
-    Orange = '\x0307'
-    Yellow = '\x0308',
-    LightGreen = '\x0309'
-    Teal = '\x0310'
-    LightCyan = '\x0311'
-    LightBlue = '\x0312'
-    Violet = '\x0313'
-    Grey = '\x0314'
-    LightGrey = '\x0315'
+    White = "\x0300"
+    Black = "\x0301"
+    Blue = "\x0302"
+    Green = "\x0303"
+    Red = "\x0304"
+    Brown = "\x0305"
+    Purple = "\x0306"
+    Orange = "\x0307"
+    Yellow = ("\x0308",)
+    LightGreen = "\x0309"
+    Teal = "\x0310"
+    LightCyan = "\x0311"
+    LightBlue = "\x0312"
+    Violet = "\x0313"
+    Grey = "\x0314"
+    LightGrey = "\x0315"
 
 
 class NotifyNotifico(NotifyBase):
-    """
-    A wrapper for Notifico Notifications
-    """
+    """A wrapper for Notifico Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Notifico'
+    service_name = "Notifico"
 
     # The services URL
-    service_url = 'https://n.tkte.ch'
+    service_url = "https://n.tkte.ch"
 
     # The default protocol
-    protocol = 'notifico'
+    protocol = "notifico"
 
     # The default secure protocol
-    secure_protocol = 'notifico'
+    secure_protocol = "notifico"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_notifico'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_notifico"
 
     # Plain Text Notification URL
-    notify_url = 'https://n.tkte.ch/h/{proj}/{hook}'
+    notify_url = "https://n.tkte.ch/h/{proj}/{hook}"
 
     # The title is not used
     title_maxlen = 0
@@ -114,71 +112,75 @@ class NotifyNotifico(NotifyBase):
     body_maxlen = 512
 
     # Define object templates
-    templates = (
-        '{schema}://{project_id}/{msghook}',
+    templates = ("{schema}://{project_id}/{msghook}",)
+
+    # Define our template arguments
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            # The Project ID is found as the first part of the URL
+            #  /1234/........................
+            "project_id": {
+                "name": _("Project ID"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[0-9]+$", ""),
+            },
+            # The Message Hook follows the Project ID
+            #  /..../AbCdEfGhIjKlMnOpQrStUvWX
+            "msghook": {
+                "name": _("Message Hook"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[a-z0-9]+$", "i"),
+            },
+        },
     )
 
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        # The Project ID is found as the first part of the URL
-        #  /1234/........................
-        'project_id': {
-            'name': _('Project ID'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-            'regex': (r'^[0-9]+$', ''),
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            # You can optionally pass IRC colors into
+            "color": {
+                "name": _("IRC Colors"),
+                "type": "bool",
+                "default": True,
+            },
+            # You can optionally pass IRC color into
+            "prefix": {
+                "name": _("Prefix"),
+                "type": "bool",
+                "default": True,
+            },
         },
-        # The Message Hook follows the Project ID
-        #  /..../AbCdEfGhIjKlMnOpQrStUvWX
-        'msghook': {
-            'name': _('Message Hook'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
-        },
-    })
+    )
 
-    # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        # You can optionally pass IRC colors into
-        'color': {
-            'name': _('IRC Colors'),
-            'type': 'bool',
-            'default': True,
-        },
-
-        # You can optionally pass IRC color into
-        'prefix': {
-            'name': _('Prefix'),
-            'type': 'bool',
-            'default': True,
-        },
-    })
-
-    def __init__(self, project_id, msghook, color=True, prefix=True,
-                 **kwargs):
-        """
-        Initialize Notifico Object
-        """
+    def __init__(self, project_id, msghook, color=True, prefix=True, **kwargs):
+        """Initialize Notifico Object."""
         super().__init__(**kwargs)
 
         # Assign our message hook
         self.project_id = validate_regex(
-            project_id, *self.template_tokens['project_id']['regex'])
+            project_id, *self.template_tokens["project_id"]["regex"]
+        )
         if not self.project_id:
-            msg = 'An invalid Notifico Project ID ' \
-                  '({}) was specified.'.format(project_id)
+            msg = (
+                f"An invalid Notifico Project ID ({project_id}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Assign our message hook
         self.msghook = validate_regex(
-            msghook, *self.template_tokens['msghook']['regex'])
+            msghook, *self.template_tokens["msghook"]["regex"]
+        )
         if not self.msghook:
-            msg = 'An invalid Notifico Message Token ' \
-                  '({}) was specified.'.format(msghook)
+            msg = (
+                f"An invalid Notifico Message Token ({msghook}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -198,97 +200,98 @@ class NotifyNotifico(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.project_id, self.msghook)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'color': 'yes' if self.color else 'no',
-            'prefix': 'yes' if self.prefix else 'no',
+            "color": "yes" if self.color else "no",
+            "prefix": "yes" if self.prefix else "no",
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{proj}/{hook}/?{params}'.format(
+        return "{schema}://{proj}/{hook}/?{params}".format(
             schema=self.secure_protocol,
-            proj=self.pprint(self.project_id, privacy, safe=''),
-            hook=self.pprint(self.msghook, privacy, safe=''),
+            proj=self.pprint(self.project_id, privacy, safe=""),
+            hook=self.pprint(self.msghook, privacy, safe=""),
             params=NotifyNotifico.urlencode(params),
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        wrapper to _send since we can alert more then one channel
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Wrapper to _send since we can alert more then one channel."""
 
         # prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
         }
 
         # Prepare our IRC Prefix
-        color = ''
-        token = ''
+        color = ""
+        token = ""
         if notify_type == NotifyType.INFO:
             color = NotificoColor.Teal
-            token = 'i'
+            token = "i"
 
         elif notify_type == NotifyType.SUCCESS:
             color = NotificoColor.LightGreen
-            token = '✔'
+            token = "✔"
 
         elif notify_type == NotifyType.WARNING:
             color = NotificoColor.Orange
-            token = '!'
+            token = "!"
 
         elif notify_type == NotifyType.FAILURE:
             color = NotificoColor.Red
-            token = '✗'
+            token = "✗"
 
         if self.color:
             # Colors were specified, make sure we capture and correctly
             # allow them to exist inline in the message
             # \g<1> is less ambiguous than \1
-            body = re.sub(r'\\x03(\d{0,2})', r'\\x03\g<1>', body)
+            body = re.sub(r"\\x03(\d{0,2})", r"\\x03\g<1>", body)
 
         else:
             # no colors specified, make sure we strip out any colors found
             # to make the string read-able
-            body = re.sub(r'\\x03(\d{1,2}(,[0-9]{1,2})?)?', r'', body)
+            body = re.sub(r"\\x03(\d{1,2}(,[0-9]{1,2})?)?", r"", body)
 
         # Prepare our payload
         payload = {
-            'payload': body if not self.prefix
-            else '{}[{}]{} {}{}{}: {}{}'.format(
-                # Token [?] at the head
-                color if self.color else '',
-                token,
-                NotificoColor.Reset if self.color else '',
-                # App ID
-                NotificoFormat.Bold if self.color else '',
-                self.app_id,
-                NotificoFormat.Reset if self.color else '',
-                # Message Body
-                body,
-                # Reset
-                NotificoFormat.Reset if self.color else '',
+            "payload": (
+                body
+                if not self.prefix
+                else "{}[{}]{} {}{}{}: {}{}".format(
+                    # Token [?] at the head
+                    color if self.color else "",
+                    token,
+                    NotificoColor.Reset if self.color else "",
+                    # App ID
+                    NotificoFormat.Bold if self.color else "",
+                    self.app_id,
+                    NotificoFormat.Reset if self.color else "",
+                    # Message Body
+                    body,
+                    # Reset
+                    NotificoFormat.Reset if self.color else "",
+                )
             ),
         }
 
-        self.logger.debug('Notifico GET URL: %s (cert_verify=%r)' % (
-            self.api_url, self.verify_certificate))
-        self.logger.debug('Notifico Payload: %s' % str(payload))
+        self.logger.debug(
+            "Notifico GET URL:"
+            f" {self.api_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Notifico Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -303,29 +306,30 @@ class NotifyNotifico(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyNotifico.http_response_code_lookup(r.status_code)
+                status_str = NotifyNotifico.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Notifico notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Notifico notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Notifico notification.')
+                self.logger.info("Sent Notifico notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Notifico '
-                'notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Notifico notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -334,11 +338,8 @@ class NotifyNotifico(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -346,23 +347,22 @@ class NotifyNotifico(NotifyBase):
             return results
 
         # The first token is stored in the hostname
-        results['project_id'] = NotifyNotifico.unquote(results['host'])
+        results["project_id"] = NotifyNotifico.unquote(results["host"])
 
         # Get Message Hook
         try:
-            results['msghook'] = NotifyNotifico.split_path(
-                results['fullpath'])[0]
+            results["msghook"] = NotifyNotifico.split_path(
+                results["fullpath"]
+            )[0]
 
         except IndexError:
-            results['msghook'] = None
+            results["msghook"] = None
 
         # Include Color
-        results['color'] = \
-            parse_bool(results['qsd'].get('color', True))
+        results["color"] = parse_bool(results["qsd"].get("color", True))
 
         # Include Prefix
-        results['prefix'] = \
-            parse_bool(results['qsd'].get('prefix', True))
+        results["prefix"] = parse_bool(results["qsd"].get("prefix", True))
 
         return results
 
@@ -373,18 +373,26 @@ class NotifyNotifico(NotifyBase):
         """
 
         result = re.match(
-            r'^https?://n\.tkte\.ch/h/'
-            r'(?P<proj>[0-9]+)/'
-            r'(?P<hook>[A-Z0-9]+)/?'
-            r'(?P<params>\?.+)?$', url, re.I)
+            r"^https?://n\.tkte\.ch/h/"
+            r"(?P<proj>[0-9]+)/"
+            r"(?P<hook>[A-Z0-9]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
             return NotifyNotifico.parse_url(
-                '{schema}://{proj}/{hook}/{params}'.format(
+                "{schema}://{proj}/{hook}/{params}".format(
                     schema=NotifyNotifico.secure_protocol,
-                    proj=result.group('proj'),
-                    hook=result.group('hook'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                    proj=result.group("proj"),
+                    hook=result.group("hook"),
+                    params=(
+                        ""
+                        if not result.group("params")
+                        else result.group("params")
+                    ),
+                )
+            )
 
         return None

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,36 +25,32 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
 import os
-from .base import ConfigBase
-from ..utils.disk import path_decode
-from ..common import ConfigFormat
-from ..common import ContentIncludeMode
+import re
+
+from ..common import ConfigFormat, ContentIncludeMode
 from ..locale import gettext_lazy as _
+from ..utils.disk import path_decode
+from .base import ConfigBase
 
 
 class ConfigFile(ConfigBase):
-    """
-    A wrapper for File based configuration sources
-    """
+    """A wrapper for File based configuration sources."""
 
     # The default descriptive name associated with the service
-    service_name = _('Local File')
+    service_name = _("Local File")
 
     # The default protocol
-    protocol = 'file'
+    protocol = "file"
 
     # Configuration file inclusion can only be of the same type
     allow_cross_includes = ContentIncludeMode.STRICT
 
     def __init__(self, path, **kwargs):
-        """
-        Initialize File Object
+        """Initialize File Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
@@ -71,61 +66,60 @@ class ConfigFile(ConfigBase):
         return
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Prepare our cache value
         if isinstance(self.cache, bool) or not self.cache:
-            cache = 'yes' if self.cache else 'no'
+            cache = "yes" if self.cache else "no"
 
         else:
             cache = int(self.cache)
 
         # Define any URL parameters
         params = {
-            'encoding': self.encoding,
-            'cache': cache,
+            "encoding": self.encoding,
+            "cache": cache,
         }
 
         if self.config_format:
             # A format was enforced; make sure it's passed back with the url
-            params['format'] = self.config_format
+            params["format"] = self.config_format
 
-        return 'file://{path}{params}'.format(
+        return "file://{path}{params}".format(
             path=self.quote(self.__original_path),
-            params='?{}'.format(self.urlencode(params)) if params else '',
+            params=f"?{self.urlencode(params)}" if params else "",
         )
 
     def read(self, **kwargs):
-        """
-        Perform retrieval of the configuration based on the specified request
-        """
+        """Perform retrieval of the configuration based on the specified
+        request."""
 
         response = None
 
         try:
-            if self.max_buffer_size > 0 and \
-                    os.path.getsize(self.path) > self.max_buffer_size:
+            if (
+                self.max_buffer_size > 0
+                and os.path.getsize(self.path) > self.max_buffer_size
+            ):
 
                 # Content exceeds maximum buffer size
                 self.logger.error(
-                    'File size exceeds maximum allowable buffer length'
-                    ' ({}KB).'.format(int(self.max_buffer_size / 1024)))
+                    "File size exceeds maximum allowable buffer length"
+                    f" ({int(self.max_buffer_size / 1024)}KB)."
+                )
                 return None
 
         except OSError:
             # getsize() can throw this acception if the file is missing
             # and or simply isn't accessible
-            self.logger.error(
-                'File is not accessible: {}'.format(self.path))
+            self.logger.error(f"File is not accessible: {self.path}")
             return None
 
         # Always call throttle before any server i/o is made
         self.throttle()
 
         try:
-            with open(self.path, "rt", encoding=self.encoding) as f:
+            with open(self.path, encoding=self.encoding) as f:
                 # Store our content for parsing
                 response = f.read()
 
@@ -135,24 +129,26 @@ class ConfigFile(ConfigBase):
             # understand the encoding of..
 
             self.logger.error(
-                'File not using expected encoding ({}) : {}'.format(
-                    self.encoding, self.path))
+                f"File not using expected encoding ({self.encoding}) :"
+                f" {self.path}"
+            )
             return None
 
-        except (IOError, OSError):
+        except OSError:
             # IOError is present for backwards compatibility with Python
             # versions older then 3.3.  >= 3.3 throw OSError now.
 
             # Could not open and/or read the file; this is not a problem since
             # we scan a lot of default paths.
-            self.logger.error(
-                'File can not be opened for read: {}'.format(self.path))
+            self.logger.error(f"File can not be opened for read: {self.path}")
             return None
 
         # Detect config format based on file extension if it isn't already
         # enforced
-        if self.config_format is None and \
-                re.match(r'^.*\.ya?ml\s*$', self.path, re.I) is not None:
+        if (
+            self.config_format is None
+            and re.match(r"^.*\.ya?ml\s*$", self.path, re.I) is not None
+        ):
 
             # YAML Filename Detected
             self.default_config_format = ConfigFormat.YAML
@@ -162,20 +158,17 @@ class ConfigFile(ConfigBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL so that we can handle all different file paths
-        and return it as our path object
-
-        """
+        """Parses the URL so that we can handle all different file paths and
+        return it as our path object."""
 
         results = ConfigBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early; it's not a good URL
             return results
 
-        match = re.match(r'[a-z0-9]+://(?P<path>[^?]+)(\?.*)?', url, re.I)
+        match = re.match(r"[a-z0-9]+://(?P<path>[^?]+)(\?.*)?", url, re.I)
         if not match:
             return None
 
-        results['path'] = ConfigFile.unquote(match.group('path'))
+        results["path"] = ConfigFile.unquote(match.group("path"))
         return results

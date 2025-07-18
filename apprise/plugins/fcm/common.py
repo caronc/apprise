@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,10 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+
 class FCMMode:
-    """
-    Define the Firebase Cloud Messaging Modes
-    """
+    """Define the Firebase Cloud Messaging Modes."""
+
     # The legacy way of sending a message
     Legacy = "legacy"
 

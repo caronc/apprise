@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -28,7 +27,4 @@
 
 from .notify import notify
 
-
-__all__ = [
-    'notify'
-]
+__all__ = ["notify"]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,14 +26,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Used for testing
-from .base import ConfigBase
 from ..manager_config import ConfigurationManager
+from .base import ConfigBase
 
 # Initalize our Config Manager Singleton
 C_MGR = ConfigurationManager()
 
 __all__ = [
     # Reference
-    'ConfigBase',
-    'ConfigurationManager',
+    "ConfigBase",
+    "ConfigurationManager",
 ]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -34,34 +33,36 @@
 # https://firebase.google.com/docs/reference/fcm/rest/v1/\
 #       projects.messages#androidnotification
 import re
-from ...utils.parse import parse_bool
-from ...common import NotifyType
+
 from ...asset import AppriseAsset
+from ...common import NotifyType
+from ...utils.parse import parse_bool
 
 
 class FCMColorManager:
-    """
-    A Simple object to accept either a boolean value
-      - True: Use colors provided by Apprise
-      - False: Do not use colors at all
-      - rrggbb: where you provide the rgb values (hence #333333)
-      - rgb: is also accepted as rgb values (hence #333)
+    """A Simple object to accept either a boolean value.
 
-      For RGB colors, the hashtag is optional
+    - True: Use colors provided by Apprise
+    - False: Do not use colors at all
+    - rrggbb: where you provide the rgb values (hence #333333)
+    - rgb: is also accepted as rgb values (hence #333)
+
+    For RGB colors, the hashtag is optional
     """
 
     __color_rgb = re.compile(
-        r'#?((?P<r1>[0-9A-F]{2})(?P<g1>[0-9A-F]{2})(?P<b1>[0-9A-F]{2})'
-        r'|(?P<r2>[0-9A-F])(?P<g2>[0-9A-F])(?P<b2>[0-9A-F]))', re.IGNORECASE)
+        r"#?((?P<r1>[0-9A-F]{2})(?P<g1>[0-9A-F]{2})(?P<b1>[0-9A-F]{2})"
+        r"|(?P<r2>[0-9A-F])(?P<g2>[0-9A-F])(?P<b2>[0-9A-F]))",
+        re.IGNORECASE,
+    )
 
     def __init__(self, color, asset=None):
-        """
-        Parses the color object accordingly
-        """
+        """Parses the color object accordingly."""
 
         # Initialize an asset object if one isn't otherwise defined
-        self.asset = asset \
-            if isinstance(asset, AppriseAsset) else AppriseAsset()
+        self.asset = (
+            asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        )
 
         # Prepare our color
         self.color = color
@@ -69,27 +70,29 @@ class FCMColorManager:
             self.color = self.__color_rgb.match(color)
             if self.color:
                 # Store our RGB value as #rrggbb
-                self.color = '{red}{green}{blue}'.format(
-                    red=self.color.group('r1'),
-                    green=self.color.group('g1'),
-                    blue=self.color.group('b1')).lower() \
-                    if self.color.group('r1') else \
-                    '{red1}{red2}{green1}{green2}{blue1}{blue2}'.format(
-                    red1=self.color.group('r2'),
-                    red2=self.color.group('r2'),
-                    green1=self.color.group('g2'),
-                    green2=self.color.group('g2'),
-                    blue1=self.color.group('b2'),
-                    blue2=self.color.group('b2')).lower()
+                self.color = (
+                    "{red}{green}{blue}".format(
+                        red=self.color.group("r1"),
+                        green=self.color.group("g1"),
+                        blue=self.color.group("b1"),
+                    ).lower()
+                    if self.color.group("r1")
+                    else "{red1}{red2}{green1}{green2}{blue1}{blue2}".format(
+                        red1=self.color.group("r2"),
+                        red2=self.color.group("r2"),
+                        green1=self.color.group("g2"),
+                        green2=self.color.group("g2"),
+                        blue1=self.color.group("b2"),
+                        blue2=self.color.group("b2"),
+                    ).lower()
+                )
 
         if self.color is None:
             # Color not determined, so base it on boolean parser
             self.color = parse_bool(color)
 
     def get(self, notify_type=NotifyType.INFO):
-        """
-        Returns color or true/false value based on configuration
-        """
+        """Returns color or true/false value based on configuration."""
 
         if isinstance(self.color, bool) and self.color:
             # We want to use the asset value
@@ -97,25 +100,22 @@ class FCMColorManager:
 
         elif self.color:
             # return our color as is
-            return '#' + self.color
+            return "#" + self.color
 
         # No color to return
         return None
 
     def __str__(self):
-        """
-        our color representation
-        """
+        """Our color representation."""
         if isinstance(self.color, bool):
-            return 'yes' if self.color else 'no'
+            return "yes" if self.color else "no"
 
         # otherwise return our color
         return self.color
 
     def __bool__(self):
-        """
-        Allows this object to be wrapped in an 'if statement'.
+        """Allows this object to be wrapped in an 'if statement'.
+
         True is returned if a color was loaded
         """
-        return True if self.color is True or \
-            isinstance(self.color, str) else False
+        return bool(self.color is True or isinstance(self.color, str))

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -35,17 +34,21 @@
 #    2. Generate an API key in web administration.
 
 import requests
-from .base import NotifyBase
+
 from ..common import NotifyType
-from ..utils.parse import (
-    is_phone_no, parse_phone_no, parse_bool, validate_regex)
 from ..locale import gettext_lazy as _
+from ..utils.parse import (
+    is_phone_no,
+    parse_bool,
+    parse_phone_no,
+    validate_regex,
+)
+from .base import NotifyBase
 
 
-class SMSManagerGateway(object):
-    """
-    The different gateway values
-    """
+class SMSManagerGateway:
+    """The different gateway values."""
+
     HIGH = "high"
     ECONOMY = "economy"
     LOW = "low"
@@ -62,24 +65,25 @@ SMS_MANAGER_GATEWAYS = (
 
 
 class NotifySMSManager(NotifyBase):
-    """
-    A wrapper for SMS Manager Notifications
-    """
+    """A wrapper for SMS Manager Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'SMS Manager'
+    service_name = "SMS Manager"
 
     # The services URL
-    service_url = 'https://smsmanager.cz'
+    service_url = "https://smsmanager.cz"
 
     # All notification requests are secure
-    secure_protocol = ('smsmgr', 'smsmanager',)
+    secure_protocol = (
+        "smsmgr",
+        "smsmanager",
+    )
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sms_manager'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sms_manager"
 
     # SMS Manager uses the http protocol with JSON requests
-    notify_url = 'https://http-api.smsmanager.cz/Send'
+    notify_url = "https://http-api.smsmanager.cz/Send"
 
     # The maximum amount of texts that can go out in one batch
     default_batch_size = 4000
@@ -92,92 +96,107 @@ class NotifySMSManager(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{apikey}@{targets}',
-    )
+    templates = ("{schema}://{apikey}@{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'key': {
-            'alias_of': 'apikey',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "key": {
+                "alias_of": "apikey",
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "name": _("From Phone No"),
+                "type": "string",
+                "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
+                "map_to": "sender",
+            },
+            "sender": {
+                "alias_of": "from",
+            },
+            "gateway": {
+                "name": _("Gateway"),
+                "type": "choice:string",
+                "values": SMS_MANAGER_GATEWAYS,
+                "default": SMS_MANAGER_GATEWAYS[0],
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
         },
-        'to': {
-            'alias_of': 'targets',
-        },
-        'from': {
-            'name': _('From Phone No'),
-            'type': 'string',
-            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
-            'map_to': 'sender',
-        },
-        'sender': {
-            'alias_of': 'from',
-        },
-        'gateway': {
-            'name': _('Gateway'),
-            'type': 'choice:string',
-            'values': SMS_MANAGER_GATEWAYS,
-            'default': SMS_MANAGER_GATEWAYS[0],
-        },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-    })
+    )
 
-    def __init__(self, apikey=None, sender=None, targets=None, batch=None,
-                 gateway=None, **kwargs):
-        """
-        Initialize SMS Manager Object
-        """
-        super(NotifySMSManager, self).__init__(**kwargs)
+    def __init__(
+        self,
+        apikey=None,
+        sender=None,
+        targets=None,
+        batch=None,
+        gateway=None,
+        **kwargs,
+    ):
+        """Initialize SMS Manager Object."""
+        super().__init__(**kwargs)
 
         self.apikey = validate_regex(apikey)
         if not self.apikey:
-            msg = 'An invalid API Key ({}) was specified.'.format(apikey)
+            msg = f"An invalid API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Setup our gateway
-        self.gateway = self.template_args['gateway']['default'] \
-            if not isinstance(gateway, str) else gateway.lower()
+        self.gateway = (
+            self.template_args["gateway"]["default"]
+            if not isinstance(gateway, str)
+            else gateway.lower()
+        )
         if self.gateway not in SMS_MANAGER_GATEWAYS:
-            msg = 'The Gateway specified ({}) is invalid.'.format(gateway)
+            msg = f"The Gateway specified ({gateway}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Define whether or not we should operate in a batch mode
-        self.batch = self.template_args['batch']['default'] \
-            if batch is None else bool(batch)
+        self.batch = (
+            self.template_args["batch"]["default"]
+            if batch is None
+            else bool(batch)
+        )
 
         # Maximum 11 characters and must be approved by administrators of site
         self.sender = sender[0:11] if isinstance(sender, str) else None
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Parse each phone number we found
@@ -187,24 +206,24 @@ class NotifySMSManager(NotifyBase):
             if result:
                 # Carry forward '+' if defined, otherwise do not...
                 self.targets.append(
-                    ('+' + result['full'])
-                    if target.lstrip()[0] == '+' else result['full'])
+                    ("+" + result["full"])
+                    if target.lstrip()[0] == "+"
+                    else result["full"]
+                )
                 continue
 
             self.logger.warning(
-                'Dropped invalid phone # ({}) specified.'.format(target),
+                f"Dropped invalid phone # ({target}) specified.",
             )
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform SMS Manager Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform SMS Manager Notification."""
 
         if not self.targets:
             # We have nothing to notify
-            self.logger.warning('There are no SMS Manager targets to notify')
+            self.logger.warning("There are no SMS Manager targets to notify")
             return False
 
         # error tracking (used for function return)
@@ -215,13 +234,18 @@ class NotifySMSManager(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         # Prepare our targets
-        targets = list(self.targets) if batch_size == 1 else \
-            [self.targets[index:index + batch_size]
-             for index in range(0, len(self.targets), batch_size)]
+        targets = (
+            list(self.targets)
+            if batch_size == 1
+            else [
+                self.targets[index : index + batch_size]
+                for index in range(0, len(self.targets), batch_size)
+            ]
+        )
 
         while len(targets):
             # Get our target to notify
@@ -232,34 +256,35 @@ class NotifySMSManager(NotifyBase):
             #       mock testing issues (payload singleton isn't persistent
             #       when performing follow up checks on the params object.
             payload = {
-                'apikey': self.apikey,
-                'gateway': self.gateway,
+                "apikey": self.apikey,
+                "gateway": self.gateway,
                 # The number gets populated in the loop below
-                'number': None,
-                'message': body,
+                "number": None,
+                "message": body,
             }
 
             if self.sender:
                 # Sender is ony set if specified
-                payload['sender'] = self.sender
+                payload["sender"] = self.sender
 
             # Printable target details
             if isinstance(target, list):
-                p_target = '{} targets'.format(len(target))
+                p_target = f"{len(target)} targets"
 
                 # Prepare our target numbers
-                payload['number'] = ';'.join(target)
+                payload["number"] = ";".join(target)
 
             else:
                 p_target = target
                 # Prepare our target numbers
-                payload['number'] = target
+                payload["number"] = target
 
             # Some Debug Logging
             self.logger.debug(
-                'SMS Manager POST URL: {} (cert_verify={})'.format(
-                    self.notify_url, self.verify_certificate))
-            self.logger.debug('SMS Manager Payload: {}' .format(payload))
+                "SMS Manager POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"SMS Manager Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -274,22 +299,24 @@ class NotifySMSManager(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     # set up our status code to use
                     status_code = r.status_code
 
                     self.logger.warning(
-                        'Failed to send SMS Manager notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send SMS Manager notification to {}: "
+                        "{}{}error={}.".format(
                             p_target,
                             status_str,
-                            ', ' if status_str else '',
-                            status_code))
+                            ", " if status_str else "",
+                            status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -297,14 +324,15 @@ class NotifySMSManager(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent SMS Manager notification to {}.'.format(
-                            p_target))
+                        f"Sent SMS Manager notification to {p_target}."
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending SMS Manager: to %s ',
-                    p_target)
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending SMS Manager: to %s ",
+                    p_target,
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -314,44 +342,40 @@ class NotifySMSManager(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol[0], self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'batch': 'yes' if self.batch else 'no',
-            'gateway': self.gateway,
+            "batch": "yes" if self.batch else "no",
+            "gateway": self.gateway,
         }
 
         if self.sender:
             # Set our sender if it was set
-            params['sender'] = self.sender
+            params["sender"] = self.sender
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{apikey}@{targets}' \
-            '?{params}'.format(
-                schema=self.secure_protocol[0],
-                apikey=self.pprint(self.apikey, privacy, safe=''),
-                targets='/'.join([
-                    NotifySMSManager.quote('{}'.format(x), safe='+')
-                    for x in self.targets]),
-                params=NotifySMSManager.urlencode(params))
+        return "{schema}://{apikey}@{targets}?{params}".format(
+            schema=self.secure_protocol[0],
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets="/".join([
+                NotifySMSManager.quote(f"{x}", safe="+") for x in self.targets
+            ]),
+            params=NotifySMSManager.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
 
         #
         # Factor batch into calculation
@@ -361,18 +385,16 @@ class NotifySMSManager(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
         if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
 
         return targets
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -380,41 +402,47 @@ class NotifySMSManager(NotifyBase):
             return results
 
         # Get our API Key
-        results['apikey'] = NotifySMSManager.unquote(results['user'])
+        results["apikey"] = NotifySMSManager.unquote(results["user"])
 
         # Store our targets
-        results['targets'] = [
-            *NotifySMSManager.parse_phone_no(results['host']),
-            *NotifySMSManager.split_path(results['fullpath'])]
+        results["targets"] = [
+            *NotifySMSManager.parse_phone_no(results["host"]),
+            *NotifySMSManager.split_path(results["fullpath"]),
+        ]
 
         # The 'from' makes it easier to use yaml configuration
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['sender'] = \
-                NotifySMSManager.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["sender"] = NotifySMSManager.unquote(
+                results["qsd"]["from"]
+            )
 
-        elif 'sender' in results['qsd'] and len(results['qsd']['sender']):
+        elif "sender" in results["qsd"] and len(results["qsd"]["sender"]):
             # Support sender= value as well to align with SMS Manager API
-            results['sender'] = \
-                NotifySMSManager.unquote(results['qsd']['sender'])
+            results["sender"] = NotifySMSManager.unquote(
+                results["qsd"]["sender"]
+            )
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifySMSManager.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifySMSManager.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
-        if 'key' in results['qsd'] and len(results['qsd']['key']):
-            results['apikey'] = \
-                NotifySMSManager.unquote(results['qsd']['key'])
+        if "key" in results["qsd"] and len(results["qsd"]["key"]):
+            results["apikey"] = NotifySMSManager.unquote(results["qsd"]["key"])
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get(
-                'batch', NotifySMSManager.template_args['batch']['default']))
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch", NotifySMSManager.template_args["batch"]["default"]
+            )
+        )
 
         # Define our gateway
-        if 'gateway' in results['qsd'] and len(results['qsd']['gateway']):
-            results['gateway'] = \
-                NotifySMSManager.unquote(results['qsd']['gateway'])
+        if "gateway" in results["qsd"] and len(results["qsd"]["gateway"]):
+            results["gateway"] = NotifySMSManager.unquote(
+                results["qsd"]["gateway"]
+            )
 
         return results

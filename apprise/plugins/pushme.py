@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -28,74 +27,72 @@
 
 import requests
 
-from .base import NotifyBase
-from ..common import NotifyType
-from ..common import NotifyFormat
-from ..utils.parse import validate_regex, parse_bool
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool, validate_regex
+from .base import NotifyBase
 
 
 class NotifyPushMe(NotifyBase):
-    """
-    A wrapper for PushMe Notifications
-    """
+    """A wrapper for PushMe Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'PushMe'
+    service_name = "PushMe"
 
     # The services URL
-    service_url = 'https://push.i-i.me/'
+    service_url = "https://push.i-i.me/"
 
     # Insecure protocol (for those self hosted requests)
-    protocol = 'pushme'
+    protocol = "pushme"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushme'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushme"
 
     # PushMe URL
-    notify_url = 'https://push.i-i.me/'
+    notify_url = "https://push.i-i.me/"
 
     # Define object templates
-    templates = (
-        '{schema}://{token}',
-    )
+    templates = ("{schema}://{token}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
         },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'token': {
-            'alias_of': 'token',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "token": {
+                "alias_of": "token",
+            },
+            "push_key": {
+                "alias_of": "token",
+            },
+            "status": {
+                "name": _("Show Status"),
+                "type": "bool",
+                "default": True,
+            },
         },
-        'push_key': {
-            'alias_of': 'token',
-        },
-        'status': {
-            'name': _('Show Status'),
-            'type': 'bool',
-            'default': True,
-        },
-    })
+    )
 
     def __init__(self, token, status=None, **kwargs):
-        """
-        Initialize PushMe Object
-        """
+        """Initialize PushMe Object."""
         super().__init__(**kwargs)
 
         # Token (associated with project)
         self.token = validate_regex(token)
         if not self.token:
-            msg = 'An invalid PushMe Token ' \
-                  '({}) was specified.'.format(token)
+            msg = f"An invalid PushMe Token ({token}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -104,29 +101,34 @@ class NotifyPushMe(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform PushMe Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform PushMe Notification."""
 
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         # Prepare our payload
         params = {
-            'push_key': self.token,
-            'title': title if not self.status
-            else '{} {}'.format(self.asset.ascii(notify_type), title),
-            'content': body,
-            'type': 'markdown'
-            if self.notify_format == NotifyFormat.MARKDOWN else 'text'
+            "push_key": self.token,
+            "title": (
+                title
+                if not self.status
+                else f"{self.asset.ascii(notify_type)} {title}"
+            ),
+            "content": body,
+            "type": (
+                "markdown"
+                if self.notify_format == NotifyFormat.MARKDOWN
+                else "text"
+            ),
         }
 
-        self.logger.debug('PushMe POST URL: %s (cert_verify=%r)' % (
-            self.notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('PushMe Payload: %s' % str(params))
+        self.logger.debug(
+            "PushMe POST URL:"
+            f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"PushMe Payload: {params!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -141,29 +143,29 @@ class NotifyPushMe(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyPushMe.http_response_code_lookup(r.status_code)
+                status_str = NotifyPushMe.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send PushMe notification:'
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send PushMe notification:{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent PushMe notification.')
+                self.logger.info("Sent PushMe notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending PushMe notification.',
+                "A Connection error occurred sending PushMe notification.",
             )
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -172,58 +174,52 @@ class NotifyPushMe(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.token)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'status': 'yes' if self.status else 'no',
+            "status": "yes" if self.status else "no",
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Official URLs are easy to assemble
-        return '{schema}://{token}/?{params}'.format(
+        return "{schema}://{token}/?{params}".format(
             schema=self.protocol,
-            token=self.pprint(self.token, privacy, safe=''),
+            token=self.pprint(self.token, privacy, safe=""),
             params=NotifyPushMe.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # Store our token using the host
-        results['token'] = NotifyPushMe.unquote(results['host'])
+        results["token"] = NotifyPushMe.unquote(results["host"])
 
         # The 'token' makes it easier to use yaml configuration
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = NotifyPushMe.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = NotifyPushMe.unquote(results["qsd"]["token"])
 
-        elif 'push_key' in results['qsd'] and len(results['qsd']['push_key']):
+        elif "push_key" in results["qsd"] and len(results["qsd"]["push_key"]):
             # Support 'push_key' if specified
-            results['token'] = NotifyPushMe.unquote(results['qsd']['push_key'])
+            results["token"] = NotifyPushMe.unquote(results["qsd"]["push_key"])
 
         # Get status switch
-        results['status'] = \
-            parse_bool(results['qsd'].get('status', True))
+        results["status"] = parse_bool(results["qsd"].get("status", True))
 
         return results

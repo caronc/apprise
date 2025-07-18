@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,55 +25,45 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
 from json import dumps
 
+import requests
+
 from .. import exception
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyImageSize
-from ..common import NotifyType
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import NotifyBase
 
 
 class JSONPayloadField:
-    """
-    Identifies the fields available in the JSON Payload
-    """
-    VERSION = 'version'
-    TITLE = 'title'
-    MESSAGE = 'message'
-    ATTACHMENTS = 'attachments'
-    MESSAGETYPE = 'type'
+    """Identifies the fields available in the JSON Payload."""
+
+    VERSION = "version"
+    TITLE = "title"
+    MESSAGE = "message"
+    ATTACHMENTS = "attachments"
+    MESSAGETYPE = "type"
 
 
 # Defines the method to send the notification
-METHODS = (
-    'POST',
-    'GET',
-    'DELETE',
-    'PUT',
-    'HEAD',
-    'PATCH'
-)
+METHODS = ("POST", "GET", "DELETE", "PUT", "HEAD", "PATCH")
 
 
 class NotifyJSON(NotifyBase):
-    """
-    A wrapper for JSON Notifications
-    """
+    """A wrapper for JSON Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'JSON'
+    service_name = "JSON"
 
     # The default protocol
-    protocol = 'json'
+    protocol = "json"
 
     # The default secure protocol
-    secure_protocol = 'jsons'
+    secure_protocol = "jsons"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_JSON'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_Custom_JSON"
 
     # Support attachments
     attachment_support = True
@@ -90,91 +79,98 @@ class NotifyJSON(NotifyBase):
     # Version: Major.Minor,  Major is only updated if the entire schema is
     # changed. If just adding new items (or removing old ones, only increment
     # the Minor!
-    json_version = '1.0'
+    json_version = "1.0"
 
     # Define object templates
     templates = (
-        '{schema}://{host}',
-        '{schema}://{host}:{port}',
-        '{schema}://{user}@{host}',
-        '{schema}://{user}@{host}:{port}',
-        '{schema}://{user}:{password}@{host}',
-        '{schema}://{user}:{password}@{host}:{port}',
+        "{schema}://{host}",
+        "{schema}://{host}:{port}",
+        "{schema}://{user}@{host}",
+        "{schema}://{user}@{host}:{port}",
+        "{schema}://{user}:{password}@{host}",
+        "{schema}://{user}:{password}@{host}:{port}",
     )
 
     # Define our tokens; these are the minimum tokens required required to
     # be passed into this function (as arguments). The syntax appends any
     # previously defined in the base package and builds onto them
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'method': {
-            'name': _('Fetch Method'),
-            'type': 'choice:string',
-            'values': METHODS,
-            'default': METHODS[0],
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "method": {
+                "name": _("Fetch Method"),
+                "type": "choice:string",
+                "values": METHODS,
+                "default": METHODS[0],
+            },
         },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("HTTP Header"),
+            "prefix": "+",
         },
-        'payload': {
-            'name': _('Payload Extras'),
-            'prefix': ':',
+        "payload": {
+            "name": _("Payload Extras"),
+            "prefix": ":",
         },
-        'params': {
-            'name': _('GET Params'),
-            'prefix': '-',
+        "params": {
+            "name": _("GET Params"),
+            "prefix": "-",
         },
     }
 
-    def __init__(self, headers=None, method=None, payload=None, params=None,
-                 **kwargs):
-        """
-        Initialize JSON Object
+    def __init__(
+        self, headers=None, method=None, payload=None, params=None, **kwargs
+    ):
+        """Initialize JSON Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
         if not isinstance(self.fullpath, str):
-            self.fullpath = ''
+            self.fullpath = ""
 
-        self.method = self.template_args['method']['default'] \
-            if not isinstance(method, str) else method.upper()
+        self.method = (
+            self.template_args["method"]["default"]
+            if not isinstance(method, str)
+            else method.upper()
+        )
 
         if self.method not in METHODS:
-            msg = 'The method specified ({}) is invalid.'.format(method)
+            msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -195,16 +191,20 @@ class NotifyJSON(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform JSON Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform JSON Notification."""
 
         # Prepare HTTP Headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         # Apply any/all header over-rides defined
@@ -218,28 +218,34 @@ class NotifyJSON(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access Custom JSON attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access Custom JSON attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 try:
                     attachments.append({
-                        "filename": attachment.name
-                        if attachment.name else f'file{no:03}.dat',
-                        'base64': attachment.base64(),
-                        'mimetype': attachment.mimetype,
+                        "filename": (
+                            attachment.name
+                            if attachment.name
+                            else f"file{no:03}.dat"
+                        ),
+                        "base64": attachment.base64(),
+                        "mimetype": attachment.mimetype,
                     })
 
                 except exception.AppriseException:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access Custom JSON attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access Custom JSON attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 self.logger.debug(
-                    'Appending Custom JSON attachment {}'.format(
-                        attachment.url(privacy=True)))
+                    "Appending Custom JSON attachment"
+                    f" {attachment.url(privacy=True)}"
+                )
 
         # Prepare JSON Object
         payload = {
@@ -271,35 +277,35 @@ class NotifyJSON(NotifyBase):
             auth = (self.user, self.password)
 
         # Set our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
-        url = '%s://%s' % (schema, self.host)
+        url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 
-        self.logger.debug('JSON POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('JSON Payload: %s' % str(payload))
+        self.logger.debug(
+            f"JSON POST URL: {url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"JSON Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        if self.method == 'GET':
+        if self.method == "GET":
             method = requests.get
 
-        elif self.method == 'PUT':
+        elif self.method == "PUT":
             method = requests.put
 
-        elif self.method == 'PATCH':
+        elif self.method == "PATCH":
             method = requests.patch
 
-        elif self.method == 'DELETE':
+        elif self.method == "DELETE":
             method = requests.delete
 
-        elif self.method == 'HEAD':
+        elif self.method == "HEAD":
             method = requests.head
 
         else:  # POST
@@ -317,29 +323,32 @@ class NotifyJSON(NotifyBase):
             )
             if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem
-                status_str = \
-                    NotifyJSON.http_response_code_lookup(r.status_code)
+                status_str = NotifyJSON.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send JSON %s notification: %s%serror=%s.',
+                    "Failed to send JSON %s notification: %s%serror=%s.",
                     self.method,
                     status_str,
-                    ', ' if status_str else '',
-                    str(r.status_code))
+                    ", " if status_str else "",
+                    str(r.status_code),
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent JSON %s notification.', self.method)
+                self.logger.info("Sent JSON %s notification.", self.method)
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending JSON '
-                'notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending JSON "
+                f"notification to {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -348,95 +357,103 @@ class NotifyJSON(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host,
+            self.user,
+            self.password,
+            self.host,
             self.port if self.port else (443 if self.secure else 80),
-            self.fullpath.rstrip('/'),
+            self.fullpath.rstrip("/"),
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'method': self.method,
+            "method": self.method,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Append our GET params into our parameters
-        params.update({'-{}'.format(k): v for k, v in self.params.items()})
+        params.update({f"-{k}": v for k, v in self.params.items()})
 
         # Append our payload extra's into our parameters
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_extras.items()})
+        params.update({f":{k}": v for k, v in self.payload_extras.items()})
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyJSON.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifyJSON.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyJSON.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifyJSON.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=NotifyJSON.quote(self.fullpath, safe='/')
-            if self.fullpath else '/',
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=(
+                NotifyJSON.quote(self.fullpath, safe="/")
+                if self.fullpath
+                else "/"
+            ),
             params=NotifyJSON.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # store any additional payload extra's defined
-        results['payload'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)
-                              for x, y in results['qsd:'].items()}
+        results["payload"] = {
+            NotifyJSON.unquote(x): NotifyJSON.unquote(y)
+            for x, y in results["qsd:"].items()
+        }
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)
-                              for x, y in results['qsd+'].items()}
+        results["headers"] = {
+            NotifyJSON.unquote(x): NotifyJSON.unquote(y)
+            for x, y in results["qsd+"].items()
+        }
 
         # Add our GET paramters in the event the user wants to pass these along
-        results['params'] = {NotifyJSON.unquote(x): NotifyJSON.unquote(y)
-                             for x, y in results['qsd-'].items()}
+        results["params"] = {
+            NotifyJSON.unquote(x): NotifyJSON.unquote(y)
+            for x, y in results["qsd-"].items()
+        }
 
         # Set method if not otherwise set
-        if 'method' in results['qsd'] and len(results['qsd']['method']):
-            results['method'] = NotifyJSON.unquote(results['qsd']['method'])
+        if "method" in results["qsd"] and len(results["qsd"]["method"]):
+            results["method"] = NotifyJSON.unquote(results["qsd"]["method"])
 
         return results

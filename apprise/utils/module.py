@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -25,15 +24,15 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import sys
+import contextlib
 import importlib.util
+import sys
+
 from ..logger import logger
 
 
 def import_module(path, name):
-    """
-    Load our module based on path
-    """
+    """Load our module based on path."""
     spec = importlib.util.spec_from_file_location(name, path)
     try:
         module = importlib.util.module_from_spec(spec)
@@ -43,17 +42,13 @@ def import_module(path, name):
 
     except Exception as e:
         # module isn't loadable
-        try:
+        with contextlib.suppress(KeyError):
             del sys.modules[name]
-
-        except KeyError:
-            # nothing to clean up
-            pass
 
         module = None
 
         logger.debug(
-            'Module exception raised from %s (name=%s) %s',
-            path, name, str(e))
+            "Module exception raised from %s (name=%s) %s", path, name, str(e)
+        )
 
     return module

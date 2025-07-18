@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -38,16 +37,16 @@
 #
 import requests
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 # calls
 class StrmlabsCall:
-    ALERT = 'ALERTS'
-    DONATION = 'DONATIONS'
+    ALERT = "ALERTS"
+    DONATION = "DONATIONS"
 
 
 # A List of calls we can use for verification
@@ -59,10 +58,10 @@ STRMLABS_CALLS = (
 
 # alerts
 class StrmlabsAlert:
-    FOLLOW = 'follow'
-    SUBSCRIPTION = 'subscription'
-    DONATION = 'donation'
-    HOST = 'host'
+    FOLLOW = "follow"
+    SUBSCRIPTION = "subscription"
+    DONATION = "donation"
+    HOST = "host"
 
 
 # A List of calls we can use for verification
@@ -75,128 +74,133 @@ STRMLABS_ALERTS = (
 
 
 class NotifyStreamlabs(NotifyBase):
-    """
-    A wrapper to Streamlabs Donation Notifications
+    """A wrapper to Streamlabs Donation Notifications."""
 
-    """
     # The default descriptive name associated with the Notification
-    service_name = 'Streamlabs'
+    service_name = "Streamlabs"
 
     # The services URL
-    service_url = 'https://streamlabs.com/'
+    service_url = "https://streamlabs.com/"
 
     # The default secure protocol
-    secure_protocol = 'strmlabs'
+    secure_protocol = "strmlabs"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_streamlabs'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_streamlabs"
 
     # Streamlabs Api endpoint
-    notify_url = 'https://streamlabs.com/api/v1.0/'
+    notify_url = "https://streamlabs.com/api/v1.0/"
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 255
 
     # Define object templates
-    templates = (
-        '{schema}://{access_token}/',
-    )
+    templates = ("{schema}://{access_token}/",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'access_token': {
-            'name': _('Access Token'),
-            'private': True,
-            'required': True,
-            'type': 'string',
-            'regex': (r'^[a-z0-9]{40}$', 'i')
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "access_token": {
+                "name": _("Access Token"),
+                "private": True,
+                "required": True,
+                "type": "string",
+                "regex": (r"^[a-z0-9]{40}$", "i"),
+            },
         },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'call': {
-            'name': _('Call'),
-            'type': 'choice:string',
-            'values': STRMLABS_CALLS,
-            'default': StrmlabsCall.ALERT,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "call": {
+                "name": _("Call"),
+                "type": "choice:string",
+                "values": STRMLABS_CALLS,
+                "default": StrmlabsCall.ALERT,
+            },
+            "alert_type": {
+                "name": _("Alert Type"),
+                "type": "choice:string",
+                "values": STRMLABS_ALERTS,
+                "default": StrmlabsAlert.DONATION,
+            },
+            "image_href": {
+                "name": _("Image Link"),
+                "type": "string",
+                "default": "",
+            },
+            "sound_href": {
+                "name": _("Sound Link"),
+                "type": "string",
+                "default": "",
+            },
+            "duration": {
+                "name": _("Duration"),
+                "type": "int",
+                "default": 1000,
+                "min": 0,
+            },
+            "special_text_color": {
+                "name": _("Special Text Color"),
+                "type": "string",
+                "default": "",
+                "regex": (r"^[A-Z]$", "i"),
+            },
+            "amount": {
+                "name": _("Amount"),
+                "type": "int",
+                "default": 0,
+                "min": 0,
+            },
+            "currency": {
+                "name": _("Currency"),
+                "type": "string",
+                "default": "USD",
+                "regex": (r"^[A-Z]{3}$", "i"),
+            },
+            "name": {
+                "name": _("Name"),
+                "type": "string",
+                "default": "Anon",
+                "regex": (r"^[^\s].{1,24}$", "i"),
+            },
+            "identifier": {
+                "name": _("Identifier"),
+                "type": "string",
+                "default": "Apprise",
+            },
         },
-        'alert_type': {
-            'name': _('Alert Type'),
-            'type': 'choice:string',
-            'values': STRMLABS_ALERTS,
-            'default': StrmlabsAlert.DONATION,
-        },
-        'image_href': {
-            'name': _('Image Link'),
-            'type': 'string',
-            'default': '',
-        },
-        'sound_href': {
-            'name': _('Sound Link'),
-            'type': 'string',
-            'default': '',
-        },
-        'duration': {
-            'name': _('Duration'),
-            'type': 'int',
-            'default': 1000,
-            'min': 0
-        },
-        'special_text_color': {
-            'name': _('Special Text Color'),
-            'type': 'string',
-            'default': '',
-            'regex': (r'^[A-Z]$', 'i'),
-        },
-        'amount': {
-            'name': _('Amount'),
-            'type': 'int',
-            'default': 0,
-            'min': 0
-        },
-        'currency': {
-            'name': _('Currency'),
-            'type': 'string',
-            'default': 'USD',
-            'regex': (r'^[A-Z]{3}$', 'i'),
-        },
-        'name': {
-            'name': _('Name'),
-            'type': 'string',
-            'default': 'Anon',
-            'regex': (r'^[^\s].{1,24}$', 'i')
-        },
-        'identifier': {
-            'name': _('Identifier'),
-            'type': 'string',
-            'default': 'Apprise',
-        },
-    })
+    )
 
-    def __init__(self, access_token,
-                 call=StrmlabsCall.ALERT,
-                 alert_type=StrmlabsAlert.DONATION,
-                 image_href='', sound_href='', duration=1000,
-                 special_text_color='',
-                 amount=0, currency='USD', name='Anon',
-                 identifier='Apprise',
-                 **kwargs):
-        """
-        Initialize Streamlabs Object
-
-        """
+    def __init__(
+        self,
+        access_token,
+        call=StrmlabsCall.ALERT,
+        alert_type=StrmlabsAlert.DONATION,
+        image_href="",
+        sound_href="",
+        duration=1000,
+        special_text_color="",
+        amount=0,
+        currency="USD",
+        name="Anon",
+        identifier="Apprise",
+        **kwargs,
+    ):
+        """Initialize Streamlabs Object."""
         super().__init__(**kwargs)
 
         # access token is generated by user
         # using https://streamlabs.com/api/v1.0/token
         # Tokens for Streamlabs never need to be refreshed.
         self.access_token = validate_regex(
-            access_token,
-            *self.template_tokens['access_token']['regex']
+            access_token, *self.template_tokens["access_token"]["regex"]
         )
         if not self.access_token:
-            msg = 'An invalid Streamslabs access token was specified.'
+            msg = "An invalid Streamslabs access token was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -209,11 +213,10 @@ class NotifyStreamlabs(NotifyBase):
                 self.call = call
         except Exception as e:
             # Invalid region specified
-            msg = 'The streamlabs call specified ({}) is invalid.' \
-                .format(call)
+            msg = f"The streamlabs call specified ({call}) is invalid."
             self.logger.warning(msg)
-            self.logger.debug('Socket Exception: %s' % str(e))
-            raise TypeError(msg)
+            self.logger.debug(f"Socket Exception: {e!s}")
+            raise TypeError(msg) from None
 
         # Store the alert_type
         # only applicable when calling /alerts
@@ -225,11 +228,10 @@ class NotifyStreamlabs(NotifyBase):
                 self.alert_type = alert_type
         except Exception as e:
             # Invalid region specified
-            msg = 'The streamlabs alert type specified ({}) is invalid.' \
-                .format(call)
+            msg = f"The streamlabs alert type specified ({call}) is invalid."
             self.logger.warning(msg)
-            self.logger.debug('Socket Exception: %s' % str(e))
-            raise TypeError(msg)
+            self.logger.debug(f"Socket Exception: {e!s}")
+            raise TypeError(msg) from None
 
         # params only applicable when calling /alerts
         self.image_href = image_href
@@ -245,24 +247,20 @@ class NotifyStreamlabs(NotifyBase):
         # The 3 letter currency code for this donation.
         # Must be one of the supported currency codes.
         self.currency = validate_regex(
-            currency,
-            *self.template_args['currency']['regex']
+            currency, *self.template_args["currency"]["regex"]
         )
 
         # only applicable when calling /donations
         if not self.currency:
-            msg = 'An invalid Streamslabs currency was specified.'
+            msg = "An invalid Streamslabs currency was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # only applicable when calling /donations
         # The name of the donor
-        self.name = validate_regex(
-            name,
-            *self.template_args['name']['regex']
-        )
+        self.name = validate_regex(name, *self.template_args["name"]["regex"])
         if not self.name:
-            msg = 'An invalid Streamslabs donor was specified.'
+            msg = "An invalid Streamslabs donor was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -273,25 +271,23 @@ class NotifyStreamlabs(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Streamlabs notification call (either donation or alert)
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Streamlabs notification call (either donation or alert)"""
 
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
         if self.call == StrmlabsCall.ALERT:
 
             data = {
-                'access_token': self.access_token,
-                'type': self.alert_type.lower(),
-                'image_href': self.image_href,
-                'sound_href': self.sound_href,
-                'message': title,
-                'user_massage': body,
-                'duration': self.duration,
-                'special_text_color': self.special_text_color,
+                "access_token": self.access_token,
+                "type": self.alert_type.lower(),
+                "image_href": self.image_href,
+                "sound_href": self.sound_href,
+                "message": title,
+                "user_massage": body,
+                "duration": self.duration,
+                "special_text_color": self.special_text_color,
             }
 
             try:
@@ -303,40 +299,40 @@ class NotifyStreamlabs(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyStreamlabs.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyStreamlabs.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send Streamlabs alert: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Streamlabs alert: "
+                        "{}{}error={}.".format(
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
                     return False
 
                 else:
-                    self.logger.info('Sent Streamlabs alert.')
+                    self.logger.info("Sent Streamlabs alert.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Streamlabs '
-                    'alert.'
+                    "A Connection error occurred sending Streamlabs alert."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
                 return False
 
         if self.call == StrmlabsCall.DONATION:
             data = {
-                'name': self.name,
-                'identifier': self.identifier,
-                'amount': self.amount,
-                'currency': self.currency,
-                'access_token': self.access_token,
-                'message': body,
+                "name": self.name,
+                "identifier": self.identifier,
+                "amount": self.amount,
+                "currency": self.currency,
+                "access_token": self.access_token,
+                "message": body,
             }
 
             try:
@@ -348,81 +344,77 @@ class NotifyStreamlabs(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyStreamlabs.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyStreamlabs.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send Streamlabs donation: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Streamlabs donation: "
+                        "{}{}error={}.".format(
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
                     return False
 
                 else:
-                    self.logger.info('Sent Streamlabs donation.')
+                    self.logger.info("Sent Streamlabs donation.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Streamlabs '
-                    'donation.'
+                    "A Connection error occurred sending Streamlabs donation."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
                 return False
 
         return True
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.access_token)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'call': self.call,
+            "call": self.call,
             # donation
-            'name': self.name,
-            'identifier': self.identifier,
-            'amount': self.amount,
-            'currency': self.currency,
+            "name": self.name,
+            "identifier": self.identifier,
+            "amount": self.amount,
+            "currency": self.currency,
             # alert
-            'alert_type': self.alert_type,
-            'image_href': self.image_href,
-            'sound_href': self.sound_href,
-            'duration': self.duration,
-            'special_text_color': self.special_text_color,
+            "alert_type": self.alert_type,
+            "image_href": self.image_href,
+            "sound_href": self.sound_href,
+            "duration": self.duration,
+            "special_text_color": self.special_text_color,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
-        return '{schema}://{access_token}/?{params}'.format(
+        return "{schema}://{access_token}/?{params}".format(
             schema=self.secure_protocol,
-            access_token=self.pprint(self.access_token, privacy, safe=''),
+            access_token=self.pprint(self.access_token, privacy, safe=""),
             params=NotifyStreamlabs.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object.
 
         Syntax:
           strmlabs://access_token
-
         """
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -430,49 +422,61 @@ class NotifyStreamlabs(NotifyBase):
             return results
 
         # Store our access code
-        access_token = NotifyStreamlabs.unquote(results['host'])
-        results['access_token'] = access_token
+        access_token = NotifyStreamlabs.unquote(results["host"])
+        results["access_token"] = access_token
 
         # call
-        if 'call' in results['qsd'] and results['qsd']['call']:
-            results['call'] = NotifyStreamlabs.unquote(
-                results['qsd']['call'].strip().upper())
+        if "call" in results["qsd"] and results["qsd"]["call"]:
+            results["call"] = NotifyStreamlabs.unquote(
+                results["qsd"]["call"].strip().upper()
+            )
         # donation - amount
-        if 'amount' in results['qsd'] and results['qsd']['amount']:
-            results['amount'] = NotifyStreamlabs.unquote(
-                results['qsd']['amount'])
+        if "amount" in results["qsd"] and results["qsd"]["amount"]:
+            results["amount"] = NotifyStreamlabs.unquote(
+                results["qsd"]["amount"]
+            )
         # donation - currency
-        if 'currency' in results['qsd'] and results['qsd']['currency']:
-            results['currency'] = NotifyStreamlabs.unquote(
-                results['qsd']['currency'].strip().upper())
+        if "currency" in results["qsd"] and results["qsd"]["currency"]:
+            results["currency"] = NotifyStreamlabs.unquote(
+                results["qsd"]["currency"].strip().upper()
+            )
         # donation - name
-        if 'name' in results['qsd'] and results['qsd']['name']:
-            results['name'] = NotifyStreamlabs.unquote(
-                results['qsd']['name'].strip().upper())
+        if "name" in results["qsd"] and results["qsd"]["name"]:
+            results["name"] = NotifyStreamlabs.unquote(
+                results["qsd"]["name"].strip().upper()
+            )
         # donation - identifier
-        if 'identifier' in results['qsd'] and results['qsd']['identifier']:
-            results['identifier'] = NotifyStreamlabs.unquote(
-                results['qsd']['identifier'].strip().upper())
+        if "identifier" in results["qsd"] and results["qsd"]["identifier"]:
+            results["identifier"] = NotifyStreamlabs.unquote(
+                results["qsd"]["identifier"].strip().upper()
+            )
         # alert - alert_type
-        if 'alert_type' in results['qsd'] and results['qsd']['alert_type']:
-            results['alert_type'] = NotifyStreamlabs.unquote(
-                results['qsd']['alert_type'])
+        if "alert_type" in results["qsd"] and results["qsd"]["alert_type"]:
+            results["alert_type"] = NotifyStreamlabs.unquote(
+                results["qsd"]["alert_type"]
+            )
         # alert - image_href
-        if 'image_href' in results['qsd'] and results['qsd']['image_href']:
-            results['image_href'] = NotifyStreamlabs.unquote(
-                results['qsd']['image_href'])
+        if "image_href" in results["qsd"] and results["qsd"]["image_href"]:
+            results["image_href"] = NotifyStreamlabs.unquote(
+                results["qsd"]["image_href"]
+            )
         # alert - sound_href
-        if 'sound_href' in results['qsd'] and results['qsd']['sound_href']:
-            results['sound_href'] = NotifyStreamlabs.unquote(
-                results['qsd']['sound_href'].strip().upper())
+        if "sound_href" in results["qsd"] and results["qsd"]["sound_href"]:
+            results["sound_href"] = NotifyStreamlabs.unquote(
+                results["qsd"]["sound_href"].strip().upper()
+            )
         # alert - duration
-        if 'duration' in results['qsd'] and results['qsd']['duration']:
-            results['duration'] = NotifyStreamlabs.unquote(
-                results['qsd']['duration'].strip().upper())
+        if "duration" in results["qsd"] and results["qsd"]["duration"]:
+            results["duration"] = NotifyStreamlabs.unquote(
+                results["qsd"]["duration"].strip().upper()
+            )
         # alert - special_text_color
-        if 'special_text_color' in results['qsd'] \
-                and results['qsd']['special_text_color']:
-            results['special_text_color'] = NotifyStreamlabs.unquote(
-                results['qsd']['special_text_color'].strip().upper())
+        if (
+            "special_text_color" in results["qsd"]
+            and results["qsd"]["special_text_color"]
+        ):
+            results["special_text_color"] = NotifyStreamlabs.unquote(
+                results["qsd"]["special_text_color"].strip().upper()
+            )
 
         return results

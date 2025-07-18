@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -29,41 +28,36 @@ import errno
 
 
 class AppriseException(Exception):
-    """
-    Base Apprise Exception Class
-    """
+    """Base Apprise Exception Class."""
+
     def __init__(self, message, error_code=0):
         super().__init__(message)
         self.error_code = error_code
 
 
 class ApprisePluginException(AppriseException):
-    """
-    Class object for handling exceptions raised from within a plugin
-    """
+    """Class object for handling exceptions raised from within a plugin."""
+
     def __init__(self, message, error_code=600):
         super().__init__(message, error_code=error_code)
 
 
 class AppriseDiskIOError(AppriseException):
-    """
-    Thrown when an disk i/o error occurs
-    """
+    """Thrown when an disk i/o error occurs."""
+
     def __init__(self, message, error_code=errno.EIO):
         super().__init__(message, error_code=error_code)
 
 
 class AppriseInvalidData(AppriseException):
-    """
-    Thrown when bad data was passed into an internal function
-    """
+    """Thrown when bad data was passed into an internal function."""
+
     def __init__(self, message, error_code=errno.EINVAL):
         super().__init__(message, error_code=error_code)
 
 
 class AppriseFileNotFound(AppriseDiskIOError, FileNotFoundError):
-    """
-    Thrown when a persistent write occured in MEMORY mode
-    """
+    """Thrown when a persistent write occured in MEMORY mode."""
+
     def __init__(self, message):
         super().__init__(message, error_code=errno.ENOENT)

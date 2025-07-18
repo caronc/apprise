@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,34 +25,30 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
 import os
-from .base import AttachBase
-from ..utils.disk import path_decode
+import re
+
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
+from ..utils.disk import path_decode
+from .base import AttachBase
 
 
 class AttachFile(AttachBase):
-    """
-    A wrapper for File based attachment sources
-    """
+    """A wrapper for File based attachment sources."""
 
     # The default descriptive name associated with the service
-    service_name = _('Local File')
+    service_name = _("Local File")
 
     # The default protocol
-    protocol = 'file'
+    protocol = "file"
 
     # Content is local to the same location as the apprise instance
     # being called (server-side)
     location = ContentLocation.LOCAL
 
     def __init__(self, path, **kwargs):
-        """
-        Initialize Local File Attachment Object
-
-        """
+        """Initialize Local File Attachment Object."""
         super().__init__(**kwargs)
 
         # Store path but mark it dirty since we have not performed any
@@ -65,30 +60,30 @@ class AttachFile(AttachBase):
         return
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {}
 
         if self._mimetype:
             # A mime-type was enforced
-            params['mime'] = self._mimetype
+            params["mime"] = self._mimetype
 
         if self._name:
             # A name was enforced
-            params['name'] = self._name
+            params["name"] = self._name
 
-        return 'file://{path}{params}'.format(
+        return "file://{path}{params}".format(
             path=self.quote(self.__original_path),
-            params='?{}'.format(self.urlencode(params, safe='/'))
-            if params else '',
+            params=(
+                "?{}".format(self.urlencode(params, safe="/"))
+                if params
+                else ""
+            ),
         )
 
     def download(self, **kwargs):
-        """
-        Perform retrieval of our data.
+        """Perform retrieval of our data.
 
         For file base attachments, our data already exists, so we only need to
         validate it.
@@ -108,14 +103,17 @@ class AttachFile(AttachBase):
         except OSError:
             return False
 
-        if self.max_file_size > 0 and \
-                os.path.getsize(self.dirty_path) > self.max_file_size:
+        if (
+            self.max_file_size > 0
+            and os.path.getsize(self.dirty_path) > self.max_file_size
+        ):
 
             # The content to attach is to large
             self.logger.error(
-                'Content exceeds allowable maximum file length '
-                '({}KB): {}'.format(
-                    int(self.max_file_size / 1024), self.url(privacy=True)))
+                "Content exceeds allowable maximum file length"
+                f" ({int(self.max_file_size / 1024)}KB):"
+                f" {self.url(privacy=True)}"
+            )
 
             # Return False (signifying a failure)
             return False
@@ -131,20 +129,17 @@ class AttachFile(AttachBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL so that we can handle all different file paths
-        and return it as our path object
-
-        """
+        """Parses the URL so that we can handle all different file paths and
+        return it as our path object."""
 
         results = AttachBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early; it's not a good URL
             return results
 
-        match = re.match(r'file://(?P<path>[^?]+)(\?.*)?', url, re.I)
+        match = re.match(r"file://(?P<path>[^?]+)(\?.*)?", url, re.I)
         if not match:
             return None
 
-        results['path'] = AttachFile.unquote(match.group('path'))
+        results["path"] = AttachFile.unquote(match.group("path"))
         return results

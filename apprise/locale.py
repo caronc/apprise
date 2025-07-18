@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,16 +25,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 import ctypes
 import locale
-import contextlib
 import os
+from os.path import abspath, dirname, join
 import re
-from os.path import join
-from os.path import dirname
-from os.path import abspath
-from .logger import logger
+from typing import Union
 
+from .logger import logger
 
 # This gets toggled to True if we succeed
 GETTEXT_LOADED = False
@@ -54,39 +52,37 @@ except ImportError:
 
 
 class AppriseLocale:
-    """
-    A wrapper class to gettext so that we can manipulate multiple lanaguages
-    on the fly if required.
-
-    """
+    """A wrapper class to gettext so that we can manipulate multiple lanaguages
+    on the fly if required."""
 
     # Define our translation domain
-    _domain = 'apprise'
+    _domain = "apprise"
 
     # The path to our translations
-    _locale_dir = abspath(join(dirname(__file__), 'i18n'))
+    _locale_dir = abspath(join(dirname(__file__), "i18n"))
 
     # Locale regular expression
     _local_re = re.compile(
-        r'^((?P<ansii>C)|(?P<lang>([a-z]{2}))([_:](?P<country>[a-z]{2}))?)'
-        r'(\.(?P<enc>[a-z0-9-]+))?$', re.IGNORECASE)
+        r"^((?P<ansii>C)|(?P<lang>([a-z]{2}))([_:](?P<country>[a-z]{2}))?)"
+        r"(\.(?P<enc>[a-z0-9-]+))?$",
+        re.IGNORECASE,
+    )
 
     # Define our default encoding
-    _default_encoding = 'utf-8'
+    _default_encoding = "utf-8"
 
     # The function to assign `_` by default
-    _fn = 'gettext'
+    _fn = "gettext"
 
     # The language we should fall back to if all else fails
-    _default_language = 'en'
+    _default_language = "en"
 
     def __init__(self, language=None):
-        """
-        Initializes our object, if a language is specified, then we
-        initialize ourselves to that, otherwise we use whatever we detect
-        from the local operating system. If all else fails, we resort to the
-        defined default_language.
+        """Initializes our object, if a language is specified, then we
+        initialize ourselves to that, otherwise we use whatever we detect from
+        the local operating system.
 
+        If all else fails, we resort to the defined default_language.
         """
 
         # Cache previously loaded translations
@@ -106,16 +102,17 @@ class AppriseLocale:
         self.add(self.lang)
 
     def add(self, lang=None, set_default=True):
-        """
-        Add a language to our list
-        """
+        """Add a language to our list."""
         lang = lang if lang else self._default_language
         if lang not in self._gtobjs:
             # Load our gettext object and install our language
             try:
                 self._gtobjs[lang] = gettext.translation(
-                    self._domain, localedir=self._locale_dir, languages=[lang],
-                    fallback=False)
+                    self._domain,
+                    localedir=self._locale_dir,
+                    languages=[lang],
+                    fallback=False,
+                )
 
                 # The non-intrusive method of applying the gettext change to
                 # the global namespace only
@@ -124,8 +121,9 @@ class AppriseLocale:
             except FileNotFoundError:
                 # The translation directory does not exist
                 logger.debug(
-                    'Could not load translation path: %s',
-                    join(self._locale_dir, lang))
+                    "Could not load translation path: %s",
+                    join(self._locale_dir, lang),
+                )
 
                 # Fallback (handle case where self.lang does not exist)
                 if self.lang not in self._gtobjs:
@@ -134,10 +132,10 @@ class AppriseLocale:
 
                 return False
 
-            logger.trace('Loaded language %s', lang)
+            logger.trace("Loaded language %s", lang)
 
         if set_default:
-            logger.debug('Language set to %s', lang)
+            logger.debug("Language set to %s", lang)
             self.lang = lang
 
         return True
@@ -172,8 +170,7 @@ class AppriseLocale:
 
     @property
     def gettext(self):
-        """
-        Return the current language gettext() function
+        """Return the current language gettext() function.
 
         Useful for assigning to `_`
         """
@@ -181,9 +178,7 @@ class AppriseLocale:
 
     @staticmethod
     def detect_language(lang=None, detect_fallback=True):
-        """
-        Returns the language (if it's retrievable)
-        """
+        """Returns the language (if it's retrievable)"""
         # We want to only use the 2 character version of this language
         # hence en_CA becomes en, en_US becomes en.
         if not isinstance(lang, str):
@@ -194,19 +189,20 @@ class AppriseLocale:
             # Posix lookup
             lookup = os.environ.get
             localename = None
-            for variable in ('LC_ALL', 'LC_CTYPE', 'LANG', 'LANGUAGE'):
+            for variable in ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE"):
                 localename = lookup(variable, None)
                 if localename:
                     result = AppriseLocale._local_re.match(localename)
-                    if result and result.group('lang'):
-                        return result.group('lang').lower()
+                    if result and result.group("lang"):
+                        return result.group("lang").lower()
 
             # Windows handling
-            if hasattr(ctypes, 'windll'):
+            if hasattr(ctypes, "windll"):
                 windll = ctypes.windll.kernel32
                 try:
                     lang = locale.windows_locale[
-                        windll.GetUserDefaultUILanguage()]
+                        windll.GetUserDefaultUILanguage()
+                    ]
 
                     # Our detected windows language
                     return lang[0:2].lower()
@@ -220,7 +216,7 @@ class AppriseLocale:
                 # Acquire our locale
                 lang = locale.getlocale()[0]
                 # Compatibility for Python >= 3.12
-                if lang == 'C':
+                if lang == "C":
                     lang = AppriseLocale._default_language
 
             except (ValueError, TypeError) as e:
@@ -229,32 +225,27 @@ class AppriseLocale:
                 # case, we want to better notify the end user of this. Users
                 # receiving this error should check their environment
                 # variables.
-                logger.warning(
-                    'Language detection failure / {}'.format(str(e)))
+                logger.warning(f"Language detection failure / {e!s}")
                 return None
 
         return None if not lang else lang[0:2].lower()
 
     def __getstate__(self):
-        """
-        Pickle Support dumps()
-        """
+        """Pickle Support dumps()"""
         state = self.__dict__.copy()
 
         # Remove the unpicklable entries.
-        del state['_gtobjs']
-        del state['_AppriseLocale__fn_map']
+        del state["_gtobjs"]
+        del state["_AppriseLocale__fn_map"]
         return state
 
     def __setstate__(self, state):
-        """
-        Pickle Support loads()
-        """
+        """Pickle Support loads()"""
         self.__dict__.update(state)
         # Our mapping to our _fn
         self.__fn_map = None
         self._gtobjs = {}
-        self.add(state['lang'], set_default=True)
+        self.add(state["lang"], set_default=True)
 
 
 #
@@ -264,15 +255,11 @@ LOCALE = AppriseLocale()
 
 
 class LazyTranslation:
-    """
-    Doesn't translate anything until str() or unicode() references
-    are made.
+    """Doesn't translate anything until str() or unicode() references are
+    made."""
 
-    """
     def __init__(self, text, *args, **kwargs):
-        """
-        Store our text
-        """
+        """Store our text."""
         self.text = text
 
         super().__init__(*args, **kwargs)
@@ -283,7 +270,10 @@ class LazyTranslation:
 
 # Lazy translation handling
 def gettext_lazy(text):
-    """
-    A dummy function that can be referenced
-    """
+    """A dummy function that can be referenced."""
+
     return LazyTranslation(text=text)
+
+
+# Identify our Translatable content
+Translatable = Union[str, LazyTranslation]

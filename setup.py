@@ -1,5 +1,4 @@
 #!/usr/bin/env python
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,88 +26,50 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
+#
+# 2025.07.10 NOTE:
+# setup.py (Temporary shim for RHEL9 Package Building Only)
+# Refer to tox for everything else; this will be removed once RHEL9 support
+# is dropped.
+#
 import os
-import platform
-import sys
+import re
 
 from setuptools import find_packages, setup
 
-cmdclass = {}
-try:
-    from babel.messages import frontend as babel
-    cmdclass = {
-        'compile_catalog': babel.compile_catalog,
-        'extract_messages': babel.extract_messages,
-        'init_catalog': babel.init_catalog,
-        'update_catalog': babel.update_catalog,
-    }
-except ImportError:
-    pass
 
-install_options = os.environ.get("APPRISE_INSTALL", "").split(",")
-install_requires = open('requirements.txt').readlines()
-if platform.system().lower().startswith('win') \
-        and not hasattr(sys, "pypy_version_info"):
-    # Windows Notification Support
-    install_requires += open('win-requirements.txt').readlines()
+def read_version() -> str:
+    with open(os.path.join("apprise", "__init__.py"), encoding="utf-8") as f:
+        for line in f:
+            m = re.match(r'^__version__\s*=\s*[\'"]([^\'"]+)', line)
+            if m:
+                return m.group(1)
+    raise RuntimeError("Version not found")
 
-libonly_flags = set(["lib-only", "libonly", "no-cli", "without-cli"])
-if libonly_flags.intersection(install_options):
-    console_scripts = []
 
-else:
-    # Load our CLI
-    console_scripts = ['apprise = apprise.cli:main']
-
+# tox is not supported well in RHEL9 so this stub file is the only way to
+# successfully build the RPM; packaging/redhat/python-apprise.spec has
+# been updated accordingly to accomodate reference to this for older
+# versions of the distribution only
 setup(
-    name='apprise',
-    version='1.9.3',
-    description='Push Notifications that work with just about every platform!',
-    license='BSD 2-Clause',
-    long_description=open('README.md', encoding="utf-8").read(),
-    long_description_content_type='text/markdown',
-    cmdclass=cmdclass,
-    url='https://github.com/caronc/apprise',
-    keywords=' '.join(re.split(r'\s+', open('KEYWORDS').read())),
-    author='Chris Caron',
-    author_email='lead2gold@gmail.com',
-    packages=find_packages(),
-    package_data={
-        'apprise': [
-            'assets/NotifyXML-*.xsd',
-            'assets/themes/default/*.png',
-            'assets/themes/default/*.ico',
-            'i18n/*.py',
-            'i18n/*/LC_MESSAGES/*.mo',
-            'py.typed',
-            '*.pyi',
-            '*/*.pyi'
+    name="apprise",
+    version=read_version(),
+    packages=find_packages(exclude=["tests*", "packaging*"]),
+    entry_points={
+        "console_scripts": [
+            "apprise = apprise.cli:main",
         ],
     },
-    install_requires=install_requires,
-    classifiers=[
-        'Development Status :: 5 - Production/Stable',
-        'Intended Audience :: Developers',
-        'Intended Audience :: System Administrators',
-        'Operating System :: OS Independent',
-        'Natural Language :: English',
-        'Programming Language :: Python',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-        'Programming Language :: Python :: 3.9',
-        'Programming Language :: Python :: 3.10',
-        'Programming Language :: Python :: 3.11',
-        'Programming Language :: Python :: 3.12',
-        'Programming Language :: Python :: Implementation :: CPython',
-        'Programming Language :: Python :: Implementation :: PyPy',
-        'License :: OSI Approved :: BSD License',
-        'Topic :: Software Development :: Libraries :: Python Modules',
-        'Topic :: Software Development :: Libraries :: Application Frameworks',
-    ],
-    entry_points={'console_scripts': console_scripts},
-    python_requires='>=3.6',
-    setup_requires=['babel', ],
+    package_data={
+        "apprise": [
+            "assets/NotifyXML-*.xsd",
+            "assets/themes/default/*.png",
+            "assets/themes/default/*.ico",
+            "i18n/*.py",
+            "i18n/*/LC_MESSAGES/*.mo",
+            "py.typed",
+            "*.pyi",
+            "*/*.pyi",
+        ],
+    },
 )

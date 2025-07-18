@@ -1,4 +1,5 @@
-from typing import Any, Iterable, Optional, Union
+from collections.abc import Iterable
+from typing import Any, Union
 
 from . import AppriseAsset, ContentLocation
 from .attachment import AttachBase
@@ -9,24 +10,24 @@ _Attachments = Iterable[_Attachment]
 class AppriseAttachment:
     def __init__(
         self,
-        paths: Optional[_Attachments] = ...,
-        asset: Optional[AppriseAttachment] = ...,
+        paths: _Attachments | None = ...,
+        asset: AppriseAttachment | None = ...,
         cache: bool = ...,
-        location: Optional[ContentLocation] = ...,
-        **kwargs: Any
+        location: ContentLocation | None = ...,
+        **kwargs: Any,
     ) -> None: ...
     def add(
         self,
         attachments: _Attachments,
-        asset: Optional[AppriseAttachment] = ...,
-        cache: Optional[bool] = ...
+        asset: AppriseAttachment | None = ...,
+        cache: bool | None = ...,
     ) -> bool: ...
     @staticmethod
     def instantiate(
         url: str,
-        asset: Optional[AppriseAsset] = ...,
-        cache: Optional[bool] = ...,
-        suppress_exceptions: bool = ...
+        asset: AppriseAsset | None = ...,
+        cache: bool | None = ...,
+        suppress_exceptions: bool = ...,
     ) -> NotifyBase: ...
     def clear(self) -> None: ...
     def size(self) -> int: ...

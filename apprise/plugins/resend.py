@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -40,15 +39,15 @@
 # Simple API Reference:
 #  - https://resend.com/onboarding
 
-import requests
 from json import dumps
 
-from .base import NotifyBase
+import requests
+
 from .. import exception
-from ..common import NotifyFormat
-from ..common import NotifyType
-from ..utils.parse import parse_list, is_email, validate_regex
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_email, parse_list, validate_regex
+from .base import NotifyBase
 
 RESEND_HTTP_ERROR_MAP = {
     200: "Successful request.",
@@ -61,27 +60,25 @@ RESEND_HTTP_ERROR_MAP = {
 
 
 class NotifyResend(NotifyBase):
-    """
-    A wrapper for Notify Resend Notifications
-    """
+    """A wrapper for Notify Resend Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Resend'
+    service_name = "Resend"
 
     # The services URL
-    service_url = 'https://resend.com'
+    service_url = "https://resend.com"
 
     # The default secure protocol
-    secure_protocol = 'resend'
+    secure_protocol = "resend"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_resend'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_resend"
 
     # Default to markdown
     notify_format = NotifyFormat.HTML
 
     # The default Email API URL to use
-    notify_url = 'https://api.resend.com/emails'
+    notify_url = "https://api.resend.com/emails"
 
     # Support attachments
     attachment_support = True
@@ -91,81 +88,86 @@ class NotifyResend(NotifyBase):
     request_rate_per_sec = 0.2
 
     # The default subject to use if one isn't specified.
-    default_empty_subject = '<no subject>'
+    default_empty_subject = "<no subject>"
 
     # Define object templates
     templates = (
-        '{schema}://{apikey}:{from_email}',
-        '{schema}://{apikey}:{from_email}/{targets}',
+        "{schema}://{apikey}:{from_email}",
+        "{schema}://{apikey}:{from_email}/{targets}",
     )
 
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[A-Z0-9._-]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[A-Z0-9._-]+$", "i"),
+            },
+            "from_email": {
+                "name": _("Source Email"),
+                "type": "string",
+                "required": True,
+            },
+            "target_email": {
+                "name": _("Target Email"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'from_email': {
-            'name': _('Source Email'),
-            'type': 'string',
-            'required': True,
-        },
-        'target_email': {
-            'name': _('Target Email'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "cc": {
+                "name": _("Carbon Copy"),
+                "type": "list:string",
+            },
+            "bcc": {
+                "name": _("Blind Carbon Copy"),
+                "type": "list:string",
+            },
         },
-        'cc': {
-            'name': _('Carbon Copy'),
-            'type': 'list:string',
-        },
-        'bcc': {
-            'name': _('Blind Carbon Copy'),
-            'type': 'list:string',
-        },
-    })
+    )
 
-    def __init__(self, apikey, from_email, targets=None, cc=None,
-                 bcc=None, **kwargs):
-        """
-        Initialize Notify Resend Object
-        """
+    def __init__(
+        self, apikey, from_email, targets=None, cc=None, bcc=None, **kwargs
+    ):
+        """Initialize Notify Resend Object."""
         super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'An invalid Resend API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid Resend API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         result = is_email(from_email)
         if not result:
-            msg = 'Invalid ~From~ email specified: {}'.format(from_email)
+            msg = f"Invalid ~From~ email specified: {from_email}"
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Store email address
-        self.from_email = result['full_email']
+        self.from_email = result["full_email"]
 
         # Acquire Targets (To Emails)
-        self.targets = list()
+        self.targets = []
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -178,12 +180,11 @@ class NotifyResend(NotifyBase):
 
             result = is_email(recipient)
             if result:
-                self.targets.append(result['full_email'])
+                self.targets.append(result["full_email"])
                 continue
 
             self.logger.warning(
-                'Dropped invalid email '
-                '({}) specified.'.format(recipient),
+                f"Dropped invalid email ({recipient}) specified.",
             )
 
         # Validate recipients (cc:) and drop bad ones:
@@ -191,12 +192,11 @@ class NotifyResend(NotifyBase):
 
             result = is_email(recipient)
             if result:
-                self.cc.add(result['full_email'])
+                self.cc.add(result["full_email"])
                 continue
 
             self.logger.warning(
-                'Dropped invalid Carbon Copy email '
-                '({}) specified.'.format(recipient),
+                f"Dropped invalid Carbon Copy email ({recipient}) specified.",
             )
 
         # Validate recipients (bcc:) and drop bad ones:
@@ -204,12 +204,12 @@ class NotifyResend(NotifyBase):
 
             result = is_email(recipient)
             if result:
-                self.bcc.add(result['full_email'])
+                self.bcc.add(result["full_email"])
                 continue
 
             self.logger.warning(
-                'Dropped invalid Blind Carbon Copy email '
-                '({}) specified.'.format(recipient),
+                "Dropped invalid Blind Carbon Copy email "
+                f"({recipient}) specified.",
             )
 
         if len(self.targets) == 0:
@@ -220,73 +220,80 @@ class NotifyResend(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.apikey, self.from_email)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
-            params['cc'] = ','.join(self.cc)
+            params["cc"] = ",".join(self.cc)
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
-            params['bcc'] = ','.join(self.bcc)
+            params["bcc"] = ",".join(self.bcc)
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = \
-            not (len(self.targets) == 1 and self.targets[0] == self.from_email)
+        has_targets = not (
+            len(self.targets) == 1 and self.targets[0] == self.from_email
+        )
 
-        return '{schema}://{apikey}:{from_email}/{targets}?{params}'.format(
+        return "{schema}://{apikey}:{from_email}/{targets}?{params}".format(
             schema=self.secure_protocol,
-            apikey=self.pprint(self.apikey, privacy, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=""),
             # never encode email since it plays a huge role in our hostname
             from_email=self.from_email,
-            targets='' if not has_targets else '/'.join(
-                [NotifyResend.quote(x, safe='') for x in self.targets]),
+            targets=(
+                ""
+                if not has_targets
+                else "/".join(
+                    [NotifyResend.quote(x, safe="") for x in self.targets]
+                )
+            ),
             params=NotifyResend.urlencode(params),
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.targets)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform Resend Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform Resend Notification."""
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer {}'.format(self.apikey),
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.apikey}",
         }
 
         # error tracking (used for function return)
         has_error = False
 
         _payload = {
-            'from': self.from_email,
+            "from": self.from_email,
             # A subject is a requirement, so if none is specified we must
             # set a default with at least 1 character or Resend will deny
             # our request
-            'subject': title if title else self.default_empty_subject,
-            'text' if self.notify_format == NotifyFormat.TEXT
-            else 'html': body,
+            "subject": title if title else self.default_empty_subject,
+            (
+                "text" if self.notify_format == NotifyFormat.TEXT else "html"
+            ): body,
         }
 
         if attach and self.attachment_support:
@@ -298,33 +305,39 @@ class NotifyResend(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access Resend attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access Resend attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 try:
                     attachments.append({
                         "content": attachment.base64(),
-                        "filename": attachment.name
-                        if attachment.name else f'file{no:03}.dat',
+                        "filename": (
+                            attachment.name
+                            if attachment.name
+                            else f"file{no:03}.dat"
+                        ),
                         "type": "application/octet-stream",
-                        "disposition": "attachment"
+                        "disposition": "attachment",
                     })
 
                 except exception.AppriseException:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access Resend attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access Resend attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 self.logger.debug(
-                    'Appending Resend attachment {}'.format(
-                        attachment.url(privacy=True)))
+                    "Appending Resend attachment"
+                    f" {attachment.url(privacy=True)}"
+                )
 
             # Append our attachments to the payload
             _payload.update({
-                'attachments': attachments,
+                "attachments": attachments,
             })
 
         targets = list(self.targets)
@@ -335,22 +348,23 @@ class NotifyResend(NotifyBase):
             payload = _payload.copy()
 
             # unique cc/bcc list management
-            cc = (self.cc - self.bcc - set([target]))
-            bcc = (self.bcc - set([target]))
+            cc = self.cc - self.bcc - {target}
+            bcc = self.bcc - {target}
 
             # Set our target
-            payload['to'] = target
+            payload["to"] = target
 
             if len(cc):
-                payload['cc'] = list(cc)
+                payload["cc"] = list(cc)
 
             if len(bcc):
-                payload['bcc'] = list(bcc)
+                payload["bcc"] = list(bcc)
 
-            self.logger.debug('Resend POST URL: %s (cert_verify=%r)' % (
-                self.notify_url, self.verify_certificate,
-            ))
-            self.logger.debug('Resend Payload: %s', str(payload))
+            self.logger.debug(
+                "Resend POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug("Resend Payload: %s", str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -363,36 +377,39 @@ class NotifyResend(NotifyBase):
                     timeout=self.request_timeout,
                 )
                 if r.status_code not in (
-                        requests.codes.ok, requests.codes.accepted):
+                    requests.codes.ok,
+                    requests.codes.accepted,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyResend.http_response_code_lookup(
-                            r.status_code, RESEND_HTTP_ERROR_MAP)
+                    status_str = NotifyResend.http_response_code_lookup(
+                        r.status_code, RESEND_HTTP_ERROR_MAP
+                    )
 
                     self.logger.warning(
-                        'Failed to send Resend notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Resend notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        'Sent Resend notification to {}.'.format(target))
+                    self.logger.info(f"Sent Resend notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Resend '
-                    'notification to {}.'.format(target))
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending Resend "
+                    f"notification to {target}."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -402,11 +419,8 @@ class NotifyResend(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url)
         if not results:
@@ -422,39 +436,36 @@ class NotifyResend(NotifyBase):
         #                 |       |         |
         #              apikey     -from addr-
 
-        if not results.get('user'):
+        if not results.get("user"):
             # An API Key as not properly specified
             return None
 
-        if not results.get('password'):
+        if not results.get("password"):
             # A From Email was not correctly specified
             return None
 
         # Prepare our API Key
-        results['apikey'] = NotifyResend.unquote(results['user'])
+        results["apikey"] = NotifyResend.unquote(results["user"])
 
         # Prepare our From Email Address
-        results['from_email'] = '{}@{}'.format(
-            NotifyResend.unquote(results['password']),
-            NotifyResend.unquote(results['host']),
+        results["from_email"] = "{}@{}".format(
+            NotifyResend.unquote(results["password"]),
+            NotifyResend.unquote(results["host"]),
         )
 
         # Acquire our targets
-        results['targets'] = NotifyResend.split_path(results['fullpath'])
+        results["targets"] = NotifyResend.split_path(results["fullpath"])
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyResend.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyResend.parse_list(results["qsd"]["to"])
 
         # Handle Carbon Copy Addresses
-        if 'cc' in results['qsd'] and len(results['qsd']['cc']):
-            results['cc'] = \
-                NotifyResend.parse_list(results['qsd']['cc'])
+        if "cc" in results["qsd"] and len(results["qsd"]["cc"]):
+            results["cc"] = NotifyResend.parse_list(results["qsd"]["cc"])
 
         # Handle Blind Carbon Copy Addresses
-        if 'bcc' in results['qsd'] and len(results['qsd']['bcc']):
-            results['bcc'] = \
-                NotifyResend.parse_list(results['qsd']['bcc'])
+        if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
+            results["bcc"] = NotifyResend.parse_list(results["qsd"]["bcc"])
 
         return results

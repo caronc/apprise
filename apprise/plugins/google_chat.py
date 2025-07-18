@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -54,36 +53,34 @@
 #         incoming-bot-python
 #    - https://developers.google.com/hangouts/chat/reference/rest
 #
-import re
-import requests
 from json import dumps
+import re
 
-from .base import NotifyBase
-from ..common import NotifyFormat
-from ..common import NotifyType
-from ..utils.parse import validate_regex
+import requests
+
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 class NotifyGoogleChat(NotifyBase):
-    """
-    A wrapper to Google Chat Notifications
+    """A wrapper to Google Chat Notifications."""
 
-    """
     # The default descriptive name associated with the Notification
-    service_name = 'Google Chat'
+    service_name = "Google Chat"
 
     # The services URL
-    service_url = 'https://chat.google.com/'
+    service_url = "https://chat.google.com/"
 
     # The default secure protocol
-    secure_protocol = 'gchat'
+    secure_protocol = "gchat"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_googlechat'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_googlechat"
 
     # Google Chat Webhook
-    notify_url = 'https://chat.googleapis.com/v1/spaces/{workspace}/messages'
+    notify_url = "https://chat.googleapis.com/v1/spaces/{workspace}/messages"
 
     # Default Notify Format
     notify_format = NotifyFormat.MARKDOWN
@@ -97,90 +94,102 @@ class NotifyGoogleChat(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{workspace}/{webhook_key}/{webhook_token}',
-        '{schema}://{workspace}/{webhook_key}/{webhook_token}/{thread_key}',
+        "{schema}://{workspace}/{webhook_key}/{webhook_token}",
+        "{schema}://{workspace}/{webhook_key}/{webhook_token}/{thread_key}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'workspace': {
-            'name': _('Workspace'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "workspace": {
+                "name": _("Workspace"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "webhook_key": {
+                "name": _("Webhook Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "webhook_token": {
+                "name": _("Webhook Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "thread_key": {
+                "name": _("Thread Key"),
+                "type": "string",
+                "private": True,
+            },
         },
-        'webhook_key': {
-            'name': _('Webhook Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'webhook_token': {
-            'name': _('Webhook Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'thread_key': {
-            'name': _('Thread Key'),
-            'type': 'string',
-            'private': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'workspace': {
-            'alias_of': 'workspace',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "workspace": {
+                "alias_of": "workspace",
+            },
+            "key": {
+                "alias_of": "webhook_key",
+            },
+            "token": {
+                "alias_of": "webhook_token",
+            },
+            "thread": {
+                "alias_of": "thread_key",
+            },
         },
-        'key': {
-            'alias_of': 'webhook_key',
-        },
-        'token': {
-            'alias_of': 'webhook_token',
-        },
-        'thread': {
-            'alias_of': 'thread_key',
-        },
-    })
+    )
 
-    def __init__(self, workspace, webhook_key, webhook_token,
-                 thread_key=None, **kwargs):
-        """
-        Initialize Google Chat Object
-
-        """
+    def __init__(
+        self, workspace, webhook_key, webhook_token, thread_key=None, **kwargs
+    ):
+        """Initialize Google Chat Object."""
         super().__init__(**kwargs)
 
         # Workspace (associated with project)
         self.workspace = validate_regex(workspace)
         if not self.workspace:
-            msg = 'An invalid Google Chat Workspace ' \
-                  '({}) was specified.'.format(workspace)
+            msg = (
+                "An invalid Google Chat Workspace "
+                f"({workspace}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Webhook Key (associated with project)
         self.webhook_key = validate_regex(webhook_key)
         if not self.webhook_key:
-            msg = 'An invalid Google Chat Webhook Key ' \
-                  '({}) was specified.'.format(webhook_key)
+            msg = (
+                "An invalid Google Chat Webhook Key "
+                f"({webhook_key}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Webhook Token (associated with project)
         self.webhook_token = validate_regex(webhook_token)
         if not self.webhook_token:
-            msg = 'An invalid Google Chat Webhook Token ' \
-                  '({}) was specified.'.format(webhook_token)
+            msg = (
+                "An invalid Google Chat Webhook Token "
+                f"({webhook_token}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         if thread_key:
             self.thread_key = validate_regex(thread_key)
             if not self.thread_key:
-                msg = 'An invalid Google Chat Thread Key ' \
-                      '({}) was specified.'.format(thread_key)
+                msg = (
+                    "An invalid Google Chat Thread Key "
+                    f"({thread_key}) was specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
@@ -188,20 +197,18 @@ class NotifyGoogleChat(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Google Chat Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Google Chat Notification."""
 
         # Our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json; charset=utf-8',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json; charset=utf-8",
         }
 
         payload = {
             # Our Message
-            'text': body,
+            "text": body,
         }
 
         # Construct Notify URL
@@ -211,18 +218,19 @@ class NotifyGoogleChat(NotifyBase):
 
         params = {
             # Prepare our URL Parameters
-            'token': self.webhook_token,
-            'key': self.webhook_key,
+            "token": self.webhook_token,
+            "key": self.webhook_key,
         }
 
         if self.thread_key:
-            params['threadKey'] = self.thread_key
+            params["threadKey"] = self.thread_key
 
-        self.logger.debug('Google Chat POST URL: %s (cert_verify=%r)' % (
-            notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('Google Chat Parameters: %s' % str(params))
-        self.logger.debug('Google Chat Payload: %s' % str(payload))
+        self.logger.debug(
+            "Google Chat POST URL:"
+            f" {notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Google Chat Parameters: {params!s}")
+        self.logger.debug(f"Google Chat Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -236,75 +244,80 @@ class NotifyGoogleChat(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                    requests.codes.ok, requests.codes.no_content):
+                requests.codes.ok,
+                requests.codes.no_content,
+            ):
 
                 # We had a problem
-                status_str = \
-                    NotifyBase.http_response_code_lookup(r.status_code)
+                status_str = NotifyBase.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Google Chat notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Google Chat notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Google Chat notification.')
+                self.logger.info("Sent Google Chat notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred postingto Google Chat.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred postingto Google Chat."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
         return True
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
-            self.secure_protocol, self.workspace, self.webhook_key,
+            self.secure_protocol,
+            self.workspace,
+            self.webhook_key,
             self.webhook_token,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Set our parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{workspace}/{key}/{token}/{thread}?{params}'.format(
+        return "{schema}://{workspace}/{key}/{token}/{thread}?{params}".format(
             schema=self.secure_protocol,
-            workspace=self.pprint(self.workspace, privacy, safe=''),
-            key=self.pprint(self.webhook_key, privacy, safe=''),
-            token=self.pprint(self.webhook_token, privacy, safe=''),
-            thread='' if not self.thread_key
-            else self.pprint(self.thread_key, privacy, safe=''),
+            workspace=self.pprint(self.workspace, privacy, safe=""),
+            key=self.pprint(self.webhook_key, privacy, safe=""),
+            token=self.pprint(self.webhook_token, privacy, safe=""),
+            thread=(
+                ""
+                if not self.thread_key
+                else self.pprint(self.thread_key, privacy, safe="")
+            ),
             params=NotifyGoogleChat.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object.
 
         Syntax:
           gchat://workspace/webhook_key/webhook_token
           gchat://workspace/webhook_key/webhook_token/thread_key
-
         """
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -312,43 +325,48 @@ class NotifyGoogleChat(NotifyBase):
             return results
 
         # Store our Workspace
-        results['workspace'] = NotifyGoogleChat.unquote(results['host'])
+        results["workspace"] = NotifyGoogleChat.unquote(results["host"])
 
         # Acquire our tokens
-        tokens = NotifyGoogleChat.split_path(results['fullpath'])
+        tokens = NotifyGoogleChat.split_path(results["fullpath"])
 
         # Store our Webhook Key
-        results['webhook_key'] = tokens.pop(0) if tokens else None
+        results["webhook_key"] = tokens.pop(0) if tokens else None
 
         # Store our Webhook Token
-        results['webhook_token'] = tokens.pop(0) if tokens else None
+        results["webhook_token"] = tokens.pop(0) if tokens else None
 
         # Store our Thread Key
-        results['thread_key'] = tokens.pop(0) if tokens else None
+        results["thread_key"] = tokens.pop(0) if tokens else None
 
         # Support arguments as overrides (if specified)
-        if 'workspace' in results['qsd']:
-            results['workspace'] = \
-                NotifyGoogleChat.unquote(results['qsd']['workspace'])
+        if "workspace" in results["qsd"]:
+            results["workspace"] = NotifyGoogleChat.unquote(
+                results["qsd"]["workspace"]
+            )
 
-        if 'key' in results['qsd']:
-            results['webhook_key'] = \
-                NotifyGoogleChat.unquote(results['qsd']['key'])
+        if "key" in results["qsd"]:
+            results["webhook_key"] = NotifyGoogleChat.unquote(
+                results["qsd"]["key"]
+            )
 
-        if 'token' in results['qsd']:
-            results['webhook_token'] = \
-                NotifyGoogleChat.unquote(results['qsd']['token'])
+        if "token" in results["qsd"]:
+            results["webhook_token"] = NotifyGoogleChat.unquote(
+                results["qsd"]["token"]
+            )
 
-        if 'thread' in results['qsd']:
-            results['thread_key'] = \
-                NotifyGoogleChat.unquote(results['qsd']['thread'])
+        if "thread" in results["qsd"]:
+            results["thread_key"] = NotifyGoogleChat.unquote(
+                results["qsd"]["thread"]
+            )
 
-        elif 'threadkey' in results['qsd']:
+        elif "threadkey" in results["qsd"]:
             # Support Google Chat's Thread Key (if set)
             # keys are always made lowercase; so check above is attually
             # testing threadKey successfully as well
-            results['thread_key'] = \
-                NotifyGoogleChat.unquote(results['qsd']['threadkey'])
+            results["thread_key"] = NotifyGoogleChat.unquote(
+                results["qsd"]["threadkey"]
+            )
 
         return results
 
@@ -363,15 +381,19 @@ class NotifyGoogleChat(NotifyBase):
         """
 
         result = re.match(
-            r'^https://chat\.googleapis\.com/v1/spaces/'
-            r'(?P<workspace>[A-Z0-9_-]+)/messages/*(?P<params>.+)$',
-            url, re.I)
+            r"^https://chat\.googleapis\.com/v1/spaces/"
+            r"(?P<workspace>[A-Z0-9_-]+)/messages/*(?P<params>.+)$",
+            url,
+            re.I,
+        )
 
         if result:
             return NotifyGoogleChat.parse_url(
-                '{schema}://{workspace}/{params}'.format(
+                "{schema}://{workspace}/{params}".format(
                     schema=NotifyGoogleChat.secure_protocol,
-                    workspace=result.group('workspace'),
-                    params=result.group('params')))
+                    workspace=result.group("workspace"),
+                    params=result.group("params"),
+                )
+            )
 
         return None

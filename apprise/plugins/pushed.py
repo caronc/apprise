@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,44 +25,42 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-import requests
-from json import dumps
 from itertools import chain
+from json import dumps
+import re
 
-from .base import NotifyBase
-from ..url import PrivacyMode
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import parse_list, validate_regex
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import parse_list, validate_regex
+from .base import NotifyBase
 
 # Used to detect and parse channels
-IS_CHANNEL = re.compile(r'^#?(?P<name>[A-Za-z0-9]+)$')
+IS_CHANNEL = re.compile(r"^#?(?P<name>[A-Za-z0-9]+)$")
 
 # Used to detect and parse a users push id
-IS_USER_PUSHED_ID = re.compile(r'^@(?P<name>[A-Za-z0-9]+)$')
+IS_USER_PUSHED_ID = re.compile(r"^@(?P<name>[A-Za-z0-9]+)$")
 
 
 class NotifyPushed(NotifyBase):
-    """
-    A wrapper to Pushed Notifications
-
-    """
+    """A wrapper to Pushed Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Pushed'
+    service_name = "Pushed"
 
     # The services URL
-    service_url = 'https://pushed.co/'
+    service_url = "https://pushed.co/"
 
     # The default secure protocol
-    secure_protocol = 'pushed'
+    secure_protocol = "pushed"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushed'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushed"
 
     # Pushed uses the http protocol with JSON requests
-    notify_url = 'https://api.pushed.co/1/push'
+    notify_url = "https://api.pushed.co/1/push"
 
     # A title can not be used for Pushed Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
@@ -74,77 +71,83 @@ class NotifyPushed(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{app_key}/{app_secret}',
-        '{schema}://{app_key}/{app_secret}@{targets}',
+        "{schema}://{app_key}/{app_secret}",
+        "{schema}://{app_key}/{app_secret}@{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'app_key': {
-            'name': _('Application Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "app_key": {
+                "name": _("Application Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "app_secret": {
+                "name": _("Application Secret"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "target_user": {
+                "name": _("Target User"),
+                "prefix": "@",
+                "type": "string",
+                "map_to": "targets",
+            },
+            "target_channel": {
+                "name": _("Target Channel"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'app_secret': {
-            'name': _('Application Secret'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'target_user': {
-            'name': _('Target User'),
-            'prefix': '@',
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'target_channel': {
-            'name': _('Target Channel'),
-            'type': 'string',
-            'prefix': '#',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
         },
-    })
+    )
 
     def __init__(self, app_key, app_secret, targets=None, **kwargs):
-        """
-        Initialize Pushed Object
-
-        """
+        """Initialize Pushed Object."""
         super().__init__(**kwargs)
 
         # Application Key (associated with project)
         self.app_key = validate_regex(app_key)
         if not self.app_key:
-            msg = 'An invalid Pushed Application Key ' \
-                  '({}) was specified.'.format(app_key)
+            msg = (
+                f"An invalid Pushed Application Key ({app_key}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Access Secret (associated with project)
         self.app_secret = validate_regex(app_secret)
         if not self.app_secret:
-            msg = 'An invalid Pushed Application Secret ' \
-                  '({}) was specified.'.format(app_secret)
+            msg = (
+                "An invalid Pushed Application Secret "
+                f"({app_secret}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Initialize channel list
-        self.channels = list()
+        self.channels = []
 
         # Initialize user list
-        self.users = list()
+        self.users = []
 
         # Get our targets
         targets = parse_list(targets)
@@ -154,43 +157,40 @@ class NotifyPushed(NotifyBase):
                 result = IS_CHANNEL.match(target)
                 if result:
                     # store valid device
-                    self.channels.append(result.group('name'))
+                    self.channels.append(result.group("name"))
                     continue
 
                 result = IS_USER_PUSHED_ID.match(target)
                 if result:
                     # store valid room
-                    self.users.append(result.group('name'))
+                    self.users.append(result.group("name"))
                     continue
 
                 self.logger.warning(
-                    'Dropped invalid channel/userid '
-                    '(%s) specified.' % target,
+                    f"Dropped invalid channel/userid ({target}) specified.",
                 )
 
             if len(self.channels) + len(self.users) == 0:
                 # We have no valid channels or users to notify after
                 # explicitly identifying at least one.
-                msg = 'No Pushed targets to notify.'
+                msg = "No Pushed targets to notify."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Pushed Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Pushed Notification."""
 
         # Initiaize our error tracking
         has_error = False
 
         # prepare JSON Object
         payload = {
-            'app_key': self.app_key,
-            'app_secret': self.app_secret,
-            'target_type': 'app',
-            'content': body,
+            "app_key": self.app_key,
+            "app_secret": self.app_secret,
+            "target_type": "app",
+            "content": body,
         }
 
         # So the logic is as follows:
@@ -203,7 +203,8 @@ class NotifyPushed(NotifyBase):
         if len(self.channels) + len(self.users) == 0:
             # Just notify the app
             return self._send(
-                payload=payload, notify_type=notify_type, **kwargs)
+                payload=payload, notify_type=notify_type, **kwargs
+            )
 
         # If our code reaches here, we want to target channels and users (by
         # their Pushed_ID instead...
@@ -214,29 +215,31 @@ class NotifyPushed(NotifyBase):
 
         # Copy our payload
         _payload = dict(payload)
-        _payload['target_type'] = 'channel'
+        _payload["target_type"] = "channel"
 
         while len(channels) > 0:
             # Get Channel
-            _payload['target_alias'] = channels.pop(0)
+            _payload["target_alias"] = channels.pop(0)
 
             if not self._send(
-                    payload=_payload, notify_type=notify_type, **kwargs):
+                payload=_payload, notify_type=notify_type, **kwargs
+            ):
 
                 # toggle flag
                 has_error = True
 
         # Copy our payload
         _payload = dict(payload)
-        _payload['target_type'] = 'pushed_id'
+        _payload["target_type"] = "pushed_id"
 
         # Send all our defined User Pushed ID's
         while len(users):
             # Get User's Pushed ID
-            _payload['pushed_id'] = users.pop(0)
+            _payload["pushed_id"] = users.pop(0)
 
             if not self._send(
-                    payload=_payload, notify_type=notify_type, **kwargs):
+                payload=_payload, notify_type=notify_type, **kwargs
+            ):
 
                 # toggle flag
                 has_error = True
@@ -244,21 +247,23 @@ class NotifyPushed(NotifyBase):
         return not has_error
 
     def _send(self, payload, notify_type, **kwargs):
-        """
-        A lower level call that directly pushes a payload to the Pushed
-        Notification servers.  This should never be called directly; it is
-        referenced automatically through the send() function.
+        """A lower level call that directly pushes a payload to the Pushed
+        Notification servers.
+
+        This should never be called directly; it is referenced automatically
+        through the send() function.
         """
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json'
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
-        self.logger.debug('Pushed POST URL: %s (cert_verify=%r)' % (
-            self.notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('Pushed Payload: %s' % str(payload))
+        self.logger.debug(
+            "Pushed POST URL:"
+            f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Pushed Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -274,28 +279,29 @@ class NotifyPushed(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyPushed.http_response_code_lookup(r.status_code)
+                status_str = NotifyPushed.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Pushed notification:'
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Pushed notification:{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Pushed notification.')
+                self.logger.info("Sent Pushed notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Pushed notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Pushed notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -304,58 +310,55 @@ class NotifyPushed(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.app_key, self.app_secret)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{app_key}/{app_secret}/{targets}/?{params}'.format(
+        return "{schema}://{app_key}/{app_secret}/{targets}/?{params}".format(
             schema=self.secure_protocol,
-            app_key=self.pprint(self.app_key, privacy, safe=''),
+            app_key=self.pprint(self.app_key, privacy, safe=""),
             app_secret=self.pprint(
-                self.app_secret, privacy, mode=PrivacyMode.Secret, safe=''),
-            targets='/'.join(
-                [NotifyPushed.quote(x) for x in chain(
+                self.app_secret, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
+            targets="/".join([
+                NotifyPushed.quote(x)
+                for x in chain(
                     # Channels are prefixed with a pound/hashtag symbol
-                    ['#{}'.format(x) for x in self.channels],
+                    [f"#{x}" for x in self.channels],
                     # Users are prefixed with an @ symbol
-                    ['@{}'.format(x) for x in self.users],
-                )]),
-            params=NotifyPushed.urlencode(params))
+                    [f"@{x}" for x in self.users],
+                )
+            ]),
+            params=NotifyPushed.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         targets = len(self.channels) + len(self.users)
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The first token is stored in the hostname
-        app_key = NotifyPushed.unquote(results['host'])
+        app_key = NotifyPushed.unquote(results["host"])
 
-        entries = NotifyPushed.split_path(results['fullpath'])
+        entries = NotifyPushed.split_path(results["fullpath"])
         # Now fetch the remaining tokens
         try:
             app_secret = entries.pop(0)
@@ -367,14 +370,13 @@ class NotifyPushed(NotifyBase):
             app_key = None
 
         # Get our recipients (based on remaining entries)
-        results['targets'] = entries
+        results["targets"] = entries
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyPushed.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyPushed.parse_list(results["qsd"]["to"])
 
-        results['app_key'] = app_key
-        results['app_secret'] = app_secret
+        results["app_key"] = app_key
+        results["app_secret"] = app_secret
 
         return results

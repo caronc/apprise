@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,55 +25,56 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import sys
-import re
-from .logger import logger
-import time
-import hashlib
 from datetime import datetime
+import hashlib
+import re
+import sys
+import time
+from urllib.parse import quote as _quote, unquote as _unquote
 from xml.sax.saxutils import escape as sax_escape
 
-from urllib.parse import unquote as _unquote
-from urllib.parse import quote as _quote
-
-from .locale import gettext_lazy as _
 from .asset import AppriseAsset
+from .locale import gettext_lazy as _
+from .logger import logger
 from .utils.parse import (
-    urlencode, parse_url, parse_bool, parse_list, parse_phone_no)
+    parse_bool,
+    parse_list,
+    parse_phone_no,
+    parse_url,
+    urlencode,
+)
 
 # Used to break a path list into parts
-PATHSPLIT_LIST_DELIM = re.compile(r'[ \t\r\n,\\/]+')
+PATHSPLIT_LIST_DELIM = re.compile(r"[ \t\r\n,\\/]+")
 
 
 class PrivacyMode:
     # Defines different privacy modes strings can be printed as
     # Astrisk sets 4 of them: e.g. ****
     # This is used for passwords
-    Secret = '*'
+    Secret = "*"
 
     # Outer takes the first and last character displaying them with
     # 3 dots between.  Hence, 'i-am-a-token' would become 'i...n'
-    Outer = 'o'
+    Outer = "o"
 
     # Displays the last four characters
-    Tail = 't'
+    Tail = "t"
 
 
 # Define the HTML Lookup Table
 HTML_LOOKUP = {
-    400: 'Bad Request - Unsupported Parameters.',
-    401: 'Verification Failed.',
-    404: 'Page not found.',
-    405: 'Method not allowed.',
-    500: 'Internal server error.',
-    503: 'Servers are overloaded.',
+    400: "Bad Request - Unsupported Parameters.",
+    401: "Verification Failed.",
+    404: "Page not found.",
+    405: "Method not allowed.",
+    500: "Internal server error.",
+    503: "Servers are overloaded.",
 }
 
 
 class URLBase:
-    """
-    This is the base class for all URL Manipulation
-    """
+    """This is the base class for all URL Manipulation."""
 
     # The default descriptive name associated with the URL
     service_name = None
@@ -137,21 +137,21 @@ class URLBase:
     # These act the same way as tokens except they are optional and/or
     # have default values set if mandatory. This rule must be followed
     template_args = {
-        'verify': {
-            'name': _('Verify SSL'),
+        "verify": {
+            "name": _("Verify SSL"),
             # SSL Certificate Authority Verification
-            'type': 'bool',
+            "type": "bool",
             # Provide a default
-            'default': verify_certificate,
+            "default": verify_certificate,
             # look up default using the following parent class value at
             # runtime.
-            '_lookup_default': 'verify_certificate',
+            "_lookup_default": "verify_certificate",
         },
-        'rto': {
-            'name': _('Socket Read Timeout'),
-            'type': 'float',
+        "rto": {
+            "name": _("Socket Read Timeout"),
+            "type": "float",
             # Provide a default
-            'default': socket_read_timeout,
+            "default": socket_read_timeout,
             # look up default using the following parent class value at
             # runtime. The variable name identified here (in this case
             # socket_read_timeout) is checked and it's result is placed
@@ -159,13 +159,13 @@ class URLBase:
             # class inherits this one, the overflow_mode already set as a
             # default 'could' be potentially over-ridden and changed to a
             # different value.
-            '_lookup_default': 'socket_read_timeout',
+            "_lookup_default": "socket_read_timeout",
         },
-        'cto': {
-            'name': _('Socket Connect Timeout'),
-            'type': 'float',
+        "cto": {
+            "name": _("Socket Connect Timeout"),
+            "type": "float",
             # Provide a default
-            'default': socket_connect_timeout,
+            "default": socket_connect_timeout,
             # look up default using the following parent class value at
             # runtime. The variable name identified here (in this case
             # socket_connect_timeout) is checked and it's result is placed
@@ -173,7 +173,7 @@ class URLBase:
             # class inherits this one, the overflow_mode already set as a
             # default 'could' be potentially over-ridden and changed to a
             # different value.
-            '_lookup_default': 'socket_connect_timeout',
+            "_lookup_default": "socket_connect_timeout",
         },
     }
 
@@ -197,91 +197,90 @@ class URLBase:
     # Internal Values
 
     def __init__(self, asset=None, **kwargs):
-        """
-        Initialize some general logging and common server arguments that will
-        keep things consistent when working with the children that
-        inherit this class.
-
-        """
+        """Initialize some general logging and common server arguments that
+        will keep things consistent when working with the children that inherit
+        this class."""
         # Prepare our Asset Object
-        self.asset = \
+        self.asset = (
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        )
 
         # Certificate Verification (for SSL calls); default to being enabled
         self.verify_certificate = parse_bool(
-            kwargs.get('verify', URLBase.verify_certificate))
+            kwargs.get("verify", URLBase.verify_certificate)
+        )
 
         # Schema
-        self.schema = kwargs.get('schema', 'unknown').lower()
+        self.schema = kwargs.get("schema", "unknown").lower()
 
         # Secure Mode
-        self.secure = kwargs.get('secure', None)
+        self.secure = kwargs.get("secure")
         if not isinstance(self.secure, bool):
             # Attempt to detect
-            self.secure = self.schema[-1:] == 's'
+            self.secure = self.schema[-1:] == "s"
 
-        self.host = URLBase.unquote(kwargs.get('host'))
-        self.port = kwargs.get('port')
+        self.host = URLBase.unquote(kwargs.get("host"))
+        self.port = kwargs.get("port")
         if self.port:
             try:
                 self.port = int(self.port)
 
             except (TypeError, ValueError):
                 self.logger.warning(
-                    'Invalid port number specified {}'
-                    .format(self.port))
+                    f"Invalid port number specified {self.port}"
+                )
                 self.port = None
 
-        self.user = kwargs.get('user')
+        self.user = kwargs.get("user")
         if self.user:
             # Always unquote user if it exists
             self.user = URLBase.unquote(self.user)
 
-        self.password = kwargs.get('password')
+        self.password = kwargs.get("password")
         if self.password:
             # Always unquote the password if it exists
             self.password = URLBase.unquote(self.password)
 
         # Store our full path consistently ensuring it ends with a `/'
-        self.fullpath = URLBase.unquote(kwargs.get('fullpath'))
+        self.fullpath = URLBase.unquote(kwargs.get("fullpath"))
         if not isinstance(self.fullpath, str) or not self.fullpath:
-            self.fullpath = '/'
+            self.fullpath = "/"
 
         # Store our Timeout Variables
-        if 'rto' in kwargs:
+        if "rto" in kwargs:
             try:
-                self.socket_read_timeout = float(kwargs.get('rto'))
+                self.socket_read_timeout = float(kwargs.get("rto"))
             except (TypeError, ValueError):
                 self.logger.warning(
-                    'Invalid socket read timeout (rto) was specified {}'
-                    .format(kwargs.get('rto')))
+                    "Invalid socket read timeout (rto) was specified {}"
+                    .format(kwargs.get("rto"))
+                )
 
-        if 'cto' in kwargs:
+        if "cto" in kwargs:
             try:
-                self.socket_connect_timeout = float(kwargs.get('cto'))
+                self.socket_connect_timeout = float(kwargs.get("cto"))
 
             except (TypeError, ValueError):
                 self.logger.warning(
-                    'Invalid socket connect timeout (cto) was specified {}'
-                    .format(kwargs.get('cto')))
+                    "Invalid socket connect timeout (cto) was specified {}"
+                    .format(kwargs.get("cto"))
+                )
 
-        if 'tag' in kwargs:
+        if "tag" in kwargs:
             # We want to associate some tags with our notification service.
             # the code below gets the 'tag' argument if defined, otherwise
             # it just falls back to whatever was already defined globally
-            self.tags = set(parse_list(kwargs.get('tag'), self.tags))
+            self.tags = set(parse_list(kwargs.get("tag"), self.tags))
 
         # Tracks the time any i/o was made to the remote server.  This value
         # is automatically set and controlled through the throttle() call.
         self._last_io_datetime = None
 
     def throttle(self, last_io=None, wait=None):
-        """
-        A common throttle control
+        """A common throttle control.
 
-        if a wait is specified, then it will force a sleep of the
-        specified time if it is larger then the calculated throttle
-        time.
+        if a wait is specified, then it will force a sleep of the specified
+        time if it is larger then the calculated throttle time.
         """
 
         if last_io is not None:
@@ -308,12 +307,13 @@ class URLBase:
         elapsed = (reference - self._last_io_datetime).total_seconds()
 
         if wait is not None:
-            self.logger.debug('Throttling forced for {}s...'.format(wait))
+            self.logger.debug(f"Throttling forced for {wait}s...")
             time.sleep(wait)
 
         elif elapsed < self.request_rate_per_sec:
-            self.logger.debug('Throttling for {}s...'.format(
-                self.request_rate_per_sec - elapsed))
+            self.logger.debug(
+                f"Throttling for {self.request_rate_per_sec - elapsed}s..."
+            )
             time.sleep(self.request_rate_per_sec - elapsed)
 
         # Update our timestamp before we leave
@@ -321,47 +321,49 @@ class URLBase:
         return
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Assembles the URL associated with the notification based on the
-        arguments provied.
-
-        """
+        """Assembles the URL associated with the notification based on the
+        arguments provied."""
 
         # Our default parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=URLBase.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=URLBase.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=URLBase.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=URLBase.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}{params}'.format(
-            schema='https' if self.secure else 'http',
+        return "{schema}://{auth}{hostname}{port}{fullpath}{params}".format(
+            schema="https" if self.secure else "http",
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=URLBase.quote(self.fullpath, safe='/')
-            if self.fullpath else '/',
-            params=('?' + URLBase.urlencode(params) if params else ''),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=(
+                URLBase.quote(self.fullpath, safe="/")
+                if self.fullpath
+                else "/"
+            ),
+            params=("?" + URLBase.urlencode(params) if params else ""),
         )
 
     def url_id(self, lazy=True, hash_engine=hashlib.sha256):
-        """
-        Returns a unique URL identifier that representing the Apprise URL
-        itself. The url_id is always a hash string or None if it can't
-        be generated.
+        """Returns a unique URL identifier that representing the Apprise URL
+        itself. The url_id is always a hash string or None if it can't be
+        generated.
 
         The idea is to only build the ID based on the credentials or specific
         elements relative to the URL itself. The URL ID should never factor in
@@ -385,18 +387,21 @@ class URLBase:
         Hence the following would all return the same URL Identifier:
              json://abc/def/ghi?image=no
              json://abc/def/ghi/?test=yes&image=yes
-
         """
 
         if lazy and self.__cached_url_identifier is not False:
-            return self.__cached_url_identifier \
-                if not (self.__cached_url_identifier
-                        and self.asset.storage_idlen) \
-                else self.__cached_url_identifier[:self.asset.storage_idlen]
+            return (
+                self.__cached_url_identifier
+                if not (
+                    self.__cached_url_identifier and self.asset.storage_idlen
+                )
+                else self.__cached_url_identifier[: self.asset.storage_idlen]
+            )
 
         # Python v3.9 introduces usedforsecurity argument
-        kwargs = {'usedforsecurity': False} \
-            if sys.version_info >= (3, 9) else {}
+        kwargs = (
+            {"usedforsecurity": False} if sys.version_info >= (3, 9) else {}
+        )
 
         if self.url_identifier is False:
             # Disabled
@@ -406,71 +411,98 @@ class URLBase:
 
             # Prepare our object
             engine = hash_engine(
-                self.asset.storage_salt + self.schema.encode(
-                    self.asset.encoding), **kwargs)
+                self.asset.storage_salt
+                + self.schema.encode(self.asset.encoding),
+                **kwargs,
+            )
 
             # We want to treat `None` differently then a blank entry
             engine.update(
-                b'\0' if self.password is None
-                else self.password.encode(self.asset.encoding))
+                b"\0"
+                if self.password is None
+                else self.password.encode(self.asset.encoding)
+            )
             engine.update(
-                b'\0' if self.user is None
-                else self.user.encode(self.asset.encoding))
+                b"\0"
+                if self.user is None
+                else self.user.encode(self.asset.encoding)
+            )
             engine.update(
-                b'\0' if not self.host
-                else self.host.encode(self.asset.encoding))
+                b"\0"
+                if not self.host
+                else self.host.encode(self.asset.encoding)
+            )
             engine.update(
-                b'\0' if self.port is None
-                else f'{self.port}'.encode(self.asset.encoding))
+                b"\0"
+                if self.port is None
+                else f"{self.port}".encode(self.asset.encoding)
+            )
             engine.update(
-                self.fullpath.rstrip('/').encode(self.asset.encoding))
-            engine.update(b's' if self.secure else b'i')
+                self.fullpath.rstrip("/").encode(self.asset.encoding)
+            )
+            engine.update(b"s" if self.secure else b"i")
 
             # Save our generated content
             self.__cached_url_identifier = engine.hexdigest()
 
         elif isinstance(self.url_identifier, str):
             self.__cached_url_identifier = hash_engine(
-                self.asset.storage_salt + self.url_identifier.encode(
-                    self.asset.encoding), **kwargs).hexdigest()
+                self.asset.storage_salt
+                + self.url_identifier.encode(self.asset.encoding),
+                **kwargs,
+            ).hexdigest()
 
         elif isinstance(self.url_identifier, bytes):
             self.__cached_url_identifier = hash_engine(
-                self.asset.storage_salt + self.url_identifier,
-                **kwargs).hexdigest()
+                self.asset.storage_salt + self.url_identifier, **kwargs
+            ).hexdigest()
 
         elif isinstance(self.url_identifier, (list, tuple, set)):
             self.__cached_url_identifier = hash_engine(
-                self.asset.storage_salt + b''.join([
-                    (x if isinstance(x, bytes)
-                     else str(x).encode(self.asset.encoding))
-                    for x in self.url_identifier]), **kwargs).hexdigest()
+                self.asset.storage_salt
+                + b"".join([
+                    (
+                        x
+                        if isinstance(x, bytes)
+                        else str(x).encode(self.asset.encoding)
+                    )
+                    for x in self.url_identifier
+                ]),
+                **kwargs,
+            ).hexdigest()
 
         elif isinstance(self.url_identifier, dict):
             self.__cached_url_identifier = hash_engine(
-                self.asset.storage_salt + b''.join([
-                    (x if isinstance(x, bytes)
-                     else str(x).encode(self.asset.encoding))
-                    for x in self.url_identifier.values()]),
-                **kwargs).hexdigest()
+                self.asset.storage_salt
+                + b"".join([
+                    (
+                        x
+                        if isinstance(x, bytes)
+                        else str(x).encode(self.asset.encoding)
+                    )
+                    for x in self.url_identifier.values()
+                ]),
+                **kwargs,
+            ).hexdigest()
 
         else:
             self.__cached_url_identifier = hash_engine(
-                self.asset.storage_salt + str(
-                    self.url_identifier).encode(self.asset.encoding),
-                **kwargs).hexdigest()
+                self.asset.storage_salt
+                + str(self.url_identifier).encode(self.asset.encoding),
+                **kwargs,
+            ).hexdigest()
 
-        return self.__cached_url_identifier \
-            if not (self.__cached_url_identifier
-                    and self.asset.storage_idlen) \
-            else self.__cached_url_identifier[:self.asset.storage_idlen]
+        return (
+            self.__cached_url_identifier
+            if not (self.__cached_url_identifier and self.asset.storage_idlen)
+            else self.__cached_url_identifier[: self.asset.storage_idlen]
+        )
 
     def __contains__(self, tags):
-        """
-        Returns true if the tag specified is associated with this notification.
+        """Returns true if the tag specified is associated with this
+        notification.
 
         tag can also be a tuple, set, and/or list
-
         """
         if isinstance(tags, (tuple, set, list)):
             return bool(set(tags) & self.tags)
@@ -479,16 +511,13 @@ class URLBase:
         return tags in self.tags
 
     def __str__(self):
-        """
-        Returns the url path
-        """
+        """Returns the url path."""
         return self.url(privacy=True)
 
     @staticmethod
     def escape_html(html, convert_new_lines=False, whitespace=True):
-        """
-        Takes html text as input and escapes it so that it won't
-        conflict with any xml/html wrapping characters.
+        """Takes html text as input and escapes it so that it won't conflict
+        with any xml/html wrapping characters.
 
         Args:
             html (str): The HTML code to escape
@@ -499,28 +528,25 @@ class URLBase:
             str: The escaped html
         """
         if not isinstance(html, str) or not html:
-            return ''
+            return ""
 
         # Escape HTML
-        escaped = sax_escape(html, {"'": "&apos;", "\"": "&quot;"})
+        escaped = sax_escape(html, {"'": "&apos;", '"': "&quot;"})
 
         if whitespace:
             # Tidy up whitespace too
-            escaped = escaped\
-                .replace(u'\t', u'&emsp;')\
-                .replace(u' ', u'&nbsp;')
+            escaped = escaped.replace("\t", "&emsp;").replace(" ", "&nbsp;")
 
         if convert_new_lines:
-            return escaped.replace(u'\n', u'<br/>')
+            return escaped.replace("\n", "<br/>")
 
         return escaped
 
     @staticmethod
-    def unquote(content, encoding='utf-8', errors='replace'):
-        """
-        Replace %xx escapes by their single-character equivalent. The optional
-        encoding and errors parameters specify how to decode percent-encoded
-        sequences.
+    def unquote(content, encoding="utf-8", errors="replace"):
+        """Replace %xx escapes by their single-character equivalent. The
+        optional encoding and errors parameters specify how to decode percent-
+        encoded sequences.
 
         Wrapper to Python's `unquote` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
@@ -539,14 +565,14 @@ class URLBase:
             str: The unquoted URI string
         """
         if not content:
-            return ''
+            return ""
 
         return _unquote(content, encoding=encoding, errors=errors)
 
     @staticmethod
-    def quote(content, safe='/', encoding=None, errors=None):
-        """ Replaces single character non-ascii characters and URI specific
-        ones by their %xx code.
+    def quote(content, safe="/", encoding=None, errors=None):
+        """Replaces single character non-ascii characters and URI specific ones
+        by their %xx code.
 
         Wrapper to Python's `quote` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
@@ -566,17 +592,23 @@ class URLBase:
             str: The quoted URI string
         """
         if not content:
-            return ''
+            return ""
 
         return _quote(content, safe=safe, encoding=encoding, errors=errors)
 
     @staticmethod
-    def pprint(content, privacy=True, mode=PrivacyMode.Outer,
-               # privacy print; quoting is ignored when privacy is set to True
-               quote=True, safe='/', encoding=None, errors=None):
-        """
-        Privacy Print is used to mainpulate the string before passing it into
-        part of the URL.  It is used to mask/hide private details such as
+    def pprint(
+        content,
+        privacy=True,
+        mode=PrivacyMode.Outer,
+        # privacy print; quoting is ignored when privacy is set to True
+        quote=True,
+        safe="/",
+        encoding=None,
+        errors=None,
+    ):
+        """Privacy Print is used to mainpulate the string before passing it
+        into part of the URL.  It is used to mask/hide private details such as
         tokens, passwords, apikeys, etc from on-lookers.  If the privacy=False
         is set, then the quote variable is the next flag checked.
 
@@ -588,29 +620,30 @@ class URLBase:
             if quote:
                 # Return quoted string if specified to do so
                 return URLBase.quote(
-                    content, safe=safe, encoding=encoding, errors=errors)
+                    content, safe=safe, encoding=encoding, errors=errors
+                )
 
                 # Return content 'as-is'
             return content
 
         if mode is PrivacyMode.Secret:
             # Return 4 Asterisks
-            return '****'
+            return "****"
 
         if not isinstance(content, str) or not content:
             # Nothing more to do
-            return ''
+            return ""
 
         if mode is PrivacyMode.Tail:
             # Return the trailing 4 characters
-            return '...{}'.format(content[-4:])
+            return f"...{content[-4:]}"
 
         # Default mode is Outer Mode
-        return '{}...{}'.format(content[0:1], content[-1:])
+        return f"{content[0:1]}...{content[-1:]}"
 
     @staticmethod
-    def urlencode(query, doseq=False, safe='', encoding=None, errors=None):
-        """Convert a mapping object or a sequence of two-element tuples
+    def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
+        """Convert a mapping object or a sequence of two-element tuples.
 
         Wrapper to Python's `urlencode` while remaining compatible with both
         Python 2 & 3 since the reference to this function changed between
@@ -638,7 +671,8 @@ class URLBase:
             str: The escaped parameters returned as a string
         """
         return urlencode(
-            query, doseq=doseq, safe=safe, encoding=encoding, errors=errors)
+            query, doseq=doseq, safe=safe, encoding=encoding, errors=errors
+        )
 
     @staticmethod
     def split_path(path, unquote=True):
@@ -656,10 +690,9 @@ class URLBase:
         """
 
         try:
-            paths = PATHSPLIT_LIST_DELIM.split(path.lstrip('/'))
+            paths = PATHSPLIT_LIST_DELIM.split(path.lstrip("/"))
             if unquote:
-                paths = \
-                    [URLBase.unquote(x) for x in filter(bool, paths)]
+                paths = [URLBase.unquote(x) for x in filter(bool, paths)]
 
         except AttributeError:
             # path is not useable, we still want to gracefully return an
@@ -670,7 +703,7 @@ class URLBase:
 
     @staticmethod
     def parse_list(content, allow_whitespace=True, unquote=True):
-        """A wrapper to utils.parse_list() with unquoting support
+        """A wrapper to utils.parse_list() with unquoting support.
 
         Parses a specified set of data and breaks it into a list.
 
@@ -690,14 +723,13 @@ class URLBase:
 
         content = parse_list(content, allow_whitespace=allow_whitespace)
         if unquote:
-            content = \
-                [URLBase.unquote(x) for x in filter(bool, content)]
+            content = [URLBase.unquote(x) for x in filter(bool, content)]
 
         return content
 
     @staticmethod
     def parse_phone_no(content, unquote=True, prefix=False):
-        """A wrapper to utils.parse_phone_no() with unquoting support
+        """A wrapper to utils.parse_phone_no() with unquoting support.
 
         Parses a specified set of data and breaks it into a list.
 
@@ -725,58 +757,52 @@ class URLBase:
 
     @property
     def app_id(self):
-        return self.asset.app_id if self.asset.app_id else ''
+        return self.asset.app_id if self.asset.app_id else ""
 
     @property
     def app_desc(self):
-        return self.asset.app_desc if self.asset.app_desc else ''
+        return self.asset.app_desc if self.asset.app_desc else ""
 
     @property
     def app_url(self):
-        return self.asset.app_url if self.asset.app_url else ''
+        return self.asset.app_url if self.asset.app_url else ""
 
     @property
     def request_timeout(self):
         """This is primarily used to fullfill the `timeout` keyword argument
-        that is used by requests.get() and requests.put() calls.
-        """
+        that is used by requests.get() and requests.put() calls."""
         return (self.socket_connect_timeout, self.socket_read_timeout)
 
     @property
     def request_auth(self):
-        """This is primarily used to fullfill the `auth` keyword argument
-        that is used by requests.get() and requests.put() calls.
-        """
+        """This is primarily used to fullfill the `auth` keyword argument that
+        is used by requests.get() and requests.put() calls."""
         return (self.user, self.password) if self.user else None
 
     @property
     def request_url(self):
-        """
-        Assemble a simple URL that can be used by the requests library
-
-        """
+        """Assemble a simple URL that can be used by the requests library."""
 
         # Acquire our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
         # Prepare our URL
-        url = '%s://%s' % (schema, self.host)
+        url = f"{schema}://{self.host}"
 
         # Apply Port information if present
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         # Append our full path
         return url + self.fullpath
 
     def url_parameters(self, *args, **kwargs):
-        """
-        Provides a default set of args to work with. This can greatly
+        """Provides a default set of args to work with. This can greatly
         simplify URL construction in the acommpanied url() function.
 
-        The following property returns a dictionary (of strings) containing
-        all of the parameters that can be set on a URL and managed through
-        this class.
+        The following property returns a dictionary (of strings) containing all
+        of the parameters that can be set on a URL and managed through this
+        class.
         """
 
         # parameters are only provided on demand to keep the URL short
@@ -784,94 +810,97 @@ class URLBase:
 
         # The socket read timeout
         if self.socket_read_timeout != URLBase.socket_read_timeout:
-            params['rto'] = str(self.socket_read_timeout)
+            params["rto"] = str(self.socket_read_timeout)
 
         # The request/socket connect timeout
         if self.socket_connect_timeout != URLBase.socket_connect_timeout:
-            params['cto'] = str(self.socket_connect_timeout)
+            params["cto"] = str(self.socket_connect_timeout)
 
         # Certificate verification
         if self.verify_certificate != URLBase.verify_certificate:
-            params['verify'] = 'yes' if self.verify_certificate else 'no'
+            params["verify"] = "yes" if self.verify_certificate else "no"
 
         return params
 
     @staticmethod
     def post_process_parse_url_results(results):
-        """
-        After parsing the URL, this function applies a bit of extra logic to
-        support extra entries like `pass` becoming `password`, etc
+        """After parsing the URL, this function applies a bit of extra logic to
+        support extra entries like `pass` becoming `password`, etc.
 
-        This function assumes that parse_url() was called previously setting
-        up the basics to be checked
+        This function assumes that parse_url() was called previously setting up
+        the basics to be checked
         """
 
         # if our URL ends with an 's', then assume our secure flag is set.
-        results['secure'] = (results['schema'][-1] == 's')
+        results["secure"] = results["schema"][-1] == "s"
 
         # QSD Checking (over-rides all)
-        qsd_exists = True if isinstance(results.get('qsd'), dict) else False
+        qsd_exists = bool(isinstance(results.get("qsd"), dict))
 
-        if qsd_exists and 'verify' in results['qsd']:
+        if qsd_exists and "verify" in results["qsd"]:
             # Pulled from URL String
-            results['verify'] = parse_bool(
-                results['qsd'].get('verify', True))
+            results["verify"] = parse_bool(results["qsd"].get("verify", True))
 
-        elif 'verify' in results:
+        elif "verify" in results:
             # Pulled from YAML Configuratoin
-            results['verify'] = parse_bool(results.get('verify', True))
+            results["verify"] = parse_bool(results.get("verify", True))
 
         else:
             # Support SSL Certificate 'verify' keyword. Default to being
             # enabled
-            results['verify'] = True
+            results["verify"] = True
 
         # Password overrides
-        if 'pass' in results:
-            results['password'] = results['pass']
-            del results['pass']
+        if "pass" in results:
+            results["password"] = results["pass"]
+            del results["pass"]
 
         if qsd_exists:
-            if 'password' in results['qsd']:
-                results['password'] = results['qsd']['password']
-            if 'pass' in results['qsd']:
-                results['password'] = results['qsd']['pass']
+            if "password" in results["qsd"]:
+                results["password"] = results["qsd"]["password"]
+            if "pass" in results["qsd"]:
+                results["password"] = results["qsd"]["pass"]
 
             # User overrides
-            if 'user' in results['qsd']:
-                results['user'] = results['qsd']['user']
+            if "user" in results["qsd"]:
+                results["user"] = results["qsd"]["user"]
 
             # parse_url() always creates a 'password' and 'user' entry in the
             # results returned.  Entries are set to None if they weren't
             # specified
-            if results['password'] is None and 'user' in results['qsd']:
+            if results["password"] is None and "user" in results["qsd"]:
                 # Handle cases where the user= provided in 2 locations, we want
                 # the original to fall back as a being a password (if one
                 # wasn't otherwise defined) e.g.
                 #    mailtos://PASSWORD@hostname?user=admin@mail-domain.com
                 # - in the above, the PASSWORD gets lost in the parse url()
                 #   since a user= over-ride is specified.
-                presults = parse_url(results['url'])
+                presults = parse_url(results["url"])
                 if presults:
                     # Store our Password
-                    results['password'] = presults['user']
+                    results["password"] = presults["user"]
 
             # Store our socket read timeout if specified
-            if 'rto' in results['qsd']:
-                results['rto'] = results['qsd']['rto']
+            if "rto" in results["qsd"]:
+                results["rto"] = results["qsd"]["rto"]
 
             # Store our socket connect timeout if specified
-            if 'cto' in results['qsd']:
-                results['cto'] = results['qsd']['cto']
+            if "cto" in results["qsd"]:
+                results["cto"] = results["qsd"]["cto"]
 
-            if 'port' in results['qsd']:
-                results['port'] = results['qsd']['port']
+            if "port" in results["qsd"]:
+                results["port"] = results["qsd"]["port"]
 
         return results
 
     @staticmethod
-    def parse_url(url, verify_host=True, plus_to_space=False,
-                  strict_port=False, sanitize=True):
+    def parse_url(
+        url,
+        verify_host=True,
+        plus_to_space=False,
+        strict_port=False,
+        sanitize=True,
+    ):
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
@@ -891,9 +920,13 @@ class URLBase:
         """
 
         results = parse_url(
-            url, default_schema='unknown', verify_host=verify_host,
-            plus_to_space=plus_to_space, strict_port=strict_port,
-            sanitize=sanitize)
+            url,
+            default_schema="unknown",
+            verify_host=verify_host,
+            plus_to_space=plus_to_space,
+            strict_port=strict_port,
+            sanitize=sanitize,
+        )
 
         if not results:
             # We're done; we failed to parse our url
@@ -903,8 +936,8 @@ class URLBase:
 
     @staticmethod
     def http_response_code_lookup(code, response_mask=None):
-        """Parses the interger response code returned by a remote call from
-        a web request into it's human readable string version.
+        """Parses the interger response code returned by a remote call from a
+        web request into it's human readable string version.
 
         You can over-ride codes or add new ones by providing your own
         response_mask that contains a dictionary of integer -> string mapped
@@ -919,13 +952,12 @@ class URLBase:
             response = HTML_LOOKUP[code]
 
         except KeyError:
-            response = ''
+            response = ""
 
         return response
 
     def __len__(self):
-        """
-        Should be over-ridden and allows the tracking of how many targets
+        """Should be over-ridden and allows the tracking of how many targets
         are associated with each URLBase object.
 
         Default is always 1
@@ -933,14 +965,12 @@ class URLBase:
         return 1
 
     def schemas(self):
-        """A simple function that returns a set of all schemas associated
-        with this object based on the object.protocol and
-        object.secure_protocol
-        """
+        """A simple function that returns a set of all schemas associated with
+        this object based on the object.protocol and object.secure_protocol."""
 
-        schemas = set([])
+        schemas = set()
 
-        for key in ('protocol', 'secure_protocol'):
+        for key in ("protocol", "secure_protocol"):
             schema = getattr(self, key, None)
             if isinstance(schema, str):
                 schemas.add(schema)

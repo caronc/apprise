@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,35 +25,34 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from json import dumps
+
 import requests
 
-from json import dumps
-from .base import NotifyBase
-from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils.parse import parse_list
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import parse_list
+from .base import NotifyBase
 
 
 class NotifyNextcloudTalk(NotifyBase):
-    """
-    A wrapper for Nextcloud Talk Notifications
-    """
+    """A wrapper for Nextcloud Talk Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = _('Nextcloud Talk')
+    service_name = _("Nextcloud Talk")
 
     # The services URL
-    service_url = 'https://nextcloud.com/talk'
+    service_url = "https://nextcloud.com/talk"
 
     # Insecure protocol (for those self hosted requests)
-    protocol = 'nctalk'
+    protocol = "nctalk"
 
     # The default protocol (this is secure for notica)
-    secure_protocol = 'nctalks'
+    secure_protocol = "nctalks"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_nextcloudtalk'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_nextcloudtalk"
 
     # Nextcloud title length
     title_maxlen = 255
@@ -64,70 +62,74 @@ class NotifyNextcloudTalk(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}:{password}@{host}/{targets}',
-        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        "{schema}://{user}:{password}@{host}/{targets}",
+        "{schema}://{user}:{password}@{host}:{port}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+                "required": True,
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "target_room_id": {
+                "name": _("Room ID"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-            'required': True,
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'target_room_id': {
-            'name': _('Room ID'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'url_prefix': {
-            'name': _('URL Prefix'),
-            'type': 'string',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "url_prefix": {
+                "name": _("URL Prefix"),
+                "type": "string",
+            },
         },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("HTTP Header"),
+            "prefix": "+",
         },
     }
 
     def __init__(self, targets=None, headers=None, url_prefix=None, **kwargs):
-        """
-        Initialize Nextcloud Talk Object
-        """
+        """Initialize Nextcloud Talk Object."""
         super().__init__(**kwargs)
 
         if self.user is None or self.password is None:
-            msg = 'A NextCloudTalk User and Password must be specified.'
+            msg = "A NextCloudTalk User and Password must be specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -135,8 +137,7 @@ class NotifyNextcloudTalk(NotifyBase):
         self.targets = parse_list(targets)
 
         # Support URL Prefix
-        self.url_prefix = '' if not url_prefix \
-            else url_prefix.strip('/')
+        self.url_prefix = "" if not url_prefix else url_prefix.strip("/")
 
         self.headers = {}
         if headers:
@@ -145,23 +146,22 @@ class NotifyNextcloudTalk(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Nextcloud Talk Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Nextcloud Talk Notification."""
 
         if len(self.targets) == 0:
             # There were no services to notify
             self.logger.warning(
-                'There were no Nextcloud Talk targets to notify.')
+                "There were no Nextcloud Talk targets to notify."
+            )
             return False
 
         # Prepare our Header
         headers = {
-            'User-Agent': self.app_id,
-            'OCS-APIRequest': 'true',
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "OCS-APIRequest": "true",
+            "Accept": "application/json",
+            "Content-Type": "application/json",
         }
 
         # Apply any/all header over-rides defined
@@ -178,32 +178,40 @@ class NotifyNextcloudTalk(NotifyBase):
             # Prepare our Payload
             if not body:
                 payload = {
-                    'message': title if title else self.app_desc,
+                    "message": title if title else self.app_desc,
                 }
             else:
                 payload = {
-                    'message': title + '\r\n' + body
-                    if title else self.app_desc + '\r\n' + body,
+                    "message": (
+                        title + "\r\n" + body
+                        if title
+                        else self.app_desc + "\r\n" + body
+                    ),
                 }
 
             # Nextcloud Talk URL
-            notify_url = '{schema}://{host}/{url_prefix}'\
-                         '/ocs/v2.php/apps/spreed/api/v1/chat/{target}'
+            notify_url = (
+                "{schema}://{host}/{url_prefix}"
+                "/ocs/v2.php/apps/spreed/api/v1/chat/{target}"
+            )
 
             notify_url = notify_url.format(
-                schema='https' if self.secure else 'http',
-                host=self.host if not isinstance(self.port, int)
-                else '{}:{}'.format(self.host, self.port),
+                schema="https" if self.secure else "http",
+                host=(
+                    self.host
+                    if not isinstance(self.port, int)
+                    else f"{self.host}:{self.port}"
+                ),
                 url_prefix=self.url_prefix,
                 target=target,
             )
 
             self.logger.debug(
-                'Nextcloud Talk POST URL: %s (cert_verify=%r)',
-                notify_url, self.verify_certificate)
-            self.logger.debug(
-                'Nextcloud Talk Payload: %s',
-                str(payload))
+                "Nextcloud Talk POST URL: %s (cert_verify=%r)",
+                notify_url,
+                self.verify_certificate,
+            )
+            self.logger.debug("Nextcloud Talk Payload: %s", str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -218,34 +226,37 @@ class NotifyNextcloudTalk(NotifyBase):
                     timeout=self.request_timeout,
                 )
                 if r.status_code not in (
-                        requests.codes.created, requests.codes.ok):
+                    requests.codes.created,
+                    requests.codes.ok,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyNextcloudTalk.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyNextcloudTalk.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send Nextcloud Talk notification:'
-                        '{}{}error={}.'.format(
+                        "Failed to send Nextcloud Talk notification:"
+                        "{}{}error={}.".format(
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
                     # track our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        'Sent Nextcloud Talk notification.')
+                    self.logger.info("Sent Nextcloud Talk notification.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Nextcloud Talk '
-                    'notification.')
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending Nextcloud Talk "
+                    "notification."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # track our failure
                 has_error = True
@@ -255,67 +266,65 @@ class NotifyNextcloudTalk(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host, self.port,
+            self.user,
+            self.password,
+            self.host,
+            self.port,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our default set of parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
         if self.url_prefix:
-            params['url_prefix'] = self.url_prefix
+            params["url_prefix"] = self.url_prefix
 
         # Determine Authentication
-        auth = '{user}:{password}@'.format(
-            user=NotifyNextcloudTalk.quote(self.user, safe=''),
+        auth = "{user}:{password}@".format(
+            user=NotifyNextcloudTalk.quote(self.user, safe=""),
             password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
         )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}/{targets}?{params}' \
-               .format(
-                   schema=self.secure_protocol
-                   if self.secure else self.protocol,
-                   auth=auth,
-                   # never encode hostname since we're expecting it to be a
-                   # valid one
-                   hostname=self.host,
-                   port='' if self.port is None or self.port == default_port
-                        else ':{}'.format(self.port),
-                   targets='/'.join([NotifyNextcloudTalk.quote(x)
-                                     for x in self.targets]),
-                   params=NotifyNextcloudTalk.urlencode(params),
-               )
+        return "{schema}://{auth}{hostname}{port}/{targets}?{params}".format(
+            schema=self.secure_protocol if self.secure else self.protocol,
+            auth=auth,
+            # never encode hostname since we're expecting it to be a
+            # valid one
+            hostname=self.host,
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            targets="/".join(
+                [NotifyNextcloudTalk.quote(x) for x in self.targets]
+            ),
+            params=NotifyNextcloudTalk.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         targets = len(self.targets)
         return targets if targets else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url)
         if not results:
@@ -323,19 +332,23 @@ class NotifyNextcloudTalk(NotifyBase):
             return results
 
         # Fetch our targets
-        results['targets'] = \
-            NotifyNextcloudTalk.split_path(results['fullpath'])
+        results["targets"] = NotifyNextcloudTalk.split_path(
+            results["fullpath"]
+        )
 
         # Support URL Prefixes
-        if 'url_prefix' in results['qsd'] \
-                and len(results['qsd']['url_prefix']):
-            results['url_prefix'] = \
-                NotifyNextcloudTalk.unquote(results['qsd']['url_prefix'])
+        if "url_prefix" in results["qsd"] and len(
+            results["qsd"]["url_prefix"]
+        ):
+            results["url_prefix"] = NotifyNextcloudTalk.unquote(
+                results["qsd"]["url_prefix"]
+            )
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {
+        results["headers"] = {
             NotifyNextcloudTalk.unquote(x): NotifyNextcloudTalk.unquote(y)
-            for x, y in results['qsd+'].items()}
+            for x, y in results["qsd+"].items()
+        }
 
         return results

@@ -1,1 +1,6 @@
+#
+# Note: This file is being kept for backwards compatibility with
+#       legacy systems that point here.  All future changes should
+#       occur in pyproject.toml.  Contents of this file can be found
+#       in [project.optional-dependencies].windows
 pywin32

@@ -1,10 +1,15 @@
 include LICENSE
-include KEYWORDS
 include README.md
+include CONTRIBUTING.md
+include ACKNOWLEDGEMENTS.md
+include pyproject.toml
+include tox.ini
 include requirements.txt
 include win-requirements.txt
 include dev-requirements.txt
-recursive-include test *
+include all-plugin-requirements.txt
+recursive-include tests *
 recursive-include packaging *
 global-exclude *.pyc
+global-exclude *.pyo
 global-exclude __pycache__

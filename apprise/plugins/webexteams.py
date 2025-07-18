@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -59,45 +58,43 @@
 # - https://developer.cisco.com/ecosystem/webex/apps/\
 #       incoming-webhooks-cisco-systems/ - Simple webhook example
 
-import re
-import requests
 from json import dumps
+import re
 
-from .base import NotifyBase
-from ..common import NotifyType
-from ..common import NotifyFormat
-from ..utils.parse import validate_regex
+import requests
+
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 # Extend HTTP Error Messages
 # Based on: https://developer.webex.com/docs/api/basics/rate-limiting
 WEBEX_HTTP_ERROR_MAP = {
-    401: 'Unauthorized - Invalid Token.',
-    415: 'Unsuported media specified',
-    429: 'To many consecutive requests were made.',
-    503: 'Service is overloaded, try again later',
+    401: "Unauthorized - Invalid Token.",
+    415: "Unsuported media specified",
+    429: "To many consecutive requests were made.",
+    503: "Service is overloaded, try again later",
 }
 
 
 class NotifyWebexTeams(NotifyBase):
-    """
-    A wrapper for Webex Teams Notifications
-    """
+    """A wrapper for Webex Teams Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Cisco Webex Teams'
+    service_name = "Cisco Webex Teams"
 
     # The services URL
-    service_url = 'https://webex.teams.com/'
+    service_url = "https://webex.teams.com/"
 
     # The default secure protocol
-    secure_protocol = ('wxteams', 'webex')
+    secure_protocol = ("wxteams", "webex")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_wxteams'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_wxteams"
 
     # Webex Teams uses the http protocol with JSON requests
-    notify_url = 'https://api.ciscospark.com/v1/webhooks/incoming/'
+    notify_url = "https://api.ciscospark.com/v1/webhooks/incoming/"
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
@@ -109,59 +106,60 @@ class NotifyWebexTeams(NotifyBase):
     notify_format = NotifyFormat.MARKDOWN
 
     # Define object templates
-    templates = (
-        '{schema}://{token}',
-    )
+    templates = ("{schema}://{token}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9]{80,160}$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9]{80,160}$", "i"),
+            },
         },
-    })
+    )
 
     def __init__(self, token, **kwargs):
-        """
-        Initialize Webex Teams Object
-        """
+        """Initialize Webex Teams Object."""
         super().__init__(**kwargs)
 
         # The token associated with the account
         self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+            token, *self.template_tokens["token"]["regex"]
+        )
         if not self.token:
-            msg = 'The Webex Teams token specified ({}) is invalid.'\
-                .format(token)
+            msg = f"The Webex Teams token specified ({token}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Webex Teams Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Webex Teams Notification."""
 
         # Setup our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         # Prepare our URL
-        url = '{}/{}'.format(self.notify_url, self.token)
+        url = f"{self.notify_url}/{self.token}"
 
         payload = {
-            'markdown' if (self.notify_format == NotifyFormat.MARKDOWN)
-            else 'text': body,
+            (
+                "markdown"
+                if (self.notify_format == NotifyFormat.MARKDOWN)
+                else "text"
+            ): body,
         }
 
-        self.logger.debug('Webex Teams POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('Webex Teams Payload: %s' % str(payload))
+        self.logger.debug(
+            "Webex Teams POST URL:"
+            f" {url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Webex Teams Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -174,34 +172,33 @@ class NotifyWebexTeams(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                    requests.codes.ok, requests.codes.no_content):
+                requests.codes.ok,
+                requests.codes.no_content,
+            ):
                 # We had a problem
-                status_str = \
-                    NotifyWebexTeams.http_response_code_lookup(
-                        r.status_code)
+                status_str = NotifyWebexTeams.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Webex Teams notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Webex Teams notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 return False
 
             else:
-                self.logger.info(
-                    'Sent Webex Teams notification.')
+                self.logger.info("Sent Webex Teams notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Webex Teams '
-                'notification.'
+                "A Connection error occurred sending Webex Teams notification."
             )
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             return False
 
@@ -209,41 +206,36 @@ class NotifyWebexTeams(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol[0], self.token)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{token}/?{params}'.format(
+        return "{schema}://{token}/?{params}".format(
             schema=self.secure_protocol[0],
-            token=self.pprint(self.token, privacy, safe=''),
+            token=self.pprint(self.token, privacy, safe=""),
             params=NotifyWebexTeams.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The first token is stored in the hostname
-        results['token'] = NotifyWebexTeams.unquote(results['host'])
+        results["token"] = NotifyWebexTeams.unquote(results["host"])
 
         return results
 
@@ -254,17 +246,25 @@ class NotifyWebexTeams(NotifyBase):
         """
 
         result = re.match(
-            r'^https?://(api\.ciscospark\.com|webexapis\.com)'
-            r'/v[1-9][0-9]*/webhooks/incoming/'
-            r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<params>\?.+)?$', url, re.I)
+            r"^https?://(api\.ciscospark\.com|webexapis\.com)"
+            r"/v[1-9][0-9]*/webhooks/incoming/"
+            r"(?P<webhook_token>[A-Z0-9_-]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
             return NotifyWebexTeams.parse_url(
-                '{schema}://{webhook_token}/{params}'.format(
+                "{schema}://{webhook_token}/{params}".format(
                     schema=NotifyWebexTeams.secure_protocol[0],
-                    webhook_token=result.group('webhook_token'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                    webhook_token=result.group("webhook_token"),
+                    params=(
+                        ""
+                        if not result.group("params")
+                        else result.group("params")
+                    ),
+                )
+            )
 
         return None

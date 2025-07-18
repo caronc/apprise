@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -28,10 +27,11 @@
 
 import json
 from typing import Optional, Union
-from ...asset import AppriseAsset
-from ...utils.base64 import base64_urldecode
-from ...exception import AppriseInvalidData
+
 from ...apprise_attachment import AppriseAttachment
+from ...asset import AppriseAsset
+from ...exception import AppriseInvalidData
+from ...utils.base64 import base64_urldecode
 
 try:
     from cryptography.hazmat.primitives.asymmetric import ec
@@ -45,9 +45,8 @@ except ImportError:
 
 
 class WebPushSubscription:
-    """
-    WebPush Subscription
-    """
+    """WebPush Subscription."""
+
     # Format:
     # {
     #     "endpoint": "https://fcm.googleapis.com/fcm/send/abc123...",
@@ -57,10 +56,8 @@ class WebPushSubscription:
     #     }
     # }
     def __init__(self, content: Union[str, dict, None] = None) -> None:
-        """
-        Prepares a webpush object provided with content
-        Content can be a dictionary, or JSON String
-        """
+        """Prepares a webpush object provided with content Content can be a
+        dictionary, or JSON String."""
 
         # Our variables
         self.__endpoint = None
@@ -69,14 +66,11 @@ class WebPushSubscription:
         self.__auth_secret = None
         self.__public_key = None
 
-        if content is not None:
-            if not self.load(content):
-                raise AppriseInvalidData('Could not load subscription')
+        if content is not None and not self.load(content):
+            raise AppriseInvalidData("Could not load subscription")
 
     def load(self, content: Union[str, dict, None] = None) -> bool:
-        """
-        Performs the loading/validation of the object
-        """
+        """Performs the loading/validation of the object."""
 
         # Reset our variables
         self.__endpoint = None
@@ -101,16 +95,16 @@ class WebPushSubscription:
             return False
 
         # Retreive our contents for validation
-        endpoint = content.get('endpoint')
+        endpoint = content.get("endpoint")
         if not isinstance(endpoint, str):
             return False
 
         try:
-            p256dh = base64_urldecode(content['keys']['p256dh'])
+            p256dh = base64_urldecode(content["keys"]["p256dh"])
             if not p256dh:
                 return False
 
-            auth_secret = base64_urldecode(content['keys']['auth'])
+            auth_secret = base64_urldecode(content["keys"]["auth"])
             if not auth_secret:
                 return False
 
@@ -120,7 +114,8 @@ class WebPushSubscription:
         try:
             # Store our data
             self.__public_key = ec.EllipticCurvePublicKey.from_encoded_point(
-                ec.SECP256R1(), p256dh,
+                ec.SECP256R1(),
+                p256dh,
             )
 
         except ValueError:
@@ -128,23 +123,23 @@ class WebPushSubscription:
             return False
 
         self.__endpoint = endpoint
-        self.__p256dh = content['keys']['p256dh']
-        self.__auth = content['keys']['auth']
+        self.__p256dh = content["keys"]["p256dh"]
+        self.__auth = content["keys"]["auth"]
         self.__auth_secret = auth_secret
 
         return True
 
     def write(self, path: str, indent: int = 2) -> bool:
-        """
-        Writes content to disk based on path specified.  Content is a JSON
-        file, so ideally you may wish to have `.json' as it's extension for
-        clarity
+        """Writes content to disk based on path specified.
+
+        Content is a JSON file, so ideally you may wish to have `.json' as it's
+        extension for clarity
         """
         if not self.__public_key:
             return False
 
         try:
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.dict, f, indent=indent)
 
         except (TypeError, OSError):
@@ -170,51 +165,49 @@ class WebPushSubscription:
         return self.__auth_secret if self.__public_key else None
 
     @property
-    def public_key(self) -> Optional['ec.EllipticCurvePublicKey']:
+    def public_key(self) -> Optional["ec.EllipticCurvePublicKey"]:
         return self.__public_key
 
     @property
     def dict(self) -> dict:
-        return {
-            "endpoint": self.__endpoint,
-            "keys": {
-                "p256dh": self.__p256dh,
-                "auth": self.__auth,
-            },
-        } if self.__public_key else {
-            "endpoint": 'https://fcm.googleapis.com/fcm/send/abc123...',
-            "keys": {
-                "p256dh": '<place public key in base64 here>',
-                "auth": '<place auth in base64 here>',
-            },
-        }
+        return (
+            {
+                "endpoint": self.__endpoint,
+                "keys": {
+                    "p256dh": self.__p256dh,
+                    "auth": self.__auth,
+                },
+            }
+            if self.__public_key
+            else {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123...",
+                "keys": {
+                    "p256dh": "<place public key in base64 here>",
+                    "auth": "<place auth in base64 here>",
+                },
+            }
+        )
 
     def json(self, indent: int = 2) -> str:
-        """
-        Returns JSON representation of the object
-        """
+        """Returns JSON representation of the object."""
         return json.dumps(self.dict, indent=indent)
 
     def __bool__(self) -> bool:
-        """
-        handle 'if' statement
-        """
-        return True if self.__public_key else False
+        """Handle 'if' statement."""
+        return bool(self.__public_key)
 
     def __str__(self) -> str:
-        """
-        Returns our JSON entry as a string
-        """
+        """Returns our JSON entry as a string."""
         # Return the first 16 characters of the detected endpoint subscription
         # id
-        return '' if not self.__endpoint \
-            else self.__endpoint.split('/')[-1][:16]
+        return (
+            "" if not self.__endpoint else self.__endpoint.split("/")[-1][:16]
+        )
 
 
 class WebPushSubscriptionManager:
-    """
-    WebPush Subscription Manager
-    """
+    """WebPush Subscription Manager."""
+
     # Format:
     # {
     #     "name1": {
@@ -236,39 +229,35 @@ class WebPushSubscriptionManager:
     # the file is bad
     max_load_failure_count = 3
 
-    def __init__(self, asset: Optional['AppriseAsset'] = None) -> None:
-        """
-        Webpush Subscription Manager
-        """
+    def __init__(self, asset: Optional["AppriseAsset"] = None) -> None:
+        """Webpush Subscription Manager."""
 
         # Our subscriptions
         self.__subscriptions = {}
 
         # Prepare our Asset Object
-        self.asset = \
+        self.asset = (
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        )
 
     def __getitem__(self, key: str) -> WebPushSubscription:
-        """
-        Returns our indexed value if it exists
-        """
+        """Returns our indexed value if it exists."""
         return self.__subscriptions[key.lower()]
 
-    def __setitem__(self, name: str,
-                    subscription: Union[WebPushSubscription, str, dict]
-                    ) -> None:
-        """
-        Set's our object if possible
-        """
+    def __setitem__(
+        self, name: str, subscription: Union[WebPushSubscription, str, dict]
+    ) -> None:
+        """Set's our object if possible."""
 
         if not self.add(subscription, name=name.lower()):
-            raise AppriseInvalidData('Invalid subscription provided')
+            raise AppriseInvalidData("Invalid subscription provided")
 
-    def add(self, subscription: Union[WebPushSubscription, str, dict],
-            name: Optional[str] = None) -> bool:
-        """
-        Add a subscription into our manager
-        """
+    def add(
+        self,
+        subscription: Union[WebPushSubscription, str, dict],
+        name: Optional[str] = None,
+    ) -> bool:
+        """Add a subscription into our manager."""
 
         if not isinstance(subscription, WebPushSubscription):
             try:
@@ -285,53 +274,48 @@ class WebPushSubscriptionManager:
         return True
 
     def __bool__(self) -> bool:
-        """
-        True is returned if at least one subscription has been loaded.
-        """
-        return True if self.__subscriptions else False
+        """True is returned if at least one subscription has been loaded."""
+        return bool(self.__subscriptions)
 
     def __len__(self) -> int:
-        """
-        Returns the number of servers loaded; this includes those found within
-        loaded configuration. This funtion nnever actually counts the
-        Config entry themselves (if they exist), only what they contain.
+        """Returns the number of servers loaded; this includes those found
+        within loaded configuration.
+
+        This funtion nnever actually counts the Config entry themselves (if
+        they exist), only what they contain.
         """
         return len(self.__subscriptions)
 
-    def __iadd__(self, subscription: Union[WebPushSubscription, str, dict]
-                 ) -> 'WebPushSubscriptionManager':
+    def __iadd__(
+        self, subscription: Union[WebPushSubscription, str, dict]
+    ) -> "WebPushSubscriptionManager":
 
         if not self.add(subscription):
-            raise AppriseInvalidData('Invalid subscription provided')
+            raise AppriseInvalidData("Invalid subscription provided")
 
         return self
 
     def __contains__(self, key: str) -> bool:
-        """
-        Checks if the key exists
-        """
+        """Checks if the key exists."""
         return key.lower() in self.__subscriptions
 
     def clear(self) -> None:
-        """
-        Empties our server list
-
-        """
+        """Empties our server list."""
         self.__subscriptions.clear()
 
     @property
     def dict(self) -> dict:
-        """
-        Returns a dictionary of all entries
-        """
-        return {k: v.dict for k, v in self.__subscriptions.items()} \
-            if self.__subscriptions else {}
+        """Returns a dictionary of all entries."""
+        return (
+            {k: v.dict for k, v in self.__subscriptions.items()}
+            if self.__subscriptions
+            else {}
+        )
 
     def load(self, path: str, byte_limit=0) -> bool:
-        """
-        Writes content to disk based on path specified.  Content is a JSON
+        """Writes content to disk based on path specified.  Content is a JSON
         file, so ideally you may wish to have `.json' as it's extension for
-        clarity
+        clarity.
 
         if byte_limit is zero, then we do not limit our file size, otherwise
         set this to the bytes you want to restrict yourself by
@@ -355,7 +339,7 @@ class WebPushSubscriptionManager:
 
         try:
             # Otherwise open our path
-            with open(attach[0].path, 'r', encoding='utf-8') as f:
+            with open(attach[0].path, encoding="utf-8") as f:
                 content = json.load(f)
 
         except (json.decoder.JSONDecodeError, TypeError, OSError):
@@ -394,7 +378,7 @@ class WebPushSubscriptionManager:
         #     },
 
         error_count = 0
-        if 'endpoint' in content and 'keys' in content:
+        if "endpoint" in content and "keys" in content:
             if not self.add(content):
                 return False
 
@@ -409,13 +393,13 @@ class WebPushSubscriptionManager:
         return True
 
     def write(self, path: str, indent: int = 2) -> bool:
-        """
-        Writes content to disk based on path specified.  Content is a JSON
-        file, so ideally you may wish to have `.json' as it's extension for
-        clarity
+        """Writes content to disk based on path specified.
+
+        Content is a JSON file, so ideally you may wish to have `.json' as it's
+        extension for clarity
         """
         try:
-            with open(path, 'w', encoding='utf-8') as f:
+            with open(path, "w", encoding="utf-8") as f:
                 json.dump(self.dict, f, indent=indent)
 
         except (TypeError, OSError):
@@ -425,7 +409,5 @@ class WebPushSubscriptionManager:
         return True
 
     def json(self, indent: int = 2) -> str:
-        """
-        Returns JSON representation of the object
-        """
+        """Returns JSON representation of the object."""
         return json.dumps(self.dict, indent=indent)

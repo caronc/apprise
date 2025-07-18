@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -48,18 +47,19 @@
 #
 # If you Generate a new private key, it will provide a .json file
 # You will need this in order to send an apprise messag
-import requests
 from json import dumps
-from ..base import NotifyBase
-from ...common import NotifyType
-from ...utils.parse import validate_regex, parse_list, parse_bool
-from ...utils.logic import dict_full_update
-from ...common import NotifyImageSize
+
+import requests
+
 from ...apprise_attachment import AppriseAttachment
+from ...common import NotifyImageSize, NotifyType
 from ...locale import gettext_lazy as _
-from .common import (FCMMode, FCM_MODES)
-from .priority import (FCM_PRIORITIES, FCMPriorityManager)
+from ...utils.logic import dict_full_update
+from ...utils.parse import parse_bool, parse_list, validate_regex
+from ..base import NotifyBase
 from .color import FCMColorManager
+from .common import FCM_MODES, FCMMode
+from .priority import FCM_PRIORITIES, FCMPriorityManager
 
 # Default our global support flag
 NOTIFY_FCM_SUPPORT_ENABLED = False
@@ -80,41 +80,40 @@ except ImportError:
 
 # Our lookup map
 FCM_HTTP_ERROR_MAP = {
-    400: 'A bad request was made to the server.',
-    401: 'The provided API Key was not valid.',
-    404: 'The token could not be registered.',
+    400: "A bad request was made to the server.",
+    401: "The provided API Key was not valid.",
+    404: "The token could not be registered.",
 }
 
 
 class NotifyFCM(NotifyBase):
-    """
-    A wrapper for Google's Firebase Cloud Messaging Notifications
-    """
+    """A wrapper for Google's Firebase Cloud Messaging Notifications."""
 
     # Set our global enabled flag
     enabled = NOTIFY_FCM_SUPPORT_ENABLED
 
     requirements = {
         # Define our required packaging in order to work
-        'packages_required': 'cryptography'
+        "packages_required": "cryptography"
     }
 
     # The default descriptive name associated with the Notification
-    service_name = 'Firebase Cloud Messaging'
+    service_name = "Firebase Cloud Messaging"
 
     # The services URL
-    service_url = 'https://firebase.google.com'
+    service_url = "https://firebase.google.com"
 
     # The default protocol
-    secure_protocol = 'fcm'
+    secure_protocol = "fcm"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_fcm'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_fcm"
 
     # Project Notification
     # https://firebase.google.com/docs/cloud-messaging/send-message
-    notify_oauth2_url = \
+    notify_oauth2_url = (
         "https://fcm.googleapis.com/v1/projects/{project}/messages:send"
+    )
 
     notify_legacy_url = "https://fcm.googleapis.com/fcm/send"
 
@@ -131,94 +130,108 @@ class NotifyFCM(NotifyBase):
     # Define object templates
     templates = (
         # OAuth2
-        '{schema}://{project}/{targets}?keyfile={keyfile}',
+        "{schema}://{project}/{targets}?keyfile={keyfile}",
         # Legacy Mode
-        '{schema}://{apikey}/{targets}',
+        "{schema}://{apikey}/{targets}",
     )
 
     # Define our template
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'private': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "private": True,
+            },
+            "keyfile": {
+                "name": _("OAuth2 KeyFile"),
+                "type": "string",
+                "private": True,
+            },
+            "project": {
+                "name": _("Project ID"),
+                "type": "string",
+            },
+            "target_device": {
+                "name": _("Target Device"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "target_topic": {
+                "name": _("Target Topic"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'keyfile': {
-            'name': _('OAuth2 KeyFile'),
-            'type': 'string',
-            'private': True,
-        },
-        'project': {
-            'name': _('Project ID'),
-            'type': 'string',
-        },
-        'target_device': {
-            'name': _('Target Device'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'target_topic': {
-            'name': _('Target Topic'),
-            'type': 'string',
-            'prefix': '#',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "mode": {
+                "name": _("Mode"),
+                "type": "choice:string",
+                "values": FCM_MODES,
+                "default": FCMMode.Legacy,
+            },
+            "priority": {
+                "name": _("Mode"),
+                "type": "choice:string",
+                "values": FCM_PRIORITIES,
+            },
+            "image_url": {
+                "name": _("Custom Image URL"),
+                "type": "string",
+            },
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": False,
+                "map_to": "include_image",
+            },
+            # Color can either be yes, no, or a #rrggbb (
+            # rrggbb without hashtag is accepted to)
+            "color": {
+                "name": _("Notification Color"),
+                "type": "string",
+                "default": "yes",
+            },
         },
-        'mode': {
-            'name': _('Mode'),
-            'type': 'choice:string',
-            'values': FCM_MODES,
-            'default': FCMMode.Legacy,
-        },
-        'priority': {
-            'name': _('Mode'),
-            'type': 'choice:string',
-            'values': FCM_PRIORITIES,
-        },
-        'image_url': {
-            'name': _('Custom Image URL'),
-            'type': 'string',
-        },
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': False,
-            'map_to': 'include_image',
-        },
-        # Color can either be yes, no, or a #rrggbb (
-        # rrggbb without hashtag is accepted to)
-        'color': {
-            'name': _('Notification Color'),
-            'type': 'string',
-            'default': 'yes',
-        },
-    })
+    )
 
     # Define our data entry
     template_kwargs = {
-        'data_kwargs': {
-            'name': _('Data Entries'),
-            'prefix': '+',
+        "data_kwargs": {
+            "name": _("Data Entries"),
+            "prefix": "+",
         },
     }
 
-    def __init__(self, project, apikey, targets=None, mode=None, keyfile=None,
-                 data_kwargs=None, image_url=None, include_image=False,
-                 color=None, priority=None, **kwargs):
-        """
-        Initialize Firebase Cloud Messaging
-
-        """
+    def __init__(
+        self,
+        project,
+        apikey,
+        targets=None,
+        mode=None,
+        keyfile=None,
+        data_kwargs=None,
+        image_url=None,
+        include_image=False,
+        color=None,
+        priority=None,
+        **kwargs,
+    ):
+        """Initialize Firebase Cloud Messaging."""
         super().__init__(**kwargs)
 
         if mode is None:
@@ -227,10 +240,13 @@ class NotifyFCM(NotifyBase):
 
         else:
             # Setup our mode
-            self.mode = NotifyFCM.template_tokens['mode']['default'] \
-                if not isinstance(mode, str) else mode.lower()
+            self.mode = (
+                NotifyFCM.template_tokens["mode"]["default"]
+                if not isinstance(mode, str)
+                else mode.lower()
+            )
             if self.mode and self.mode not in FCM_MODES:
-                msg = 'The FCM mode specified ({}) is invalid.'.format(mode)
+                msg = f"The FCM mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -247,20 +263,21 @@ class NotifyFCM(NotifyBase):
 
         # Initialize our Google OAuth module we can work with
         self.oauth = GoogleOAuth(
-            user_agent=self.app_id, timeout=self.request_timeout,
-            verify_certificate=self.verify_certificate)
+            user_agent=self.app_id,
+            timeout=self.request_timeout,
+            verify_certificate=self.verify_certificate,
+        )
 
         if self.mode == FCMMode.OAuth2:
             # The project ID associated with the account
             self.project = validate_regex(project)
             if not self.project:
-                msg = 'An invalid FCM Project ID ' \
-                      '({}) was specified.'.format(project)
+                msg = f"An invalid FCM Project ID ({project}) was specified."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             if not keyfile:
-                msg = 'No FCM JSON KeyFile was specified.'
+                msg = "No FCM JSON KeyFile was specified."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -276,8 +293,7 @@ class NotifyFCM(NotifyBase):
             # The apikey associated with the account
             self.apikey = validate_regex(apikey)
             if not self.apikey:
-                msg = 'An invalid FCM API key ' \
-                      '({}) was specified.'.format(apikey)
+                msg = f"An invalid FCM API key ({apikey}) was specified."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -310,42 +326,39 @@ class NotifyFCM(NotifyBase):
 
     @property
     def access_token(self):
-        """
-        Generates a access_token based on the keyfile provided
-        """
+        """Generates a access_token based on the keyfile provided."""
         keyfile = self.keyfile[0]
         if not keyfile:
             # We could not access the keyfile
             self.logger.error(
-                'Could not access FCM keyfile {}.'.format(
-                    keyfile.url(privacy=True)))
+                f"Could not access FCM keyfile {keyfile.url(privacy=True)}."
+            )
             return None
 
         if not self.oauth.load(keyfile.path):
             self.logger.error(
-                'FCM keyfile {} could not be loaded.'.format(
-                    keyfile.url(privacy=True)))
+                f"FCM keyfile {keyfile.url(privacy=True)} could not be loaded."
+            )
             return None
 
         # Verify our project id against the one provided in our keyfile
         if self.project != self.oauth.project_id:
             self.logger.error(
-                'FCM keyfile {} identifies itself for a different project'
-                .format(keyfile.url(privacy=True)))
+                f"FCM keyfile {keyfile.url(privacy=True)} identifies itself"
+                " for a different project"
+            )
             return None
 
         # Return our generated key; the below returns None if a token could
         # not be acquired
         return self.oauth.access_token
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform FCM Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform FCM Notification."""
 
         if not self.targets:
             # There is no one to email; we're done
-            self.logger.warning('There are no FCM devices or topics to notify')
+            self.logger.warning("There are no FCM devices or topics to notify")
             return False
 
         if self.mode == FCMMode.OAuth2:
@@ -356,9 +369,9 @@ class NotifyFCM(NotifyBase):
                 return False
 
             headers = {
-                'User-Agent': self.app_id,
-                'Content-Type': 'application/json',
-                "Authorization": "Bearer {}".format(access_token),
+                "User-Agent": self.app_id,
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {access_token}",
             }
 
             # Prepare our notify URL
@@ -366,17 +379,20 @@ class NotifyFCM(NotifyBase):
 
         else:  # FCMMode.Legacy
             headers = {
-                'User-Agent': self.app_id,
-                'Content-Type': 'application/json',
-                "Authorization": "key={}".format(self.apikey),
+                "User-Agent": self.app_id,
+                "Content-Type": "application/json",
+                "Authorization": f"key={self.apikey}",
             }
 
             # Prepare our notify URL
             notify_url = self.notify_legacy_url
 
         # Acquire image url
-        image = self.image_url(notify_type) \
-            if not self.image_src else self.image_src
+        image = (
+            self.image_url(notify_type)
+            if not self.image_src
+            else self.image_src
+        )
 
         has_error = False
         # Create a copy of the targets list
@@ -386,80 +402,84 @@ class NotifyFCM(NotifyBase):
 
             if self.mode == FCMMode.OAuth2:
                 payload = {
-                    'message': {
-                        'token': None,
-                        'notification': {
-                            'title': title,
-                            'body': body,
-                        }
+                    "message": {
+                        "token": None,
+                        "notification": {
+                            "title": title,
+                            "body": body,
+                        },
                     }
                 }
 
                 if self.color:
                     # Acquire our color
-                    payload['message']['android'] = {
-                        'notification': {'color': self.color.get(notify_type)}}
+                    payload["message"]["android"] = {
+                        "notification": {"color": self.color.get(notify_type)}
+                    }
 
                 if self.include_image and image:
-                    payload['message']['notification']['image'] = image
+                    payload["message"]["notification"]["image"] = image
 
                 if self.data_kwargs:
-                    payload['message']['data'] = self.data_kwargs
+                    payload["message"]["data"] = self.data_kwargs
 
-                if recipient[0] == '#':
-                    payload['message']['topic'] = recipient[1:]
+                if recipient[0] == "#":
+                    payload["message"]["topic"] = recipient[1:]
                     self.logger.debug(
-                        "FCM recipient %s parsed as a topic",
-                        recipient[1:])
+                        "FCM recipient %s parsed as a topic", recipient[1:]
+                    )
 
                 else:
-                    payload['message']['token'] = recipient
+                    payload["message"]["token"] = recipient
                     self.logger.debug(
-                        "FCM recipient %s parsed as a device token",
-                        recipient)
+                        "FCM recipient %s parsed as a device token", recipient
+                    )
 
             else:  # FCMMode.Legacy
                 payload = {
-                    'notification': {
-                        'notification': {
-                            'title': title,
-                            'body': body,
+                    "notification": {
+                        "notification": {
+                            "title": title,
+                            "body": body,
                         }
                     }
                 }
 
                 if self.color:
                     # Acquire our color
-                    payload['notification']['notification']['color'] = \
+                    payload["notification"]["notification"]["color"] = (
                         self.color.get(notify_type)
+                    )
 
                 if self.include_image and image:
-                    payload['notification']['notification']['image'] = image
+                    payload["notification"]["notification"]["image"] = image
 
                 if self.data_kwargs:
-                    payload['data'] = self.data_kwargs
+                    payload["data"] = self.data_kwargs
 
-                if recipient[0] == '#':
-                    payload['to'] = '/topics/{}'.format(recipient)
+                if recipient[0] == "#":
+                    payload["to"] = f"/topics/{recipient}"
                     self.logger.debug(
-                        "FCM recipient %s parsed as a topic",
-                        recipient[1:])
+                        "FCM recipient %s parsed as a topic", recipient[1:]
+                    )
 
                 else:
-                    payload['to'] = recipient
+                    payload["to"] = recipient
                     self.logger.debug(
-                        "FCM recipient %s parsed as a device token",
-                        recipient)
+                        "FCM recipient %s parsed as a device token", recipient
+                    )
 
             # A more advanced dict.update() that recursively includes
             # sub-dictionaries as well
             dict_full_update(payload, self.priority.payload())
 
             self.logger.debug(
-                'FCM %s POST URL: %s (cert_verify=%r)',
-                self.mode, notify_url, self.verify_certificate,
+                "FCM %s POST URL: %s (cert_verify=%r)",
+                self.mode,
+                notify_url,
+                self.verify_certificate,
             )
-            self.logger.debug('FCM %s Payload: %s', self.mode, str(payload))
+            self.logger.debug("FCM %s Payload: %s", self.mode, str(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -472,34 +492,36 @@ class NotifyFCM(NotifyBase):
                     timeout=self.request_timeout,
                 )
                 if r.status_code not in (
-                        requests.codes.ok, requests.codes.no_content):
+                    requests.codes.ok,
+                    requests.codes.no_content,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(
-                            r.status_code, FCM_HTTP_ERROR_MAP)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code, FCM_HTTP_ERROR_MAP
+                    )
 
                     self.logger.warning(
-                        'Failed to send {} FCM notification: '
-                        '{}{}error={}.'.format(
+                        "Failed to send {} FCM notification: "
+                        "{}{}error={}.".format(
                             self.mode,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n%s', r.content)
+                    self.logger.debug("Response Details:\r\n%s", r.content)
 
                     has_error = True
 
                 else:
-                    self.logger.info('Sent %s FCM notification.', self.mode)
+                    self.logger.info("Sent %s FCM notification.", self.mode)
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending FCM '
-                    'notification.'
+                    "A Connection error occurred sending FCM notification."
                 )
-                self.logger.debug('Socket Exception: %s', str(e))
+                self.logger.debug("Socket Exception: %s", str(e))
 
                 has_error = True
 
@@ -507,129 +529,121 @@ class NotifyFCM(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.mode, self.apikey, self.project)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'mode': self.mode,
-            'image': 'yes' if self.include_image else 'no',
-            'color': str(self.color),
+            "mode": self.mode,
+            "image": "yes" if self.include_image else "no",
+            "color": str(self.color),
         }
 
         if self.priority:
             # Store our priority if one was defined
-            params['priority'] = str(self.priority)
+            params["priority"] = str(self.priority)
 
         if self.keyfile:
             # Include our keyfile if specified
-            params['keyfile'] = NotifyFCM.quote(
-                self.keyfile[0].url(privacy=privacy), safe='')
+            params["keyfile"] = NotifyFCM.quote(
+                self.keyfile[0].url(privacy=privacy), safe=""
+            )
 
         if self.image_src:
             # Include our image path as part of our URL payload
-            params['image_url'] = self.image_src
+            params["image_url"] = self.image_src
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Add our data keyword/args into our URL response
-        params.update(
-            {'+{}'.format(k): v for k, v in self.data_kwargs.items()})
+        params.update({f"+{k}": v for k, v in self.data_kwargs.items()})
 
-        reference = NotifyFCM.quote(self.project) \
-            if self.mode == FCMMode.OAuth2 \
-            else self.pprint(self.apikey, privacy, safe='')
+        reference = (
+            NotifyFCM.quote(self.project)
+            if self.mode == FCMMode.OAuth2
+            else self.pprint(self.apikey, privacy, safe="")
+        )
 
-        return '{schema}://{reference}/{targets}?{params}'.format(
+        return "{schema}://{reference}/{targets}?{params}".format(
             schema=self.secure_protocol,
             reference=reference,
-            targets='/'.join(
-                [NotifyFCM.quote(x) for x in self.targets]),
+            targets="/".join([NotifyFCM.quote(x) for x in self.targets]),
             params=NotifyFCM.urlencode(params),
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.targets)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The apikey/project is stored in the hostname
-        results['apikey'] = NotifyFCM.unquote(results['host'])
-        results['project'] = results['apikey']
+        results["apikey"] = NotifyFCM.unquote(results["host"])
+        results["project"] = results["apikey"]
 
         # Get our Device IDs
-        results['targets'] = NotifyFCM.split_path(results['fullpath'])
+        results["targets"] = NotifyFCM.split_path(results["fullpath"])
 
         # Get our mode
-        results['mode'] = results['qsd'].get('mode')
+        results["mode"] = results["qsd"].get("mode")
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyFCM.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyFCM.parse_list(results["qsd"]["to"])
 
         # Our Project ID
-        if 'project' in results['qsd'] and results['qsd']['project']:
-            results['project'] = \
-                NotifyFCM.unquote(results['qsd']['project'])
+        if "project" in results["qsd"] and results["qsd"]["project"]:
+            results["project"] = NotifyFCM.unquote(results["qsd"]["project"])
 
         # Our Web API Key
-        if 'apikey' in results['qsd'] and results['qsd']['apikey']:
-            results['apikey'] = \
-                NotifyFCM.unquote(results['qsd']['apikey'])
+        if "apikey" in results["qsd"] and results["qsd"]["apikey"]:
+            results["apikey"] = NotifyFCM.unquote(results["qsd"]["apikey"])
 
         # Our Keyfile (JSON)
-        if 'keyfile' in results['qsd'] and results['qsd']['keyfile']:
-            results['keyfile'] = \
-                NotifyFCM.unquote(results['qsd']['keyfile'])
+        if "keyfile" in results["qsd"] and results["qsd"]["keyfile"]:
+            results["keyfile"] = NotifyFCM.unquote(results["qsd"]["keyfile"])
 
         # Our Priority
-        if 'priority' in results['qsd'] and results['qsd']['priority']:
-            results['priority'] = \
-                NotifyFCM.unquote(results['qsd']['priority'])
+        if "priority" in results["qsd"] and results["qsd"]["priority"]:
+            results["priority"] = NotifyFCM.unquote(results["qsd"]["priority"])
 
         # Our Color
-        if 'color' in results['qsd'] and results['qsd']['color']:
-            results['color'] = \
-                NotifyFCM.unquote(results['qsd']['color'])
+        if "color" in results["qsd"] and results["qsd"]["color"]:
+            results["color"] = NotifyFCM.unquote(results["qsd"]["color"])
 
         # Boolean to include an image or not
-        results['include_image'] = parse_bool(results['qsd'].get(
-            'image', NotifyFCM.template_args['image']['default']))
+        results["include_image"] = parse_bool(
+            results["qsd"].get(
+                "image", NotifyFCM.template_args["image"]["default"]
+            )
+        )
 
         # Extract image_url if it was specified
-        if 'image_url' in results['qsd']:
-            results['image_url'] = \
-                NotifyFCM.unquote(results['qsd']['image_url'])
-            if 'image' not in results['qsd']:
+        if "image_url" in results["qsd"]:
+            results["image_url"] = NotifyFCM.unquote(
+                results["qsd"]["image_url"]
+            )
+            if "image" not in results["qsd"]:
                 # Toggle default behaviour if a custom image was provided
                 # but ONLY if the `image` boolean was not set
-                results['include_image'] = True
+                results["include_image"] = True
 
         # Store our data keyword/args if specified
-        results['data_kwargs'] = results['qsd+']
+        results["data_kwargs"] = results["qsd+"]
 
         return results

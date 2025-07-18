@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,34 +25,32 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from os.path import abspath, dirname, join
 import re
-from os.path import dirname
-from os.path import abspath
-from os.path import join
+
 from .manager import PluginManager
 
 
 class ConfigurationManager(PluginManager):
-    """
-    Designed to be a singleton object to maintain all initialized
-    configuration plugins/modules in memory.
-    """
+    """Designed to be a singleton object to maintain all initialized
+    configuration plugins/modules in memory."""
 
     # Description (used for logging)
-    name = 'Configuration Plugin'
+    name = "Configuration Plugin"
 
     # Filename Prefix to filter on
-    fname_prefix = 'Config'
+    fname_prefix = "Config"
 
     # Memory Space
-    _id = 'config'
+    _id = "config"
 
     # Our Module Python path name
-    module_name_prefix = f'apprise.{_id}'
+    module_name_prefix = f"apprise.{_id}"
 
     # The module path to scan
     module_path = join(abspath(dirname(__file__)), _id)
 
     # For filtering our result set
     module_filter_re = re.compile(
-        r'^(?P<name>' + fname_prefix + r'(?!Base)[A-Za-z0-9]+)$')
+        r"^(?P<name>" + fname_prefix + r"(?!Base)[A-Za-z0-9]+)$"
+    )

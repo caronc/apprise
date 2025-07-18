@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -36,22 +35,22 @@
 # from). Activated phone numbers can be found on your dashboard here:
 #  - https://dashboard.sinch.com/numbers/your-numbers/numbers
 #
-import requests
 import json
 
-from .base import NotifyBase
-from ..url import PrivacyMode
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from .base import NotifyBase
 
 
 class SinchRegion:
-    """
-    Defines the Sinch Server Regions
-    """
-    USA = 'us'
-    EUROPE = 'eu'
+    """Defines the Sinch Server Regions."""
+
+    USA = "us"
+    EUROPE = "eu"
 
 
 # Used for verification purposes
@@ -59,18 +58,16 @@ SINCH_REGIONS = (SinchRegion.USA, SinchRegion.EUROPE)
 
 
 class NotifySinch(NotifyBase):
-    """
-    A wrapper for Sinch Notifications
-    """
+    """A wrapper for Sinch Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Sinch'
+    service_name = "Sinch"
 
     # The services URL
-    service_url = 'https://sinch.com/'
+    service_url = "https://sinch.com/"
 
     # All notification requests are secure
-    secure_protocol = 'sinch'
+    secure_protocol = "sinch"
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
@@ -81,12 +78,12 @@ class NotifySinch(NotifyBase):
     validity_period = 14400
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_sinch'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sinch"
 
     # Sinch uses the http protocol with JSON requests
     #   - the 'spi' gets substituted with the Service Provider ID
     #     provided as part of the Apprise URL.
-    notify_url = 'https://{region}.sms.api.sinch.com/xms/v1/{spi}/batches'
+    notify_url = "https://{region}.sms.api.sinch.com/xms/v1/{spi}/batches"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -97,124 +94,148 @@ class NotifySinch(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{service_plan_id}:{api_token}@{from_phone}',
-        '{schema}://{service_plan_id}:{api_token}@{from_phone}/{targets}',
+        "{schema}://{service_plan_id}:{api_token}@{from_phone}",
+        "{schema}://{service_plan_id}:{api_token}@{from_phone}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'service_plan_id': {
-            'name': _('Account SID'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-f0-9]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "service_plan_id": {
+                "name": _("Account SID"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-f0-9]+$", "i"),
+            },
+            "api_token": {
+                "name": _("Auth Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-f0-9]+$", "i"),
+            },
+            "from_phone": {
+                "name": _("From Phone No"),
+                "type": "string",
+                "required": True,
+                "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
+                "map_to": "source",
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "short_code": {
+                "name": _("Target Short Code"),
+                "type": "string",
+                "regex": (r"^[0-9]{5,6}$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'api_token': {
-            'name': _('Auth Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-f0-9]+$', 'i'),
-        },
-        'from_phone': {
-            'name': _('From Phone No'),
-            'type': 'string',
-            'required': True,
-            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
-            'map_to': 'source',
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'short_code': {
-            'name': _('Target Short Code'),
-            'type': 'string',
-            'regex': (r'^[0-9]{5,6}$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "alias_of": "from_phone",
+            },
+            "spi": {
+                "alias_of": "service_plan_id",
+            },
+            "region": {
+                "name": _("Region"),
+                "type": "string",
+                "regex": (r"^[a-z]{2}$", "i"),
+                "default": SinchRegion.USA,
+            },
+            "token": {
+                "alias_of": "api_token",
+            },
         },
-        'from': {
-            'alias_of': 'from_phone',
-        },
-        'spi': {
-            'alias_of': 'service_plan_id',
-        },
-        'region': {
-            'name': _('Region'),
-            'type': 'string',
-            'regex': (r'^[a-z]{2}$', 'i'),
-            'default': SinchRegion.USA,
-        },
-        'token': {
-            'alias_of': 'api_token',
-        },
-    })
+    )
 
-    def __init__(self, service_plan_id, api_token, source, targets=None,
-                 region=None, **kwargs):
-        """
-        Initialize Sinch Object
-        """
+    def __init__(
+        self,
+        service_plan_id,
+        api_token,
+        source,
+        targets=None,
+        region=None,
+        **kwargs,
+    ):
+        """Initialize Sinch Object."""
         super().__init__(**kwargs)
 
         # The Account SID associated with the account
         self.service_plan_id = validate_regex(
-            service_plan_id, *self.template_tokens['service_plan_id']['regex'])
+            service_plan_id, *self.template_tokens["service_plan_id"]["regex"]
+        )
         if not self.service_plan_id:
-            msg = 'An invalid Sinch Account SID ' \
-                  '({}) was specified.'.format(service_plan_id)
+            msg = (
+                "An invalid Sinch Account SID "
+                f"({service_plan_id}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The Authentication Token associated with the account
         self.api_token = validate_regex(
-            api_token, *self.template_tokens['api_token']['regex'])
+            api_token, *self.template_tokens["api_token"]["regex"]
+        )
         if not self.api_token:
-            msg = 'An invalid Sinch Authentication Token ' \
-                  '({}) was specified.'.format(api_token)
+            msg = (
+                "An invalid Sinch Authentication Token "
+                f"({api_token}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Setup our region
-        self.region = self.template_args['region']['default'] \
-            if not isinstance(region, str) else region.lower()
+        self.region = (
+            self.template_args["region"]["default"]
+            if not isinstance(region, str)
+            else region.lower()
+        )
         if self.region and self.region not in SINCH_REGIONS:
-            msg = 'The region specified ({}) is invalid.'.format(region)
+            msg = f"The region specified ({region}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The Source Phone # and/or short-code
         result = is_phone_no(source, min_len=5)
         if not result:
-            msg = 'The Account (From) Phone # or Short-code specified ' \
-                  '({}) is invalid.'.format(source)
+            msg = (
+                "The Account (From) Phone # or Short-code specified "
+                f"({source}) is invalid."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Tidy source
-        self.source = result['full']
+        self.source = result["full"]
 
         if len(self.source) < 11 or len(self.source) > 14:
             # A short code is a special 5 or 6 digit telephone number
             # that's shorter than a full phone number.
             if len(self.source) not in (5, 6):
-                msg = 'The Account (From) Phone # specified ' \
-                      '({}) is invalid.'.format(source)
+                msg = (
+                    "The Account (From) Phone # specified "
+                    f"({source}) is invalid."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -223,61 +244,56 @@ class NotifySinch(NotifyBase):
         else:
             # We're dealing with a phone number; so we need to just
             # place a plus symbol at the end of it
-            self.source = '+{}'.format(self.source)
+            self.source = f"+{self.source}"
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Parse each phone number we found
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
 
             # store valid phone number
-            self.targets.append('+{}'.format(result['full']))
+            self.targets.append("+{}".format(result["full"]))
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Sinch Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Sinch Notification."""
 
-        if not self.targets:
-            if len(self.source) in (5, 6):
-                # Generate a warning since we're a short-code.  We need
-                # a number to message at minimum
-                self.logger.warning(
-                    'There are no valid Sinch targets to notify.')
-                return False
+        if not self.targets and len(self.source) in (5, 6):
+            # Generate a warning since we're a short-code.  We need
+            # a number to message at minimum
+            self.logger.warning("There are no valid Sinch targets to notify.")
+            return False
 
         # error tracking (used for function return)
         has_error = False
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Authorization': 'Bearer {}'.format(self.api_token),
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Authorization": f"Bearer {self.api_token}",
+            "Content-Type": "application/json",
         }
 
         # Prepare our payload
         payload = {
-            'body': body,
-            'from': self.source,
-
+            "body": body,
+            "from": self.source,
             # The To gets populated in the loop below
-            'to': None,
+            "to": None,
         }
 
         # Prepare our Sinch URL (spi = Service Provider ID)
         url = self.notify_url.format(
-            region=self.region, spi=self.service_plan_id)
+            region=self.region, spi=self.service_plan_id
+        )
 
         # Create a copy of the targets list
         targets = list(self.targets)
@@ -291,12 +307,14 @@ class NotifySinch(NotifyBase):
             target = targets.pop(0)
 
             # Prepare our user
-            payload['to'] = [target]
+            payload["to"] = [target]
 
             # Some Debug Logging
-            self.logger.debug('Sinch POST URL: {} (cert_verify={})'.format(
-                url, self.verify_certificate))
-            self.logger.debug('Sinch Payload: {}' .format(payload))
+            self.logger.debug(
+                "Sinch POST URL:"
+                f" {url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"Sinch Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -324,10 +342,13 @@ class NotifySinch(NotifyBase):
                 #  "flash_message": false
                 # }
                 if r.status_code not in (
-                        requests.codes.created, requests.codes.ok):
+                    requests.codes.created,
+                    requests.codes.ok,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     # set up our status code to use
                     status_code = r.status_code
@@ -335,8 +356,8 @@ class NotifySinch(NotifyBase):
                     try:
                         # Update our status response if we can
                         json_response = json.loads(r.content)
-                        status_code = json_response.get('code', status_code)
-                        status_str = json_response.get('message', status_str)
+                        status_code = json_response.get("code", status_code)
+                        status_str = json_response.get("message", status_str)
 
                     except (AttributeError, TypeError, ValueError):
                         # ValueError = r.content is Unparsable
@@ -348,30 +369,30 @@ class NotifySinch(NotifyBase):
                         pass
 
                     self.logger.warning(
-                        'Failed to send Sinch notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Sinch notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            status_code))
+                            ", " if status_str else "",
+                            status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        'Sent Sinch notification to {}.'.format(target))
+                    self.logger.info(f"Sent Sinch notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Sinch:%s ' % (
-                        target) + 'notification.'
+                    f"A Connection error occurred sending Sinch:{target} "
+                    + "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -381,53 +402,51 @@ class NotifySinch(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.service_plan_id, self.api_token, self.source,
+            self.service_plan_id,
+            self.api_token,
+            self.source,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'region': self.region,
+            "region": self.region,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{spi}:{token}@{source}/{targets}/?{params}'.format(
+        return "{schema}://{spi}:{token}@{source}/{targets}/?{params}".format(
             schema=self.secure_protocol,
             spi=self.pprint(
-                self.service_plan_id, privacy, mode=PrivacyMode.Tail, safe=''),
-            token=self.pprint(self.api_token, privacy, safe=''),
-            source=NotifySinch.quote(self.source, safe=''),
-            targets='/'.join(
-                [NotifySinch.quote(x, safe='') for x in self.targets]),
-            params=NotifySinch.urlencode(params))
+                self.service_plan_id, privacy, mode=PrivacyMode.Tail, safe=""
+            ),
+            token=self.pprint(self.api_token, privacy, safe=""),
+            source=NotifySinch.quote(self.source, safe=""),
+            targets="/".join(
+                [NotifySinch.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifySinch.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         targets = len(self.targets)
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
@@ -435,47 +454,45 @@ class NotifySinch(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = NotifySinch.split_path(results['fullpath'])
+        results["targets"] = NotifySinch.split_path(results["fullpath"])
 
         # The hostname is our source number
-        results['source'] = NotifySinch.unquote(results['host'])
+        results["source"] = NotifySinch.unquote(results["host"])
 
         # Get our service_plan_ide and api_token from the user/pass config
-        results['service_plan_id'] = NotifySinch.unquote(results['user'])
-        results['api_token'] = NotifySinch.unquote(results['password'])
+        results["service_plan_id"] = NotifySinch.unquote(results["user"])
+        results["api_token"] = NotifySinch.unquote(results["password"])
 
         # Auth Token
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
             # Extract the account spi from an argument
-            results['api_token'] = \
-                NotifySinch.unquote(results['qsd']['token'])
+            results["api_token"] = NotifySinch.unquote(results["qsd"]["token"])
 
         # Account SID
-        if 'spi' in results['qsd'] and len(results['qsd']['spi']):
+        if "spi" in results["qsd"] and len(results["qsd"]["spi"]):
             # Extract the account spi from an argument
-            results['service_plan_id'] = \
-                NotifySinch.unquote(results['qsd']['spi'])
+            results["service_plan_id"] = NotifySinch.unquote(
+                results["qsd"]["spi"]
+            )
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifySinch.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifySinch.unquote(results["qsd"]["from"])
 
-        if 'source' in results['qsd'] and len(results['qsd']['source']):
-            results['source'] = \
-                NotifySinch.unquote(results['qsd']['source'])
+        if "source" in results["qsd"] and len(results["qsd"]["source"]):
+            results["source"] = NotifySinch.unquote(results["qsd"]["source"])
 
         # Allow one to define a region
-        if 'region' in results['qsd'] and len(results['qsd']['region']):
-            results['region'] = \
-                NotifySinch.unquote(results['qsd']['region'])
+        if "region" in results["qsd"] and len(results["qsd"]["region"]):
+            results["region"] = NotifySinch.unquote(results["qsd"]["region"])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifySinch.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifySinch.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         return results

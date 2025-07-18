@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -45,30 +44,28 @@
 #
 
 import re
+
 # Import namespace so the class won't conflict with the actual Notify object
 from . import discord
 
 
 class NotifyGuilded(discord.NotifyDiscord):
-    """
-    A wrapper to Guilded Notifications
-
-    """
+    """A wrapper to Guilded Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Guilded'
+    service_name = "Guilded"
 
     # The services URL
-    service_url = 'https://guilded.gg/'
+    service_url = "https://guilded.gg/"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_guilded'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_guilded"
 
     # The default secure protocol
-    secure_protocol = 'guilded'
+    secure_protocol = "guilded"
 
     # Guilded Webhook
-    notify_url = 'https://media.guilded.gg/webhooks'
+    notify_url = "https://media.guilded.gg/webhooks"
 
     @staticmethod
     def parse_native_url(url):
@@ -77,19 +74,27 @@ class NotifyGuilded(discord.NotifyDiscord):
         """
 
         result = re.match(
-            r'^https?://(media\.)?guilded\.gg/webhooks/'
+            r"^https?://(media\.)?guilded\.gg/webhooks/"
             # a UUID, but we do we really need to be _that_ picky?
-            r'(?P<webhook_id>[-0-9a-f]+)/'
-            r'(?P<webhook_token>[A-Z0-9_-]+)/?'
-            r'(?P<params>\?.+)?$', url, re.I)
+            r"(?P<webhook_id>[-0-9a-f]+)/"
+            r"(?P<webhook_token>[A-Z0-9_-]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
             return NotifyGuilded.parse_url(
-                '{schema}://{webhook_id}/{webhook_token}/{params}'.format(
+                "{schema}://{webhook_id}/{webhook_token}/{params}".format(
                     schema=NotifyGuilded.secure_protocol,
-                    webhook_id=result.group('webhook_id'),
-                    webhook_token=result.group('webhook_token'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                    webhook_id=result.group("webhook_id"),
+                    webhook_token=result.group("webhook_token"),
+                    params=(
+                        ""
+                        if not result.group("params")
+                        else result.group("params")
+                    ),
+                )
+            )
 
         return None
