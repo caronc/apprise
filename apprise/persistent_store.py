@@ -495,7 +495,7 @@ class PersistentStore:
                 raise exception.AppriseDiskIOError(
                     f"Invalid data type {type(data)} provided to Persistent"
                     " Storage"
-                )
+                ) from None
 
         if self.__mode == PersistentStoreMode.MEMORY:
             # Nothing further can be done
@@ -531,7 +531,7 @@ class PersistentStore:
             if isinstance(data, str):
                 data = data.encode(self.encoding)
 
-            ntf = tempfile.NamedTemporaryFile(
+            ntf = tempfile.NamedTemporaryFile(  # noqa: SIM115
                 mode="wb", dir=self.__temp_path, delete=False
             )
 
@@ -762,13 +762,13 @@ class PersistentStore:
             # pass along (but wrap with Apprise exception)
             raise exception.AppriseFileNotFound(
                 f"No such file or directory: '{io_file}'"
-            )
+            ) from None
 
         except (OSError, zlib.error) as e:
             # We can't access the file or it does not exist
             logger.warning("Could not read with persistent key: %s", key)
             logger.debug("Persistent Storage Exception: %s", str(e))
-            raise exception.AppriseDiskIOError(str(e))
+            raise exception.AppriseDiskIOError(str(e)) from None
 
     def get(self, key, default=None, lazy=True):
         """Fetches from cache."""
@@ -1124,7 +1124,7 @@ class PersistentStore:
         ntf = None
 
         try:
-            ntf = tempfile.NamedTemporaryFile(
+            ntf = tempfile.NamedTemporaryFile(  # noqa: SIM115
                 mode="w+",
                 encoding=self.encoding,
                 dir=self.__temp_path,

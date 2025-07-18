@@ -27,7 +27,6 @@
 
 
 import dataclasses
-import typing as t
 
 from ...exception import ApprisePluginException
 
@@ -82,5 +81,5 @@ class EmailMessage:
     """
 
     recipient: str
-    to_addrs: t.List[str]
+    to_addrs: list[str]
     body: str

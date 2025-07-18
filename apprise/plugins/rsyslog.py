@@ -219,7 +219,7 @@ class NotifyRSyslog(NotifyBase):
             except KeyError:
                 msg = f"An invalid syslog facility ({facility}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
         else:
             self.facility = SYSLOG_FACILITY_MAP[
@@ -245,18 +245,9 @@ class NotifyRSyslog(NotifyBase):
             self.port if self.port else self.template_tokens["port"]["default"]
         )
 
-        if self.log_pid:
-            payload = "<%d>- %d - %s" % (
-                SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8,
-                os.getpid(),
-                body,
-            )
-
-        else:
-            payload = "<%d>- %s" % (
-                SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8,
-                body,
-            )
+        priority = SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8
+        payload = f"<{priority}>- {os.getpid()} {body}" \
+            if self.log_pid else f"<{priority}>- {body}"
 
         # send UDP packet to upstream server
         self.logger.debug(

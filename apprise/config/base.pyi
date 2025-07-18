@@ -1,3 +1,0 @@
-from .. import URLBase
-
-class ConfigBase(URLBase): ...

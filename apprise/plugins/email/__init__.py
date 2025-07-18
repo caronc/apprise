@@ -41,18 +41,14 @@ from .templates import EMAIL_TEMPLATES
 charset.add_charset("utf-8", charset.QP, charset.QP, "utf-8")
 
 __all__ = [
-    # Reference
-    "NotifyEmail",
-    # Pretty Good Privacy
-    "ApprisePGPController",
-    "ApprisePGPException",
-    # Other
-    "AppriseEmailException",
-    "EmailMessage",
-    "SecureMailMode",
-    "SECURE_MODES",
-    "WebBaseLogin",
-    # Additional entries that may be useful to some developers
     "EMAIL_TEMPLATES",
     "PGP_SUPPORT",
+    "SECURE_MODES",
+    "AppriseEmailException",
+    "ApprisePGPController",
+    "ApprisePGPException",
+    "EmailMessage",
+    "NotifyEmail",
+    "SecureMailMode",
+    "WebBaseLogin",
 ]

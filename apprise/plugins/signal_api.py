@@ -317,7 +317,7 @@ class NotifySignalAPI(NotifyBase):
         # Construct our URL
         notify_url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            notify_url += ":%d" % self.port
+            notify_url += f":{self.port}"
         notify_url += "/v2/send"
 
         # Send in batches if identified to do so

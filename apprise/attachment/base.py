@@ -160,7 +160,7 @@ class AttachBase(URLBase):
             except (TypeError, ValueError):
                 err = f"An invalid cache value ({cache}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err)
+                raise TypeError(err) from None
 
             # Some simple error checking
             if self.cache < 0:
@@ -172,8 +172,7 @@ class AttachBase(URLBase):
             self.cache = None
 
         # Validate mimetype if specified
-        if self._mimetype:
-            if (
+        if self._mimetype and (
                 next(
                     (
                         t
@@ -182,11 +181,10 @@ class AttachBase(URLBase):
                     ),
                     None,
                 )
-                is None
-            ):
-                err = f"An invalid mime-type ({mimetype}) was specified."
-                self.logger.warning(err)
-                raise TypeError(err)
+                is None):
+            err = f"An invalid mime-type ({mimetype}) was specified."
+            self.logger.warning(err)
+            raise TypeError(err)
 
         return
 
@@ -318,9 +316,9 @@ class AttachBase(URLBase):
                     else base64.b64encode(f.read())
                 )
 
-        except (TypeError, FileNotFoundError):
+        except (FileNotFoundError):
             # We no longer have a path to open
-            raise exception.AppriseFileNotFound("Attachment Missing")
+            raise exception.AppriseFileNotFound("Attachment Missing") from None
 
         except (TypeError, OSError) as e:
             self.logger.warning(
@@ -329,7 +327,8 @@ class AttachBase(URLBase):
                 )
             )
             self.logger.debug(f"I/O Exception: {e!s}")
-            raise exception.AppriseDiskIOError("Attachment Access Error")
+            raise exception.AppriseDiskIOError(
+                "Attachment Access Error") from e
 
     def invalidate(self):
         """Release any temporary data that may be open by child classes.
@@ -367,7 +366,7 @@ class AttachBase(URLBase):
 
     def open(self, mode="rb"):
         """Return our file pointer and track it (we'll auto close later)"""
-        pointer = open(self.path, mode=mode)
+        pointer = open(self.path, mode=mode)  # noqa: SIM115
         self.__pointers.add(pointer)
         return pointer
 

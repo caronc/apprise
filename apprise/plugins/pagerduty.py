@@ -281,7 +281,7 @@ class NotifyPagerDuty(NotifyBase):
             # Invalid region specified
             msg = f"The PagerDuty region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # The severity (if specified)
         self.severity = (

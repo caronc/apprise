@@ -509,7 +509,13 @@ class NotifyPushover(NotifyBase):
         try:
             # Open our attachment path if required:
             if attach:
-                files = {"attachment": (attach.name, open(attach.path, "rb"))}
+                files = {
+                    "attachment": (
+                        attach.name,
+                        # file handle is safely closed in `finally`; inline
+                        # open is intentional
+                        open(attach.path, "rb"),  # noqa: SIM115
+                    )}
 
             r = requests.post(
                 self.notify_url,

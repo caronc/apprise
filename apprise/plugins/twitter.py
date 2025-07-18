@@ -697,12 +697,12 @@ class NotifyTwitter(NotifyBase):
         # Open our attachment path if required:
         if isinstance(payload, AttachBase):
             # prepare payload
-            # file handle is safely closed in `finally`; inline open is
-            # intentional
             files = {
                 "media": (
                     payload.name,
-                    open(payload.path, "rb"),
+                    # file handle is safely closed in `finally`; inline open is
+                    # intentional
+                    open(payload.path, "rb"),  # noqa: SIM115
                 ),
             }
 

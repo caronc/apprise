@@ -217,7 +217,7 @@ class NotifyNotica(NotifyBase):
             # Prepare our notify_url
             notify_url = f"{schema}://{self.host}"
             if isinstance(self.port, int):
-                notify_url += ":%d" % self.port
+                notify_url += f":{self.port}"
 
             notify_url += f"{self.fullpath}?token={self.token}"
 

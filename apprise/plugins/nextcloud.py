@@ -161,7 +161,7 @@ class NotifyNextcloud(NotifyBase):
                     f"At invalid Nextcloud version ({version}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
         # Support URL Prefix
         self.url_prefix = "" if not url_prefix else url_prefix.strip("/")

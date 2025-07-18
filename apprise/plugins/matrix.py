@@ -658,10 +658,10 @@ class NotifyMatrix(NotifyBase):
             self.access_token = self.password
             self.transaction_id = uuid.uuid4()
 
-        if self.access_token is None:
+        if self.access_token is None and not self._login() \
+                and not self._register():
             # We need to register
-            if not self._login() and not self._register():
-                return False
+            return False
 
         if len(self.rooms) == 0:
             # Attempt to retrieve a list of already joined channels
@@ -709,7 +709,8 @@ class NotifyMatrix(NotifyBase):
 
             # Build our path
             if self.version == MatrixVersion.V3:
-                path = f"/rooms/{NotifyMatrix.quote(room_id)}/send/m.room.message/{self.transaction_id}"
+                path = f"/rooms/{NotifyMatrix.quote(room_id)}" \
+                    f"/send/m.room.message/{self.transaction_id}"
 
             else:
                 path = (
@@ -770,16 +771,20 @@ class NotifyMatrix(NotifyBase):
                 })
 
             elif self.notify_format == NotifyFormat.MARKDOWN:
+                _title = (
+                    ""
+                    if not title
+                    else (
+                        "<h1>"
+                        f"{NotifyMatrix.escape_html(title, whitespace=False)}"
+                        "</h1>"
+                    )
+                )
+
                 payload.update({
                     "format": "org.matrix.custom.html",
                     "formatted_body": "{title}{body}".format(
-                        title=(
-                            ""
-                            if not title
-                            else (
-                                f"<h1>{NotifyMatrix.escape_html(title, whitespace=False)}</h1>"
-                            )
-                        ),
+                        title=_title,
                         body=markdown(body),
                     ),
                 })
@@ -1020,7 +1025,7 @@ class NotifyMatrix(NotifyBase):
 
         # Expire our token
         postokay, response = self._fetch("/logout", payload=payload)
-        if not postokay:
+        if not postokay and response.get("errcode") != "M_UNKNOWN_TOKEN":
             # If we get here, the token was declared as having already
             # been expired.  The response looks like this:
             # {
@@ -1030,8 +1035,7 @@ class NotifyMatrix(NotifyBase):
             #
             # In this case it's okay to safely return True because
             # we're logged out in this case.
-            if response.get("errcode") != "M_UNKNOWN_TOKEN":
-                return False
+            return False
 
         # else: The response object looks like this if we were successful:
         #  {}
@@ -1403,8 +1407,7 @@ class NotifyMatrix(NotifyBase):
                 status_code = r.status_code
 
                 self.logger.debug(
-                    "Matrix Response: code=%d, %s"
-                    % (r.status_code, str(r.content))
+                    f"Matrix Response: code={r.status_code}, {r.content!s}"
                 )
                 response = loads(r.content)
 
@@ -1718,7 +1721,7 @@ class NotifyMatrix(NotifyBase):
             # We can use our cached value and return early
             return base_url
 
-        # 1. Extract the server name from the user’s Matrix ID by splitting
+        # 1. Extract the server name from the user's Matrix ID by splitting
         # the Matrix ID at the first colon.
         verify_url = f"https://{self.host}/.well-known/matrix/client"
         code, wk_response = self._fetch(

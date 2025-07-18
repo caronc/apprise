@@ -113,7 +113,7 @@ class AttachHTTP(AttachBase):
 
         url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 
@@ -194,7 +194,8 @@ class AttachHTTP(AttachBase):
                     # to False or it isn't compatible with Microsoft Windows
                     # instances. In lieu of this, __del__ will clean up the
                     # file for us.
-                    self._temp_file = NamedTemporaryFile(delete=False)
+                    self._temp_file = \
+                        NamedTemporaryFile(delete=False)  # noqa: SIM115
 
                     # Get our chunk size
                     chunk_size = self.chunk_size
@@ -219,8 +220,8 @@ class AttachHTTP(AttachBase):
                                     self.logger.error(
                                         "HTTP response exceeds allowable"
                                         " maximum file length"
-                                        f" ({int(self.max_file_size / 1024)}KB):"
-                                        f" {self.url(privacy=True)}"
+                                        f" ({int(self.max_file_size / 1024)}"
+                                        f"KB): {self.url(privacy=True)}"
                                     )
 
                                     # Invalidate any variables previously set

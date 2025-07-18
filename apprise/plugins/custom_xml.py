@@ -372,7 +372,7 @@ class NotifyXML(NotifyBase):
 
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
         payload = re_table.sub(lambda x: re_map[x.group()], self.payload)

@@ -102,11 +102,8 @@ class AppriseAttachment:
         self.location = location
 
         # Now parse any paths specified
-        if paths is not None:
-            # Store our path(s)
-            if not self.add(paths):
-                # Parse Source domain based on from_addr
-                raise TypeError("One or more attachments could not be added.")
+        if paths is not None and not self.add(paths):
+            raise TypeError("One or more attachments could not be added.")
 
     def add(self, attachments, asset=None, cache=None):
         """Adds one or more attachments into our list.

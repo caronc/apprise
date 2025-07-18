@@ -216,7 +216,7 @@ class NotifyParsePlatform(NotifyBase):
         # Our Notification URL
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         url += self.fullpath.rstrip("/") + "/parse/push/"
 

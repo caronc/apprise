@@ -205,7 +205,7 @@ class NotifyRocketChat(NotifyBase):
         self.api_url = f"{self.schema}://{self.host}"
 
         if isinstance(self.port, int):
-            self.api_url += ":%d" % self.port
+            self.api_url += f":{self.port}"
 
         # Initialize channels list
         self.channels = []

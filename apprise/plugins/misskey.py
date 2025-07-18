@@ -188,7 +188,7 @@ class NotifyMisskey(NotifyBase):
         self.api_url = f"{self.schema}://{self.host}"
 
         if isinstance(self.port, int):
-            self.api_url += ":%d" % self.port
+            self.api_url += f":{self.port}"
 
         return
 
@@ -218,7 +218,7 @@ class NotifyMisskey(NotifyBase):
 
         host = self.host
         if isinstance(self.port, int):
-            host += ":%d" % self.port
+            host += f":{self.port}"
 
         return "{schema}://{token}@{host}/?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,

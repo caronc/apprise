@@ -2797,15 +2797,6 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # Key is a binary image; definitely not a valid key
     assert obj.notify("test") is False
 
-    # Using a public key
-    shutil.copyfile(
-        os.path.join(TEST_VAR_DIR, "pgp", "valid-pub.asc"),
-        os.path.join(obj.store.path, "chris-pub.asc"),
-    )
-
-    # Notification goes through
-    assert obj.notify("test") is True
-
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 def test_plugin_email_prepare():

@@ -259,7 +259,6 @@ version = {attr = "apprise.__version__"}
 
 [tool.ruff]
 line-length = 79  # Respecting BSD-style 79-char limit
-extend-select = ["I"]  # Automatically sort imports with isort logic
 target-version = "py39"
 exclude = [
   "tests/data",
@@ -310,10 +309,10 @@ select = [
 extend-select = [
    "E501",   # Spacing
    "Q000",   # Quoting
+   "I"  # Automatically sort imports with isort logic
 ]
 
 ignore = [
-  "ANN101",  # missing type on `self`
   "D100",    # missing docstring in public module
   "D104",    # missing docstring in public package
   "B008",    # do not call `dict()` with keyword args
@@ -325,24 +324,24 @@ ignore = [
   # The following needs to be supported at some point and is of great value
   "RUF012",  # typing.ClassVar implimentation
   "E501",    # Enforcing wordrap at 79 characters per BSD should be enforced
-            # it broke when ruff-autofixed over 600+ entries to accomodate
-            # other PEP styles.
+             # it broke when ruff-autofixed over 600+ entries to accomodate
+             # other PEP styles.
   "SIM105",  # leverage contextlib.supress() so signifigantly simply the
-            # readability of the code
+             # readability of the code
   "UP032",   # This is a massive undertaking and requires a massive rewrite
-            # of test cases; this will take a while to fix, so turning off
-            # for now
+             # of test cases; this will take a while to fix, so turning off
+             # for now
 ]
 
-[tool.ruff.flake8-quotes]
+[tool.ruff.lint.flake8-quotes]
 inline-quotes = "double"
 
-[tool.ruff.isort]
+[tool.ruff.lint.isort]
 known-first-party = ["apprise"]
 force-sort-within-sections = true
 combine-as-imports = true
 
-[tool.ruff.flake8-builtins]
+[tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["_"]
 
 [tool.pytest.ini_options]

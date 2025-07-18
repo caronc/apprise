@@ -162,8 +162,8 @@ class NotifyDiscord(NotifyBase):
             "url": {
                 "alias_of": "href",
             },
-            # Send a message to the specified thread within a webhook's channel.
-            # The thread will automatically be unarchived.
+            # Send a message to the specified thread within a webhook's
+            # channel. The thread will automatically be unarchived.
             "thread": {
                 "name": _("Thread ID"),
                 "type": "string",
@@ -352,7 +352,7 @@ class NotifyDiscord(NotifyBase):
                         ]
 
                         # Remove entry from head of fields
-                        fields = fields[self.discord_max_fields :]
+                        fields = fields[self.discord_max_fields:]
 
             else:
                 # not markdown
@@ -495,7 +495,13 @@ class NotifyDiscord(NotifyBase):
 
             # Open our attachment path if required:
             if attach:
-                files = {"file": (attach.name, open(attach.path, "rb"))}
+                files = {
+                    "file": (
+                        attach.name,
+                        # file handle is safely closed in `finally`; inline
+                        # open is intentional
+                        open(attach.path, "rb"),  # noqa: SIM115
+                    )}
 
             else:
                 headers["Content-Type"] = "application/json; charset=utf-8"

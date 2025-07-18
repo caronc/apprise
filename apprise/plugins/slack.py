@@ -519,7 +519,7 @@ class NotifySlack(NotifyBase):
                         re.escape(match[0]),
                         f"<!{channel}|{desc}>" if desc else f"<!{channel}>",
                         body,
-                        re.IGNORECASE,
+                        flags=re.IGNORECASE,
                     )
 
                 # Support <@userid|desc>, <@channel> entries
@@ -533,7 +533,7 @@ class NotifySlack(NotifyBase):
                         re.escape(match[0]),
                         f"<@{user}|{desc}>" if desc else f"<@{user}>",
                         body,
-                        re.IGNORECASE,
+                        flags=re.IGNORECASE,
                     )
 
                 # Support <url|desc>, <url> entries
@@ -547,7 +547,7 @@ class NotifySlack(NotifyBase):
                         re.escape(match[0]),
                         f"<{url}|{desc}>" if desc else f"<{url}>",
                         body,
-                        re.IGNORECASE,
+                        flags=re.IGNORECASE,
                     )
 
             # Perform Formatting on title here; this is not needed for block
@@ -597,7 +597,10 @@ class NotifySlack(NotifyBase):
 
         # Prepare our Slack URL (depends on mode)
         if self.mode is SlackMode.WEBHOOK:
-            url = f"{self.webhook_url}/{self.token_a}/{self.token_b}/{self.token_c}"
+            url = (
+                f"{self.webhook_url}/{self.token_a}"
+                f"/{self.token_b}/{self.token_c}"
+            )
 
         else:  # SlackMode.BOT
             url = self.api_url.format("chat.postMessage")
@@ -956,7 +959,14 @@ class NotifySlack(NotifyBase):
         try:
             # Open our attachment path if required:
             if attach:
-                files = {"file": (attach.name, open(attach.path, "rb"))}
+                files = {
+                    "file": (
+                        attach.name,
+                        # file handle is safely closed in `finally`; inline
+                        # open is intentional
+                        open(attach.path, "rb"),  # noqa: SIM115
+                        ),
+                    }
 
             r = requests.request(
                 http_method,

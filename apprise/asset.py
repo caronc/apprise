@@ -255,7 +255,7 @@ class AppriseAsset:
                     raise ValueError(
                         "AppriseAsset namespace_salt(): "
                         "Value provided could not be encoded"
-                    )
+                    ) from None
 
             else:  # Unsupported
                 raise ValueError(

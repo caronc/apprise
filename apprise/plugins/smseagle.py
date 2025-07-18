@@ -298,7 +298,7 @@ class NotifySMSEagle(NotifyBase):
                     f"An invalid SMSEagle priority ({priority}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
             # store our successfully looked up priority
             self.priority = SMSEAGLE_PRIORITY_MAP[result]
@@ -441,7 +441,7 @@ class NotifySMSEagle(NotifyBase):
         # Construct our URL
         notify_url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            notify_url += ":%d" % self.port
+            notify_url += f":{self.port}"
         notify_url += self.notify_path
 
         # Send in batches if identified to do so

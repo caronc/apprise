@@ -494,7 +494,7 @@ class Apprise:
                 f"type: {self.asset.encoding}"
             )
             logger.error(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # Tracks conversions
         conversion_body_map = {}
@@ -581,7 +581,7 @@ class Apprise:
                         # Must be of string type
                         msg = "Failed to escape message body"
                         logger.error(msg)
-                        raise TypeError(msg)
+                        raise TypeError(msg) from None
 
                 if server.interpret_emojis:
                     #

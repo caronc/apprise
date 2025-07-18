@@ -303,7 +303,9 @@ class NotifyAppriseAPI(NotifyBase):
                             f"file{no:02d}",
                             (
                                 filename,
-                                open(attachment.path, "rb"),
+                                # file handle is safely closed in `finally`;
+                                # inline open is intentional
+                                open(attachment.path, "rb"),  # noqa: SIM115
                                 attachment.mimetype,
                             ),
                         ))
@@ -350,7 +352,7 @@ class NotifyAppriseAPI(NotifyBase):
 
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         fullpath = self.fullpath.strip("/")
         url += "{}".format("/" + fullpath) if fullpath else ""

@@ -271,7 +271,7 @@ class NotifyMQTT(NotifyBase):
         except (ValueError, TypeError):
             msg = f"An invalid MQTT QOS ({qos}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         if not self.port:
             # Assign port (if not otherwise set)
@@ -308,7 +308,7 @@ class NotifyMQTT(NotifyBase):
                 f"An invalid MQTT Protocol version ({version}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # Our MQTT Client Object
         self.client = mqtt.Client(
@@ -638,7 +638,7 @@ class NotifyMQTT(NotifyBase):
             "/usr/local/etc/ca-certificates/cert.pem",
         ]
 
-        # Certifi provides Mozilla’s carefully curated collection of Root
+        # Certifi provides Mozilla's carefully curated collection of Root
         # Certificates for validating the trustworthiness of SSL certificates
         # while verifying the identity of TLS hosts. It has been extracted from
         # the Requests project.

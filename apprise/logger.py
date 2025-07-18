@@ -194,8 +194,4 @@ class LogCapture:
                     # It's okay if the file does not exist
                     pass
 
-        if exc_type is not None:
-            # pass exception on if one was generated
-            return False
-
-        return True
+        return exc_type is None

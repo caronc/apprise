@@ -269,7 +269,7 @@ class NotifyEnigma2(NotifyBase):
 
         url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ":%d" % self.port
+            url += f":{self.port}"
 
         # Prepare our message URL
         url += self.fullpath.rstrip("/") + "/api/message"

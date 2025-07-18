@@ -337,7 +337,13 @@ class NotifyPushBullet(NotifyBase):
         try:
             # Open our attachment path if required:
             if isinstance(payload, AttachBase):
-                files = {"file": (payload.name, open(payload.path, "rb"))}
+                files = {
+                    "file": (
+                        payload.name,
+                        # file handle is safely closed in `finally`; inline
+                        # open is intentional
+                        open(payload.path, "rb"),  # noqa: SIM115
+                    )}
 
             r = requests.post(
                 url,

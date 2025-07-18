@@ -161,7 +161,7 @@ class ConfigBase(URLBase):
         except (ValueError, TypeError):
             err = f"An invalid cache value ({cache}) was specified."
             self.logger.warning(err)
-            raise TypeError(err)
+            raise TypeError(err) from None
 
         return
 
@@ -987,7 +987,7 @@ class ConfigBase(URLBase):
             includes = []
 
         # Iterate over each config URL
-        for no, url in enumerate(includes):
+        for _no, url in enumerate(includes):
 
             if isinstance(url, str):
                 # Support a single inline string or multiple ones separated by
@@ -1055,7 +1055,8 @@ class ConfigBase(URLBase):
 
                 # Track last acquired schema
                 schema = None
-                for key, tokens in it:
+
+                for key, _tokens in it:
                     # Test our schema
                     _schema = GET_SCHEMA_RE.match(key)
                     if _schema is None:
@@ -1073,6 +1074,12 @@ class ConfigBase(URLBase):
 
                     # Store our URL and Schema Regex
                     _url = key
+
+                    # Update our token assignment
+                    tokens = _tokens
+
+                    # We're done
+                    break
 
                 if _url is None:
                     # the loop above failed to match anything

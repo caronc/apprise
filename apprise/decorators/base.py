@@ -181,18 +181,9 @@ class CustomNotifyPlugin(NotifyBase):
                         **kwargs,
                     )
 
-                    if result is None:
-                        # The wrapper did not define a return (or returned
-                        # None)
-                        # this is treated as a successful return as it is
-                        # assumed the developer did not care about the result
-                        # of the call.
-                        response = True
-
-                    else:
-                        # Perform boolean check (allowing obects to also be
-                        # returned and check against the __bool__ call
-                        response = bool(result)
+                    # None and True are both considered successful
+                    # False however is passed along further upstream
+                    response = True if result is None else bool(result)
 
                 except Exception as e:
                     # Unhandled Exception

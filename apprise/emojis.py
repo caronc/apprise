@@ -1728,8 +1728,8 @@ EMOJI_MAP = {
     # Math
     #
     DELIM + r"heavy_multiplication_x" + DELIM: "✖️",
-    DELIM + r"heavy_plus_sign" + DELIM: "➕",
-    DELIM + r"heavy_minus_sign" + DELIM: "➖",
+    DELIM + r"heavy_plus_sign" + DELIM: "➕",  # noqa: RUF001
+    DELIM + r"heavy_minus_sign" + DELIM: "➖",  # noqa: RUF001
     DELIM + r"heavy_division_sign" + DELIM: "➗",
     DELIM + r"infinity" + DELIM: "♾️",
     #
@@ -1801,7 +1801,7 @@ EMOJI_MAP = {
     DELIM + r"cl" + DELIM: "🆑",
     DELIM + r"cool" + DELIM: "🆒",
     DELIM + r"free" + DELIM: "🆓",
-    DELIM + r"information_source" + DELIM: "ℹ️",
+    DELIM + r"information_source" + DELIM: "ℹ️",  # noqa: RUF001
     DELIM + r"id" + DELIM: "🆔",
     DELIM + r"m" + DELIM: "Ⓜ️",
     DELIM + r"new" + DELIM: "🆕",
