@@ -35,11 +35,45 @@ import pytest
 
 import apprise
 
-logging.disable(logging.CRITICAL)
+try:
+    import syslog
 
-# Skip tests when Python environment does not provide the `syslog` package.
-if "syslog" not in sys.modules:
-    pytest.skip("Skipping syslog based tests", allow_module_level=True)
+except ImportError:
+    # Shim so that test cases can run in environments that
+    # do not have syslog
+    import types
+    syslog = types.SimpleNamespace(
+        LOG_PID=0x01,
+        LOG_PERROR=0x02,
+        LOG_INFO=6,
+        LOG_NOTICE=5,
+        LOG_CRIT=2,
+        LOG_WARNING=4,
+        LOG_KERN=0,
+        LOG_USER=1,
+        LOG_MAIL=2,
+        LOG_DAEMON=3,
+        LOG_AUTH=4,
+        LOG_SYSLOG=5,
+        LOG_LPR=6,
+        LOG_NEWS=7,
+        LOG_UUCP=8,
+        LOG_CRON=9,
+        LOG_LOCAL0=16,
+        LOG_LOCAL1=17,
+        LOG_LOCAL2=18,
+        LOG_LOCAL3=19,
+        LOG_LOCAL4=20,
+        LOG_LOCAL5=21,
+        LOG_LOCAL6=22,
+        LOG_LOCAL7=23,
+        openlog=lambda *a, **kw: None,
+        syslog=lambda *a, **kw: None,
+    )
+    sys.modules["syslog"] = syslog
+
+
+logging.disable(logging.CRITICAL)
 
 from apprise.plugins.syslog import NotifySyslog  # noqa E402
 

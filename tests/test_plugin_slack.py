@@ -38,7 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
-from apprise.plugins.slack import NotifySlack, SlackMode
+from apprise.plugins.slack import NotifySlack
 
 logging.disable(logging.CRITICAL)
 
@@ -565,48 +565,6 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # We'll fail now because of an internal exception
     assert obj.send(body="test") is False
 
-    # --- Simulate failure to send file to channel (missing 'files') ---
-    mock_request.reset_mock()
-    mock_request.side_effect = [
-        request,  # chat.postMessage
-        mock.Mock(**{  # getUploadURLExternal
-            "content": dumps({
-                "ok": True,
-                "upload_url": "https://files.slack.com/upload/v1/ABC123",
-                "file_id": "F123ABC456",
-            }),
-            "status_code": requests.codes.ok,
-        }),
-        mock.Mock(**{  # File upload
-            "content": b"OK - 123",
-            "status_code": requests.codes.ok,
-        }),
-        mock.Mock(**{  # completeUploadExternal returns invalid response
-            "content": dumps({
-                "ok": True,
-                "files": [],  # <== This triggers the unhit block
-            }),
-            "status_code": requests.codes.ok,
-        }),
-    ]
-
-    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
-    attach = AppriseAttachment(path)
-
-    # Test via BOT Mode
-    obj.mode = SlackMode.BOT
-
-    # This will now fail on 'response.get("files")' being empty
-    assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
-        )
-        is False
-    )
-
 
 @mock.patch("requests.request")
 def test_plugin_slack_webhook_mode(mock_request):
@@ -1040,3 +998,105 @@ def test_plugin_slack_multiple_thread_reply(mock_request):
     assert loads(mock_request.call_args_list[1][1]["data"]).get(
         "thread_ts"
     ) == str(thread_id_2)
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_file_upload_success(mock_request):
+    """Test Slack BOT attachment upload success path."""
+
+    token = "xoxb-1234-1234-abc124"
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    # Simulate all successful Slack API responses
+    mock_request.side_effect = [
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "channel": "C123456",
+            }),
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "upload_url": "https://files.slack.com/upload/v1/ABC123",
+                "file_id": "F123ABC456",
+            }),
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": b"OK - 123",
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "files": [{"id": "F123ABC456", "title": "apprise-test"}],
+            }),
+            "status_code": requests.codes.ok,
+        }),
+    ]
+
+    obj = NotifySlack(access_token=token, targets=["#general"])
+    assert obj.notify(
+        body="Success path test",
+        title="Slack Upload OK",
+        notify_type=NotifyType.INFO,
+        attach=attach,
+    ) is True
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_file_upload_fails_missing_files(mock_request):
+    """Test that file upload fails when 'files' is missing or empty."""
+
+    token = "xoxb-1234-1234-abc124"
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    # Mock sequence:
+    # 1. chat.postMessage returns valid channel
+    # 2. files.getUploadURLExternal returns file_id and upload_url
+    # 3. Upload returns 'OK'
+    # 4. files.completeUploadExternal returns missing/empty 'files'
+
+    mock_request.side_effect = [
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "channel": "C555555",
+            }),
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "upload_url": "https://files.slack.com/upload/v1/X99999",
+                "file_id": "F999XYZ888",
+            }),
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": b"OK - 2048",
+            "status_code": requests.codes.ok,
+        }),
+        # <== This response will trigger the error condition
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "files": [],
+            }),
+            "status_code": requests.codes.ok,
+        }),
+    ]
+
+    obj = NotifySlack(access_token=token, targets=["#fail-channel"])
+    result = obj.notify(
+        body="This should trigger a failed file upload",
+        title="Trigger failure",
+        notify_type=NotifyType.INFO,
+        attach=attach,
+    )
+
+    assert result is False
