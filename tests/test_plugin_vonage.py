@@ -116,7 +116,8 @@ apprise_url_tests = (
             "a" * 8, "b" * 16, "5" * 11
         ),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead
+            # of from)
             "instance": NotifyVonage,
         },
     ),
@@ -223,7 +224,8 @@ apprise_url_tests = (
             "a" * 8, "b" * 16, "5" * 11
         ),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead of
+            # from)
             "instance": NotifyVonage,
         },
     ),

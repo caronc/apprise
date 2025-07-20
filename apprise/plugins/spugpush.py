@@ -92,7 +92,9 @@ class NotifySpugpush(NotifyBase):
         """Returns the URL built dynamically based on specified arguments."""
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
         return (
-            f"{self.secure_protocol}://{self.pprint(self.token, privacy, mode=PrivacyMode.Secret)}/?{self.urlencode(params)}"
+            f"{self.secure_protocol}://"
+            f"{self.pprint(self.token, privacy, mode=PrivacyMode.Secret)}/"
+            f"?{self.urlencode(params)}"
         )
 
     @property

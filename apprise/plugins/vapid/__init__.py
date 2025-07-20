@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from itertools import chain
 from json import dumps
 import os
@@ -172,7 +173,8 @@ class NotifyVapid(NotifyBase):
                 "map_to": "mode",
             },
             # Default Time To Live (defined in seconds)
-            # 0 (Zero) - message will be delivered only if the device is reacheable
+            # 0 (Zero) - message will be delivered only if the device is
+            # reacheable
             "ttl": {
                 "name": _("ttl"),
                 "type": "int",
@@ -241,12 +243,9 @@ class NotifyVapid(NotifyBase):
         # Set our Time to Live Flag
         self.ttl = self.template_args["ttl"]["default"]
         if ttl is not None:
-            try:
+            with contextlib.suppress(ValueError, TypeError):
+                # Store our TTL (Time To live) if it is a valid integer
                 self.ttl = int(ttl)
-
-            except (ValueError, TypeError):
-                # Do nothing
-                pass
 
             if (
                 self.ttl < self.template_args["ttl"]["min"]
@@ -280,8 +279,9 @@ class NotifyVapid(NotifyBase):
 
             if self.mode not in VAPID_PUSH_MODES:
                 # allow the outer except to handle this common response
-                raise
-        except:
+                raise IndexError()
+
+        except (AttributeError, IndexError, TypeError):
             # Invalid region specified
             msg = f"The Vapid mode specified ({mode}) is invalid."
             self.logger.warning(msg)

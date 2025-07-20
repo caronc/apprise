@@ -157,7 +157,8 @@ apprise_url_tests = (
         ),
         {
             # template with kwarg assignments
-            # Invalid keyword specified; cna only be a digit OR `body' or 'type'
+            # Invalid keyword specified; cna only be a digit OR `body'
+            # or 'type'
             "instance": TypeError,
         },
     ),
@@ -200,7 +201,8 @@ apprise_url_tests = (
             "d" * 32, "5" * 11, "6" * 11
         ),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead
+            # of from)
             "instance": NotifyWhatsApp,
         },
     ),

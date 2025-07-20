@@ -518,8 +518,8 @@ class ApprisePEMController:
             if (
                 self.load_public_key(path)
                 or
-                # Try to see if we can load a private key (which we can generate a
-                # public from)
+                # Try to see if we can load a private key (which we ca
+                # generate a public from)
                 self.private_key(*names, autogen=autogen)
             )
             else None

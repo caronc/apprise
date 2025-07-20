@@ -80,8 +80,8 @@ apprise_url_tests = (
     (
         "vapid://user@example.com",
         {
-            # bare bone requirements met, but we don't have our subscription file
-            # or our private key (pem)
+            # bare bone requirements met, but we don't have our subscription
+            # file or our private key (pem)
             "instance": NotifyVapid,
             # We'll fail to respond because we would not have found any
             # configuration to load

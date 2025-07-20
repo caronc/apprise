@@ -240,8 +240,8 @@ class NotifyPopcornNotify(NotifyBase):
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occured sending"
-                    f" {len(self.targets[index:index + batch_size])} PopcornNotify"
-                    " notification(s)."
+                    f" {len(self.targets[index:index + batch_size])} "
+                    "PopcornNotify notification(s)."
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
 

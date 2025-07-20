@@ -133,10 +133,11 @@ class NotifyD7Networks(NotifyBase):
                 "alias_of": "targets",
             },
             "source": {
-                # Originating address,In cases where the rewriting of the sender's
-                # address is supported or permitted by the SMS-C. This is used to
-                # transmit the message, this number is transmitted as the
-                # originating address and is completely optional.
+                # Originating address,In cases where the rewriting of the
+                # sender's address is supported or permitted by the SMS-C.
+                # This is used to transmit the message, this number is
+                # transmitted as the originating address and is completely
+                # optional.
                 "name": _("Originating Address"),
                 "type": "string",
                 "map_to": "source",

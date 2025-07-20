@@ -187,10 +187,11 @@ class NotifyBase(URLBase):
                 "default": overflow_mode,
                 # look up default using the following parent class value at
                 # runtime. The variable name identified here (in this case
-                # overflow_mode) is checked and it's result is placed over-top of
-                # the 'default'. This is done because once a parent class inherits
-                # this one, the overflow_mode already set as a default 'could' be
-                # potentially over-ridden and changed to a different value.
+                # overflow_mode) is checked and it's result is placed over-top
+                # of the 'default'. This is done because once a parent class
+                # inherits this one, the overflow_mode already set as a default
+                # 'could' be potentially over-ridden and changed to a different
+                # value.
                 "_lookup_default": "overflow_mode",
             },
             "format": {

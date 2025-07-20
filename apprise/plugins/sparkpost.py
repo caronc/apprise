@@ -53,6 +53,7 @@
 #
 # API Documentation: https://developers.sparkpost.com/api/
 # Specifically: https://developers.sparkpost.com/api/transmissions/
+import contextlib
 from email.utils import formataddr
 from json import dumps, loads
 
@@ -273,8 +274,9 @@ class NotifySparkPost(NotifyBase):
 
             if self.region_name not in SPARKPOST_REGIONS:
                 # allow the outer except to handle this common response
-                raise
-        except:
+                raise IndexError()
+
+        except (AttributeError, IndexError, TypeError):
             # Invalid region specified
             msg = f"The SparkPost region specified ({region_name}) is invalid."
             self.logger.warning(msg)
@@ -448,18 +450,13 @@ class NotifySparkPost(NotifyBase):
                 #   ]
                 # }
                 #
-                try:
-                    # Update our status response if we can
-                    json_response = loads(r.content)
-
-                except (AttributeError, TypeError, ValueError):
+                with contextlib.suppress(
+                        AttributeError, TypeError, ValueError):
+                    # Load our JSON Object if we can
                     # ValueError = r.content is Unparsable
                     # TypeError = r.content is None
                     # AttributeError = r is None
-
-                    # We could not parse JSON response.
-                    # We will just use the status we already have.
-                    pass
+                    json_response = loads(r.content)
 
                 status_code = r.status_code
 

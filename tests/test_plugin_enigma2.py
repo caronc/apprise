@@ -59,7 +59,8 @@ apprise_url_tests = (
         "enigma2://localhost",
         {
             "instance": NotifyEnigma2,
-            # This will fail because we're also expecting a server acknowledgement
+            # This will fail because we're also expecting a server
+            # acknowledgement
             "notify_response": False,
         },
     ),

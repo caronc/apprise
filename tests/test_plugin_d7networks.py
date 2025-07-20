@@ -136,7 +136,8 @@ apprise_url_tests = (
     (
         "d7sms://token@{}?batch=yes&source=apprise".format("3" * 14),
         {
-            # valid number, utilizing the optional source= variable (same as from)
+            # valid number, utilizing the optional source= variable (same as
+            # from)
             "instance": NotifyD7Networks,
         },
     ),

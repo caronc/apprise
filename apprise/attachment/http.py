@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 import os
 import re
 from tempfile import NamedTemporaryFile
@@ -286,12 +287,9 @@ class AttachHTTP(AttachBase):
             self.logger.trace("Attachment cleanup of %s", self._temp_file.name)
             self._temp_file.close()
 
-            try:
+            with contextlib.suppress(OSError):
                 # Ensure our file is removed (if it exists)
                 os.unlink(self._temp_file.name)
-
-            except OSError:
-                pass
 
             # Reset our temporary file to prevent from entering
             # this block again

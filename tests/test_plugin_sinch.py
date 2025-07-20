@@ -147,7 +147,8 @@ apprise_url_tests = (
             "a" * 32, "b" * 32, "5" * 11
         ),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead of
+            # from)
             "instance": NotifySinch,
         },
     ),

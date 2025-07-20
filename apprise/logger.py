@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from io import StringIO
 import logging
 import os
@@ -186,12 +187,8 @@ class LogCapture:
             self.__buffer_ptr.close()
             self.__handler.close()
             if self.__delete:
-                try:
+                with contextlib.suppress(OSError):
                     # Always remove file afterwards
                     os.unlink(self.__path)
-
-                except OSError:
-                    # It's okay if the file does not exist
-                    pass
 
         return exc_type is None

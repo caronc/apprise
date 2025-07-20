@@ -23,6 +23,7 @@
 # THE SOFTWARE.
 import base64
 import binascii
+import contextlib
 from datetime import datetime, timedelta, timezone
 import glob
 import gzip
@@ -52,12 +53,8 @@ def _ntf_tidy(ntf):
     """Reusable NamedTemporaryFile cleanup."""
     if ntf:
         # Cleanup
-        try:
+        with contextlib.suppress(OSError):
             ntf.close()
-
-        except OSError:
-            # Already closed
-            pass
 
         try:
             os.unlink(ntf.name)

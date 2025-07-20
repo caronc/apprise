@@ -77,7 +77,8 @@ apprise_url_tests = (
         "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#hmm/#-invalid-",
         {
             # No username specified; this is still okay as we sub in
-            # default; The one invalid channel is skipped when sending a message
+            # default; The one invalid channel is skipped when sending a
+            # message
             "instance": NotifySlack,
             # There is an invalid channel that we will fail to deliver to
             # as a result the response type will be false
@@ -92,7 +93,8 @@ apprise_url_tests = (
         "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#channel",
         {
             # No username specified; this is still okay as we sub in
-            # default; The one invalid channel is skipped when sending a message
+            # default; The one invalid channel is skipped when sending a
+            # message
             "instance": NotifySlack,
             # don't include an image by default
             "include_image": False,
@@ -121,7 +123,8 @@ apprise_url_tests = (
         },
     ),
     (
-        "slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref",
+        ("slack://username@T1JJ3T3L2/A1BRTD4JD/"
+         "TIiajkdnlazkcOXrIdevi7FQ/#nuxref"),
         {
             "instance": NotifySlack,
             "requests_response_text": "ok",
@@ -147,7 +150,8 @@ apprise_url_tests = (
     ),
     # Specify Token and channels on argument string (no username)
     (
-        "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/&to=#chan",
+        ("slack://?token=T1JJ3T3L2/A1BRTD4JD"
+         "/TIiajkdnlazkcOXrIdevi7FQ/&to=#chan"),
         {
             "instance": NotifySlack,
             "requests_response_text": "ok",
@@ -155,7 +159,8 @@ apprise_url_tests = (
     ),
     # Test webhook that doesn't have a proper response
     (
-        "slack://username@T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#nuxref",
+        ("slack://username@T1JJ3T3L2/A1BRTD4JD/"
+         "TIiajkdnlazkcOXrIdevi7FQ/#nuxref"),
         {
             "instance": NotifySlack,
             "requests_response_text": "fail",
@@ -244,8 +249,8 @@ apprise_url_tests = (
                 "ok": True,
                 "message": "",
             },
-            # we'll fail to send attachments because we had no 'file' response in
-            # our object
+            # we'll fail to send attachments because we had no 'file' response
+            # in our object
             "response": False,
         },
     ),

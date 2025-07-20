@@ -90,7 +90,8 @@ apprise_url_tests = (
             "a" * 5, "b" * 10, "3" * 11
         ),
         {
-            # included phone, short number (123) and garbage string (abcd) dropped
+            # included phone, short number (123) and garbage string (abcd)
+            # dropped
             "instance": NotifyBulkVS,
             "privacy_url": "bulkvs://a...a:****@9876543210/33333333333",
         },

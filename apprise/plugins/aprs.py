@@ -66,6 +66,7 @@
 # http://www.aprs.org/doc/APRS101.PDF
 #
 
+import contextlib
 from itertools import chain
 import re
 import socket
@@ -321,13 +322,8 @@ class NotifyAprs(NotifyBase):
     def socket_close(self):
         """Closes the socket connection whereas present."""
         if self.sock:
-            try:
+            with contextlib.suppress(Exception):
                 self.sock.close()
-
-            except Exception:
-                # No worries if socket exception thrown on close()
-                pass
-
             self.sock = None
 
     def socket_open(self):

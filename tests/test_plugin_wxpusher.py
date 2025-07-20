@@ -218,7 +218,8 @@ apprise_url_tests = (
     (
         "wxpusher://AT_appid/{}/{}/".format("2" * 11, "3" * 11),
         {
-            # If we have from= specified, then all elements take on the to= value
+            # If we have from= specified, then all elements take on the
+            # to= value
             "instance": NotifyWxPusher,
             # Our response expected server response
             "requests_response_text": WXPUSHER_GOOD_RESPONSE,
@@ -227,7 +228,8 @@ apprise_url_tests = (
     (
         "wxpusher://AT_appid/{}".format("3" * 11),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead
+            # of from)
             "instance": NotifyWxPusher,
             # Our response expected server response
             "requests_response_text": WXPUSHER_GOOD_RESPONSE,

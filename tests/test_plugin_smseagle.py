@@ -270,7 +270,8 @@ apprise_url_tests = (
     (
         "smseagle://token@localhost:8088/{}/{}/".format("2" * 11, "3" * 11),
         {
-            # If we have from= specified, then all elements take on the to= value
+            # If we have from= specified, then all elements take on the
+            # to= value
             "instance": NotifySMSEagle,
             # Our response expected server response
             "requests_response_text": SMSEAGLE_GOOD_RESPONSE,
@@ -279,7 +280,8 @@ apprise_url_tests = (
     (
         "smseagles://token@localhost/{}".format("3" * 11),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead of
+            # from)
             "instance": NotifySMSEagle,
             # Our response expected server response
             "requests_response_text": SMSEAGLE_GOOD_RESPONSE,

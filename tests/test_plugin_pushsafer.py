@@ -68,7 +68,8 @@ apprise_url_tests = (
         "psafer://{}".format("a" * 20),
         {
             "instance": NotifyPushSafer,
-            # This will fail because we're also expecting a server acknowledgement
+            # This will fail because we're also expecting a server
+            # acknowledgement
             "notify_response": False,
         },
     ),

@@ -81,7 +81,8 @@ apprise_url_tests = (
     (
         "httpsms://{}@9876543210/{}/abcd/".format("b" * 10, "3" * 11),
         {
-            # included phone, short number (123) and garbage string (abcd) dropped
+            # included phone, short number (123) and garbage string (abcd)
+            # dropped
             "instance": NotifyHttpSMS,
             "privacy_url": "httpsms://b...b@9876543210/33333333333",
         },

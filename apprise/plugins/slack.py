@@ -71,6 +71,7 @@
 #        - You will be able to select the Bot App you previously created
 #        - Your bot will join your channel.
 
+import contextlib
 from json import dumps, loads
 import re
 from time import time
@@ -815,14 +816,13 @@ class NotifySlack(NotifyBase):
             )
 
             # Attachment posts return a JSON string
-            try:
-                response = loads(r.content)
+            with contextlib.suppress(AttributeError, TypeError, ValueError):
+                # Load our JSON object if we can
 
-            except (AttributeError, TypeError, ValueError):
                 # ValueError = r.content is Unparsable
                 # TypeError = r.content is None
                 # AttributeError = r is None
-                pass
+                response = loads(r.content)
 
             # We can get a 200 response, but still fail.  A failure message
             # might look like this (missing bot permissions):
@@ -980,14 +980,12 @@ class NotifySlack(NotifyBase):
             )
 
             # Posts return a JSON string
-            try:
-                response = loads(r.content)
-
-            except (AttributeError, TypeError, ValueError):
+            with contextlib.suppress(AttributeError, TypeError, ValueError):
+                # Load our JSON object if we can
                 # ValueError = r.content is Unparsable
                 # TypeError = r.content is None
                 # AttributeError = r is None
-                pass
+                response = loads(r.content)
 
             # Another response type is:
             # {

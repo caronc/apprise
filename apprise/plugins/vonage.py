@@ -30,6 +30,8 @@
 # Get your (api) key and secret here:
 #   - https://dashboard.nexmo.com/getting-started-guide
 #
+import contextlib
+
 import requests
 
 from ..common import NotifyType
@@ -126,10 +128,10 @@ class NotifyVonage(NotifyBase):
                 "alias_of": "secret",
             },
             # Default Time To Live
-            # By default Vonage attempt delivery for 72 hours, however the maximum
-            # effective value depends on the operator and is typically 24 - 48
-            # hours. We recommend this value should be kept at its default or at
-            # least 30 minutes.
+            # By default Vonage attempt delivery for 72 hours, however the
+            # maximum effective value depends on the operator and is typically
+            # 24 - 48 hours. We recommend this value should be kept at its
+            # default or at least 30 minutes.
             "ttl": {
                 "name": _("ttl"),
                 "type": "int",
@@ -166,12 +168,9 @@ class NotifyVonage(NotifyBase):
 
         # Set our Time to Live Flag
         self.ttl = self.template_args["ttl"]["default"]
-        try:
+        with contextlib.suppress(ValueError, TypeError):
+            # update our ttl if we're dealing with an integer
             self.ttl = int(ttl)
-
-        except (ValueError, TypeError):
-            # Do nothing
-            pass
 
         if (
             self.ttl < self.template_args["ttl"]["min"]

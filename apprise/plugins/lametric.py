@@ -86,6 +86,7 @@
 # - https://developer.lametric.com/icons
 
 
+import contextlib
 from json import dumps
 import re
 
@@ -1103,12 +1104,8 @@ class NotifyLametric(NotifyBase):
                 )
 
         # Set cycles
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             results["cycles"] = abs(int(results["qsd"].get("cycles")))
-
-        except (TypeError, ValueError):
-            # Not a valid integer; ignore entry
-            pass
 
         return results
 

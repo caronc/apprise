@@ -179,8 +179,8 @@ class NotifyPagerDuty(NotifyBase):
                 "default": PagerDutyRegion.US,
                 "map_to": "region_name",
             },
-            # The severity is automatically determined, however you can optionally
-            # over-ride its value and force it to be what you want
+            # The severity is automatically determined, however you can
+            # optionally over-ride its value and force it to be what you want
             "severity": {
                 "name": _("Severity"),
                 "type": "choice:string",
@@ -276,8 +276,9 @@ class NotifyPagerDuty(NotifyBase):
 
             if self.region_name not in PAGERDUTY_REGIONS:
                 # allow the outer except to handle this common response
-                raise
-        except:
+                raise IndexError()
+
+        except (AttributeError, IndexError, TypeError):
             # Invalid region specified
             msg = f"The PagerDuty region specified ({region_name}) is invalid."
             self.logger.warning(msg)

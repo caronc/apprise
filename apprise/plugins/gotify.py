@@ -27,7 +27,7 @@
 
 # Gotify Docker configuration: https://hub.docker.com/r/gotify/server
 # Example: https://github.com/gotify/server/blob/\
-#        f2c2688f0b5e6a816bbcec768ca1c0de5af76b88/ADD_MESSAGE_EXAMPLES.md#python
+#      f2c2688f0b5e6a816bbcec768ca1c0de5af76b88/ADD_MESSAGE_EXAMPLES.md#python
 # API: https://gotify.net/docs/swagger-docs
 
 from json import dumps

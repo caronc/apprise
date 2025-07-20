@@ -467,13 +467,13 @@ def parse_qsd(qs, simple=False, plus_to_space=False, sanitize=True):
     # Our return result set:
     result = (
         {
-            # The arguments passed in (the parsed query). This is in a dictionary
-            # of {'key': 'val', etc }.  Keys are all made lowercase before storing
-            # to simplify access to them.
+            # The arguments passed in (the parsed query). This is in a
+            # dictionary of {'key': 'val', etc }.  Keys are all made lowercase
+            # before storing to simplify access to them.
             "qsd": {},
-            # Detected Entries that start with + or - are additionally stored in
-            # these values (un-touched).  The :,+,- however are stripped from their
-            # name before they are stored here.
+            # Detected Entries that start with + or - are additionally stored
+            # in these values (un-touched).  The :,+,- however are stripped
+            # from their name before they are stored here.
             "qsd+": {},
             "qsd-": {},
             "qsd:": {},
@@ -624,14 +624,14 @@ def parse_url(
             "schema": None,
             # The schema
             "url": None,
-            # The arguments passed in (the parsed query). This is in a dictionary
-            # of {'key': 'val', etc }.  Keys are all made lowercase before storing
-            # to simplify access to them.
+            # The arguments passed in (the parsed query). This is in a
+            # dictionary of {'key': 'val', etc }.  Keys are all made lowercase
+            # before storing to simplify access to them.
             # qsd = Query String Dictionary
             "qsd": {},
-            # Detected Entries that start with +, - or : are additionally stored in
-            # these values (un-touched).  The +, -, and : however are stripped
-            # from their name before they are stored here.
+            # Detected Entries that start with +, - or : are additionally
+            # stored in these values (un-touched).  The +, -, and : however
+            # are stripped from their name before they are stored here.
             "qsd+": {},
             "qsd-": {},
             "qsd:": {},

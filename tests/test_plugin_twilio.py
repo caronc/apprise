@@ -165,7 +165,8 @@ apprise_url_tests = (
             "a" * 32, "b" * 32, "5" * 11
         ),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead of
+            # from)
             "instance": NotifyTwilio,
         },
     ),
@@ -258,7 +259,8 @@ def test_plugin_twilio_auth(mock_post):
     assert (
         first_call[0][0]
         == second_call[0][0]
-        == f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json"
+        == ("https://api.twilio.com/2010-04-01/Accounts"
+            f"/{account_sid}/Messages.json")
     )
     assert (
         first_call[1]["data"]["Body"]

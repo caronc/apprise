@@ -144,8 +144,8 @@ apprise_url_tests = (
         "mastodon://access_token@hostname/?key=My%20Idempotency%20Key",
         {
             # Prevent duplicate submissions of the same status. Idempotency
-            # keys are stored for up to 1 hour, and can be any arbitrary string.
-            # Consider using a hash or UUID generated client-side.
+            # keys are stored for up to 1 hour, and can be any arbitrary
+            # string. Consider using a hash or UUID generated client-side.
             "instance": NotifyMastodon,
         },
     ),

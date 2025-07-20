@@ -323,11 +323,6 @@ ignore = [
 
   # The following needs to be supported at some point and is of great value
   "RUF012",  # typing.ClassVar implimentation
-  "E501",    # Enforcing wordrap at 79 characters per BSD should be enforced
-             # it broke when ruff-autofixed over 600+ entries to accomodate
-             # other PEP styles.
-  "SIM105",  # leverage contextlib.supress() so signifigantly simply the
-             # readability of the code
   "UP032",   # This is a massive undertaking and requires a massive rewrite
              # of test cases; this will take a while to fix, so turning off
              # for now
@@ -340,6 +335,8 @@ inline-quotes = "double"
 known-first-party = ["apprise"]
 force-sort-within-sections = true
 combine-as-imports = true
+order-by-type = true
+section-order = ["future", "standard-library", "third-party", "first-party", "local-folder"]
 
 [tool.ruff.lint.flake8-builtins]
 builtins-ignorelist = ["_"]

@@ -93,7 +93,8 @@ class NotifyWeComBot(NotifyBase):
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
-            # The Bot Key can be found at the end of the webhook provided (?key=)
+            # The Bot Key can be found at the end of the webhook provided
+            # (?key=)
             "key": {
                 "name": _("Bot Webhook Key"),
                 "type": "string",

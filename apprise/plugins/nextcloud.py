@@ -108,8 +108,8 @@ class NotifyNextcloud(NotifyBase):
         NotifyBase.template_args,
         **{
             # Nextcloud uses different API end points depending on the version
-            # being used however the (API) payload remains the same.  Allow users
-            # to specify the version they are using:
+            # being used however the (API) payload remains the same.  Allow
+            # users to specify the version they are using:
             "version": {
                 "name": _("Version"),
                 "type": "int",

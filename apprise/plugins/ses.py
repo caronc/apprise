@@ -692,7 +692,8 @@ class NotifySES(NotifyBase):
         # Our Authorization header
         headers["Authorization"] = ", ".join([
             (
-                f"{self.aws_auth_algorithm} Credential={self.aws_access_key_id}/{scope}"
+                f"{self.aws_auth_algorithm} "
+                f"Credential={self.aws_access_key_id}/{scope}"
             ),
             "SignedHeaders={signed_headers}".format(
                 signed_headers=";".join(signed_headers.keys()),

@@ -33,6 +33,7 @@
 # Read more about VoIP.ms API here:
 #   - https://voip.ms/m/apidocs.php
 
+import contextlib
 from json import loads
 
 import requests
@@ -250,14 +251,13 @@ class NotifyVoipms(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
-                try:
-                    response = loads(r.content)
-
-                except (AttributeError, TypeError, ValueError):
+                with contextlib.suppress(
+                        AttributeError, TypeError, ValueError):
+                    # Load our JSON object if valid
                     # ValueError = r.content is Unparsable
                     # TypeError = r.content is None
                     # AttributeError = r is None
-                    pass
+                    response = loads(r.content)
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem

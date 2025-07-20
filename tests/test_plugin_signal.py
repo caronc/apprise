@@ -157,21 +157,24 @@ apprise_url_tests = (
             "1" * 11, "2" * 11, "3" * 11
         ),
         {
-            # If we have from= specified, then all elements take on the to= value
+            # If we have from= specified, then all elements take on the to=
+            # value
             "instance": NotifySignalAPI,
         },
     ),
     (
         "signals://user@localhost/{}/{}".format("1" * 11, "3" * 11),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead of
+            # from)
             "instance": NotifySignalAPI,
         },
     ),
     (
         "signals://user:password@localhost/{}/{}".format("1" * 11, "3" * 11),
         {
-            # use get args to acomplish the same thing (use source instead of from)
+            # use get args to acomplish the same thing (use source instead of
+            # from)
             "instance": NotifySignalAPI,
         },
     ),

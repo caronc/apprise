@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from copy import deepcopy
 from datetime import datetime, timezone
 from json import dumps, loads
@@ -828,12 +829,9 @@ class NotifyMastodon(NotifyBase):
             #   'emojis': [],
             #   'fields': []
             # }
-            try:
+            with contextlib.suppress(TypeError, KeyError):
                 # Cache our response for future references
                 self._whoami_cache = {response["username"]: response["id"]}
-
-            except (TypeError, KeyError):
-                pass
 
         elif response and "authorized scopes" in response.get("error", ""):
             self.logger.warning(

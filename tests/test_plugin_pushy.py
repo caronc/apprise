@@ -95,7 +95,8 @@ apprise_url_tests = (
         {
             # Invalid topic specified
             "instance": NotifyPushy,
-            # Expected notify() response False because there is no one to notify
+            # Expected notify() response False because there is no one to
+            # notify
             "notify_response": False,
             "requests_response_text": GOOD_RESPONSE,
         },

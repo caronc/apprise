@@ -454,7 +454,8 @@ class NotifyOneSignal(NotifyBase):
 
                 self.logger.debug(
                     "OneSignal POST URL:"
-                    f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+                    f" {self.notify_url} "
+                    f"(cert_verify={self.verify_certificate!r})"
                 )
                 self.logger.debug(f"OneSignal Payload: {payload!s}")
 

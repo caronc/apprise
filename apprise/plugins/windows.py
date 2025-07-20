@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from time import sleep
 
 from ..common import NotifyImageSize, NotifyType
@@ -276,12 +277,9 @@ class NotifyWindows(NotifyBase):
         )
 
         # Set duration
-        try:
+        with contextlib.suppress(TypeError, ValueError):
+            # Update our duration if we're dealing with an integer
             results["duration"] = int(results["qsd"].get("duration"))
-
-        except (TypeError, ValueError):
-            # Not a valid integer; ignore entry
-            pass
 
         # return results
         return results

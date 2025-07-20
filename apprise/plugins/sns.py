@@ -419,7 +419,8 @@ class NotifySNS(NotifyBase):
             ("content-type", headers["Content-Type"]),
             (
                 "host",
-                f"{self.aws_service_name}.{self.aws_region_name}.amazonaws.com",
+                f"{self.aws_service_name}"
+                f".{self.aws_region_name}.amazonaws.com",
             ),
             ("x-amz-date", headers["X-Amz-Date"]),
         ])
@@ -455,7 +456,8 @@ class NotifySNS(NotifyBase):
         # Our Authorization header
         headers["Authorization"] = ", ".join([
             (
-                f"{self.aws_auth_algorithm} Credential={self.aws_access_key_id}/{scope}"
+                f"{self.aws_auth_algorithm} "
+                f"Credential={self.aws_access_key_id}/{scope}"
             ),
             "SignedHeaders={signed_headers}".format(
                 signed_headers=";".join(signed_headers.keys()),

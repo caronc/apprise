@@ -144,9 +144,9 @@ class NotifyGnome(NotifyBase):
                 "default": GnomeUrgency.NORMAL,
             },
             "priority": {
-                # Apprise uses 'priority' everywhere; it's just a nice consistent
-                # feel to be able to use it here as well. Just map the
-                # value back to 'priority'
+                # Apprise uses 'priority' everywhere; it's just a nice
+                # consistent feel to be able to use it here as well. Just map
+                # the value back to 'priority'
                 "alias_of": "urgency",
             },
             "image": {

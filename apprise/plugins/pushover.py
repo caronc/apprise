@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from itertools import chain
 import re
 
@@ -339,19 +340,15 @@ class NotifyPushover(NotifyBase):
 
             # How often to resend notification, in seconds
             self.retry = self.template_args["retry"]["default"]
-            try:
+            with contextlib.suppress(ValueError, TypeError):
+                # Get our retry value
                 self.retry = int(retry)
-            except (ValueError, TypeError):
-                # Do nothing
-                pass
 
             # How often to resend notification, in seconds
             self.expire = self.template_args["expire"]["default"]
-            try:
+            with contextlib.suppress(ValueError, TypeError):
+                # Acquire our expiry value
                 self.expire = int(expire)
-            except (ValueError, TypeError):
-                # Do nothing
-                pass
 
             if self.retry < 30:
                 msg = "Pushover retry must be at least 30 seconds."

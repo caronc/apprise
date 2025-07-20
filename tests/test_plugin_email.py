@@ -900,7 +900,8 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
     # Further test encoding through the message content as well
     assert (
         obj.notify(
-            # Google Translated to Arabic: "Let's make the world a better place."
+            # Google Translated to Arabic:
+            #  "Let's make the world a better place."
             title="دعونا نجعل العالم مكانا أفضل.",
             # Google Translated to Hungarian: "One line of code at a time.'
             body="Egy sor kódot egyszerre.",
