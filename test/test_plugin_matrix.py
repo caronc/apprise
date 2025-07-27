@@ -967,15 +967,20 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
     # Test our call count
-    assert mock_put.call_count == 1
-    assert mock_post.call_count == 2
+    assert mock_put.call_count == 2
+    assert mock_post.call_count == 3
     assert mock_post.call_args_list[0][0][0] == \
         'http://localhost/_matrix/client/v3/login'
     assert mock_post.call_args_list[1][0][0] == \
+        'http://localhost/_matrix/media/v3/upload'
+    assert mock_post.call_args_list[2][0][0] == \
         'http://localhost/_matrix/client/v3/join/%23general%3Alocalhost'
     assert mock_put.call_args_list[0][0][0] == \
         'http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/' \
         'send/m.room.message/0'
+    assert mock_put.call_args_list[1][0][0] == \
+        'http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/' \
+        'send/m.room.message/1'
 
     # Attach an unsupported file type (it's just skipped)
     attach = AppriseAttachment(
@@ -999,8 +1004,7 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
     for side_effect in (requests.RequestException(), OSError(), bad_response):
         mock_post.side_effect = [side_effect]
 
-        # We'll never fail because files are not attached
-        assert obj.send(body="test", attach=attach) is True
+        assert obj.send(body="test", attach=attach) is False
 
     # Throw an exception on the second call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
