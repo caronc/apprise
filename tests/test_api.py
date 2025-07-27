@@ -1194,7 +1194,13 @@ def test_apprise_asset(tmpdir):
         a.color(NotifyType.INFO, dict)
 
     assert (
-        a.image_url(NotifyType.INFO, NotifyImageSize.XY_256)
+        a.image_url(NotifyType.INFO, NotifyImageSize.XY_128)
+        == "http://localhost/dark/info-128x128.png"
+    )
+
+    # Default image size
+    assert (
+        a.image_url(NotifyType.INFO)
         == "http://localhost/dark/info-256x256.png"
     )
 
@@ -1227,8 +1233,10 @@ def test_apprise_asset(tmpdir):
     sub = tmpdir.mkdir("great.theme")
 
     # Write a file
-    sub.join(f"{NotifyType.INFO}-{NotifyImageSize.XY_256}.png").write(
-        "the content doesn't matter for testing."
+    sub.join(
+        f"{NotifyType.INFO.value}-"
+        f"{NotifyImageSize.XY_256.value}.png").write(
+            "the content doesn't matter for testing."
     )
 
     # Create an asset that will reference our file we just created
@@ -1881,7 +1889,8 @@ def test_apprise_details_plugin_verification():
 
                         # Choices require that a values list is provided
                         assert "values" in arg
-                        assert isinstance(arg["values"], (list, tuple))
+                        assert isinstance(
+                            arg["values"], (list, tuple, frozenset, set))
                         assert len(arg["values"]) > 0
 
                         # Test default
@@ -1909,6 +1918,7 @@ def test_apprise_details_plugin_verification():
                         # valid
                         try:
                             re.compile(arg["regex"][0])
+
                         except:
                             assert "{} is an invalid regex".format(
                                 arg["regex"][0]
@@ -2049,9 +2059,10 @@ def test_apprise_details_plugin_verification():
         function_args -= valid_kwargs
         for arg in function_args:
             if arg not in map_to_entries:
+                err = N_MGR._schema_map[protocols[0]].__name__.__init__(arg)
                 raise AssertionError(
-                    f"{N_MGR._schema_map[protocols[0]].__name__}.__init__({arg})"
-                    " found but not defined in the template configuration"
+                    f"{err} found but not defined in the template "
+                    "configuration"
                 )
 
         # Iterate over our map_to_aliases and make sure they were defined in

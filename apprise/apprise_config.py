@@ -25,6 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any
+
 from . import common
 from .asset import AppriseAsset
 from .config.base import ConfigBase
@@ -33,6 +37,9 @@ from .manager_config import ConfigurationManager
 from .url import URLBase
 from .utils.logic import is_exclusive_match
 from .utils.parse import GET_SCHEMA_RE, parse_list
+
+if TYPE_CHECKING:
+    from .plugins.base import NotifyBase
 
 # Grant access to our Configuration Manager Singleton
 C_MGR = ConfigurationManager()
@@ -47,13 +54,13 @@ class AppriseConfig:
 
     def __init__(
         self,
-        paths=None,
-        asset=None,
-        cache=True,
-        recursion=0,
-        insecure_includes=False,
-        **kwargs,
-    ):
+        paths: str | list[str] | None = None,
+        asset: AppriseAsset | None = None,
+        cache: bool | int = True,
+        recursion: int = 0,
+        insecure_includes: bool = False,
+        **kwargs: Any,
+    ) -> None:
         """Loads all of the paths specified (if any).
 
         The path can either be a single string identifying one explicit
@@ -125,13 +132,13 @@ class AppriseConfig:
 
     def add(
         self,
-        configs,
-        asset=None,
-        tag=None,
-        cache=True,
-        recursion=None,
-        insecure_includes=None,
-    ):
+        configs: str | ConfigBase | list[str | ConfigBase],
+        asset: AppriseAsset | None = None,
+        tag: str | list[str] | None = None,
+        cache: bool | int = True,
+        recursion: int | None = None,
+        insecure_includes: bool | None = None,
+    ) -> bool:
         """Adds one or more config URLs into our list.
 
         You can override the global asset if you wish by including it with the
@@ -234,13 +241,13 @@ class AppriseConfig:
 
     def add_config(
         self,
-        content,
-        asset=None,
-        tag=None,
-        format=None,
-        recursion=None,
-        insecure_includes=None,
-    ):
+        content: str,
+        asset: AppriseAsset | None = None,
+        tag: str | list[str] | None = None,
+        format: str | None = None,
+        recursion: int | None = None,
+        insecure_includes: bool | None = None,
+    ) -> bool:
         """Adds one configuration file in it's raw format. Content gets loaded
         as a memory based object and only exists for the life of this
         AppriseConfig object it was loaded into.
@@ -289,7 +296,8 @@ class AppriseConfig:
             insecure_includes=insecure_includes,
         )
 
-        if instance.config_format not in common.CONFIG_FORMATS:
+        if not (instance.config_format and \
+                instance.config_format.value in common.CONFIG_FORMATS):
             logger.warning(
                 "The format of the configuration could not be deteced."
             )
@@ -302,8 +310,12 @@ class AppriseConfig:
         return True
 
     def servers(
-        self, tag=common.MATCH_ALL_TAG, match_always=True, *args, **kwargs
-    ):
+        self,
+        tag: str | list[str] = common.MATCH_ALL_TAG,
+        match_always: bool = True,
+        *args: Any,
+        **kwargs: Any,
+    ) -> list[NotifyBase]:
         """Returns all of our servers dynamically build based on parsed
         configuration.
 
@@ -349,14 +361,14 @@ class AppriseConfig:
 
     @staticmethod
     def instantiate(
-        url,
-        asset=None,
-        tag=None,
-        cache=None,
-        recursion=0,
-        insecure_includes=False,
-        suppress_exceptions=True,
-    ):
+        url: str,
+        asset: AppriseAsset | None = None,
+        tag: str | list[str] | None = None,
+        cache: bool | int | None = None,
+        recursion: int = 0,
+        insecure_includes: bool = False,
+        suppress_exceptions: bool = True,
+    ) -> ConfigBase | None:
         """Returns the instance of a instantiated configuration plugin based on
         the provided Config URL.
 
@@ -424,11 +436,11 @@ class AppriseConfig:
 
         return cfg_plugin
 
-    def clear(self):
+    def clear(self) -> None:
         """Empties our configuration list."""
         self.configs[:] = []
 
-    def server_pop(self, index):
+    def server_pop(self, index: int) -> NotifyBase:
         """Removes an indexed Apprise Notification from the servers."""
 
         # Tracking variables
@@ -455,7 +467,7 @@ class AppriseConfig:
         # If we reach here, then we indexed out of range
         raise IndexError("list index out of range")
 
-    def pop(self, index=-1):
+    def pop(self, index: int = -1) -> ConfigBase:
         """Removes an indexed Apprise Configuration from the stack and returns
         it.
 
@@ -464,22 +476,22 @@ class AppriseConfig:
         # Remove our entry
         return self.configs.pop(index)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> ConfigBase:
         """Returns the indexed config entry of a loaded apprise
         configuration."""
         return self.configs[index]
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Allows the Apprise object to be wrapped in an 'if statement'.
 
         True is returned if at least one service has been loaded.
         """
         return bool(self.configs)
 
-    def __iter__(self):
+    def __iter__(self):  # type: () -> Iterator[ConfigBase]
         """Returns an iterator to our config list."""
         return iter(self.configs)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of config entries loaded."""
         return len(self.configs)

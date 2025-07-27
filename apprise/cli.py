@@ -51,6 +51,9 @@ from .common import (
     NOTIFY_TYPES,
     PERSISTENT_STORE_MODES,
     ContentLocation,
+    NotifyFormat,
+    NotifyType,
+    PersistentStoreMode,
     PersistentStoreState,
 )
 from .logger import logger
@@ -128,10 +131,41 @@ DEFAULT_PLUGIN_PATHS = (
     "/var/lib/apprise/plugins",
 )
 
+
+#
+# General Options and Defaults
+#
+DEFAULT_NOTIFY_TYPE = NotifyType.INFO
+
+NOTIFY_TYPE_CHOICES: tuple[NotifyType, ...] = (
+    NotifyType.INFO,
+    NotifyType.SUCCESS,
+    NotifyType.WARNING,
+    NotifyType.FAILURE,
+)
+
+DEFAULT_NOTIFY_FORMAT = NotifyFormat.TEXT
+
+NOTIFY_FORMAT_CHOICES: tuple[NotifyFormat, ...] = (
+    NotifyFormat.TEXT,
+    NotifyFormat.MARKDOWN,
+    NotifyFormat.HTML,
+)
+
 #
 # Persistent Storage
 #
 DEFAULT_STORAGE_PATH = "~/.local/share/apprise/cache"
+
+# Storage Mode
+DEFAULT_STORAGE_MODE = PersistentStoreMode.AUTO
+
+# Create an ordered list of options (first is default)
+PERSISTENT_STORE_MODE_CHOICES: tuple[PersistentStoreMode, ...] = (
+    PersistentStoreMode.AUTO,
+    PersistentStoreMode.FLUSH,
+    PersistentStoreMode.MEMORY,
+)
 
 # Detect Windows
 if platform.system() == "Windows":
@@ -419,15 +453,14 @@ class CustomHelpCommand(click.Command):
 @click.option(
     "--storage-mode",
     "-SM",
-    default=PERSISTENT_STORE_MODES[0],
+    default=DEFAULT_STORAGE_MODE.value,
     type=str,
     metavar="MODE",
     help=(
         "Specify the persistent storage operational mode "
-        '(default={}). Possible values are "{}", and "{}".'.format(
-            PERSISTENT_STORE_MODES[0],
-            '", "'.join(PERSISTENT_STORE_MODES[:-1]),
-            PERSISTENT_STORE_MODES[-1],
+        f'(default={DEFAULT_STORAGE_MODE.value}). '
+        'Possible values are: "{}".'.format(
+            '", "'.join(mode.value for mode in PERSISTENT_STORE_MODE_CHOICES)
         )
     ),
 )
@@ -452,28 +485,27 @@ class CustomHelpCommand(click.Command):
 @click.option(
     "--notification-type",
     "-n",
-    default=NOTIFY_TYPES[0],
+    default=DEFAULT_NOTIFY_TYPE.value,
     type=str,
     metavar="TYPE",
     help=(
-        "Specify the message type (default={}). "
-        'Possible values are "{}", and "{}".'.format(
-            NOTIFY_TYPES[0], '", "'.join(NOTIFY_TYPES[:-1]), NOTIFY_TYPES[-1]
+        f"Specify the message type (default={DEFAULT_NOTIFY_TYPE.value}). "
+        'Possible values are: "{}".'.format(
+            '", "'.join(nt.value for nt in NOTIFY_TYPE_CHOICES)
         )
     ),
 )
 @click.option(
     "--input-format",
     "-i",
-    default=NOTIFY_FORMATS[0],
+    default=DEFAULT_NOTIFY_FORMAT.value,
     type=str,
     metavar="FORMAT",
     help=(
-        "Specify the message input format (default={}). "
-        'Possible values are "{}", and "{}".'.format(
-            NOTIFY_FORMATS[0],
-            '", "'.join(NOTIFY_FORMATS[:-1]),
-            NOTIFY_FORMATS[-1],
+        f"Specify the message input format "
+        f"(default={DEFAULT_NOTIFY_FORMAT.value}). "
+        'Possible values are: "{}".'.format(
+            '", "'.join(fmt.value for fmt in NOTIFY_FORMAT_CHOICES)
         )
     ),
 )
@@ -999,7 +1031,7 @@ def main(
             if _id not in uids:
                 uids[_id] = {
                     "plugins": [plugin],
-                    "state": PersistentStoreState.UNUSED,
+                    "state": PersistentStoreState.UNUSED.value,
                     "size": 0,
                 }
 
@@ -1018,14 +1050,14 @@ def main(
             for _id in detected_uid:
                 size, _ = dir_size(os.path.join(asset.storage_path, _id))
                 if _id in uids:
-                    uids[_id]["state"] = PersistentStoreState.ACTIVE
+                    uids[_id]["state"] = PersistentStoreState.ACTIVE.value
                     uids[_id]["size"] = size
 
                 elif not tags:
                     uids[_id] = {
                         "plugins": [],
                         # No cross reference (wasted space?)
-                        "state": PersistentStoreState.STALE,
+                        "state": PersistentStoreState.STALE.value,
                         # Acquire disk space
                         "size": size,
                     }
@@ -1033,10 +1065,10 @@ def main(
             for idx, (uid, meta) in enumerate(uids.items()):
                 fg = (
                     "green"
-                    if meta["state"] == PersistentStoreState.ACTIVE
+                    if meta["state"] == PersistentStoreState.ACTIVE.value
                     else (
                         "red"
-                        if meta["state"] == PersistentStoreState.STALE
+                        if meta["state"] == PersistentStoreState.STALE.value
                         else "white"
                     )
                 )

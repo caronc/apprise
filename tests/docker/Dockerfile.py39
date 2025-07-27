@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Base
-FROM python:3.9-buster
+FROM python:3.9-bookworm
 RUN apt-get update && \
     apt-get install -y --no-install-recommends libdbus-1-dev libgirepository1.0-dev build-essential musl-dev bash dbus && \
     rm -rf /var/lib/apt/lists/*

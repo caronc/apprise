@@ -24,6 +24,7 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+from __future__ import annotations
 
 import os
 import re
@@ -76,8 +77,12 @@ class ConfigBase(URLBase):
     config_path = os.getcwd()
 
     def __init__(
-        self, cache=True, recursion=0, insecure_includes=False, **kwargs
-    ):
+        self,
+        cache: bool | int = True,
+        recursion: int = 0,
+        insecure_includes: bool = False,
+        **kwargs: object,
+    ) -> None:
         """Initialize some general logging and common server arguments that
         will keep things consistent when working with the configurations that
         inherit this class.
@@ -137,18 +142,18 @@ class ConfigBase(URLBase):
             # Store the encoding
             self.encoding = kwargs.get("encoding")
 
-        if "format" in kwargs and isinstance(kwargs["format"], str):
-            # Store the enforced config format
-            self.config_format = kwargs.get("format").lower()
-
-            if self.config_format not in common.CONFIG_FORMATS:
-                # Simple error checking
-                err = (
-                    f"An invalid config format ({self.config_format}) was"
-                    " specified."
+        fmt = kwargs.get("format")
+        if fmt:
+            try:
+                self.config_format = (
+                    fmt if isinstance(fmt, common.ConfigFormat)
+                    else common.ConfigFormat(fmt.lower())
                 )
+
+            except (AttributeError, ValueError):
+                err = f"An invalid config format ({fmt}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err)
+                raise TypeError(err) from None
 
         # Set our cache flag; it can be True or a (positive) integer
         try:
@@ -165,7 +170,11 @@ class ConfigBase(URLBase):
 
         return
 
-    def servers(self, asset=None, **kwargs):
+    def servers(
+        self,
+        asset: AppriseAsset | None = None,
+        **kwargs: object,
+    ) -> list[plugins.NotifyBase]:
         """Performs reads loaded configuration and returns all of the services
         that could be parsed and loaded."""
 
@@ -196,7 +205,7 @@ class ConfigBase(URLBase):
         )
 
         # Dynamically load our parse_ function based on our config format
-        fn = getattr(ConfigBase, f"config_parse_{config_format}")
+        fn = getattr(ConfigBase, f"config_parse_{config_format.value}")
 
         # Initialize our asset object
         asset = asset if isinstance(asset, AppriseAsset) else self.asset
@@ -329,11 +338,11 @@ class ConfigBase(URLBase):
 
         return self._cached_servers
 
-    def read(self):
+    def read(self) -> str | None:
         """This object should be implimented by the child classes."""
         return None
 
-    def expired(self):
+    def expired(self) -> bool:
         """Simply returns True if the configuration should be considered as
         expired or False if content should be retrieved."""
         if isinstance(self._cached_servers, list) and self.cache:
@@ -355,7 +364,7 @@ class ConfigBase(URLBase):
         return True
 
     @staticmethod
-    def __normalize_tag_groups(group_tags):
+    def __normalize_tag_groups(group_tags: dict[str, set[str]]) -> None:
         """
         Used to normalize a tag assign map which looks like:
           {
@@ -430,7 +439,10 @@ class ConfigBase(URLBase):
                 del group_tags[tag]
 
     @staticmethod
-    def parse_url(url, verify_host=True):
+    def parse_url(
+        url: str,
+        verify_host: bool = True,
+    ) -> dict[str, object] | None:
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
@@ -481,7 +493,10 @@ class ConfigBase(URLBase):
         return results
 
     @staticmethod
-    def detect_config_format(content, **kwargs):
+    def detect_config_format(
+        content: str,
+        **kwargs: object,
+    ) -> common.ConfigFormat | None:
         """Takes the specified content and attempts to detect the format type.
 
         The function returns the actual format type if detected, otherwise it
@@ -556,7 +571,12 @@ class ConfigBase(URLBase):
         return config_format
 
     @staticmethod
-    def config_parse(content, asset=None, config_format=None, **kwargs):
+    def config_parse(
+        content: str,
+        asset: AppriseAsset | None = None,
+        config_format: str | common.ConfigFormat | None = None,
+        **kwargs: object,
+    ) -> tuple[list[object], list[str]]:
         """Takes the specified config content and loads it based on the
         specified config_format.
 
@@ -572,8 +592,13 @@ class ConfigBase(URLBase):
                 ConfigBase.logger.error("Could not detect configuration")
                 return ([], [])
 
-        if config_format not in common.CONFIG_FORMATS:
-            # Invalid configuration type specified
+        try:
+            config_format = (
+                config_format if isinstance(config_format, common.ConfigFormat)
+                else common.ConfigFormat(config_format.lower())
+            )
+
+        except (AttributeError, ValueError):
             ConfigBase.logger.error(
                 f"An invalid configuration format ({config_format}) was"
                 " specified"
@@ -581,13 +606,16 @@ class ConfigBase(URLBase):
             return ([], [])
 
         # Dynamically load our parse_ function based on our config format
-        fn = getattr(ConfigBase, f"config_parse_{config_format}")
+        fn = getattr(ConfigBase, f"config_parse_{config_format.value}")
 
         # Execute our config parse function which always returns a list
         return fn(content=content, asset=asset)
 
     @staticmethod
-    def config_parse_text(content, asset=None):
+    def config_parse_text(
+        content: str,
+        asset: AppriseAsset | None = None,
+    ) -> tuple[list[object], list[str]]:
         """Parse the specified content as though it were a simple text file
         only containing a list of URLs.
 
@@ -800,7 +828,10 @@ class ConfigBase(URLBase):
         return (servers, configs)
 
     @staticmethod
-    def config_parse_yaml(content, asset=None):
+    def config_parse_yaml(
+        content: str,
+        asset: AppriseAsset | None = None,
+    ) -> tuple[list[object], list[str]]:
         """Parse the specified content as though it were a yaml file
         specifically formatted for Apprise.
 
@@ -1272,7 +1303,7 @@ class ConfigBase(URLBase):
 
         return (servers, configs)
 
-    def pop(self, index=-1):
+    def pop(self, index: int = -1) -> object:
         """Removes an indexed Notification Service from the stack and returns
         it.
 
@@ -1287,7 +1318,10 @@ class ConfigBase(URLBase):
         return self._cached_servers.pop(index)
 
     @staticmethod
-    def _special_token_handler(schema, tokens):
+    def _special_token_handler(
+        schema: str,
+        tokens: dict[str, object],
+    ) -> dict[str, object]:
         """This function takes a list of tokens and updates them to no longer
         include any special tokens such as +,-, and :
 
@@ -1411,7 +1445,7 @@ class ConfigBase(URLBase):
         # Return our tokens
         return tokens
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> object:
         """Returns the indexed server entry associated with the loaded
         notification servers."""
         if not isinstance(self._cached_servers, list):
@@ -1420,7 +1454,7 @@ class ConfigBase(URLBase):
 
         return self._cached_servers[index]
 
-    def __iter__(self):
+    def __iter__(self) -> object:
         """Returns an iterator to our server list."""
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from
@@ -1428,7 +1462,7 @@ class ConfigBase(URLBase):
 
         return iter(self._cached_servers)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the total number of servers loaded."""
         if not isinstance(self._cached_servers, list):
             # Generate ourselves a list of content we can pull from
@@ -1436,7 +1470,7 @@ class ConfigBase(URLBase):
 
         return len(self._cached_servers)
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Allows the Apprise object to be wrapped in an 'if statement'.
 
         True is returned if our content was downloaded correctly.

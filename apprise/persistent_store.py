@@ -23,6 +23,7 @@
 # THE SOFTWARE.
 import base64
 import binascii
+import builtins
 import contextlib
 from datetime import datetime, timedelta, timezone
 import glob
@@ -34,10 +35,11 @@ import os
 import re
 import tempfile
 import time
+from typing import Any, Optional, Union
 import zlib
 
 from . import exception
-from .common import PERSISTENT_STORE_MODES, PersistentStoreMode
+from .common import PersistentStoreMode
 from .logger import logger
 from .utils.disk import path_decode
 
@@ -50,7 +52,7 @@ NAIVE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
 def _ntf_tidy(ntf):
-    """Reusable NamedTemporaryFile cleanup."""
+    """Reusable NamedTemporaryFile Cleanup."""
     if ntf:
         # Cleanup
         with contextlib.suppress(OSError):
@@ -77,7 +79,12 @@ class CacheObject:
     hash_engine = hashlib.sha256
     hash_length = 6
 
-    def __init__(self, value=None, expires=False, persistent=True):
+    def __init__(
+        self,
+        value: Any = None,
+        expires: Union[bool, float, int, datetime, None] = False,
+        persistent: bool = True,
+    ) -> None:
         """Tracks our objects and associates a time limit with them."""
 
         self.__value = value
@@ -90,7 +97,12 @@ class CacheObject:
         # Whether or not we persist this object to disk or not
         self.__persistent = bool(persistent)
 
-    def set(self, value, expires=None, persistent=None):
+    def set(
+        self,
+        value: Any,
+        expires: Union[bool, float, int, datetime, None] = None,
+        persistent: Optional[bool] = None,
+    ) -> None:
         """Sets fields on demand, if set to none, then they are left as is.
 
         The intent of set is that it allows you to set a new a value and
@@ -108,7 +120,8 @@ class CacheObject:
         if persistent is not None:
             self.__persistent = bool(persistent)
 
-    def set_expiry(self, expires=None):
+    def set_expiry(self, expires:
+                   Union[datetime, bool, float, int, None] = None) -> None:
         """Sets a new expiry."""
 
         if isinstance(expires, datetime):
@@ -132,13 +145,13 @@ class CacheObject:
                 f"An invalid expiry time ({expires} was specified"
             )
 
-    def hash(self):
+    def hash(self) -> str:
         """Our checksum to track the validity of our data."""
         return self.hash_engine(
             str(self).encode("utf-8"), usedforsecurity=False
         ).hexdigest()
 
-    def json(self):
+    def json(self) -> Optional[dict[str, Any]]:
         """Returns our preparable json object."""
 
         return {
@@ -161,7 +174,11 @@ class CacheObject:
         }
 
     @staticmethod
-    def instantiate(content, persistent=True, verify=True):
+    def instantiate(
+        content: dict[str, Any],
+        persistent: bool = True,
+        verify: bool = True,
+    ) -> Optional["CacheObject"]:
         """Loads back data read in and returns a CacheObject or None if it
         could not be loaded.
 
@@ -229,22 +246,22 @@ class CacheObject:
         return co
 
     @property
-    def value(self):
+    def value(self) -> Any:
         """Returns our value."""
         return self.__value
 
     @property
-    def persistent(self):
+    def persistent(self) -> bool:
         """Returns our persistent value."""
         return self.__persistent
 
     @property
-    def expires(self):
+    def expires(self) -> Optional[datetime]:
         """Returns the datetime the object will expire."""
         return self.__expires
 
     @property
-    def expires_sec(self):
+    def expires_sec(self) -> Optional[float]:
         """Returns the number of seconds from now the object will expire."""
 
         return (
@@ -258,7 +275,7 @@ class CacheObject:
             )
         )
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Returns True it the object hasn't expired, and False if it has."""
         if self.__expires is None:
             # No Expiry
@@ -267,14 +284,14 @@ class CacheObject:
         # Calculate if we've expired or not
         return self.__expires > datetime.now(tz=timezone.utc)
 
-    def __eq__(self, other):
+    def __eq__(self, other) -> bool:
         """Handles equality == flag."""
         if isinstance(other, CacheObject):
             return str(self) == str(other)
 
         return self.__value == other
 
-    def __str__(self):
+    def __str__(self) -> str:
         """String output of our data."""
         persistent = "+" if self.persistent else "-"
         return f"{self.__class_name}:{persistent}:{self.__value} expires: " + (
@@ -349,7 +366,12 @@ class PersistentStore:
     # Reference only
     __not_found_ref = (None, None)
 
-    def __init__(self, path=None, namespace="default", mode=None):
+    def __init__(
+        self,
+        path: Optional[str] = None,
+        namespace: str = "default",
+        mode: Optional[Union[str, PersistentStoreMode]] = None,
+    ) -> None:
         """Provide the namespace to work within.
 
         namespaces can only contain alpha-numeric characters with the exception
@@ -378,7 +400,7 @@ class PersistentStore:
             # A storage path has been defined
             if mode is None:
                 # Store Default if no mode was provided along side of it
-                mode = PERSISTENT_STORE_MODES[0]
+                mode = PersistentStoreMode.AUTO
 
             # Store our information
             self.__base_path = os.path.join(path_decode(path), namespace)
@@ -391,14 +413,6 @@ class PersistentStore:
             self.__temp_path = None
             self.__data_path = None
 
-        if mode not in PERSISTENT_STORE_MODES:
-            raise AttributeError(
-                f"Persistent Storage mode ({mode}) provided is invalid"
-            )
-
-        # Store our mode
-        self.__mode = mode
-
         # Tracks when we have content to flush
         self.__dirty = False
 
@@ -409,10 +423,29 @@ class PersistentStore:
         # Internal Cache
         self._cache = None
 
+        try:
+            # Store our mode
+            self.__mode = (
+                mode if isinstance(mode, PersistentStoreMode)
+                else PersistentStoreMode(mode.lower())
+            )
+
+        except (AttributeError, ValueError):
+            err = (
+                f"An invalid persistent storage mode ({mode}) was specified.",
+            )
+            logger.warning(err)
+            raise AttributeError(err) from None
+
         # Prepare our environment
         self.__prepare()
 
-    def read(self, key=None, compress=True, expires=False):
+    def read(
+        self,
+        key: Optional[str] = None,
+        compress: bool = True,
+        expires: Union[bool, float, int] = False,
+    ) -> Optional[bytes]:
         """Returns the content of the persistent store object.
 
         if refresh is set to True, then the file's modify time is updated
@@ -447,7 +480,13 @@ class PersistentStore:
         # return none
         return None
 
-    def write(self, data, key=None, compress=True, _recovery=False):
+    def write(
+        self,
+        data: Union[bytes, str, Any],
+        key: Optional[str] = None,
+        compress: bool = True,
+        _recovery: bool = False,
+    ) -> bool:
         """Writes the content to the persistent store if it doesn't exceed our
         filesize limit.
 
@@ -703,17 +742,17 @@ class PersistentStore:
 
     def open(
         self,
-        key=None,
-        mode="r",
-        buffering=-1,
-        encoding=None,
-        errors=None,
-        newline=None,
-        closefd=True,
-        opener=None,
-        compress=False,
-        compresslevel=9,
-    ):
+        key: Optional[str] = None,
+        mode: str = "r",
+        buffering: int = -1,
+        encoding: Optional[str] = None,
+        errors: Optional[str] = None,
+        newline: Optional[str] = None,
+        closefd: bool = True,
+        opener: Optional[Any] = None,
+        compress: bool = False,
+        compresslevel: int = 9,
+    ) -> Any:
         """Returns an iterator to our our file within our namespace identified
         by the key provided.
 
@@ -767,7 +806,12 @@ class PersistentStore:
             logger.debug("Persistent Storage Exception: %s", str(e))
             raise exception.AppriseDiskIOError(str(e)) from None
 
-    def get(self, key, default=None, lazy=True):
+    def get(
+        self,
+        key: str,
+        default: Any = None,
+        lazy: bool = True,
+    ) -> Any:
         """Fetches from cache."""
 
         if self._cache is None and not self.__load_cache():
@@ -784,7 +828,14 @@ class PersistentStore:
 
         return self._cache[key].value if self._cache.get(key) else default
 
-    def set(self, key, value, expires=None, persistent=True, lazy=True):
+    def set(
+        self,
+        key: str,
+        value: Any,
+        expires: Union[float, int, datetime, bool, None] = None,
+        persistent: bool = True,
+        lazy: bool = True,
+    ) -> bool:
         """Cache reference."""
 
         if self._cache is None and not self.__load_cache():
@@ -812,7 +863,7 @@ class PersistentStore:
 
         return True
 
-    def clear(self, *args):
+    def clear(self, *args: str) -> Optional[bool]:
         """Remove one or more cache entry by it's key.
 
             e.g: clear('key')
@@ -849,7 +900,7 @@ class PersistentStore:
             # Flush changes to disk
             return self.flush()
 
-    def prune(self):
+    def prune(self) -> bool:
         """Eliminates expired cache entries."""
         if self._cache is None and not self.__load_cache():
             return False
@@ -1024,7 +1075,11 @@ class PersistentStore:
                         # Flush changes to disk
                         return self.flush(_recovery=True)
 
-    def flush(self, force=False, _recovery=False):
+    def flush(
+        self,
+        force: bool = False,
+        _recovery: bool = False,
+    ) -> bool:
         """Save's our cache to disk."""
 
         if self._cache is None or self.__mode == PersistentStoreMode.MEMORY:
@@ -1213,7 +1268,11 @@ class PersistentStore:
 
         return True
 
-    def files(self, exclude=True, lazy=True):
+    def files(
+        self,
+        exclude: bool = True,
+        lazy: bool = True,
+    ) -> list[str]:
         """Returns the total files."""
 
         if lazy and exclude in self.__cache_files:
@@ -1285,7 +1344,11 @@ class PersistentStore:
         return self.__cache_files[exclude]
 
     @staticmethod
-    def disk_scan(path, namespace=None, closest=True):
+    def disk_scan(
+        path: str,
+        namespace: Optional[Union[str, list[str]]] = None,
+        closest: bool = True,
+    ) -> list[str]:
         """Scansk a path provided and returns namespaces detected."""
 
         logger.trace("Persistent path can of: %s", path)
@@ -1341,7 +1404,12 @@ class PersistentStore:
         return namespaces
 
     @staticmethod
-    def disk_prune(path, namespace=None, expires=None, action=False):
+    def disk_prune(
+        path: str,
+        namespace: Optional[Union[str, list[str]]] = None,
+        expires: Optional[Union[int, float]] = None,
+        action: bool = False,
+    ) -> dict[str, list[dict[str, Union[str, bool]]]]:
         """Prune persistent disk storage entries that are old and/or
         unreferenced.
 
@@ -1528,7 +1596,11 @@ class PersistentStore:
                             pass
         return _map
 
-    def size(self, exclude=True, lazy=True):
+    def size(
+        self,
+        exclude: bool = True,
+        lazy: bool = True,
+    ) -> int:
         """Returns the total size of the persistent storage in bytes."""
 
         if lazy and self.__cache_size is not None:
@@ -1553,14 +1625,14 @@ class PersistentStore:
 
         return self.__cache_size
 
-    def __del__(self):
+    def __del__(self) -> None:
         """Deconstruction of our object."""
 
         if self.__mode == PersistentStoreMode.AUTO:
             # Flush changes to disk
             self.flush()
 
-    def __delitem__(self, key):
+    def __delitem__(self, key: str) -> None:
         """Remove a cache entry by it's key."""
         if self._cache is None and not self.__load_cache():
             raise KeyError("Could not initialize cache")
@@ -1583,7 +1655,7 @@ class PersistentStore:
 
         return
 
-    def __contains__(self, key):
+    def __contains__(self, key: str) -> bool:
         """Verify if our storage contains the key specified or not.
 
         In additiont to this, if the content is expired, it is considered to be
@@ -1594,7 +1666,7 @@ class PersistentStore:
 
         return key in self._cache and self._cache[key]
 
-    def __setitem__(self, key, value):
+    def __setitem__(self, key: str, value: Any) -> None:
         """Sets a cache value without disrupting existing settings in place."""
 
         if self._cache is None and not self.__load_cache():
@@ -1617,7 +1689,7 @@ class PersistentStore:
 
         return
 
-    def __getitem__(self, key):
+    def __getitem__(self, key: str) -> Any:
         """Returns the indexed value."""
 
         if self._cache is None and not self.__load_cache():
@@ -1629,7 +1701,7 @@ class PersistentStore:
 
         return result
 
-    def keys(self):
+    def keys(self) -> builtins.set[str]:
         """Returns our keys."""
         if self._cache is None and not self.__load_cache():
             # There are no keys to return
@@ -1637,7 +1709,14 @@ class PersistentStore:
 
         return self._cache.keys()
 
-    def delete(self, *args, all=None, temp=None, cache=None, validate=True):
+    def delete(
+        self,
+        *args: str,
+        all: Optional[bool] = None,
+        temp: Optional[bool] = None,
+        cache: Optional[bool] = None,
+        validate: bool = True,
+    ) -> bool:
         """Manages our file space and tidys it up.
 
         delete('key', 'key2') delete(all=True) delete(temp=True, cache=True)
@@ -1768,7 +1847,7 @@ class PersistentStore:
         return not has_error
 
     @property
-    def cache_file(self):
+    def cache_file(self) -> str:
         """Returns the full path to the namespace directory."""
         return os.path.join(
             self.__base_path,
@@ -1776,11 +1855,11 @@ class PersistentStore:
         )
 
     @property
-    def path(self):
+    def path(self) -> Optional[str]:
         """Returns the full path to the namespace directory."""
         return self.__base_path
 
     @property
-    def mode(self):
-        """Returns the full path to the namespace directory."""
+    def mode(self) -> PersistentStoreMode:
+        """Returns the Persistent Storage mode."""
         return self.__mode

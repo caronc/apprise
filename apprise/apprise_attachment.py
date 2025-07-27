@@ -25,9 +25,12 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from collections.abc import Iterator
+from typing import Any, Optional, Union
+
 from .asset import AppriseAsset
 from .attachment.base import AttachBase
-from .common import CONTENT_LOCATIONS, ContentLocation
+from .common import ContentLocation
 from .logger import logger
 from .manager_attachment import AttachmentManager
 from .url import URLBase
@@ -41,8 +44,14 @@ class AppriseAttachment:
     """Our Apprise Attachment File Manager."""
 
     def __init__(
-        self, paths=None, asset=None, cache=True, location=None, **kwargs
-    ):
+        self,
+        paths: Optional[Union[str, list[
+            Union[str, AttachBase, "AppriseAttachment"]]]] = None,
+        asset: Optional[AppriseAsset] = None,
+        cache: Union[bool, int] = True,
+        location: Optional[Union[str, ContentLocation]] = None,
+        **kwargs: Any,
+    ) -> None:
         """Loads all of the paths/urls specified (if any).
 
         The path can either be a single string identifying one explicit
@@ -73,7 +82,7 @@ class AppriseAttachment:
           - LOCAL:        The least restrictive mode as local files can be
                           referenced in addition to hosted.
 
-        In all both HOSTED and LOCAL modes, INACCESSIBLE attachment types will
+        In all but HOSTED and LOCAL modes, INACCESSIBLE attachment types will
         continue to be inaccessible.  However if you set this field (location)
         to None (it's default value) the attachment location category will not
         be tested in any way (all attachment types will be allowed).
@@ -93,19 +102,39 @@ class AppriseAttachment:
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
         )
 
-        if location is not None and location not in CONTENT_LOCATIONS:
-            msg = f"An invalid Attachment location ({location}) was specified."
-            logger.warning(msg)
-            raise TypeError(msg)
+        if location:
+            try:
+                self.location = (
+                    location if isinstance(location, ContentLocation)
+                    else ContentLocation(location.lower())
+                )
 
-        # Store our location
-        self.location = location
+            except (AttributeError, ValueError):
+                err = (
+                    f"An invalid Attachment location ({location}) was "
+                    "specified.",
+                )
+                logger.warning(err)
+                raise TypeError(err) from None
+        else:
+            # do not set location if no initialization was made for it
+            self.location = None
 
         # Now parse any paths specified
         if paths is not None and not self.add(paths):
             raise TypeError("One or more attachments could not be added.")
 
-    def add(self, attachments, asset=None, cache=None):
+    def add(
+        self,
+        attachments: Union[
+            str,
+            AttachBase,
+            "AppriseAttachment",
+            list[Union[str, AttachBase, "AppriseAttachment"]],
+        ],
+        asset: Optional[AppriseAsset] = None,
+        cache: Optional[Union[bool, int]] = None,
+    ) -> bool:
         """Adds one or more attachments into our list.
 
         By default we cache our responses so that subsiquent calls does not
@@ -208,7 +237,12 @@ class AppriseAttachment:
         return return_status
 
     @staticmethod
-    def instantiate(url, asset=None, cache=None, suppress_exceptions=True):
+    def instantiate(
+        url: str,
+        asset: Optional[AppriseAsset] = None,
+        cache: Optional[Union[bool, int]] = None,
+        suppress_exceptions: bool = True,
+    ) -> Optional[AttachBase]:
         """Returns the instance of a instantiated attachment plugin based on
         the provided Attachment URL.  If the url fails to be parsed, then None
         is returned.
@@ -268,10 +302,12 @@ class AppriseAttachment:
 
         return attach_plugin
 
-    def sync(self, abort_on_error=True, abort_if_empty=True):
+    def sync(
+        self,
+        abort_on_error: bool = True,
+        abort_if_empty: bool = True,
+    ) -> bool:
         """Itereates over all of the attachments and retrieves them."""
-        # TODO: Change this to async for future
-
         return (
             False
             if abort_if_empty and not self.attachments
@@ -282,15 +318,15 @@ class AppriseAttachment:
             )
         )
 
-    def clear(self):
+    def clear(self) -> None:
         """Empties our attachment list."""
         self.attachments[:] = []
 
-    def size(self):
+    def size(self) -> int:
         """Returns the total size of accumulated attachments."""
         return sum([len(a) for a in self.attachments if len(a) > 0])
 
-    def pop(self, index=-1):
+    def pop(self, index: int = -1) -> AttachBase:
         """Removes an indexed Apprise Attachment from the stack and returns it.
 
         by default the last element is poped from the list
@@ -298,21 +334,21 @@ class AppriseAttachment:
         # Remove our entry
         return self.attachments.pop(index)
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> AttachBase:
         """Returns the indexed entry of a loaded apprise attachments."""
         return self.attachments[index]
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Allows the Apprise object to be wrapped in an 'if statement'.
 
         True is returned if at least one service has been loaded.
         """
         return bool(self.attachments)
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[AttachBase]:
         """Returns an iterator to our attachment list."""
         return iter(self.attachments)
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of attachment entries loaded."""
         return len(self.attachments)

@@ -33,7 +33,7 @@ from timeit import default_timer
 
 import pytest
 
-from apprise import NotifyImageSize, NotifyType
+from apprise import AppriseAsset, NotifyImageSize, NotifyType
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -144,7 +144,8 @@ def test_notify_base():
     assert nb.image_raw(notify_type=NotifyType.INFO) is None
 
     # Color handling
-    assert nb.color(notify_type="invalid") is None
+    assert nb.color(notify_type="invalid") == \
+        AppriseAsset.default_html_color
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=None), str
     )
@@ -156,7 +157,8 @@ def test_notify_base():
     )
 
     # Ascii Handling
-    assert nb.ascii(notify_type="invalid") is None
+    assert nb.ascii(notify_type="invalid") == \
+        AppriseAsset.default_ascii_chars
     assert nb.ascii(NotifyType.INFO) == "[i]"
     assert nb.ascii(NotifyType.SUCCESS) == "[+]"
     assert nb.ascii(NotifyType.WARNING) == "[~]"
@@ -171,11 +173,6 @@ def test_notify_base():
     assert nb.image_url(notify_type=NotifyType.INFO) is not None
     assert nb.image_path(notify_type=NotifyType.INFO) is not None
     assert nb.image_raw(notify_type=NotifyType.INFO) is not None
-
-    # But we will not get a response with an invalid notification type
-    assert nb.image_url(notify_type="invalid") is None
-    assert nb.image_path(notify_type="invalid") is None
-    assert nb.image_raw(notify_type="invalid") is None
 
     # Static function testing
     assert (

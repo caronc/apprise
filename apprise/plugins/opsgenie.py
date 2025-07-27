@@ -640,7 +640,7 @@ class NotifyOpsgenie(NotifyBase):
             # Create a copy ouf our details object
             details = self.details.copy()
             if "type" not in details:
-                details["type"] = notify_type
+                details["type"] = notify_type.value
 
             # Use body if title not set
             title_body = title if title else body
@@ -787,7 +787,7 @@ class NotifyOpsgenie(NotifyBase):
         params.update({f"+{k}": v for k, v in self.details.items()})
 
         # Append our assignment extra's into our parameters
-        params.update({f":{k}": v for k, v in self.mapping.items()})
+        params.update({f":{k.value}": v for k, v in self.mapping.items()})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -809,7 +809,7 @@ class NotifyOpsgenie(NotifyBase):
             ]["prefix"],
         }
 
-        return "{schema}://{user}{apikey}/{targets}/?{params}".format(
+        return "{schema}://{user}{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
             user=f"{self.user}@" if self.user else "",
             apikey=self.pprint(self.apikey, privacy, safe=""),

@@ -27,9 +27,15 @@
 
 from os.path import abspath, dirname, isfile, join
 import re
+from typing import Any, Optional, Union
 from uuid import uuid4
 
-from .common import NotifyType, PersistentStoreMode
+from .common import (
+    NotifyFormat,
+    NotifyImageSize,
+    NotifyType,
+    PersistentStoreMode,
+)
 from .manager_plugins import NotificationManager
 
 # Grant access to our Notification Manager Singleton
@@ -79,6 +85,9 @@ class AppriseAsset:
 
     # The default image extension to use
     default_extension = ".png"
+
+    # The default image size if one isn't specified
+    default_image_size = NotifyImageSize.XY_256
 
     # The default theme
     theme = "default"
@@ -198,13 +207,13 @@ class AppriseAsset:
 
     def __init__(
         self,
-        plugin_paths=None,
-        storage_path=None,
-        storage_mode=None,
-        storage_salt=None,
-        storage_idlen=None,
-        **kwargs,
-    ):
+        plugin_paths: Optional[list[str]] = None,
+        storage_path: Optional[str] = None,
+        storage_mode: Optional[Union[str, PersistentStoreMode]] = None,
+        storage_salt: Optional[Union[str, bytes]] = None,
+        storage_idlen: Optional[int] = None,
+        **kwargs: Any
+    ) -> None:
         """Asset Initialization."""
         # Assign default arguments if specified
         for key, value in kwargs.items():
@@ -226,7 +235,17 @@ class AppriseAsset:
 
         if storage_mode:
             # Define how our persistent storage behaves
-            self.__storage_mode = storage_mode
+            try:
+                self.__storage_mode = (
+                    storage_mode if isinstance(storage_mode, NotifyFormat)
+                    else PersistentStoreMode(storage_mode.lower())
+                )
+
+            except (AttributeError, ValueError, TypeError):
+                err = (
+                    f"An invalid persistent store mode ({storage_mode}) was "
+                    "specified.")
+                raise AttributeError(err) from None
 
         if isinstance(storage_idlen, int):
             # Define the number of characters utilized from our namespace lengh
@@ -263,7 +282,11 @@ class AppriseAsset:
                     "string or bytes object"
                 )
 
-    def color(self, notify_type, color_type=None):
+    def color(
+        self,
+        notify_type: NotifyType,
+        color_type: Optional[type] = None,
+    ) -> Union[str, int, tuple[int, int, int]]:
         """Returns an HTML mapped color based on passed in notify type.
 
         if color_type is:
@@ -276,7 +299,8 @@ class AppriseAsset:
 
         # Attempt to get the type, otherwise return a default grey
         # if we couldn't look up the entry
-        color = self.html_notify_map.get(notify_type, self.default_html_color)
+        color = self.html_notify_map.get(
+            notify_type, self.default_html_color)
         if color_type is None:
             # This is the default return type
             return color
@@ -294,12 +318,19 @@ class AppriseAsset:
             "AppriseAsset html_color(): An invalid color_type was specified."
         )
 
-    def ascii(self, notify_type):
+    def ascii(self, notify_type: NotifyType) -> str:
         """Returns an ascii representation based on passed in notify type."""
         # look our response up
-        return self.ascii_notify_map.get(notify_type, self.default_ascii_chars)
+        return self.ascii_notify_map.get(
+            notify_type, self.default_ascii_chars)
 
-    def image_url(self, notify_type, image_size, logo=False, extension=None):
+    def image_url(
+        self,
+        notify_type: NotifyType,
+        image_size: Optional[NotifyImageSize] = None,
+        logo: bool = False,
+        extension: Optional[str] = None,
+    ) -> Optional[str]:
         """Apply our mask to our image URL.
 
         if logo is set to True, then the logo_url is used instead
@@ -313,10 +344,13 @@ class AppriseAsset:
         if extension is None:
             extension = self.default_extension
 
+        if image_size is None:
+            image_size = self.default_image_size
+
         re_map = {
             "{THEME}": self.theme if self.theme else "",
-            "{TYPE}": notify_type,
-            "{XY}": image_size,
+            "{TYPE}": notify_type.value,
+            "{XY}": image_size.value,
             "{EXTENSION}": extension,
         }
 
@@ -329,8 +363,12 @@ class AppriseAsset:
         return re_table.sub(lambda x: re_map[x.group()], url_mask)
 
     def image_path(
-        self, notify_type, image_size, must_exist=True, extension=None
-    ):
+        self,
+        notify_type: NotifyType,
+        image_size: NotifyImageSize,
+        must_exist: bool = True,
+        extension: Optional[str] = None,
+    ) -> Optional[str]:
         """Apply our mask to our image file path."""
 
         if not self.image_path_mask:
@@ -342,8 +380,8 @@ class AppriseAsset:
 
         re_map = {
             "{THEME}": self.theme if self.theme else "",
-            "{TYPE}": notify_type,
-            "{XY}": image_size,
+            "{TYPE}": notify_type.value,
+            "{XY}": image_size.value,
             "{EXTENSION}": extension,
         }
 
@@ -361,7 +399,12 @@ class AppriseAsset:
         # Return what we parsed
         return path
 
-    def image_raw(self, notify_type, image_size, extension=None):
+    def image_raw(
+        self,
+        notify_type: NotifyType,
+        image_size: NotifyImageSize,
+        extension: Optional[str] = None,
+    ) -> Optional[bytes]:
         """Returns the raw image if it can (otherwise the function returns
         None)"""
 
@@ -381,7 +424,7 @@ class AppriseAsset:
 
         return None
 
-    def details(self):
+    def details(self) -> dict[str, str]:
         """Returns the details associated with the AppriseAsset object."""
         return {
             "app_id": self.app_id,
@@ -394,7 +437,7 @@ class AppriseAsset:
         }
 
     @staticmethod
-    def hex_to_rgb(value):
+    def hex_to_rgb(value: str) -> tuple[int, int, int]:
         """Takes a hex string (such as #00ff00) and returns a tuple in the form
         of (red, green, blue)
 
@@ -407,7 +450,7 @@ class AppriseAsset:
         )
 
     @staticmethod
-    def hex_to_int(value):
+    def hex_to_int(value: str) -> int:
         """Takes a hex string (such as #00ff00) and returns its integer
         equivalent.
 
@@ -416,28 +459,28 @@ class AppriseAsset:
         return int(value.lstrip("#"), 16)
 
     @property
-    def plugin_paths(self):
+    def plugin_paths(self) -> list[str]:
         """Return the plugin paths defined."""
         return self.__plugin_paths
 
     @property
-    def storage_path(self):
+    def storage_path(self) -> Optional[str]:
         """Return the persistent storage path defined."""
         return self.__storage_path
 
     @property
-    def storage_mode(self):
+    def storage_mode(self) -> PersistentStoreMode:
         """Return the persistent storage mode defined."""
 
         return self.__storage_mode
 
     @property
-    def storage_salt(self):
+    def storage_salt(self) -> bytes:
         """Return the provided namespace salt; this is always of type bytes."""
         return self.__storage_salt
 
     @property
-    def storage_idlen(self):
+    def storage_idlen(self) -> int:
         """Return the persistent storage id length."""
 
         return self.__storage_idlen

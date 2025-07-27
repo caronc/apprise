@@ -263,8 +263,14 @@ class AppriseURLTester:
             # from the one that was already created properly
             obj_cmp = Apprise.instantiate(obj.url())
 
+            if not isinstance(obj_cmp, NotifyBase):
+                raise AssertionError(
+                    f"URL: {url} generated an un-reloadable "
+                    f"url() of {obj.url()}"
+                )
+
             # Our new object should produce the same url identifier
-            if obj.url_identifier != obj_cmp.url_identifier:
+            elif obj.url_identifier != obj_cmp.url_identifier:
                 raise AssertionError(
                     f"URL Identifier: '{obj_cmp.url_identifier}' != expected"
                     f" '{obj.url_identifier}'"
@@ -276,15 +282,6 @@ class AppriseURLTester:
                     f"URL ID(): '{obj_cmp.url_id()}' != expected"
                     f" '{obj.url_id()}'"
                 )
-
-            # Our object should be the same instance as what we had
-            # originally expected above.
-            if not isinstance(obj_cmp, NotifyBase):
-                # Assert messages are hard to trace back with the
-                # way these tests work. Just printing before
-                # throwing our assertion failure makes things
-                # easier to debug later on
-                raise AssertionError()
 
             # Verify there is no change from the old and the new
             if len(obj) != len(obj_cmp):
@@ -683,7 +680,7 @@ class AppriseURLTester:
                     raise e
 
             except TypeError:
-                raise e  # noqa: B904 - re-raising in test helper context is intentional
+                raise e  # noqa: B904 - intentional re-raising in test helper
 
         #
         # Do the test again but without a title defined

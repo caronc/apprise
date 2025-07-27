@@ -428,7 +428,7 @@ class NotifySplunk(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our assignment extra's into our parameters
-        params.update({f":{k}": v for k, v in self.mapping.items()})
+        params.update({f":{k.value}": v for k, v in self.mapping.items()})
 
         return "{schema}://{routing_key}@{apikey}/{entity_id}?{params}".format(
             schema=self.secure_protocol[0],

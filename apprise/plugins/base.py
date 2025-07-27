@@ -26,16 +26,17 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import asyncio
+from collections.abc import Generator
 from functools import partial
 import re
-from typing import ClassVar, Optional, TypedDict, Union
+from typing import Any, ClassVar, Optional, TypedDict, Union
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import (
     NOTIFY_FORMATS,
-    NOTIFY_TYPES,
     OVERFLOW_MODES,
     NotifyFormat,
+    NotifyImageSize,
     NotifyType,
     OverflowMode,
     PersistentStoreMode,
@@ -310,26 +311,32 @@ class NotifyBase(URLBase):
             )
 
         if "format" in kwargs:
-            # Store the specified format if specified
-            notify_format = kwargs.get("format", "")
-            if notify_format.lower() not in NOTIFY_FORMATS:
-                msg = f"Invalid notification format {notify_format}"
-                self.logger.error(msg)
-                raise TypeError(msg)
+            value = kwargs["format"]
+            try:
+                self.notify_format = (
+                    value if isinstance(value, NotifyFormat)
+                    else NotifyFormat(value.lower())
+                )
 
-            # Provide override
-            self.notify_format = notify_format
+            except (AttributeError, ValueError):
+                err = (
+                    f"An invalid notification format ({value}) was "
+                    "specified.")
+                self.logger.warning(err)
+                raise TypeError(err) from None
 
         if "overflow" in kwargs:
-            # Store the specified format if specified
-            overflow = kwargs.get("overflow", "")
-            if overflow.lower() not in OVERFLOW_MODES:
-                msg = f"Invalid overflow method {overflow}"
-                self.logger.error(msg)
-                raise TypeError(msg)
+            value = kwargs["overflow"]
+            try:
+                self.overflow_mode = (
+                    value if isinstance(value, OverflowMode)
+                    else OverflowMode(value.lower())
+                )
 
-            # Provide override
-            self.overflow_mode = overflow
+            except (AttributeError, ValueError):
+                err = f"An invalid overflow method ({value}) was specified."
+                self.logger.warning(err)
+                raise TypeError(err) from None
 
         # Prepare our Persistent Storage switch
         self.persistent_storage = parse_bool(
@@ -341,29 +348,32 @@ class NotifyBase(URLBase):
             self.__cached_url_identifier = None
 
     def image_url(
-        self, notify_type, logo=False, extension=None, image_size=None
-    ):
+        self,
+        notify_type: NotifyType,
+        image_size: Optional[NotifyImageSize] = None,
+        logo: bool = False,
+        extension: Optional[str] = None,
+    ) -> Optional[str]:
         """Returns Image URL if possible."""
 
-        if not self.image_size:
-            return None
-
-        if notify_type not in NOTIFY_TYPES:
+        image_size = self.image_size if image_size is None else image_size
+        if not image_size:
             return None
 
         return self.asset.image_url(
             notify_type=notify_type,
-            image_size=self.image_size if image_size is None else image_size,
+            image_size=image_size,
             logo=logo,
             extension=extension,
         )
 
-    def image_path(self, notify_type, extension=None):
+    def image_path(
+        self,
+        notify_type: NotifyType,
+        extension: Optional[str] = None,
+    ) -> Optional[str]:
         """Returns the path of the image if it can."""
         if not self.image_size:
-            return None
-
-        if notify_type not in NOTIFY_TYPES:
             return None
 
         return self.asset.image_path(
@@ -372,12 +382,13 @@ class NotifyBase(URLBase):
             extension=extension,
         )
 
-    def image_raw(self, notify_type, extension=None):
+    def image_raw(
+        self,
+        notify_type: NotifyType,
+        extension: Optional[str] = None,
+    ) -> Optional[bytes]:
         """Returns the raw image if it can."""
         if not self.image_size:
-            return None
-
-        if notify_type not in NOTIFY_TYPES:
             return None
 
         return self.asset.image_raw(
@@ -386,27 +397,30 @@ class NotifyBase(URLBase):
             extension=extension,
         )
 
-    def color(self, notify_type, color_type=None):
+    def color(
+        self,
+        notify_type: NotifyType,
+        color_type: Optional[type] = None,
+    ) -> Union[str, int, tuple[int, int, int]]:
         """Returns the html color (hex code) associated with the
         notify_type."""
-        if notify_type not in NOTIFY_TYPES:
-            return None
 
         return self.asset.color(
             notify_type=notify_type,
             color_type=color_type,
         )
 
-    def ascii(self, notify_type):
+    def ascii(
+        self,
+        notify_type: NotifyType,
+    ) -> str:
         """Returns the ascii characters associated with the notify_type."""
-        if notify_type not in NOTIFY_TYPES:
-            return None
 
         return self.asset.ascii(
             notify_type=notify_type,
         )
 
-    def notify(self, *args, **kwargs):
+    def notify(self, *args: Any, **kwargs: Any) -> bool:
         """Performs notification."""
         try:
             # Build a list of dictionaries that can be used to call send().
@@ -422,7 +436,7 @@ class NotifyBase(URLBase):
             the_calls = [self.send(**kwargs2) for kwargs2 in send_calls]
             return all(the_calls)
 
-    async def async_notify(self, *args, **kwargs):
+    async def async_notify(self, *args: Any, **kwargs: Any) -> bool:
         """Performs notification for asynchronous callers."""
         try:
             # Build a list of dictionaries that can be used to call send().
@@ -449,14 +463,14 @@ class NotifyBase(URLBase):
 
     def _build_send_calls(
         self,
-        body=None,
-        title=None,
-        notify_type=NotifyType.INFO,
-        overflow=None,
-        attach=None,
-        body_format=None,
-        **kwargs,
-    ):
+        body: Optional[str] = None,
+        title: Optional[str] = None,
+        notify_type: NotifyType = NotifyType.INFO,
+        overflow: Optional[Union[str, OverflowMode]] = None,
+        attach: Optional[Union[list[str], AppriseAttachment]] = None,
+        body_format: Optional[NotifyFormat] = None,
+        **kwargs: Any,
+    ) -> Generator[dict[str, Any], None, None]:
         """Get a list of dictionaries that can be used to call send() or (in
         the future) async_send()."""
 
@@ -530,8 +544,12 @@ class NotifyBase(URLBase):
             }
 
     def _apply_overflow(
-        self, body, title=None, overflow=None, body_format=None
-    ):
+        self,
+        body: Optional[str],
+        title: Optional[str] = None,
+        overflow: Optional[Union[str, OverflowMode]] = None,
+        body_format: Optional[NotifyFormat] = None,
+    ) -> list[dict[str, str]]:
         """Takes the message body and title as input.  This function then
         applies any defined overflow restrictions associated with the
         notification service and may alter the message if/as required.
@@ -798,13 +816,23 @@ class NotifyBase(URLBase):
 
         return response
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Should preform the actual notification itself."""
         raise NotImplementedError(
             "send() is not implimented by the child class."
         )
 
-    def url_parameters(self, *args, **kwargs):
+    def url_parameters(
+        self,
+        *args: Any,
+        **kwargs: Any,
+    ) -> dict[str, Any]:
         """Provides a default set of parameters to work with.
 
         This can greatly simplify URL construction in the acommpanied url()
@@ -812,8 +840,8 @@ class NotifyBase(URLBase):
         """
 
         params = {
-            "format": self.notify_format,
-            "overflow": self.overflow_mode,
+            "format": self.notify_format.value,
+            "overflow": self.overflow_mode.value,
         }
 
         # Persistent Storage Setting
@@ -826,7 +854,11 @@ class NotifyBase(URLBase):
         return params
 
     @staticmethod
-    def parse_url(url, verify_host=True, plus_to_space=False):
+    def parse_url(
+        url: str,
+        verify_host: bool = True,
+        plus_to_space: bool = False,
+    ) -> Optional[dict[str, Any]]:
         """Parses the URL and returns it broken apart into a dictionary.
 
         This is very specific and customized for Apprise.
@@ -854,21 +886,21 @@ class NotifyBase(URLBase):
 
         # Allow overriding the default format
         if "format" in results["qsd"]:
-            results["format"] = results["qsd"].get("format")
+            results["format"] = results["qsd"].get("format", "").lower()
             if results["format"] not in NOTIFY_FORMATS:
                 URLBase.logger.warning(
-                    "Unsupported format specified {}".format(results["format"])
+                    "Unsupported format specified "
+                    f"{results['qsd']['format']!r}"
                 )
                 del results["format"]
 
         # Allow overriding the default overflow
         if "overflow" in results["qsd"]:
-            results["overflow"] = results["qsd"].get("overflow")
+            results["overflow"] = results["qsd"].get("overflow", "").lower()
             if results["overflow"] not in OVERFLOW_MODES:
                 URLBase.logger.warning(
-                    "Unsupported overflow specified {}".format(
-                        results["overflow"]
-                    )
+                    "Unsupported overflow mode specified "
+                    f"{results['qsd']['overflow']!r}"
                 )
                 del results["overflow"]
 
@@ -883,7 +915,7 @@ class NotifyBase(URLBase):
         return results
 
     @staticmethod
-    def parse_native_url(url):
+    def parse_native_url(url: str) -> Optional[dict[str, Any]]:
         """This is a base class that can be optionally over-ridden by child
         classes who can build their Apprise URL based on the one provided by
         the notification service they choose to use.

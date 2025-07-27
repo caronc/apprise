@@ -25,8 +25,10 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from enum import Enum
 
-class NotifyType:
+
+class NotifyType(str, Enum):
     """A simple mapping of notification types most commonly used with all types
     of logging and notification services."""
 
@@ -36,15 +38,11 @@ class NotifyType:
     FAILURE = "failure"
 
 
-NOTIFY_TYPES = (
-    NotifyType.INFO,
-    NotifyType.SUCCESS,
-    NotifyType.WARNING,
-    NotifyType.FAILURE,
-)
+# Define our types so we can verify if we need to
+NOTIFY_TYPES: frozenset[str] = frozenset(e.value for e in NotifyType)
 
 
-class NotifyImageSize:
+class NotifyImageSize(str, Enum):
     """A list of pre-defined image sizes to make it easier to work with defined
     plugins."""
 
@@ -54,15 +52,12 @@ class NotifyImageSize:
     XY_256 = "256x256"
 
 
-NOTIFY_IMAGE_SIZES = (
-    NotifyImageSize.XY_32,
-    NotifyImageSize.XY_72,
-    NotifyImageSize.XY_128,
-    NotifyImageSize.XY_256,
-)
+# Define our image sizes so we can verify if we need to
+NOTIFY_IMAGE_SIZES: frozenset[str] = \
+    frozenset(e.value for e in NotifyImageSize)
 
 
-class NotifyFormat:
+class NotifyFormat(str, Enum):
     """A list of pre-defined text message formats that can be passed via the
     apprise library."""
 
@@ -71,14 +66,11 @@ class NotifyFormat:
     MARKDOWN = "markdown"
 
 
-NOTIFY_FORMATS = (
-    NotifyFormat.TEXT,
-    NotifyFormat.HTML,
-    NotifyFormat.MARKDOWN,
-)
+# Define our formats so we can verify if we need to
+NOTIFY_FORMATS: frozenset[str] = frozenset(e.value for e in NotifyFormat)
 
 
-class OverflowMode:
+class OverflowMode(str, Enum):
     """A list of pre-defined modes of how to handle the text when it exceeds
     the defined maximum message size."""
 
@@ -97,14 +89,10 @@ class OverflowMode:
 
 
 # Define our modes so we can verify if we need to
-OVERFLOW_MODES = (
-    OverflowMode.UPSTREAM,
-    OverflowMode.TRUNCATE,
-    OverflowMode.SPLIT,
-)
+OVERFLOW_MODES: frozenset[str] = frozenset(e.value for e in OverflowMode)
 
 
-class ConfigFormat:
+class ConfigFormat(str, Enum):
     """A list of pre-defined config formats that can be passed via the apprise
     library."""
 
@@ -119,13 +107,10 @@ class ConfigFormat:
 
 
 # Define our configuration formats mostly used for verification
-CONFIG_FORMATS = (
-    ConfigFormat.TEXT,
-    ConfigFormat.YAML,
-)
+CONFIG_FORMATS: frozenset[str] = frozenset(e.value for e in ConfigFormat)
 
 
-class ContentIncludeMode:
+class ContentIncludeMode(str, Enum):
     """The different Content inclusion modes.
 
     All content based plugins will have one of these associated with it.
@@ -144,14 +129,12 @@ class ContentIncludeMode:
     ALWAYS = "always"
 
 
-CONTENT_INCLUDE_MODES = (
-    ContentIncludeMode.STRICT,
-    ContentIncludeMode.NEVER,
-    ContentIncludeMode.ALWAYS,
-)
+# Define our file inclusion types so we can verify if we need to
+CONTENT_INCLUDE_MODES: frozenset[str] = \
+    frozenset(e.value for e in ContentIncludeMode)
 
 
-class ContentLocation:
+class ContentLocation(str, Enum):
     """This is primarily used for handling file attachments.  The idea is to
     track the source of the attachment itself.  We don't want remote calls to a
     server to access local attachments for example.
@@ -174,14 +157,11 @@ class ContentLocation:
     INACCESSIBLE = "n/a"
 
 
-CONTENT_LOCATIONS = (
-    ContentLocation.LOCAL,
-    ContentLocation.HOSTED,
-    ContentLocation.INACCESSIBLE,
-)
+# Define our location types so we can verify if we need to
+CONTENT_LOCATIONS: frozenset[str] = frozenset(e.value for e in ContentLocation)
 
 
-class PersistentStoreMode:
+class PersistentStoreMode(str, Enum):
     # Allow persistent storage; write on demand
     AUTO = "auto"
 
@@ -193,14 +173,12 @@ class PersistentStoreMode:
     MEMORY = "memory"
 
 
-PERSISTENT_STORE_MODES = (
-    PersistentStoreMode.AUTO,
-    PersistentStoreMode.FLUSH,
-    PersistentStoreMode.MEMORY,
-)
+# Define our persistent storage modes so we can verify if we need to
+PERSISTENT_STORE_MODES: frozenset[str] = \
+    frozenset(e.value for e in PersistentStoreMode)
 
 
-class PersistentStoreState:
+class PersistentStoreState(str, Enum):
     """Defines the persistent states describing what has been cached."""
 
     # Persistent Directory is actively cross-referenced against a matching URL
@@ -214,6 +192,10 @@ class PersistentStoreState:
     # is utilized
     UNUSED = "unused"
 
+
+# Define our persistent storage states so we can verify if we need to
+PERSISTENT_STORE_STATES: frozenset[str] = \
+    frozenset(e.value for e in PersistentStoreState)
 
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin

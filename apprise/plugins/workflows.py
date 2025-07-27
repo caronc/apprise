@@ -333,7 +333,7 @@ class NotifyWorkflows(NotifyBase):
         # Apply some defaults template values
         tokens["app_body"] = body
         tokens["app_title"] = title
-        tokens["app_type"] = notify_type
+        tokens["app_type"] = notify_type.value
         tokens["app_id"] = self.app_id
         tokens["app_desc"] = self.app_desc
         tokens["app_color"] = self.color(notify_type)

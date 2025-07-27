@@ -70,6 +70,18 @@ def test_persistent_storage_asset(tmpdir):
     assert asset.storage_mode is PersistentStoreMode.MEMORY
 
 
+def test_persistent_storage_bad_mode(tmpdir):
+    """Persistent Storage Bad Mode Testing."""
+    # Create ourselves an attachment object set in Memory Mode only
+    with pytest.raises(AttributeError):
+        PersistentStore(
+            namespace="abc", path=str(tmpdir), mode="invalid"
+        )
+
+    with pytest.raises(AttributeError):
+        AppriseAsset(storage_mode="invalid")
+
+
 def test_disabled_persistent_storage(tmpdir):
     """Persistent Storage General Testing."""
     # Create ourselves an attachment object set in Memory Mode only

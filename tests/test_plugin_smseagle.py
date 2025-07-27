@@ -101,12 +101,12 @@ apprise_url_tests = (
         },
     ),
     (
-        "smseagle://token@localhost/%20/%20/",
+        "smseagle://tokenb@localhost/%20/%20/",
         {
             # invalid 'to' phone number
             "instance": NotifySMSEagle,
             # Notify will fail because it couldn't send to anyone
-            "response": False,
+            "notify_response": False,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "smseagle://****@localhost/",
             # Our response expected server response

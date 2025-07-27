@@ -100,10 +100,10 @@ Alternatively you can continue to use the `tox` environment:
 tox -e apprise -- -vv -b "test body" -t "test title" mailto://credentials
 ```
 
-Optionally, add the `bin/` directory to your PATH:
+Optionally, add the `bin/apprise` to tests your changes
 
 ```bash
-export PATH="$(pwd)/bin:$PATH"
+bin/apprise -vv -b "test body" -t "test title" <schema>
 ```
 
 ---
@@ -121,7 +121,31 @@ docker-compose run --rm rpmbuild.el9 build-rpm.sh
 docker-compose run --rm rpmbuild.f42 build-rpm.sh
 ```
 
----
+## 📦 Specific Environment Emulation
+
+You can also emulate your own docker environment and just test/build inside that
+```bash
+# Python v3.9 Testing
+docker-compose run --rm test.py39 bash
+
+# Python v3.10 Testing
+docker-compose run --rm test.py310 bash
+
+# Python v3.11 Testing
+docker-compose run --rm test.py311 bash
+
+# Python v3.12 Testing
+docker-compose run --rm test.py312 bash
+```
+Once you've entered one of these environments, you can leverage the following command to work with:
+
+1. `bin/test.sh`: runs the full test suite (same as `tox -e qa`)
+1. `bin/apprise`: launches the Apprise CLI using the local build (same as `tox -e apprise`)
+1. `ruff check . --fix`: auto-formats the codebase (same as `tox -e format`)
+1. `ruff check .`: performs lint-only validation (same as `tox -e lint`)
+1. `coverage run --source=apprise -m pytest tests`: manual test execution with coverage
+
+The only advantage of this route is the overhead associated with each `tox` call is gone (faster responses).  Otherwise just utilizing the `tox` commands can sometimes be easier.
 
 ## 🧪 GitHub Actions
 

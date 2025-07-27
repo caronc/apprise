@@ -48,6 +48,7 @@ from .common import (
     NOTIFY_TYPES,
     OVERFLOW_MODES,
     PERSISTENT_STORE_MODES,
+    PERSISTENT_STORE_STATES,
     ConfigFormat,
     ContentIncludeMode,
     ContentLocation,
@@ -81,6 +82,7 @@ __all__ = [
     "NOTIFY_TYPES",
     "OVERFLOW_MODES",
     "PERSISTENT_STORE_MODES",
+    "PERSISTENT_STORE_STATES",
     # Core
     "Apprise",
     "AppriseAsset",

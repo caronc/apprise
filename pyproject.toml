@@ -328,6 +328,9 @@ ignore = [
              # for now
 ]
 
+[tool.ruff.lint.pyupgrade]
+keep-runtime-typing = true
+
 [tool.ruff.lint.flake8-quotes]
 inline-quotes = "double"
 
@@ -344,8 +347,9 @@ builtins-ignorelist = ["_"]
 [tool.pytest.ini_options]
 addopts = "-ra"
 python_files = ["tests/test_*.py"]
-norecursedirs = ["tests/helpers", "dist"]
 filterwarnings = ["once::Warning"]
+norecursedirs = ["tests/helpers", "dist", ".tox", ".venv", ".eggs", ".local", "venv"]
+testpaths = ["tests"]
 
 [tool.coverage.run]
 branch = true

@@ -25,15 +25,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import annotations
+
 import asyncio
+from collections.abc import Iterator
 import concurrent.futures as cf
 from itertools import chain
 import os
+from typing import Any, Optional, Union
 
 from . import __version__, common, plugins
 from .apprise_attachment import AppriseAttachment
 from .apprise_config import AppriseConfig
 from .asset import AppriseAsset
+from .common import ContentLocation
 from .config.base import ConfigBase
 from .conversion import convert_between
 from .emojis import apply_emojis
@@ -52,7 +57,22 @@ N_MGR = NotificationManager()
 class Apprise:
     """Our Notification Manager."""
 
-    def __init__(self, servers=None, asset=None, location=None, debug=False):
+    def __init__(
+        self,
+        servers: Optional[
+            Union[
+                str,
+                dict,
+                NotifyBase,
+                AppriseConfig,
+                ConfigBase,
+                list[Union[str, dict, NotifyBase, AppriseConfig, ConfigBase]],
+            ]
+        ] = None,
+        asset: Optional[AppriseAsset] = None,
+        location: Optional[ContentLocation] = None,
+        debug: bool = False,
+    ) -> None:
         """Loads a set of server urls while applying the Asset() module to each
         if specified.
 
@@ -89,7 +109,12 @@ class Apprise:
         self.location = location
 
     @staticmethod
-    def instantiate(url, asset=None, tag=None, suppress_exceptions=True):
+    def instantiate(
+        url: Union[str, dict],
+        asset: Optional[AppriseAsset] = None,
+        tag: Optional[Union[str, list[str]]] = None,
+        suppress_exceptions: bool = True,
+    ) -> Optional[NotifyBase]:
         """Returns the instance of a instantiated plugin based on the provided
         Server URL.  If the url fails to be parsed, then None is returned.
 
@@ -236,7 +261,19 @@ class Apprise:
 
         return plugin
 
-    def add(self, servers, asset=None, tag=None):
+    def add(
+        self,
+        servers: Union[
+            str,
+            dict,
+            NotifyBase,
+            AppriseConfig,
+            ConfigBase,
+            list[Union[str, dict, NotifyBase, AppriseConfig, ConfigBase]],
+        ],
+        asset: Optional[AppriseAsset] = None,
+        tag: Optional[Union[str, list[str]]] = None,
+    ) -> bool:
         """Adds one or more server URLs into our list.
 
         You can override the global asset if you wish by including it with the
@@ -306,11 +343,15 @@ class Apprise:
         # Return our status
         return return_status
 
-    def clear(self):
+    def clear(self) -> None:
         """Empties our server list."""
         self.servers[:] = []
 
-    def find(self, tag=common.MATCH_ALL_TAG, match_always=True):
+    def find(
+        self,
+        tag: Any = common.MATCH_ALL_TAG,
+        match_always: bool = True,
+    ) -> Iterator[NotifyBase]:
         """Returns a list of all servers matching against the tag specified."""
 
         # Build our tag setup
@@ -352,15 +393,15 @@ class Apprise:
 
     def notify(
         self,
-        body,
-        title="",
-        notify_type=common.NotifyType.INFO,
-        body_format=None,
-        tag=common.MATCH_ALL_TAG,
-        match_always=True,
-        attach=None,
-        interpret_escapes=None,
-    ):
+        body: Union[str, bytes],
+        title: Union[str, bytes] = "",
+        notify_type: common.NotifyType = common.NotifyType.INFO,
+        body_format: Optional[str] = None,
+        tag: Any = common.MATCH_ALL_TAG,
+        match_always: bool = True,
+        attach: Any = None,
+        interpret_escapes: Optional[bool] = None,
+    ) -> Optional[bool]:
         """Send a notification to all the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will be
@@ -410,7 +451,11 @@ class Apprise:
         parallel_result = Apprise._notify_parallel_threadpool(*parallel_calls)
         return sequential_result and parallel_result
 
-    async def async_notify(self, *args, **kwargs):
+    async def async_notify(
+        self,
+        *args: Any,
+        **kwargs: Any
+    ) -> Optional[bool]:
         """Send a notification to all the plugins previously loaded, for
         asynchronous callers.
 
@@ -712,7 +757,12 @@ class Apprise:
 
         return all(results)
 
-    def details(self, lang=None, show_requirements=False, show_disabled=False):
+    def details(
+        self,
+        lang: Optional[str] = None,
+        show_requirements: bool = False,
+        show_disabled: bool = False,
+    ) -> dict[str, Any]:
         """Returns the details associated with the Apprise object."""
 
         # general object returned
@@ -789,7 +839,7 @@ class Apprise:
 
         return response
 
-    def urls(self, privacy=False):
+    def urls(self, privacy: bool = False) -> list[str]:
         """Returns all of the loaded URLs defined in this apprise object."""
         urls = []
         for s in self.servers:
@@ -800,7 +850,7 @@ class Apprise:
                 urls.append(s.url(privacy=privacy))
         return urls
 
-    def pop(self, index):
+    def pop(self, index: int) -> NotifyBase:
         """Removes an indexed Notification Service from the stack and returns
         it.
 
@@ -845,7 +895,7 @@ class Apprise:
         # If we reach here, then we indexed out of range
         raise IndexError("list index out of range")
 
-    def __getitem__(self, index):
+    def __getitem__(self, index: int) -> NotifyBase:
         """Returns the indexed server entry of a loaded notification server."""
         # Tracking variables
         prev_offset = -1
@@ -877,7 +927,7 @@ class Apprise:
         # If we reach here, then we indexed out of range
         raise IndexError("list index out of range")
 
-    def __getstate__(self):
+    def __getstate__(self) -> dict[str, object]:
         """Pickle Support dumps()"""
         attributes = {
             "asset": self.asset,
@@ -893,28 +943,36 @@ class Apprise:
             ],
             "locale": self.locale,
             "debug": self.debug,
-            "location": self.location,
+            "location": self.location.value if self.location else None,
         }
 
         return attributes
 
-    def __setstate__(self, state):
+    def __setstate__(self, state: dict[str, object]) -> None:
         """Pickle Support loads()"""
         self.servers = []
         self.asset = state["asset"]
         self.locale = state["locale"]
-        self.location = state["location"]
+
+        location = state.get("location")
+        self.location = (
+            location if isinstance(location, ContentLocation)
+            else ContentLocation(location)
+            if location is not None
+            else None
+        )
+
         for entry in state["urls"]:
             self.add(entry["url"], asset=entry["asset"], tag=entry["tag"])
 
-    def __bool__(self):
+    def __bool__(self) -> bool:
         """Allows the Apprise object to be wrapped in an 'if statement'.
 
         True is returned if at least one service has been loaded.
         """
         return len(self) > 0
 
-    def __iter__(self):
+    def __iter__(self) -> Iterator[NotifyBase]:
         """Returns an iterator to each of our servers loaded.
 
         This includes those found inside configuration.
@@ -928,7 +986,7 @@ class Apprise:
             for s in self.servers
         ])
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of servers loaded; this includes those found
         within loaded configuration.
 
