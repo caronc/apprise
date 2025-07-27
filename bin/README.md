@@ -22,13 +22,13 @@ The tools are as follows:
 
    ```bash
    # Run all tests:
-   ./bin/tests.sh
+   ./bin/test.sh
 
    # Run just the tests associated with the rest framework:
-   ./bin/tests.sh rest
+   ./bin/test.sh rest
 
    # Run just the Apprise config related unit tests
-   ./bin/tests.sh config
+   ./bin/test.sh config
    ```
 
 - :gear: `checkdone.sh`: This script just runs a lint check against the code to make sure there are no PEP8 issues and additionally runs a full test coverage report.  This is what will happen once you check in your code.  Nothing can be merged unless these tests pass with 100% coverage.  So it's useful to have this handy to run now and then.
@@ -50,7 +50,7 @@ export PATH="$(pwd)/bin:$PATH"
 
 ## RPM Testing
 
-Apprise is also packaged for Redhat/Fedora as an RPM. To verify this processs works correctly an additional tool called `build-rpm.sh` is provided.  It's best tested using the Docker environments:
+Apprise is also packaged for Redhat/Fedora as an RPM. To verify this process works correctly an additional tool called `build-rpm.sh` is provided.  It's best tested using the Docker environments:
    ```bash
    # To test with el9; do the following:
    docker-compose run --rm rpmbuild.el9 build-rpm.sh
