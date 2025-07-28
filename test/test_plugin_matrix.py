@@ -932,9 +932,8 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
 
 @mock.patch('requests.put')
-@mock.patch('requests.get')
 @mock.patch('requests.post')
-def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
+def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     """
     NotifyMatrix() Attachment Checks (v3)
 
@@ -951,7 +950,6 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
 
     # Prepare Mock return object
     mock_post.return_value = response
-    mock_get.return_value = response
     mock_put.return_value = response
 
     # Instantiate our object
@@ -982,7 +980,7 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
         'http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/' \
         'send/m.room.message/1'
 
-    # Attach an unsupported file type (it's just skipped)
+    # Attach a zip file type
     attach = AppriseAttachment(
         os.path.join(TEST_VAR_DIR, 'apprise-archive.zip'))
     assert obj.notify(
@@ -999,27 +997,37 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_get, mock_put):
     # update our attachment to be valid
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, 'apprise-test.gif'))
 
+    mock_put.return_value = None
     mock_post.return_value = None
+
     # Throw an exception on the first call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
+        # Reset our value
+        mock_put.reset_mock()
+        mock_post.reset_mock()
+
         mock_post.side_effect = [side_effect]
 
         assert obj.send(body="test", attach=attach) is False
 
     # Throw an exception on the second call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
-        mock_post.side_effect = [response, side_effect]
+        # Reset our value
+        mock_put.reset_mock()
+        mock_post.reset_mock()
 
-        # Attachment support does not exist vor v3 at time, so this will
-        # work nicely
-        assert obj.send(body="test", attach=attach) is True
+        mock_put.side_effect = [side_effect, response]
+        mock_post.side_effect = [response, side_effect, response]
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
 
     # handle a bad response
+    mock_put.side_effect = [bad_response, response]
     mock_post.side_effect = [response, bad_response, response]
 
-    # Attachment support does not exist vor v3 at time, so this will
-    # work nicely
-    assert obj.send(body="test", attach=attach) is True
+    # We'll fail now because of an internal exception
+    assert obj.send(body="test", attach=attach) is False
 
     # Force a object removal (thus a logout call)
     del obj
