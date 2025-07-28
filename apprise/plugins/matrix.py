@@ -79,6 +79,9 @@ IS_ROOM_ID = re.compile(
     r'^\s*(!|&#33;|%21)(?P<room>[a-z0-9-]+)((:|%3A)'
     r'(?P<home_server>[a-z0-9.-]+))?\s*$', re.I)
 
+# Matrix is_image check
+IS_IMAGE = re.compile(r'^image/.*', re.I)
+
 
 class MatrixMessageType:
     """
@@ -788,7 +791,8 @@ class NotifyMatrix(NotifyBase):
                 # invalid attachment (bad file)
                 return False
 
-            if not re.match(r'^image/', attachment.mimetype, re.I):
+            if not IS_IMAGE.match(attachment.mimetype) \
+               and self.version == MatrixVersion.V2:
                 # unsuppored at this time
                 continue
 
@@ -805,15 +809,19 @@ class NotifyMatrix(NotifyBase):
 
             if self.version == MatrixVersion.V3:
                 # Prepare our payload
+                is_image = IS_IMAGE.match(attachment.mimetype)
                 payloads.append({
                     "body": attachment.name,
                     "info": {
                         "mimetype": attachment.mimetype,
                         "size": len(attachment),
                     },
-                    "msgtype": "m.image",
+                    "msgtype": "m.image" if is_image else "m.file",
                     "url": response.get('content_uri'),
                 })
+                if not is_image:
+                    # Setup `m.file'
+                    payloads[-1]['filename'] = attachment.name
 
             else:
                 # Prepare our payload
