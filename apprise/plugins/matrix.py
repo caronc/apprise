@@ -683,7 +683,7 @@ class NotifyMatrix(NotifyBase):
                 path = '/rooms/{}/send/m.room.message'.format(
                     NotifyMatrix.quote(room_id))
 
-            if image_url:
+            if image_url and self.version == MatrixVersion.V2:
                 # Define our payload
                 image_payload = {
                     'msgtype': 'm.image',
