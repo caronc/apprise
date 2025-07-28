@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -30,24 +29,26 @@ from email import charset
 
 from .base import NotifyEmail
 from .common import (
-    AppriseEmailException, EmailMessage, SecureMailMode, SECURE_MODES,
-    WebBaseLogin)
+    SECURE_MODES,
+    AppriseEmailException,
+    EmailMessage,
+    SecureMailMode,
+    WebBaseLogin,
+)
 from .templates import EMAIL_TEMPLATES
 
 # Globally Default encoding mode set to Quoted Printable.
-charset.add_charset('utf-8', charset.QP, charset.QP, 'utf-8')
+charset.add_charset("utf-8", charset.QP, charset.QP, "utf-8")
 
 __all__ = [
-    # Reference
-    'NotifyEmail',
-
-    # Pretty Good Privacy
-    'ApprisePGPController', 'ApprisePGPException',
-
-    # Other
-    'AppriseEmailException', 'EmailMessage', 'SecureMailMode', 'SECURE_MODES',
-    'WebBaseLogin',
-
-    # Additional entries that may be useful to some developers
-    'EMAIL_TEMPLATES', 'PGP_SUPPORT',
+    "EMAIL_TEMPLATES",
+    "PGP_SUPPORT",
+    "SECURE_MODES",
+    "AppriseEmailException",
+    "ApprisePGPController",
+    "ApprisePGPException",
+    "EmailMessage",
+    "NotifyEmail",
+    "SecureMailMode",
+    "WebBaseLogin",
 ]

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -34,13 +33,14 @@
 # - https://github.com/E2OpenPlugins/e2openplugin-OpenWebif/wiki/\
 #       OpenWebif-API-documentation#message
 
-import requests
 from json import loads
 
-from .base import NotifyBase
-from ..url import PrivacyMode
+import requests
+
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import NotifyBase
 
 
 class Enigma2MessageType:
@@ -60,24 +60,22 @@ MESSAGE_MAPPING = {
 
 
 class NotifyEnigma2(NotifyBase):
-    """
-    A wrapper for Enigma2 Notifications
-    """
+    """A wrapper for Enigma2 Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Enigma2'
+    service_name = "Enigma2"
 
     # The services URL
-    service_url = 'https://dreambox.de/'
+    service_url = "https://dreambox.de/"
 
     # The default protocol
-    protocol = 'enigma2'
+    protocol = "enigma2"
 
     # The default secure protocol
-    secure_protocol = 'enigma2s'
+    secure_protocol = "enigma2s"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_enigma2'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_enigma2"
 
     # Enigma2 does not support a title
     title_maxlen = 0
@@ -90,70 +88,75 @@ class NotifyEnigma2(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{host}',
-        '{schema}://{host}:{port}',
-        '{schema}://{user}@{host}',
-        '{schema}://{user}@{host}:{port}',
-        '{schema}://{user}:{password}@{host}',
-        '{schema}://{user}:{password}@{host}:{port}',
-        '{schema}://{host}/{fullpath}',
-        '{schema}://{host}:{port}/{fullpath}',
-        '{schema}://{user}@{host}/{fullpath}',
-        '{schema}://{user}@{host}:{port}/{fullpath}',
-        '{schema}://{user}:{password}@{host}/{fullpath}',
-        '{schema}://{user}:{password}@{host}:{port}/{fullpath}',
+        "{schema}://{host}",
+        "{schema}://{host}:{port}",
+        "{schema}://{user}@{host}",
+        "{schema}://{user}@{host}:{port}",
+        "{schema}://{user}:{password}@{host}",
+        "{schema}://{user}:{password}@{host}:{port}",
+        "{schema}://{host}/{fullpath}",
+        "{schema}://{host}:{port}/{fullpath}",
+        "{schema}://{user}@{host}/{fullpath}",
+        "{schema}://{user}@{host}:{port}/{fullpath}",
+        "{schema}://{user}:{password}@{host}/{fullpath}",
+        "{schema}://{user}:{password}@{host}:{port}/{fullpath}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
+            "fullpath": {
+                "name": _("Path"),
+                "type": "string",
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-        'fullpath': {
-            'name': _('Path'),
-            'type': 'string',
-        },
-    })
+    )
 
-    template_args = dict(NotifyBase.template_args, **{
-        'timeout': {
-            'name': _('Server Timeout'),
-            'type': 'int',
-            # The number of seconds to display the message for
-            'default': 13,
-            # -1 means infinit
-            'min': -1,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "timeout": {
+                "name": _("Server Timeout"),
+                "type": "int",
+                # The number of seconds to display the message for
+                "default": 13,
+                # -1 means infinit
+                "min": -1,
+            },
         },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("HTTP Header"),
+            "prefix": "+",
         },
     }
 
     def __init__(self, timeout=None, headers=None, **kwargs):
-        """
-        Initialize Enigma2 Object
+        """Initialize Enigma2 Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
@@ -162,17 +165,17 @@ class NotifyEnigma2(NotifyBase):
 
         try:
             self.timeout = int(timeout)
-            if self.timeout < self.template_args['timeout']['min']:
+            if self.timeout < self.template_args["timeout"]["min"]:
                 # Bulletproof; can't go lower then min value
-                self.timeout = self.template_args['timeout']['min']
+                self.timeout = self.template_args["timeout"]["min"]
 
         except (ValueError, TypeError):
             # Use default timeout
-            self.timeout = self.template_args['timeout']['default']
+            self.timeout = self.template_args["timeout"]["default"]
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
         if not isinstance(self.fullpath, str):
-            self.fullpath = '/'
+            self.fullpath = "/"
 
         self.headers = {}
         if headers:
@@ -183,75 +186,75 @@ class NotifyEnigma2(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol,
-            self.user, self.password, self.host,
+            self.user,
+            self.password,
+            self.host,
             self.port if self.port else (443 if self.secure else 80),
-            self.fullpath.rstrip('/'),
+            self.fullpath.rstrip("/"),
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'timeout': str(self.timeout),
+            "timeout": str(self.timeout),
         }
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyEnigma2.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifyEnigma2.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyEnigma2.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifyEnigma2.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=NotifyEnigma2.quote(self.fullpath, safe='/'),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=NotifyEnigma2.quote(self.fullpath, safe="/"),
             params=NotifyEnigma2.urlencode(params),
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Enigma2 Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Enigma2 Notification."""
 
         # prepare Enigma2 Object
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         params = {
-            'text': body,
-            'type': MESSAGE_MAPPING.get(
-                notify_type, Enigma2MessageType.INFO),
-            'timeout': self.timeout,
+            "text": body,
+            "type": MESSAGE_MAPPING.get(notify_type, Enigma2MessageType.INFO),
+            "timeout": self.timeout,
         }
 
         # Apply any/all header over-rides defined
@@ -262,19 +265,20 @@ class NotifyEnigma2(NotifyBase):
             auth = (self.user, self.password)
 
         # Set our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
-        url = '%s://%s' % (schema, self.host)
+        url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         # Prepare our message URL
-        url += self.fullpath.rstrip('/') + '/api/message'
+        url += self.fullpath.rstrip("/") + "/api/message"
 
-        self.logger.debug('Enigma2 POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('Enigma2 Parameters: %s' % str(params))
+        self.logger.debug(
+            "Enigma2 POST URL:"
+            f" {url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Enigma2 Parameters: {params!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -291,17 +295,18 @@ class NotifyEnigma2(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyEnigma2.http_response_code_lookup(r.status_code)
+                status_str = NotifyEnigma2.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Enigma2 notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Enigma2 notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
@@ -309,7 +314,7 @@ class NotifyEnigma2(NotifyBase):
             # We were able to post our message; now lets evaluate the response
             try:
                 # Acquire our result
-                result = loads(r.content).get('result', False)
+                result = loads(r.content).get("result", False)
 
             except (AttributeError, TypeError, ValueError):
                 # ValueError = r.content is Unparsable
@@ -321,19 +326,21 @@ class NotifyEnigma2(NotifyBase):
 
             if not result:
                 self.logger.warning(
-                    'Failed to send Enigma2 notification: '
-                    'There was no server acknowledgement.')
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                    "Failed to send Enigma2 notification: "
+                    "There was no server acknowledgement."
+                )
+                self.logger.debug(f"Response Details:\r\n{r.content}")
                 # Return; we're done
                 return False
 
-            self.logger.info('Sent Enigma2 notification.')
+            self.logger.info("Sent Enigma2 notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Enigma2 '
-                'notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Enigma2 "
+                f"notification to {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -342,11 +349,8 @@ class NotifyEnigma2(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
@@ -354,12 +358,13 @@ class NotifyEnigma2(NotifyBase):
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {
+        results["headers"] = {
             NotifyEnigma2.unquote(x): NotifyEnigma2.unquote(y)
-            for x, y in results['qsd+'].items()}
+            for x, y in results["qsd+"].items()
+        }
 
         # Save timeout value (if specified)
-        if 'timeout' in results['qsd'] and len(results['qsd']['timeout']):
-            results['timeout'] = results['qsd']['timeout']
+        if "timeout" in results["qsd"] and len(results["qsd"]["timeout"]):
+            results["timeout"] = results["qsd"]["timeout"]
 
         return results

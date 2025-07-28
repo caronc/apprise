@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -33,23 +32,27 @@
 #
 import requests
 
-from .base import NotifyBase
-from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils.parse import (
-    is_phone_no, parse_phone_no, parse_bool, validate_regex)
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import (
+    is_phone_no,
+    parse_bool,
+    parse_phone_no,
+    validate_regex,
+)
+from .base import NotifyBase
 
 
 class BurstSMSCountryCode:
     # Australia
-    AU = 'au'
+    AU = "au"
     # New Zeland
-    NZ = 'nz'
+    NZ = "nz"
     # United Kingdom
-    UK = 'gb'
+    UK = "gb"
     # United States
-    US = 'us'
+    US = "us"
 
 
 BURST_SMS_COUNTRY_CODES = (
@@ -61,18 +64,16 @@ BURST_SMS_COUNTRY_CODES = (
 
 
 class NotifyBurstSMS(NotifyBase):
-    """
-    A wrapper for Burst SMS Notifications
-    """
+    """A wrapper for Burst SMS Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Burst SMS'
+    service_name = "Burst SMS"
 
     # The services URL
-    service_url = 'https://burstsms.com/'
+    service_url = "https://burstsms.com/"
 
     # The default protocol
-    secure_protocol = 'burstsms'
+    secure_protocol = "burstsms"
 
     # The maximum amount of SMS Messages that can reside within a single
     # batch transfer based on:
@@ -80,10 +81,10 @@ class NotifyBurstSMS(NotifyBase):
     default_batch_size = 500
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_burst_sms'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_burst_sms"
 
     # Burst SMS uses the http protocol with JSON requests
-    notify_url = 'https://api.transmitsms.com/send-sms.json'
+    notify_url = "https://api.transmitsms.com/send-sms.json"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -93,168 +94,176 @@ class NotifyBurstSMS(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{apikey}:{secret}@{sender_id}/{targets}',
-    )
+    templates = ("{schema}://{apikey}:{secret}@{sender_id}/{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
-            'private': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "required": True,
+                "regex": (r"^[a-z0-9]+$", "i"),
+                "private": True,
+            },
+            "secret": {
+                "name": _("API Secret"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9]+$", "i"),
+            },
+            "sender_id": {
+                "name": _("Sender ID"),
+                "type": "string",
+                "required": True,
+                "map_to": "source",
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'secret': {
-            'name': _('API Secret'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
-        },
-        'sender_id': {
-            'name': _('Sender ID'),
-            'type': 'string',
-            'required': True,
-            'map_to': 'source',
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "alias_of": "sender_id",
+            },
+            "key": {
+                "alias_of": "apikey",
+            },
+            "secret": {
+                "alias_of": "secret",
+            },
+            "country": {
+                "name": _("Country"),
+                "type": "choice:string",
+                "values": BURST_SMS_COUNTRY_CODES,
+                "default": BurstSMSCountryCode.US,
+            },
+            # Validity
+            # Expire a message send if it is undeliverable (defined in minutes)
+            # If set to Zero (0); this is the default and sets the max validity
+            # period
+            "validity": {"name": _("validity"), "type": "int", "default": 0},
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
         },
-        'from': {
-            'alias_of': 'sender_id',
-        },
-        'key': {
-            'alias_of': 'apikey',
-        },
-        'secret': {
-            'alias_of': 'secret',
-        },
-        'country': {
-            'name': _('Country'),
-            'type': 'choice:string',
-            'values': BURST_SMS_COUNTRY_CODES,
-            'default': BurstSMSCountryCode.US,
-        },
-        # Validity
-        # Expire a message send if it is undeliverable (defined in minutes)
-        # If set to Zero (0); this is the default and sets the max validity
-        # period
-        'validity': {
-            'name': _('validity'),
-            'type': 'int',
-            'default': 0
-        },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-    })
+    )
 
-    def __init__(self, apikey, secret, source, targets=None, country=None,
-                 validity=None, batch=None, **kwargs):
-        """
-        Initialize Burst SMS Object
-        """
+    def __init__(
+        self,
+        apikey,
+        secret,
+        source,
+        targets=None,
+        country=None,
+        validity=None,
+        batch=None,
+        **kwargs,
+    ):
+        """Initialize Burst SMS Object."""
         super().__init__(**kwargs)
 
         # API Key (associated with project)
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'An invalid Burst SMS API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid Burst SMS API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # API Secret (associated with project)
         self.secret = validate_regex(
-            secret, *self.template_tokens['secret']['regex'])
+            secret, *self.template_tokens["secret"]["regex"]
+        )
         if not self.secret:
-            msg = 'An invalid Burst SMS API Secret ' \
-                  '({}) was specified.'.format(secret)
+            msg = f"An invalid Burst SMS API Secret ({secret}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         if not country:
-            self.country = self.template_args['country']['default']
+            self.country = self.template_args["country"]["default"]
 
         else:
             self.country = country.lower().strip()
             if country not in BURST_SMS_COUNTRY_CODES:
-                msg = 'An invalid Burst SMS country ' \
-                      '({}) was specified.'.format(country)
+                msg = (
+                    f"An invalid Burst SMS country ({country}) was specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
         # Set our Validity
-        self.validity = self.template_args['validity']['default']
+        self.validity = self.template_args["validity"]["default"]
         if validity:
             try:
                 self.validity = int(validity)
 
             except (ValueError, TypeError):
-                msg = 'The Burst SMS Validity specified ({}) is invalid.'\
-                    .format(validity)
+                msg = (
+                    f"The Burst SMS Validity specified ({validity}) is"
+                    " invalid."
+                )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
         # Prepare Batch Mode Flag
-        self.batch = self.template_args['batch']['default'] \
-            if batch is None else batch
+        self.batch = (
+            self.template_args["batch"]["default"] if batch is None else batch
+        )
 
         # The Sender ID
         self.source = validate_regex(source)
         if not self.source:
-            msg = 'The Account Sender ID specified ' \
-                  '({}) is invalid.'.format(source)
+            msg = f"The Account Sender ID specified ({source}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
 
             # store valid phone number
-            self.targets.append(result['full'])
+            self.targets.append(result["full"])
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Burst SMS Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Burst SMS Notification."""
 
         if not self.targets:
             self.logger.warning(
-                'There are no valid Burst SMS targets to notify.')
+                "There are no valid Burst SMS targets to notify."
+            )
             return False
 
         # error tracking (used for function return)
@@ -262,8 +271,8 @@ class NotifyBurstSMS(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Accept': 'application/json',
+            "User-Agent": self.app_id,
+            "Accept": "application/json",
         }
 
         # Prepare our authentication
@@ -271,14 +280,12 @@ class NotifyBurstSMS(NotifyBase):
 
         # Prepare our payload
         payload = {
-            'countrycode': self.country,
-            'message': body,
-
+            "countrycode": self.country,
+            "message": body,
             # Sender ID
-            'from': self.source,
-
+            "from": self.source,
             # The to gets populated in the loop below
-            'to': None,
+            "to": None,
         }
 
         # Send in batches if identified to do so
@@ -290,12 +297,14 @@ class NotifyBurstSMS(NotifyBase):
         for index in range(0, len(targets), batch_size):
 
             # Prepare our user
-            payload['to'] = ','.join(self.targets[index:index + batch_size])
+            payload["to"] = ",".join(self.targets[index : index + batch_size])
 
             # Some Debug Logging
-            self.logger.debug('Burst SMS POST URL: {} (cert_verify={})'.format(
-                self.notify_url, self.verify_certificate))
-            self.logger.debug('Burst SMS Payload: {}' .format(payload))
+            self.logger.debug(
+                "Burst SMS POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"Burst SMS Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -312,20 +321,21 @@ class NotifyBurstSMS(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyBurstSMS.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyBurstSMS.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send Burst SMS notification to {} '
-                        'target(s): {}{}error={}.'.format(
-                            len(self.targets[index:index + batch_size]),
+                        "Failed to send Burst SMS notification to {} "
+                        "target(s): {}{}error={}.".format(
+                            len(self.targets[index : index + batch_size]),
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -333,15 +343,19 @@ class NotifyBurstSMS(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent Burst SMS notification to %d target(s).' %
-                        len(self.targets[index:index + batch_size]))
+                        "Sent Burst SMS notification to "
+                        f"{len(self.targets[index : index + batch_size])} "
+                        "target(s)."
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Burst SMS '
-                    'notification to %d target(s).' %
-                    len(self.targets[index:index + batch_size]))
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    f"A Connection error occurred sending Burst SMS "
+                    "notification to "
+                    f"{len(self.targets[index : index + batch_size])} "
+                    "target(s)."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -350,118 +364,118 @@ class NotifyBurstSMS(NotifyBase):
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'country': self.country,
-            'batch': 'yes' if self.batch else 'no',
+            "country": self.country,
+            "batch": "yes" if self.batch else "no",
         }
 
         if self.validity:
-            params['validity'] = str(self.validity)
+            params["validity"] = str(self.validity)
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{key}:{secret}@{source}/{targets}/?{params}'.format(
+        return "{schema}://{key}:{secret}@{source}/{targets}/?{params}".format(
             schema=self.secure_protocol,
-            key=self.pprint(self.apikey, privacy, safe=''),
+            key=self.pprint(self.apikey, privacy, safe=""),
             secret=self.pprint(
-                self.secret, privacy, mode=PrivacyMode.Secret, safe=''),
-            source=NotifyBurstSMS.quote(self.source, safe=''),
-            targets='/'.join(
-                [NotifyBurstSMS.quote(x, safe='') for x in self.targets]),
-            params=NotifyBurstSMS.urlencode(params))
+                self.secret, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
+            source=NotifyBurstSMS.quote(self.source, safe=""),
+            targets="/".join(
+                [NotifyBurstSMS.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifyBurstSMS.urlencode(params),
+        )
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.apikey, self.secret, self.source)
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         #
         # Factor batch into calculation
         #
         batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
         if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
 
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The hostname is our source (Sender ID)
-        results['source'] = NotifyBurstSMS.unquote(results['host'])
+        results["source"] = NotifyBurstSMS.unquote(results["host"])
 
         # Get any remaining targets
-        results['targets'] = NotifyBurstSMS.split_path(results['fullpath'])
+        results["targets"] = NotifyBurstSMS.split_path(results["fullpath"])
 
         # Get our account_side and auth_token from the user/pass config
-        results['apikey'] = NotifyBurstSMS.unquote(results['user'])
-        results['secret'] = NotifyBurstSMS.unquote(results['password'])
+        results["apikey"] = NotifyBurstSMS.unquote(results["user"])
+        results["secret"] = NotifyBurstSMS.unquote(results["password"])
 
         # API Key
-        if 'key' in results['qsd'] and len(results['qsd']['key']):
+        if "key" in results["qsd"] and len(results["qsd"]["key"]):
             # Extract the API Key from an argument
-            results['apikey'] = \
-                NotifyBurstSMS.unquote(results['qsd']['key'])
+            results["apikey"] = NotifyBurstSMS.unquote(results["qsd"]["key"])
 
         # API Secret
-        if 'secret' in results['qsd'] and len(results['qsd']['secret']):
+        if "secret" in results["qsd"] and len(results["qsd"]["secret"]):
             # Extract the API Secret from an argument
-            results['secret'] = \
-                NotifyBurstSMS.unquote(results['qsd']['secret'])
+            results["secret"] = NotifyBurstSMS.unquote(
+                results["qsd"]["secret"]
+            )
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifyBurstSMS.unquote(results['qsd']['from'])
-        if 'source' in results['qsd'] and len(results['qsd']['source']):
-            results['source'] = \
-                NotifyBurstSMS.unquote(results['qsd']['source'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifyBurstSMS.unquote(results["qsd"]["from"])
+        if "source" in results["qsd"] and len(results["qsd"]["source"]):
+            results["source"] = NotifyBurstSMS.unquote(
+                results["qsd"]["source"]
+            )
 
         # Support country
-        if 'country' in results['qsd'] and len(results['qsd']['country']):
-            results['country'] = \
-                NotifyBurstSMS.unquote(results['qsd']['country'])
+        if "country" in results["qsd"] and len(results["qsd"]["country"]):
+            results["country"] = NotifyBurstSMS.unquote(
+                results["qsd"]["country"]
+            )
 
         # Support validity value
-        if 'validity' in results['qsd'] and len(results['qsd']['validity']):
-            results['validity'] = \
-                NotifyBurstSMS.unquote(results['qsd']['validity'])
+        if "validity" in results["qsd"] and len(results["qsd"]["validity"]):
+            results["validity"] = NotifyBurstSMS.unquote(
+                results["qsd"]["validity"]
+            )
 
         # Get Batch Mode Flag
-        if 'batch' in results['qsd'] and len(results['qsd']['batch']):
-            results['batch'] = parse_bool(results['qsd']['batch'])
+        if "batch" in results["qsd"] and len(results["qsd"]["batch"]):
+            results["batch"] = parse_bool(results["qsd"]["batch"])
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyBurstSMS.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyBurstSMS.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         return results

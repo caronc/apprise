@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -35,48 +34,50 @@
 #
 # API Reference: https://d7networks.com/docs/Messages/Send_Message/
 
-import requests
-from json import dumps
-from json import loads
+from json import dumps, loads
 
-from .base import NotifyBase
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import (
-    is_phone_no, parse_phone_no, validate_regex, parse_bool)
 from ..locale import gettext_lazy as _
+from ..utils.parse import (
+    is_phone_no,
+    parse_bool,
+    parse_phone_no,
+    validate_regex,
+)
+from .base import NotifyBase
 
 # Extend HTTP Error Messages
 D7NETWORKS_HTTP_ERROR_MAP = {
-    401: 'Invalid Argument(s) Specified.',
-    403: 'Unauthorized - Authentication Failure.',
-    412: 'A Routing Error Occured',
-    500: 'A Serverside Error Occured Handling the Request.',
+    401: "Invalid Argument(s) Specified.",
+    403: "Unauthorized - Authentication Failure.",
+    412: "A Routing Error Occured",
+    500: "A Serverside Error Occured Handling the Request.",
 }
 
 
 class NotifyD7Networks(NotifyBase):
-    """
-    A wrapper for D7 Networks Notifications
-    """
+    """A wrapper for D7 Networks Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'D7 Networks'
+    service_name = "D7 Networks"
 
     # The services URL
-    service_url = 'https://d7networks.com/'
+    service_url = "https://d7networks.com/"
 
     # All notification requests are secure
-    secure_protocol = 'd7sms'
+    secure_protocol = "d7sms"
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_d7networks'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_d7networks"
 
     # D7 Networks single notification URL
-    notify_url = 'https://api.d7networks.com/messages/v1/send'
+    notify_url = "https://api.d7networks.com/messages/v1/send"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -86,115 +87,122 @@ class NotifyD7Networks(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{token}@{targets}',
-    )
+    templates = ("{schema}://{token}@{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('API Access Token'),
-            'type': 'string',
-            'required': True,
-            'private': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("API Access Token"),
+                "type": "string",
+                "required": True,
+                "private": True,
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'unicode': {
-            # Unicode characters (default is 'auto')
-            'name': _('Unicode Characters'),
-            'type': 'bool',
-            'default': False,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "unicode": {
+                # Unicode characters (default is 'auto')
+                "name": _("Unicode Characters"),
+                "type": "bool",
+                "default": False,
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "source": {
+                # Originating address,In cases where the rewriting of the
+                # sender's address is supported or permitted by the SMS-C.
+                # This is used to transmit the message, this number is
+                # transmitted as the originating address and is completely
+                # optional.
+                "name": _("Originating Address"),
+                "type": "string",
+                "map_to": "source",
+            },
+            "from": {
+                "alias_of": "source",
+            },
         },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-        'to': {
-            'alias_of': 'targets',
-        },
-        'source': {
-            # Originating address,In cases where the rewriting of the sender's
-            # address is supported or permitted by the SMS-C. This is used to
-            # transmit the message, this number is transmitted as the
-            # originating address and is completely optional.
-            'name': _('Originating Address'),
-            'type': 'string',
-            'map_to': 'source',
+    )
 
-        },
-        'from': {
-            'alias_of': 'source',
-        },
-    })
-
-    def __init__(self, token=None, targets=None, source=None,
-                 batch=False, unicode=None, **kwargs):
-        """
-        Initialize D7 Networks Object
-        """
+    def __init__(
+        self,
+        token=None,
+        targets=None,
+        source=None,
+        batch=False,
+        unicode=None,
+        **kwargs,
+    ):
+        """Initialize D7 Networks Object."""
         super().__init__(**kwargs)
 
         # Prepare Batch Mode Flag
         self.batch = batch
 
         # Setup our source address (if defined)
-        self.source = None \
-            if not isinstance(source, str) else source.strip()
+        self.source = None if not isinstance(source, str) else source.strip()
 
         # Define whether or not we should set the unicode flag
-        self.unicode = self.template_args['unicode']['default'] \
-            if unicode is None else bool(unicode)
+        self.unicode = (
+            self.template_args["unicode"]["default"]
+            if unicode is None
+            else bool(unicode)
+        )
 
         # The token associated with the account
         self.token = validate_regex(token)
         if not self.token:
-            msg = 'The D7 Networks token specified ({}) is invalid.'\
-                .format(token)
+            msg = f"The D7 Networks token specified ({token}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
             result = result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
 
             # store valid phone number
-            self.targets.append(result['full'])
+            self.targets.append(result["full"])
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Depending on whether we are set to batch mode or single mode this
-        redirects to the appropriate handling
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Depending on whether we are set to batch mode or single mode this
+        redirects to the appropriate handling."""
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no D7 Networks targets to notify.')
+            self.logger.warning("There were no D7 Networks targets to notify.")
             return False
 
         # error tracking (used for function return)
@@ -202,24 +210,24 @@ class NotifyD7Networks(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': f'Bearer {self.token}',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.token}",
         }
 
         payload = {
-            'message_globals': {
-                'channel': 'sms',
+            "message_globals": {
+                "channel": "sms",
             },
-            'messages': [{
+            "messages": [{
                 # Populated later on
-                'recipients': None,
-                'content': body,
-                'data_coding':
+                "recipients": None,
+                "content": body,
+                "data_coding":
                 # auto is a better substitute over 'text' as text is easier to
                 # detect from a post than `unicode` is.
-                'auto' if not self.unicode else 'unicode',
+                "auto" if not self.unicode else "unicode",
             }],
         }
 
@@ -227,14 +235,14 @@ class NotifyD7Networks(NotifyBase):
         targets = list(self.targets)
 
         if self.source:
-            payload['message_globals']['originator'] = self.source
+            payload["message_globals"]["originator"] = self.source
 
         target = None
         while len(targets):
 
             if self.batch:
                 # Prepare our payload
-                payload['messages'][0]['recipients'] = self.targets
+                payload["messages"][0]["recipients"] = self.targets
 
                 # Reset our targets so we don't keep going. This is required
                 # because we're in batch mode; we only need to loop once.
@@ -246,13 +254,14 @@ class NotifyD7Networks(NotifyBase):
                 target = targets.pop(0)
 
                 # Prepare our payload
-                payload['messages'][0]['recipients'] = [target]
+                payload["messages"][0]["recipients"] = [target]
 
             # Some Debug Logging
             self.logger.debug(
-                'D7 Networks POST URL: {} (cert_verify={})'.format(
-                    self.notify_url, self.verify_certificate))
-            self.logger.debug('D7 Networks Payload: {}' .format(payload))
+                "D7 Networks POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"D7 Networks Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -266,16 +275,18 @@ class NotifyD7Networks(NotifyBase):
                 )
 
                 if r.status_code not in (
-                        requests.codes.created, requests.codes.ok):
+                    requests.codes.created,
+                    requests.codes.ok,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(
-                            r.status_code, D7NETWORKS_HTTP_ERROR_MAP)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code, D7NETWORKS_HTTP_ERROR_MAP
+                    )
 
                     try:
                         # Update our status response if we can
                         json_response = loads(r.content)
-                        status_str = json_response.get('message', status_str)
+                        status_str = json_response.get("message", status_str)
 
                     except (AttributeError, TypeError, ValueError):
                         # ValueError = r.content is Unparsable
@@ -287,15 +298,16 @@ class NotifyD7Networks(NotifyBase):
                         pass
 
                     self.logger.warning(
-                        'Failed to send D7 Networks SMS notification to {}: '
-                        '{}{}error={}.'.format(
-                            ', '.join(target) if self.batch else target,
+                        "Failed to send D7 Networks SMS notification to {}: "
+                        "{}{}error={}.".format(
+                            ", ".join(target) if self.batch else target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -305,23 +317,24 @@ class NotifyD7Networks(NotifyBase):
 
                     if self.batch:
                         self.logger.info(
-                            'Sent D7 Networks batch SMS notification to '
-                            '{} target(s).'.format(len(self.targets)))
+                            "Sent D7 Networks batch SMS notification to "
+                            f"{len(self.targets)} target(s)."
+                        )
 
                     else:
                         self.logger.info(
-                            'Sent D7 Networks SMS notification to {}.'.format(
-                                target))
+                            f"Sent D7 Networks SMS notification to {target}."
+                        )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending D7 Networks:%s ' % (
-                        ', '.join(self.targets)) + 'notification.'
+                    "A Connection error occurred sending D7 Networks:{} "
+                    .format(", ".join(self.targets))
+                    + "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
                 # Mark our failure
                 has_error = True
                 continue
@@ -329,42 +342,40 @@ class NotifyD7Networks(NotifyBase):
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'batch': 'yes' if self.batch else 'no',
-            'unicode': 'yes' if self.unicode else 'no',
+            "batch": "yes" if self.batch else "no",
+            "unicode": "yes" if self.unicode else "no",
         }
 
         if self.source:
-            params['from'] = self.source
+            params["from"] = self.source
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{token}@{targets}/?{params}'.format(
+        return "{schema}://{token}@{targets}/?{params}".format(
             schema=self.secure_protocol,
-            token=self.pprint(self.token, privacy, safe=''),
-            targets='/'.join(
-                [NotifyD7Networks.quote(x, safe='') for x in self.targets]),
-            params=NotifyD7Networks.urlencode(params))
+            token=self.pprint(self.token, privacy, safe=""),
+            targets="/".join(
+                [NotifyD7Networks.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifyD7Networks.urlencode(params),
+        )
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.token)
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         #
         # Factor batch into calculation
         #
@@ -372,65 +383,67 @@ class NotifyD7Networks(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = \
-                NotifyD7Networks.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = NotifyD7Networks.unquote(
+                results["qsd"]["token"]
+            )
 
-        elif results['user']:
-            results['token'] = NotifyD7Networks.unquote(results['user'])
+        elif results["user"]:
+            results["token"] = NotifyD7Networks.unquote(results["user"])
 
-            if results['password']:
+            if results["password"]:
                 # Support token containing a colon (:)
-                results['token'] += \
-                    ':' + NotifyD7Networks.unquote(results['password'])
+                results["token"] += ":" + NotifyD7Networks.unquote(
+                    results["password"]
+                )
 
-        elif results['password']:
+        elif results["password"]:
             # Support token starting with a colon (:)
-            results['token'] = \
-                ':' + NotifyD7Networks.unquote(results['password'])
+            results["token"] = ":" + NotifyD7Networks.unquote(
+                results["password"]
+            )
 
         # Initialize our targets
-        results['targets'] = list()
+        results["targets"] = []
 
         # The store our first target stored in the hostname
-        results['targets'].append(NotifyD7Networks.unquote(results['host']))
+        results["targets"].append(NotifyD7Networks.unquote(results["host"]))
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'].extend(
-            NotifyD7Networks.split_path(results['fullpath']))
+        results["targets"].extend(
+            NotifyD7Networks.split_path(results["fullpath"])
+        )
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get('batch', False))
+        results["batch"] = parse_bool(results["qsd"].get("batch", False))
 
         # Get Unicode Flag
-        results['unicode'] = \
-            parse_bool(results['qsd'].get('unicode', False))
+        results["unicode"] = parse_bool(results["qsd"].get("unicode", False))
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyD7Networks.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyD7Networks.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         # Support the 'from' and source variable
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifyD7Networks.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifyD7Networks.unquote(
+                results["qsd"]["from"]
+            )
 
-        elif 'source' in results['qsd'] and len(results['qsd']['source']):
-            results['source'] = \
-                NotifyD7Networks.unquote(results['qsd']['source'])
+        elif "source" in results["qsd"] and len(results["qsd"]["source"]):
+            results["source"] = NotifyD7Networks.unquote(
+                results["qsd"]["source"]
+            )
 
         return results

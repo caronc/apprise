@@ -1,60 +1,165 @@
-# Apprise Development Tools
+# 🛠️ Apprise Development Guide
 
-# Common Testing
-This directory just contains some tools that are useful when developing with Apprise.  It is presumed that you've set yourself up with a working development environment before using the tools identified here:
+Welcome! This guide helps you contribute to Apprise with confidence. It outlines
+how to set up your local environment, run tests, lint your code, and build 
+packages — all using modern tools like [Tox](https://tox.readthedocs.io/) and 
+[Ruff](https://docs.astral.sh/ruff/).
+
+---
+
+## 🚀 Getting Started
+
+Set up your local development environment using Tox:
 
 ```bash
-# Using pip, setup a working development environment:
-pip install -r dev-requirements.txt
+# Install Tox
+python -m pip install tox
 ```
 
-The tools are as follows:
+Tox manages dependencies, linting, testing, and builds — no need to manually 
+install `requirements-dev.txt`.
 
-- :gear: `apprise`: This effectively acts as the `apprise` tool would once Apprise has been installed into your environment.  However `apprise` uses the branch you're working in.  So if you added a new Notification service, you can test with it as you would easily.  `apprise` takes all the same parameters as the `apprise` tool does.
+---
 
-    ```bash
-    # simply make your code changes to apprise and test it out:
-    ./bin/apprise -t title -b body \
-          mailto://user:pass@example.com
-    ```
+## 🧪 Running Tests
 
-- :gear: `test.sh`: This allows you to just run the unit tests associated with this project.  You can optionally specify a _keyword_ as a parameter and the unit tests will specifically focus on a single test.  This is useful when you need to debug something and don't want to run the entire fleet of tests each time.  e.g:
+Use the `qa` environment for full testing and plugin coverage:
 
-   ```bash
-   # Run all tests:
-   ./bin/tests.sh
-
-   # Run just the tests associated with the rest framework:
-   ./bin/tests.sh rest
-
-   # Run just the Apprise config related unit tests
-   ./bin/tests.sh config
-   ```
-
-- :gear: `checkdone.sh`: This script just runs a lint check against the code to make sure there are no PEP8 issues and additionally runs a full test coverage report.  This is what will happen once you check in your code.  Nothing can be merged unless these tests pass with 100% coverage.  So it's useful to have this handy to run now and then.
-
-   ```bash
-   # Perform PEP8 and test coverage check on all code and reports
-   # back. It's called 'checkdone' because it checks to see if you're
-   # actually done with your code commit or not. :)
-   ./bin/checkdone.sh
-   ```
-
-You can optionally just update your path to include this `./bin` directory and call the scripts that way as well. Hence:
 ```bash
-# Update the path to include the bin directory:
-export PATH="$(pwd)/bin:$PATH"
-
-# Now you can call the scripts identified above from anywhere...
+tox -e qa
 ```
 
-## RPM Testing
+To focus on specific tests (e.g., email-related):
 
-Apprise is also packaged for Redhat/Fedora as an RPM. To verify this processs works correctly an additional tool called `build-rpm.sh` is provided.  It's best tested using the Docker environments:
-   ```bash
-   # To test with el9; do the following:
-   docker-compose run --rm rpmbuild.el9 build-rpm.sh
+```bash
+tox -e qa -- -k email
+```
 
-   # To test with f39; do the following:
-   docker-compose run --rm rpmbuild.f39 build-rpm.sh
-   ```
+To run a minimal dependency test set:
+
+```bash
+tox -e minimal
+```
+
+---
+
+## 🧹 Linting and Formatting
+
+Apprise uses [Ruff](https://docs.astral.sh/ruff/) for linting and formatting.
+This is configured via `pyproject.toml`.
+
+Run linting:
+
+```bash
+tox -e lint
+```
+
+Fix formatting automatically (where possible):
+
+```bash
+tox -e format
+```
+
+> Linting runs automatically on all PRs that touch Python files via GitHub 
+> Actions and will fail builds on violation.
+
+---
+
+## ✅ Pre-Commit Check (Recommended)
+
+Before pushing or creating a PR, validate your work with:
+
+```bash
+tox -e lint,qa
+```
+
+Or use a combined check shortcut (if defined):
+
+```bash
+tox -e checkdone
+```
+
+This ensures your changes are linted, tested, and PR-ready.
+
+---
+
+## 📨 CLI Testing
+
+You can run the `apprise` CLI using your local code without installation or run within docker containers:
+
+```bash
+# From the root of the repo
+./bin/apprise -t "Title" -b "Body" mailto://user:pass@example.com
+```
+
+Alternatively you can continue to use the `tox` environment:
+
+
+```bash
+# syntax tox -e apprise -- [options], e.g.:
+tox -e apprise -- -vv -b "test body" -t "test title" mailto://credentials
+```
+
+Optionally, add the `bin/apprise` to tests your changes
+
+```bash
+bin/apprise -vv -b "test body" -t "test title" <schema>
+```
+
+---
+
+## 📦 RPM Build & Verification
+
+Apprise supports RPM packaging for Fedora and RHEL-based systems. Use Docker 
+to safely test builds:
+
+```bash
+# Build RPM for EL9
+docker-compose run --rm rpmbuild.el9 build-rpm.sh
+
+# Build RPM for Fedora 42
+docker-compose run --rm rpmbuild.f42 build-rpm.sh
+```
+
+## 📦 Specific Environment Emulation
+
+You can also emulate your own docker environment and just test/build inside that
+```bash
+# Python v3.9 Testing
+docker-compose run --rm test.py39 bash
+
+# Python v3.10 Testing
+docker-compose run --rm test.py310 bash
+
+# Python v3.11 Testing
+docker-compose run --rm test.py311 bash
+
+# Python v3.12 Testing
+docker-compose run --rm test.py312 bash
+```
+Once you've entered one of these environments, you can leverage the following command to work with:
+
+1. `bin/test.sh`: runs the full test suite (same as `tox -e qa`)
+1. `bin/apprise`: launches the Apprise CLI using the local build (same as `tox -e apprise`)
+1. `ruff check . --fix`: auto-formats the codebase (same as `tox -e format`)
+1. `ruff check .`: performs lint-only validation (same as `tox -e lint`)
+1. `coverage run --source=apprise -m pytest tests`: manual test execution with coverage
+
+The only advantage of this route is the overhead associated with each `tox` call is gone (faster responses).  Otherwise just utilizing the `tox` commands can sometimes be easier.
+
+## 🧪 GitHub Actions
+
+GitHub Actions runs:
+- ✅ Full test suite with coverage
+- ✅ Linting (using Ruff)
+- ✅ Packaging and validation
+
+Linting **must pass** before PRs can be merged.
+
+---
+
+## 🧠 Developer Tips
+
+- Add new plugins by following [`demo.py`](https://github.com/caronc/apprise/blob/master/apprise/plugins/demo.py) as a template.
+- Write unit tests under `tests/` using the `AppriseURLTester` pattern.
+- All new plugins must include test coverage and pass linting.

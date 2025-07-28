@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -59,52 +58,51 @@
 #  https://zulipchat.com/api/send-message
 #
 import re
+
 import requests
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import (parse_list, validate_regex, is_email)
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_email, parse_list, validate_regex
+from .base import NotifyBase
 
 # A Valid Bot Name
-VALIDATE_BOTNAME = re.compile(r'(?P<name>[A-Z0-9_-]{1,32})', re.I)
+VALIDATE_BOTNAME = re.compile(r"(?P<name>[A-Z0-9_-]{1,32})", re.I)
 
 # Organization required as part of the API request
 VALIDATE_ORG = re.compile(
-    r'(?P<org>[A-Z0-9_-]{1,32})(\.(?P<hostname>[^\s]+))?', re.I)
+    r"(?P<org>[A-Z0-9_-]{1,32})(\.(?P<hostname>[^\s]+))?", re.I
+)
 
 # Extend HTTP Error Messages
 ZULIP_HTTP_ERROR_MAP = {
-    401: 'Unauthorized - Invalid Token.',
+    401: "Unauthorized - Invalid Token.",
 }
 
 # Used to break path apart into list of streams
-TARGET_LIST_DELIM = re.compile(r'[ \t\r\n,#\\/]+')
+TARGET_LIST_DELIM = re.compile(r"[ \t\r\n,#\\/]+")
 
 # Used to detect a streams
-IS_VALID_TARGET_RE = re.compile(
-    r'#?(?P<stream>[A-Z0-9_]{1,32})', re.I)
+IS_VALID_TARGET_RE = re.compile(r"#?(?P<stream>[A-Z0-9_]{1,32})", re.I)
 
 
 class NotifyZulip(NotifyBase):
-    """
-    A wrapper for Zulip Notifications
-    """
+    """A wrapper for Zulip Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Zulip'
+    service_name = "Zulip"
 
     # The services URL
-    service_url = 'https://zulipchat.com/'
+    service_url = "https://zulipchat.com/"
 
     # The default secure protocol
-    secure_protocol = 'zulip'
+    secure_protocol = "zulip"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_zulip'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_zulip"
 
     # Zulip uses the http protocol with JSON requests
-    notify_url = 'https://{org}.{hostname}/api/v1/messages'
+    notify_url = "https://{org}.{hostname}/api/v1/messages"
 
     # The maximum allowable characters allowed in the title per message
     title_maxlen = 60
@@ -114,68 +112,72 @@ class NotifyZulip(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{botname}@{organization}/{token}',
-        '{schema}://{botname}@{organization}/{token}/{targets}',
+        "{schema}://{botname}@{organization}/{token}",
+        "{schema}://{botname}@{organization}/{token}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'botname': {
-            'name': _('Bot Name'),
-            'type': 'string',
-            'regex': (r'^[A-Z0-9_-]{1,32}$', 'i'),
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "botname": {
+                "name": _("Bot Name"),
+                "type": "string",
+                "regex": (r"^[A-Z0-9_-]{1,32}$", "i"),
+                "required": True,
+            },
+            "organization": {
+                "name": _("Organization"),
+                "type": "string",
+                "required": True,
+                "regex": (r"^[A-Z0-9_-]{1,32})$", "i"),
+            },
+            "token": {
+                "name": _("Token"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[A-Z0-9]{32}$", "i"),
+            },
+            "target_user": {
+                "name": _("Target User"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "target_stream": {
+                "name": _("Target Stream"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'organization': {
-            'name': _('Organization'),
-            'type': 'string',
-            'required': True,
-            'regex': (r'^[A-Z0-9_-]{1,32})$', 'i')
-        },
-        'token': {
-            'name': _('Token'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-            'regex': (r'^[A-Z0-9]{32}$', 'i'),
-        },
-        'target_user': {
-            'name': _('Target User'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'target_stream': {
-            'name': _('Target Stream'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "token": {
+                "alias_of": "token",
+            },
         },
-        'token': {
-            'alias_of': 'token',
-        },
-    })
+    )
 
     # The default hostname to append to a defined organization
     # if one isn't defined in the apprise url
-    default_hostname = 'zulipchat.com'
+    default_hostname = "zulipchat.com"
 
     # The default stream to notify if no targets are specified
-    default_notification_stream = 'general'
+    default_notification_stream = "general"
 
     def __init__(self, botname, organization, token, targets=None, **kwargs):
-        """
-        Initialize Zulip Object
-        """
+        """Initialize Zulip Object."""
         super().__init__(**kwargs)
 
         # our default hostname
@@ -188,18 +190,20 @@ class NotifyZulip(NotifyBase):
                 raise TypeError
 
             # The botname
-            botname = match.group('name')
-            suffix = '-bot'
+            botname = match.group("name")
+            suffix = "-bot"
             # Eliminate suffix if found
-            botname = \
-                botname[:-len(suffix)] if botname.endswith(suffix) else botname
+            botname = (
+                botname[: -len(suffix)]
+                if botname.endswith(suffix)
+                else botname
+            )
             self.botname = botname
 
-        except (TypeError, AttributeError):
-            msg = 'The Zulip botname specified ({}) is invalid.'\
-                .format(botname)
+        except (TypeError, AttributeError) as err:
+            msg = f"The Zulip botname specified ({botname}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from err
 
         try:
             match = VALIDATE_ORG.match(organization.strip())
@@ -208,21 +212,23 @@ class NotifyZulip(NotifyBase):
                 raise TypeError
 
             # The organization
-            self.organization = match.group('org')
-            if match.group('hostname'):
-                self.hostname = match.group('hostname')
+            self.organization = match.group("org")
+            if match.group("hostname"):
+                self.hostname = match.group("hostname")
 
-        except (TypeError, AttributeError):
-            msg = 'The Zulip organization specified ({}) is invalid.'\
-                .format(organization)
+        except (TypeError, AttributeError) as err:
+            msg = (
+                "The Zulip organization specified "
+                f"({organization}) is invalid."
+            )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from err
 
         self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+            token, *self.template_tokens["token"]["regex"]
+        )
         if not self.token:
-            msg = 'The Zulip token specified ({}) is invalid.'\
-                .format(token)
+            msg = f"The Zulip token specified ({token}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -231,14 +237,12 @@ class NotifyZulip(NotifyBase):
             # No streams identified, use default
             self.targets.append(self.default_notification_stream)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Zulip Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Zulip Notification."""
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded; charset=utf-8',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded; charset=utf-8",
         }
 
         # error tracking (used for function return)
@@ -252,17 +256,13 @@ class NotifyZulip(NotifyBase):
 
         # prepare JSON Object
         payload = {
-            'subject': title,
-            'content': body,
+            "subject": title,
+            "content": body,
         }
 
         # Determine Authentication
         auth = (
-            '{botname}-bot@{org}.{hostname}'.format(
-                botname=self.botname,
-                org=self.organization,
-                hostname=self.hostname,
-            ),
+            f"{self.botname}-bot@{self.organization}.{self.hostname}",
             self.token,
         )
 
@@ -273,18 +273,19 @@ class NotifyZulip(NotifyBase):
             result = is_email(target)
             if result:
                 # Send a private message
-                payload['type'] = 'private'
+                payload["type"] = "private"
             else:
                 # Send a stream message
-                payload['type'] = 'stream'
+                payload["type"] = "stream"
 
             # Set our target
-            payload['to'] = target if not result else result['full_email']
+            payload["to"] = target if not result else result["full_email"]
 
-            self.logger.debug('Zulip POST URL: %s (cert_verify=%r)' % (
-                url, self.verify_certificate,
-            ))
-            self.logger.debug('Zulip Payload: %s' % str(payload))
+            self.logger.debug(
+                f"Zulip POST URL: {url} "
+                f"(cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(f"Zulip Payload: {payload!s}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -299,34 +300,35 @@ class NotifyZulip(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyZulip.http_response_code_lookup(
-                            r.status_code, ZULIP_HTTP_ERROR_MAP)
+                    status_str = NotifyZulip.http_response_code_lookup(
+                        r.status_code, ZULIP_HTTP_ERROR_MAP
+                    )
 
                     self.logger.warning(
-                        'Failed to send Zulip notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Zulip notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        'Sent Zulip notification to {}.'.format(target))
+                    self.logger.info(f"Sent Zulip notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Zulip '
-                    'notification to {}.'.format(target))
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending Zulip "
+                    f"notification to {target}."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -336,85 +338,89 @@ class NotifyZulip(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
-            self.secure_protocol, self.organization, self.hostname,
+            self.secure_protocol,
+            self.organization,
+            self.hostname,
             self.token,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         # simplify our organization in our URL if we can
-        organization = '{}{}'.format(
+        organization = "{}{}".format(
             self.organization,
-            '.{}'.format(self.hostname)
-            if self.hostname != self.default_hostname else '')
+            (
+                f".{self.hostname}"
+                if self.hostname != self.default_hostname
+                else ""
+            ),
+        )
 
-        return '{schema}://{botname}@{org}/{token}/' \
-            '{targets}?{params}'.format(
-                schema=self.secure_protocol,
-                botname=NotifyZulip.quote(self.botname, safe=''),
-                org=NotifyZulip.quote(organization, safe=''),
-                token=self.pprint(self.token, privacy, safe=''),
-                targets='/'.join(
-                    [NotifyZulip.quote(x, safe='') for x in self.targets]),
-                params=NotifyZulip.urlencode(params),
-            )
+        return "{schema}://{botname}@{org}/{token}/{targets}?{params}".format(
+            schema=self.secure_protocol,
+            botname=NotifyZulip.quote(self.botname, safe=""),
+            org=NotifyZulip.quote(organization, safe=""),
+            token=self.pprint(self.token, privacy, safe=""),
+            targets="/".join(
+                [NotifyZulip.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifyZulip.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.targets)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The botname
-        results['botname'] = NotifyZulip.unquote(results['user'])
+        results["botname"] = NotifyZulip.unquote(results["user"])
 
         # The organization is stored in the hostname
-        results['organization'] = NotifyZulip.unquote(results['host'])
+        results["organization"] = NotifyZulip.unquote(results["host"])
 
         # Store our targets
-        results['targets'] = NotifyZulip.split_path(results['fullpath'])
+        results["targets"] = NotifyZulip.split_path(results["fullpath"])
 
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
             # Store our token if specified
-            results['token'] = NotifyZulip.unquote(results['qsd']['token'])
+            results["token"] = NotifyZulip.unquote(results["qsd"]["token"])
 
-        elif results['targets']:
+        elif results["targets"]:
             # First item is the token
-            results['token'] = results['targets'].pop(0)
+            results["token"] = results["targets"].pop(0)
 
         else:
             # no token
-            results['token'] = None
+            results["token"] = None
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += [x for x in filter(
-                bool, TARGET_LIST_DELIM.split(
-                    NotifyZulip.unquote(results['qsd']['to'])))]
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += list(
+                filter(
+                    bool,
+                    TARGET_LIST_DELIM.split(
+                        NotifyZulip.unquote(results["qsd"]["to"])
+                    ),
+                )
+            )
 
         return results

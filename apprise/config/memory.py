@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,28 +25,25 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .base import ConfigBase
 from ..locale import gettext_lazy as _
+from .base import ConfigBase
 
 
 class ConfigMemory(ConfigBase):
-    """
-    For information that was loaded from memory and does not
-    persist anywhere.
-    """
+    """For information that was loaded from memory and does not persist
+    anywhere."""
 
     # The default descriptive name associated with the service
-    service_name = _('Memory')
+    service_name = _("Memory")
 
     # The default protocol
-    protocol = 'memory'
+    protocol = "memory"
 
     def __init__(self, content, **kwargs):
-        """
-        Initialize Memory Object
+        """Initialize Memory Object.
 
-        Memory objects just store the raw configuration in memory.  There is
-        no external reference point. It's always considered cached.
+        Memory objects just store the raw configuration in memory.  There is no
+        external reference point. It's always considered cached.
         """
         super().__init__(**kwargs)
 
@@ -56,30 +52,24 @@ class ConfigMemory(ConfigBase):
 
         if self.config_format is None:
             # Detect our format if possible
-            self.config_format = \
-                ConfigMemory.detect_config_format(self.content)
+            self.config_format = ConfigMemory.detect_config_format(
+                self.content
+            )
 
         return
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
-        return 'memory://'
+        return "memory://"
 
     def read(self, **kwargs):
-        """
-        Simply return content stored into memory
-        """
+        """Simply return content stored into memory."""
 
         return self.content
 
     @staticmethod
     def parse_url(url):
-        """
-        Memory objects have no parseable URL
-
-        """
+        """Memory objects have no parseable URL."""
         # These URLs can not be parsed
         return None

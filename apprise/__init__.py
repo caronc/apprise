@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,81 +25,95 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-__title__ = 'Apprise'
-__version__ = '1.9.3'
-__author__ = 'Chris Caron'
-__license__ = 'BSD 2-Clause'
-__copywrite__ = 'Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>'
-__email__ = 'lead2gold@gmail.com'
-__status__ = 'Production'
+__title__ = "Apprise"
+__version__ = "1.9.3"
+__author__ = "Chris Caron"
+__license__ = "BSD 2-Clause"
+__copywrite__ = "Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>"
+__email__ = "lead2gold@gmail.com"
+__status__ = "Production"
 
-from .common import NotifyType
-from .common import NOTIFY_TYPES
-from .common import NotifyImageSize
-from .common import NOTIFY_IMAGE_SIZES
-from .common import NotifyFormat
-from .common import NOTIFY_FORMATS
-from .common import OverflowMode
-from .common import OVERFLOW_MODES
-from .common import ConfigFormat
-from .common import CONFIG_FORMATS
-from .common import ContentIncludeMode
-from .common import CONTENT_INCLUDE_MODES
-from .common import ContentLocation
-from .common import CONTENT_LOCATIONS
-from .common import PersistentStoreMode
-from .common import PERSISTENT_STORE_MODES
-
-from .url import URLBase
-from .url import PrivacyMode
-from .plugins.base import NotifyBase
-from .config.base import ConfigBase
-from .attachment.base import AttachBase
-from . import exception
-
+from . import decorators, exception
 from .apprise import Apprise
-from .locale import AppriseLocale
-from .asset import AppriseAsset
-from .persistent_store import PersistentStore
-from .apprise_config import AppriseConfig
 from .apprise_attachment import AppriseAttachment
+from .apprise_config import AppriseConfig
+from .asset import AppriseAsset
+from .attachment.base import AttachBase
+from .common import (
+    CONFIG_FORMATS,
+    CONTENT_INCLUDE_MODES,
+    CONTENT_LOCATIONS,
+    NOTIFY_FORMATS,
+    NOTIFY_IMAGE_SIZES,
+    NOTIFY_TYPES,
+    OVERFLOW_MODES,
+    PERSISTENT_STORE_MODES,
+    PERSISTENT_STORE_STATES,
+    ConfigFormat,
+    ContentIncludeMode,
+    ContentLocation,
+    NotifyFormat,
+    NotifyImageSize,
+    NotifyType,
+    OverflowMode,
+    PersistentStoreMode,
+)
+from .config.base import ConfigBase
+from .locale import AppriseLocale
+
+# Inherit our logging with our additional entries added to it
+from .logger import LogCapture, logger, logging
 from .manager_attachment import AttachmentManager
 from .manager_config import ConfigurationManager
 from .manager_plugins import NotificationManager
-from . import decorators
-
-# Inherit our logging with our additional entries added to it
-from .logger import logging
-from .logger import logger
-from .logger import LogCapture
+from .persistent_store import PersistentStore
+from .plugins.base import NotifyBase
+from .url import PrivacyMode, URLBase
 
 # Set default logging handler to avoid "No handler found" warnings.
 logging.getLogger(__name__).addHandler(logging.NullHandler())
 
 __all__ = [
+    "CONFIG_FORMATS",
+    "CONTENT_INCLUDE_MODES",
+    "CONTENT_LOCATIONS",
+    "NOTIFY_FORMATS",
+    "NOTIFY_IMAGE_SIZES",
+    "NOTIFY_TYPES",
+    "OVERFLOW_MODES",
+    "PERSISTENT_STORE_MODES",
+    "PERSISTENT_STORE_STATES",
     # Core
-    'Apprise', 'AppriseAsset', 'AppriseConfig', 'AppriseAttachment', 'URLBase',
-    'NotifyBase', 'ConfigBase', 'AttachBase', 'AppriseLocale',
-    'PersistentStore',
-
-    # Exceptions
-    'exception',
-
-    # Reference
-    'NotifyType', 'NotifyImageSize', 'NotifyFormat', 'OverflowMode',
-    'NOTIFY_TYPES', 'NOTIFY_IMAGE_SIZES', 'NOTIFY_FORMATS', 'OVERFLOW_MODES',
-    'ConfigFormat', 'CONFIG_FORMATS',
-    'ContentIncludeMode', 'CONTENT_INCLUDE_MODES',
-    'ContentLocation', 'CONTENT_LOCATIONS',
-    'PersistentStoreMode', 'PERSISTENT_STORE_MODES',
-    'PrivacyMode',
-
+    "Apprise",
+    "AppriseAsset",
+    "AppriseAttachment",
+    "AppriseConfig",
+    "AppriseLocale",
+    "AttachBase",
+    "AttachmentManager",
+    "ConfigBase",
+    "ConfigFormat",
+    "ConfigurationManager",
+    "ContentIncludeMode",
+    "ContentLocation",
+    "LogCapture",
     # Managers
-    'NotificationManager', 'ConfigurationManager', 'AttachmentManager',
-
+    "NotificationManager",
+    "NotifyBase",
+    "NotifyFormat",
+    "NotifyImageSize",
+    # Reference
+    "NotifyType",
+    "OverflowMode",
+    "PersistentStore",
+    "PersistentStoreMode",
+    "PrivacyMode",
+    "URLBase",
     # Decorator
-    'decorators',
-
+    "decorators",
+    # Exceptions
+    "exception",
     # Logging
-    'logging', 'logger', 'LogCapture',
+    "logger",
+    "logging",
 ]

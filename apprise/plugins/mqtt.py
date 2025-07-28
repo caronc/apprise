@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -33,16 +32,17 @@
 # as their inline documentation is pretty good!
 #   https://github.com/eclipse/paho.mqtt.python\
 #           /blob/master/src/paho/mqtt/client.py
-import ssl
-import re
-from time import sleep
 from datetime import datetime
 from os.path import isfile
-from .base import NotifyBase
-from ..url import PrivacyMode
+import re
+import ssl
+from time import sleep
+
 from ..common import NotifyType
-from ..utils.parse import parse_list, parse_bool
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import parse_bool, parse_list
+from .base import NotifyBase
 
 # Default our global support flag
 NOTIFY_MQTT_SUPPORT_ENABLED = False
@@ -79,29 +79,27 @@ HUMAN_MQTT_PROTOCOL_MAP = {
 
 
 class NotifyMQTT(NotifyBase):
-    """
-    A wrapper for MQTT Notifications
-    """
+    """A wrapper for MQTT Notifications."""
 
     # Set our global enabled flag
     enabled = NOTIFY_MQTT_SUPPORT_ENABLED
 
     requirements = {
         # Define our required packaging in order to work
-        'packages_required': 'paho-mqtt != 2.0.*'
+        "packages_required": "paho-mqtt != 2.0.*"
     }
 
     # The default descriptive name associated with the Notification
-    service_name = 'MQTT Notification'
+    service_name = "MQTT Notification"
 
     # The default protocol
-    protocol = 'mqtt'
+    protocol = "mqtt"
 
     # Secure protocol
-    secure_protocol = 'mqtts'
+    secure_protocol = "mqtts"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mqtt'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_mqtt"
 
     # MQTT does not have a title
     title_maxlen = 0
@@ -136,85 +134,97 @@ class NotifyMQTT(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}@{host}/{topic}',
-        '{schema}://{user}@{host}:{port}/{topic}',
-        '{schema}://{user}:{password}@{host}/{topic}',
-        '{schema}://{user}:{password}@{host}:{port}/{topic}',
+        "{schema}://{user}@{host}/{topic}",
+        "{schema}://{user}@{host}:{port}/{topic}",
+        "{schema}://{user}:{password}@{host}/{topic}",
+        "{schema}://{user}:{password}@{host}:{port}/{topic}",
     )
 
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("User Name"),
+                "type": "string",
+                "required": True,
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "topic": {
+                "name": _("Target Queue"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('User Name'),
-            'type': 'string',
-            'required': True,
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'topic': {
-            'name': _('Target Queue'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "qos": {
+                "name": _("QOS"),
+                "type": "int",
+                "default": 0,
+                "min": 0,
+                "max": 2,
+            },
+            "version": {
+                "name": _("Version"),
+                "type": "choice:string",
+                "values": HUMAN_MQTT_PROTOCOL_MAP,
+                "default": "v3.1.1",
+            },
+            "client_id": {
+                "name": _("Client ID"),
+                "type": "string",
+            },
+            "session": {
+                "name": _("Use Session"),
+                "type": "bool",
+                "default": False,
+            },
+            "retain": {
+                "name": _("Retain Messages"),
+                "type": "bool",
+                "default": False,
+            },
         },
-        'qos': {
-            'name': _('QOS'),
-            'type': 'int',
-            'default': 0,
-            'min': 0,
-            'max': 2,
-        },
-        'version': {
-            'name': _('Version'),
-            'type': 'choice:string',
-            'values': HUMAN_MQTT_PROTOCOL_MAP,
-            'default': "v3.1.1",
-        },
-        'client_id': {
-            'name': _('Client ID'),
-            'type': 'string',
-        },
-        'session': {
-            'name': _('Use Session'),
-            'type': 'bool',
-            'default': False,
-        },
-        'retain': {
-            'name': _('Retain Messages'),
-            'type': 'bool',
-            'default': False,
-        },
-    })
+    )
 
-    def __init__(self, targets=None, version=None, qos=None,
-                 client_id=None, session=None, retain=None, **kwargs):
-        """
-        Initialize MQTT Object
-        """
+    def __init__(
+        self,
+        targets=None,
+        version=None,
+        qos=None,
+        client_id=None,
+        session=None,
+        retain=None,
+        **kwargs,
+    ):
+        """Initialize MQTT Object."""
 
         super().__init__(**kwargs)
 
@@ -222,7 +232,7 @@ class NotifyMQTT(NotifyBase):
         self.topics = parse_list(targets)
 
         if version is None:
-            self.version = self.template_args['version']['default']
+            self.version = self.template_args["version"]["default"]
         else:
             self.version = version
 
@@ -230,33 +240,46 @@ class NotifyMQTT(NotifyBase):
         self.client_id = client_id
 
         # Maintain our session (associated with our user id if set)
-        self.session = self.template_args['session']['default'] \
-            if session is None or not self.client_id \
+        self.session = (
+            self.template_args["session"]["default"]
+            if session is None or not self.client_id
             else parse_bool(session)
+        )
 
         # Our Retain Message Flag
-        self.retain = self.template_args['retain']['default'] \
-            if retain is None else parse_bool(retain)
+        self.retain = (
+            self.template_args["retain"]["default"]
+            if retain is None
+            else parse_bool(retain)
+        )
 
         # Set up our Quality of Service (QoS)
         try:
-            self.qos = self.template_args['qos']['default'] \
-                if qos is None else int(qos)
+            self.qos = (
+                self.template_args["qos"]["default"]
+                if qos is None
+                else int(qos)
+            )
 
-            if self.qos < self.template_args['qos']['min'] \
-                    or self.qos > self.template_args['qos']['max']:
+            if (
+                self.qos < self.template_args["qos"]["min"]
+                or self.qos > self.template_args["qos"]["max"]
+            ):
                 # Let error get handle on exceptio higher up
                 raise ValueError("")
 
         except (ValueError, TypeError):
-            msg = 'An invalid MQTT QOS ({}) was specified.'.format(qos)
+            msg = f"An invalid MQTT QOS ({qos}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         if not self.port:
             # Assign port (if not otherwise set)
-            self.port = self.mqtt_secure_port \
-                if self.secure else self.mqtt_insecure_port
+            self.port = (
+                self.mqtt_secure_port
+                if self.secure
+                else self.mqtt_insecure_port
+            )
 
         self.ca_certs = None
         if self.secure:
@@ -265,26 +288,35 @@ class NotifyMQTT(NotifyBase):
             #       It could be useful to inform the user _where_ Apprise
             #       tried to find the root CA certificates file.
             self.ca_certs = next(
-                (cert for cert in self.CA_CERTIFICATE_FILE_LOCATIONS
-                 if isfile(cert)), None)
+                (
+                    cert
+                    for cert in self.CA_CERTIFICATE_FILE_LOCATIONS
+                    if isfile(cert)
+                ),
+                None,
+            )
 
         # Set up our MQTT Publisher
         try:
             # Get our protocol
-            self.mqtt_protocol = \
-                MQTT_PROTOCOL_MAP[re.sub(r'[^0-9]+', '', self.version)]
+            self.mqtt_protocol = MQTT_PROTOCOL_MAP[
+                re.sub(r"[^0-9]+", "", self.version)
+            ]
 
-        except (KeyError):
-            msg = 'An invalid MQTT Protocol version ' \
-                '({}) was specified.'.format(version)
+        except KeyError:
+            msg = (
+                f"An invalid MQTT Protocol version ({version}) was specified."
+            )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         # Our MQTT Client Object
         self.client = mqtt.Client(
             client_id=self.client_id,
-            clean_session=not self.session, userdata=None,
-            protocol=self.mqtt_protocol, transport=self.mqtt_transport,
+            clean_session=not self.session,
+            userdata=None,
+            protocol=self.mqtt_protocol,
+            transport=self.mqtt_transport,
         )
 
         # Our maximum number of in-flight messages
@@ -294,50 +326,58 @@ class NotifyMQTT(NotifyBase):
         # once
         self.__initial_connect = True
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform MQTT Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform MQTT Notification."""
 
         if len(self.topics) == 0:
             # There were no services to notify
-            self.logger.warning('There were no MQTT topics to notify.')
+            self.logger.warning("There were no MQTT topics to notify.")
             return False
 
         # For logging:
-        url = '{host}:{port}'.format(host=self.host, port=self.port)
+        url = f"{self.host}:{self.port}"
 
         try:
             if self.__initial_connect:
                 # Our initial connection
                 if self.user:
                     self.client.username_pw_set(
-                        self.user, password=self.password)
+                        self.user, password=self.password
+                    )
 
                 if self.secure:
                     if self.ca_certs is None:
                         self.logger.error(
-                            'MQTT secure communication can not be verified, '
-                            'CA certificates file missing')
+                            "MQTT secure communication can not be verified, "
+                            "CA certificates file missing"
+                        )
                         return False
 
                     self.client.tls_set(
-                        ca_certs=self.ca_certs, certfile=None, keyfile=None,
+                        ca_certs=self.ca_certs,
+                        certfile=None,
+                        keyfile=None,
                         cert_reqs=ssl.CERT_REQUIRED,
                         tls_version=ssl.PROTOCOL_TLS,
-                        ciphers=None)
+                        ciphers=None,
+                    )
 
                     # Set our TLS Verify Flag
                     self.client.tls_insecure_set(not self.verify_certificate)
 
                 # Establish our connection
-                if self.client.connect(
-                        self.host, port=self.port,
-                        keepalive=self.mqtt_keepalive) \
-                        != mqtt.MQTT_ERR_SUCCESS:
+                if (
+                    self.client.connect(
+                        self.host,
+                        port=self.port,
+                        keepalive=self.mqtt_keepalive,
+                    )
+                    != mqtt.MQTT_ERR_SUCCESS
+                ):
                     self.logger.warning(
-                        'An MQTT connection could not be established for {}'.
-                        format(url))
+                        "An MQTT connection could not be established for"
+                        f" {url}"
+                    )
                     return False
 
                 # Start our client loop
@@ -361,42 +401,46 @@ class NotifyMQTT(NotifyBase):
                 topic = topics.pop()
 
                 # For logging:
-                url = '{host}:{port}/{topic}'.format(
-                    host=self.host,
-                    port=self.port,
-                    topic=topic)
+                url = f"{self.host}:{self.port}/{topic}"
 
                 # Always call throttle before any remote server i/o is made
                 self.throttle()
 
                 # handle a re-connection
-                if not self.client.is_connected() and \
-                        self.client.reconnect() != mqtt.MQTT_ERR_SUCCESS:
+                if (
+                    not self.client.is_connected()
+                    and self.client.reconnect() != mqtt.MQTT_ERR_SUCCESS
+                ):
                     self.logger.warning(
-                        'An MQTT connection could not be sustained for {}'.
-                        format(url))
+                        f"An MQTT connection could not be sustained for {url}"
+                    )
                     has_error = True
                     break
 
                 # Some Debug Logging
-                self.logger.debug('MQTT POST URL: {} (cert_verify={})'.format(
-                    url, self.verify_certificate))
-                self.logger.debug('MQTT Payload: %s' % str(body))
+                self.logger.debug(
+                    "MQTT POST URL:"
+                    f" {url} (cert_verify={self.verify_certificate})"
+                )
+                self.logger.debug(f"MQTT Payload: {body!s}")
 
                 result = self.client.publish(
-                    topic, payload=body, qos=self.qos, retain=self.retain)
+                    topic, payload=body, qos=self.qos, retain=self.retain
+                )
 
                 if result.rc != mqtt.MQTT_ERR_SUCCESS:
                     # Toggle our status
                     self.logger.warning(
-                        'An error (rc={}) occured when sending MQTT to {}'.
-                        format(result.rc, url))
+                        f"An error (rc={result.rc}) occured when sending MQTT"
+                        f" to {url}"
+                    )
                     has_error = True
                     break
 
                 elif not result.is_published():
                     self.logger.debug(
-                        'Blocking until MQTT payload is published...')
+                        "Blocking until MQTT payload is published..."
+                    )
                     reference = datetime.now()
                     while not has_error and not result.is_published():
                         # Throttle
@@ -406,115 +450,124 @@ class NotifyMQTT(NotifyBase):
                         elapsed = (datetime.now() - reference).total_seconds()
                         if elapsed >= self.socket_read_timeout:
                             self.logger.warning(
-                                'The MQTT message could not be delivered')
+                                "The MQTT message could not be delivered"
+                            )
                             has_error = True
 
                 # if we reach here; we're at the bottom of our loop
                 # we loop around and do the next topic now
 
         except ConnectionError as e:
-            self.logger.warning(
-                'MQTT Connection Error received from {}'.format(url))
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.warning(f"MQTT Connection Error received from {url}")
+            self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
         except ssl.CertificateError as e:
             self.logger.warning(
-                'MQTT SSL Certificate Error received from {}'.format(url))
-            self.logger.debug('Socket Exception: %s' % str(e))
+                f"MQTT SSL Certificate Error received from {url}"
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
         except ValueError as e:
             # ValueError's are thrown from publish() call if there is a problem
-            self.logger.warning(
-                'MQTT Publishing error received: from {}'.format(url))
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.warning(f"MQTT Publishing error received: from {url}")
+            self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
         if not has_error:
             # Verbal notice
-            self.logger.info('Sent MQTT notification')
+            self.logger.info("Sent MQTT notification")
 
         return not has_error
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host,
-            self.port if self.port else (
-                self.mqtt_secure_port if self.secure
-                else self.mqtt_insecure_port),
-            self.fullpath.rstrip('/'),
+            self.user,
+            self.password,
+            self.host,
+            (
+                self.port
+                if self.port
+                else (
+                    self.mqtt_secure_port
+                    if self.secure
+                    else self.mqtt_insecure_port
+                )
+            ),
+            self.fullpath.rstrip("/"),
             self.client_id,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'version': self.version,
-            'qos': str(self.qos),
-            'session': 'yes' if self.session else 'no',
-            'retain': 'yes' if self.retain else 'no',
+            "version": self.version,
+            "qos": str(self.qos),
+            "session": "yes" if self.session else "no",
+            "retain": "yes" if self.retain else "no",
         }
 
         if self.client_id:
             # Our client id is set if specified
-            params['client_id'] = self.client_id
+            params["client_id"] = self.client_id
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyMQTT.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifyMQTT.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyMQTT.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifyMQTT.quote(self.user, safe=""),
             )
 
-        default_port = self.mqtt_secure_port \
-            if self.secure else self.mqtt_insecure_port
+        default_port = (
+            self.mqtt_secure_port if self.secure else self.mqtt_insecure_port
+        )
 
-        return '{schema}://{auth}{hostname}{port}/{targets}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}/{targets}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            targets=','.join(
-                [NotifyMQTT.quote(x, safe='/') for x in self.topics]),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            targets=",".join(
+                [NotifyMQTT.quote(x, safe="/") for x in self.topics]
+            ),
             params=NotifyMQTT.urlencode(params),
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.topics)
 
     @staticmethod
     def parse_url(url):
-        """
-        There are no parameters nessisary for this protocol; simply having
-        windows:// is all you need.  This function just makes sure that
-        is in place.
+        """There are no parameters nessisary for this protocol; simply having
+        windows:// is all you need.
 
+        This function just makes sure that is in place.
         """
 
         results = NotifyBase.parse_url(url)
@@ -524,47 +577,48 @@ class NotifyMQTT(NotifyBase):
 
         try:
             # Acquire topic(s)
-            results['targets'] = parse_list(
-                NotifyMQTT.unquote(results['fullpath'].lstrip('/')))
+            results["targets"] = parse_list(
+                NotifyMQTT.unquote(results["fullpath"].lstrip("/"))
+            )
 
         except AttributeError:
             # No 'fullpath' specified
-            results['targets'] = []
+            results["targets"] = []
 
         # The MQTT protocol version to use
-        if 'version' in results['qsd'] and len(results['qsd']['version']):
-            results['version'] = \
-                NotifyMQTT.unquote(results['qsd']['version'])
+        if "version" in results["qsd"] and len(results["qsd"]["version"]):
+            results["version"] = NotifyMQTT.unquote(results["qsd"]["version"])
 
         # The MQTT Client ID
-        if 'client_id' in results['qsd'] and len(results['qsd']['client_id']):
-            results['client_id'] = \
-                NotifyMQTT.unquote(results['qsd']['client_id'])
+        if "client_id" in results["qsd"] and len(results["qsd"]["client_id"]):
+            results["client_id"] = NotifyMQTT.unquote(
+                results["qsd"]["client_id"]
+            )
 
-        if 'session' in results['qsd'] and len(results['qsd']['session']):
-            results['session'] = parse_bool(results['qsd']['session'])
+        if "session" in results["qsd"] and len(results["qsd"]["session"]):
+            results["session"] = parse_bool(results["qsd"]["session"])
 
         # Message Retain Flag
-        if 'retain' in results['qsd'] and len(results['qsd']['retain']):
-            results['retain'] = parse_bool(results['qsd']['retain'])
+        if "retain" in results["qsd"] and len(results["qsd"]["retain"]):
+            results["retain"] = parse_bool(results["qsd"]["retain"])
 
         # The MQTT Quality of Service to use
-        if 'qos' in results['qsd'] and len(results['qsd']['qos']):
-            results['qos'] = \
-                NotifyMQTT.unquote(results['qsd']['qos'])
+        if "qos" in results["qsd"] and len(results["qsd"]["qos"]):
+            results["qos"] = NotifyMQTT.unquote(results["qsd"]["qos"])
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'].extend(
-                NotifyMQTT.parse_list(results['qsd']['to']))
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"].extend(
+                NotifyMQTT.parse_list(results["qsd"]["to"])
+            )
 
         # return results
         return results
 
     @property
     def CA_CERTIFICATE_FILE_LOCATIONS(self):
-        """
-        Return possible locations to root certificate authority (CA) bundles.
+        """Return possible locations to root certificate authority (CA)
+        bundles.
 
         Taken from https://golang.org/src/crypto/x509/root_linux.go
         TODO: Maybe refactor to a general utility function?
@@ -584,12 +638,13 @@ class NotifyMQTT(NotifyBase):
             "/usr/local/etc/ca-certificates/cert.pem",
         ]
 
-        # Certifi provides Mozilla’s carefully curated collection of Root
+        # Certifi provides Mozilla's carefully curated collection of Root
         # Certificates for validating the trustworthiness of SSL certificates
         # while verifying the identity of TLS hosts. It has been extracted from
         # the Requests project.
         try:
             import certifi
+
             candidates.append(certifi.where())
         except ImportError:  # pragma: no cover
             pass

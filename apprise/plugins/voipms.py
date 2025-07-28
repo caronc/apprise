@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -34,136 +33,140 @@
 # Read more about VoIP.ms API here:
 #   - https://voip.ms/m/apidocs.php
 
-import requests
+import contextlib
 from json import loads
 
-from .base import NotifyBase
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, is_email, parse_phone_no
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_email, is_phone_no, parse_phone_no
+from .base import NotifyBase
 
 
 class NotifyVoipms(NotifyBase):
-    """
-    A wrapper for VoIPms Notifications
-    """
+    """A wrapper for VoIPms Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'VoIPms'
+    service_name = "VoIPms"
 
     # The services URL
-    service_url = 'https://voip.ms'
+    service_url = "https://voip.ms"
 
     # The default protocol
-    secure_protocol = 'voipms'
+    secure_protocol = "voipms"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_voipms'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_voipms"
 
     # VoIPms uses the http protocol with JSON requests
-    notify_url = 'https://voip.ms/api/v1/rest.php'
+    notify_url = "https://voip.ms/api/v1/rest.php"
 
     # The maximum length of the body
     body_maxlen = 160
 
     # The supported country code by VoIP.ms
-    voip_ms_country_code = '1'
+    voip_ms_country_code = "1"
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{password}:{email}/{from_phone}/{targets}',
-    )
+    templates = ("{schema}://{password}:{email}/{from_phone}/{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'email': {
-            'name': _('User Email'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "email": {
+                "name": _("User Email"),
+                "type": "string",
+                "required": True,
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "from_phone": {
+                "name": _("From Phone No"),
+                "type": "string",
+                "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
+                "map_to": "source",
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'from_phone': {
-            'name': _('From Phone No'),
-            'type': 'string',
-            'regex': (r'^\+?[0-9\s)(+-]+$', 'i'),
-            'map_to': 'source',
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "alias_of": "from_phone",
+            },
         },
-        'from': {
-            'alias_of': 'from_phone',
-        },
-    })
+    )
 
     def __init__(self, email, source=None, targets=None, **kwargs):
-        """
-        Initialize VoIPms Object
-        """
+        """Initialize VoIPms Object."""
         super().__init__(**kwargs)
 
         # Validate our params here.
         if self.password is None:
-            msg = 'Password has to be specified.'
+            msg = "Password has to be specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # User is the email associated with the account
         result = is_email(email)
         if not result:
-            msg = 'An invalid VoIPms user email: ' \
-                '({}) was specified.'.format(email)
+            msg = f"An invalid VoIPms user email: ({email}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
-        self.email = result['full_email']
+        self.email = result["full_email"]
 
         # Validate our source Phone #
         result = is_phone_no(source)
         if not result:
-            msg = 'An invalid VoIPms source phone # ' \
-                  '({}) was specified.'.format(source)
+            msg = f"An invalid VoIPms source phone # ({source}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Source Phone # only supports +1 country code
         # Allow 7 digit phones (presume they're local with +1 country code)
-        if result['country'] \
-                and result['country'] != self.voip_ms_country_code:
-            msg = 'VoIPms only supports +1 country code ' \
-                  '({}) was specified.'.format(source)
+        if (
+            result["country"]
+            and result["country"] != self.voip_ms_country_code
+        ):
+            msg = (
+                "VoIPms only supports +1 country code "
+                f"({source}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Store our source phone number (without country code)
-        self.source = result['area'] + result['line']
+        self.source = result["area"] + result["line"]
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         if targets:
             for target in parse_phone_no(targets):
@@ -171,16 +174,17 @@ class NotifyVoipms(NotifyBase):
                 result = is_phone_no(target)
 
                 # Target Phone # only supports +1 country code
-                if result['country'] \
-                        and result['country'] != self.voip_ms_country_code:
+                if (
+                    result["country"]
+                    and result["country"] != self.voip_ms_country_code
+                ):
                     self.logger.warning(
-                        'Ignoring invalid phone # '
-                        '({}) specified.'.format(target),
+                        f"Ignoring invalid phone # ({target}) specified.",
                     )
                     continue
 
                 # store valid phone number
-                self.targets.append(result['area'] + result['line'])
+                self.targets.append(result["area"] + result["line"])
 
         else:
             # Send a message to ourselves
@@ -188,14 +192,12 @@ class NotifyVoipms(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform VoIPms Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform VoIPms Notification."""
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no VoIPms targets to notify.')
+            self.logger.warning("There were no VoIPms targets to notify.")
             return False
 
         # error tracking (used for function return)
@@ -203,20 +205,19 @@ class NotifyVoipms(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded",
         }
 
         # Prepare our payload
         payload = {
-            'api_username': self.email,
-            'api_password': self.password,
-            'did': self.source,
-            'message': body,
-            'method': 'sendSMS',
-
+            "api_username": self.email,
+            "api_password": self.password,
+            "did": self.source,
+            "message": body,
+            "method": "sendSMS",
             # Gets filled in the loop below
-            'dst': None
+            "dst": None,
         }
 
         # Create a copy of the targets list
@@ -227,17 +228,19 @@ class NotifyVoipms(NotifyBase):
             target = targets.pop(0)
 
             # Add target Phone #
-            payload['dst'] = target
+            payload["dst"] = target
 
             # Some Debug Logging
-            self.logger.debug('VoIPms GET URL: {} (cert_verify={})'.format(
-                self.notify_url, self.verify_certificate))
-            self.logger.debug('VoIPms Payload: {}' .format(payload))
+            self.logger.debug(
+                "VoIPms GET URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"VoIPms Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
-            response = {'status': 'unknown', 'message': ''}
+            response = {"status": "unknown", "message": ""}
 
             try:
                 r = requests.get(
@@ -248,31 +251,31 @@ class NotifyVoipms(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
-                try:
-                    response = loads(r.content)
-
-                except (AttributeError, TypeError, ValueError):
+                with contextlib.suppress(
+                        AttributeError, TypeError, ValueError):
+                    # Load our JSON object if valid
                     # ValueError = r.content is Unparsable
                     # TypeError = r.content is None
                     # AttributeError = r is None
-                    pass
+                    response = loads(r.content)
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyVoipms.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyVoipms.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send VoIPms SMS notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send VoIPms SMS notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -281,11 +284,12 @@ class NotifyVoipms(NotifyBase):
                 # VoIPms sends 200 OK even if there is an error
                 # check if status in response and if it is not success
 
-                if response is not None and response['status'] != 'success':
+                if response is not None and response["status"] != "success":
                     self.logger.warning(
-                        'Failed to send VoIPms SMS notification to {}: '
-                        'status: {}, message: {}'.format(
-                            target, response['status'], response['message'])
+                        "Failed to send VoIPms SMS notification to {}: "
+                        "status: {}, message: {}".format(
+                            target, response["status"], response["message"]
+                        )
                     )
 
                     # Mark our failure
@@ -293,14 +297,15 @@ class NotifyVoipms(NotifyBase):
                     continue
                 else:
                     self.logger.info(
-                        'Sent VoIPms SMS notification to %s' % target)
+                        f"Sent VoIPms SMS notification to {target}"
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending VoIPms:%s '
-                    'SMS notification.' % target
+                    f"A Connection error occurred sending VoIPms:{target} "
+                    "SMS notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -310,81 +315,79 @@ class NotifyVoipms(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
-            self.secure_protocol, self.email, self.password, self.source,
+            self.secure_protocol,
+            self.email,
+            self.password,
+            self.source,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        schemaStr =  \
-            '{schema}://{password}:{email}/{from_phone}/{targets}/?{params}'
+        schemaStr = (
+            "{schema}://{password}:{email}/{from_phone}/{targets}/?{params}"
+        )
         return schemaStr.format(
             schema=self.secure_protocol,
             email=self.email,
-            password=self.pprint(self.password, privacy, safe=''),
-            from_phone=self.voip_ms_country_code +
-            self.pprint(self.source, privacy, safe=''),
-            targets='/'.join(
-                [self.voip_ms_country_code + NotifyVoipms.quote(x, safe='')
-                 for x in self.targets]),
-            params=NotifyVoipms.urlencode(params))
+            password=self.pprint(self.password, privacy, safe=""),
+            from_phone=self.voip_ms_country_code
+            + self.pprint(self.source, privacy, safe=""),
+            targets="/".join([
+                self.voip_ms_country_code + NotifyVoipms.quote(x, safe="")
+                for x in self.targets
+            ]),
+            params=NotifyVoipms.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         targets = len(self.targets)
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        results['targets'] = \
-            NotifyVoipms.split_path(results['fullpath'])
+        results["targets"] = NotifyVoipms.split_path(results["fullpath"])
 
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifyVoipms.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifyVoipms.unquote(results["qsd"]["from"])
 
-        elif results['targets']:
+        elif results["targets"]:
             # The from phone no is the first entry in the list otherwise
-            results['source'] = results['targets'].pop(0)
+            results["source"] = results["targets"].pop(0)
 
         # Swap user for pass since our input is: password:email
         #   where email is user@hostname (or user@domain)
-        user = results['password']
-        password = results['user']
-        results['password'] = password
-        results['user'] = user
+        user = results["password"]
+        password = results["user"]
+        results["password"] = password
+        results["user"] = user
 
-        results['email'] = '{}@{}'.format(
+        results["email"] = "{}@{}".format(
             NotifyVoipms.unquote(user),
-            NotifyVoipms.unquote(results['host']),
+            NotifyVoipms.unquote(results["host"]),
         )
 
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyVoipms.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyVoipms.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         return results

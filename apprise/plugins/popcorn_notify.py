@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -28,92 +27,97 @@
 
 import requests
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import (
-    is_email, is_phone_no, parse_list, parse_bool, validate_regex)
 from ..locale import gettext_lazy as _
+from ..utils.parse import (
+    is_email,
+    is_phone_no,
+    parse_bool,
+    parse_list,
+    validate_regex,
+)
+from .base import NotifyBase
 
 
 class NotifyPopcornNotify(NotifyBase):
-    """
-    A wrapper for PopcornNotify Notifications
-    """
+    """A wrapper for PopcornNotify Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'PopcornNotify'
+    service_name = "PopcornNotify"
 
     # The services URL
-    service_url = 'https://popcornnotify.com/'
+    service_url = "https://popcornnotify.com/"
 
     # The default protocol
-    secure_protocol = 'popcorn'
+    secure_protocol = "popcorn"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_popcornnotify'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_popcornnotify"
 
     # PopcornNotify uses the http protocol
-    notify_url = 'https://popcornnotify.com/notify'
+    notify_url = "https://popcornnotify.com/notify"
 
     # The maximum targets to include when doing batch transfers
     default_batch_size = 10
 
     # Define object templates
-    templates = (
-        '{schema}://{apikey}/{targets}',
-    )
+    templates = ("{schema}://{apikey}/{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'regex': (r'^[a-z0-9]+$', 'i'),
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "regex": (r"^[a-z0-9]+$", "i"),
+                "required": True,
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "target_email": {
+                "name": _("Target Email"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'target_email': {
-            'name': _('Target Email'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        }
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
         },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-    })
+    )
 
     def __init__(self, apikey, targets=None, batch=False, **kwargs):
-        """
-        Initialize PopcornNotify Object
-        """
+        """Initialize PopcornNotify Object."""
         super().__init__(**kwargs)
 
         # Access Token (associated with project)
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'An invalid PopcornNotify API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid PopcornNotify API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -121,36 +125,34 @@ class NotifyPopcornNotify(NotifyBase):
         self.batch = batch
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_list(targets):
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if result:
                 # store valid phone number
-                self.targets.append(result['full'])
+                self.targets.append(result["full"])
                 continue
 
             result = is_email(target)
             if result:
                 # store valid email
-                self.targets.append(result['full_email'])
+                self.targets.append(result["full_email"])
                 continue
 
             self.logger.warning(
-                'Dropped invalid target '
-                '({}) specified.'.format(target),
+                f"Dropped invalid target ({target}) specified.",
             )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform PopcornNotify Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform PopcornNotify Notification."""
 
         if len(self.targets) == 0:
             # There were no services to notify
             self.logger.warning(
-                'There were no PopcornNotify targets to notify.')
+                "There were no PopcornNotify targets to notify."
+            )
             return False
 
         # error tracking (used for function return)
@@ -158,14 +160,14 @@ class NotifyPopcornNotify(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded",
         }
 
         # Prepare our payload
         payload = {
-            'message': body,
-            'subject': title,
+            "message": body,
+            "subject": title,
         }
 
         auth = (self.apikey, None)
@@ -175,13 +177,15 @@ class NotifyPopcornNotify(NotifyBase):
 
         for index in range(0, len(self.targets), batch_size):
             # Prepare our recipients
-            payload['recipients'] = \
-                ','.join(self.targets[index:index + batch_size])
+            payload["recipients"] = ",".join(
+                self.targets[index : index + batch_size]
+            )
 
-            self.logger.debug('PopcornNotify POST URL: %s (cert_verify=%r)' % (
-                self.notify_url, self.verify_certificate,
-            ))
-            self.logger.debug('PopcornNotify Payload: %s' % str(payload))
+            self.logger.debug(
+                "PopcornNotify POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(f"PopcornNotify Payload: {payload!s}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -196,22 +200,26 @@ class NotifyPopcornNotify(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyPopcornNotify.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyPopcornNotify.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send {} PopcornNotify notification{}: '
-                        '{}{}error={}.'.format(
-                            len(self.targets[index:index + batch_size]),
-                            ' to {}'.format(self.targets[index])
-                            if batch_size == 1 else '(s)',
+                        "Failed to send {} PopcornNotify notification{}: "
+                        "{}{}error={}.".format(
+                            len(self.targets[index : index + batch_size]),
+                            (
+                                f" to {self.targets[index]}"
+                                if batch_size == 1
+                                else "(s)"
+                            ),
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -219,19 +227,23 @@ class NotifyPopcornNotify(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent {} PopcornNotify notification{}.'
-                        .format(
-                            len(self.targets[index:index + batch_size]),
-                            ' to {}'.format(self.targets[index])
-                            if batch_size == 1 else '(s)',
-                        ))
+                        "Sent {} PopcornNotify notification{}.".format(
+                            len(self.targets[index : index + batch_size]),
+                            (
+                                f" to {self.targets[index]}"
+                                if batch_size == 1
+                                else "(s)"
+                            ),
+                        )
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occured sending {} PopcornNotify '
-                    'notification(s).'.format(
-                        len(self.targets[index:index + batch_size])))
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occured sending"
+                    f" {len(self.targets[index:index + batch_size])} "
+                    "PopcornNotify notification(s)."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -241,55 +253,51 @@ class NotifyPopcornNotify(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'batch': 'yes' if self.batch else 'no',
+            "batch": "yes" if self.batch else "no",
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{apikey}/{targets}/?{params}'.format(
+        return "{schema}://{apikey}/{targets}/?{params}".format(
             schema=self.secure_protocol,
-            apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='/'.join(
-                [NotifyPopcornNotify.quote(x, safe='') for x in self.targets]),
-            params=NotifyPopcornNotify.urlencode(params))
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets="/".join(
+                [NotifyPopcornNotify.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifyPopcornNotify.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         #
         # Factor batch into calculation
         #
         batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
         if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
 
         return targets
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -298,20 +306,21 @@ class NotifyPopcornNotify(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = \
-            NotifyPopcornNotify.split_path(results['fullpath'])
+        results["targets"] = NotifyPopcornNotify.split_path(
+            results["fullpath"]
+        )
 
         # The hostname is our authentication key
-        results['apikey'] = NotifyPopcornNotify.unquote(results['host'])
+        results["apikey"] = NotifyPopcornNotify.unquote(results["host"])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyPopcornNotify.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyPopcornNotify.parse_list(
+                results["qsd"]["to"]
+            )
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get('batch', False))
+        results["batch"] = parse_bool(results["qsd"].get("batch", False))
 
         return results

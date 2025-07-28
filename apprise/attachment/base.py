@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,34 +25,34 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import base64
+import contextlib
+import mimetypes
 import os
 import time
-import mimetypes
-import base64
+
 from .. import exception
-from ..url import URLBase
-from ..utils.parse import parse_bool
 from ..common import ContentLocation
 from ..locale import gettext_lazy as _
+from ..url import URLBase
+from ..utils.parse import parse_bool
 
 
 class AttachBase(URLBase):
-    """
-    This is the base class for all supported attachment types
-    """
+    """This is the base class for all supported attachment types."""
 
     # For attachment type detection; this amount of data is read into memory
     # 128KB (131072B)
     max_detect_buffer_size = 131072
 
     # Unknown mimetype
-    unknown_mimetype = 'application/octet-stream'
+    unknown_mimetype = "application/octet-stream"
 
     # Our filename when we can't otherwise determine one
-    unknown_filename = 'apprise-attachment'
+    unknown_filename = "apprise-attachment"
 
     # Our filename extension when we can't otherwise determine one
-    unknown_filename_extension = '.obj'
+    unknown_filename_extension = ".obj"
 
     # The strict argument is a flag specifying whether the list of known MIME
     # types is limited to only the official types registered with IANA. When
@@ -79,33 +78,32 @@ class AttachBase(URLBase):
     # These act the same way as tokens except they are optional and/or
     # have default values set if mandatory. This rule must be followed
     template_args = {
-        'cache': {
-            'name': _('Cache Age'),
-            'type': 'int',
+        "cache": {
+            "name": _("Cache Age"),
+            "type": "int",
             # We default to (600) which means we cache for 10 minutes
-            'default': 600,
+            "default": 600,
         },
-        'mime': {
-            'name': _('Forced Mime Type'),
-            'type': 'string',
+        "mime": {
+            "name": _("Forced Mime Type"),
+            "type": "string",
         },
-        'name': {
-            'name': _('Forced File Name'),
-            'type': 'string',
+        "name": {
+            "name": _("Forced File Name"),
+            "type": "string",
         },
-        'verify': {
-            'name': _('Verify SSL'),
+        "verify": {
+            "name": _("Verify SSL"),
             # SSL Certificate Authority Verification
-            'type': 'bool',
+            "type": "bool",
             # Provide a default
-            'default': True,
+            "default": True,
         },
     }
 
     def __init__(self, name=None, mimetype=None, cache=None, **kwargs):
-        """
-        Initialize some general logging and common server arguments that will
-        keep things consistent when working with the configurations that
+        """Initialize some general logging and common server arguments that
+        will keep things consistent when working with the configurations that
         inherit this class.
 
         Optionally provide a filename to over-ride name associated with the
@@ -160,15 +158,13 @@ class AttachBase(URLBase):
                 self.cache = cache if isinstance(cache, bool) else int(cache)
 
             except (TypeError, ValueError):
-                err = 'An invalid cache value ({}) was specified.'.format(
-                    cache)
+                err = f"An invalid cache value ({cache}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err)
+                raise TypeError(err) from None
 
             # Some simple error checking
             if self.cache < 0:
-                err = 'A negative cache value ({}) was specified.'.format(
-                    cache)
+                err = f"A negative cache value ({cache}) was specified."
                 self.logger.warning(err)
                 raise TypeError(err)
 
@@ -176,22 +172,28 @@ class AttachBase(URLBase):
             self.cache = None
 
         # Validate mimetype if specified
-        if self._mimetype:
-            if next((t for t in mimetypes.types_map.values()
-                     if self._mimetype == t), None) is None:
-                err = 'An invalid mime-type ({}) was specified.'.format(
-                    mimetype)
-                self.logger.warning(err)
-                raise TypeError(err)
+        if self._mimetype and (
+                next(
+                    (
+                        t
+                        for t in mimetypes.types_map.values()
+                        if self._mimetype == t
+                    ),
+                    None,
+                )
+                is None):
+            err = f"An invalid mime-type ({mimetype}) was specified."
+            self.logger.warning(err)
+            raise TypeError(err)
 
         return
 
     @property
     def path(self):
-        """
-        Returns the absolute path to the filename. If this is not known or
-        is know but has been considered expired (due to cache setting), then
-        content is re-retrieved prior to returning.
+        """Returns the absolute path to the filename.
+
+        If this is not known or is know but has been considered expired (due to
+        cache setting), then content is re-retrieved prior to returning.
         """
 
         if not self.exists():
@@ -202,9 +204,7 @@ class AttachBase(URLBase):
 
     @property
     def name(self):
-        """
-        Returns the filename
-        """
+        """Returns the filename."""
         if self._name:
             # return our fixed content
             return self._name
@@ -216,20 +216,19 @@ class AttachBase(URLBase):
         if not self.detected_name:
             # If we get here, our download was successful but we don't have a
             # filename based on our content.
-            extension = mimetypes.guess_extension(self.mimetype)
-            self.detected_name = '{}{}'.format(
-                self.unknown_filename,
-                extension if extension else self.unknown_filename_extension)
+            ext = mimetypes.guess_extension(self.mimetype)
+            self.detected_name = (
+                f"{self.unknown_filename}"
+                f"{ext if ext else self.unknown_filename_extension}"
+            )
 
         return self.detected_name
 
     @property
     def mimetype(self):
-        """
-        Returns mime type (if one is present).
+        """Returns mime type (if one is present).
 
-        Content is cached once determied to prevent overhead of future
-        calls.
+        Content is cached once determied to prevent overhead of future calls.
         """
         if not self.exists():
             # we could not obtain our attachment
@@ -242,36 +241,40 @@ class AttachBase(URLBase):
         if not self.detected_mimetype:
             # guess_type() returns: (type, encoding) and sets type to None
             # if it can't otherwise determine it.
-            try:
+            with contextlib.suppress(TypeError):
                 # Directly reference _name and detected_name to prevent
                 # recursion loop (as self.name calls this function)
                 self.detected_mimetype, _ = mimetypes.guess_type(
-                    self._name if self._name
-                    else self.detected_name, strict=self.strict)
-
-            except TypeError:
-                # Thrown if None was specified in filename section
-                pass
+                    self._name if self._name else self.detected_name,
+                    strict=self.strict,
+                )
 
         # Return our mime type
-        return self.detected_mimetype \
-            if self.detected_mimetype else self.unknown_mimetype
+        return (
+            self.detected_mimetype
+            if self.detected_mimetype
+            else self.unknown_mimetype
+        )
 
     def exists(self, retrieve_if_missing=True):
-        """
-        Simply returns true if the object has downloaded and stored the
-        attachment AND the attachment has not expired.
-        """
+        """Simply returns true if the object has downloaded and stored the
+        attachment AND the attachment has not expired."""
         if self.location == ContentLocation.INACCESSIBLE:
             # our content is inaccessible
             return False
 
-        cache = self.template_args['cache']['default'] \
-            if self.cache is None else self.cache
+        cache = (
+            self.template_args["cache"]["default"]
+            if self.cache is None
+            else self.cache
+        )
 
         try:
-            if self.download_path and os.path.isfile(self.download_path) \
-                    and cache:
+            if (
+                self.download_path
+                and os.path.isfile(self.download_path)
+                and cache
+            ):
 
                 # We have enough reason to look further into our cached content
                 # and verify it has not expired.
@@ -281,53 +284,56 @@ class AttachBase(URLBase):
 
                 # Verify our cache time to determine whether we will get our
                 # content again.
-                age_in_sec = \
-                    time.time() - os.stat(self.download_path).st_mtime
+                age_in_sec = time.time() - os.stat(self.download_path).st_mtime
                 if age_in_sec <= cache:
                     return True
 
-        except (OSError, IOError):
+        except OSError:
             # The file is not present
             pass
 
         return False if not retrieve_if_missing else self.download()
 
-    def base64(self, encoding='ascii'):
-        """
-        Returns the attachment object as a base64 string otherwise
-        None is returned if an error occurs.
+    def base64(self, encoding="ascii"):
+        """Returns the attachment object as a base64 string otherwise None is
+        returned if an error occurs.
 
         If encoding is set to None, then it is not encoded when returned
         """
         if not self:
             # We could not access the attachment
             self.logger.error(
-                'Could not access attachment {}.'.format(
-                    self.url(privacy=True)))
+                f"Could not access attachment {self.url(privacy=True)}."
+            )
             raise exception.AppriseFileNotFound("Attachment Missing")
 
         try:
             with self.open() as f:
                 # Prepare our Attachment in Base64
-                return base64.b64encode(f.read()).decode(encoding) \
-                    if encoding else base64.b64encode(f.read())
+                return (
+                    base64.b64encode(f.read()).decode(encoding)
+                    if encoding
+                    else base64.b64encode(f.read())
+                )
 
-        except (TypeError, FileNotFoundError):
+        except (FileNotFoundError):
             # We no longer have a path to open
-            raise exception.AppriseFileNotFound("Attachment Missing")
+            raise exception.AppriseFileNotFound("Attachment Missing") from None
 
-        except (TypeError, OSError, IOError) as e:
+        except (TypeError, OSError) as e:
             self.logger.warning(
-                'An I/O error occurred while reading {}.'.format(
-                    self.name if self else 'attachment'))
-            self.logger.debug('I/O Exception: %s' % str(e))
-            raise exception.AppriseDiskIOError("Attachment Access Error")
+                "An I/O error occurred while reading {}.".format(
+                    self.name if self else "attachment"
+                )
+            )
+            self.logger.debug(f"I/O Exception: {e!s}")
+            raise exception.AppriseDiskIOError(
+                "Attachment Access Error") from e
 
     def invalidate(self):
-        """
-        Release any temporary data that may be open by child classes.
-        Externally fetched content should be automatically cleaned up when
-        this function is called.
+        """Release any temporary data that may be open by child classes.
+        Externally fetched content should be automatically cleaned up when this
+        function is called.
 
         This function should also reset the following entries to None:
           - detected_name : Should identify a human readable filename
@@ -345,8 +351,7 @@ class AttachBase(URLBase):
         return
 
     def download(self):
-        """
-        This function must be over-ridden by inheriting classes.
+        """This function must be over-ridden by inheriting classes.
 
         Inherited classes MUST populate:
           - detected_name: Should identify a human readable filename
@@ -356,19 +361,17 @@ class AttachBase(URLBase):
         If a download fails, you should ensure these values are set to None.
         """
         raise NotImplementedError(
-            "download() is implimented by the child class.")
+            "download() is implimented by the child class."
+        )
 
-    def open(self, mode='rb'):
-        """
-        return our file pointer and track it (we'll auto close later)
-        """
-        pointer = open(self.path, mode=mode)
+    def open(self, mode="rb"):
+        """Return our file pointer and track it (we'll auto close later)"""
+        pointer = open(self.path, mode=mode)  # noqa: SIM115
         self.__pointers.add(pointer)
         return pointer
 
     def chunk(self, size=5242880):
-        """
-        A Generator that yield chunks of a file with the specified size.
+        """A Generator that yield chunks of a file with the specified size.
 
         By default the chunk size is set to 5MB (5242880 bytes)
         """
@@ -382,15 +385,12 @@ class AttachBase(URLBase):
                 yield chunk
 
     def __enter__(self):
-        """
-        support with keyword
-        """
+        """Support with keyword."""
         return self.open()
 
     def __exit__(self, value_type, value, traceback):
-        """
-        stub to do nothing; but support exit of with statement gracefully
-        """
+        """Stub to do nothing; but support exit of with statement
+        gracefully."""
         return
 
     @staticmethod
@@ -413,40 +413,38 @@ class AttachBase(URLBase):
         """
 
         results = URLBase.parse_url(
-            url, verify_host=verify_host, sanitize=sanitize)
+            url, verify_host=verify_host, sanitize=sanitize
+        )
 
         if not results:
             # We're done; we failed to parse our url
             return results
 
         # Allow overriding the default config mime type
-        if 'mime' in results['qsd']:
-            results['mimetype'] = results['qsd'].get('mime', '') \
-                .strip().lower()
+        if "mime" in results["qsd"]:
+            results["mimetype"] = (
+                results["qsd"].get("mime", "").strip().lower()
+            )
 
         # Allow overriding the default file name
-        if 'name' in results['qsd']:
-            results['name'] = results['qsd'].get('name', '') \
-                .strip().lower()
+        if "name" in results["qsd"]:
+            results["name"] = results["qsd"].get("name", "").strip().lower()
 
         # Our cache value
-        if 'cache' in results['qsd']:
+        if "cache" in results["qsd"]:
             # First try to get it's integer value
             try:
-                results['cache'] = int(results['qsd']['cache'])
+                results["cache"] = int(results["qsd"]["cache"])
 
             except (ValueError, TypeError):
                 # No problem, it just isn't an integer; now treat it as a bool
                 # instead:
-                results['cache'] = parse_bool(results['qsd']['cache'])
+                results["cache"] = parse_bool(results["qsd"]["cache"])
 
         return results
 
     def __len__(self):
-        """
-        Returns the filesize of the attachment.
-
-        """
+        """Returns the filesize of the attachment."""
         if not self:
             return 0
 
@@ -458,14 +456,12 @@ class AttachBase(URLBase):
             return 0
 
     def __bool__(self):
-        """
-        Allows the Apprise object to be wrapped in an based 'if statement'.
+        """Allows the Apprise object to be wrapped in an based 'if statement'.
+
         True is returned if our content was downloaded correctly.
         """
-        return True if self.path else False
+        return bool(self.path)
 
     def __del__(self):
-        """
-        Perform any house cleaning
-        """
+        """Perform any house cleaning."""
         self.invalidate()

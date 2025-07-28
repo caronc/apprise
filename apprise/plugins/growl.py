@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,12 +25,11 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..utils.parse import parse_bool
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import parse_bool
+from .base import NotifyBase
 
 # Default our global support flag
 NOTIFY_GROWL_SUPPORT_ENABLED = False
@@ -59,58 +57,55 @@ class GrowlPriority:
 
 GROWL_PRIORITIES = {
     # Note: This also acts as a reverse lookup mapping
-    GrowlPriority.LOW: 'low',
-    GrowlPriority.MODERATE: 'moderate',
-    GrowlPriority.NORMAL: 'normal',
-    GrowlPriority.HIGH: 'high',
-    GrowlPriority.EMERGENCY: 'emergency',
+    GrowlPriority.LOW: "low",
+    GrowlPriority.MODERATE: "moderate",
+    GrowlPriority.NORMAL: "normal",
+    GrowlPriority.HIGH: "high",
+    GrowlPriority.EMERGENCY: "emergency",
 }
 
 GROWL_PRIORITY_MAP = {
     # Maps against string 'low'
-    'l': GrowlPriority.LOW,
+    "l": GrowlPriority.LOW,
     # Maps against string 'moderate'
-    'm': GrowlPriority.MODERATE,
+    "m": GrowlPriority.MODERATE,
     # Maps against string 'normal'
-    'n': GrowlPriority.NORMAL,
+    "n": GrowlPriority.NORMAL,
     # Maps against string 'high'
-    'h': GrowlPriority.HIGH,
+    "h": GrowlPriority.HIGH,
     # Maps against string 'emergency'
-    'e': GrowlPriority.EMERGENCY,
-
+    "e": GrowlPriority.EMERGENCY,
     # Entries to additionally support (so more like Growl's API)
-    '-2': GrowlPriority.LOW,
-    '-1': GrowlPriority.MODERATE,
-    '0': GrowlPriority.NORMAL,
-    '1': GrowlPriority.HIGH,
-    '2': GrowlPriority.EMERGENCY,
+    "-2": GrowlPriority.LOW,
+    "-1": GrowlPriority.MODERATE,
+    "0": GrowlPriority.NORMAL,
+    "1": GrowlPriority.HIGH,
+    "2": GrowlPriority.EMERGENCY,
 }
 
 
 class NotifyGrowl(NotifyBase):
-    """
-    A wrapper to Growl Notifications
+    """A wrapper to Growl Notifications."""
 
-    """
     # Set our global enabled flag
     enabled = NOTIFY_GROWL_SUPPORT_ENABLED
 
     requirements = {
         # Define our required packaging in order to work
-        'packages_required': 'gntp'
+        "packages_required": "gntp"
     }
 
     # The default descriptive name associated with the Notification
-    service_name = 'Growl'
+    service_name = "Growl"
 
     # The services URL
-    service_url = 'http://growl.info/'
+    service_url = "http://growl.info/"
 
     # The default protocol
-    protocol = 'growl'
+    protocol = "growl"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_growl'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_growl"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
@@ -131,77 +126,93 @@ class NotifyGrowl(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{host}',
-        '{schema}://{host}:{port}',
-        '{schema}://{password}@{host}',
-        '{schema}://{password}@{host}:{port}',
+        "{schema}://{host}",
+        "{schema}://{host}:{port}",
+        "{schema}://{password}@{host}",
+        "{schema}://{password}@{host}:{port}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'priority': {
-            'name': _('Priority'),
-            'type': 'choice:int',
-            'values': GROWL_PRIORITIES,
-            'default': GrowlPriority.NORMAL,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "priority": {
+                "name": _("Priority"),
+                "type": "choice:int",
+                "values": GROWL_PRIORITIES,
+                "default": GrowlPriority.NORMAL,
+            },
+            "version": {
+                "name": _("Version"),
+                "type": "choice:int",
+                "values": (1, 2),
+                "default": 2,
+            },
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": True,
+                "map_to": "include_image",
+            },
+            "sticky": {
+                "name": _("Sticky"),
+                "type": "bool",
+                "default": True,
+                "map_to": "sticky",
+            },
         },
-        'version': {
-            'name': _('Version'),
-            'type': 'choice:int',
-            'values': (1, 2),
-            'default': 2,
-        },
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'include_image',
-        },
-        'sticky': {
-            'name': _('Sticky'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'sticky',
-        },
-    })
+    )
 
-    def __init__(self, priority=None, version=2, include_image=True,
-                 sticky=False, **kwargs):
-        """
-        Initialize Growl Object
-        """
+    def __init__(
+        self,
+        priority=None,
+        version=2,
+        include_image=True,
+        sticky=False,
+        **kwargs,
+    ):
+        """Initialize Growl Object."""
         super().__init__(**kwargs)
 
         if not self.port:
             self.port = self.default_port
 
         # The Priority of the message
-        self.priority = NotifyGrowl.template_args['priority']['default'] \
-            if not priority else \
-            next((
-                v for k, v in GROWL_PRIORITY_MAP.items()
-                if str(priority).lower().startswith(k)),
-                NotifyGrowl.template_args['priority']['default'])
+        self.priority = (
+            NotifyGrowl.template_args["priority"]["default"]
+            if not priority
+            else next(
+                (
+                    v
+                    for k, v in GROWL_PRIORITY_MAP.items()
+                    if str(priority).lower().startswith(k)
+                ),
+                NotifyGrowl.template_args["priority"]["default"],
+            )
+        )
 
         # Our Registered object
         self.growl = None
@@ -219,61 +230,67 @@ class NotifyGrowl(NotifyBase):
         return
 
     def register(self):
-        """
-        Registers with the Growl server
-        """
+        """Registers with the Growl server."""
         payload = {
-            'applicationName': self.app_id,
-            'notifications': [self.growl_notification_type, ],
-            'defaultNotifications': [self.growl_notification_type, ],
-            'hostname': self.host,
-            'port': self.port,
+            "applicationName": self.app_id,
+            "notifications": [
+                self.growl_notification_type,
+            ],
+            "defaultNotifications": [
+                self.growl_notification_type,
+            ],
+            "hostname": self.host,
+            "port": self.port,
         }
 
         if self.password is not None:
-            payload['password'] = self.password
+            payload["password"] = self.password
 
-        self.logger.debug('Growl Registration Payload: %s' % str(payload))
+        self.logger.debug(f"Growl Registration Payload: {payload!s}")
         self.growl = gntp.notifier.GrowlNotifier(**payload)
 
         try:
             self.growl.register()
 
         except gntp.errors.NetworkError:
-            msg = 'A network error error occurred registering ' \
-                  'with Growl at {}.'.format(self.host)
+            msg = (
+                "A network error error occurred registering "
+                f"with Growl at {self.host}."
+            )
             self.logger.warning(msg)
             return False
 
         except gntp.errors.ParseError:
-            msg = 'A parsing error error occurred registering ' \
-                  'with Growl at {}.'.format(self.host)
+            msg = (
+                "A parsing error error occurred registering "
+                f"with Growl at {self.host}."
+            )
             self.logger.warning(msg)
             return False
 
         except gntp.errors.AuthError:
-            msg = 'An authentication error error occurred registering ' \
-                  'with Growl at {}.'.format(self.host)
+            msg = (
+                "An authentication error error occurred registering "
+                f"with Growl at {self.host}."
+            )
             self.logger.warning(msg)
             return False
 
         except gntp.errors.UnsupportedError:
-            msg = 'An unsupported error occurred registering with ' \
-                  'Growl at {}.'.format(self.host)
+            msg = (
+                "An unsupported error occurred registering with "
+                f"Growl at {self.host}."
+            )
             self.logger.warning(msg)
             return False
 
-        self.logger.debug(
-            'Growl server registration completed successfully.'
-        )
+        self.logger.debug("Growl server registration completed successfully.")
 
         # Return our state
         return True
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Growl Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Growl Notification."""
         # Register ourselves with the server if we haven't done so already
         if not self.growl and not self.register():
             # We failed to register
@@ -282,28 +299,30 @@ class NotifyGrowl(NotifyBase):
         icon = None
         if self.version >= 2:
             # URL Based
-            icon = None if not self.include_image \
-                else self.image_url(notify_type)
+            icon = (
+                None if not self.include_image else self.image_url(notify_type)
+            )
 
         else:
             # Raw
-            icon = None if not self.include_image \
-                else self.image_raw(notify_type)
+            icon = (
+                None if not self.include_image else self.image_raw(notify_type)
+            )
 
         payload = {
-            'noteType': self.growl_notification_type,
-            'title': title,
-            'description': body,
-            'icon': icon is not None,
-            'sticky': self.sticky,
-            'priority': self.priority,
+            "noteType": self.growl_notification_type,
+            "title": title,
+            "description": body,
+            "icon": icon is not None,
+            "sticky": self.sticky,
+            "priority": self.priority,
         }
-        self.logger.debug('Growl Payload: %s' % str(payload))
+        self.logger.debug(f"Growl Payload: {payload!s}")
 
         # Update icon of payload to be raw data; this is intentionally done
         # here after we spit the debug message above (so we don't try to
         # print the binary contents of an image
-        payload['icon'] = icon
+        payload["icon"] = icon
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -313,12 +332,12 @@ class NotifyGrowl(NotifyBase):
             response = self.growl.notify(**payload)
             if not isinstance(response, bool):
                 self.logger.warning(
-                    'Growl notification failed to send with response: %s' %
-                    str(response),
+                    "Growl notification failed to send with response:"
+                    f" {response!s}",
                 )
 
             else:
-                self.logger.info('Sent Growl notification.')
+                self.logger.info("Sent Growl notification.")
 
         except gntp.errors.BaseError as e:
             # Since Growl servers listen for UDP broadcasts, it's possible
@@ -329,9 +348,10 @@ class NotifyGrowl(NotifyBase):
             # However, if the host/server is unavailable, you will get to this
             # point of the code.
             self.logger.warning(
-                'A Connection error occurred sending Growl '
-                'notification to %s.' % self.host)
-            self.logger.debug('Growl Exception: %s' % str(e))
+                "A Connection error occurred sending Growl "
+                f"notification to {self.host}."
+            )
+            self.logger.debug(f"Growl Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -340,106 +360,115 @@ class NotifyGrowl(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host,
+            self.user,
+            self.password,
+            self.host,
             self.port if self.port else self.default_port,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'image': 'yes' if self.include_image else 'no',
-            'sticky': 'yes' if self.sticky else 'no',
-            'priority':
-                GROWL_PRIORITIES[self.template_args['priority']['default']]
+            "image": "yes" if self.include_image else "no",
+            "sticky": "yes" if self.sticky else "no",
+            "priority": (
+                GROWL_PRIORITIES[self.template_args["priority"]["default"]]
                 if self.priority not in GROWL_PRIORITIES
-                else GROWL_PRIORITIES[self.priority],
-            'version': self.version,
+                else GROWL_PRIORITIES[self.priority]
+            ),
+            "version": self.version,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        auth = ''
+        auth = ""
         if self.user:
             # The growl password is stored in the user field
-            auth = '{password}@'.format(
+            auth = "{password}@".format(
                 password=self.pprint(
-                    self.user, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.user, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
 
-        return '{schema}://{auth}{hostname}{port}/?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}/?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == self.default_port
-                 else ':{}'.format(self.port),
+            port=(
+                ""
+                if self.port is None or self.port == self.default_port
+                else f":{self.port}"
+            ),
             params=NotifyGrowl.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         version = None
-        if 'version' in results['qsd'] and len(results['qsd']['version']):
+        if "version" in results["qsd"] and len(results["qsd"]["version"]):
             # Allow the user to specify the version of the protocol to use.
             try:
                 version = int(
-                    NotifyGrowl.unquote(
-                        results['qsd']['version']).strip().split('.')[0])
+                    NotifyGrowl.unquote(results["qsd"]["version"])
+                    .strip()
+                    .split(".")[0]
+                )
 
             except (AttributeError, IndexError, TypeError, ValueError):
                 NotifyGrowl.logger.warning(
-                    'An invalid Growl version of "%s" was specified and will '
-                    'be ignored.' % results['qsd']['version']
+                    'An invalid Growl version of "{}" was specified and will '
+                    "be ignored.".format(results["qsd"]["version"])
                 )
                 pass
 
         # Set our priority
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = \
-                NotifyGrowl.unquote(results['qsd']['priority'])
+        if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
+            results["priority"] = NotifyGrowl.unquote(
+                results["qsd"]["priority"]
+            )
 
         # Because of the URL formatting, the password is actually where the
         # username field is. For this reason, we just preform this small hack
         # to make it (the URL) conform correctly. The following strips out the
         # existing password entry (if exists) so that it can be swapped with
         # the new one we specify.
-        if results.get('password', None) is None:
-            results['password'] = results.get('user', None)
+        if results.get("password", None) is None:
+            results["password"] = results.get("user", None)
 
         # Include images with our message
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image',
-                       NotifyGrowl.template_args['image']['default']))
+        results["include_image"] = parse_bool(
+            results["qsd"].get(
+                "image", NotifyGrowl.template_args["image"]["default"]
+            )
+        )
 
         # Include images with our message
-        results['sticky'] = \
-            parse_bool(results['qsd'].get('sticky',
-                       NotifyGrowl.template_args['sticky']['default']))
+        results["sticky"] = parse_bool(
+            results["qsd"].get(
+                "sticky", NotifyGrowl.template_args["sticky"]["default"]
+            )
+        )
 
         # Set our version
         if version:
-            results['version'] = version
+            results["version"] = version
 
         return results

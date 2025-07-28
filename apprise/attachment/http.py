@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,30 +25,31 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
+import contextlib
 import os
-import requests
-import threading
+import re
 from tempfile import NamedTemporaryFile
-from .base import AttachBase
+import threading
+
+import requests
+
 from ..common import ContentLocation
-from ..url import PrivacyMode
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import AttachBase
 
 
 class AttachHTTP(AttachBase):
-    """
-    A wrapper for HTTP based attachment sources
-    """
+    """A wrapper for HTTP based attachment sources."""
 
     # The default descriptive name associated with the service
-    service_name = _('Web Based')
+    service_name = _("Web Based")
 
     # The default protocol
-    protocol = 'http'
+    protocol = "http"
 
     # The default secure protocol
-    secure_protocol = 'https'
+    secure_protocol = "https"
 
     # The number of bytes in memory to read from the remote source at a time
     chunk_size = 8192
@@ -61,20 +61,18 @@ class AttachHTTP(AttachBase):
     _lock = threading.Lock()
 
     def __init__(self, headers=None, **kwargs):
-        """
-        Initialize HTTP Object
+        """Initialize HTTP Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
-        self.schema = 'https' if self.secure else 'http'
+        self.schema = "https" if self.secure else "http"
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
         if not isinstance(self.fullpath, str):
-            self.fullpath = '/'
+            self.fullpath = "/"
 
         self.headers = {}
         if headers:
@@ -86,15 +84,17 @@ class AttachHTTP(AttachBase):
 
         # Our Query String Dictionary; we use this to track arguments
         # specified that aren't otherwise part of this class
-        self.qsd = {k: v for k, v in kwargs.get('qsd', {}).items()
-                    if k not in self.template_args}
+        self.qsd = {
+            k: v
+            for k, v in kwargs.get("qsd", {}).items()
+            if k not in self.template_args
+        }
 
         return
 
     def download(self, **kwargs):
-        """
-        Perform retrieval of the configuration based on the specified request
-        """
+        """Perform retrieval of the configuration based on the specified
+        request."""
 
         if self.location == ContentLocation.INACCESSIBLE:
             # our content is inaccessible
@@ -102,7 +102,7 @@ class AttachHTTP(AttachBase):
 
         # prepare header
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         # Apply any/all header over-rides defined
@@ -112,9 +112,9 @@ class AttachHTTP(AttachBase):
         if self.user:
             auth = (self.user, self.password)
 
-        url = '%s://%s' % (self.schema, self.host)
+        url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 
@@ -129,67 +129,74 @@ class AttachHTTP(AttachBase):
                 # Due to locking; it's possible a concurrent thread already
                 # handled the retrieval in which case we can safely move on
                 self.logger.trace(
-                    'HTTP Attachment %s already retrieved',
-                    self._temp_file.name)
+                    "HTTP Attachment %s already retrieved",
+                    self._temp_file.name,
+                )
                 return True
 
             # Ensure any existing content set has been invalidated
             self.invalidate()
 
             self.logger.debug(
-                'HTTP Attachment Fetch URL: %s (cert_verify=%r)' % (
-                    url, self.verify_certificate))
+                "HTTP Attachment Fetch URL:"
+                f" {url} (cert_verify={self.verify_certificate!r})"
+            )
 
             try:
                 # Make our request
                 with requests.get(
-                        url,
-                        headers=headers,
-                        auth=auth,
-                        params=self.qsd,
-                        verify=self.verify_certificate,
-                        timeout=self.request_timeout,
-                        stream=True) as r:
+                    url,
+                    headers=headers,
+                    auth=auth,
+                    params=self.qsd,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                    stream=True,
+                ) as r:
 
                     # Handle Errors
                     r.raise_for_status()
 
                     # Get our file-size (if known)
                     try:
-                        file_size = int(r.headers.get('Content-Length', '0'))
+                        file_size = int(r.headers.get("Content-Length", "0"))
                     except (TypeError, ValueError):
                         # Handle edge case where Content-Length is a bad value
                         file_size = 0
 
                     # Perform a little Q/A on file limitations and restrictions
-                    if self.max_file_size > 0 and \
-                            file_size > self.max_file_size:
+                    if (
+                        self.max_file_size > 0
+                        and file_size > self.max_file_size
+                    ):
 
                         # The content retrieved is to large
                         self.logger.error(
-                            'HTTP response exceeds allowable maximum file '
-                            'length ({}KB): {}'.format(
-                                int(self.max_file_size / 1024),
-                                self.url(privacy=True)))
+                            "HTTP response exceeds allowable maximum file"
+                            f" length ({int(self.max_file_size / 1024)}KB):"
+                            f" {self.url(privacy=True)}"
+                        )
 
                         # Return False (signifying a failure)
                         return False
 
                     # Detect config format based on mime if the format isn't
                     # already enforced
-                    self.detected_mimetype = r.headers.get('Content-Type')
+                    self.detected_mimetype = r.headers.get("Content-Type")
 
-                    d = r.headers.get('Content-Disposition', '')
+                    d = r.headers.get("Content-Disposition", "")
                     result = re.search(
-                        "filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I)
+                        "filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I
+                    )
                     if result:
-                        self.detected_name = result.group('name').strip()
+                        self.detected_name = result.group("name").strip()
 
                     # Create a temporary file to work with; delete must be set
                     # to False or it isn't compatible with Microsoft Windows
                     # instances. In lieu of this, __del__ will clean up the
                     # file for us.
-                    self._temp_file = NamedTemporaryFile(delete=False)
+                    self._temp_file = \
+                        NamedTemporaryFile(delete=False)  # noqa: SIM115
 
                     # Get our chunk size
                     chunk_size = self.chunk_size
@@ -212,11 +219,11 @@ class AttachHTTP(AttachBase):
                                 if bytes_written > self.max_file_size:
                                     # The content retrieved is to large
                                     self.logger.error(
-                                        'HTTP response exceeds allowable '
-                                        'maximum file length '
-                                        '({}KB): {}'.format(
-                                            int(self.max_file_size / 1024),
-                                            self.url(privacy=True)))
+                                        "HTTP response exceeds allowable"
+                                        " maximum file length"
+                                        f" ({int(self.max_file_size / 1024)}"
+                                        f"KB): {self.url(privacy=True)}"
+                                    )
 
                                     # Invalidate any variables previously set
                                     self.invalidate()
@@ -224,8 +231,10 @@ class AttachHTTP(AttachBase):
                                     # Return False (signifying a failure)
                                     return False
 
-                                elif bytes_written + chunk_size \
-                                        > self.max_file_size:
+                                elif (
+                                    bytes_written + chunk_size
+                                    > self.max_file_size
+                                ):
                                     # Adjust out next read to accomodate up to
                                     # our limit +1. This will prevent us from
                                     # reading to much into our memory buffer
@@ -242,9 +251,10 @@ class AttachHTTP(AttachBase):
 
             except requests.RequestException as e:
                 self.logger.error(
-                    'A Connection error occurred retrieving HTTP '
-                    'configuration from %s.' % self.host)
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred retrieving HTTP "
+                    f"configuration from {self.host}."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Invalidate any variables previously set
                 self.invalidate()
@@ -252,14 +262,15 @@ class AttachHTTP(AttachBase):
                 # Return False (signifying a failure)
                 return False
 
-            except (IOError, OSError):
+            except OSError:
                 # IOError is present for backwards compatibility with Python
                 # versions older then 3.3.  >= 3.3 throw OSError now.
 
                 # Could not open and/or write the temporary file
                 self.logger.error(
-                    'Could not write attachment to disk: {}'.format(
-                        self.url(privacy=True)))
+                    "Could not write attachment to disk:"
+                    f" {self.url(privacy=True)}"
+                )
 
                 # Invalidate any variables previously set
                 self.invalidate()
@@ -271,20 +282,14 @@ class AttachHTTP(AttachBase):
         return True
 
     def invalidate(self):
-        """
-        Close our temporary file
-        """
+        """Close our temporary file."""
         if self._temp_file:
-            self.logger.trace(
-                'Attachment cleanup of %s', self._temp_file.name)
+            self.logger.trace("Attachment cleanup of %s", self._temp_file.name)
             self._temp_file.close()
 
-            try:
+            with contextlib.suppress(OSError):
                 # Ensure our file is removed (if it exists)
                 os.unlink(self._temp_file.name)
-
-            except OSError:
-                pass
 
             # Reset our temporary file to prevent from entering
             # this block again
@@ -293,15 +298,11 @@ class AttachHTTP(AttachBase):
         super().invalidate()
 
     def __del__(self):
-        """
-        Tidy memory if open
-        """
+        """Tidy memory if open."""
         self.invalidate()
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
@@ -309,59 +310,59 @@ class AttachHTTP(AttachBase):
         # Prepare our cache value
         if self.cache is not None:
             if isinstance(self.cache, bool) or not self.cache:
-                cache = 'yes' if self.cache else 'no'
+                cache = "yes" if self.cache else "no"
             else:
                 cache = int(self.cache)
 
             # Set our cache value
-            params['cache'] = cache
+            params["cache"] = cache
 
         if self._mimetype:
             # A format was enforced
-            params['mime'] = self._mimetype
+            params["mime"] = self._mimetype
 
         if self._name:
             # A name was enforced
-            params['name'] = self._name
+            params["name"] = self._name
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Apply any remaining entries to our URL
         params.update(self.qsd)
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=self.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=self.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=self.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=self.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.quote(self.host, safe=''),
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=self.quote(self.fullpath, safe='/'),
-            params=self.urlencode(params, safe='/'),
+            hostname=self.quote(self.host, safe=""),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=self.quote(self.fullpath, safe="/"),
+            params=self.urlencode(params, safe="/"),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = AttachBase.parse_url(url, sanitize=False)
         if not results:
             # We're done early as we couldn't load the results
@@ -369,7 +370,7 @@ class AttachHTTP(AttachBase):
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set
-        results['headers'] = results['qsd-']
-        results['headers'].update(results['qsd+'])
+        results["headers"] = results["qsd-"]
+        results["headers"].update(results["qsd+"])
 
         return results

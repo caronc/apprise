@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,14 +26,14 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Used for testing
-from .base import AttachBase
 from ..manager_attachment import AttachmentManager
+from .base import AttachBase
 
 # Initalize our Attachment Manager Singleton
 A_MGR = AttachmentManager()
 
 __all__ = [
     # Reference
-    'AttachBase',
-    'AttachmentManager',
+    "AttachBase",
+    "AttachmentManager",
 ]

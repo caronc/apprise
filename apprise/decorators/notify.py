@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -113,14 +112,14 @@ def notify(on, name=None):
     treated as as success (True).
 
     """
+
     def wrapper(func):
-        """
-        Instantiate our custom (notification) plugin
-        """
+        """Instantiate our custom (notification) plugin."""
 
         # Generate
         CustomNotifyPlugin.instantiate_plugin(
-            url=on, send_func=func, name=name)
+            url=on, send_func=func, name=name
+        )
 
         return func
 

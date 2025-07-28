@@ -1,0 +1,76 @@
+# -*- coding: utf-8 -*-
+# BSD 2-Clause License
+#
+# Apprise - Push Notification Library.
+# Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions are met:
+#
+# 1. Redistributions of source code must retain the above copyright notice,
+#    this list of conditions and the following disclaimer.
+#
+# 2. Redistributions in binary form must reproduce the above copyright notice,
+#    this list of conditions and the following disclaimer in the documentation
+#    and/or other materials provided with the distribution.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+# POSSIBILITY OF SUCH DAMAGE.
+
+## The following was added to accomodate:
+#   https://bugzilla.redhat.com/show_bug.cgi?id=2216807
+#
+# the switch was added and it didn't work:
+#  dnf update -y --setopt=protected_packages=,
+#
+# The second work-around was to add --skip-broken
+# This also didn't work.  the final option was to download the RPMs in
+# advance and just force them.
+#
+# Base
+FROM fedora:rawhide
+ENV container=docker
+
+# https://bugzilla.redhat.com/show_bug.cgi?id=2216807 workaround
+RUN dnf download -y --destdir BZ2216807 --resolve dnf-data && \
+    rpm -Uhi --force BZ2216807/*
+
+RUN \
+	rm -f /usr/lib/systemd/system/multi-user.target.wants/*;\
+	rm -f /etc/systemd/system/*.wants/*;\
+	rm -f /usr/lib/systemd/system/local-fs.target.wants/*; \
+	rm -f /usr/lib/systemd/system/sockets.target.wants/*udev*; \
+	rm -f /usr/lib/systemd/system/sockets.target.wants/*initctl*; \
+	rm -f /usr/lib/systemd/system/basic.target.wants/*;\
+	rm -f /usr/lib/systemd/system/anaconda.target.wants/*; \
+   echo "assumeyes=1" >> /etc/dnf/dnf.conf; \
+   dnf install -y epel-release; \
+   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
+                  dnf-plugins-core 'dnf-command(config-manager)' \
+                 'dnf-command(builddep)' sudo rsync rpmdevtools
+
+# Place our build file into the path
+COPY bin/build-rpm.sh /usr/bin
+COPY packaging/redhat/python-apprise.spec /
+RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
+    xargs dnf install -y && dnf clean all
+
+# RPM Build Structure Setup
+ENV FLAVOR=rpmbuild OS=centos DIST=rawhide
+RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
+    echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+VOLUME ["/apprise"]
+WORKDIR /apprise
+
+# RPMs should never be built as root
+USER builder

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -55,76 +54,76 @@
 # This plugin also supports taking the URL (as identified above) directly
 # as well.
 
-import re
-import requests
 from json import dumps
+import re
 
-from .base import NotifyBase
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 class NotifyWeComBot(NotifyBase):
-    """
-    A wrapper for WeCom Bot Notifications
-    """
+    """A wrapper for WeCom Bot Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'WeCom Bot'
+    service_name = "WeCom Bot"
 
     # The services URL
-    service_url = 'https://weixin.qq.com/'
+    service_url = "https://weixin.qq.com/"
 
     # The default secure protocol
-    secure_protocol = 'wecombot'
+    secure_protocol = "wecombot"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_wecombot'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_wecombot"
 
     # Plain Text Notification URL
-    notify_url = 'https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={key}'
+    notify_url = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={key}"
 
     # Define object templates
-    templates = (
-        '{schema}://{key}',
-    )
+    templates = ("{schema}://{key}",)
 
     # The title is not used
     title_maxlen = 0
 
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        # The Bot Key can be found at the end of the webhook provided (?key=)
-        'key': {
-            'name': _('Bot Webhook Key'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            # The Bot Key can be found at the end of the webhook provided
+            # (?key=)
+            "key": {
+                "name": _("Bot Webhook Key"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[a-z0-9_-]+$", "i"),
+            },
         },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        # You can optionally pass IRC colors into
-        'key': {
-            'alias_of': 'key',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            # You can optionally pass IRC colors into
+            "key": {
+                "alias_of": "key",
+            },
         },
-    })
+    )
 
     def __init__(self, key, **kwargs):
-        """
-        Initialize WeCom Bot Object
-        """
+        """Initialize WeCom Bot Object."""
         super().__init__(**kwargs)
 
         # Assign our bot webhook
-        self.key = validate_regex(
-            key, *self.template_tokens['key']['regex'])
+        self.key = validate_regex(key, *self.template_tokens["key"]["regex"])
         if not self.key:
-            msg = 'An invalid WeCom Bot Webhook Key ' \
-                  '({}) was specified.'.format(key)
+            msg = f"An invalid WeCom Bot Webhook Key ({key}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -136,49 +135,47 @@ class NotifyWeComBot(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.key)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Prepare our parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{key}/?{params}'.format(
+        return "{schema}://{key}/?{params}".format(
             schema=self.secure_protocol,
-            key=self.pprint(self.key, privacy, safe=''),
+            key=self.pprint(self.key, privacy, safe=""),
             params=NotifyWeComBot.urlencode(params),
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        wrapper to _send since we can alert more then one channel
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Wrapper to _send since we can alert more then one channel."""
 
         # prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json; charset=utf-8',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json; charset=utf-8",
         }
 
         # Prepare our payload
         payload = {
-            'msgtype': "text",
-            'text': {
-                'content': body,
-            }
+            "msgtype": "text",
+            "text": {
+                "content": body,
+            },
         }
 
-        self.logger.debug('WeCom Bot GET URL: %s (cert_verify=%r)' % (
-            self.api_url, self.verify_certificate))
-        self.logger.debug('WeCom Bot Payload: %s' % str(payload))
+        self.logger.debug(
+            "WeCom Bot GET URL:"
+            f" {self.api_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"WeCom Bot Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -186,36 +183,37 @@ class NotifyWeComBot(NotifyBase):
         try:
             r = requests.post(
                 self.api_url,
-                data=dumps(payload).encode('utf-8'),
+                data=dumps(payload).encode("utf-8"),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyWeComBot.http_response_code_lookup(r.status_code)
+                status_str = NotifyWeComBot.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send WeCom Bot notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send WeCom Bot notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent WeCom Bot notification.')
+                self.logger.info("Sent WeCom Bot notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending WeCom Bot '
-                'notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending WeCom Bot notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -224,11 +222,8 @@ class NotifyWeComBot(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -236,12 +231,11 @@ class NotifyWeComBot(NotifyBase):
             return results
 
         # The first token is stored in the hostname
-        results['key'] = NotifyWeComBot.unquote(results['host'])
+        results["key"] = NotifyWeComBot.unquote(results["host"])
 
         # The 'key' makes it easier to use yaml configuration
-        if 'key' in results['qsd'] and len(results['qsd']['key']):
-            results['key'] = \
-                NotifyWeComBot.unquote(results['qsd']['key'])
+        if "key" in results["qsd"] and len(results["qsd"]["key"]):
+            results["key"] = NotifyWeComBot.unquote(results["qsd"]["key"])
 
         return results
 
@@ -252,16 +246,24 @@ class NotifyWeComBot(NotifyBase):
         """
 
         result = re.match(
-            r'^https?://qyapi\.weixin\.qq\.com/cgi-bin/webhook/send/?\?key='
-            r'(?P<key>[A-Z0-9_-]+)/?'
-            r'&?(?P<params>.+)?$', url, re.I)
+            r"^https?://qyapi\.weixin\.qq\.com/cgi-bin/webhook/send/?\?key="
+            r"(?P<key>[A-Z0-9_-]+)/?"
+            r"&?(?P<params>.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
             return NotifyWeComBot.parse_url(
-                '{schema}://{key}{params}'.format(
+                "{schema}://{key}{params}".format(
                     schema=NotifyWeComBot.secure_protocol,
-                    key=result.group('key'),
-                    params='' if not result.group('params')
-                    else '?' + result.group('params')))
+                    key=result.group("key"),
+                    params=(
+                        ""
+                        if not result.group("params")
+                        else "?" + result.group("params")
+                    ),
+                )
+            )
 
         return None

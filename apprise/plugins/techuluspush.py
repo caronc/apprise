@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -50,95 +49,93 @@
 # - https://push.techulus.com/ - Main Website
 # - https://pushtechulus.docs.apiary.io - API Documentation
 
-import requests
 from json import dumps
 
-from .base import NotifyBase
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 # Token required as part of the API request
 # Used to prepare our UUID regex matching
-UUID4_RE = \
-    r'[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}'
+UUID4_RE = (
+    r"[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}"
+)
 
 
 class NotifyTechulusPush(NotifyBase):
-    """
-    A wrapper for Techulus Push Notifications
-    """
+    """A wrapper for Techulus Push Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Techulus Push'
+    service_name = "Techulus Push"
 
     # The services URL
-    service_url = 'https://push.techulus.com'
+    service_url = "https://push.techulus.com"
 
     # The default secure protocol
-    secure_protocol = 'push'
+    secure_protocol = "push"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_techulus'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_techulus"
 
     # Techulus Push uses the http protocol with JSON requests
-    notify_url = 'https://push.techulus.com/api/v1/notify'
+    notify_url = "https://push.techulus.com/api/v1/notify"
 
     # The maximum allowable characters allowed in the body per message
     body_maxlen = 1000
 
     # Define object templates
-    templates = (
-        '{schema}://{apikey}',
-    )
+    templates = ("{schema}://{apikey}",)
 
     # Define our template apikeys
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^{}$'.format(UUID4_RE), 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (rf"^{UUID4_RE}$", "i"),
+            },
         },
-    })
+    )
 
     def __init__(self, apikey, **kwargs):
-        """
-        Initialize Techulus Push Object
-        """
+        """Initialize Techulus Push Object."""
         super().__init__(**kwargs)
 
         # The apikey associated with the account
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'An invalid Techulus Push API key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid Techulus Push API key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Techulus Push Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Techulus Push Notification."""
 
         # Setup our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-            'x-api-key': self.apikey,
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
+            "x-api-key": self.apikey,
         }
 
         payload = {
-            'title': title,
-            'body': body,
+            "title": title,
+            "body": body,
         }
 
-        self.logger.debug('Techulus Push POST URL: %s (cert_verify=%r)' % (
-            self.notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('Techulus Push Payload: %s' % str(payload))
+        self.logger.debug(
+            "Techulus Push POST URL:"
+            f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Techulus Push Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -151,34 +148,34 @@ class NotifyTechulusPush(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                    requests.codes.ok, requests.codes.no_content):
+                requests.codes.ok,
+                requests.codes.no_content,
+            ):
                 # We had a problem
-                status_str = \
-                    NotifyTechulusPush.http_response_code_lookup(
-                        r.status_code)
+                status_str = NotifyTechulusPush.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Techulus Push notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Techulus Push notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 return False
 
             else:
-                self.logger.info(
-                    'Sent Techulus Push notification.')
+                self.logger.info("Sent Techulus Push notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Techulus Push '
-                'notification.'
+                "A Connection error occurred sending Techulus Push "
+                "notification."
             )
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             return False
 
@@ -186,40 +183,35 @@ class NotifyTechulusPush(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{apikey}/?{params}'.format(
+        return "{schema}://{apikey}/?{params}".format(
             schema=self.secure_protocol,
-            apikey=self.pprint(self.apikey, privacy, safe=''),
+            apikey=self.pprint(self.apikey, privacy, safe=""),
             params=NotifyTechulusPush.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The first apikey is stored in the hostname
-        results['apikey'] = NotifyTechulusPush.unquote(results['host'])
+        results["apikey"] = NotifyTechulusPush.unquote(results["host"])
 
         return results

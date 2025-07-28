@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,31 +26,31 @@
 # POSSIBILITY OF SUCH DAMAGE.USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from ..plugins.base import NotifyBase
-from ..manager_plugins import NotificationManager
-from ..utils.parse import URL_DETAILS_RE, parse_url, url_assembly
-from ..utils.logic import dict_full_update
+import inspect
+
 from .. import common
 from ..logger import logger
-import inspect
+from ..manager_plugins import NotificationManager
+from ..plugins.base import NotifyBase
+from ..utils.logic import dict_full_update
+from ..utils.parse import URL_DETAILS_RE, parse_url, url_assembly
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
 
 class CustomNotifyPlugin(NotifyBase):
-    """
-    Apprise Custom Plugin Hook
+    """Apprise Custom Plugin Hook.
 
     This gets initialized based on @notify decorator definitions
-
     """
+
     # Our Custom notification
-    service_url = 'https://github.com/caronc/apprise/wiki/Custom_Notification'
+    service_url = "https://github.com/caronc/apprise/wiki/Custom_Notification"
 
     # Over-ride our category since this inheritance of the NotifyBase class
     # should be treated differently.
-    category = 'custom'
+    category = "custom"
 
     # Support Attachments
     attachment_support = True
@@ -60,60 +59,58 @@ class CustomNotifyPlugin(NotifyBase):
     storage_mode = common.PersistentStoreMode.AUTO
 
     # Define object templates
-    templates = (
-        '{schema}://',
-    )
+    templates = ("{schema}://",)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns arguments retrieved
-
-        """
+        """Parses the URL and returns arguments retrieved."""
         return parse_url(url, verify_host=False, simple=True)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        General URL assembly
-        """
-        return '{schema}://'.format(schema=self.secure_protocol)
+        """General URL assembly."""
+        return f"{self.secure_protocol}://"
 
     @staticmethod
     def instantiate_plugin(url, send_func, name=None):
-        """
-        The function used to add a new notification plugin based on the schema
-        parsed from the provided URL into our supported matrix structure.
-        """
+        """The function used to add a new notification plugin based on the
+        schema parsed from the provided URL into our supported matrix
+        structure."""
 
         if not isinstance(url, str):
-            msg = 'An invalid custom notify url/schema ({}) provided in ' \
-                'function {}.'.format(url, send_func.__name__)
+            msg = (
+                f"An invalid custom notify url/schema ({url}) provided in "
+                f"function {send_func.__name__}."
+            )
             logger.warning(msg)
             return None
 
         # Validate that our schema is okay
         re_match = URL_DETAILS_RE.match(url)
         if not re_match:
-            msg = 'An invalid custom notify url/schema ({}) provided in ' \
-                'function {}.'.format(url, send_func.__name__)
+            msg = (
+                f"An invalid custom notify url/schema ({url}) provided in "
+                f"function {send_func.__name__}."
+            )
             logger.warning(msg)
             return None
 
         # Acquire our schema
-        schema = re_match.group('schema').lower()
+        schema = re_match.group("schema").lower()
 
-        if not re_match.group('base'):
-            url = '{}://'.format(schema)
+        if not re_match.group("base"):
+            url = f"{schema}://"
 
         # Keep a default set of arguments to apply to all called references
         base_args = parse_url(
-            url, default_schema=schema, verify_host=False, simple=True)
+            url, default_schema=schema, verify_host=False, simple=True
+        )
 
         if schema in N_MGR:
             # we're already handling this object
-            msg = 'The schema ({}) is already defined and could not be ' \
-                'loaded from custom notify function {}.' \
-                .format(url, send_func.__name__)
+            msg = (
+                f"The schema ({url}) is already defined and could not be "
+                f"loaded from custom notify function {send_func.__name__}."
+            )
             logger.warning(msg)
             return None
 
@@ -124,15 +121,18 @@ class CustomNotifyPlugin(NotifyBase):
         class CustomNotifyPluginWrapper(CustomNotifyPlugin):
 
             # Our Service Name
-            service_name = name if isinstance(name, str) \
-                and name else 'Custom - {}'.format(schema)
+            service_name = (
+                name
+                if isinstance(name, str) and name
+                else f"Custom - {schema}"
+            )
 
             # Store our matched schema
             secure_protocol = schema
 
             requirements = {
                 # Define our required packaging in order to work
-                'details': "Source: {}".format(inspect.getfile(send_func))
+                "details": f"Source: {inspect.getfile(send_func)}"
             }
 
             # Assign our send() function
@@ -142,18 +142,14 @@ class CustomNotifyPlugin(NotifyBase):
             _base_args = base_args
 
             def __init__(self, **kwargs):
-                """
-                Our initialization
-
-                """
+                """Our initialization."""
                 #  init parent
                 super().__init__(**kwargs)
 
                 self._default_args = {}
 
                 # Some variables do not need to be set
-                if 'secure' in kwargs:
-                    del kwargs['secure']
+                kwargs.pop("secure", None)
 
                 # Apply our updates based on what was parsed
                 dict_full_update(self._default_args, self._base_args)
@@ -161,52 +157,55 @@ class CustomNotifyPlugin(NotifyBase):
 
                 # Update our arguments (applying them to what we originally)
                 # initialized as
-                self._default_args['url'] = url_assembly(**self._default_args)
+                self._default_args["url"] = url_assembly(**self._default_args)
 
-            def send(self, body, title='', notify_type=common.NotifyType.INFO,
-                     *args, **kwargs):
-                """
-                Our send() call which triggers our hook
-                """
+            def send(
+                self,
+                body,
+                title="",
+                notify_type=common.NotifyType.INFO,
+                *args,
+                **kwargs,
+            ):
+                """Our send() call which triggers our hook."""
 
                 response = False
                 try:
                     # Enforce a boolean response
                     result = self.__send(
-                        body, title, notify_type, *args,
-                        meta=self._default_args, **kwargs)
+                        body,
+                        title,
+                        notify_type,
+                        *args,
+                        meta=self._default_args,
+                        **kwargs,
+                    )
 
-                    if result is None:
-                        # The wrapper did not define a return (or returned
-                        # None)
-                        # this is treated as a successful return as it is
-                        # assumed the developer did not care about the result
-                        # of the call.
-                        response = True
-
-                    else:
-                        # Perform boolean check (allowing obects to also be
-                        # returned and check against the __bool__ call
-                        response = True if result else False
+                    # None and True are both considered successful
+                    # False however is passed along further upstream
+                    response = True if result is None else bool(result)
 
                 except Exception as e:
                     # Unhandled Exception
                     self.logger.warning(
-                        'An exception occured sending a %s notification.',
-                        N_MGR[self.secure_protocol].service_name)
+                        "An exception occured sending a %s notification.",
+                        N_MGR[self.secure_protocol].service_name,
+                    )
                     self.logger.debug(
-                        '%s Exception: %s',
-                        N_MGR[self.secure_protocol], str(e))
+                        "%s Exception: %s", N_MGR[self.secure_protocol], str(e)
+                    )
                     return False
 
                 if response:
                     self.logger.info(
-                        'Sent %s notification.',
-                        N_MGR[self.secure_protocol].service_name)
+                        "Sent %s notification.",
+                        N_MGR[self.secure_protocol].service_name,
+                    )
                 else:
                     self.logger.warning(
-                        'Failed to send %s notification.',
-                        N_MGR[self.secure_protocol].service_name)
+                        "Failed to send %s notification.",
+                        N_MGR[self.secure_protocol].service_name,
+                    )
                 return response
 
         # Store our plugin into our core map file

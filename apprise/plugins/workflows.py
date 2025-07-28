@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -50,38 +49,36 @@
 #   workflows://HOST:PORT/ABCD/DEFG/
 #
 
-import re
-import requests
 import json
 from json.decoder import JSONDecodeError
+import re
 
-from .base import NotifyBase
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..common import NotifyFormat
-from ..utils.parse import parse_bool, validate_regex
-from ..utils.templates import apply_template, TemplateType
+import requests
+
 from ..apprise_attachment import AppriseAttachment
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool, validate_regex
+from ..utils.templates import TemplateType, apply_template
+from .base import NotifyBase
 
 
 class NotifyWorkflows(NotifyBase):
-    """
-    A wrapper for Microsoft Workflows (MS Teams) Notifications
-    """
+    """A wrapper for Microsoft Workflows (MS Teams) Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Power Automate / Workflows (for MSTeams)'
+    service_name = "Power Automate / Workflows (for MSTeams)"
 
     # The services URL
-    service_url = 'https://www.microsoft.com/power-platform/' \
-        'products/power-automate'
+    service_url = (
+        "https://www.microsoft.com/power-platform/products/power-automate"
+    )
 
     # The default secure protocol
-    secure_protocol = ('workflow', 'workflows')
+    secure_protocol = ("workflow", "workflows")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_workflows'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_workflows"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_32
@@ -97,125 +94,136 @@ class NotifyWorkflows(NotifyBase):
     max_workflows_template_size = 35000
 
     # Adaptive Card Version
-    adaptive_card_version = '1.4'
+    adaptive_card_version = "1.4"
 
     # Define object templates
     templates = (
-        '{schema}://{host}/{workflow}/{signature}',
-        '{schema}://{host}:{port}/{workflow}/{signature}',
+        "{schema}://{host}/{workflow}/{signature}",
+        "{schema}://{host}:{port}/{workflow}/{signature}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            # workflow identifier
+            "workflow": {
+                "name": _("Workflow ID"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[A-Z0-9_-]+$", "i"),
+            },
+            # Signature
+            "signature": {
+                "name": _("Signature"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9_-]+$", "i"),
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        # workflow identifier
-        'workflow': {
-            'name': _('Workflow ID'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[A-Z0-9_-]+$', 'i'),
-        },
-        # Signature
-        'signature': {
-            'name': _('Signature'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9_-]+$', 'i'),
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'id': {
-            'alias_of': 'workflow',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "id": {
+                "alias_of": "workflow",
+            },
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": True,
+                "map_to": "include_image",
+            },
+            "wrap": {
+                "name": _("Wrap Text"),
+                "type": "bool",
+                "default": True,
+                "map_to": "wrap",
+            },
+            "template": {
+                "name": _("Template Path"),
+                "type": "string",
+                "private": True,
+            },
+            # Below variable shortforms are taken from the Workflows webhook
+            # for consistency
+            "sig": {
+                "alias_of": "signature",
+            },
+            "ver": {
+                "name": _("API Version"),
+                "type": "string",
+                "default": "2016-06-01",
+                "map_to": "version",
+            },
+            "api-version": {"alias_of": "ver"},
         },
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'include_image',
-        },
-        'wrap': {
-            'name': _('Wrap Text'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'wrap',
-        },
-        'template': {
-            'name': _('Template Path'),
-            'type': 'string',
-            'private': True,
-        },
-        # Below variable shortforms are taken from the Workflows webhook
-        # for consistency
-        'sig': {
-            'alias_of': 'signature',
-        },
-        'ver': {
-            'name': _('API Version'),
-            'type': 'string',
-            'default': '2016-06-01',
-            'map_to': 'version',
-        },
-        'api-version': {
-            'alias_of': 'ver'
-        },
-    })
+    )
 
     # Define our token control
     template_kwargs = {
-        'tokens': {
-            'name': _('Template Tokens'),
-            'prefix': ':',
+        "tokens": {
+            "name": _("Template Tokens"),
+            "prefix": ":",
         },
     }
 
-    def __init__(self, workflow, signature, include_image=None,
-                 version=None, template=None, tokens=None, wrap=None,
-                 **kwargs):
-        """
-        Initialize Microsoft Workflows Object
-
-        """
+    def __init__(
+        self,
+        workflow,
+        signature,
+        include_image=None,
+        version=None,
+        template=None,
+        tokens=None,
+        wrap=None,
+        **kwargs,
+    ):
+        """Initialize Microsoft Workflows Object."""
         super().__init__(**kwargs)
 
         self.workflow = validate_regex(
-            workflow, *self.template_tokens['workflow']['regex'])
+            workflow, *self.template_tokens["workflow"]["regex"]
+        )
         if not self.workflow:
-            msg = 'An invalid Workflows ID ' \
-                  '({}) was specified.'.format(workflow)
+            msg = f"An invalid Workflows ID ({workflow}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         self.signature = validate_regex(
-            signature, *self.template_tokens['signature']['regex'])
+            signature, *self.template_tokens["signature"]["regex"]
+        )
         if not self.signature:
-            msg = 'An invalid Signature ' \
-                  '({}) was specified.'.format(signature)
+            msg = f"An invalid Signature ({signature}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Place a thumbnail image inline with the message body
-        self.include_image = True if (
-            include_image if include_image is not None else
-            self.template_args['image']['default']) else False
+        self.include_image = bool(
+            include_image
+            if include_image is not None
+            else self.template_args["image"]["default"]
+        )
 
         # Wrap Text
-        self.wrap = True if (
-            wrap if wrap is not None else
-            self.template_args['wrap']['default']) else False
+        self.wrap = bool(
+            wrap if wrap is not None else self.template_args["wrap"]["default"]
+        )
 
         # Our template object is just an AppriseAttachment object
         self.template = AppriseAttachment(asset=self.asset)
@@ -226,8 +234,11 @@ class NotifyWorkflows(NotifyBase):
             self.template[0].max_file_size = self.max_workflows_template_size
 
         # Prepare Version
-        self.api_version = version if version is not None \
-            else self.template_args['ver']['default']
+        self.api_version = (
+            version
+            if version is not None
+            else self.template_args["ver"]["default"]
+        )
 
         # Template functionality
         self.tokens = {}
@@ -235,25 +246,27 @@ class NotifyWorkflows(NotifyBase):
             self.tokens.update(tokens)
 
         elif tokens:
-            msg = 'The specified Workflows Template Tokens ' \
-                  '({}) are not identified as a dictionary.'.format(tokens)
+            msg = (
+                "The specified Workflows Template Tokens "
+                f"({tokens}) are not identified as a dictionary."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # else:  NoneType - this is okay
         return
 
-    def gen_payload(self, body, title='', notify_type=NotifyType.INFO,
-                    **kwargs):
-        """
-        This function generates our payload whether it be the generic one
-        Apprise generates by default, or one provided by a specified
-        external template.
-        """
+    def gen_payload(
+        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+    ):
+        """This function generates our payload whether it be the generic one
+        Apprise generates by default, or one provided by a specified external
+        template."""
 
         # Acquire our to-be footer icon if configured to do so
-        image_url = None if not self.include_image \
-            else self.image_url(notify_type)
+        image_url = (
+            None if not self.include_image else self.image_url(notify_type)
+        )
 
         body_content = []
         if image_url:
@@ -267,7 +280,7 @@ class NotifyWorkflows(NotifyBase):
         if title:
             body_content.append({
                 "type": "TextBlock",
-                "text": f'{title}',
+                "text": f"{title}",
                 "style": "heading",
                 "weight": "Bolder",
                 "size": "Large",
@@ -288,21 +301,18 @@ class NotifyWorkflows(NotifyBase):
             schema = "http://adaptivecards.io/schemas/adaptive-card.json"
             payload = {
                 "type": "message",
-                "attachments": [
-                    {
-                        "contentType":
-                        "application/vnd.microsoft.card.adaptive",
-                        "contentUrl": None,
-                        "content": {
-                            "$schema": schema,
-                            "type": "AdaptiveCard",
-                            "version": self.adaptive_card_version,
-                            "body": body_content,
-                            # Additionally
-                            "msteams": {"width": "full"},
-                        }
-                    }
-                ]
+                "attachments": [{
+                    "contentType": "application/vnd.microsoft.card.adaptive",
+                    "contentUrl": None,
+                    "content": {
+                        "$schema": schema,
+                        "type": "AdaptiveCard",
+                        "version": self.adaptive_card_version,
+                        "body": body_content,
+                        # Additionally
+                        "msteams": {"width": "full"},
+                    },
+                }],
             }
 
             return payload
@@ -312,80 +322,86 @@ class NotifyWorkflows(NotifyBase):
         if not template:
             # We could not access the attachment
             self.logger.error(
-                'Could not access Workflow template {}.'.format(
-                    template.url(privacy=True)))
+                "Could not access Workflow template"
+                f" {template.url(privacy=True)}."
+            )
             return False
 
         # Take a copy of our token dictionary
         tokens = self.tokens.copy()
 
         # Apply some defaults template values
-        tokens['app_body'] = body
-        tokens['app_title'] = title
-        tokens['app_type'] = notify_type
-        tokens['app_id'] = self.app_id
-        tokens['app_desc'] = self.app_desc
-        tokens['app_color'] = self.color(notify_type)
-        tokens['app_image_url'] = image_url
-        tokens['app_url'] = self.app_url
+        tokens["app_body"] = body
+        tokens["app_title"] = title
+        tokens["app_type"] = notify_type.value
+        tokens["app_id"] = self.app_id
+        tokens["app_desc"] = self.app_desc
+        tokens["app_color"] = self.color(notify_type)
+        tokens["app_image_url"] = image_url
+        tokens["app_url"] = self.app_url
 
         # Enforce Application mode
-        tokens['app_mode'] = TemplateType.JSON
+        tokens["app_mode"] = TemplateType.JSON
 
         try:
-            with open(template.path, 'r') as fp:
+            with open(template.path) as fp:
                 content = json.loads(apply_template(fp.read(), **tokens))
 
-        except (OSError, IOError):
+        except OSError:
             self.logger.error(
-                'MSTeam template {} could not be read.'.format(
-                    template.url(privacy=True)))
+                f"MSTeam template {template.url(privacy=True)} could not be"
+                " read."
+            )
             return None
 
         except JSONDecodeError as e:
             self.logger.error(
-                'MSTeam template {} contains invalid JSON.'.format(
-                    template.url(privacy=True)))
-            self.logger.debug('JSONDecodeError: {}'.format(e))
+                f"MSTeam template {template.url(privacy=True)} contains"
+                " invalid JSON."
+            )
+            self.logger.debug(f"JSONDecodeError: {e}")
             return None
 
         return content
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Microsoft Teams Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Microsoft Teams Notification."""
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         params = {
-            'api-version': self.api_version,
-            'sp': '/triggers/manual/run',
-            'sv': '1.0',
-            'sig': self.signature,
+            "api-version": self.api_version,
+            "sp": "/triggers/manual/run",
+            "sv": "1.0",
+            "sig": self.signature,
         }
 
-        notify_url = 'https://{host}{port}/workflows/{workflow}/' \
-            'triggers/manual/paths/invoke'.format(
+        notify_url = (
+            "https://{host}{port}/workflows/{workflow}/"
+            "triggers/manual/paths/invoke".format(
                 host=self.host,
-                port='' if not self.port else f':{self.port}',
-                workflow=self.workflow)
+                port="" if not self.port else f":{self.port}",
+                workflow=self.workflow,
+            )
+        )
 
         # Generate our payload if it's possible
         payload = self.gen_payload(
-            body=body, title=title, notify_type=notify_type, **kwargs)
+            body=body, title=title, notify_type=notify_type, **kwargs
+        )
         if not payload:
             # No need to present a reason; that will come from the
             # gen_payload() function itself
             return False
 
-        self.logger.debug('Workflows POST URL: %s (cert_verify=%r)' % (
-            notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('Workflows Payload: %s' % str(payload))
+        self.logger.debug(
+            "Workflows POST URL:"
+            f" {notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Workflows Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -399,31 +415,34 @@ class NotifyWorkflows(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                    requests.codes.ok, requests.codes.accepted):
+                requests.codes.ok,
+                requests.codes.accepted,
+            ):
                 # We had a problem
-                status_str = \
-                    NotifyWorkflows.http_response_code_lookup(r.status_code)
+                status_str = NotifyWorkflows.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Workflows notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Workflows notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # We failed
                 return False
 
             else:
-                self.logger.info('Sent Workflows notification.')
+                self.logger.info("Sent Workflows notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Workflows notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Workflows notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # We failed
             return False
@@ -432,57 +451,57 @@ class NotifyWorkflows(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
-            self.secure_protocol[0], self.host, self.port, self.workflow,
+            self.secure_protocol[0],
+            self.host,
+            self.port,
+            self.workflow,
             self.signature,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'image': 'yes' if self.include_image else 'no',
-            'wrap': 'yes' if self.wrap else 'no',
+            "image": "yes" if self.include_image else "no",
+            "wrap": "yes" if self.wrap else "no",
         }
 
         if self.template:
-            params['template'] = NotifyWorkflows.quote(
-                self.template[0].url(), safe='')
+            params["template"] = NotifyWorkflows.quote(
+                self.template[0].url(), safe=""
+            )
 
         # Store our version if it differs from default
-        if self.api_version != self.template_args['ver']['default']:
-            params['ver'] = self.api_version
+        if self.api_version != self.template_args["ver"]["default"]:
+            params["ver"] = self.api_version
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
         # Store any template entries if specified
-        params.update({':{}'.format(k): v for k, v in self.tokens.items()})
+        params.update({f":{k}": v for k, v in self.tokens.items()})
 
-        return '{schema}://{host}{port}/{workflow}/{signature}/' \
-            '?{params}'.format(
+        return (
+            "{schema}://{host}{port}/{workflow}/{signature}/?{params}".format(
                 schema=self.secure_protocol[0],
                 host=self.host,
-                port='' if not self.port else f':{self.port}',
-                workflow=self.pprint(self.workflow, privacy, safe=''),
-                signature=self.pprint(self.signature, privacy, safe=''),
+                port="" if not self.port else f":{self.port}",
+                workflow=self.pprint(self.workflow, privacy, safe=""),
+                signature=self.pprint(self.signature, privacy, safe=""),
                 params=NotifyWorkflows.urlencode(params),
             )
+        )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url)
         if not results:
@@ -490,58 +509,73 @@ class NotifyWorkflows(NotifyBase):
             return results
 
         # store values if provided
-        entries = NotifyWorkflows.split_path(results['fullpath'])
+        entries = NotifyWorkflows.split_path(results["fullpath"])
 
         # Display image?
-        results['include_image'] = parse_bool(results['qsd'].get(
-            'image', NotifyWorkflows.template_args['image']['default']))
+        results["include_image"] = parse_bool(
+            results["qsd"].get(
+                "image", NotifyWorkflows.template_args["image"]["default"]
+            )
+        )
 
         # Wrap Text?
-        results['wrap'] = parse_bool(results['qsd'].get(
-            'wrap', NotifyWorkflows.template_args['wrap']['default']))
+        results["wrap"] = parse_bool(
+            results["qsd"].get(
+                "wrap", NotifyWorkflows.template_args["wrap"]["default"]
+            )
+        )
 
         # Template Handling
-        if 'template' in results['qsd'] and results['qsd']['template']:
-            results['template'] = \
-                NotifyWorkflows.unquote(results['qsd']['template'])
+        if "template" in results["qsd"] and results["qsd"]["template"]:
+            results["template"] = NotifyWorkflows.unquote(
+                results["qsd"]["template"]
+            )
 
-        if 'workflow' in results['qsd'] and results['qsd']['workflow']:
-            results['workflow'] = \
-                NotifyWorkflows.unquote(results['qsd']['workflow'])
+        if "workflow" in results["qsd"] and results["qsd"]["workflow"]:
+            results["workflow"] = NotifyWorkflows.unquote(
+                results["qsd"]["workflow"]
+            )
 
-        elif 'id' in results['qsd'] and results['qsd']['id']:
-            results['workflow'] = \
-                NotifyWorkflows.unquote(results['qsd']['id'])
+        elif "id" in results["qsd"] and results["qsd"]["id"]:
+            results["workflow"] = NotifyWorkflows.unquote(results["qsd"]["id"])
 
         else:
-            results['workflow'] = None if not entries \
+            results["workflow"] = (
+                None
+                if not entries
                 else NotifyWorkflows.unquote(entries.pop(0))
+            )
 
         # Signature
-        if 'signature' in results['qsd'] and results['qsd']['signature']:
-            results['signature'] = \
-                NotifyWorkflows.unquote(results['qsd']['signature'])
+        if "signature" in results["qsd"] and results["qsd"]["signature"]:
+            results["signature"] = NotifyWorkflows.unquote(
+                results["qsd"]["signature"]
+            )
 
-        elif 'sig' in results['qsd'] and results['qsd']['sig']:
-            results['signature'] = \
-                NotifyWorkflows.unquote(results['qsd']['sig'])
+        elif "sig" in results["qsd"] and results["qsd"]["sig"]:
+            results["signature"] = NotifyWorkflows.unquote(
+                results["qsd"]["sig"]
+            )
 
         else:
             # Read information from path
-            results['signature'] = None if not entries \
+            results["signature"] = (
+                None
+                if not entries
                 else NotifyWorkflows.unquote(entries.pop(0))
+            )
 
         # Version
-        if 'api-version' in results['qsd'] and results['qsd']['api-version']:
-            results['version'] = \
-                NotifyWorkflows.unquote(results['qsd']['api-version'])
+        if "api-version" in results["qsd"] and results["qsd"]["api-version"]:
+            results["version"] = NotifyWorkflows.unquote(
+                results["qsd"]["api-version"]
+            )
 
-        elif 'ver' in results['qsd'] and results['qsd']['ver']:
-            results['version'] = \
-                NotifyWorkflows.unquote(results['qsd']['ver'])
+        elif "ver" in results["qsd"] and results["qsd"]["ver"]:
+            results["version"] = NotifyWorkflows.unquote(results["qsd"]["ver"])
 
         # Store our tokens
-        results['tokens'] = results['qsd:']
+        results["tokens"] = results["qsd:"]
 
         return results
 
@@ -554,22 +588,29 @@ class NotifyWorkflows(NotifyBase):
 
         # Match our workflows webhook URL and re-assemble
         result = re.match(
-            r'^https?://(?P<host>[A-Z0-9_.-]+)'
-            r'(?P<port>:[1-9][0-9]{0,5})?'
-            r'/workflows/'
-            r'(?P<workflow>[A-Z0-9_-]+)'
-            r'/triggers/manual/paths/invoke/?'
-            r'(?P<params>\?.+)$', url, re.I)
+            r"^https?://(?P<host>[A-Z0-9_.-]+)"
+            r"(?P<port>:[1-9][0-9]{0,5})?"
+            r"/workflows/"
+            r"(?P<workflow>[A-Z0-9_-]+)"
+            r"/triggers/manual/paths/invoke/?"
+            r"(?P<params>\?.+)$",
+            url,
+            re.I,
+        )
 
         if result:
             # Construct our URL
             return NotifyWorkflows.parse_url(
-                '{schema}://{host}{port}/{workflow}'
-                '/{params}'.format(
+                "{schema}://{host}{port}/{workflow}/{params}".format(
                     schema=NotifyWorkflows.secure_protocol[0],
-                    host=result.group('host'),
-                    port='' if not result.group('port')
-                    else result.group('port'),
-                    workflow=result.group('workflow'),
-                    params=result.group('params')))
+                    host=result.group("host"),
+                    port=(
+                        ""
+                        if not result.group("port")
+                        else result.group("port")
+                    ),
+                    workflow=result.group("workflow"),
+                    params=result.group("params"),
+                )
+            )
         return None

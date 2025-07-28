@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,18 +25,18 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from html.parser import HTMLParser
 import re
+
 from markdown import markdown
+
 from .common import NotifyFormat
 from .url import URLBase
 
-from html.parser import HTMLParser
-
 
 def convert_between(from_format, to_format, content):
-    """
-    Converts between different suported formats. If no conversion exists,
-    or the selected one fails, the original text will be returned.
+    """Converts between different suported formats. If no conversion exists, or
+    the selected one fails, the original text will be returned.
 
     This function returns the content translated (if required)
     """
@@ -55,26 +54,22 @@ def convert_between(from_format, to_format, content):
 
 
 def markdown_to_html(content):
-    """
-    Converts specified content from markdown to HTML.
-    """
-    return markdown(content, extensions=[
-        'markdown.extensions.nl2br', 'markdown.extensions.tables'])
+    """Converts specified content from markdown to HTML."""
+    return markdown(
+        content,
+        extensions=["markdown.extensions.nl2br", "markdown.extensions.tables"],
+    )
 
 
 def text_to_html(content):
-    """
-    Converts specified content from plain text to HTML.
-    """
+    """Converts specified content from plain text to HTML."""
 
     # First eliminate any carriage returns
     return URLBase.escape_html(content, convert_new_lines=True)
 
 
 def html_to_text(content):
-    """
-    Converts a content from HTML to plain text.
-    """
+    """Converts a content from HTML to plain text."""
 
     parser = HTMLConverter()
     parser.feed(content)
@@ -82,20 +77,46 @@ def html_to_text(content):
     return parser.converted
 
 
-class HTMLConverter(HTMLParser, object):
+class HTMLConverter(HTMLParser):
     """An HTML to plain text converter tuned for email messages."""
 
     # The following tags must start on a new line
-    BLOCK_TAGS = ('p', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6',
-                  'div', 'td', 'th', 'code', 'pre', 'label', 'li',)
+    BLOCK_TAGS = (
+        "p",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "div",
+        "td",
+        "th",
+        "code",
+        "pre",
+        "label",
+        "li",
+    )
 
     # the folowing tags ignore any internal text
     IGNORE_TAGS = (
-        'form', 'input', 'textarea', 'select', 'ul', 'ol', 'style', 'link',
-        'meta', 'title', 'html', 'head', 'script')
+        "form",
+        "input",
+        "textarea",
+        "select",
+        "ul",
+        "ol",
+        "style",
+        "link",
+        "meta",
+        "title",
+        "html",
+        "head",
+        "script",
+    )
 
     # Condense Whitespace
-    WS_TRIM = re.compile(r'[\s]+', re.DOTALL | re.MULTILINE)
+    WS_TRIM = re.compile(r"[\s]+", re.DOTALL | re.MULTILINE)
 
     # Sentinel value for block tag boundaries, which may be consolidated into a
     # single line break.
@@ -115,12 +136,11 @@ class HTMLConverter(HTMLParser, object):
         self.converted = ""
 
     def close(self):
-        string = ''.join(self._finalize(self._result))
+        string = "".join(self._finalize(self._result))
         self.converted = string.strip()
 
     def _finalize(self, result):
-        """
-        Combines and strips consecutive strings, then converts consecutive
+        """Combines and strips consecutive strings, then converts consecutive
         block ends into singleton newlines.
 
         [ {be} " Hello " {be} {be} " World!" ] -> "\nHello\nWorld!"
@@ -136,7 +156,7 @@ class HTMLConverter(HTMLParser, object):
                     continue
 
                 # First block end; yield the current string, plus a newline.
-                yield accum.strip() + '\n'
+                yield accum.strip() + "\n"
                 accum = None
 
             # Multiple consecutive strings; combine them.
@@ -152,48 +172,42 @@ class HTMLConverter(HTMLParser, object):
             yield accum.strip()
 
     def handle_data(self, data, *args, **kwargs):
-        """
-        Store our data if it is not on the ignore list
-        """
+        """Store our data if it is not on the ignore list."""
 
         # initialize our previous flag
         if self._do_store:
 
             # Tidy our whitespace
-            content = self.WS_TRIM.sub(' ', data)
+            content = self.WS_TRIM.sub(" ", data)
             self._result.append(content)
 
     def handle_starttag(self, tag, attrs):
-        """
-        Process our starting HTML Tag
-        """
+        """Process our starting HTML Tag."""
         # Toggle initial states
         self._do_store = tag not in self.IGNORE_TAGS
 
         if tag in self.BLOCK_TAGS:
             self._result.append(self.BLOCK_END)
 
-        if tag == 'li':
-            self._result.append('- ')
+        if tag == "li":
+            self._result.append("- ")
 
-        elif tag == 'br':
-            self._result.append('\n')
+        elif tag == "br":
+            self._result.append("\n")
 
-        elif tag == 'hr':
+        elif tag == "hr":
             if self._result and isinstance(self._result[-1], str):
-                self._result[-1] = self._result[-1].rstrip(' ')
+                self._result[-1] = self._result[-1].rstrip(" ")
             else:
                 pass
 
-            self._result.append('\n---\n')
+            self._result.append("\n---\n")
 
-        elif tag == 'blockquote':
-            self._result.append(' >')
+        elif tag == "blockquote":
+            self._result.append(" >")
 
     def handle_endtag(self, tag):
-        """
-        Edge case handling of open/close tags
-        """
+        """Edge case handling of open/close tags."""
         self._do_store = True
 
         if tag in self.BLOCK_TAGS:

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -29,16 +28,15 @@
 #
 # API: https://github.com/Finb/bark-server/blob/master/docs/API_V2.md#python
 #
-import requests
 import json
 
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..utils.parse import parse_list, parse_bool
-from ..locale import gettext_lazy as _
+import requests
 
+from ..common import NotifyImageSize, NotifyType
+from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import parse_bool, parse_list
+from .base import NotifyBase
 
 # Sounds generated off of: https://github.com/Finb/Bark/tree/master/Sounds
 BARK_SOUNDS = (
@@ -79,16 +77,15 @@ BARK_SOUNDS = (
 
 # Supported Level Entries
 class NotifyBarkLevel:
-    """
-    Defines the Bark Level options
-    """
-    ACTIVE = 'active'
+    """Defines the Bark Level options."""
 
-    TIME_SENSITIVE = 'timeSensitive'
+    ACTIVE = "active"
 
-    PASSIVE = 'passive'
+    TIME_SENSITIVE = "timeSensitive"
 
-    CRITICAL = 'critical'
+    PASSIVE = "passive"
+
+    CRITICAL = "critical"
 
 
 BARK_LEVELS = (
@@ -100,24 +97,22 @@ BARK_LEVELS = (
 
 
 class NotifyBark(NotifyBase):
-    """
-    A wrapper for Notify Bark Notifications
-    """
+    """A wrapper for Notify Bark Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Bark'
+    service_name = "Bark"
 
     # The services URL
-    service_url = 'https://github.com/Finb/Bark'
+    service_url = "https://github.com/Finb/Bark"
 
     # The default protocol
-    protocol = 'bark'
+    protocol = "bark"
 
     # The default secure protocol
-    secure_protocol = 'barks'
+    secure_protocol = "barks"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_bark'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_bark"
 
     # Allows the user to specify the NotifyImageSize object; this is supported
     # through the webhook
@@ -125,111 +120,127 @@ class NotifyBark(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{host}/{targets}',
-        '{schema}://{host}:{port}/{targets}',
-        '{schema}://{user}:{password}@{host}/{targets}',
-        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        "{schema}://{host}/{targets}",
+        "{schema}://{host}:{port}/{targets}",
+        "{schema}://{user}:{password}@{host}/{targets}",
+        "{schema}://{user}:{password}@{host}:{port}/{targets}",
     )
 
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
+            "target_device": {
+                "name": _("Target Device"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-        'target_device': {
-            'name': _('Target Device'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-            'required': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "sound": {
+                "name": _("Sound"),
+                "type": "choice:string",
+                "values": BARK_SOUNDS,
+            },
+            "level": {
+                "name": _("Level"),
+                "type": "choice:string",
+                "values": BARK_LEVELS,
+            },
+            "volume": {
+                "name": _("Volume"),
+                "type": "int",
+                "min": 0,
+                "max": 10,
+            },
+            "click": {
+                "name": _("Click"),
+                "type": "string",
+            },
+            "badge": {
+                "name": _("Badge"),
+                "type": "int",
+                "min": 0,
+            },
+            "category": {
+                "name": _("Category"),
+                "type": "string",
+            },
+            "group": {
+                "name": _("Group"),
+                "type": "string",
+            },
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": True,
+                "map_to": "include_image",
+            },
         },
-        'sound': {
-            'name': _('Sound'),
-            'type': 'choice:string',
-            'values': BARK_SOUNDS,
-        },
-        'level': {
-            'name': _('Level'),
-            'type': 'choice:string',
-            'values': BARK_LEVELS,
-        },
-        'volume': {
-            'name': _('Volume'),
-            'type': 'int',
-            'min': 0,
-            'max': 10,
-        },
-        'click': {
-            'name': _('Click'),
-            'type': 'string',
-        },
-        'badge': {
-            'name': _('Badge'),
-            'type': 'int',
-            'min': 0,
-        },
-        'category': {
-            'name': _('Category'),
-            'type': 'string',
-        },
-        'group': {
-            'name': _('Group'),
-            'type': 'string',
-        },
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'include_image',
-        },
-    })
+    )
 
-    def __init__(self, targets=None, include_image=True, sound=None,
-                 category=None, group=None, level=None, click=None,
-                 badge=None, volume=None, **kwargs):
-        """
-        Initialize Notify Bark Object
-        """
+    def __init__(
+        self,
+        targets=None,
+        include_image=True,
+        sound=None,
+        category=None,
+        group=None,
+        level=None,
+        click=None,
+        badge=None,
+        volume=None,
+        **kwargs,
+    ):
+        """Initialize Notify Bark Object."""
         super().__init__(**kwargs)
 
         # Prepare our URL
-        self.notify_url = '%s://%s%s/push' % (
-            'https' if self.secure else 'http',
+        self.notify_url = "{}://{}{}/push".format(
+            "https" if self.secure else "http",
             self.host,
-            ':{}'.format(self.port)
-            if (self.port and isinstance(self.port, int)) else '',
+            (
+                f":{self.port}"
+                if (self.port and isinstance(self.port, int))
+                else ""
+            ),
         )
 
         # Assign our category
-        self.category = \
-            category if isinstance(category, str) else None
+        self.category = category if isinstance(category, str) else None
 
         # Assign our group
         self.group = group if isinstance(group, str) else None
@@ -259,14 +270,21 @@ class NotifyBark(NotifyBase):
         except ValueError:
             self.badge = None
             self.logger.warning(
-                'The specified Bark badge ({}) is not valid ', badge)
+                "The specified Bark badge ({}) is not valid ", badge
+            )
 
         # Sound (easy-lookup)
-        self.sound = None if not sound else next(
-            (f for f in BARK_SOUNDS if f.startswith(sound.lower())), None)
+        self.sound = (
+            None
+            if not sound
+            else next(
+                (f for f in BARK_SOUNDS if f.startswith(sound.lower())), None
+            )
+        )
         if sound and not self.sound:
             self.logger.warning(
-                'The specified Bark sound ({}) was not found ', sound)
+                "The specified Bark sound ({}) was not found ", sound
+            )
 
         # Volume
         self.volume = None
@@ -278,35 +296,39 @@ class NotifyBark(NotifyBase):
 
             except (TypeError, ValueError):
                 self.logger.warning(
-                    'The specified Bark volume ({}) is not valid. '
-                    'Must be between 0 and 10', volume)
+                    "The specified Bark volume ({}) is not valid. "
+                    "Must be between 0 and 10",
+                    volume,
+                )
 
         # Level
-        self.level = None if not level else next(
-            (f for f in BARK_LEVELS if f[0] == level[0]), None)
+        self.level = (
+            None
+            if not level
+            else next((f for f in BARK_LEVELS if f[0] == level[0]), None)
+        )
         if level and not self.level:
             self.logger.warning(
-                'The specified Bark level ({}) is not valid ', level)
+                "The specified Bark level ({}) is not valid ", level
+            )
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Bark Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Bark Notification."""
 
         # error tracking (used for function return)
         has_error = False
 
         if not self.targets:
             # We have nothing to notify; we're done
-            self.logger.warning('There are no Bark devices to notify')
+            self.logger.warning("There are no Bark devices to notify")
             return False
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json; charset=utf-8',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json; charset=utf-8",
         }
 
         # Prepare our payload (sample below)
@@ -322,37 +344,38 @@ class NotifyBark(NotifyBase):
         #     "url": "https://mritd.com"
         # }
         payload = {
-            'title': title if title else self.app_desc,
-            'body': body,
+            "title": title if title else self.app_desc,
+            "body": body,
         }
 
         # Acquire our image url if configured to do so
-        image_url = None if not self.include_image else \
-            self.image_url(notify_type)
+        image_url = (
+            None if not self.include_image else self.image_url(notify_type)
+        )
 
         if image_url:
-            payload['icon'] = image_url
+            payload["icon"] = image_url
 
         if self.sound:
-            payload['sound'] = self.sound
+            payload["sound"] = self.sound
 
         if self.click:
-            payload['url'] = self.click
+            payload["url"] = self.click
 
         if self.badge:
-            payload['badge'] = self.badge
+            payload["badge"] = self.badge
 
         if self.level:
-            payload['level'] = self.level
+            payload["level"] = self.level
 
         if self.category:
-            payload['category'] = self.category
+            payload["category"] = self.category
 
         if self.group:
-            payload['group'] = self.group
+            payload["group"] = self.group
 
         if self.volume:
-            payload['volume'] = self.volume
+            payload["volume"] = self.volume
 
         auth = None
         if self.user:
@@ -365,11 +388,12 @@ class NotifyBark(NotifyBase):
             # Retrieve our device key
             target = targets.pop()
 
-            payload['device_key'] = target
-            self.logger.debug('Bark POST URL: %s (cert_verify=%r)' % (
-                self.notify_url, self.verify_certificate,
-            ))
-            self.logger.debug('Bark Payload: %s' % str(payload))
+            payload["device_key"] = target
+            self.logger.debug(
+                "Bark POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(f"Bark Payload: {payload!s}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -384,34 +408,35 @@ class NotifyBark(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyBark.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifyBark.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     self.logger.warning(
-                        'Failed to send Bark notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Bark notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        'Sent Bark notification to {}.'.format(target))
+                    self.logger.info(f"Sent Bark notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Bark '
-                    'notification to {}.'.format(target))
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending Bark "
+                    f"notification to {target}."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -421,90 +446,88 @@ class NotifyBark(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host, self.port,
+            self.user,
+            self.password,
+            self.host,
+            self.port,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'image': 'yes' if self.include_image else 'no',
+            "image": "yes" if self.include_image else "no",
         }
 
         if self.sound:
-            params['sound'] = self.sound
+            params["sound"] = self.sound
 
         if self.click:
-            params['click'] = self.click
+            params["click"] = self.click
 
         if self.badge:
-            params['badge'] = str(self.badge)
+            params["badge"] = str(self.badge)
 
         if self.level:
-            params['level'] = self.level
+            params["level"] = self.level
 
         if self.volume:
-            params['volume'] = str(self.volume)
+            params["volume"] = str(self.volume)
 
         if self.category:
-            params['category'] = self.category
+            params["category"] = self.category
 
         if self.group:
-            params['group'] = self.group
+            params["group"] = self.group
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyBark.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifyBark.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyBark.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifyBark.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}/{targets}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}/{targets}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            targets='/'.join(
-                [NotifyBark.quote('{}'.format(x)) for x in self.targets]),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            targets="/".join([NotifyBark.quote(f"{x}") for x in self.targets]),
             params=NotifyBark.urlencode(params),
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.targets)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url)
         if not results:
@@ -512,50 +535,57 @@ class NotifyBark(NotifyBase):
             return results
 
         # Apply our targets
-        results['targets'] = NotifyBark.split_path(results['fullpath'])
+        results["targets"] = NotifyBark.split_path(results["fullpath"])
 
         # Category
-        if 'category' in results['qsd'] and results['qsd']['category']:
-            results['category'] = NotifyBark.unquote(
-                results['qsd']['category'].strip())
+        if "category" in results["qsd"] and results["qsd"]["category"]:
+            results["category"] = NotifyBark.unquote(
+                results["qsd"]["category"].strip()
+            )
 
         # Group
-        if 'group' in results['qsd'] and results['qsd']['group']:
-            results['group'] = NotifyBark.unquote(
-                results['qsd']['group'].strip())
+        if "group" in results["qsd"] and results["qsd"]["group"]:
+            results["group"] = NotifyBark.unquote(
+                results["qsd"]["group"].strip()
+            )
 
         # Badge
-        if 'badge' in results['qsd'] and results['qsd']['badge']:
-            results['badge'] = NotifyBark.unquote(
-                results['qsd']['badge'].strip())
+        if "badge" in results["qsd"] and results["qsd"]["badge"]:
+            results["badge"] = NotifyBark.unquote(
+                results["qsd"]["badge"].strip()
+            )
 
         # Volume
-        if 'volume' in results['qsd'] and results['qsd']['volume']:
-            results['volume'] = NotifyBark.unquote(
-                results['qsd']['volume'].strip())
+        if "volume" in results["qsd"] and results["qsd"]["volume"]:
+            results["volume"] = NotifyBark.unquote(
+                results["qsd"]["volume"].strip()
+            )
 
         # Level
-        if 'level' in results['qsd'] and results['qsd']['level']:
-            results['level'] = NotifyBark.unquote(
-                results['qsd']['level'].strip())
+        if "level" in results["qsd"] and results["qsd"]["level"]:
+            results["level"] = NotifyBark.unquote(
+                results["qsd"]["level"].strip()
+            )
 
         # Click (URL)
-        if 'click' in results['qsd'] and results['qsd']['click']:
-            results['click'] = NotifyBark.unquote(
-                results['qsd']['click'].strip())
+        if "click" in results["qsd"] and results["qsd"]["click"]:
+            results["click"] = NotifyBark.unquote(
+                results["qsd"]["click"].strip()
+            )
 
         # Sound
-        if 'sound' in results['qsd'] and results['qsd']['sound']:
-            results['sound'] = NotifyBark.unquote(
-                results['qsd']['sound'].strip())
+        if "sound" in results["qsd"] and results["qsd"]["sound"]:
+            results["sound"] = NotifyBark.unquote(
+                results["qsd"]["sound"].strip()
+            )
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyBark.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyBark.parse_list(results["qsd"]["to"])
 
         # use image= for consistency with the other plugins
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+        results["include_image"] = parse_bool(
+            results["qsd"].get("image", True)
+        )
 
         return results

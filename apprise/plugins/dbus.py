@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,11 +26,11 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-from .base import NotifyBase
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..utils.parse import parse_bool
+
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool
+from .base import NotifyBase
 
 # Default our global support flag
 NOTIFY_DBUS_SUPPORT_ENABLED = False
@@ -46,11 +45,7 @@ LOOP_QT = None
 
 try:
     # dbus essentials
-    from dbus import SessionBus
-    from dbus import Interface
-    from dbus import Byte
-    from dbus import ByteArray
-    from dbus import DBusException
+    from dbus import Byte, ByteArray, DBusException, Interface, SessionBus
 
     #
     # now we try to determine which mainloop(s) we can access
@@ -59,6 +54,7 @@ try:
     # glib
     try:
         from dbus.mainloop.glib import DBusGMainLoop
+
         LOOP_GLIB = DBusGMainLoop()
 
     except ImportError:  # pragma: no cover
@@ -68,6 +64,7 @@ try:
     # qt
     try:
         from dbus.mainloop.qt import DBusQtMainLoop
+
         LOOP_QT = DBusQtMainLoop(set_as_default=True)
 
     except ImportError:
@@ -75,8 +72,7 @@ try:
         pass
 
     # We're good as long as at least one
-    NOTIFY_DBUS_SUPPORT_ENABLED = (
-        LOOP_GLIB is not None or LOOP_QT is not None)
+    NOTIFY_DBUS_SUPPORT_ENABLED = LOOP_GLIB is not None or LOOP_QT is not None
 
     # ImportError: When using gi.repository you must not import static modules
     # like "gobject". Please change all occurrences of "import gobject" to
@@ -88,8 +84,10 @@ try:
     try:
         # The following is required for Image/Icon loading only
         import gi
-        gi.require_version('GdkPixbuf', '2.0')
+
+        gi.require_version("GdkPixbuf", "2.0")
         from gi.repository import GdkPixbuf
+
         NOTIFY_DBUS_IMAGE_SUPPORT = True
 
     except (ImportError, ValueError, AttributeError):
@@ -109,10 +107,10 @@ except ImportError:
 # The key to value pairs are the actual supported schema's matched
 # up with the Main Loop they should reference when accessed.
 MAINLOOP_MAP = {
-    'qt': LOOP_QT,
-    'kde': LOOP_QT,
-    'glib': LOOP_GLIB,
-    'dbus': LOOP_QT if LOOP_QT else LOOP_GLIB,
+    "qt": LOOP_QT,
+    "kde": LOOP_QT,
+    "glib": LOOP_GLIB,
+    "dbus": LOOP_QT if LOOP_QT else LOOP_GLIB,
 }
 
 
@@ -125,48 +123,45 @@ class DBusUrgency:
 
 DBUS_URGENCIES = {
     # Note: This also acts as a reverse lookup mapping
-    DBusUrgency.LOW: 'low',
-    DBusUrgency.NORMAL: 'normal',
-    DBusUrgency.HIGH: 'high',
+    DBusUrgency.LOW: "low",
+    DBusUrgency.NORMAL: "normal",
+    DBusUrgency.HIGH: "high",
 }
 
 DBUS_URGENCY_MAP = {
     # Maps against string 'low'
-    'l': DBusUrgency.LOW,
+    "l": DBusUrgency.LOW,
     # Maps against string 'moderate'
-    'm': DBusUrgency.LOW,
+    "m": DBusUrgency.LOW,
     # Maps against string 'normal'
-    'n': DBusUrgency.NORMAL,
+    "n": DBusUrgency.NORMAL,
     # Maps against string 'high'
-    'h': DBusUrgency.HIGH,
+    "h": DBusUrgency.HIGH,
     # Maps against string 'emergency'
-    'e': DBusUrgency.HIGH,
-
+    "e": DBusUrgency.HIGH,
     # Entries to additionally support (so more like DBus's API)
-    '0': DBusUrgency.LOW,
-    '1': DBusUrgency.NORMAL,
-    '2': DBusUrgency.HIGH,
+    "0": DBusUrgency.LOW,
+    "1": DBusUrgency.NORMAL,
+    "2": DBusUrgency.HIGH,
 }
 
 
 class NotifyDBus(NotifyBase):
-    """
-    A wrapper for local DBus/Qt Notifications
-    """
+    """A wrapper for local DBus/Qt Notifications."""
 
     # Set our global enabled flag
     enabled = NOTIFY_DBUS_SUPPORT_ENABLED
 
     requirements = {
         # Define our required packaging in order to work
-        'details': _('libdbus-1.so.x must be installed.')
+        "details": _("libdbus-1.so.x must be installed.")
     }
 
     # The default descriptive name associated with the Notification
-    service_name = _('DBus Notification')
+    service_name = _("DBus Notification")
 
     # The services URL
-    service_url = 'http://www.freedesktop.org/Software/dbus/'
+    service_url = "http://www.freedesktop.org/Software/dbus/"
 
     # The default protocols
     # Python 3 keys() does not return a list object, it is its own dict_keys()
@@ -176,7 +171,7 @@ class NotifyDBus(NotifyBase):
     protocol = list(MAINLOOP_MAP.keys())
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_dbus'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_dbus"
 
     # No throttling required for DBus queries
     request_rate_per_sec = 0
@@ -192,57 +187,62 @@ class NotifyDBus(NotifyBase):
     body_max_line_count = 10
 
     # The following are required to hook into the notifications:
-    dbus_interface = 'org.freedesktop.Notifications'
-    dbus_setting_location = '/org/freedesktop/Notifications'
+    dbus_interface = "org.freedesktop.Notifications"
+    dbus_setting_location = "/org/freedesktop/Notifications"
 
     # No URL Identifier will be defined for this service as there simply isn't
     # enough details to uniquely identify one dbus:// from another.
     url_identifier = False
 
     # Define object templates
-    templates = (
-        '{schema}://',
-    )
+    templates = ("{schema}://",)
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'urgency': {
-            'name': _('Urgency'),
-            'type': 'choice:int',
-            'values': DBUS_URGENCIES,
-            'default': DBusUrgency.NORMAL,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "urgency": {
+                "name": _("Urgency"),
+                "type": "choice:int",
+                "values": DBUS_URGENCIES,
+                "default": DBusUrgency.NORMAL,
+            },
+            "priority": {
+                # Apprise uses 'priority' everywhere; it's just a nice
+                # consistent feel to be able to use it here as well. Just map
+                # the value back to 'priority'
+                "alias_of": "urgency",
+            },
+            "x": {
+                "name": _("X-Axis"),
+                "type": "int",
+                "min": 0,
+                "map_to": "x_axis",
+            },
+            "y": {
+                "name": _("Y-Axis"),
+                "type": "int",
+                "min": 0,
+                "map_to": "y_axis",
+            },
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": True,
+                "map_to": "include_image",
+            },
         },
-        'priority': {
-            # Apprise uses 'priority' everywhere; it's just a nice consistent
-            # feel to be able to use it here as well. Just map the
-            # value back to 'priority'
-            'alias_of': 'urgency',
-        },
-        'x': {
-            'name': _('X-Axis'),
-            'type': 'int',
-            'min': 0,
-            'map_to': 'x_axis',
-        },
-        'y': {
-            'name': _('Y-Axis'),
-            'type': 'int',
-            'min': 0,
-            'map_to': 'y_axis',
-        },
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': True,
-            'map_to': 'include_image',
-        },
-    })
+    )
 
-    def __init__(self, urgency=None, x_axis=None, y_axis=None,
-                 include_image=True, **kwargs):
-        """
-        Initialize DBus Object
-        """
+    def __init__(
+        self,
+        urgency=None,
+        x_axis=None,
+        y_axis=None,
+        include_image=True,
+        **kwargs,
+    ):
+        """Initialize DBus Object."""
 
         super().__init__(**kwargs)
 
@@ -250,22 +250,26 @@ class NotifyDBus(NotifyBase):
         self.registry = {}
 
         # Store our schema; default to dbus
-        self.schema = kwargs.get('schema', 'dbus')
+        self.schema = kwargs.get("schema", "dbus")
 
         if self.schema not in MAINLOOP_MAP:
-            msg = 'The schema specified ({}) is not supported.' \
-                .format(self.schema)
+            msg = f"The schema specified ({self.schema}) is not supported."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The urgency of the message
         self.urgency = int(
-            NotifyDBus.template_args['urgency']['default']
-            if urgency is None else
-            next((
-                v for k, v in DBUS_URGENCY_MAP.items()
-                if str(urgency).lower().startswith(k)),
-                NotifyDBus.template_args['urgency']['default']))
+            NotifyDBus.template_args["urgency"]["default"]
+            if urgency is None
+            else next(
+                (
+                    v
+                    for k, v in DBUS_URGENCY_MAP.items()
+                    if str(urgency).lower().startswith(k)
+                ),
+                NotifyDBus.template_args["urgency"]["default"],
+            )
+        )
 
         # Our x/y axis settings
         if x_axis or y_axis:
@@ -275,10 +279,12 @@ class NotifyDBus(NotifyBase):
 
             except (TypeError, ValueError):
                 # Invalid x/y values specified
-                msg = 'The x,y coordinates specified ({},{}) are invalid.'\
-                    .format(x_axis, y_axis)
+                msg = (
+                    f"The x,y coordinates specified ({x_axis},{y_axis}) are"
+                    " invalid."
+                )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
         else:
             self.x_axis = None
             self.y_axis = None
@@ -286,25 +292,23 @@ class NotifyDBus(NotifyBase):
         # Track whether we want to add an image to the notification.
         self.include_image = include_image
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform DBus Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform DBus Notification."""
         # Acquire our session
         try:
             session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
 
         except DBusException as e:
             # Handle exception
-            self.logger.warning('Failed to send DBus notification.')
-            self.logger.debug(f'DBus Exception: {e}')
+            self.logger.warning("Failed to send DBus notification.")
+            self.logger.debug(f"DBus Exception: {e}")
             return False
 
         # If there is no title, but there is a body, swap the two to get rid
         # of the weird whitespace
         if not title:
             title = body
-            body = ''
+            body = ""
 
         # acquire our dbus object
         dbus_obj = session.get_object(
@@ -319,18 +323,19 @@ class NotifyDBus(NotifyBase):
         )
 
         # image path
-        icon_path = None if not self.include_image \
-            else self.image_path(notify_type, extension='.ico')
+        icon_path = (
+            None
+            if not self.include_image
+            else self.image_path(notify_type, extension=".ico")
+        )
 
         # Our meta payload
-        meta_payload = {
-            "urgency": Byte(self.urgency)
-        }
+        meta_payload = {"urgency": Byte(self.urgency)}
 
         if not (self.x_axis is None and self.y_axis is None):
             # Set x/y access if these were set
-            meta_payload['x'] = self.x_axis
-            meta_payload['y'] = self.y_axis
+            meta_payload["x"] = self.x_axis
+            meta_payload["y"] = self.y_axis
 
         if NOTIFY_DBUS_IMAGE_SUPPORT and icon_path:
             try:
@@ -338,20 +343,21 @@ class NotifyDBus(NotifyBase):
                 image = GdkPixbuf.Pixbuf.new_from_file(icon_path)
 
                 # Associate our image to our notification
-                meta_payload['icon_data'] = (
+                meta_payload["icon_data"] = (
                     image.get_width(),
                     image.get_height(),
                     image.get_rowstride(),
                     image.get_has_alpha(),
                     image.get_bits_per_sample(),
                     image.get_n_channels(),
-                    ByteArray(image.get_pixels())
+                    ByteArray(image.get_pixels()),
                 )
 
             except Exception as e:
                 self.logger.warning(
-                    "Could not load notification icon (%s).", icon_path)
-                self.logger.debug(f'DBus Exception: {e}')
+                    "Could not load notification icon (%s).", icon_path
+                )
+                self.logger.debug(f"DBus Exception: {e}")
 
         try:
             # Always call throttle() before any remote execution is made
@@ -363,40 +369,39 @@ class NotifyDBus(NotifyBase):
                 # Message ID (0 = New Message)
                 0,
                 # Icon (str) - not used
-                '',
+                "",
                 # Title
                 str(title),
                 # Body
                 str(body),
                 # Actions
-                list(),
+                [],
                 # Meta
                 meta_payload,
                 # Message Timeout
                 self.message_timeout_ms,
             )
 
-            self.logger.info('Sent DBus notification.')
+            self.logger.info("Sent DBus notification.")
 
         except Exception as e:
-            self.logger.warning('Failed to send DBus notification.')
-            self.logger.debug(f'DBus Exception: {e}')
+            self.logger.warning("Failed to send DBus notification.")
+            self.logger.debug(f"DBus Exception: {e}")
             return False
 
         return True
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'image': 'yes' if self.include_image else 'no',
-            'urgency':
-                DBUS_URGENCIES[self.template_args['urgency']['default']]
+            "image": "yes" if self.include_image else "no",
+            "urgency": (
+                DBUS_URGENCIES[self.template_args["urgency"]["default"]]
                 if self.urgency not in DBUS_URGENCIES
-                else DBUS_URGENCIES[self.urgency],
+                else DBUS_URGENCIES[self.urgency]
+            ),
         }
 
         # Extend our parameters
@@ -404,48 +409,43 @@ class NotifyDBus(NotifyBase):
 
         # x in (x,y) screen coordinates
         if self.x_axis:
-            params['x'] = str(self.x_axis)
+            params["x"] = str(self.x_axis)
 
         # y in (x,y) screen coordinates
         if self.y_axis:
-            params['y'] = str(self.y_axis)
+            params["y"] = str(self.y_axis)
 
-        return '{schema}://_/?{params}'.format(
-            schema=self.schema,
-            params=NotifyDBus.urlencode(params),
-        )
+        return f"{self.schema}://_/?{NotifyDBus.urlencode(params)}"
 
     @staticmethod
     def parse_url(url):
-        """
-        There are no parameters nessisary for this protocol; simply having
-        gnome:// is all you need.  This function just makes sure that
-        is in place.
+        """There are no parameters nessisary for this protocol; simply having
+        gnome:// is all you need.
 
+        This function just makes sure that is in place.
         """
 
         results = NotifyBase.parse_url(url, verify_host=False)
 
         # Include images with our message
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+        results["include_image"] = parse_bool(
+            results["qsd"].get("image", True)
+        )
 
         # DBus supports urgency, but we we also support the keyword priority
         # so that it is consistent with some of the other plugins
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
+        if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
             # We intentionally store the priority in the urgency section
-            results['urgency'] = \
-                NotifyDBus.unquote(results['qsd']['priority'])
+            results["urgency"] = NotifyDBus.unquote(results["qsd"]["priority"])
 
-        if 'urgency' in results['qsd'] and len(results['qsd']['urgency']):
-            results['urgency'] = \
-                NotifyDBus.unquote(results['qsd']['urgency'])
+        if "urgency" in results["qsd"] and len(results["qsd"]["urgency"]):
+            results["urgency"] = NotifyDBus.unquote(results["qsd"]["urgency"])
 
         # handle x,y coordinates
-        if 'x' in results['qsd'] and len(results['qsd']['x']):
-            results['x_axis'] = NotifyDBus.unquote(results['qsd'].get('x'))
+        if "x" in results["qsd"] and len(results["qsd"]["x"]):
+            results["x_axis"] = NotifyDBus.unquote(results["qsd"].get("x"))
 
-        if 'y' in results['qsd'] and len(results['qsd']['y']):
-            results['y_axis'] = NotifyDBus.unquote(results['qsd'].get('y'))
+        if "y" in results["qsd"] and len(results["qsd"]["y"]):
+            results["y_axis"] = NotifyDBus.unquote(results["qsd"].get("y"))
 
         return results

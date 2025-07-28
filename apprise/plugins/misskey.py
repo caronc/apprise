@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -44,27 +43,27 @@
 # This plugin also supports taking the URL (as identified above) directly
 # as well.
 
-import requests
 from json import dumps
 
-from .base import NotifyBase
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 
 class MisskeyVisibility:
-    """
-    The visibility of any note created
-    """
+    """The visibility of any note created."""
+
     # post will be public
-    PUBLIC = 'public'
+    PUBLIC = "public"
 
-    HOME = 'home'
+    HOME = "home"
 
-    FOLLOWERS = 'followers'
+    FOLLOWERS = "followers"
 
-    SPECIFIED = 'specified'
+    SPECIFIED = "specified"
 
 
 # Define the types in a list for validation purposes
@@ -77,24 +76,22 @@ MISSKEY_VISIBILITIES = (
 
 
 class NotifyMisskey(NotifyBase):
-    """
-    A wrapper for Misskey Notifications
-    """
+    """A wrapper for Misskey Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Misskey'
+    service_name = "Misskey"
 
     # The services URL
-    service_url = 'https://misskey-hub.net/'
+    service_url = "https://misskey-hub.net/"
 
     # The default protocol
-    protocol = 'misskey'
+    protocol = "misskey"
 
     # The default secure protocol
-    secure_protocol = 'misskeys'
+    secure_protocol = "misskeys"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_misskey'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_misskey"
 
     # The title is not used
     title_maxlen = 0
@@ -103,110 +100,117 @@ class NotifyMisskey(NotifyBase):
     body_maxlen = 512
 
     # Define object templates
-    templates = (
-        '{schema}://{project_id}/{msghook}',
-    )
+    templates = ("{schema}://{project_id}/{msghook}",)
 
     # Define object templates
     templates = (
-        '{schema}://{token}@{host}',
-        '{schema}://{token}@{host}:{port}',
+        "{schema}://{token}@{host}",
+        "{schema}://{token}@{host}:{port}",
     )
 
     # Define our template arguments
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "token": {
+                "name": _("Access Token"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
         },
-        'token': {
-            'name': _('Access Token'),
-            'type': 'string',
-            'required': True,
-        },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'token': {
-            'alias_of': 'token',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "token": {
+                "alias_of": "token",
+            },
+            "visibility": {
+                "name": _("Visibility"),
+                "type": "choice:string",
+                "values": MISSKEY_VISIBILITIES,
+                "default": MisskeyVisibility.PUBLIC,
+            },
         },
-        'visibility': {
-            'name': _('Visibility'),
-            'type': 'choice:string',
-            'values': MISSKEY_VISIBILITIES,
-            'default': MisskeyVisibility.PUBLIC,
-        },
-    })
+    )
 
     def __init__(self, token=None, visibility=None, **kwargs):
-        """
-        Initialize Misskey Object
-        """
+        """Initialize Misskey Object."""
         super().__init__(**kwargs)
 
         self.token = validate_regex(token)
         if not self.token:
-            msg = 'An invalid Misskey Access Token was specified.'
+            msg = "An invalid Misskey Access Token was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         if visibility:
             # Input is a string; attempt to get the lookup from our
             # sound mapping
-            vis = 'invalid' if not isinstance(visibility, str) \
+            vis = (
+                "invalid"
+                if not isinstance(visibility, str)
                 else visibility.lower().strip()
+            )
 
             # This little bit of black magic allows us to match against
             # against multiple versions of the same string ... etc
-            self.visibility = \
-                next((v for v in MISSKEY_VISIBILITIES
-                      if v.startswith(vis)), None)
+            self.visibility = next(
+                (v for v in MISSKEY_VISIBILITIES if v.startswith(vis)), None
+            )
 
             if self.visibility not in MISSKEY_VISIBILITIES:
-                msg = 'The Misskey visibility specified ({}) is invalid.' \
-                    .format(visibility)
+                msg = (
+                    f"The Misskey visibility specified ({visibility}) is"
+                    " invalid."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
-            self.visibility = self.template_args['visibility']['default']
+            self.visibility = self.template_args["visibility"]["default"]
 
         # Prepare our URL
-        self.schema = 'https' if self.secure else 'http'
-        self.api_url = '%s://%s' % (self.schema, self.host)
+        self.schema = "https" if self.secure else "http"
+        self.api_url = f"{self.schema}://{self.host}"
 
         if isinstance(self.port, int):
-            self.api_url += ':%d' % self.port
+            self.api_url += f":{self.port}"
 
         return
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.token, self.host, self.port,
+            self.token,
+            self.host,
+            self.port,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         params = {
-            'visibility': self.visibility,
+            "visibility": self.visibility,
         }
 
         # Extend our parameters
@@ -214,37 +218,37 @@ class NotifyMisskey(NotifyBase):
 
         host = self.host
         if isinstance(self.port, int):
-            host += ':%d' % self.port
+            host += f":{self.port}"
 
-        return '{schema}://{token}@{host}/?{params}'.format(
+        return "{schema}://{token}@{host}/?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             host=host,
-            token=self.pprint(self.token, privacy, safe=''),
+            token=self.pprint(self.token, privacy, safe=""),
             params=NotifyMisskey.urlencode(params),
         )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        wrapper to _send since we can alert more then one channel
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Wrapper to _send since we can alert more then one channel."""
 
         # prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         # Prepare our payload
         payload = {
-            'i': self.token,
-            'text': body,
-            'visibility': self.visibility,
+            "i": self.token,
+            "text": body,
+            "visibility": self.visibility,
         }
 
-        api_url = f'{self.api_url}/api/notes/create'
-        self.logger.debug('Misskey GET URL: %s (cert_verify=%r)' % (
-            api_url, self.verify_certificate))
-        self.logger.debug('Misskey Payload: %s' % str(payload))
+        api_url = f"{self.api_url}/api/notes/create"
+        self.logger.debug(
+            "Misskey GET URL:"
+            f" {api_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Misskey Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -259,29 +263,30 @@ class NotifyMisskey(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyMisskey.http_response_code_lookup(r.status_code)
+                status_str = NotifyMisskey.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Misskey notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send Misskey notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Misskey notification.')
+                self.logger.info("Sent Misskey notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Misskey '
-                'notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Misskey notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -290,27 +295,26 @@ class NotifyMisskey(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = NotifyMisskey.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = NotifyMisskey.unquote(results["qsd"]["token"])
 
-        elif not results['password'] and results['user']:
-            results['token'] = NotifyMisskey.unquote(results['user'])
+        elif not results["password"] and results["user"]:
+            results["token"] = NotifyMisskey.unquote(results["user"])
 
         # Capture visibility if specified
-        if 'visibility' in results['qsd'] and \
-                len(results['qsd']['visibility']):
-            results['visibility'] = \
-                NotifyMisskey.unquote(results['qsd']['visibility'])
+        if "visibility" in results["qsd"] and len(
+            results["qsd"]["visibility"]
+        ):
+            results["visibility"] = NotifyMisskey.unquote(
+                results["qsd"]["visibility"]
+            )
 
         return results
