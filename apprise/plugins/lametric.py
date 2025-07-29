@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -87,27 +86,31 @@
 # - https://developer.lametric.com/icons
 
 
-import re
-import requests
+import contextlib
 from json import dumps
-from .base import NotifyBase
+import re
+
+import requests
+
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex, is_hostname, is_ipaddr
+from ..utils.parse import is_hostname, is_ipaddr, validate_regex
+from .base import NotifyBase
 
 # A URL Parser to detect App ID
 LAMETRIC_APP_ID_DETECTOR_RE = re.compile(
-    r'(com\.lametric\.)?(?P<app_id>[0-9a-z.-]{1,64})'
-    r'(/(?P<app_ver>[1-9][0-9]*))?', re.I)
+    r"(com\.lametric\.)?(?P<app_id>[0-9a-z.-]{1,64})"
+    r"(/(?P<app_ver>[1-9][0-9]*))?",
+    re.I,
+)
 
 # Tokens are huge
-LAMETRIC_IS_APP_TOKEN = re.compile(r'^[a-z0-9]{80,}==$', re.I)
+LAMETRIC_IS_APP_TOKEN = re.compile(r"^[a-z0-9]{80,}==$", re.I)
 
 
 class LametricMode:
-    """
-    Define Lametric Notification Modes
-    """
+    """Define Lametric Notification Modes."""
+
     # App posts upstream to the developer API on Lametric's website
     CLOUD = "cloud"
 
@@ -122,9 +125,7 @@ LAMETRIC_MODES = (
 
 
 class LametricPriority:
-    """
-    Priority of the message
-    """
+    """Priority of the message."""
 
     # info: this priority means that notification will be displayed on the
     #        same “level” as all other notifications on the device that come
@@ -132,14 +133,14 @@ class LametricPriority:
     #        be shown when screensaver is active. By default message is sent
     #        with "info" priority. This level of notification should be used
     #        for notifications like news, weather, temperature, etc.
-    INFO = 'info'
+    INFO = "info"
 
     # warning: notifications with this priority will interrupt ones sent with
     #           lower priority (“info”). Should be used to notify the user
     #           about something important but not critical. For example,
     #           events like “someone is coming home” should use this priority
     #           when sending notifications from smart home.
-    WARNING = 'warning'
+    WARNING = "warning"
 
     # critical: the most important notifications. Interrupts notification
     #            with priority info or warning and is displayed even if
@@ -148,7 +149,7 @@ class LametricPriority:
     #            really important notifications like notifications from smoke
     #            detectors, water leak sensors, etc. Use it for events that
     #            require human interaction immediately.
-    CRITICAL = 'critical'
+    CRITICAL = "critical"
 
 
 LAMETRIC_PRIORITIES = (
@@ -159,22 +160,20 @@ LAMETRIC_PRIORITIES = (
 
 
 class LametricIconType:
-    """
-    Represents the nature of notification.
-    """
+    """Represents the nature of notification."""
 
     # info  - "i" icon will be displayed prior to the notification. Means that
     #         notification contains information, no need to take actions on it.
-    INFO = 'info'
+    INFO = "info"
 
     # alert: "!!!" icon will be displayed prior to the notification. Use it
     #         when you want the user to pay attention to that notification as
     #         it indicates that something bad happened and user must take
     #         immediate action.
-    ALERT = 'alert'
+    ALERT = "alert"
 
     # none: no notification icon will be shown.
-    NONE = 'none'
+    NONE = "none"
 
 
 LAMETRIC_ICON_TYPES = (
@@ -185,89 +184,121 @@ LAMETRIC_ICON_TYPES = (
 
 
 class LametricSoundCategory:
-    """
-    Define Sound Categories
-    """
+    """Define Sound Categories."""
+
     NOTIFICATIONS = "notifications"
     ALARMS = "alarms"
 
 
 class LametricSound:
-    """
-    There are 2 categories of sounds, to make things simple we just lump them
-    all togther in one class object.
+    """There are 2 categories of sounds, to make things simple we just lump
+    them all togther in one class object.
 
     Syntax is (Category, (AlarmID, Alias1, Alias2, ...))
     """
 
     # Alarm Category Sounds
-    ALARM01 = (LametricSoundCategory.ALARMS, ('alarm1', 'a1', 'a01'))
-    ALARM02 = (LametricSoundCategory.ALARMS, ('alarm2', 'a2', 'a02'))
-    ALARM03 = (LametricSoundCategory.ALARMS, ('alarm3', 'a3', 'a03'))
-    ALARM04 = (LametricSoundCategory.ALARMS, ('alarm4', 'a4', 'a04'))
-    ALARM05 = (LametricSoundCategory.ALARMS, ('alarm5', 'a5', 'a05'))
-    ALARM06 = (LametricSoundCategory.ALARMS, ('alarm6', 'a6', 'a06'))
-    ALARM07 = (LametricSoundCategory.ALARMS, ('alarm7', 'a7', 'a07'))
-    ALARM08 = (LametricSoundCategory.ALARMS, ('alarm8', 'a8', 'a08'))
-    ALARM09 = (LametricSoundCategory.ALARMS, ('alarm9', 'a9', 'a09'))
-    ALARM10 = (LametricSoundCategory.ALARMS, ('alarm10', 'a10'))
-    ALARM11 = (LametricSoundCategory.ALARMS, ('alarm11', 'a11'))
-    ALARM12 = (LametricSoundCategory.ALARMS, ('alarm12', 'a12'))
-    ALARM13 = (LametricSoundCategory.ALARMS, ('alarm13', 'a13'))
+    ALARM01 = (LametricSoundCategory.ALARMS, ("alarm1", "a1", "a01"))
+    ALARM02 = (LametricSoundCategory.ALARMS, ("alarm2", "a2", "a02"))
+    ALARM03 = (LametricSoundCategory.ALARMS, ("alarm3", "a3", "a03"))
+    ALARM04 = (LametricSoundCategory.ALARMS, ("alarm4", "a4", "a04"))
+    ALARM05 = (LametricSoundCategory.ALARMS, ("alarm5", "a5", "a05"))
+    ALARM06 = (LametricSoundCategory.ALARMS, ("alarm6", "a6", "a06"))
+    ALARM07 = (LametricSoundCategory.ALARMS, ("alarm7", "a7", "a07"))
+    ALARM08 = (LametricSoundCategory.ALARMS, ("alarm8", "a8", "a08"))
+    ALARM09 = (LametricSoundCategory.ALARMS, ("alarm9", "a9", "a09"))
+    ALARM10 = (LametricSoundCategory.ALARMS, ("alarm10", "a10"))
+    ALARM11 = (LametricSoundCategory.ALARMS, ("alarm11", "a11"))
+    ALARM12 = (LametricSoundCategory.ALARMS, ("alarm12", "a12"))
+    ALARM13 = (LametricSoundCategory.ALARMS, ("alarm13", "a13"))
 
     # Notification Category Sounds
-    BICYCLE = (LametricSoundCategory.NOTIFICATIONS, ('bicycle', 'bike'))
-    CAR = (LametricSoundCategory.NOTIFICATIONS, ('car', ))
-    CASH = (LametricSoundCategory.NOTIFICATIONS, ('cash', ))
-    CAT = (LametricSoundCategory.NOTIFICATIONS, ('cat', ))
-    DOG01 = (LametricSoundCategory.NOTIFICATIONS, ('dog', 'dog1', 'dog01'))
-    DOG02 = (LametricSoundCategory.NOTIFICATIONS, ('dog2', 'dog02'))
-    ENERGY = (LametricSoundCategory.NOTIFICATIONS, ('energy', ))
-    KNOCK = (LametricSoundCategory.NOTIFICATIONS, ('knock-knock', 'knock'))
-    EMAIL = (LametricSoundCategory.NOTIFICATIONS, (
-        'letter_email', 'letter', 'email'))
-    LOSE01 = (LametricSoundCategory.NOTIFICATIONS, ('lose1', 'lose01', 'lose'))
-    LOSE02 = (LametricSoundCategory.NOTIFICATIONS, ('lose2', 'lose02'))
-    NEGATIVE01 = (LametricSoundCategory.NOTIFICATIONS, (
-        'negative1', 'negative01', 'neg01', 'neg1', '-'))
-    NEGATIVE02 = (LametricSoundCategory.NOTIFICATIONS, (
-        'negative2', 'negative02', 'neg02', 'neg2', '--'))
-    NEGATIVE03 = (LametricSoundCategory.NOTIFICATIONS, (
-        'negative3', 'negative03', 'neg03', 'neg3', '---'))
-    NEGATIVE04 = (LametricSoundCategory.NOTIFICATIONS, (
-        'negative4', 'negative04', 'neg04', 'neg4', '----'))
-    NEGATIVE05 = (LametricSoundCategory.NOTIFICATIONS, (
-        'negative5', 'negative05', 'neg05', 'neg5', '-----'))
-    NOTIFICATION01 = (LametricSoundCategory.NOTIFICATIONS, (
-        'notification', 'notification1', 'notification01', 'not01', 'not1'))
-    NOTIFICATION02 = (LametricSoundCategory.NOTIFICATIONS, (
-        'notification2', 'notification02', 'not02', 'not2'))
-    NOTIFICATION03 = (LametricSoundCategory.NOTIFICATIONS, (
-        'notification3', 'notification03', 'not03', 'not3'))
-    NOTIFICATION04 = (LametricSoundCategory.NOTIFICATIONS, (
-        'notification4', 'notification04', 'not04', 'not4'))
-    OPEN_DOOR = (LametricSoundCategory.NOTIFICATIONS, (
-        'open_door', 'open', 'door'))
-    POSITIVE01 = (LametricSoundCategory.NOTIFICATIONS, (
-        'positive1', 'positive01', 'pos01', 'p1', '+'))
-    POSITIVE02 = (LametricSoundCategory.NOTIFICATIONS, (
-        'positive2', 'positive02', 'pos02', 'p2', '++'))
-    POSITIVE03 = (LametricSoundCategory.NOTIFICATIONS, (
-        'positive3', 'positive03', 'pos03', 'p3', '+++'))
-    POSITIVE04 = (LametricSoundCategory.NOTIFICATIONS, (
-        'positive4', 'positive04', 'pos04', 'p4', '++++'))
-    POSITIVE05 = (LametricSoundCategory.NOTIFICATIONS, (
-        'positive5', 'positive05', 'pos05', 'p5', '+++++'))
-    POSITIVE06 = (LametricSoundCategory.NOTIFICATIONS, (
-        'positive6', 'positive06', 'pos06', 'p6', '++++++'))
-    STATISTIC = (LametricSoundCategory.NOTIFICATIONS, ('statistic', 'stat'))
-    THUNDER = (LametricSoundCategory.NOTIFICATIONS, ('thunder'))
-    WATER01 = (LametricSoundCategory.NOTIFICATIONS, ('water1', 'water01'))
-    WATER02 = (LametricSoundCategory.NOTIFICATIONS, ('water2', 'water02'))
-    WIN01 = (LametricSoundCategory.NOTIFICATIONS, ('win', 'win01', 'win1'))
-    WIN02 = (LametricSoundCategory.NOTIFICATIONS, ('win2', 'win02'))
-    WIND = (LametricSoundCategory.NOTIFICATIONS, ('wind', ))
-    WIND_SHORT = (LametricSoundCategory.NOTIFICATIONS, ('wind_short', ))
+    BICYCLE = (LametricSoundCategory.NOTIFICATIONS, ("bicycle", "bike"))
+    CAR = (LametricSoundCategory.NOTIFICATIONS, ("car",))
+    CASH = (LametricSoundCategory.NOTIFICATIONS, ("cash",))
+    CAT = (LametricSoundCategory.NOTIFICATIONS, ("cat",))
+    DOG01 = (LametricSoundCategory.NOTIFICATIONS, ("dog", "dog1", "dog01"))
+    DOG02 = (LametricSoundCategory.NOTIFICATIONS, ("dog2", "dog02"))
+    ENERGY = (LametricSoundCategory.NOTIFICATIONS, ("energy",))
+    KNOCK = (LametricSoundCategory.NOTIFICATIONS, ("knock-knock", "knock"))
+    EMAIL = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("letter_email", "letter", "email"),
+    )
+    LOSE01 = (LametricSoundCategory.NOTIFICATIONS, ("lose1", "lose01", "lose"))
+    LOSE02 = (LametricSoundCategory.NOTIFICATIONS, ("lose2", "lose02"))
+    NEGATIVE01 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("negative1", "negative01", "neg01", "neg1", "-"),
+    )
+    NEGATIVE02 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("negative2", "negative02", "neg02", "neg2", "--"),
+    )
+    NEGATIVE03 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("negative3", "negative03", "neg03", "neg3", "---"),
+    )
+    NEGATIVE04 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("negative4", "negative04", "neg04", "neg4", "----"),
+    )
+    NEGATIVE05 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("negative5", "negative05", "neg05", "neg5", "-----"),
+    )
+    NOTIFICATION01 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("notification", "notification1", "notification01", "not01", "not1"),
+    )
+    NOTIFICATION02 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("notification2", "notification02", "not02", "not2"),
+    )
+    NOTIFICATION03 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("notification3", "notification03", "not03", "not3"),
+    )
+    NOTIFICATION04 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("notification4", "notification04", "not04", "not4"),
+    )
+    OPEN_DOOR = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("open_door", "open", "door"),
+    )
+    POSITIVE01 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("positive1", "positive01", "pos01", "p1", "+"),
+    )
+    POSITIVE02 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("positive2", "positive02", "pos02", "p2", "++"),
+    )
+    POSITIVE03 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("positive3", "positive03", "pos03", "p3", "+++"),
+    )
+    POSITIVE04 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("positive4", "positive04", "pos04", "p4", "++++"),
+    )
+    POSITIVE05 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("positive5", "positive05", "pos05", "p5", "+++++"),
+    )
+    POSITIVE06 = (
+        LametricSoundCategory.NOTIFICATIONS,
+        ("positive6", "positive06", "pos06", "p6", "++++++"),
+    )
+    STATISTIC = (LametricSoundCategory.NOTIFICATIONS, ("statistic", "stat"))
+    THUNDER = (LametricSoundCategory.NOTIFICATIONS, "thunder")
+    WATER01 = (LametricSoundCategory.NOTIFICATIONS, ("water1", "water01"))
+    WATER02 = (LametricSoundCategory.NOTIFICATIONS, ("water2", "water02"))
+    WIN01 = (LametricSoundCategory.NOTIFICATIONS, ("win", "win01", "win1"))
+    WIN02 = (LametricSoundCategory.NOTIFICATIONS, ("win2", "win02"))
+    WIND = (LametricSoundCategory.NOTIFICATIONS, ("wind",))
+    WIND_SHORT = (LametricSoundCategory.NOTIFICATIONS, ("wind_short",))
 
 
 # A listing of all the sounds; the order DOES matter, content is read from
@@ -277,66 +308,94 @@ class LametricSound:
 # which is very close to 'alarm10'
 LAMETRIC_SOUNDS = (
     # Alarm Category Entries
-    LametricSound.ALARM13, LametricSound.ALARM12, LametricSound.ALARM11,
-    LametricSound.ALARM10, LametricSound.ALARM09, LametricSound.ALARM08,
-    LametricSound.ALARM07, LametricSound.ALARM06, LametricSound.ALARM05,
-    LametricSound.ALARM04, LametricSound.ALARM03, LametricSound.ALARM02,
+    LametricSound.ALARM13,
+    LametricSound.ALARM12,
+    LametricSound.ALARM11,
+    LametricSound.ALARM10,
+    LametricSound.ALARM09,
+    LametricSound.ALARM08,
+    LametricSound.ALARM07,
+    LametricSound.ALARM06,
+    LametricSound.ALARM05,
+    LametricSound.ALARM04,
+    LametricSound.ALARM03,
+    LametricSound.ALARM02,
     LametricSound.ALARM01,
-
     # Notification Category Entries
-    LametricSound.BICYCLE, LametricSound.CAR, LametricSound.CASH,
-    LametricSound.CAT, LametricSound.DOG02, LametricSound.DOG01,
-    LametricSound.ENERGY, LametricSound.KNOCK, LametricSound.EMAIL,
-    LametricSound.LOSE02, LametricSound.LOSE01, LametricSound.NEGATIVE01,
-    LametricSound.NEGATIVE02, LametricSound.NEGATIVE03,
-    LametricSound.NEGATIVE04, LametricSound.NEGATIVE05,
-    LametricSound.NOTIFICATION04, LametricSound.NOTIFICATION03,
-    LametricSound.NOTIFICATION02, LametricSound.NOTIFICATION01,
-    LametricSound.OPEN_DOOR, LametricSound.POSITIVE01,
-    LametricSound.POSITIVE02, LametricSound.POSITIVE03,
-    LametricSound.POSITIVE04, LametricSound.POSITIVE05,
-    LametricSound.POSITIVE01, LametricSound.STATISTIC, LametricSound.THUNDER,
-    LametricSound.WATER02, LametricSound.WATER01, LametricSound.WIND,
-    LametricSound.WIND_SHORT, LametricSound.WIN01, LametricSound.WIN02,
+    LametricSound.BICYCLE,
+    LametricSound.CAR,
+    LametricSound.CASH,
+    LametricSound.CAT,
+    LametricSound.DOG02,
+    LametricSound.DOG01,
+    LametricSound.ENERGY,
+    LametricSound.KNOCK,
+    LametricSound.EMAIL,
+    LametricSound.LOSE02,
+    LametricSound.LOSE01,
+    LametricSound.NEGATIVE01,
+    LametricSound.NEGATIVE02,
+    LametricSound.NEGATIVE03,
+    LametricSound.NEGATIVE04,
+    LametricSound.NEGATIVE05,
+    LametricSound.NOTIFICATION04,
+    LametricSound.NOTIFICATION03,
+    LametricSound.NOTIFICATION02,
+    LametricSound.NOTIFICATION01,
+    LametricSound.OPEN_DOOR,
+    LametricSound.POSITIVE01,
+    LametricSound.POSITIVE02,
+    LametricSound.POSITIVE03,
+    LametricSound.POSITIVE04,
+    LametricSound.POSITIVE05,
+    LametricSound.POSITIVE01,
+    LametricSound.STATISTIC,
+    LametricSound.THUNDER,
+    LametricSound.WATER02,
+    LametricSound.WATER01,
+    LametricSound.WIND,
+    LametricSound.WIND_SHORT,
+    LametricSound.WIN01,
+    LametricSound.WIN02,
 )
 
 
 class NotifyLametric(NotifyBase):
-    """
-    A wrapper for LaMetric Notifications
-    """
+    """A wrapper for LaMetric Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'LaMetric'
+    service_name = "LaMetric"
 
     # The services URL
-    service_url = 'https://lametric.com'
+    service_url = "https://lametric.com"
 
     # The default protocol
-    protocol = 'lametric'
+    protocol = "lametric"
 
     # The default secure protocol
-    secure_protocol = 'lametrics'
+    secure_protocol = "lametrics"
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_lametric'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_lametric"
 
     # Lametric does have titles when creating a message
     title_maxlen = 0
 
     # URL used for notifying Lametric App's created in the Dev Portal
-    cloud_notify_url = 'https://developer.lametric.com/api/v1' \
-                       '/dev/widget/update/com.lametric.{app_id}/{app_ver}'
+    cloud_notify_url = (
+        "https://developer.lametric.com/api/v1"
+        "/dev/widget/update/com.lametric.{app_id}/{app_ver}"
+    )
 
     # URL used for local notifications directly to the device
-    device_notify_url = '{schema}://{host}{port}/api/v2/device/notifications'
+    device_notify_url = "{schema}://{host}{port}/api/v2/device/notifications"
 
     # The Device User ID
-    default_device_user = 'dev'
+    default_device_user = "dev"
 
     # Track all icon mappings back to Apprise Icon NotifyType's
     # See: https://developer.lametric.com/icons
@@ -347,132 +406,148 @@ class NotifyLametric(NotifyBase):
     #            https://developer.lametric.com/icons
     lametric_icon_id_mapping = {
         # 620/Info
-        NotifyType.INFO: 'i620',
+        NotifyType.INFO: "i620",
         # 9182/info_good
-        NotifyType.SUCCESS: 'i9182',
+        NotifyType.SUCCESS: "i9182",
         # 9183/info_caution
-        NotifyType.WARNING: 'i9183',
+        NotifyType.WARNING: "i9183",
         # 9184/info_error
-        NotifyType.FAILURE: 'i9184',
+        NotifyType.FAILURE: "i9184",
     }
 
     # Define object templates
     templates = (
         # Cloud (App) Mode
-        '{schema}://{app_token}@{app_id}',
-        '{schema}://{app_token}@{app_id}/{app_ver}',
-
+        "{schema}://{app_token}@{app_id}",
+        "{schema}://{app_token}@{app_id}/{app_ver}",
         # Device Mode
-        '{schema}://{apikey}@{host}',
-        '{schema}://{user}:{apikey}@{host}',
-        '{schema}://{apikey}@{host}:{port}',
-        '{schema}://{user}:{apikey}@{host}:{port}',
+        "{schema}://{apikey}@{host}",
+        "{schema}://{user}:{apikey}@{host}",
+        "{schema}://{apikey}@{host}:{port}",
+        "{schema}://{user}:{apikey}@{host}:{port}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        # Used for Local Device mode
-        'apikey': {
-            'name': _('Device API Key'),
-            'type': 'string',
-            'private': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            # Used for Local Device mode
+            "apikey": {
+                "name": _("Device API Key"),
+                "type": "string",
+                "private": True,
+            },
+            # Used for Cloud mode
+            "app_id": {
+                "name": _("App ID"),
+                "type": "string",
+                "private": True,
+            },
+            # Used for Cloud mode
+            "app_ver": {
+                "name": _("App Version"),
+                "type": "string",
+                "regex": (r"^[1-9][0-9]*$", ""),
+                "default": "1",
+            },
+            # Used for Cloud mode
+            "app_token": {
+                "name": _("App Access Token"),
+                "type": "string",
+                "regex": (r"^[A-Z0-9]{80,}==$", "i"),
+            },
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+                "default": 8080,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
         },
-        # Used for Cloud mode
-        'app_id': {
-            'name': _('App ID'),
-            'type': 'string',
-            'private': True,
-        },
-        # Used for Cloud mode
-        'app_ver': {
-            'name': _('App Version'),
-            'type': 'string',
-            'regex': (r'^[1-9][0-9]*$', ''),
-            'default': '1',
-        },
-        # Used for Cloud mode
-        'app_token': {
-            'name': _('App Access Token'),
-            'type': 'string',
-            'regex': (r'^[A-Z0-9]{80,}==$', 'i'),
-        },
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-        },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-            'default': 8080,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'apikey': {
-            'alias_of': 'apikey',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "apikey": {
+                "alias_of": "apikey",
+            },
+            "app_id": {
+                "alias_of": "app_id",
+            },
+            "app_ver": {
+                "alias_of": "app_ver",
+            },
+            "app_token": {
+                "alias_of": "app_token",
+            },
+            "priority": {
+                "name": _("Priority"),
+                "type": "choice:string",
+                "values": LAMETRIC_PRIORITIES,
+                "default": LametricPriority.INFO,
+            },
+            "icon": {
+                "name": _("Custom Icon"),
+                "type": "string",
+            },
+            "icon_type": {
+                "name": _("Icon Type"),
+                "type": "choice:string",
+                "values": LAMETRIC_ICON_TYPES,
+                "default": LametricIconType.NONE,
+            },
+            "mode": {
+                "name": _("Mode"),
+                "type": "choice:string",
+                "values": LAMETRIC_MODES,
+                "default": LametricMode.DEVICE,
+            },
+            "sound": {
+                "name": _("Sound"),
+                "type": "string",
+            },
+            # Lifetime is in seconds
+            "cycles": {
+                "name": _("Cycles"),
+                "type": "int",
+                "min": 0,
+                "default": 1,
+            },
         },
-        'app_id': {
-            'alias_of': 'app_id',
-        },
-        'app_ver': {
-            'alias_of': 'app_ver',
-        },
-        'app_token': {
-            'alias_of': 'app_token',
-        },
-        'priority': {
-            'name': _('Priority'),
-            'type': 'choice:string',
-            'values': LAMETRIC_PRIORITIES,
-            'default': LametricPriority.INFO,
-        },
-        'icon': {
-            'name': _('Custom Icon'),
-            'type': 'string',
-        },
-        'icon_type': {
-            'name': _('Icon Type'),
-            'type': 'choice:string',
-            'values': LAMETRIC_ICON_TYPES,
-            'default': LametricIconType.NONE,
-        },
-        'mode': {
-            'name': _('Mode'),
-            'type': 'choice:string',
-            'values': LAMETRIC_MODES,
-            'default': LametricMode.DEVICE,
-        },
-        'sound': {
-            'name': _('Sound'),
-            'type': 'string',
-        },
-        # Lifetime is in seconds
-        'cycles': {
-            'name': _('Cycles'),
-            'type': 'int',
-            'min': 0,
-            'default': 1,
-        },
-    })
+    )
 
-    def __init__(self, apikey=None, app_token=None, app_id=None,
-                 app_ver=None, priority=None, icon=None, icon_type=None,
-                 sound=None, mode=None, cycles=None, **kwargs):
-        """
-        Initialize LaMetric Object
-        """
+    def __init__(
+        self,
+        apikey=None,
+        app_token=None,
+        app_id=None,
+        app_ver=None,
+        priority=None,
+        icon=None,
+        icon_type=None,
+        sound=None,
+        mode=None,
+        cycles=None,
+        **kwargs,
+    ):
+        """Initialize LaMetric Object."""
         super().__init__(**kwargs)
 
-        self.mode = mode.strip().lower() \
-            if isinstance(mode, str) \
-            else self.template_args['mode']['default']
+        self.mode = (
+            mode.strip().lower()
+            if isinstance(mode, str)
+            else self.template_args["mode"]["default"]
+        )
 
         # Default Cloud Argument
         self.lametric_app_id = None
@@ -483,7 +558,7 @@ class NotifyLametric(NotifyBase):
         self.lametric_apikey = None
 
         if self.mode not in LAMETRIC_MODES:
-            msg = 'An invalid LaMetric Mode ({}) was specified.'.format(mode)
+            msg = f"An invalid LaMetric Mode ({mode}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -491,70 +566,89 @@ class NotifyLametric(NotifyBase):
             try:
                 results = LAMETRIC_APP_ID_DETECTOR_RE.match(app_id)
             except TypeError:
-                msg = 'An invalid LaMetric Application ID ' \
-                      '({}) was specified.'.format(app_id)
+                msg = (
+                    "An invalid LaMetric Application ID "
+                    f"({app_id}) was specified."
+                )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
 
             # Detect our Access Token
             self.lametric_app_access_token = validate_regex(
-                app_token,
-                *self.template_tokens['app_token']['regex'])
+                app_token, *self.template_tokens["app_token"]["regex"]
+            )
             if not self.lametric_app_access_token:
-                msg = 'An invalid LaMetric Application Access Token ' \
-                      '({}) was specified.'.format(app_token)
+                msg = (
+                    "An invalid LaMetric Application Access Token "
+                    f"({app_token}) was specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             # If app_ver is specified, it over-rides all
             if app_ver:
                 self.lametric_app_ver = validate_regex(
-                    app_ver, *self.template_tokens['app_ver']['regex'])
+                    app_ver, *self.template_tokens["app_ver"]["regex"]
+                )
                 if not self.lametric_app_ver:
-                    msg = 'An invalid LaMetric Application Version ' \
-                          '({}) was specified.'.format(app_ver)
+                    msg = (
+                        "An invalid LaMetric Application Version "
+                        f"({app_ver}) was specified."
+                    )
                     self.logger.warning(msg)
                     raise TypeError(msg)
 
             else:
                 # If app_ver wasn't specified, we parse it from the
                 # Application ID
-                self.lametric_app_ver = results.group('app_ver') \
-                    if results.group('app_ver') else \
-                    self.template_tokens['app_ver']['default']
+                self.lametric_app_ver = (
+                    results.group("app_ver")
+                    if results.group("app_ver")
+                    else self.template_tokens["app_ver"]["default"]
+                )
 
             # Store our Application ID
-            self.lametric_app_id = results.group('app_id')
+            self.lametric_app_id = results.group("app_id")
 
         if self.mode == LametricMode.DEVICE:
             self.lametric_apikey = validate_regex(apikey)
             if not self.lametric_apikey:
-                msg = 'An invalid LaMetric Device API Key ' \
-                      '({}) was specified.'.format(apikey)
+                msg = (
+                    "An invalid LaMetric Device API Key "
+                    f"({apikey}) was specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
         if priority not in LAMETRIC_PRIORITIES:
-            self.priority = self.template_args['priority']['default']
+            self.priority = self.template_args["priority"]["default"]
 
         else:
             self.priority = priority
 
         # assign our icon (if it was defined); we also eliminate
         # any hashtag (#) entries that might be present
-        self.icon = re.search(r'[#\s]*(?P<value>.+?)\s*$', icon) \
-            .group('value') if isinstance(icon, str) else None
+        self.icon = (
+            re.search(r"[#\s]*(?P<value>.+?)\s*$", icon).group("value")
+            if isinstance(icon, str)
+            else None
+        )
 
         if icon_type not in LAMETRIC_ICON_TYPES:
-            self.icon_type = self.template_args['icon_type']['default']
+            self.icon_type = self.template_args["icon_type"]["default"]
 
         else:
             self.icon_type = icon_type
 
         # The number of times the message should be displayed
-        self.cycles = self.template_args['cycles']['default'] \
-            if not (isinstance(cycles, int) and
-                    cycles > self.template_args['cycles']['min']) else cycles
+        self.cycles = (
+            self.template_args["cycles"]["default"]
+            if not (
+                isinstance(cycles, int)
+                and cycles > self.template_args["cycles"]["min"]
+            )
+            else cycles
+        )
 
         self.sound = None
         if isinstance(sound, str):
@@ -562,17 +656,14 @@ class NotifyLametric(NotifyBase):
             self.sound = self.sound_lookup(sound.strip().lower())
             if self.sound is None:
                 self.logger.warning(
-                    'An invalid LaMetric sound ({}) was specified.'.format(
-                        sound))
+                    f"An invalid LaMetric sound ({sound}) was specified."
+                )
         return
 
     @staticmethod
     def sound_lookup(lookup):
-        """
-        A simple match function that takes string and returns the
-        LametricSound object it was found in.
-
-        """
+        """A simple match function that takes string and returns the
+        LametricSound object it was found in."""
 
         for x in LAMETRIC_SOUNDS:
             match = next((f for f in x[1] if f.startswith(lookup)), None)
@@ -584,92 +675,92 @@ class NotifyLametric(NotifyBase):
         return None
 
     def _cloud_notification_payload(self, body, notify_type, headers):
-        """
-        Return URL and payload for cloud directed requests
-        """
+        """Return URL and payload for cloud directed requests."""
 
         # Update header entries
         headers.update({
-            'X-Access-Token': self.lametric_apikey,
+            "X-Access-Token": self.lametric_apikey,
         })
 
         if self.sound:
             self.logger.warning(
-                'LaMetric sound setting is unavailable in Cloud mode')
+                "LaMetric sound setting is unavailable in Cloud mode"
+            )
 
-        if self.priority != self.template_args['priority']['default']:
+        if self.priority != self.template_args["priority"]["default"]:
             self.logger.warning(
-                'LaMetric priority setting is unavailable in Cloud mode')
+                "LaMetric priority setting is unavailable in Cloud mode"
+            )
 
-        if self.icon_type != self.template_args['icon_type']['default']:
+        if self.icon_type != self.template_args["icon_type"]["default"]:
             self.logger.warning(
-                'LaMetric icon_type setting is unavailable in Cloud mode')
+                "LaMetric icon_type setting is unavailable in Cloud mode"
+            )
 
-        if self.cycles != self.template_args['cycles']['default']:
+        if self.cycles != self.template_args["cycles"]["default"]:
             self.logger.warning(
-                'LaMetric cycle settings is unavailable in Cloud mode')
+                "LaMetric cycle settings is unavailable in Cloud mode"
+            )
 
         # Assign our icon if the user specified a custom one, otherwise
         # choose from our pre-set list (based on notify_type)
-        icon = self.icon if self.icon \
+        icon = (
+            self.icon
+            if self.icon
             else self.lametric_icon_id_mapping[notify_type]
+        )
 
         # Our Payload
         # Cloud Notifications don't have as much functionality
         # You can not set priority and/or sound
         payload = {
-            "frames": [
-                {
-                    "icon": icon,
-                    "text": body,
-                    "index": 0,
-                }
-            ]
+            "frames": [{
+                "icon": icon,
+                "text": body,
+                "index": 0,
+            }]
         }
 
         # Prepare our Cloud Notify URL
         notify_url = self.cloud_notify_url.format(
-            app_id=self.lametric_app_id, app_ver=self.lametric_app_ver)
+            app_id=self.lametric_app_id, app_ver=self.lametric_app_ver
+        )
 
         # Return request parameters
         return (notify_url, None, payload)
 
     def _device_notification_payload(self, body, notify_type, headers):
-        """
-        Return URL and Payload for Device directed requests
-        """
+        """Return URL and Payload for Device directed requests."""
 
         # Assign our icon if the user specified a custom one, otherwise
         # choose from our pre-set list (based on notify_type)
-        icon = self.icon if self.icon \
+        icon = (
+            self.icon
+            if self.icon
             else self.lametric_icon_id_mapping[notify_type]
+        )
 
         # Our Payload
         payload = {
             # Priority of the message
             "priority": self.priority,
-
             # Icon Type: Represents the nature of notification
             "icon_type": self.icon_type,
-
             # The time notification lives in queue to be displayed in
             # milliseconds (ms). The default lifetime is 2 minutes (120000ms).
             # If notification stayed in queue for longer than lifetime
             # milliseconds - it will not be displayed.
             "lifetime": 120000,
-
             "model": {
                 # cycles - the number of times message should be displayed. If
                 # cycles is set to 0, notification will stay on the screen
                 # until user dismisses it manually. By default it is set to 1.
                 "cycles": self.cycles,
-                "frames": [
-                    {
-                        "icon": icon,
-                        "text": body,
-                    }
-                ]
-            }
+                "frames": [{
+                    "icon": icon,
+                    "text": body,
+                }],
+            },
         }
 
         if self.sound:
@@ -677,10 +768,8 @@ class NotifyLametric(NotifyBase):
             payload["model"]["sound"] = {
                 # The sound category
                 "category": self.sound[0],
-
                 # The first element of our tuple is always the id
                 "id": self.sound[1][0],
-
                 # repeat - defines the number of times sound must be played.
                 # If set to 0 sound will be played until notification is
                 # dismissed. By default the value is set to 1.
@@ -698,37 +787,39 @@ class NotifyLametric(NotifyBase):
         notify_url = self.device_notify_url.format(
             schema="https" if self.secure else "http",
             host=self.host,
-            port=':{}'.format(
-                self.port if self.port
-                else self.template_tokens['port']['default']))
+            port=":{}".format(
+                self.port
+                if self.port
+                else self.template_tokens["port"]["default"]
+            ),
+        )
 
         # Return request parameters
         return (notify_url, auth, payload)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform LaMetric Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform LaMetric Notification."""
 
         # Prepare our headers:
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Cache-Control': 'no-cache',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "Cache-Control": "no-cache",
         }
 
         # Depending on the mode, the payload is gathered by
         # - _device_notification_payload()
         # - _cloud_notification_payload()
         (notify_url, auth, payload) = getattr(
-            self, '_{}_notification_payload'.format(self.mode))(
-                body=body, notify_type=notify_type, headers=headers)
+            self, f"_{self.mode}_notification_payload"
+        )(body=body, notify_type=notify_type, headers=headers)
 
-        self.logger.debug('LaMetric POST URL: %s (cert_verify=%r)' % (
-            notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('LaMetric Payload: %s' % str(payload))
+        self.logger.debug(
+            "LaMetric POST URL:"
+            f" {notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"LaMetric Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -750,31 +841,35 @@ class NotifyLametric(NotifyBase):
             # }
 
             if r.status_code not in (
-                    requests.codes.created, requests.codes.ok):
+                requests.codes.created,
+                requests.codes.ok,
+            ):
                 # We had a problem
-                status_str = \
-                    NotifyLametric.http_response_code_lookup(r.status_code)
+                status_str = NotifyLametric.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send LaMetric notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send LaMetric notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent LaMetric notification.')
+                self.logger.info("Sent LaMetric notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending LaMetric '
-                'notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending LaMetric "
+                f"notification to {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -783,18 +878,26 @@ class NotifyLametric(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         if self.mode == LametricMode.DEVICE:
             return (
                 self.secure_protocol if self.secure else self.protocol,
-                self.user, self.lametric_apikey, self.host,
-                self.port if self.port else (
-                    443 if self.secure else
-                    self.template_tokens['port']['default']),
+                self.user,
+                self.lametric_apikey,
+                self.host,
+                (
+                    self.port
+                    if self.port
+                    else (
+                        443
+                        if self.secure
+                        else self.template_tokens["port"]["default"]
+                    )
+                ),
             )
 
         return (
@@ -805,13 +908,11 @@ class NotifyLametric(NotifyBase):
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'mode': self.mode,
+            "mode": self.mode,
         }
 
         # Extend our parameters
@@ -819,137 +920,144 @@ class NotifyLametric(NotifyBase):
 
         if self.icon:
             # Assign our icon IF one was specified
-            params['icon'] = self.icon
+            params["icon"] = self.icon
 
         if self.mode == LametricMode.CLOUD:
             # Upstream/LaMetric App Return
-            return '{schema}://{token}@{app_id}/{app_ver}/?{params}'.format(
+            return "{schema}://{token}@{app_id}/{app_ver}/?{params}".format(
                 schema=self.protocol,
                 token=self.pprint(
-                    self.lametric_app_access_token, privacy, safe=''),
-                app_id=self.pprint(self.lametric_app_id, privacy, safe=''),
-                app_ver=NotifyLametric.quote(self.lametric_app_ver, safe=''),
-                params=NotifyLametric.urlencode(params))
+                    self.lametric_app_access_token, privacy, safe=""
+                ),
+                app_id=self.pprint(self.lametric_app_id, privacy, safe=""),
+                app_ver=NotifyLametric.quote(self.lametric_app_ver, safe=""),
+                params=NotifyLametric.urlencode(params),
+            )
 
         #
         # If we reach here then we're dealing with LametricMode.DEVICE
         #
-        if self.priority != self.template_args['priority']['default']:
-            params['priority'] = self.priority
+        if self.priority != self.template_args["priority"]["default"]:
+            params["priority"] = self.priority
 
-        if self.icon_type != self.template_args['icon_type']['default']:
-            params['icon_type'] = self.icon_type
+        if self.icon_type != self.template_args["icon_type"]["default"]:
+            params["icon_type"] = self.icon_type
 
-        if self.cycles != self.template_args['cycles']['default']:
-            params['cycles'] = self.cycles
+        if self.cycles != self.template_args["cycles"]["default"]:
+            params["cycles"] = self.cycles
 
         if self.sound:
             # Store our sound entry
             # The first element of our tuple is always the id
-            params['sound'] = self.sound[1][0]
+            params["sound"] = self.sound[1][0]
 
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{apikey}@'.format(
-                user=NotifyLametric.quote(self.user, safe=''),
-                apikey=self.pprint(self.lametric_apikey, privacy, safe=''),
+            auth = "{user}:{apikey}@".format(
+                user=NotifyLametric.quote(self.user, safe=""),
+                apikey=self.pprint(self.lametric_apikey, privacy, safe=""),
             )
         else:  # self.apikey is set
-            auth = '{apikey}@'.format(
-                apikey=self.pprint(self.lametric_apikey, privacy, safe=''),
+            auth = "{apikey}@".format(
+                apikey=self.pprint(self.lametric_apikey, privacy, safe=""),
             )
 
         # Local Return
-        return '{schema}://{auth}{hostname}{port}/?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}/?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None
-                 or self.port == self.template_tokens['port']['default']
-                 else ':{}'.format(self.port),
+            port=(
+                ""
+                if self.port is None
+                or self.port == self.template_tokens["port"]["default"]
+                else f":{self.port}"
+            ),
             params=NotifyLametric.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        if results.get('user') and not results.get('password'):
+        if results.get("user") and not results.get("password"):
             # Handle URL like:
             # schema://user@host
 
             # This becomes the password
-            results['password'] = results['user']
-            results['user'] = None
+            results["password"] = results["user"]
+            results["user"] = None
 
         # Get unquoted entries
-        entries = NotifyLametric.split_path(results['fullpath'])
+        entries = NotifyLametric.split_path(results["fullpath"])
 
         # Priority Handling
-        if 'priority' in results['qsd'] and results['qsd']['priority']:
-            results['priority'] = NotifyLametric.unquote(
-                results['qsd']['priority'].strip().lower())
+        if "priority" in results["qsd"] and results["qsd"]["priority"]:
+            results["priority"] = NotifyLametric.unquote(
+                results["qsd"]["priority"].strip().lower()
+            )
 
         # Icon Type
-        if 'icon' in results['qsd'] and results['qsd']['icon']:
-            results['icon'] = NotifyLametric.unquote(
-                results['qsd']['icon'].strip().lower())
+        if "icon" in results["qsd"] and results["qsd"]["icon"]:
+            results["icon"] = NotifyLametric.unquote(
+                results["qsd"]["icon"].strip().lower()
+            )
 
         # Icon Type
-        if 'icon_type' in results['qsd'] and results['qsd']['icon_type']:
-            results['icon_type'] = NotifyLametric.unquote(
-                results['qsd']['icon_type'].strip().lower())
+        if "icon_type" in results["qsd"] and results["qsd"]["icon_type"]:
+            results["icon_type"] = NotifyLametric.unquote(
+                results["qsd"]["icon_type"].strip().lower()
+            )
 
         # Sound
-        if 'sound' in results['qsd'] and results['qsd']['sound']:
-            results['sound'] = NotifyLametric.unquote(
-                results['qsd']['sound'].strip().lower())
+        if "sound" in results["qsd"] and results["qsd"]["sound"]:
+            results["sound"] = NotifyLametric.unquote(
+                results["qsd"]["sound"].strip().lower()
+            )
 
         # API Key (Device Mode)
-        if 'apikey' in results['qsd'] and results['qsd']['apikey']:
+        if "apikey" in results["qsd"] and results["qsd"]["apikey"]:
             # Extract API Key from an argument
-            results['apikey'] = \
-                NotifyLametric.unquote(results['qsd']['apikey'])
+            results["apikey"] = NotifyLametric.unquote(
+                results["qsd"]["apikey"]
+            )
 
         # App ID
-        if 'app' in results['qsd'] \
-                and results['qsd']['app']:
+        if "app" in results["qsd"] and results["qsd"]["app"]:
 
             # Extract the App ID from an argument
-            results['app_id'] = \
-                NotifyLametric.unquote(results['qsd']['app'])
+            results["app_id"] = NotifyLametric.unquote(results["qsd"]["app"])
 
         # App Version
-        if 'app_ver' in results['qsd'] \
-                and results['qsd']['app_ver']:
+        if "app_ver" in results["qsd"] and results["qsd"]["app_ver"]:
 
             # Extract the App ID from an argument
-            results['app_ver'] = \
-                NotifyLametric.unquote(results['qsd']['app_ver'])
+            results["app_ver"] = NotifyLametric.unquote(
+                results["qsd"]["app_ver"]
+            )
 
         elif entries:
             # Store our app id
-            results['app_ver'] = entries.pop(0)
+            results["app_ver"] = entries.pop(0)
 
-        if 'token' in results['qsd'] and results['qsd']['token']:
+        if "token" in results["qsd"] and results["qsd"]["token"]:
             # Extract Application Access Token from an argument
-            results['app_token'] = \
-                NotifyLametric.unquote(results['qsd']['token'])
+            results["app_token"] = NotifyLametric.unquote(
+                results["qsd"]["token"]
+            )
 
         # Mode override
-        if 'mode' in results['qsd'] and results['qsd']['mode']:
-            results['mode'] = NotifyLametric.unquote(
-                results['qsd']['mode'].strip().lower())
+        if "mode" in results["qsd"] and results["qsd"]["mode"]:
+            results["mode"] = NotifyLametric.unquote(
+                results["qsd"]["mode"].strip().lower()
+            )
         else:
             # We can try to detect the mode based on the validity of the
             # hostname. We can also scan the validity of the Application
@@ -957,42 +1065,47 @@ class NotifyLametric(NotifyBase):
             #
             # This isn't a surfire way to do things though; it's best to
             # specify the mode= flag
-            results['mode'] = LametricMode.DEVICE \
-                if ((is_hostname(results['host']) or
-                    is_ipaddr(results['host'])) and
-
+            results["mode"] = (
+                LametricMode.DEVICE
+                if (
+                    (
+                        is_hostname(results["host"])
+                        or is_ipaddr(results["host"])
+                    )
+                    and
                     # make sure password is not an Access Token
-                    (results['password'] and not
-                        LAMETRIC_IS_APP_TOKEN.match(results['password'])) and
-
+                    (
+                        results["password"]
+                        and not LAMETRIC_IS_APP_TOKEN.match(
+                            results["password"]
+                        )
+                    )
+                    and
                     # Scan for app_ flags
-                    next((f for f in results.keys()
-                          if f.startswith('app_')), None) is None) \
+                    next((f for f in results if f.startswith("app_")), None)
+                    is None
+                )
                 else LametricMode.CLOUD
+            )
 
         # Handle defaults if not set
-        if results['mode'] == LametricMode.DEVICE:
+        if results["mode"] == LametricMode.DEVICE:
             # Device Mode Defaults
-            if 'apikey' not in results:
-                results['apikey'] = \
-                    NotifyLametric.unquote(results['password'])
+            if "apikey" not in results:
+                results["apikey"] = NotifyLametric.unquote(results["password"])
 
         else:
             # CLOUD Mode Defaults
-            if 'app_id' not in results:
-                results['app_id'] = \
-                    NotifyLametric.unquote(results['host'])
-            if 'app_token' not in results:
-                results['app_token'] = \
-                    NotifyLametric.unquote(results['password'])
+            if "app_id" not in results:
+                results["app_id"] = NotifyLametric.unquote(results["host"])
+            if "app_token" not in results:
+                results["app_token"] = NotifyLametric.unquote(
+                    results["password"]
+                )
 
         # Set cycles
-        try:
-            results['cycles'] = abs(int(results['qsd'].get('cycles')))
-
-        except (TypeError, ValueError):
-            # Not a valid integer; ignore entry
-            pass
+        with contextlib.suppress(TypeError, ValueError):
+            results["cycles"] = abs(int(results["qsd"].get("cycles")))
 
         return results
 
@@ -1011,22 +1124,36 @@ class NotifyLametric(NotifyBase):
         # ?token={APP_ACCESS_TOKEN} to the parameters at the end or the
         # URL will fail to load in later stages.
         result = re.match(
-            r'^http(?P<secure>s)?://(?P<host>[^/]+)'
-            r'/api/(?P<api_ver>v[1-9]*[0-9]+)'
-            r'/dev/widget/update/'
-            r'com\.lametric\.(?P<app_id>[0-9a-z.-]{1,64})'
-            r'(/(?P<app_ver>[1-9][0-9]*))?/?'
-            r'(?P<params>\?.+)?$', url, re.I)
+            r"^http(?P<secure>s)?://(?P<host>[^/]+)"
+            r"/api/(?P<api_ver>v[1-9]*[0-9]+)"
+            r"/dev/widget/update/"
+            r"com\.lametric\.(?P<app_id>[0-9a-z.-]{1,64})"
+            r"(/(?P<app_ver>[1-9][0-9]*))?/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
             return NotifyLametric.parse_url(
-                '{schema}://{app_id}{app_ver}/{params}'.format(
-                    schema=NotifyLametric.secure_protocol
-                    if result.group('secure') else NotifyLametric.protocol,
-                    app_id=result.group('app_id'),
-                    app_ver='/{}'.format(result.group('app_ver'))
-                    if result.group('app_ver') else '',
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                "{schema}://{app_id}{app_ver}/{params}".format(
+                    schema=(
+                        NotifyLametric.secure_protocol
+                        if result.group("secure")
+                        else NotifyLametric.protocol
+                    ),
+                    app_id=result.group("app_id"),
+                    app_ver=(
+                        "/{}".format(result.group("app_ver"))
+                        if result.group("app_ver")
+                        else ""
+                    ),
+                    params=(
+                        ""
+                        if not result.group("params")
+                        else result.group("params")
+                    ),
+                )
+            )
 
         return None

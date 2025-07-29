@@ -1,60 +1,79 @@
 #
 # Verify on CI/GHA that package building works.
 #
-# TODO: Currently, this supports RPM-based systems only.
-#       By adjusting a few details, it can be made work
-#       for other distribution types as well.
-#
-name: Test packaging
+name: RPM Packaging
 
 on:
-
-  # On which repository actions to trigger the build.
   push:
-    branches: [ master ]
+    branches: [main, master, 'release/**']
   pull_request:
-    branches: [ master ]
-
-  # Allow job to be triggered manually.
+    branches: [main, master]
   workflow_dispatch:
-
-# Cancel in-progress jobs when pushing to the same branch.
-concurrency:
-  cancel-in-progress: true
-  group: ${{ github.workflow }}-${{ github.ref }}
 
 jobs:
 
-  tests:
+  build:
+    name: Build RPMs
+    runs-on: ubuntu-latest
 
-    runs-on: "ubuntu-latest"
-    strategy:
+    container:
+      image: ghcr.io/caronc/apprise-rpmbuild:el9
+      options: --user root
+      credentials:
+        username: caronc
+        password: ${{ secrets.CR_PAT }}
 
-      # Run all jobs to completion (false), or cancel
-      # all jobs once the first one fails (true).
-      fail-fast: false
-
-      # Define a list of build targets. The labels should match the
-      # items within the `services` section of `docker-compose.yml`.
-      matrix:
-        target: [
-          "rpmbuild.el9",
-        ]
-
-    defaults:
-      run:
-        shell: bash
-
-    name: Target ${{ matrix.target }}
     steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
 
-    - name: Acquire sources
-      uses: actions/checkout@v4
+      - name: Build RPMs
+        run: ./bin/build-rpm.sh
+        env:
+          APPRISE_DIR: ${{ github.workspace }}
 
-    - name: Build package
-      run: |
-        docker compose run --user root --rm ${{ matrix.target }} build-rpm.sh
+      - name: Show RPMs found for upload
+        run: |
+          echo "Listing dist/**/*.rpm:"
+          find dist -type f -name '*.rpm'
 
-    - name: Verify package has been produced
-      run: |
-        ls -alF dist/rpm/noarch/*.noarch.rpm
+      - name: Upload RPM Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: built-rpms
+          path: |
+            dist/**/*.rpm
+          if-no-files-found: error
+          retention-days: 5
+
+  verify:
+    name: Verify RPMs
+    needs: build
+    runs-on: ubuntu-latest
+
+    container:
+      image: ghcr.io/caronc/apprise-rpmbuild:el9
+      options: --user root
+      credentials:
+        username: caronc
+        password: ${{ secrets.CR_PAT }}
+
+    steps:
+      - name: Download built RPMs
+        uses: actions/download-artifact@v4
+        with:
+          name: built-rpms
+          path: ./dist
+
+      - name: Lint RPMs
+        run: rpmlint ./dist/**/*.rpm
+      
+      - name: Install and verify RPMs
+        run: |
+          echo "Installing RPMs from: ./dist/"
+          find ./dist -name '*.rpm'
+          dnf install -y ./dist/**/*.rpm
+          apprise --version
+      
+      - name: Check Installed Files
+        run: rpm -qlp ./dist/**/*.rpm

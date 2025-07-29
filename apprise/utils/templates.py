@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -25,39 +24,36 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import re
 import json
+import re
 
 
 class TemplateType:
-    """
-    Defines the different template types we can perform parsing on
-    """
+    """Defines the different template types we can perform parsing on."""
+
     # RAW does nothing at all to the content being parsed
     # data is taken at it's absolute value
-    RAW = 'raw'
+    RAW = "raw"
 
     # Data is presumed to be of type JSON and is therefore escaped
     # if required to do so (such as single quotes)
-    JSON = 'json'
+    JSON = "json"
 
 
 def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
-    """
-    Takes a template in a str format and applies all of the keywords
-    and their values to it.
+    """Takes a template in a str format and applies all of the keywords and
+    their values to it.
 
     The app$mode is used to dictact any pre-processing that needs to take place
     to the escaped string prior to it being placed.  The idea here is for
     elements to be placed in a JSON response for example should be escaped
     early in their string format.
 
-    The template must contain keywords wrapped in in double
-    squirly braces like {{keyword}}.  These are matched to the respected
-    kwargs passed into this function.
+    The template must contain keywords wrapped in in double squirly braces like
+    {{keyword}}.  These are matched to the respected kwargs passed into this
+    function.
 
     If there is no match found, content is not swapped.
-
     """
 
     def _escape_raw(content):
@@ -71,12 +67,17 @@ def apply_template(template, app_mode=TemplateType.RAW, **kwargs):
     # Our escape function
     fn = _escape_json if app_mode == TemplateType.JSON else _escape_raw
 
-    lookup = [re.escape(x) for x in kwargs.keys()]
+    lookup = [re.escape(x) for x in kwargs]
 
     # Compile this into a list
     mask_r = re.compile(
-        re.escape('{{') + r'\s*(' + '|'.join(lookup) + r')\s*'
-        + re.escape('}}'), re.IGNORECASE)
+        re.escape("{{")
+        + r"\s*("
+        + "|".join(lookup)
+        + r")\s*"
+        + re.escape("}}"),
+        re.IGNORECASE,
+    )
 
     # we index 2 characters off the head and 2 characters from the tail
     # to drop the '{{' and '}}' surrounding our match so that we can

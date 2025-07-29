@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,40 +26,30 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
+
 import requests
 
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyImageSize
-from ..common import NotifyType
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import NotifyBase
 
 
 class FORMPayloadField:
-    """
-    Identifies the fields available in the FORM Payload
-    """
-    VERSION = 'version'
-    TITLE = 'title'
-    MESSAGE = 'message'
-    MESSAGETYPE = 'type'
+    """Identifies the fields available in the FORM Payload."""
+
+    VERSION = "version"
+    TITLE = "title"
+    MESSAGE = "message"
+    MESSAGETYPE = "type"
 
 
 # Defines the method to send the notification
-METHODS = (
-    'POST',
-    'GET',
-    'DELETE',
-    'PUT',
-    'HEAD',
-    'PATCH'
-)
+METHODS = ("POST", "GET", "DELETE", "PUT", "HEAD", "PATCH")
 
 
 class NotifyForm(NotifyBase):
-    """
-    A wrapper for Form Notifications
-    """
+    """A wrapper for Form Notifications."""
 
     # Support
     # - file*
@@ -72,28 +61,29 @@ class NotifyForm(NotifyBase):
     # - file
     # The code will convert the ? or * to the digit increments
     __attach_as_re = re.compile(
-        r'((?P<match1>(?P<id1a>[a-z0-9_-]+)?'
-        r'(?P<wc1>[*?+$:.%]+)(?P<id1b>[a-z0-9_-]+))'
-        r'|(?P<match2>(?P<id2>[a-z0-9_-]+)(?P<wc2>[*?+$:.%]?)))',
-        re.IGNORECASE)
+        r"((?P<match1>(?P<id1a>[a-z0-9_-]+)?"
+        r"(?P<wc1>[*?+$:.%]+)(?P<id1b>[a-z0-9_-]+))"
+        r"|(?P<match2>(?P<id2>[a-z0-9_-]+)(?P<wc2>[*?+$:.%]?)))",
+        re.IGNORECASE,
+    )
 
     # Our count
-    attach_as_count = '{:02d}'
+    attach_as_count = "{:02d}"
 
     # the default attach_as value
-    attach_as_default = f'file{attach_as_count}'
+    attach_as_default = f"file{attach_as_count}"
 
     # The default descriptive name associated with the Notification
-    service_name = 'Form'
+    service_name = "Form"
 
     # The default protocol
-    protocol = 'form'
+    protocol = "form"
 
     # The default secure protocol
-    secure_protocol = 'forms'
+    secure_protocol = "forms"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_Form'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_Custom_Form"
 
     # Support attachments
     attachment_support = True
@@ -109,97 +99,110 @@ class NotifyForm(NotifyBase):
     # Version: Major.Minor,  Major is only updated if the entire schema is
     # changed. If just adding new items (or removing old ones, only increment
     # the Minor!
-    form_version = '1.0'
+    form_version = "1.0"
 
     # Define object templates
     templates = (
-        '{schema}://{host}',
-        '{schema}://{host}:{port}',
-        '{schema}://{user}@{host}',
-        '{schema}://{user}@{host}:{port}',
-        '{schema}://{user}:{password}@{host}',
-        '{schema}://{user}:{password}@{host}:{port}',
+        "{schema}://{host}",
+        "{schema}://{host}:{port}",
+        "{schema}://{user}@{host}",
+        "{schema}://{user}@{host}:{port}",
+        "{schema}://{user}:{password}@{host}",
+        "{schema}://{user}:{password}@{host}:{port}",
     )
 
     # Define our tokens; these are the minimum tokens required required to
     # be passed into this function (as arguments). The syntax appends any
     # previously defined in the base package and builds onto them
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'method': {
-            'name': _('Fetch Method'),
-            'type': 'choice:string',
-            'values': METHODS,
-            'default': METHODS[0],
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "method": {
+                "name": _("Fetch Method"),
+                "type": "choice:string",
+                "values": METHODS,
+                "default": METHODS[0],
+            },
+            "attach-as": {
+                "name": _("Attach File As"),
+                "type": "string",
+                "default": "file*",
+                "map_to": "attach_as",
+            },
         },
-        'attach-as': {
-            'name': _('Attach File As'),
-            'type': 'string',
-            'default': 'file*',
-            'map_to': 'attach_as',
-        },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("HTTP Header"),
+            "prefix": "+",
         },
-        'payload': {
-            'name': _('Payload Extras'),
-            'prefix': ':',
+        "payload": {
+            "name": _("Payload Extras"),
+            "prefix": ":",
         },
-        'params': {
-            'name': _('GET Params'),
-            'prefix': '-',
+        "params": {
+            "name": _("GET Params"),
+            "prefix": "-",
         },
     }
 
-    def __init__(self, headers=None, method=None, payload=None, params=None,
-                 attach_as=None, **kwargs):
-        """
-        Initialize Form Object
+    def __init__(
+        self,
+        headers=None,
+        method=None,
+        payload=None,
+        params=None,
+        attach_as=None,
+        **kwargs,
+    ):
+        """Initialize Form Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
         if not isinstance(self.fullpath, str):
-            self.fullpath = ''
+            self.fullpath = ""
 
-        self.method = self.template_args['method']['default'] \
-            if not isinstance(method, str) else method.upper()
+        self.method = (
+            self.template_args["method"]["default"]
+            if not isinstance(method, str)
+            else method.upper()
+        )
 
         if self.method not in METHODS:
-            msg = 'The method specified ({}) is invalid.'.format(method)
+            msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -212,24 +215,23 @@ class NotifyForm(NotifyBase):
         else:
             result = self.__attach_as_re.match(attach_as.strip())
             if not result:
-                msg = 'The attach-as specified ({}) is invalid.'.format(
-                    attach_as)
+                msg = f"The attach-as specified ({attach_as}) is invalid."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-            self.attach_as = ''
+            self.attach_as = ""
             self.attach_multi_support = False
-            if result.group('match1'):
-                if result.group('id1a'):
-                    self.attach_as += result.group('id1a')
+            if result.group("match1"):
+                if result.group("id1a"):
+                    self.attach_as += result.group("id1a")
 
                 self.attach_as += self.attach_as_count
                 self.attach_multi_support = True
-                self.attach_as += result.group('id1b')
+                self.attach_as += result.group("id1b")
 
             else:  # result.group('match2'):
-                self.attach_as += result.group('id2')
-                if result.group('wc2'):
+                self.attach_as += result.group("id2")
+                if result.group("wc2"):
                     self.attach_as += self.attach_as_count
                     self.attach_multi_support = True
 
@@ -272,15 +274,19 @@ class NotifyForm(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform Form Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform Form Notification."""
 
         # Prepare HTTP Headers
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         # Apply any/all header over-rides defined
@@ -294,40 +300,55 @@ class NotifyForm(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 try:
                     files.append((
-                        self.attach_as.format(no)
-                        if self.attach_multi_support else self.attach_as, (
-                            attachment.name
-                            if attachment.name else f'file{no:03}.dat',
-                            open(attachment.path, 'rb'),
-                            attachment.mimetype)
+                        (
+                            self.attach_as.format(no)
+                            if self.attach_multi_support
+                            else self.attach_as
+                        ),
+                        (
+                            (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            # file handle is safely closed in `finally`; inline
+                            # open is intentional
+                            open(attachment.path, "rb"),  # noqa: SIM115
+                            attachment.mimetype,
+                        ),
                     ))
 
-                except (OSError, IOError) as e:
+                except OSError as e:
                     self.logger.warning(
-                        'An I/O error occurred while opening {}.'.format(
-                            attachment.name if attachment else 'attachment'))
-                    self.logger.debug('I/O Exception: %s' % str(e))
+                        "An I/O error occurred while opening {}.".format(
+                            attachment.name if attachment else "attachment"
+                        )
+                    )
+                    self.logger.debug(f"I/O Exception: {e!s}")
                     return False
 
             if not self.attach_multi_support and no > 1:
                 self.logger.warning(
-                    'Multiple attachments provided while '
-                    'form:// Multi-Attachment Support not enabled')
+                    "Multiple attachments provided while "
+                    "form:// Multi-Attachment Support not enabled"
+                )
 
         # prepare Form Object
         payload = {}
 
         for key, value in (
-                (FORMPayloadField.VERSION, self.form_version),
-                (FORMPayloadField.TITLE, title),
-                (FORMPayloadField.MESSAGE, body),
-                (FORMPayloadField.MESSAGETYPE, notify_type)):
+            (FORMPayloadField.VERSION, self.form_version),
+            (FORMPayloadField.TITLE, title),
+            (FORMPayloadField.MESSAGE, body),
+            (FORMPayloadField.MESSAGETYPE, notify_type),
+        ):
 
             if not self.payload_map[key]:
                 # Do not store element in payload response
@@ -342,36 +363,37 @@ class NotifyForm(NotifyBase):
             auth = (self.user, self.password)
 
         # Set our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
-        url = '%s://%s' % (schema, self.host)
+        url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 
-        self.logger.debug('Form %s URL: %s (cert_verify=%r)' % (
-            self.method, url, self.verify_certificate,
-        ))
-        self.logger.debug('Form Payload: %s' % str(payload))
+        self.logger.debug(
+            f"Form {self.method} URL:"
+            f" {url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Form Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        if self.method == 'GET':
+        if self.method == "GET":
             method = requests.get
             payload.update(self.params)
 
-        elif self.method == 'PUT':
+        elif self.method == "PUT":
             method = requests.put
 
-        elif self.method == 'PATCH':
+        elif self.method == "PATCH":
             method = requests.patch
 
-        elif self.method == 'DELETE':
+        elif self.method == "DELETE":
             method = requests.delete
 
-        elif self.method == 'HEAD':
+        elif self.method == "HEAD":
             method = requests.head
 
         else:  # POST
@@ -380,9 +402,9 @@ class NotifyForm(NotifyBase):
         try:
             r = method(
                 url,
-                files=None if not files else files,
-                data=payload if self.method != 'GET' else None,
-                params=payload if self.method == 'GET' else self.params,
+                files=files if files else None,
+                data=payload if self.method != "GET" else None,
+                params=payload if self.method == "GET" else self.params,
                 headers=headers,
                 auth=auth,
                 verify=self.verify_certificate,
@@ -390,38 +412,42 @@ class NotifyForm(NotifyBase):
             )
             if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem
-                status_str = \
-                    NotifyForm.http_response_code_lookup(r.status_code)
+                status_str = NotifyForm.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Form %s notification: %s%serror=%s.',
+                    "Failed to send Form %s notification: %s%serror=%s.",
                     self.method,
                     status_str,
-                    ', ' if status_str else '',
-                    str(r.status_code))
+                    ", " if status_str else "",
+                    str(r.status_code),
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Form %s notification.', self.method)
+                self.logger.info("Sent Form %s notification.", self.method)
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Form '
-                'notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Form "
+                f"notification to {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             self.logger.warning(
-                'An I/O error occurred while reading one of the '
-                'attached files.')
-            self.logger.debug('I/O Exception: %s' % str(e))
+                "An I/O error occurred while reading one of the "
+                "attached files."
+            )
+            self.logger.debug(f"I/O Exception: {e!s}")
             return False
 
         finally:
@@ -433,107 +459,114 @@ class NotifyForm(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host,
+            self.user,
+            self.password,
+            self.host,
             self.port if self.port else (443 if self.secure else 80),
-            self.fullpath.rstrip('/'),
+            self.fullpath.rstrip("/"),
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'method': self.method,
+            "method": self.method,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Append our GET params into our parameters
-        params.update({'-{}'.format(k): v for k, v in self.params.items()})
+        params.update({f"-{k}": v for k, v in self.params.items()})
 
         # Append our payload extra's into our parameters
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_extras.items()})
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
+        params.update({f":{k}": v for k, v in self.payload_extras.items()})
+        params.update({f":{k}": v for k, v in self.payload_overrides.items()})
 
         if self.attach_as != self.attach_as_default:
             # Provide Attach-As extension details
-            params['attach-as'] = self.attach_as
+            params["attach-as"] = self.attach_as
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyForm.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifyForm.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyForm.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifyForm.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=NotifyForm.quote(self.fullpath, safe='/')
-            if self.fullpath else '/',
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=(
+                NotifyForm.quote(self.fullpath, safe="/")
+                if self.fullpath
+                else "/"
+            ),
             params=NotifyForm.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # store any additional payload extra's defined
-        results['payload'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
-                              for x, y in results['qsd:'].items()}
+        results["payload"] = {
+            NotifyForm.unquote(x): NotifyForm.unquote(y)
+            for x, y in results["qsd:"].items()
+        }
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
-                              for x, y in results['qsd+'].items()}
+        results["headers"] = {
+            NotifyForm.unquote(x): NotifyForm.unquote(y)
+            for x, y in results["qsd+"].items()
+        }
 
         # Add our GET paramters in the event the user wants to pass these along
-        results['params'] = {NotifyForm.unquote(x): NotifyForm.unquote(y)
-                             for x, y in results['qsd-'].items()}
+        results["params"] = {
+            NotifyForm.unquote(x): NotifyForm.unquote(y)
+            for x, y in results["qsd-"].items()
+        }
 
         # Allow Attach-As Support which over-rides the name of the filename
         # posted with the form://
         # the default is file01, file02, file03, etc
-        if 'attach-as' in results['qsd'] and len(results['qsd']['attach-as']):
-            results['attach_as'] = results['qsd']['attach-as']
+        if "attach-as" in results["qsd"] and len(results["qsd"]["attach-as"]):
+            results["attach_as"] = results["qsd"]["attach-as"]
 
         # Set method if not otherwise set
-        if 'method' in results['qsd'] and len(results['qsd']['method']):
-            results['method'] = NotifyForm.unquote(results['qsd']['method'])
+        if "method" in results["qsd"] and len(results["qsd"]["method"]):
+            results["method"] = NotifyForm.unquote(results["qsd"]["method"])
 
         return results

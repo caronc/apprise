@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -33,25 +32,28 @@
 # API Details: https://developers.africastalking.com/docs/sms/sending/bulk
 import requests
 
-from .base import NotifyBase
 from ..common import NotifyType
-from ..utils.parse import (
-    is_phone_no, parse_bool, parse_phone_no, validate_regex)
 from ..locale import gettext_lazy as _
+from ..utils.parse import (
+    is_phone_no,
+    parse_bool,
+    parse_phone_no,
+    validate_regex,
+)
+from .base import NotifyBase
 
 
 class AfricasTalkingSMSMode:
-    """
-    Africas Talking SMS Mode
-    """
+    """Africas Talking SMS Mode."""
+
     # BulkSMS Mode
-    BULKSMS = 'bulksms'
+    BULKSMS = "bulksms"
 
     # Premium Mode
-    PREMIUM = 'premium'
+    PREMIUM = "premium"
 
     # Sandbox Mode
-    SANDBOX = 'sandbox'
+    SANDBOX = "sandbox"
 
 
 # Define the types in a list for validation purposes
@@ -64,48 +66,49 @@ AFRICAS_TALKING_SMS_MODES = (
 
 # Extend HTTP Error Messages
 AFRICAS_TALKING_HTTP_ERROR_MAP = {
-    100: 'Processed',
-    101: 'Sent',
-    102: 'Queued',
-    401: 'Risk Hold',
-    402: 'Invalid Sender ID',
-    403: 'Invalid Phone Number',
-    404: 'Unsupported Number Type',
-    405: 'Insufficient Balance',
-    406: 'User In Blacklist',
-    407: 'Could Not Route',
-    409: 'Do Not Disturb Rejection',
-    500: 'Internal Server Error',
-    501: 'Gateway Error',
-    502: 'Rejected By Gateway',
+    100: "Processed",
+    101: "Sent",
+    102: "Queued",
+    401: "Risk Hold",
+    402: "Invalid Sender ID",
+    403: "Invalid Phone Number",
+    404: "Unsupported Number Type",
+    405: "Insufficient Balance",
+    406: "User In Blacklist",
+    407: "Could Not Route",
+    409: "Do Not Disturb Rejection",
+    500: "Internal Server Error",
+    501: "Gateway Error",
+    502: "Rejected By Gateway",
 }
 
 
 class NotifyAfricasTalking(NotifyBase):
-    """
-    A wrapper for Africas Talking Notifications
-    """
+    """A wrapper for Africas Talking Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Africas Talking'
+    service_name = "Africas Talking"
 
     # The services URL
-    service_url = 'https://africastalking.com/'
+    service_url = "https://africastalking.com/"
 
     # The default secure protocol
-    secure_protocol = 'atalk'
+    secure_protocol = "atalk"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_africas_talking'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_africas_talking"
 
     # Africas Talking API Request URLs
     notify_url = {
-        AfricasTalkingSMSMode.BULKSMS:
-        'https://api.africastalking.com/version1/messaging',
-        AfricasTalkingSMSMode.PREMIUM:
-        'https://content.africastalking.com/version1/messaging',
-        AfricasTalkingSMSMode.SANDBOX:
-        'https://api.sandbox.africastalking.com/version1/messaging',
+        AfricasTalkingSMSMode.BULKSMS: (
+            "https://api.africastalking.com/version1/messaging"
+        ),
+        AfricasTalkingSMSMode.PREMIUM: (
+            "https://content.africastalking.com/version1/messaging"
+        ),
+        AfricasTalkingSMSMode.SANDBOX: (
+            "https://api.sandbox.africastalking.com/version1/messaging"
+        ),
     }
 
     # The maximum allowable characters allowed in the title per message
@@ -119,146 +122,172 @@ class NotifyAfricasTalking(NotifyBase):
     default_batch_size = 50
 
     # Define object templates
-    templates = (
-        '{schema}://{appuser}@{apikey}/{targets}',
-    )
+    templates = ("{schema}://{appuser}@{apikey}/{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'appuser': {
-            'name': _('App User Name'),
-            'type': 'string',
-            'regex': (r'^[A-Z0-9_-]+$', 'i'),
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "appuser": {
+                "name": _("App User Name"),
+                "type": "string",
+                "regex": (r"^[A-Z0-9_-]+$", "i"),
+                "required": True,
+            },
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[A-Z0-9_-]+$", "i"),
+            },
+            "target_phone": {
+                "name": _("Target Phone"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-            'regex': (r'^[A-Z0-9_-]+$', 'i'),
-        },
-        'target_phone': {
-            'name': _('Target Phone'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "apikey": {
+                "alias_of": "apikey",
+            },
+            "from": {
+                # Your registered short code or alphanumeric
+                "name": _("From"),
+                "type": "string",
+                "default": "AFRICASTKNG",
+                "map_to": "sender",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
+            "mode": {
+                "name": _("SMS Mode"),
+                "type": "choice:string",
+                "values": AFRICAS_TALKING_SMS_MODES,
+                "default": AFRICAS_TALKING_SMS_MODES[0],
+            },
         },
-        'apikey': {
-            'alias_of': 'apikey',
-        },
-        'from': {
-            # Your registered short code or alphanumeric
-            'name': _('From'),
-            'type': 'string',
-            'default': 'AFRICASTKNG',
-            'map_to': 'sender',
-        },
-        'batch': {
-            'name': _('Batch Mode'),
-            'type': 'bool',
-            'default': False,
-        },
-        'mode': {
-            'name': _('SMS Mode'),
-            'type': 'choice:string',
-            'values': AFRICAS_TALKING_SMS_MODES,
-            'default': AFRICAS_TALKING_SMS_MODES[0],
-        },
-    })
+    )
 
-    def __init__(self, appuser, apikey, targets=None, sender=None, batch=None,
-                 mode=None, **kwargs):
-        """
-        Initialize Africas Talking Object
-        """
+    def __init__(
+        self,
+        appuser,
+        apikey,
+        targets=None,
+        sender=None,
+        batch=None,
+        mode=None,
+        **kwargs,
+    ):
+        """Initialize Africas Talking Object."""
         super().__init__(**kwargs)
 
         self.appuser = validate_regex(
-            appuser, *self.template_tokens['appuser']['regex'])
+            appuser, *self.template_tokens["appuser"]["regex"]
+        )
         if not self.appuser:
-            msg = 'The Africas Talking appuser specified ({}) is invalid.'\
-                .format(appuser)
+            msg = (
+                f"The Africas Talking appuser specified ({appuser}) is"
+                " invalid."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'The Africas Talking apikey specified ({}) is invalid.'\
-                .format(apikey)
+            msg = (
+                f"The Africas Talking apikey specified ({apikey}) is invalid."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Prepare Sender
-        self.sender = self.template_args['from']['default'] \
-            if sender is None else sender
+        self.sender = (
+            self.template_args["from"]["default"] if sender is None else sender
+        )
 
         # Prepare Batch Mode Flag
-        self.batch = self.template_args['batch']['default'] \
-            if batch is None else batch
+        self.batch = (
+            self.template_args["batch"]["default"] if batch is None else batch
+        )
 
-        self.mode = self.template_args['mode']['default'] \
-            if not isinstance(mode, str) else mode.lower()
+        self.mode = (
+            self.template_args["mode"]["default"]
+            if not isinstance(mode, str)
+            else mode.lower()
+        )
 
         if isinstance(mode, str) and mode:
             self.mode = next(
-                (a for a in AFRICAS_TALKING_SMS_MODES if a.startswith(
-                    mode.lower())), None)
+                (
+                    a
+                    for a in AFRICAS_TALKING_SMS_MODES
+                    if a.startswith(mode.lower())
+                ),
+                None,
+            )
 
             if self.mode not in AFRICAS_TALKING_SMS_MODES:
-                msg = 'The Africas Talking mode specified ({}) is invalid.'\
-                    .format(mode)
+                msg = (
+                    f"The Africas Talking mode specified ({mode}) is invalid."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
-            self.mode = self.template_args['mode']['default']
+            self.mode = self.template_args["mode"]["default"]
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
 
             # store valid phone number
             # Carry forward '+' if defined, otherwise do not...
             self.targets.append(
-                ('+' + result['full'])
-                if target.lstrip()[0] == '+' else result['full'])
+                ("+" + result["full"])
+                if target.lstrip()[0] == "+"
+                else result["full"]
+            )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Africas Talking Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Africas Talking Notification."""
 
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
-                'There are no Africas Talking recipients to notify')
+                "There are no Africas Talking recipients to notify"
+            )
             return False
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': 'application/json',
-            'apiKey': self.apikey,
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "application/json",
+            "apiKey": self.apikey,
         }
 
         # error tracking (used for function return)
@@ -271,24 +300,27 @@ class NotifyAfricasTalking(NotifyBase):
         for index in range(0, len(self.targets), batch_size):
             # Prepare our payload
             payload = {
-                'username': self.appuser,
-                'to': ','.join(self.targets[index:index + batch_size]),
-                'from': self.sender,
-                'message': body,
+                "username": self.appuser,
+                "to": ",".join(self.targets[index : index + batch_size]),
+                "from": self.sender,
+                "message": body,
             }
 
             # Acquire our URL
             notify_url = self.notify_url[self.mode]
 
             self.logger.debug(
-                'Africas Talking POST URL: %s (cert_verify=%r)' % (
-                    notify_url, self.verify_certificate))
-            self.logger.debug('Africas Talking Payload: %s' % str(payload))
+                "Africas Talking POST URL:"
+                f" {notify_url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(f"Africas Talking Payload: {payload!s}")
 
             # Printable target detail
-            p_target = self.targets[index] if batch_size == 1 \
-                else '{} target(s)'.format(
-                    len(self.targets[index:index + batch_size]))
+            p_target = (
+                self.targets[index]
+                if batch_size == 1
+                else f"{len(self.targets[index:index + batch_size])} target(s)"
+            )
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -316,20 +348,23 @@ class NotifyAfricasTalking(NotifyBase):
 
                 if r.status_code not in (100, 101, 102, requests.codes.ok):
                     # We had a problem
-                    status_str = \
+                    status_str = (
                         NotifyAfricasTalking.http_response_code_lookup(
-                            r.status_code, AFRICAS_TALKING_HTTP_ERROR_MAP)
+                            r.status_code, AFRICAS_TALKING_HTTP_ERROR_MAP
+                        )
+                    )
 
                     self.logger.warning(
-                        'Failed to send Africas Talking notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Africas Talking notification to {}: "
+                        "{}{}error={}.".format(
                             p_target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -337,14 +372,15 @@ class NotifyAfricasTalking(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent Africas Talking notification to {}.'
-                        .format(p_target))
+                        f"Sent Africas Talking notification to {p_target}."
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Africas Talking '
-                    'notification to {}.'.format(p_target))
-                self.logger.debug('Socket Exception: %s' % str(e))
+                    "A Connection error occurred sending Africas Talking "
+                    f"notification to {p_target}."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -354,115 +390,116 @@ class NotifyAfricasTalking(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.appuser, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'batch': 'yes' if self.batch else 'no',
+            "batch": "yes" if self.batch else "no",
         }
 
-        if self.sender != self.template_args['from']['default']:
+        if self.sender != self.template_args["from"]["default"]:
             # Set our sender if it was set
-            params['from'] = self.sender
+            params["from"] = self.sender
 
-        if self.mode != self.template_args['mode']['default']:
+        if self.mode != self.template_args["mode"]["default"]:
             # Set our mode
-            params['mode'] = self.mode
+            params["mode"] = self.mode
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{appuser}@{apikey}/{targets}?{params}'.format(
+        return "{schema}://{appuser}@{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
-            appuser=NotifyAfricasTalking.quote(self.appuser, safe=''),
-            apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='/'.join(
-                [NotifyAfricasTalking.quote(x, safe='+')
-                 for x in self.targets]),
+            appuser=NotifyAfricasTalking.quote(self.appuser, safe=""),
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets="/".join(
+                [NotifyAfricasTalking.quote(x, safe="+") for x in self.targets]
+            ),
             params=NotifyAfricasTalking.urlencode(params),
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         #
         # Factor batch into calculation
         #
         batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
         if batch_size > 1:
-            targets = int(targets / batch_size) + \
-                (1 if targets % batch_size else 0)
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
 
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # The Application User ID
-        results['appuser'] = NotifyAfricasTalking.unquote(results['user'])
+        results["appuser"] = NotifyAfricasTalking.unquote(results["user"])
 
         # Prepare our targets
-        results['targets'] = []
+        results["targets"] = []
 
         # Our Application APIKey
-        if 'apikey' in results['qsd'] and len(results['qsd']['apikey']):
+        if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
             # Store our apikey if specified as keyword
-            results['apikey'] = \
-                NotifyAfricasTalking.unquote(results['qsd']['apikey'])
+            results["apikey"] = NotifyAfricasTalking.unquote(
+                results["qsd"]["apikey"]
+            )
 
             # This means our host is actually a phone number (target)
-            results['targets'].append(
-                NotifyAfricasTalking.unquote(results['host']))
+            results["targets"].append(
+                NotifyAfricasTalking.unquote(results["host"])
+            )
 
         else:
             # First item is our apikey
-            results['apikey'] = NotifyAfricasTalking.unquote(results['host'])
+            results["apikey"] = NotifyAfricasTalking.unquote(results["host"])
 
         # Store our remaining targets found on path
-        results['targets'].extend(
-            NotifyAfricasTalking.split_path(results['fullpath']))
+        results["targets"].extend(
+            NotifyAfricasTalking.split_path(results["fullpath"])
+        )
 
         # The 'from' makes it easier to use yaml configuration
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['sender'] = \
-                NotifyAfricasTalking.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["sender"] = NotifyAfricasTalking.unquote(
+                results["qsd"]["from"]
+            )
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyAfricasTalking.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyAfricasTalking.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         # Get our Mode
-        if 'mode' in results['qsd'] and len(results['qsd']['mode']):
-            results['mode'] = \
-                NotifyAfricasTalking.unquote(results['qsd']['mode'])
+        if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
+            results["mode"] = NotifyAfricasTalking.unquote(
+                results["qsd"]["mode"]
+            )
 
         # Get Batch Mode Flag
-        results['batch'] = \
-            parse_bool(results['qsd'].get(
-                'batch',
-                NotifyAfricasTalking.template_args['batch']['default']))
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch", NotifyAfricasTalking.template_args["batch"]["default"]
+            )
+        )
 
         return results

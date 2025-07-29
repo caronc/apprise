@@ -55,8 +55,8 @@ sys.path.insert(
 sys.path.insert(0, join(getcwd()))
 
 # Apprise tool now importable
-from apprise.cli import main  # noqa E402
-import logging  # noqa E402
+from apprise.cli import main
+import logging
 
 
 if __name__ == "__main__":

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -32,47 +31,42 @@
 #  2. Click Generate New Private Key, then confirm by clicking Generate Key.
 #  3. Securely store the JSON file containing the key.
 
-import requests
 import base64
-import json
 import calendar
-from cryptography.hazmat import backends
-from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives import asymmetric
-from cryptography.exceptions import UnsupportedAlgorithm
-from datetime import datetime
-from datetime import timedelta
-from datetime import timezone
+from datetime import datetime, timedelta, timezone
+import json
 from json.decoder import JSONDecodeError
 from urllib.parse import urlencode as _urlencode
+
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat import backends
+from cryptography.hazmat.primitives import asymmetric, hashes, serialization
+import requests
 
 from ...logger import logger
 
 
 class GoogleOAuth:
-    """
-    A OAuth simplified implimentation to Google's Firebase Cloud Messaging
+    """A OAuth simplified implimentation to Google's Firebase Cloud
+    Messaging."""
 
-    """
     scopes = [
-        'https://www.googleapis.com/auth/firebase.messaging',
+        "https://www.googleapis.com/auth/firebase.messaging",
     ]
 
     # 1 hour in seconds (the lifetime of our token)
     access_token_lifetime_sec = timedelta(seconds=3600)
 
     # The default URI to use if one is not found
-    default_token_uri = 'https://oauth2.googleapis.com/token'
+    default_token_uri = "https://oauth2.googleapis.com/token"
 
     # Taken right from google.auth.helpers:
     clock_skew = timedelta(seconds=10)
 
-    def __init__(self, user_agent=None, timeout=(5, 4),
-                 verify_certificate=True):
-        """
-        Initialize our OAuth object
-        """
+    def __init__(
+        self, user_agent=None, timeout=(5, 4), verify_certificate=True
+    ):
+        """Initialize our OAuth object."""
 
         # Wether or not to verify ssl
         self.verify_certificate = verify_certificate
@@ -87,12 +81,10 @@ class GoogleOAuth:
         self.__reset()
 
     def __reset(self):
-        """
-        Reset object internal variables
-        """
+        """Reset object internal variables."""
 
         # Google Keyfile Encoding
-        self.encoding = 'utf-8'
+        self.encoding = "utf-8"
 
         # Our retrieved JSON content (unmangled)
         self.content = None
@@ -106,9 +98,7 @@ class GoogleOAuth:
         self.__access_token_expiry = datetime.now(timezone.utc)
 
     def load(self, path):
-        """
-        Generate our SSL details
-        """
+        """Generate our SSL details."""
 
         # Reset our objects
         self.content = None
@@ -117,48 +107,58 @@ class GoogleOAuth:
         self.__access_token_expiry = datetime.now(timezone.utc)
 
         try:
-            with open(path, mode="r", encoding=self.encoding) as fp:
+            with open(path, encoding=self.encoding) as fp:
                 self.content = json.loads(fp.read())
 
-        except (OSError, IOError):
-            logger.debug('FCM keyfile {} could not be accessed'.format(path))
+        except OSError:
+            logger.debug(f"FCM keyfile {path} could not be accessed")
             return False
 
         except JSONDecodeError as e:
             logger.debug(
-                'FCM keyfile {} generated a JSONDecodeError: {}'.format(
-                    path, e))
+                f"FCM keyfile {path} generated a JSONDecodeError: {e}"
+            )
             return False
 
         if not isinstance(self.content, dict):
-            logger.debug(
-                'FCM keyfile {} is incorrectly structured'.format(path))
+            logger.debug(f"FCM keyfile {path} is incorrectly structured")
             self.__reset()
             return False
 
         # Verify we've got the correct tokens in our content to work with
-        is_valid = next((False for k in (
-            'client_email', 'private_key_id', 'private_key',
-            'type', 'project_id') if not self.content.get(k)), True)
+        is_valid = next(
+            (
+                False
+                for k in (
+                    "client_email",
+                    "private_key_id",
+                    "private_key",
+                    "type",
+                    "project_id",
+                )
+                if not self.content.get(k)
+            ),
+            True,
+        )
 
         if not is_valid:
-            logger.debug(
-                'FCM keyfile {} is missing required information'.format(path))
+            logger.debug(f"FCM keyfile {path} is missing required information")
             self.__reset()
             return False
 
         # Verify our service_account type
-        if self.content.get('type') != 'service_account':
-            logger.debug(
-                'FCM keyfile {} is not of type service_account'.format(path))
+        if self.content.get("type") != "service_account":
+            logger.debug(f"FCM keyfile {path} is not of type service_account")
             self.__reset()
             return False
 
         # Prepare our private key which is in PKCS8 PEM format
         try:
             self.private_key = serialization.load_pem_private_key(
-                self.content.get('private_key').encode(self.encoding),
-                password=None, backend=backends.default_backend())
+                self.content.get("private_key").encode(self.encoding),
+                password=None,
+                backend=backends.default_backend(),
+            )
 
         except (TypeError, ValueError):
             # ValueError: If the PEM data could not be decrypted or if its
@@ -166,14 +166,14 @@ class GoogleOAuth:
             # TypeError:  If a password was given and the private key was
             #             not encrypted. Or if the key was encrypted but
             #             no password was supplied.
-            logger.error('FCM provided private key is invalid.')
+            logger.error("FCM provided private key is invalid.")
             self.__reset()
             return False
 
         except UnsupportedAlgorithm:
             # If the serialized key is of a type that is not supported by
             # the backend.
-            logger.error('FCM provided private key is not supported')
+            logger.error("FCM provided private key is not supported")
             self.__reset()
             return False
 
@@ -182,18 +182,19 @@ class GoogleOAuth:
 
     @property
     def access_token(self):
-        """
-        Returns our access token (if it hasn't expired yet)
-          - if we do not have one we'll fetch one.
-          - if it expired, we'll renew it
-          - if a key simply can't be acquired, then we return None
+        """Returns our access token (if it hasn't expired yet)
+
+        - if we do not have one we'll fetch one.
+        - if it expired, we'll renew it
+        - if a key simply can't be acquired, then we return None
         """
 
         if not self.private_key or not self.content:
             # invalid content (or not loaded)
             logger.error(
-                'No FCM JSON keyfile content loaded to generate a access '
-                'token with.')
+                "No FCM JSON keyfile content loaded to generate a access "
+                "token with."
+            )
             return None
 
         if self.__access_token_expiry > datetime.now(timezone.utc):
@@ -201,9 +202,9 @@ class GoogleOAuth:
             return self.__access_token
 
         # If we reach here we need to prepare our payload
-        token_uri = self.content.get('token_uri', self.default_token_uri)
-        service_email = self.content.get('client_email')
-        key_identifier = self.content.get('private_key_id')
+        token_uri = self.content.get("token_uri", self.default_token_uri)
+        service_email = self.content.get("client_email")
+        key_identifier = self.content.get("private_key_id")
 
         # Generate our Assertion
         now = datetime.now(timezone.utc)
@@ -223,20 +224,24 @@ class GoogleOAuth:
 
         # JWT Details
         header = {
-            'typ': 'JWT',
-            'alg': 'RS256' if isinstance(
-                self.private_key, asymmetric.rsa.RSAPrivateKey) else 'ES256',
-
+            "typ": "JWT",
+            "alg": (
+                "RS256"
+                if isinstance(self.private_key, asymmetric.rsa.RSAPrivateKey)
+                else "ES256"
+            ),
             # Key Identifier
-            'kid': key_identifier,
+            "kid": key_identifier,
         }
 
         # Encodes base64 strings removing any padding characters.
         segments = [
             base64.urlsafe_b64encode(
-                json.dumps(header).encode(self.encoding)).rstrip(b"="),
+                json.dumps(header).encode(self.encoding)
+            ).rstrip(b"="),
             base64.urlsafe_b64encode(
-                json.dumps(payload).encode(self.encoding)).rstrip(b"="),
+                json.dumps(payload).encode(self.encoding)
+            ).rstrip(b"="),
         ]
 
         signing_input = b".".join(segments)
@@ -251,17 +256,17 @@ class GoogleOAuth:
         assertion = b".".join(segments)
 
         http_payload = _urlencode({
-            'assertion': assertion,
-            'grant_type': 'urn:ietf:params:oauth:grant-type:jwt-bearer',
+            "assertion": assertion,
+            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
         })
 
         http_headers = {
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "Content-Type": "application/x-www-form-urlencoded",
         }
         if self.user_agent:
-            http_headers['User-Agent'] = self.user_agent
+            http_headers["User-Agent"] = self.user_agent
 
-        logger.info('Refreshing FCM Access Token')
+        logger.info("Refreshing FCM Access Token")
         try:
             r = requests.post(
                 token_uri,
@@ -273,47 +278,45 @@ class GoogleOAuth:
             if r.status_code != requests.codes.ok:
                 # We had a problem
                 logger.warning(
-                    'Failed to update FCM Access Token error={}.'
-                    .format(r.status_code))
+                    f"Failed to update FCM Access Token error={r.status_code}."
+                )
 
-                logger.debug(
-                    'Response Details:\r\n%s', r.content)
+                logger.debug("Response Details:\r\n%s", r.content)
                 return None
 
         except requests.RequestException as e:
             logger.warning(
-                'A Connection error occurred refreshing FCM '
-                'Access Token.'
+                "A Connection error occurred refreshing FCM Access Token."
             )
-            logger.debug('Socket Exception: %s', str(e))
+            logger.debug("Socket Exception: %s", str(e))
             return None
 
         # If we get here, we made our request successfully, now we need
         # to parse out the data
         response = json.loads(r.content)
-        self.__access_token = response['access_token']
+        self.__access_token = response["access_token"]
         self.__refresh_token = response.get(
-            'refresh_token', self.__refresh_token)
+            "refresh_token", self.__refresh_token
+        )
 
-        if 'expires_in' in response:
-            delta = timedelta(seconds=int(response['expires_in']))
-            self.__access_token_expiry = \
+        if "expires_in" in response:
+            delta = timedelta(seconds=int(response["expires_in"]))
+            self.__access_token_expiry = (
                 delta + datetime.now(timezone.utc) - self.clock_skew
+            )
 
         else:
             # Allow some grace before we expire
             self.__access_token_expiry = expiry - self.clock_skew
 
         logger.debug(
-            'Access Token successfully acquired: %s', self.__access_token)
+            "Access Token successfully acquired: %s", self.__access_token
+        )
 
         # Return our token
         return self.__access_token
 
     @property
     def project_id(self):
-        """
-        Returns the project id found in the file
-        """
-        return None if not self.content \
-            else self.content.get('project_id')
+        """Returns the project id found in the file."""
+        return None if not self.content else self.content.get("project_id")

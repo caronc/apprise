@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,39 +26,38 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
+
 import requests
-from .base import ConfigBase
-from ..common import ConfigFormat
-from ..common import ContentIncludeMode
-from ..url import PrivacyMode
+
+from ..common import ConfigFormat, ContentIncludeMode
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import ConfigBase
 
 # Support YAML formats
 # text/yaml
 # text/x-yaml
 # application/yaml
 # application/x-yaml
-MIME_IS_YAML = re.compile('(text|application)/(x-)?yaml', re.I)
+MIME_IS_YAML = re.compile("(text|application)/(x-)?yaml", re.I)
 
 # Support TEXT formats
 # text/plain
 # text/html
-MIME_IS_TEXT = re.compile('text/(plain|html)', re.I)
+MIME_IS_TEXT = re.compile("text/(plain|html)", re.I)
 
 
 class ConfigHTTP(ConfigBase):
-    """
-    A wrapper for HTTP based configuration sources
-    """
+    """A wrapper for HTTP based configuration sources."""
 
     # The default descriptive name associated with the service
-    service_name = _('Web Based')
+    service_name = _("Web Based")
 
     # The default protocol
-    protocol = 'http'
+    protocol = "http"
 
     # The default secure protocol
-    secure_protocol = 'https'
+    secure_protocol = "https"
 
     # If an HTTP error occurs, define the number of characters you still want
     # to read back.  This is useful for debugging purposes, but nothing else.
@@ -71,20 +69,18 @@ class ConfigHTTP(ConfigBase):
     allow_cross_includes = ContentIncludeMode.ALWAYS
 
     def __init__(self, headers=None, **kwargs):
-        """
-        Initialize HTTP Object
+        """Initialize HTTP Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
-        self.schema = 'https' if self.secure else 'http'
+        self.schema = "https" if self.secure else "http"
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
         if not isinstance(self.fullpath, str):
-            self.fullpath = '/'
+            self.fullpath = "/"
 
         self.headers = {}
         if headers:
@@ -94,21 +90,19 @@ class ConfigHTTP(ConfigBase):
         return
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Prepare our cache value
         if isinstance(self.cache, bool) or not self.cache:
-            cache = 'yes' if self.cache else 'no'
+            cache = "yes" if self.cache else "no"
 
         else:
             cache = int(self.cache)
 
         # Define any arguments set
         params = {
-            'encoding': self.encoding,
-            'cache': cache,
+            "encoding": self.encoding,
+            "cache": cache,
         }
 
         # Extend our parameters
@@ -116,44 +110,46 @@ class ConfigHTTP(ConfigBase):
 
         if self.config_format:
             # A format was enforced; make sure it's passed back with the url
-            params['format'] = self.config_format
+            params["format"] = self.config_format
 
         # Append our headers into our args
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=self.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=self.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=self.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=self.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}/?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}{fullpath}/?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
-            hostname=self.quote(self.host, safe=''),
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=self.quote(self.fullpath, safe='/'),
+            hostname=self.quote(self.host, safe=""),
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=self.quote(self.fullpath, safe="/"),
             params=self.urlencode(params),
         )
 
     def read(self, **kwargs):
-        """
-        Perform retrieval of the configuration based on the specified request
-        """
+        """Perform retrieval of the configuration based on the specified
+        request."""
 
         # prepare XML Object
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         # Apply any/all header over-rides defined
@@ -163,15 +159,15 @@ class ConfigHTTP(ConfigBase):
         if self.user:
             auth = (self.user, self.password)
 
-        url = '%s://%s' % (self.schema, self.host)
+        url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
 
-        self.logger.debug('HTTP POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
+        self.logger.debug(
+            f"HTTP POST URL: {url} (cert_verify={self.verify_certificate!r})"
+        )
 
         # Prepare our response object
         response = None
@@ -185,44 +181,49 @@ class ConfigHTTP(ConfigBase):
         try:
             # Make our request
             with requests.post(
-                    url,
-                    headers=headers,
-                    auth=auth,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                    stream=True) as r:
+                url,
+                headers=headers,
+                auth=auth,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+                stream=True,
+            ) as r:
 
                 # Handle Errors
                 r.raise_for_status()
 
                 # Get our file-size (if known)
                 try:
-                    file_size = int(r.headers.get('Content-Length', '0'))
+                    file_size = int(r.headers.get("Content-Length", "0"))
                 except (TypeError, ValueError):
                     # Handle edge case where Content-Length is a bad value
                     file_size = 0
 
                 # Store our response
-                if self.max_buffer_size > 0 \
-                        and file_size > self.max_buffer_size:
+                if (
+                    self.max_buffer_size > 0
+                    and file_size > self.max_buffer_size
+                ):
 
                     # Provide warning of data truncation
                     self.logger.error(
-                        'HTTP config response exceeds maximum buffer length '
-                        '({}KB);'.format(int(self.max_buffer_size / 1024)))
+                        "HTTP config response exceeds maximum buffer length "
+                        f"({int(self.max_buffer_size / 1024)}KB);"
+                    )
 
                     # Return None - buffer execeeded
                     return None
 
                 # Store our result (but no more than our buffer length)
-                response = r.text[:self.max_buffer_size + 1]
+                response = r.text[: self.max_buffer_size + 1]
 
                 # Verify that our content did not exceed the buffer size:
                 if len(response) > self.max_buffer_size:
                     # Provide warning of data truncation
                     self.logger.error(
-                        'HTTP config response exceeds maximum buffer length '
-                        '({}KB);'.format(int(self.max_buffer_size / 1024)))
+                        "HTTP config response exceeds maximum buffer length "
+                        f"({int(self.max_buffer_size / 1024)}KB);"
+                    )
 
                     # Return None - buffer execeeded
                     return None
@@ -230,7 +231,8 @@ class ConfigHTTP(ConfigBase):
                 # Detect config format based on mime if the format isn't
                 # already enforced
                 content_type = r.headers.get(
-                    'Content-Type', 'application/octet-stream')
+                    "Content-Type", "application/octet-stream"
+                )
                 if self.config_format is None and content_type:
                     if MIME_IS_YAML.match(content_type) is not None:
 
@@ -244,9 +246,10 @@ class ConfigHTTP(ConfigBase):
 
         except requests.RequestException as e:
             self.logger.error(
-                'A Connection error occurred retrieving HTTP '
-                'configuration from %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred retrieving HTTP "
+                f"configuration from {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return None (signifying a failure)
             return None
@@ -256,11 +259,8 @@ class ConfigHTTP(ConfigBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = ConfigBase.parse_url(url)
 
         if not results:
@@ -269,7 +269,7 @@ class ConfigHTTP(ConfigBase):
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set
-        results['headers'] = results['qsd-']
-        results['headers'].update(results['qsd+'])
+        results["headers"] = results["qsd-"]
+        results["headers"].update(results["qsd+"])
 
         return results

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,37 +25,36 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import requests
 from json import dumps
 
-from .base import NotifyBase
-from ..url import PrivacyMode
+import requests
+
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import NotifyBase
 
 # For API Details see:
 # https://kb.synology.com/en-au/DSM/help/Chat/chat_integration
 
 
 class NotifySynology(NotifyBase):
-    """
-    A wrapper for Synology Chat Notifications
-    """
+    """A wrapper for Synology Chat Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Synology Chat'
+    service_name = "Synology Chat"
 
     # The services URL
-    service_url = 'https://www.synology.com/'
+    service_url = "https://www.synology.com/"
 
     # The default protocol
-    protocol = 'synology'
+    protocol = "synology"
 
     # The default secure protocol
-    secure_protocol = 'synologys'
+    secure_protocol = "synologys"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_synology_chat'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_synology_chat"
 
     # Title is to be part of body
     title_maxlen = 0
@@ -67,83 +65,86 @@ class NotifySynology(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{host}/{token}',
-        '{schema}://{host}:{port}/{token}',
-        '{schema}://{user}@{host}/{token}',
-        '{schema}://{user}@{host}:{port}/{token}',
-        '{schema}://{user}:{password}@{host}/{token}',
-        '{schema}://{user}:{password}@{host}:{port}/{token}',
+        "{schema}://{host}/{token}",
+        "{schema}://{host}:{port}/{token}",
+        "{schema}://{user}@{host}/{token}",
+        "{schema}://{user}@{host}:{port}/{token}",
+        "{schema}://{user}:{password}@{host}/{token}",
+        "{schema}://{user}:{password}@{host}:{port}/{token}",
     )
 
     # Define our tokens; these are the minimum tokens required required to
     # be passed into this function (as arguments). The syntax appends any
     # previously defined in the base package and builds onto them
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
+            "token": {
+                "name": _("Token"),
+                "type": "string",
+                "required": True,
+                "private": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-        'token': {
-            'name': _('Token'),
-            'type': 'string',
-            'required': True,
-            'private': True,
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'file_url': {
-            'name': _('Upload'),
-            'type': 'string',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "file_url": {
+                "name": _("Upload"),
+                "type": "string",
+            },
+            "token": {
+                "alias_of": "token",
+            },
         },
-        'token': {
-            'alias_of': 'token',
-        },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("HTTP Header"),
+            "prefix": "+",
         },
     }
 
     def __init__(self, token=None, headers=None, file_url=None, **kwargs):
-        """
-        Initialize Synology Chat Object
+        """Initialize Synology Chat Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
         self.token = token
         if not self.token:
-            msg = 'An invalid Synology Token ' \
-                  '({}) was specified.'.format(token)
+            msg = f"An invalid Synology Token ({token}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
 
         # A URL to an attachment you want to upload (must be less then 32MB
         # Acording to API details (at the time of writing plugin)
@@ -158,74 +159,83 @@ class NotifySynology(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host, self.port, self.token,
-            self.fullpath.rstrip('/'),
+            self.user,
+            self.password,
+            self.host,
+            self.port,
+            self.token,
+            self.fullpath.rstrip("/"),
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {}
 
         if self.file_url:
-            params['file_url'] = self.file_url
+            params["file_url"] = self.file_url
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifySynology.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifySynology.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifySynology.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifySynology.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
 
-        return '{schema}://{auth}{hostname}{port}/{token}' \
-            '{fullpath}?{params}'.format(
+        return (
+            "{schema}://{auth}{hostname}{port}/{token}"
+            "{fullpath}?{params}".format(
                 schema=self.secure_protocol if self.secure else self.protocol,
                 auth=auth,
                 # never encode hostname since we're expecting it to be a valid
                 # one
                 hostname=self.host,
-                port='' if self.port is None or self.port == default_port
-                     else ':{}'.format(self.port),
-                token=self.pprint(self.token, privacy, safe=''),
-                fullpath=NotifySynology.quote(self.fullpath, safe='/')
-                if self.fullpath else '/',
+                port=(
+                    ""
+                    if self.port is None or self.port == default_port
+                    else f":{self.port}"
+                ),
+                token=self.pprint(self.token, privacy, safe=""),
+                fullpath=(
+                    NotifySynology.quote(self.fullpath, safe="/")
+                    if self.fullpath
+                    else "/"
+                ),
                 params=NotifySynology.urlencode(params),
             )
+        )
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Synology Chat Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Synology Chat Notification."""
 
         # Prepare HTTP Headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
-            'Accept': '*/*',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded",
+            "Accept": "*/*",
         }
 
         # Apply any/all header over-rides defined
@@ -233,18 +243,18 @@ class NotifySynology(NotifyBase):
 
         # prepare Synology Object
         payload = {
-            'text': body,
+            "text": body,
         }
 
         if self.file_url:
-            payload['file_url'] = self.file_url
+            payload["file_url"] = self.file_url
 
         # Prepare our parameters
         params = {
-            'api': 'SYNO.Chat.External',
-            'method': 'incoming',
-            'version': 2,
-            'token': self.token,
+            "api": "SYNO.Chat.External",
+            "method": "incoming",
+            "version": 2,
+            "token": self.token,
         }
 
         auth = None
@@ -252,19 +262,20 @@ class NotifySynology(NotifyBase):
             auth = (self.user, self.password)
 
         # Set our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
-        url = '%s://%s' % (schema, self.host)
+        url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         # Prepare our Synology API URL
-        url += self.fullpath + '/webapi/entry.cgi'
+        url += self.fullpath + "/webapi/entry.cgi"
 
-        self.logger.debug('Synology Chat POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
-        self.logger.debug('Synology Chat Payload: %s' % str(payload))
+        self.logger.debug(
+            "Synology Chat POST URL:"
+            f" {url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Synology Chat Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -281,29 +292,32 @@ class NotifySynology(NotifyBase):
             )
             if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem
-                status_str = \
-                    NotifySynology.http_response_code_lookup(r.status_code)
+                status_str = NotifySynology.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send Synology Chat %s notification: '
-                    '%serror=%s.',
+                    "Failed to send Synology Chat %s notification: "
+                    "%serror=%s.",
                     status_str,
-                    ', ' if status_str else '',
-                    str(r.status_code))
+                    ", " if status_str else "",
+                    str(r.status_code),
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent Synology Chat notification.')
+                self.logger.info("Sent Synology Chat notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Synology '
-                'Chat notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending Synology "
+                f"Chat notification to {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -312,11 +326,8 @@ class NotifySynology(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
@@ -324,28 +335,31 @@ class NotifySynology(NotifyBase):
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {
+        results["headers"] = {
             NotifySynology.unquote(x): NotifySynology.unquote(y)
-            for x, y in results['qsd+'].items()}
+            for x, y in results["qsd+"].items()
+        }
 
         # Set our token if found as an argument
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
-            results['token'] = NotifySynology.unquote(results['qsd']['token'])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = NotifySynology.unquote(results["qsd"]["token"])
 
         else:
             # Get unquoted entries
-            entries = NotifySynology.split_path(results['fullpath'])
+            entries = NotifySynology.split_path(results["fullpath"])
             if entries:
                 # Pop the first element
-                results['token'] = entries.pop(0)
+                results["token"] = entries.pop(0)
 
                 # Update our fullpath to not include our token
-                results['fullpath'] = \
-                    results['fullpath'][len(results['token']) + 1:]
+                results["fullpath"] = results["fullpath"][
+                    len(results["token"]) + 1:
+                ]
 
         # Set upload/file_url if not otherwise set
-        if 'file_url' in results['qsd'] and len(results['qsd']['file_url']):
-            results['file_url'] = \
-                NotifySynology.unquote(results['qsd']['file_url'])
+        if "file_url" in results["qsd"] and len(results["qsd"]["file_url"]):
+            results["file_url"] = NotifySynology.unquote(
+                results["qsd"]["file_url"]
+            )
 
         return results

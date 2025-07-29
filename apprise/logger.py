@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,12 +25,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import os
-import logging
+import contextlib
 from io import StringIO
+import logging
+import os
 
 # The root identifier needed to monitor 'apprise' logging
-LOGGER_NAME = 'apprise'
+LOGGER_NAME = "apprise"
 
 # Define a verbosity level that is a noisier then debug mode
 logging.TRACE = logging.DEBUG - 1
@@ -54,9 +54,7 @@ def trace(self, message, *args, **kwargs):
 
 
 def deprecate(self, message, *args, **kwargs):
-    """
-    Deprication Warning Logging
-    """
+    """Deprication Warning Logging."""
     if self.isEnabledFor(logging.DEPRECATE):
         self._log(logging.DEPRECATE, message, args, **kwargs)
 
@@ -70,25 +68,29 @@ logger = logging.getLogger(LOGGER_NAME)
 
 
 class LogCapture:
-    """
-    A class used to allow one to instantiate loggers that write to
-    memory for temporary purposes. e.g.:
+    """A class used to allow one to instantiate loggers that write to memory
+    for temporary purposes. e.g.:
 
-       1.  with LogCapture() as captured:
-       2.
-       3.      # Send our notification(s)
-       4.      aobj.notify("hello world")
-       5.
-       6.      # retrieve our logs produced by the above call via our
-       7.      # `captured` StringIO object we have access to within the `with`
-       8.      # block here:
-       9.      print(captured.getvalue())
-
+    1.  with LogCapture() as captured:
+    2.
+    3.      # Send our notification(s)
+    4.      aobj.notify("hello world")
+    5.
+    6.      # retrieve our logs produced by the above call via our
+    7.      # `captured` StringIO object we have access to within the `with`
+    8.      # block here:
+    9.      print(captured.getvalue())
     """
-    def __init__(self, path=None, level=None, name=LOGGER_NAME, delete=True,
-                 fmt='%(asctime)s - %(levelname)s - %(message)s'):
-        """
-        Instantiate a temporary log capture object
+
+    def __init__(
+        self,
+        path=None,
+        level=None,
+        name=LOGGER_NAME,
+        delete=True,
+        fmt="%(asctime)s - %(levelname)s - %(message)s",
+    ):
+        """Instantiate a temporary log capture object.
 
         If a path is specified, then log content is sent to that file instead
         of a StringIO object.
@@ -99,7 +101,6 @@ class LogCapture:
         they are not automatically cleaned up afterwards.
 
         Optionally over-ride the fmt as well if you wish.
-
         """
         # Our memory buffer placeholder
         self.__buffer_ptr = StringIO()
@@ -117,23 +118,25 @@ class LogCapture:
         self.__logger = logging.getLogger(name)
 
         # Prepare our handler
-        self.__handler = logging.StreamHandler(self.__buffer_ptr) \
-            if not self.__path else logging.FileHandler(
-                self.__path, mode='a', encoding='utf-8')
+        self.__handler = (
+            logging.StreamHandler(self.__buffer_ptr)
+            if not self.__path
+            else logging.FileHandler(self.__path, mode="a", encoding="utf-8")
+        )
 
         # Use the specified level, otherwise take on the already
         # effective level of our logger
         self.__handler.setLevel(
-            self.__level if self.__level is not None
-            else self.__logger.getEffectiveLevel())
+            self.__level
+            if self.__level is not None
+            else self.__logger.getEffectiveLevel()
+        )
 
         # Prepare our formatter
         self.__handler.setFormatter(logging.Formatter(fmt))
 
     def __enter__(self):
-        """
-        Allows logger manipulation within a 'with' block
-        """
+        """Allows logger manipulation within a 'with' block."""
 
         if self.__level is not None:
             # Temporary adjust our log level if required
@@ -153,11 +156,11 @@ class LogCapture:
         if self.__path:
             # If a path has been identified, ensure we can write to the path
             # and that the file exists
-            with open(self.__path, 'a'):
+            with open(self.__path, "a"):
                 os.utime(self.__path, None)
 
             # Update our buffer pointer
-            self.__buffer_ptr = open(self.__path, 'r')
+            self.__buffer_ptr = open(self.__path)
 
         # Add our handler
         self.__logger.addHandler(self.__handler)
@@ -166,9 +169,7 @@ class LogCapture:
         return self.__buffer_ptr
 
     def __exit__(self, exc_type, exc_value, tb):
-        """
-        removes the handler gracefully when the with block has completed
-        """
+        """Removes the handler gracefully when the with block has completed."""
 
         # Flush our content
         self.__handler.flush()
@@ -186,16 +187,8 @@ class LogCapture:
             self.__buffer_ptr.close()
             self.__handler.close()
             if self.__delete:
-                try:
+                with contextlib.suppress(OSError):
                     # Always remove file afterwards
                     os.unlink(self.__path)
 
-                except OSError:
-                    # It's okay if the file does not exist
-                    pass
-
-        if exc_type is not None:
-            # pass exception on if one was generated
-            return False
-
-        return True
+        return exc_type is None

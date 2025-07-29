@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -30,33 +29,33 @@
 # Get your (apikey) from here:
 #   - https://help.seven.io/en/api-key-access
 #
-import requests
 import json
-from .base import NotifyBase
+
+import requests
+
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no, parse_bool
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
+from .base import NotifyBase
 
 
 class NotifySeven(NotifyBase):
-    """
-    A wrapper for seven Notifications
-    """
+    """A wrapper for seven Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'seven'
+    service_name = "seven"
 
     # The services URL
-    service_url = 'https://www.seven.io'
+    service_url = "https://www.seven.io"
 
     # The default protocol
-    secure_protocol = 'seven'
+    secure_protocol = "seven"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_seven'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_seven"
 
     # Seven uses the http protocol with JSON requests
-    notify_url = 'https://gateway.seven.io/api/sms'
+    notify_url = "https://gateway.seven.io/api/sms"
 
     # The maximum length of the body
     body_maxlen = 160
@@ -66,113 +65,117 @@ class NotifySeven(NotifyBase):
     title_maxlen = 0
 
     # Define object templates
-    templates = (
-        '{schema}://{apikey}/{targets}',
-    )
+    templates = ("{schema}://{apikey}/{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'required': True,
-            'private': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "required": True,
+                "private": True,
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "source": {
+                # Originating address,In cases where the rewriting of the
+                # sender's address is supported or permitted by the SMS-C.
+                # This is used to transmit the message, this number is
+                # transmitted as the originating address and is completely
+                # optional.
+                "name": _("Originating Address"),
+                "type": "string",
+                "map_to": "source",
+            },
+            "from": {
+                "alias_of": "source",
+            },
+            "flash": {
+                "name": _("Flash"),
+                "type": "bool",
+                "default": False,
+            },
+            "label": {"name": _("Label"), "type": "string"},
         },
-        'source': {
-            # Originating address,In cases where the rewriting of the sender's
-            # address is supported or permitted by the SMS-C. This is used to
-            # transmit the message, this number is transmitted as the
-            # originating address and is completely optional.
-            'name': _('Originating Address'),
-            'type': 'string',
-            'map_to': 'source',
-        },
-        'from': {
-            'alias_of': 'source',
-        },
-        'flash': {
-            'name': _('Flash'),
-            'type': 'bool',
-            'default': False,
-        },
-        'label': {
-            'name': _('Label'),
-            'type': 'string'
-        },
-    })
+    )
 
-    def __init__(self, apikey, targets=None, source=None, flash=None,
-                 label=None, **kwargs):
-        """
-        Initialize Seven Object
-        """
+    def __init__(
+        self,
+        apikey,
+        targets=None,
+        source=None,
+        flash=None,
+        label=None,
+        **kwargs,
+    ):
+        """Initialize Seven Object."""
         super().__init__(**kwargs)
         # API Key (associated with project)
         self.apikey = apikey
         if not self.apikey:
-            msg = 'An invalid seven API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid seven API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        self.source = None \
-            if not isinstance(source, str) else source.strip()
-        self.flash = self.template_args['flash']['default'] \
-            if flash is None else bool(flash)
-        self.label = None \
-            if not isinstance(label, str) else label.strip()
+        self.source = None if not isinstance(source, str) else source.strip()
+        self.flash = (
+            self.template_args["flash"]["default"]
+            if flash is None
+            else bool(flash)
+        )
+        self.label = None if not isinstance(label, str) else label.strip()
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
             # store valid phone number
-            self.targets.append(result['full'])
+            self.targets.append(result["full"])
         return
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another similar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another similar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.apikey)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform seven Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform seven Notification."""
 
         if len(self.targets) == 0:
             # There were no services to notify
-            self.logger.warning('There were no seven targets to notify.')
+            self.logger.warning("There were no seven targets to notify.")
             return False
 
         # error tracking (used for function return)
@@ -180,35 +183,36 @@ class NotifySeven(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'SentWith': 'Apprise',
-            'X-Api-Key': self.apikey,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "SentWith": "Apprise",
+            "X-Api-Key": self.apikey,
         }
 
         # Prepare our payload
         payload = {
-            'to': None,
-            'text': body,
+            "to": None,
+            "text": body,
         }
         if self.source:
-            payload['from'] = self.source
+            payload["from"] = self.source
         if self.flash:
-            payload['flash'] = self.flash
+            payload["flash"] = self.flash
         if self.label:
-            payload['label'] = self.label
+            payload["label"] = self.label
         # Create a copy of the targets list
         targets = list(self.targets)
         while len(targets):
             # Get our target to notify
             target = targets.pop(0)
             # Prepare our user
-            payload['to'] = '+{}'.format(target)
+            payload["to"] = f"+{target}"
             # Some Debug Logging
             self.logger.debug(
-                'seven POST URL: {} (cert_verify={})'.format(
-                    self.notify_url, self.verify_certificate))
-            self.logger.debug('seven Payload: {}' .format(payload))
+                "seven POST URL:"
+                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"seven Payload: {payload}")
             # Always call throttle before any remote server i/o is made
             self.throttle()
             try:
@@ -245,73 +249,71 @@ class NotifySeven(NotifyBase):
                 #     ]
                 # }
                 if r.status_code not in (
-                        requests.codes.ok, requests.codes.created):
+                    requests.codes.ok,
+                    requests.codes.created,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifySeven.http_response_code_lookup(
-                            r.status_code)
+                    status_str = NotifySeven.http_response_code_lookup(
+                        r.status_code
+                    )
                     self.logger.warning(
-                        'Failed to send seven notification to {}: '
-                        '{}{}error={}.'.format(
-                            ','.join(target),
+                        "Failed to send seven notification to {}: "
+                        "{}{}error={}.".format(
+                            ",".join(target),
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
                     # Mark our failure
                     has_error = True
                     continue
                 else:
-                    self.logger.info(
-                        'Sent seven notification to {}.'.format(target))
+                    self.logger.info(f"Sent seven notification to {target}.")
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending seven:%s ' % (
-                        target) + 'notification.'
+                    f"A Connection error occurred sending seven:{target} "
+                    + "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
                 # Mark our failure
                 has_error = True
                 continue
         return not has_error
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         params = {
-            'flash': 'yes' if self.flash else 'no',
+            "flash": "yes" if self.flash else "no",
         }
         if self.source:
-            params['from'] = self.source
+            params["from"] = self.source
         if self.label:
-            params['label'] = self.label
+            params["label"] = self.label
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        return '{schema}://{apikey}/{targets}/?{params}'.format(
+        return "{schema}://{apikey}/{targets}/?{params}".format(
             schema=self.secure_protocol,
-            apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='/'.join(
-                [NotifySeven.quote(x, safe='') for x in self.targets]),
-            params=NotifySeven.urlencode(params))
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets="/".join(
+                [NotifySeven.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifySeven.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         targets = len(self.targets)
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -320,29 +322,26 @@ class NotifySeven(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = NotifySeven.split_path(results['fullpath'])
+        results["targets"] = NotifySeven.split_path(results["fullpath"])
 
         # The hostname is our authentication key
-        results['apikey'] = NotifySeven.unquote(results['host'])
+        results["apikey"] = NotifySeven.unquote(results["host"])
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifySeven.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifySeven.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         # Support the 'from' and source variable
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['source'] = \
-                NotifySeven.unquote(results['qsd']['from'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = NotifySeven.unquote(results["qsd"]["from"])
 
-        elif 'source' in results['qsd'] and len(results['qsd']['source']):
-            results['source'] = \
-                NotifySeven.unquote(results['qsd']['source'])
+        elif "source" in results["qsd"] and len(results["qsd"]["source"]):
+            results["source"] = NotifySeven.unquote(results["qsd"]["source"])
 
-        results['flash'] = \
-            parse_bool(results['qsd'].get('flash', False))
-        results['label'] = \
-            results['qsd'].get('label', None)
+        results["flash"] = parse_bool(results["qsd"].get("flash", False))
+        results["label"] = results["qsd"].get("label", None)
 
         return results

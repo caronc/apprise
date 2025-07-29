@@ -32,28 +32,50 @@
 %bcond_without tests
 %endif
 
+# Handling of new python building structure (for backwards compatiblity)
+%global legacy_python_build 0
+%if 0%{?fedora} && 0%{?fedora} <= 29
+%global legacy_python_build 1
+%endif
+%if 0%{?rhel} && 0%{?rhel} <= 9
+%global legacy_python_build 1
+%endif
+
 %global pypi_name apprise
 
-%global common_description %{expand: \
-Apprise is a Python package for simplifying access to all of the different
-notification services that are out there. Apprise opens the door and makes
-it easy to access:
+# Handle rpmlint false positives
+# - Prevent warnings:
+#    en_US ntfy -> notify
+#    en_US httpSMS -> HTTP
+# rpmlint: ignore-spelling httpSMS ntfy
 
-Africas Talking, Apprise API, APRS, AWS SES, AWS SNS, Bark, BlueSky, Burst SMS,
-BulkSMS, BulkVS, Chanify, Clickatell, ClickSend, DAPNET, DingTalk, Discord, E-Mail, Emby,
-FCM, Feishu, Flock, Free Mobile, Google Chat, Gotify, Growl, Guilded, Home
-Assistant, httpSMS, IFTTT, Join, Kavenegar, KODI, Kumulos, LaMetric, Lark, Line,
-MacOSX, Mailgun, Mastodon, Mattermost, Matrix, MessageBird, Microsoft
-Windows, Microsoft Teams, Misskey, MQTT, MSG91, MyAndroid, Nexmo, Nextcloud,
-NextcloudTalk, Notica, Notifiarr, Notifico, ntfy, Office365, OneSignal,
-Opsgenie, PagerDuty, PagerTree, ParsePlatform, Plivo, PopcornNotify, Prowl,
-Pushalot, PushBullet, Pushjet, PushMe, Pushover, Pushplus, PushSafer, Pushy,
-PushDeer, QQ Push, Revolt, Reddit, Resend, Rocket.Chat, RSyslog, SendGrid,
-ServerChan, Seven, SFR, Signal, SimplePush, Sinch, Slack, SMPP, SMSEagle,
-SMS Manager, SMTP2Go, SparkPost, Splunk, Spike, Spug Push, Super Toasty,
-Streamlabs, Stride, Synology Chat, Syslog, Techulus Push, Telegram, Threema
-Gateway, Twilio, Twitter, Twist, Vapid, VictorOps, Voipms, Vonage, WebPush,
-WeCom Bot, WhatsApp, Webex Teams, Workflows, WxPusher, XBMC}
+# - RHEL9 does not recognize: BSD-2-Clause which is correct
+# rpmlint: ignore invalid-license
+
+%global common_description %{expand: \
+Apprise is a Python package that simplifies access to many popular \
+notification services. It supports sending alerts to platforms such as: \
+\
+`AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`, `Bark`, \
+`BlueSky`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, `Clickatell`, \
+`ClickSend`, `DAPNET`, `DingTalk`, `Discord`, `E-Mail`, `Emby`, `FCM`, \
+`Feishu`, `Flock`, `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, \
+`Guilded`, `Home Assistant`, `httpSMS`, `IFTTT`, `Join`, `Kavenegar`, `KODI`, \
+`Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
+`Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
+`Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, \
+`Nextcloud`, `NextcloudTalk`, `Notica`, `Notifiarr`, `Notifico`, `ntfy`, \
+`Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, `PagerTree`, \
+`ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, `Pushalot`, \
+`PushBullet`, `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, \
+`Pushy`, `PushDeer`, `QQ Push`, `Revolt`, `Reddit`, `Resend`, `Rocket.Chat`, \
+`RSyslog`, `SendGrid`, `ServerChan`, `Seven`, `SFR`, `Signal`, \
+`SimplePush`, `Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, \
+`SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Super Toasty`, \
+`Streamlabs`, `Stride`, `Synology Chat`, `Syslog`, `Techulus Push`, \
+`Telegram`, `Threema Gateway`, `Twilio`, `Twitter`, `Twist`, `Vapid`, \
+`VictorOps`, `Voipms`, `Vonage`, `WebPush`, `WeCom Bot`, `WhatsApp`, \
+`Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
 
 Name:           python-%{pypi_name}
 Version:        1.9.3
@@ -64,10 +86,13 @@ URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
 BuildArch:      noarch
 
+Obsoletes: python%{python3_pkgversion}-%{pypi_name} < %{version}-%{release}
+Provides: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
+
 %description %{common_description}
 
 %package -n %{pypi_name}
-Summary: Apprise CLI Tool
+Summary: Notify messaging platforms from the command line
 
 Requires: python%{python3_pkgversion}-click >= 5.0
 Requires: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
@@ -83,7 +108,11 @@ Summary: A simple wrapper to many popular notification services used today
 
 BuildRequires: gettext
 BuildRequires: python%{python3_pkgversion}-devel
+%if %{legacy_python_build}
+# backwards compatible
 BuildRequires: python%{python3_pkgversion}-setuptools
+%endif
+BuildRequires: python%{python3_pkgversion}-wheel
 BuildRequires: python%{python3_pkgversion}-requests
 BuildRequires: python%{python3_pkgversion}-requests-oauthlib
 BuildRequires: python%{python3_pkgversion}-click >= 5.0
@@ -93,6 +122,7 @@ BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
 BuildRequires: python%{python3_pkgversion}-certifi
 BuildRequires: python%{python3_pkgversion}-paho-mqtt
+BuildRequires: python%{python3_pkgversion}-tox
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
 Requires: python%{python3_pkgversion}-markdown
@@ -108,6 +138,12 @@ BuildRequires: python%{python3_pkgversion}-pytest-runner
 BuildRequires: python%{python3_pkgversion}-pytest-cov
 %endif
 
+%if 0%{?legacy_python_build} == 0
+# Logic for non-RHEL ≤ 9 systems
+%generate_buildrequires
+%pyproject_buildrequires
+%endif
+
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
 
 %prep
@@ -117,37 +153,65 @@ BuildRequires: python%{python3_pkgversion}-pytest-cov
 # section of this RPM, but works completley fine under all other circumstances.
 # As a workaround, just remove the file so it doesn't hold up the RPM
 # Preparation
-%{__rm} test/test_plugin_bulksms.py
+%{__rm} tests/test_plugin_bulksms.py
 
 # 2023.08.27: rawhide does not install translationfiles for some reason
 # at this time; remove failing test until this is resolved
-%{__rm} test/test_apprise_translations.py
+%{__rm} tests/test_apprise_translations.py
 
 %build
+%if %{legacy_python_build}
+# backwards compatible
 %py3_build
+%else
+%pyproject_wheel
+%endif
+
 
 %install
+%if %{legacy_python_build}
+# backwards compatible
 %py3_install
+%else
+%pyproject_install
+%endif
 
 %{__install} -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
    %{buildroot}%{_mandir}/man1/%{pypi_name}.1
 
 %if %{with tests}
 %check
-LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib} py.test-%{python3_version}
+%if %{legacy_python_build}
+# backwards compatible
+LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{version} py.test-%{python3_version}
+%else
+%pytest
+%endif
 %endif
 
 %files -n python%{python3_pkgversion}-%{pypi_name}
 %license LICENSE
-%doc README.md
-%{python3_sitelib}/%{pypi_name}
+%doc README.md ACKNOWLEDGEMENTS.md CONTRIBUTING.md
+%{python3_sitelib}/%{pypi_name}/
+# Exclude i18n as it is handled below with the lang(spoken) tag below
+%exclude %{python3_sitelib}/%{pypi_name}/i18n/
 %exclude %{python3_sitelib}/%{pypi_name}/cli.*
-%{python3_sitelib}/*.egg-info
+
+# Handle egg-info to dist-info transfer
+%if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
+%{python3_sitelib}/apprise-*.dist-info/
+%else
+%{python3_sitelib}/apprise-*.egg-info
+%endif
+
+# Localised Files
+%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/messages.mo
 
 %files -n %{pypi_name}
 %{_bindir}/%{pypi_name}
 %{_mandir}/man1/%{pypi_name}.1*
 %{python3_sitelib}/%{pypi_name}/cli.*
+%{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
 * Sun Mar 30 2025 Chris Caron <lead2gold@gmail.com> - 1.9.3

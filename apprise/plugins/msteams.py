@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -76,48 +75,51 @@
 # These 3 tokens need to be placed in the URL after the Team
 #   msteams://TEAM/ABCD/DEFG/HIJK
 #
-import re
-import requests
 import json
 from json.decoder import JSONDecodeError
+import re
 
-from .base import NotifyBase
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..common import NotifyFormat
-from ..utils.parse import parse_bool, validate_regex
-from ..utils.templates import apply_template, TemplateType
+import requests
+
 from ..apprise_attachment import AppriseAttachment
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool, validate_regex
+from ..utils.templates import TemplateType, apply_template
+from .base import NotifyBase
 
 
 class NotifyMSTeams(NotifyBase):
-    """
-    A wrapper for Microsoft Teams Notifications
-    """
+    """A wrapper for Microsoft Teams Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'MSTeams'
+    service_name = "MSTeams"
 
     # The services URL
-    service_url = 'https://teams.micrsoft.com/'
+    service_url = "https://teams.micrsoft.com/"
 
     # The default secure protocol
-    secure_protocol = 'msteams'
+    secure_protocol = "msteams"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_msteams'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_msteams"
 
     # MSTeams uses the http protocol with JSON requests
-    notify_url_v1 = 'https://outlook.office.com/webhook/' \
-        '{token_a}/IncomingWebhook/{token_b}/{token_c}'
+    notify_url_v1 = (
+        "https://outlook.office.com/webhook/"
+        "{token_a}/IncomingWebhook/{token_b}/{token_c}"
+    )
 
     # New MSTeams webhook (as of April 11th, 2021)
-    notify_url_v2 = 'https://{team}.webhook.office.com/webhookb2/' \
-        '{token_a}/IncomingWebhook/{token_b}/{token_c}'
+    notify_url_v2 = (
+        "https://{team}.webhook.office.com/webhookb2/"
+        "{token_a}/IncomingWebhook/{token_b}/{token_c}"
+    )
 
-    notify_url_v3 = 'https://{team}.webhook.office.com/webhookb2/' \
-        '{token_a}/IncomingWebhook/{token_b}/{token_c}/{token_d}'
+    notify_url_v3 = (
+        "https://{team}.webhook.office.com/webhookb2/"
+        "{token_a}/IncomingWebhook/{token_b}/{token_c}/{token_d}"
+    )
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
@@ -135,93 +137,107 @@ class NotifyMSTeams(NotifyBase):
     # Define object templates
     templates = (
         # New required format
-        '{schema}://{team}/{token_a}/{token_b}/{token_c}',
-
+        "{schema}://{team}/{token_a}/{token_b}/{token_c}",
         # Deprecated
-        '{schema}://{token_a}/{token_b}/{token_c}',
+        "{schema}://{token_a}/{token_b}/{token_c}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        # The Microsoft Team Name
-        'team': {
-            'name': _('Team Name'),
-            'type': 'string',
-            'required': True,
-            'regex': (r'^[A-Z0-9_-]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            # The Microsoft Team Name
+            "team": {
+                "name": _("Team Name"),
+                "type": "string",
+                "required": True,
+                "regex": (r"^[A-Z0-9_-]+$", "i"),
+            },
+            # Token required as part of the API request
+            #  /AAAAAAAAA@AAAAAAAAA/........./.........
+            "token_a": {
+                "name": _("Token A"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[A-Z0-9-]+@[A-Z0-9-]+$", "i"),
+            },
+            # Token required as part of the API request
+            #  /................../BBBBBBBBB/..........
+            "token_b": {
+                "name": _("Token B"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9]+$", "i"),
+            },
+            # Token required as part of the API request
+            #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
+            "token_c": {
+                "name": _("Token C"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9-]+$", "i"),
+            },
+            # Token required as part of the API request
+            #  /........./........./........./DDDDDDDDDDDDDDDDD
+            "token_d": {
+                "name": _("Token D"),
+                "type": "string",
+                "private": True,
+                "required": False,
+                "regex": (r"^V2[a-zA-Z0-9-_]+$", "i"),
+            },
         },
-        # Token required as part of the API request
-        #  /AAAAAAAAA@AAAAAAAAA/........./.........
-        'token_a': {
-            'name': _('Token A'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[A-Z0-9-]+@[A-Z0-9-]+$', 'i'),
-        },
-        # Token required as part of the API request
-        #  /................../BBBBBBBBB/..........
-        'token_b': {
-            'name': _('Token B'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
-        },
-        # Token required as part of the API request
-        #  /........./........./CCCCCCCCCCCCCCCCCCCCCCCC
-        'token_c': {
-            'name': _('Token C'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9-]+$', 'i'),
-        },
-        # Token required as part of the API request
-        #  /........./........./........./DDDDDDDDDDDDDDDDD
-        'token_d': {
-            'name': _('Token D'),
-            'type': 'string',
-            'private': True,
-            'required': False,
-            'regex': (r'^V2[a-zA-Z0-9-_]+$', 'i'),
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': False,
-            'map_to': 'include_image',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": False,
+                "map_to": "include_image",
+            },
+            "version": {
+                "name": _("Version"),
+                "type": "choice:int",
+                "values": (1, 2, 3),
+                "default": 2,
+            },
+            "template": {
+                "name": _("Template Path"),
+                "type": "string",
+                "private": True,
+            },
         },
-        'version': {
-            'name': _('Version'),
-            'type': 'choice:int',
-            'values': (1, 2, 3),
-            'default': 2,
-        },
-        'template': {
-            'name': _('Template Path'),
-            'type': 'string',
-            'private': True,
-        },
-    })
+    )
 
     # Define our token control
     template_kwargs = {
-        'tokens': {
-            'name': _('Template Tokens'),
-            'prefix': ':',
+        "tokens": {
+            "name": _("Template Tokens"),
+            "prefix": ":",
         },
     }
 
-    def __init__(self, token_a, token_b, token_c, token_d=None, team=None,
-                 version=None, include_image=True, template=None, tokens=None,
-                 **kwargs):
-        """
-        Initialize Microsoft Teams Object
+    def __init__(
+        self,
+        token_a,
+        token_b,
+        token_c,
+        token_d=None,
+        team=None,
+        version=None,
+        include_image=True,
+        template=None,
+        tokens=None,
+        **kwargs,
+    ):
+        """Initialize Microsoft Teams Object.
 
         You can optional specify a template and identify arguments you
         wish to populate your template with when posting.  Some reserved
@@ -235,16 +251,15 @@ class NotifyMSTeams(NotifyBase):
 
         except TypeError:
             # None was specified... take on default
-            self.version = self.template_args['version']['default']
+            self.version = self.template_args["version"]["default"]
 
         except ValueError:
             # invalid content was provided; let this get caught in the next
             # validation check for the version
             self.version = None
 
-        if self.version not in self.template_args['version']['values']:
-            msg = 'An invalid MSTeams Version ' \
-                  '({}) was specified.'.format(version)
+        if self.version not in self.template_args["version"]["values"]:
+            msg = f"An invalid MSTeams Version ({version}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -253,37 +268,45 @@ class NotifyMSTeams(NotifyBase):
             NotifyBase.logger.deprecate(
                 "Apprise requires you to identify your Microsoft Team name as "
                 "part of the URL. e.g.: "
-                "msteams://TEAM-NAME/{token_a}/{token_b}/{token_c}")
+                "msteams://TEAM-NAME/{token_a}/{token_b}/{token_c}"
+            )
 
             # Fallback
-            self.team = 'outlook'
+            self.team = "outlook"
 
         self.token_a = validate_regex(
-            token_a, *self.template_tokens['token_a']['regex'])
+            token_a, *self.template_tokens["token_a"]["regex"]
+        )
         if not self.token_a:
-            msg = 'An invalid MSTeams (first) Token ' \
-                  '({}) was specified.'.format(token_a)
+            msg = (
+                f"An invalid MSTeams (first) Token ({token_a}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         self.token_b = validate_regex(
-            token_b, *self.template_tokens['token_b']['regex'])
+            token_b, *self.template_tokens["token_b"]["regex"]
+        )
         if not self.token_b:
-            msg = 'An invalid MSTeams (second) Token ' \
-                  '({}) was specified.'.format(token_b)
+            msg = (
+                f"An invalid MSTeams (second) Token ({token_b}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         self.token_c = validate_regex(
-            token_c, *self.template_tokens['token_c']['regex'])
+            token_c, *self.template_tokens["token_c"]["regex"]
+        )
         if not self.token_c:
-            msg = 'An invalid MSTeams (third) Token ' \
-                  '({}) was specified.'.format(token_c)
+            msg = (
+                f"An invalid MSTeams (third) Token ({token_c}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         self.token_d = validate_regex(
-            token_d, *self.template_tokens['token_d']['regex'])
+            token_d, *self.template_tokens["token_d"]["regex"]
+        )
 
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
@@ -302,8 +325,10 @@ class NotifyMSTeams(NotifyBase):
             self.tokens.update(tokens)
 
         elif tokens:
-            msg = 'The specified MSTeams Template Tokens ' \
-                  '({}) are not identified as a dictionary.'.format(tokens)
+            msg = (
+                "The specified MSTeams Template Tokens "
+                f"({tokens}) are not identified as a dictionary."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -312,19 +337,20 @@ class NotifyMSTeams(NotifyBase):
             "December 31, 2025. It is advised that you switch to "
             "Microsoft Power Automate (already supported by Apprise as "
             "workflows://. For more information visit: "
-            "https://github.com/caronc/apprise/wiki/Notify_workflows")
+            "https://github.com/caronc/apprise/wiki/Notify_workflows"
+        )
 
-    def gen_payload(self, body, title='', notify_type=NotifyType.INFO,
-                    **kwargs):
-        """
-        This function generates our payload whether it be the generic one
-        Apprise generates by default, or one provided by a specified
-        external template.
-        """
+    def gen_payload(
+        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+    ):
+        """This function generates our payload whether it be the generic one
+        Apprise generates by default, or one provided by a specified external
+        template."""
 
         # Acquire our to-be footer icon if configured to do so
-        image_url = None if not self.include_image \
-            else self.image_url(notify_type)
+        image_url = (
+            None if not self.include_image else self.image_url(notify_type)
+        )
 
         if not self.template:
             # By default we use a generic working payload if there was
@@ -340,11 +366,11 @@ class NotifyMSTeams(NotifyBase):
                         "activityTitle": title,
                         "text": body,
                     },
-                ]
+                ],
             }
 
             if image_url:
-                payload['sections'][0]['activityImage'] = image_url
+                payload["sections"][0]["activityImage"] = image_url
 
             return payload
 
@@ -353,74 +379,78 @@ class NotifyMSTeams(NotifyBase):
         if not template:
             # We could not access the attachment
             self.logger.error(
-                'Could not access MSTeam template {}.'.format(
-                    template.url(privacy=True)))
+                "Could not access MSTeam template"
+                f" {template.url(privacy=True)}."
+            )
             return False
 
         # Take a copy of our token dictionary
         tokens = self.tokens.copy()
 
         # Apply some defaults template values
-        tokens['app_body'] = body
-        tokens['app_title'] = title
-        tokens['app_type'] = notify_type
-        tokens['app_id'] = self.app_id
-        tokens['app_desc'] = self.app_desc
-        tokens['app_color'] = self.color(notify_type)
-        tokens['app_image_url'] = image_url
-        tokens['app_url'] = self.app_url
+        tokens["app_body"] = body
+        tokens["app_title"] = title
+        tokens["app_type"] = notify_type.value
+        tokens["app_id"] = self.app_id
+        tokens["app_desc"] = self.app_desc
+        tokens["app_color"] = self.color(notify_type)
+        tokens["app_image_url"] = image_url
+        tokens["app_url"] = self.app_url
 
         # Enforce Application mode
-        tokens['app_mode'] = TemplateType.JSON
+        tokens["app_mode"] = TemplateType.JSON
 
         try:
-            with open(template.path, 'r') as fp:
+            with open(template.path) as fp:
                 content = json.loads(apply_template(fp.read(), **tokens))
 
-        except (OSError, IOError):
+        except OSError:
             self.logger.error(
-                'MSTeam template {} could not be read.'.format(
-                    template.url(privacy=True)))
+                f"MSTeam template {template.url(privacy=True)} could not be"
+                " read."
+            )
             return None
 
         except JSONDecodeError as e:
             self.logger.error(
-                'MSTeam template {} contains invalid JSON.'.format(
-                    template.url(privacy=True)))
-            self.logger.debug('JSONDecodeError: {}'.format(e))
+                f"MSTeam template {template.url(privacy=True)} contains"
+                " invalid JSON."
+            )
+            self.logger.debug(f"JSONDecodeError: {e}")
             return None
 
         # Load our JSON data (if valid)
         has_error = False
-        if '@type' not in content:
+        if "@type" not in content:
             self.logger.error(
-                'MSTeam template {} is missing @type kwarg.'.format(
-                    template.url(privacy=True)))
+                f"MSTeam template {template.url(privacy=True)} is missing"
+                " @type kwarg."
+            )
             has_error = True
 
-        if '@context' not in content:
+        if "@context" not in content:
             self.logger.error(
-                'MSTeam template {} is missing @context kwarg.'.format(
-                    template.url(privacy=True)))
+                f"MSTeam template {template.url(privacy=True)} is missing"
+                " @context kwarg."
+            )
             has_error = True
 
         return content if not has_error else None
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Microsoft Teams Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Microsoft Teams Notification."""
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/json',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
         }
 
         if self.version == 1:
             notify_url = self.notify_url_v1.format(
                 token_a=self.token_a,
                 token_b=self.token_b,
-                token_c=self.token_c)
+                token_c=self.token_c,
+            )
 
         if self.version == 2:
             notify_url = self.notify_url_v2.format(
@@ -440,16 +470,18 @@ class NotifyMSTeams(NotifyBase):
 
         # Generate our payload if it's possible
         payload = self.gen_payload(
-            body=body, title=title, notify_type=notify_type, **kwargs)
+            body=body, title=title, notify_type=notify_type, **kwargs
+        )
         if not payload:
             # No need to present a reason; that will come from the
             # gen_payload() function itself
             return False
 
-        self.logger.debug('MSTeams POST URL: %s (cert_verify=%r)' % (
-            notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('MSTeams Payload: %s' % str(payload))
+        self.logger.debug(
+            "MSTeams POST URL:"
+            f" {notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"MSTeams Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -463,29 +495,30 @@ class NotifyMSTeams(NotifyBase):
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyMSTeams.http_response_code_lookup(r.status_code)
+                status_str = NotifyMSTeams.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send MSTeams notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send MSTeams notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # We failed
                 return False
 
             else:
-                self.logger.info('Sent MSTeams notification.')
+                self.logger.info("Sent MSTeams notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending MSTeams notification.')
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending MSTeams notification."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # We failed
             return False
@@ -494,82 +527,85 @@ class NotifyMSTeams(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol,
             self.team if self.version > 1 else None,
-            self.token_a, self.token_b, self.token_c,
+            self.token_a,
+            self.token_b,
+            self.token_c,
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'image': 'yes' if self.include_image else 'no',
+            "image": "yes" if self.include_image else "no",
         }
 
-        if self.version != self.template_args['version']['default']:
-            params['version'] = str(self.version)
+        if self.version != self.template_args["version"]["default"]:
+            params["version"] = str(self.version)
 
         if self.template:
-            params['template'] = NotifyMSTeams.quote(
-                self.template[0].url(), safe='')
+            params["template"] = NotifyMSTeams.quote(
+                self.template[0].url(), safe=""
+            )
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
         # Store any template entries if specified
-        params.update({':{}'.format(k): v for k, v in self.tokens.items()})
+        params.update({f":{k}": v for k, v in self.tokens.items()})
 
         result = None
 
         if self.version == 1:
-            result = '{schema}://{token_a}/{token_b}/{token_c}/'\
-                '?{params}'.format(
+            result = (
+                "{schema}://{token_a}/{token_b}/{token_c}/?{params}".format(
                     schema=self.secure_protocol,
-                    token_a=self.pprint(self.token_a, privacy, safe='@'),
-                    token_b=self.pprint(self.token_b, privacy, safe=''),
-                    token_c=self.pprint(self.token_c, privacy, safe=''),
+                    token_a=self.pprint(self.token_a, privacy, safe="@"),
+                    token_b=self.pprint(self.token_b, privacy, safe=""),
+                    token_c=self.pprint(self.token_c, privacy, safe=""),
                     params=NotifyMSTeams.urlencode(params),
                 )
+            )
 
         if self.version == 2:
-            result = '{schema}://{team}/{token_a}/{token_b}/{token_c}/'\
-                '?{params}'.format(
+            result = (
+                "{schema}://{team}/{token_a}/{token_b}/{token_c}/"
+                "?{params}".format(
                     schema=self.secure_protocol,
-                    team=NotifyMSTeams.quote(self.team, safe=''),
-                    token_a=self.pprint(self.token_a, privacy, safe=''),
-                    token_b=self.pprint(self.token_b, privacy, safe=''),
-                    token_c=self.pprint(self.token_c, privacy, safe=''),
+                    team=NotifyMSTeams.quote(self.team, safe=""),
+                    token_a=self.pprint(self.token_a, privacy, safe=""),
+                    token_b=self.pprint(self.token_b, privacy, safe=""),
+                    token_c=self.pprint(self.token_c, privacy, safe=""),
                     params=NotifyMSTeams.urlencode(params),
                 )
+            )
 
         if self.version == 3:
-            result = '{schema}://{team}/{token_a}/{token_b}/{token_c}/'\
-                '{token_d}/?{params}'.format(
+            result = (
+                "{schema}://{team}/{token_a}/{token_b}/{token_c}/"
+                "{token_d}/?{params}".format(
                     schema=self.secure_protocol,
-                    team=NotifyMSTeams.quote(self.team, safe=''),
-                    token_a=self.pprint(self.token_a, privacy, safe=''),
-                    token_b=self.pprint(self.token_b, privacy, safe=''),
-                    token_c=self.pprint(self.token_c, privacy, safe=''),
-                    token_d=self.pprint(self.token_d, privacy, safe=''),
+                    team=NotifyMSTeams.quote(self.team, safe=""),
+                    token_a=self.pprint(self.token_a, privacy, safe=""),
+                    token_b=self.pprint(self.token_b, privacy, safe=""),
+                    token_c=self.pprint(self.token_c, privacy, safe=""),
+                    token_d=self.pprint(self.token_d, privacy, safe=""),
                     params=NotifyMSTeams.urlencode(params),
                 )
+            )
         return result
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
@@ -577,62 +613,68 @@ class NotifyMSTeams(NotifyBase):
             return results
 
         # Get unquoted entries
-        entries = NotifyMSTeams.split_path(results['fullpath'])
+        entries = NotifyMSTeams.split_path(results["fullpath"])
 
         # Deprecated mode (backwards compatibility)
-        if results.get('user'):
+        if results.get("user"):
             # If a user was found, it's because it's still part of the first
             # token, so we concatinate them
-            results['token_a'] = '{}@{}'.format(
-                NotifyMSTeams.unquote(results['user']),
-                NotifyMSTeams.unquote(results['host']),
+            results["token_a"] = "{}@{}".format(
+                NotifyMSTeams.unquote(results["user"]),
+                NotifyMSTeams.unquote(results["host"]),
             )
 
         else:
             # Get the Team from the hostname
-            results['team'] = NotifyMSTeams.unquote(results['host'])
+            results["team"] = NotifyMSTeams.unquote(results["host"])
 
             # Get the token from the path
-            results['token_a'] = None if not entries \
-                else NotifyMSTeams.unquote(entries.pop(0))
+            results["token_a"] = (
+                None if not entries else NotifyMSTeams.unquote(entries.pop(0))
+            )
 
-        results['token_b'] = None if not entries \
-            else NotifyMSTeams.unquote(entries.pop(0))
-        results['token_c'] = None if not entries \
-            else NotifyMSTeams.unquote(entries.pop(0))
-        results['token_d'] = None if not entries \
-            else NotifyMSTeams.unquote(entries.pop(0))
+        results["token_b"] = (
+            None if not entries else NotifyMSTeams.unquote(entries.pop(0))
+        )
+        results["token_c"] = (
+            None if not entries else NotifyMSTeams.unquote(entries.pop(0))
+        )
+        results["token_d"] = (
+            None if not entries else NotifyMSTeams.unquote(entries.pop(0))
+        )
 
         # Get Image
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+        results["include_image"] = parse_bool(
+            results["qsd"].get("image", True)
+        )
 
         # Get Team name if defined
-        if 'team' in results['qsd'] and results['qsd']['team']:
-            results['team'] = \
-                NotifyMSTeams.unquote(results['qsd']['team'])
+        if "team" in results["qsd"] and results["qsd"]["team"]:
+            results["team"] = NotifyMSTeams.unquote(results["qsd"]["team"])
 
         # Template Handling
-        if 'template' in results['qsd'] and results['qsd']['template']:
-            results['template'] = \
-                NotifyMSTeams.unquote(results['qsd']['template'])
+        if "template" in results["qsd"] and results["qsd"]["template"]:
+            results["template"] = NotifyMSTeams.unquote(
+                results["qsd"]["template"]
+            )
 
         # Override version if defined
-        if 'version' in results['qsd'] and results['qsd']['version']:
-            results['version'] = \
-                NotifyMSTeams.unquote(results['qsd']['version'])
+        if "version" in results["qsd"] and results["qsd"]["version"]:
+            results["version"] = NotifyMSTeams.unquote(
+                results["qsd"]["version"]
+            )
 
         else:
             version = 1
-            if results.get('team'):
+            if results.get("team"):
                 version = 2
-            if results.get('token_d'):
+            if results.get("token_d"):
                 version = 3
             # Set our version if not otherwise set
-            results['version'] = version
+            results["version"] = version
 
         # Store our tokens
-        results['tokens'] = results['qsd:']
+        results["tokens"] = results["qsd:"]
 
         return results
 
@@ -653,61 +695,81 @@ class NotifyMSTeams(NotifyBase):
         # of this is just to detect that were dealing with an msteams url
         # token parsing will occur once we initialize the function
         result = re.match(
-            r'^https?://(?P<team>[^.]+)(?P<v2a>\.webhook)?\.office\.com/'
-            r'webhook(?P<v2b>b2)?/'
-            r'(?P<token_a>[A-Z0-9-]+@[A-Z0-9-]+)/'
-            r'IncomingWebhook/'
-            r'(?P<token_b>[A-Z0-9]+)/'
-            r'(?P<token_c>[A-Z0-9-]+)/'
-            r'(?P<token_d>V2[A-Z0-9-_]+)/?'
-            r'(?P<params>\?.+)?$', url, re.I)
+            r"^https?://(?P<team>[^.]+)(?P<v2a>\.webhook)?\.office\.com/"
+            r"webhook(?P<v2b>b2)?/"
+            r"(?P<token_a>[A-Z0-9-]+@[A-Z0-9-]+)/"
+            r"IncomingWebhook/"
+            r"(?P<token_b>[A-Z0-9]+)/"
+            r"(?P<token_c>[A-Z0-9-]+)/"
+            r"(?P<token_d>V2[A-Z0-9-_]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
             # Version 3 URL
             return NotifyMSTeams.parse_url(
-                '{schema}://{team}/{token_a}/{token_b}/{token_c}/{token_d}'
-                '/{params}'.format(
+                "{schema}://{team}/{token_a}/{token_b}/{token_c}/{token_d}"
+                "/{params}".format(
                     schema=NotifyMSTeams.secure_protocol,
-                    team=result.group('team'),
-                    token_a=result.group('token_a'),
-                    token_b=result.group('token_b'),
-                    token_c=result.group('token_c'),
-                    token_d=result.group('token_d'),
-                    params='' if not result.group('params')
-                    else result.group('params')))
+                    team=result.group("team"),
+                    token_a=result.group("token_a"),
+                    token_b=result.group("token_b"),
+                    token_c=result.group("token_c"),
+                    token_d=result.group("token_d"),
+                    params=(
+                        ""
+                        if not result.group("params")
+                        else result.group("params")
+                    ),
+                )
+            )
 
         result = re.match(
-            r'^https?://(?P<team>[^.]+)(?P<v2a>\.webhook)?\.office\.com/'
-            r'webhook(?P<v2b>b2)?/'
-            r'(?P<token_a>[A-Z0-9-]+@[A-Z0-9-]+)/'
-            r'IncomingWebhook/'
-            r'(?P<token_b>[A-Z0-9]+)/'
-            r'(?P<token_c>[A-Z0-9-]+)/?'
-            r'(?P<params>\?.+)?$', url, re.I)
+            r"^https?://(?P<team>[^.]+)(?P<v2a>\.webhook)?\.office\.com/"
+            r"webhook(?P<v2b>b2)?/"
+            r"(?P<token_a>[A-Z0-9-]+@[A-Z0-9-]+)/"
+            r"IncomingWebhook/"
+            r"(?P<token_b>[A-Z0-9]+)/"
+            r"(?P<token_c>[A-Z0-9-]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
 
         if result:
-            if result.group('v2a'):
+            if result.group("v2a"):
                 # Version 2 URL
                 return NotifyMSTeams.parse_url(
-                    '{schema}://{team}/{token_a}/{token_b}/{token_c}'
-                    '/{params}'.format(
+                    "{schema}://{team}/{token_a}/{token_b}/{token_c}"
+                    "/{params}".format(
                         schema=NotifyMSTeams.secure_protocol,
-                        team=result.group('team'),
-                        token_a=result.group('token_a'),
-                        token_b=result.group('token_b'),
-                        token_c=result.group('token_c'),
-                        params='' if not result.group('params')
-                        else result.group('params')))
+                        team=result.group("team"),
+                        token_a=result.group("token_a"),
+                        token_b=result.group("token_b"),
+                        token_c=result.group("token_c"),
+                        params=(
+                            ""
+                            if not result.group("params")
+                            else result.group("params")
+                        ),
+                    )
+                )
             else:
                 # Version 1 URLs
                 # team is also set to 'outlook' in this case
                 return NotifyMSTeams.parse_url(
-                    '{schema}://{token_a}/{token_b}/{token_c}'
-                    '/{params}'.format(
+                    "{schema}://{token_a}/{token_b}/{token_c}/{params}".format(
                         schema=NotifyMSTeams.secure_protocol,
-                        token_a=result.group('token_a'),
-                        token_b=result.group('token_b'),
-                        token_c=result.group('token_c'),
-                        params='' if not result.group('params')
-                        else result.group('params')))
+                        token_a=result.group("token_a"),
+                        token_b=result.group("token_b"),
+                        token_c=result.group("token_c"),
+                        params=(
+                            ""
+                            if not result.group("params")
+                            else result.group("params")
+                        ),
+                    )
+                )
         return None

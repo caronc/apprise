@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -26,23 +25,24 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import re
-import requests
+import contextlib
 from itertools import chain
+import re
 
-from .base import NotifyBase
-from ..common import NotifyType
-from ..common import NotifyFormat
-from ..conversion import convert_between
-from ..utils.parse import parse_list, validate_regex
-from ..locale import gettext_lazy as _
+import requests
+
 from ..attachment.base import AttachBase
+from ..common import NotifyFormat, NotifyType
+from ..conversion import convert_between
+from ..locale import gettext_lazy as _
+from ..utils.parse import parse_list, validate_regex
+from .base import NotifyBase
 
 # Flag used as a placeholder to sending to all devices
-PUSHOVER_SEND_TO_ALL = 'ALL_DEVICES'
+PUSHOVER_SEND_TO_ALL = "ALL_DEVICES"
 
 # Used to detect a Device
-VALIDATE_DEVICE = re.compile(r'^\s*(?P<device>[a-z0-9_-]{1,25})\s*$', re.I)
+VALIDATE_DEVICE = re.compile(r"^\s*(?P<device>[a-z0-9_-]{1,25})\s*$", re.I)
 
 
 # Priorities
@@ -56,28 +56,28 @@ class PushoverPriority:
 
 # Sounds
 class PushoverSound:
-    PUSHOVER = 'pushover'
-    BIKE = 'bike'
-    BUGLE = 'bugle'
-    CASHREGISTER = 'cashregister'
-    CLASSICAL = 'classical'
-    COSMIC = 'cosmic'
-    FALLING = 'falling'
-    GAMELAN = 'gamelan'
-    INCOMING = 'incoming'
-    INTERMISSION = 'intermission'
-    MAGIC = 'magic'
-    MECHANICAL = 'mechanical'
-    PIANOBAR = 'pianobar'
-    SIREN = 'siren'
-    SPACEALARM = 'spacealarm'
-    TUGBOAT = 'tugboat'
-    ALIEN = 'alien'
-    CLIMB = 'climb'
-    PERSISTENT = 'persistent'
-    ECHO = 'echo'
-    UPDOWN = 'updown'
-    NONE = 'none'
+    PUSHOVER = "pushover"
+    BIKE = "bike"
+    BUGLE = "bugle"
+    CASHREGISTER = "cashregister"
+    CLASSICAL = "classical"
+    COSMIC = "cosmic"
+    FALLING = "falling"
+    GAMELAN = "gamelan"
+    INCOMING = "incoming"
+    INTERMISSION = "intermission"
+    MAGIC = "magic"
+    MECHANICAL = "mechanical"
+    PIANOBAR = "pianobar"
+    SIREN = "siren"
+    SPACEALARM = "spacealarm"
+    TUGBOAT = "tugboat"
+    ALIEN = "alien"
+    CLIMB = "climb"
+    PERSISTENT = "persistent"
+    ECHO = "echo"
+    UPDOWN = "updown"
+    NONE = "none"
 
 
 PUSHOVER_SOUNDS = (
@@ -107,58 +107,55 @@ PUSHOVER_SOUNDS = (
 
 PUSHOVER_PRIORITIES = {
     # Note: This also acts as a reverse lookup mapping
-    PushoverPriority.LOW: 'low',
-    PushoverPriority.MODERATE: 'moderate',
-    PushoverPriority.NORMAL: 'normal',
-    PushoverPriority.HIGH: 'high',
-    PushoverPriority.EMERGENCY: 'emergency',
+    PushoverPriority.LOW: "low",
+    PushoverPriority.MODERATE: "moderate",
+    PushoverPriority.NORMAL: "normal",
+    PushoverPriority.HIGH: "high",
+    PushoverPriority.EMERGENCY: "emergency",
 }
 
 PUSHOVER_PRIORITY_MAP = {
     # Maps against string 'low'
-    'l': PushoverPriority.LOW,
+    "l": PushoverPriority.LOW,
     # Maps against string 'moderate'
-    'm': PushoverPriority.MODERATE,
+    "m": PushoverPriority.MODERATE,
     # Maps against string 'normal'
-    'n': PushoverPriority.NORMAL,
+    "n": PushoverPriority.NORMAL,
     # Maps against string 'high'
-    'h': PushoverPriority.HIGH,
+    "h": PushoverPriority.HIGH,
     # Maps against string 'emergency'
-    'e': PushoverPriority.EMERGENCY,
-
+    "e": PushoverPriority.EMERGENCY,
     # Entries to additionally support (so more like Pushover's API)
-    '-2': PushoverPriority.LOW,
-    '-1': PushoverPriority.MODERATE,
-    '0': PushoverPriority.NORMAL,
-    '1': PushoverPriority.HIGH,
-    '2': PushoverPriority.EMERGENCY,
+    "-2": PushoverPriority.LOW,
+    "-1": PushoverPriority.MODERATE,
+    "0": PushoverPriority.NORMAL,
+    "1": PushoverPriority.HIGH,
+    "2": PushoverPriority.EMERGENCY,
 }
 
 # Extend HTTP Error Messages
 PUSHOVER_HTTP_ERROR_MAP = {
-    401: 'Unauthorized - Invalid Token.',
+    401: "Unauthorized - Invalid Token.",
 }
 
 
 class NotifyPushover(NotifyBase):
-    """
-    A wrapper for Pushover Notifications
-    """
+    """A wrapper for Pushover Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Pushover'
+    service_name = "Pushover"
 
     # The services URL
-    service_url = 'https://pushover.net/'
+    service_url = "https://pushover.net/"
 
     # All pushover requests are secure
-    secure_protocol = 'pover'
+    secure_protocol = "pover"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_pushover'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushover"
 
     # Pushover uses the http protocol with JSON requests
-    notify_url = 'https://api.pushover.net/1/messages.json'
+    notify_url = "https://api.pushover.net/1/messages.json"
 
     # Support attachments
     attachment_support = True
@@ -175,103 +172,115 @@ class NotifyPushover(NotifyBase):
 
     # The regular expression of the current attachment supported mime types
     # At this time it is only images
-    attach_supported_mime_type = r'^image/.*'
+    attach_supported_mime_type = r"^image/.*"
 
     # Define object templates
     templates = (
-        '{schema}://{user_key}@{token}',
-        '{schema}://{user_key}@{token}/{targets}',
+        "{schema}://{user_key}@{token}",
+        "{schema}://{user_key}@{token}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'user_key': {
-            'name': _('User Key'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "user_key": {
+                "name": _("User Key"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "token": {
+                "name": _("Access Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
+            "target_device": {
+                "name": _("Target Device"),
+                "type": "string",
+                "regex": (r"^[a-z0-9_-]{1,25}$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'token': {
-            'name': _('Access Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-        },
-        'target_device': {
-            'name': _('Target Device'),
-            'type': 'string',
-            'regex': (r'^[a-z0-9_-]{1,25}$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'priority': {
-            'name': _('Priority'),
-            'type': 'choice:int',
-            'values': PUSHOVER_PRIORITIES,
-            'default': PushoverPriority.NORMAL,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "priority": {
+                "name": _("Priority"),
+                "type": "choice:int",
+                "values": PUSHOVER_PRIORITIES,
+                "default": PushoverPriority.NORMAL,
+            },
+            "sound": {
+                "name": _("Sound"),
+                "type": "string",
+                "regex": (r"^[a-z]{1,12}$", "i"),
+                "default": PushoverSound.PUSHOVER,
+            },
+            "url": {
+                "name": _("URL"),
+                "map_to": "supplemental_url",
+                "type": "string",
+            },
+            "url_title": {
+                "name": _("URL Title"),
+                "map_to": "supplemental_url_title",
+                "type": "string",
+            },
+            "retry": {
+                "name": _("Retry"),
+                "type": "int",
+                "min": 30,
+                "default": 900,  # 15 minutes
+            },
+            "expire": {
+                "name": _("Expire"),
+                "type": "int",
+                "min": 0,
+                "max": 10800,
+                "default": 3600,  # 1 hour
+            },
+            "to": {
+                "alias_of": "targets",
+            },
         },
-        'sound': {
-            'name': _('Sound'),
-            'type': 'string',
-            'regex': (r'^[a-z]{1,12}$', 'i'),
-            'default': PushoverSound.PUSHOVER,
-        },
-        'url': {
-            'name': _('URL'),
-            'map_to': 'supplemental_url',
-            'type': 'string',
-        },
-        'url_title': {
-            'name': _('URL Title'),
-            'map_to': 'supplemental_url_title',
-            'type': 'string'
-        },
-        'retry': {
-            'name': _('Retry'),
-            'type': 'int',
-            'min': 30,
-            'default': 900,  # 15 minutes
-        },
-        'expire': {
-            'name': _('Expire'),
-            'type': 'int',
-            'min': 0,
-            'max': 10800,
-            'default': 3600,  # 1 hour
-        },
-        'to': {
-            'alias_of': 'targets',
-        },
-    })
+    )
 
-    def __init__(self, user_key, token, targets=None, priority=None,
-                 sound=None, retry=None, expire=None, supplemental_url=None,
-                 supplemental_url_title=None, **kwargs):
-        """
-        Initialize Pushover Object
-        """
+    def __init__(
+        self,
+        user_key,
+        token,
+        targets=None,
+        priority=None,
+        sound=None,
+        retry=None,
+        expire=None,
+        supplemental_url=None,
+        supplemental_url_title=None,
+        **kwargs,
+    ):
+        """Initialize Pushover Object."""
         super().__init__(**kwargs)
 
         # Access Token (associated with project)
         self.token = validate_regex(token)
         if not self.token:
-            msg = 'An invalid Pushover Access Token ' \
-                  '({}) was specified.'.format(token)
+            msg = f"An invalid Pushover Access Token ({token}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # User Key (associated with project)
         self.user_key = validate_regex(user_key)
         if not self.user_key:
-            msg = 'An invalid Pushover User Key ' \
-                  '({}) was specified.'.format(user_key)
+            msg = f"An invalid Pushover User Key ({user_key}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -279,10 +288,10 @@ class NotifyPushover(NotifyBase):
         targets = parse_list(targets)
 
         # Track any invalid entries
-        self.invalid_targets = list()
+        self.invalid_targets = []
 
         if len(targets) == 0:
-            self.targets = (PUSHOVER_SEND_TO_ALL, )
+            self.targets = (PUSHOVER_SEND_TO_ALL,)
 
         else:
             self.targets = []
@@ -290,12 +299,11 @@ class NotifyPushover(NotifyBase):
                 result = VALIDATE_DEVICE.match(target)
                 if result:
                     # Store device information
-                    self.targets.append(result.group('device'))
+                    self.targets.append(result.group("device"))
                     continue
 
                 self.logger.warning(
-                    'Dropped invalid Pushover device '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid Pushover device ({target}) specified.",
                 )
                 self.invalid_targets.append(target)
 
@@ -304,92 +312,102 @@ class NotifyPushover(NotifyBase):
         self.supplemental_url_title = supplemental_url_title
 
         # Setup our sound
-        self.sound = NotifyPushover.default_pushover_sound \
-            if not isinstance(sound, str) else sound.lower()
+        self.sound = (
+            NotifyPushover.default_pushover_sound
+            if not isinstance(sound, str)
+            else sound.lower()
+        )
         if self.sound and self.sound not in PUSHOVER_SOUNDS:
-            msg = 'Using custom sound specified ({}). '.format(sound)
+            msg = f"Using custom sound specified ({sound}). "
             self.logger.debug(msg)
 
         # The Priority of the message
         self.priority = int(
-            NotifyPushover.template_args['priority']['default']
-            if priority is None else
-            next((
-                v for k, v in PUSHOVER_PRIORITY_MAP.items()
-                if str(priority).lower().startswith(k)),
-                NotifyPushover.template_args['priority']['default']))
+            NotifyPushover.template_args["priority"]["default"]
+            if priority is None
+            else next(
+                (
+                    v
+                    for k, v in PUSHOVER_PRIORITY_MAP.items()
+                    if str(priority).lower().startswith(k)
+                ),
+                NotifyPushover.template_args["priority"]["default"],
+            )
+        )
 
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
 
             # How often to resend notification, in seconds
-            self.retry = self.template_args['retry']['default']
-            try:
+            self.retry = self.template_args["retry"]["default"]
+            with contextlib.suppress(ValueError, TypeError):
+                # Get our retry value
                 self.retry = int(retry)
-            except (ValueError, TypeError):
-                # Do nothing
-                pass
 
             # How often to resend notification, in seconds
-            self.expire = self.template_args['expire']['default']
-            try:
+            self.expire = self.template_args["expire"]["default"]
+            with contextlib.suppress(ValueError, TypeError):
+                # Acquire our expiry value
                 self.expire = int(expire)
-            except (ValueError, TypeError):
-                # Do nothing
-                pass
 
             if self.retry < 30:
-                msg = 'Pushover retry must be at least 30 seconds.'
+                msg = "Pushover retry must be at least 30 seconds."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             if self.expire < 0 or self.expire > 10800:
-                msg = 'Pushover expire must reside in the range of ' \
-                      '0 to 10800 seconds.'
+                msg = (
+                    "Pushover expire must reside in the range of "
+                    "0 to 10800 seconds."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform Pushover Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform Pushover Notification."""
 
         if not self.targets:
             # There were no services to notify
-            self.logger.warning(
-                'There were no Pushover targets to notify.')
+            self.logger.warning("There were no Pushover targets to notify.")
             return False
 
         # prepare JSON Object
         payload = {
-            'token': self.token,
-            'user': self.user_key,
-            'priority': str(self.priority),
-            'title': title if title else self.app_desc,
-            'message': body,
-            'device': ','.join(self.targets),
-            'sound': self.sound,
+            "token": self.token,
+            "user": self.user_key,
+            "priority": str(self.priority),
+            "title": title if title else self.app_desc,
+            "message": body,
+            "device": ",".join(self.targets),
+            "sound": self.sound,
         }
 
         if self.supplemental_url:
-            payload['url'] = self.supplemental_url
+            payload["url"] = self.supplemental_url
 
         if self.supplemental_url_title:
-            payload['url_title'] = self.supplemental_url_title
+            payload["url_title"] = self.supplemental_url_title
 
         if self.notify_format == NotifyFormat.HTML:
             # https://pushover.net/api#html
-            payload['html'] = 1
+            payload["html"] = 1
 
         elif self.notify_format == NotifyFormat.MARKDOWN:
-            payload['message'] = convert_between(
-                NotifyFormat.MARKDOWN, NotifyFormat.HTML, body)
-            payload['html'] = 1
+            payload["message"] = convert_between(
+                NotifyFormat.MARKDOWN, NotifyFormat.HTML, body
+            )
+            payload["html"] = 1
 
         if self.priority == PushoverPriority.EMERGENCY:
-            payload.update({'retry': self.retry, 'expire': self.expire})
+            payload.update({"retry": self.retry, "expire": self.expire})
 
         if attach and self.attachment_support:
             # Create a copy of our payload
@@ -399,18 +417,18 @@ class NotifyPushover(NotifyBase):
             for no, attachment in enumerate(attach):
                 if no or not body:
                     # To handle multiple attachments, clean up our message
-                    _payload['message'] = attachment.name
+                    _payload["message"] = attachment.name
 
                 if not self._send(_payload, attachment):
                     # Mark our failure
                     return False
 
                 # Clear our title if previously set
-                _payload['title'] = ''
+                _payload["title"] = ""
 
                 # No need to alarm for each consecutive attachment uploaded
                 # afterwards
-                _payload['sound'] = PushoverSound.NONE
+                _payload["sound"] = PushoverSound.NONE
 
         else:
             # Simple send
@@ -419,32 +437,28 @@ class NotifyPushover(NotifyBase):
         return True
 
     def _send(self, payload, attach=None):
-        """
-        Wrapper to the requests (post) object
-        """
+        """Wrapper to the requests (post) object."""
 
         if isinstance(attach, AttachBase):
             # Perform some simple error checking
             if not attach:
                 # We could not access the attachment
                 self.logger.error(
-                    'Could not access attachment {}.'.format(
-                        attach.url(privacy=True)))
+                    f"Could not access attachment {attach.url(privacy=True)}."
+                )
                 return False
 
             # Perform some basic checks as we want to gracefully skip
             # over unsupported mime types.
             if not re.match(
-                    self.attach_supported_mime_type,
-                    attach.mimetype,
-                    re.I):
+                self.attach_supported_mime_type, attach.mimetype, re.I
+            ):
                 # No problem; we just don't support this attachment
                 # type; gracefully move along
                 self.logger.debug(
-                    'Ignored unsupported Pushover attachment ({}): {}'
-                    .format(
-                        attach.mimetype,
-                        attach.url(privacy=True)))
+                    "Ignored unsupported Pushover attachment"
+                    f" ({attach.mimetype}): {attach.url(privacy=True)}"
+                )
 
                 attach = None
 
@@ -452,36 +466,39 @@ class NotifyPushover(NotifyBase):
                 # If we get here, we're dealing with a supported image.
                 # Verify that the filesize is okay though.
                 file_size = len(attach)
-                if not (file_size > 0
-                        and file_size <= self.attach_max_size_bytes):
+                if not (
+                    file_size > 0 and file_size <= self.attach_max_size_bytes
+                ):
 
                     # File size is no good
                     self.logger.warning(
-                        'Pushover attachment size ({}B) exceeds limit: {}'
-                        .format(file_size, attach.url(privacy=True)))
+                        f"Pushover attachment size ({file_size}B) exceeds"
+                        f" limit: {attach.url(privacy=True)}"
+                    )
 
                     return False
 
                 self.logger.debug(
-                    'Posting Pushover attachment {}'.format(
-                        attach.url(privacy=True)))
+                    f"Posting Pushover attachment {attach.url(privacy=True)}"
+                )
 
         # Default Header
         headers = {
-            'User-Agent': self.app_id,
+            "User-Agent": self.app_id,
         }
 
         # Authentication
-        auth = (self.token, '')
+        auth = (self.token, "")
 
         # Some default values for our request object to which we'll update
         # depending on what our payload is
         files = None
 
-        self.logger.debug('Pushover POST URL: %s (cert_verify=%r)' % (
-            self.notify_url, self.verify_certificate,
-        ))
-        self.logger.debug('Pushover Payload: %s' % str(payload))
+        self.logger.debug(
+            "Pushover POST URL:"
+            f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
+        )
+        self.logger.debug(f"Pushover Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -489,7 +506,13 @@ class NotifyPushover(NotifyBase):
         try:
             # Open our attachment path if required:
             if attach:
-                files = {'attachment': (attach.name, open(attach.path, 'rb'))}
+                files = {
+                    "attachment": (
+                        attach.name,
+                        # file handle is safely closed in `finally`; inline
+                        # open is intentional
+                        open(attach.path, "rb"),  # noqa: SIM115
+                    )}
 
             r = requests.post(
                 self.notify_url,
@@ -503,146 +526,153 @@ class NotifyPushover(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyPushover.http_response_code_lookup(
-                        r.status_code, PUSHOVER_HTTP_ERROR_MAP)
+                status_str = NotifyPushover.http_response_code_lookup(
+                    r.status_code, PUSHOVER_HTTP_ERROR_MAP
+                )
 
                 self.logger.warning(
-                    'Failed to send Pushover notification to {}: '
-                    '{}{}error={}.'.format(
-                        payload['device'],
+                    "Failed to send Pushover notification to {}: "
+                    "{}{}error={}.".format(
+                        payload["device"],
                         status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                        ", " if status_str else "",
+                        r.status_code,
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 return False
 
             else:
                 self.logger.info(
-                    'Sent Pushover notification to %s.' % payload['device'])
+                    "Sent Pushover notification to {}.".format(
+                        payload["device"]
+                    )
+                )
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending Pushover:%s ' % (
-                    payload['device']) + 'notification.'
+                "A Connection error occurred sending Pushover:{} ".format(
+                    payload["device"]
+                )
+                + "notification."
             )
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             return False
 
-        except (OSError, IOError) as e:
+        except OSError as e:
             self.logger.warning(
-                'An I/O error occurred while reading {}.'.format(
-                    attach.name if attach else 'attachment'))
-            self.logger.debug('I/O Exception: %s' % str(e))
+                "An I/O error occurred while reading {}.".format(
+                    attach.name if attach else "attachment"
+                )
+            )
+            self.logger.debug(f"I/O Exception: {e!s}")
             return False
 
         finally:
             # Close our file (if it's open) stored in the second element
             # of our files tuple (index 1)
             if files:
-                files['attachment'][1].close()
+                files["attachment"][1].close()
 
         return True
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.user_key, self.token)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'priority':
-                PUSHOVER_PRIORITIES[self.template_args['priority']['default']]
+            "priority": (
+                PUSHOVER_PRIORITIES[self.template_args["priority"]["default"]]
                 if self.priority not in PUSHOVER_PRIORITIES
-                else PUSHOVER_PRIORITIES[self.priority],
+                else PUSHOVER_PRIORITIES[self.priority]
+            ),
         }
 
         # Only add expire and retry for emergency messages,
         # pushover ignores for all other priorities
         if self.priority == PushoverPriority.EMERGENCY:
-            params.update({'expire': self.expire, 'retry': self.retry})
+            params.update({"expire": self.expire, "retry": self.retry})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Escape our devices
-        devices = '/'.join(
-            [NotifyPushover.quote(x, safe='')
-             for x in chain(self.targets, self.invalid_targets)])
+        devices = "/".join([
+            NotifyPushover.quote(x, safe="")
+            for x in chain(self.targets, self.invalid_targets)
+        ])
 
         if devices == PUSHOVER_SEND_TO_ALL:
             # keyword is reserved for internal usage only; it's safe to remove
             # it from the devices list
-            devices = ''
+            devices = ""
 
-        return '{schema}://{user_key}@{token}/{devices}/?{params}'.format(
+        return "{schema}://{user_key}@{token}/{devices}/?{params}".format(
             schema=self.secure_protocol,
-            user_key=self.pprint(self.user_key, privacy, safe=''),
-            token=self.pprint(self.token, privacy, safe=''),
+            user_key=self.pprint(self.user_key, privacy, safe=""),
+            token=self.pprint(self.token, privacy, safe=""),
             devices=devices,
-            params=NotifyPushover.urlencode(params))
+            params=NotifyPushover.urlencode(params),
+        )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # Set our priority
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = \
-                NotifyPushover.unquote(results['qsd']['priority'])
+        if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
+            results["priority"] = NotifyPushover.unquote(
+                results["qsd"]["priority"]
+            )
 
         # Retrieve all of our targets
-        results['targets'] = NotifyPushover.split_path(results['fullpath'])
+        results["targets"] = NotifyPushover.split_path(results["fullpath"])
 
         # User Key is retrieved from the user
-        results['user_key'] = NotifyPushover.unquote(results['user'])
+        results["user_key"] = NotifyPushover.unquote(results["user"])
 
         # Get the sound
-        if 'sound' in results['qsd'] and len(results['qsd']['sound']):
-            results['sound'] = \
-                NotifyPushover.unquote(results['qsd']['sound'])
+        if "sound" in results["qsd"] and len(results["qsd"]["sound"]):
+            results["sound"] = NotifyPushover.unquote(results["qsd"]["sound"])
 
         # Get the supplementary url
-        if 'url' in results['qsd'] and len(results['qsd']['url']):
-            results['supplemental_url'] = NotifyPushover.unquote(
-                results['qsd']['url']
+        if "url" in results["qsd"] and len(results["qsd"]["url"]):
+            results["supplemental_url"] = NotifyPushover.unquote(
+                results["qsd"]["url"]
             )
-        if 'url_title' in results['qsd'] and len(results['qsd']['url_title']):
-            results['supplemental_url_title'] = results['qsd']['url_title']
+        if "url_title" in results["qsd"] and len(results["qsd"]["url_title"]):
+            results["supplemental_url_title"] = results["qsd"]["url_title"]
 
         # Get expire and retry
-        if 'expire' in results['qsd'] and len(results['qsd']['expire']):
-            results['expire'] = results['qsd']['expire']
-        if 'retry' in results['qsd'] and len(results['qsd']['retry']):
-            results['retry'] = results['qsd']['retry']
+        if "expire" in results["qsd"] and len(results["qsd"]["expire"]):
+            results["expire"] = results["qsd"]["expire"]
+        if "retry" in results["qsd"] and len(results["qsd"]["retry"]):
+            results["retry"] = results["qsd"]["retry"]
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyPushover.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyPushover.parse_list(
+                results["qsd"]["to"]
+            )
 
         # Token
-        results['token'] = NotifyPushover.unquote(results['host'])
+        results["token"] = NotifyPushover.unquote(results["host"])
 
         return results

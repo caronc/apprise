@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -41,42 +40,43 @@
 #  from phone number itself, but it's ID.  It's displayed below and contains
 #  way more numbers then your typical phone number
 
+from json import dumps, loads
 import re
+
 import requests
-from json import loads, dumps
-from .base import NotifyBase
+
 from ..common import NotifyType
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from ..locale import gettext_lazy as _
+from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from .base import NotifyBase
 
 
 class NotifyWhatsApp(NotifyBase):
-    """
-    A wrapper for WhatsApp Notifications
-    """
+    """A wrapper for WhatsApp Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'WhatsApp'
+    service_name = "WhatsApp"
 
     # The services URL
-    service_url = \
-        'https://developers.facebook.com/docs/whatsapp/cloud-api/get-started'
+    service_url = (
+        "https://developers.facebook.com/docs/whatsapp/cloud-api/get-started"
+    )
 
     # All notification requests are secure
-    secure_protocol = 'whatsapp'
+    secure_protocol = "whatsapp"
 
     # Allow 300 requests per minute.
     # 60/300 = 0.2
     request_rate_per_sec = 0.20
 
     # Facebook Graph version
-    fb_graph_version = 'v17.0'
+    fb_graph_version = "v17.0"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_whatsapp'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_whatsapp"
 
     # WhatsApp Message Notification URL
-    notify_url = 'https://graph.facebook.com/{fb_ver}/{phone_id}/messages'
+    notify_url = "https://graph.facebook.com/{fb_ver}/{phone_id}/messages"
 
     # The maximum length of the body
     body_maxlen = 1024
@@ -87,128 +87,150 @@ class NotifyWhatsApp(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{token}@{from_phone_id}/{targets}',
-        '{schema}://{template}:{token}@{from_phone_id}/{targets}',
+        "{schema}://{token}@{from_phone_id}/{targets}",
+        "{schema}://{template}:{token}@{from_phone_id}/{targets}",
     )
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Access Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Access Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9]+$", "i"),
+            },
+            "template": {
+                "name": _("Template Name"),
+                "type": "string",
+                "required": False,
+                "regex": (r"^[^\s]+$", "i"),
+            },
+            "from_phone_id": {
+                "name": _("From Phone ID"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[0-9]+$", "i"),
+            },
+            "target_phone": {
+                "name": _("Target Phone No"),
+                "type": "string",
+                "prefix": "+",
+                "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
+            "language": {
+                "name": _("Language"),
+                "type": "string",
+                "default": "en_US",
+                "regex": (r"^[^0-9\s]+$", "i"),
+            },
         },
-        'template': {
-            'name': _('Template Name'),
-            'type': 'string',
-            'required': False,
-            'regex': (r'^[^\s]+$', 'i'),
-        },
-        'from_phone_id': {
-            'name': _('From Phone ID'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[0-9]+$', 'i'),
-        },
-        'target_phone': {
-            'name': _('Target Phone No'),
-            'type': 'string',
-            'prefix': '+',
-            'regex': (r'^[0-9\s)(+-]+$', 'i'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-        'language': {
-            'name': _('Language'),
-            'type': 'string',
-            'default': 'en_US',
-            'regex': (r'^[^0-9\s]+$', 'i'),
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "from": {
+                "alias_of": "from_phone_id",
+            },
+            "token": {
+                "alias_of": "token",
+            },
+            "template": {
+                "alias_of": "template",
+            },
+            "lang": {
+                "alias_of": "language",
+            },
         },
-        'from': {
-            'alias_of': 'from_phone_id',
-        },
-        'token': {
-            'alias_of': 'token',
-        },
-        'template': {
-            'alias_of': 'template',
-        },
-        'lang': {
-            'alias_of': 'language',
-        },
-    })
+    )
 
     # Our supported mappings and component keys
     component_key_re = re.compile(
-        r'(?P<key>((?P<id>[1-9][0-9]*)|(?P<map>body|type)))', re.IGNORECASE)
+        r"(?P<key>((?P<id>[1-9][0-9]*)|(?P<map>body|type)))", re.IGNORECASE
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'template_mapping': {
-            'name': _('Template Mapping'),
-            'prefix': ':',
+        "template_mapping": {
+            "name": _("Template Mapping"),
+            "prefix": ":",
         },
     }
 
-    def __init__(self, token, from_phone_id, template=None, targets=None,
-                 language=None, template_mapping=None, **kwargs):
-        """
-        Initialize WhatsApp Object
-        """
+    def __init__(
+        self,
+        token,
+        from_phone_id,
+        template=None,
+        targets=None,
+        language=None,
+        template_mapping=None,
+        **kwargs,
+    ):
+        """Initialize WhatsApp Object."""
         super().__init__(**kwargs)
 
         # The Access Token associated with the account
         self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+            token, *self.template_tokens["token"]["regex"]
+        )
         if not self.token:
-            msg = 'An invalid WhatsApp Access Token ' \
-                  '({}) was specified.'.format(token)
+            msg = f"An invalid WhatsApp Access Token ({token}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The From Phone ID associated with the account
         self.from_phone_id = validate_regex(
-            from_phone_id, *self.template_tokens['from_phone_id']['regex'])
+            from_phone_id, *self.template_tokens["from_phone_id"]["regex"]
+        )
         if not self.from_phone_id:
-            msg = 'An invalid WhatsApp From Phone ID ' \
-                  '({}) was specified.'.format(from_phone_id)
+            msg = (
+                "An invalid WhatsApp From Phone ID "
+                f"({from_phone_id}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The template to associate with the message
         if template:
             self.template = validate_regex(
-                template, *self.template_tokens['template']['regex'])
+                template, *self.template_tokens["template"]["regex"]
+            )
             if not self.template:
-                msg = 'An invalid WhatsApp Template Name ' \
-                      '({}) was specified.'.format(template)
+                msg = (
+                    "An invalid WhatsApp Template Name "
+                    f"({template}) was specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             # The Template language Code to use
             if language:
                 self.language = validate_regex(
-                    language, *self.template_tokens['language']['regex'])
+                    language, *self.template_tokens["language"]["regex"]
+                )
                 if not self.language:
-                    msg = 'An invalid WhatsApp Template Language Code ' \
-                          '({}) was specified.'.format(language)
+                    msg = (
+                        "An invalid WhatsApp Template Language Code "
+                        f"({language}) was specified."
+                    )
                     self.logger.warning(msg)
                     raise TypeError(msg)
             else:
-                self.language = self.template_tokens['language']['default']
+                self.language = self.template_tokens["language"]["default"]
         else:
             #
             # Message Mode
@@ -216,20 +238,19 @@ class NotifyWhatsApp(NotifyBase):
             self.template = None
 
         # Parse our targets
-        self.targets = list()
+        self.targets = []
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
             result = is_phone_no(target)
             if not result:
                 self.logger.warning(
-                    'Dropped invalid phone # '
-                    '({}) specified.'.format(target),
+                    f"Dropped invalid phone # ({target}) specified.",
                 )
                 continue
 
             # store valid phone number
-            self.targets.append('+{}'.format(result['full']))
+            self.targets.append("+{}".format(result["full"]))
 
         self.template_mapping = {}
         if template_mapping:
@@ -237,39 +258,44 @@ class NotifyWhatsApp(NotifyBase):
             self.template_mapping.update(template_mapping)
 
         # Validate Mapping and prepare Components
-        self.components = dict()
-        self.component_keys = list()
+        self.components = {}
+        self.component_keys = []
         for key, val in self.template_mapping.items():
             matched = self.component_key_re.match(key)
             if not matched:
-                msg = 'An invalid Template Component ID ' \
-                      '({}) was specified.'.format(key)
+                msg = (
+                    f"An invalid Template Component ID ({key}) was specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
-            if matched.group('id'):
+            if matched.group("id"):
                 #
                 # Manual Component Assigment (by id)
                 #
-                index = matched.group('id')
+                index = matched.group("id")
                 map_to = {
                     "type": "text",
                     "text": val,
                 }
 
             else:  # matched.group('map')
-                map_to = matched.group('map').lower()
+                map_to = matched.group("map").lower()
                 matched = self.component_key_re.match(val)
-                if not (matched and matched.group('id')):
-                    msg = 'An invalid Template Component Mapping ' \
-                        '(:{}={}) was specified.'.format(key, val)
+                if not (matched and matched.group("id")):
+                    msg = (
+                        "An invalid Template Component Mapping "
+                        f"(:{key}={val}) was specified."
+                    )
                     self.logger.warning(msg)
                     raise TypeError(msg)
-                index = matched.group('id')
+                index = matched.group("id")
 
             if index in self.components:
-                msg = 'The Template Component index ' \
-                      '({}) was already assigned.'.format(key)
+                msg = (
+                    "The Template Component index "
+                    f"({key}) was already assigned."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -282,14 +308,13 @@ class NotifyWhatsApp(NotifyBase):
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform WhatsApp Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform WhatsApp Notification."""
 
         if not self.targets:
             self.logger.warning(
-                'There are no valid WhatsApp targets to notify.')
+                "There are no valid WhatsApp targets to notify."
+            )
             return False
 
         # error tracking (used for function return)
@@ -303,16 +328,16 @@ class NotifyWhatsApp(NotifyBase):
 
         # Prepare our headers
         headers = {
-            'User-Agent': self.app_id,
-            'Accept': 'application/json',
-            'Content-Type': 'application/json',
-            'Authorization': f'Bearer {self.token}',
+            "User-Agent": self.app_id,
+            "Accept": "application/json",
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.token}",
         }
 
         payload = {
-            'messaging_product': 'whatsapp',
+            "messaging_product": "whatsapp",
             # The To gets populated in the loop below
-            'to': None,
+            "to": None,
         }
 
         if not self.template:
@@ -320,9 +345,9 @@ class NotifyWhatsApp(NotifyBase):
             # Send Message
             #
             payload.update({
-                'recipient_type': "individual",
-                'type': 'text',
-                'text': {"body": body},
+                "recipient_type": "individual",
+                "type": "text",
+                "text": {"body": body},
             })
 
         else:
@@ -330,7 +355,7 @@ class NotifyWhatsApp(NotifyBase):
             # Send Template
             #
             payload.update({
-                'type': 'template',
+                "type": "template",
                 "template": {
                     "name": self.template,
                     "language": {"code": self.language},
@@ -338,24 +363,26 @@ class NotifyWhatsApp(NotifyBase):
             })
 
             if self.components:
-                payload['template']['components'] = [
-                    {
-                        "type": "body",
-                        "parameters": [],
-                    }
-                ]
+                payload["template"]["components"] = [{
+                    "type": "body",
+                    "parameters": [],
+                }]
                 for key in self.component_keys:
                     if isinstance(self.components[key], dict):
                         # Manual Assignment
-                        payload['template']['components'][0]["parameters"]\
-                            .append(self.components[key])
+                        payload["template"]["components"][0][
+                            "parameters"
+                        ].append(self.components[key])
                         continue
 
                     # Mapping of body and/or notify type
-                    payload['template']['components'][0]["parameters"].append({
+                    payload["template"]["components"][0]["parameters"].append({
                         "type": "text",
-                        "text": body if self.components[key] == 'body'
-                        else notify_type,
+                        "text": (
+                            body
+                            if self.components[key] == "body"
+                            else notify_type
+                        ),
                     })
 
         # Create a copy of the targets list
@@ -366,12 +393,14 @@ class NotifyWhatsApp(NotifyBase):
             target = targets.pop(0)
 
             # Prepare our user
-            payload['to'] = target
+            payload["to"] = target
 
             # Some Debug Logging
-            self.logger.debug('WhatsApp POST URL: {} (cert_verify={})'.format(
-                url, self.verify_certificate))
-            self.logger.debug('WhatsApp Payload: {}' .format(payload))
+            self.logger.debug(
+                "WhatsApp POST URL:"
+                f" {url} (cert_verify={self.verify_certificate})"
+            )
+            self.logger.debug(f"WhatsApp Payload: {payload}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -385,10 +414,13 @@ class NotifyWhatsApp(NotifyBase):
                 )
 
                 if r.status_code not in (
-                        requests.codes.created, requests.codes.ok):
+                    requests.codes.created,
+                    requests.codes.ok,
+                ):
                     # We had a problem
-                    status_str = \
-                        NotifyBase.http_response_code_lookup(r.status_code)
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code
+                    )
 
                     # set up our status code to use
                     status_code = r.status_code
@@ -396,10 +428,12 @@ class NotifyWhatsApp(NotifyBase):
                     try:
                         # Update our status response if we can
                         json_response = loads(r.content)
-                        status_code = \
-                            json_response['error'].get('code', status_code)
-                        status_str = \
-                            json_response['error'].get('message', status_str)
+                        status_code = json_response["error"].get(
+                            "code", status_code
+                        )
+                        status_str = json_response["error"].get(
+                            "message", status_str
+                        )
 
                     except (AttributeError, TypeError, ValueError, KeyError):
                         # KeyError = r.content is parseable but does not
@@ -413,15 +447,16 @@ class NotifyWhatsApp(NotifyBase):
                         pass
 
                     self.logger.warning(
-                        'Failed to send WhatsApp notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send WhatsApp notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            status_code))
+                            ", " if status_str else "",
+                            status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
@@ -429,14 +464,15 @@ class NotifyWhatsApp(NotifyBase):
 
                 else:
                     self.logger.info(
-                        'Sent WhatsApp notification to {}.'.format(target))
+                        f"Sent WhatsApp notification to {target}."
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending WhatsApp:%s ' % (
-                        target) + 'notification.'
+                    f"A Connection error occurred sending WhatsApp:{target} "
+                    + "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -446,59 +482,58 @@ class NotifyWhatsApp(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.from_phone_id, self.token)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {}
         if self.template:
             # Add language to our URL
-            params['lang'] = self.language
+            params["lang"] = self.language
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Payload body extras prefixed with a ':' sign
         # Append our payload extras into our parameters
-        params.update(
-            {':{}'.format(k): v for k, v in self.template_mapping.items()})
+        params.update({f":{k}": v for k, v in self.template_mapping.items()})
 
-        return '{schema}://{template}{token}@{from_id}/{targets}/?{params}'\
+        return (
+            "{schema}://{template}{token}@{from_id}/{targets}/?{params}"
             .format(
                 schema=self.secure_protocol,
-                from_id=self.pprint(
-                    self.from_phone_id, privacy, safe=''),
-                token=self.pprint(self.token, privacy, safe=''),
-                template='' if not self.template
-                else '{}:'.format(
-                    NotifyWhatsApp.quote(self.template, safe='')),
-                targets='/'.join(
-                    [NotifyWhatsApp.quote(x, safe='') for x in self.targets]),
-                params=NotifyWhatsApp.urlencode(params))
+                from_id=self.pprint(self.from_phone_id, privacy, safe=""),
+                token=self.pprint(self.token, privacy, safe=""),
+                template=(
+                    ""
+                    if not self.template
+                    else "{}:".format(
+                        NotifyWhatsApp.quote(self.template, safe="")
+                    )
+                ),
+                targets="/".join(
+                    [NotifyWhatsApp.quote(x, safe="") for x in self.targets]
+                ),
+                params=NotifyWhatsApp.urlencode(params),
+            )
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         targets = len(self.targets)
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
 
         if not results:
@@ -507,60 +542,61 @@ class NotifyWhatsApp(NotifyBase):
 
         # Get our entries; split_path() looks after unquoting content for us
         # by default
-        results['targets'] = NotifyWhatsApp.split_path(results['fullpath'])
+        results["targets"] = NotifyWhatsApp.split_path(results["fullpath"])
 
         # The hostname is our From Phone ID
-        results['from_phone_id'] = NotifyWhatsApp.unquote(results['host'])
+        results["from_phone_id"] = NotifyWhatsApp.unquote(results["host"])
 
         # Determine if we have a Template, otherwise load our token
-        if results['password']:
+        if results["password"]:
             #
             # Template Mode
             #
-            results['template'] = NotifyWhatsApp.unquote(results['user'])
-            results['token'] = NotifyWhatsApp.unquote(results['password'])
+            results["template"] = NotifyWhatsApp.unquote(results["user"])
+            results["token"] = NotifyWhatsApp.unquote(results["password"])
 
         else:
             #
             # Message Mode
             #
-            results['token'] = NotifyWhatsApp.unquote(results['user'])
+            results["token"] = NotifyWhatsApp.unquote(results["user"])
 
         # Access token
-        if 'token' in results['qsd'] and len(results['qsd']['token']):
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
             # Extract the account sid from an argument
-            results['token'] = \
-                NotifyWhatsApp.unquote(results['qsd']['token'])
+            results["token"] = NotifyWhatsApp.unquote(results["qsd"]["token"])
 
         # Template
-        if 'template' in results['qsd'] and len(results['qsd']['template']):
-            results['template'] = results['qsd']['template']
+        if "template" in results["qsd"] and len(results["qsd"]["template"]):
+            results["template"] = results["qsd"]["template"]
 
         # Template Language
-        if 'lang' in results['qsd'] and len(results['qsd']['lang']):
-            results['language'] = results['qsd']['lang']
+        if "lang" in results["qsd"] and len(results["qsd"]["lang"]):
+            results["language"] = results["qsd"]["lang"]
 
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
-        if 'from' in results['qsd'] and len(results['qsd']['from']):
-            results['from_phone_id'] = \
-                NotifyWhatsApp.unquote(results['qsd']['from'])
-        if 'source' in results['qsd'] and \
-                len(results['qsd']['source']):
-            results['from_phone_id'] = \
-                NotifyWhatsApp.unquote(results['qsd']['source'])
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["from_phone_id"] = NotifyWhatsApp.unquote(
+                results["qsd"]["from"]
+            )
+        if "source" in results["qsd"] and len(results["qsd"]["source"]):
+            results["from_phone_id"] = NotifyWhatsApp.unquote(
+                results["qsd"]["source"]
+            )
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyWhatsApp.parse_phone_no(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyWhatsApp.parse_phone_no(
+                results["qsd"]["to"]
+            )
 
         # store any additional payload extra's defined
-        results['template_mapping'] = {
+        results["template_mapping"] = {
             NotifyWhatsApp.unquote(x): NotifyWhatsApp.unquote(y)
-            for x, y in results['qsd:'].items()
+            for x, y in results["qsd:"].items()
         }
 
         return results

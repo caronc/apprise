@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -37,25 +36,25 @@
 #   https://play.google.com/store/apps/details?id=com.joaomgcd.join
 
 import re
+
 import requests
 
-from .base import NotifyBase
-from ..common import NotifyImageSize
-from ..common import NotifyType
-from ..utils.parse import parse_list, parse_bool, validate_regex
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..utils.parse import parse_bool, parse_list, validate_regex
+from .base import NotifyBase
 
 # Extend HTTP Error Messages
 JOIN_HTTP_ERROR_MAP = {
-    401: 'Unauthorized - Invalid Token.',
+    401: "Unauthorized - Invalid Token.",
 }
 
 # Used to detect a device
-IS_DEVICE_RE = re.compile(r'^[a-z0-9]{32}$', re.I)
+IS_DEVICE_RE = re.compile(r"^[a-z0-9]{32}$", re.I)
 
 # Used to detect a device
 IS_GROUP_RE = re.compile(
-    r'(group\.)?(?P<name>(all|android|chrome|windows10|phone|tablet|pc))',
+    r"(group\.)?(?P<name>(all|android|chrome|windows10|phone|tablet|pc))",
     re.IGNORECASE,
 )
 
@@ -74,54 +73,52 @@ class JoinPriority:
 
 JOIN_PRIORITIES = {
     # Note: This also acts as a reverse lookup mapping
-    JoinPriority.LOW: 'low',
-    JoinPriority.MODERATE: 'moderate',
-    JoinPriority.NORMAL: 'normal',
-    JoinPriority.HIGH: 'high',
-    JoinPriority.EMERGENCY: 'emergency',
+    JoinPriority.LOW: "low",
+    JoinPriority.MODERATE: "moderate",
+    JoinPriority.NORMAL: "normal",
+    JoinPriority.HIGH: "high",
+    JoinPriority.EMERGENCY: "emergency",
 }
 
 JOIN_PRIORITY_MAP = {
     # Maps against string 'low'
-    'l': JoinPriority.LOW,
+    "l": JoinPriority.LOW,
     # Maps against string 'moderate'
-    'm': JoinPriority.MODERATE,
+    "m": JoinPriority.MODERATE,
     # Maps against string 'normal'
-    'n': JoinPriority.NORMAL,
+    "n": JoinPriority.NORMAL,
     # Maps against string 'high'
-    'h': JoinPriority.HIGH,
+    "h": JoinPriority.HIGH,
     # Maps against string 'emergency'
-    'e': JoinPriority.EMERGENCY,
-
+    "e": JoinPriority.EMERGENCY,
     # Entries to additionally support (so more like Join's API)
-    '-2': JoinPriority.LOW,
-    '-1': JoinPriority.MODERATE,
-    '0': JoinPriority.NORMAL,
-    '1': JoinPriority.HIGH,
-    '2': JoinPriority.EMERGENCY,
+    "-2": JoinPriority.LOW,
+    "-1": JoinPriority.MODERATE,
+    "0": JoinPriority.NORMAL,
+    "1": JoinPriority.HIGH,
+    "2": JoinPriority.EMERGENCY,
 }
 
 
 class NotifyJoin(NotifyBase):
-    """
-    A wrapper for Join Notifications
-    """
+    """A wrapper for Join Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'Join'
+    service_name = "Join"
 
     # The services URL
-    service_url = 'https://joaoapps.com/join/'
+    service_url = "https://joaoapps.com/join/"
 
     # The default protocol
-    secure_protocol = 'join'
+    secure_protocol = "join"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_join'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_join"
 
     # Join uses the http protocol with JSON requests
-    notify_url = \
-        'https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush'
+    notify_url = (
+        "https://joinjoaomgcd.appspot.com/_ah/api/messaging/v1/sendPush"
+    )
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
@@ -130,70 +127,79 @@ class NotifyJoin(NotifyBase):
     body_maxlen = 1000
 
     # The default group to use if none is specified
-    default_join_group = 'group.all'
+    default_join_group = "group.all"
 
     # Define object templates
-    templates = (
-        '{schema}://{apikey}/{targets}',
-    )
+    templates = ("{schema}://{apikey}/{targets}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'apikey': {
-            'name': _('API Key'),
-            'type': 'string',
-            'regex': (r'^[a-z0-9]{32}$', 'i'),
-            'private': True,
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "regex": (r"^[a-z0-9]{32}$", "i"),
+                "private": True,
+                "required": True,
+            },
+            "device": {
+                "name": _("Device ID"),
+                "type": "string",
+                "regex": (r"^[a-z0-9]{32}$", "i"),
+                "map_to": "targets",
+            },
+            "device_name": {
+                "name": _("Device Name"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "group": {
+                "name": _("Group"),
+                "type": "choice:string",
+                "values": (
+                    "all",
+                    "android",
+                    "chrome",
+                    "windows10",
+                    "phone",
+                    "tablet",
+                    "pc",
+                ),
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        'device': {
-            'name': _('Device ID'),
-            'type': 'string',
-            'regex': (r'^[a-z0-9]{32}$', 'i'),
-            'map_to': 'targets',
-        },
-        'device_name': {
-            'name': _('Device Name'),
-            'type': 'string',
-            'map_to': 'targets',
-        },
-        'group': {
-            'name': _('Group'),
-            'type': 'choice:string',
-            'values': (
-                'all', 'android', 'chrome', 'windows10', 'phone', 'tablet',
-                'pc'),
-            'map_to': 'targets',
-        },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
-        },
-    })
+    )
 
-    template_args = dict(NotifyBase.template_args, **{
-        'image': {
-            'name': _('Include Image'),
-            'type': 'bool',
-            'default': False,
-            'map_to': 'include_image',
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": False,
+                "map_to": "include_image",
+            },
+            "priority": {
+                "name": _("Priority"),
+                "type": "choice:int",
+                "values": JOIN_PRIORITIES,
+                "default": JoinPriority.NORMAL,
+            },
+            "to": {
+                "alias_of": "targets",
+            },
         },
-        'priority': {
-            'name': _('Priority'),
-            'type': 'choice:int',
-            'values': JOIN_PRIORITIES,
-            'default': JoinPriority.NORMAL,
-        },
-        'to': {
-            'alias_of': 'targets',
-        },
-    })
+    )
 
-    def __init__(self, apikey, targets=None, include_image=True, priority=None,
-                 **kwargs):
-        """
-        Initialize Join Object
-        """
+    def __init__(
+        self, apikey, targets=None, include_image=True, priority=None, **kwargs
+    ):
+        """Initialize Join Object."""
         super().__init__(**kwargs)
 
         # Track whether or not we want to send an image with our notification
@@ -202,24 +208,29 @@ class NotifyJoin(NotifyBase):
 
         # API Key (associated with project)
         self.apikey = validate_regex(
-            apikey, *self.template_tokens['apikey']['regex'])
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
         if not self.apikey:
-            msg = 'An invalid Join API Key ' \
-                  '({}) was specified.'.format(apikey)
+            msg = f"An invalid Join API Key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # The Priority of the message
         self.priority = int(
-            NotifyJoin.template_args['priority']['default']
-            if priority is None else
-            next((
-                v for k, v in JOIN_PRIORITY_MAP.items()
-                if str(priority).lower().startswith(k)),
-                NotifyJoin.template_args['priority']['default']))
+            NotifyJoin.template_args["priority"]["default"]
+            if priority is None
+            else next(
+                (
+                    v
+                    for k, v in JOIN_PRIORITY_MAP.items()
+                    if str(priority).lower().startswith(k)
+                ),
+                NotifyJoin.template_args["priority"]["default"],
+            )
+        )
 
         # Prepare a list of targets to store entries into
-        self.targets = list()
+        self.targets = []
 
         # Prepare a parsed list of targets
         targets = parse_list(targets)
@@ -235,21 +246,20 @@ class NotifyJoin(NotifyBase):
             group_re = IS_GROUP_RE.match(target)
             if group_re:
                 self.targets.append(
-                    'group.{}'.format(group_re.group('name').lower()))
+                    "group.{}".format(group_re.group("name").lower())
+                )
                 continue
 
             self.targets.append(target)
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform Join Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform Join Notification."""
 
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/x-www-form-urlencoded',
+            "User-Agent": self.app_id,
+            "Content-Type": "application/x-www-form-urlencoded",
         }
 
         # error tracking (used for function return)
@@ -263,36 +273,38 @@ class NotifyJoin(NotifyBase):
             target = targets.pop(0)
 
             url_args = {
-                'apikey': self.apikey,
-                'priority': str(self.priority),
-                'title': title,
-                'text': body,
+                "apikey": self.apikey,
+                "priority": str(self.priority),
+                "title": title,
+                "text": body,
             }
 
             if IS_GROUP_RE.match(target) or IS_DEVICE_RE.match(target):
-                url_args['deviceId'] = target
+                url_args["deviceId"] = target
 
             else:
                 # Support Device Names
-                url_args['deviceNames'] = target
+                url_args["deviceNames"] = target
 
             # prepare our image for display if configured to do so
-            image_url = None if not self.include_image \
-                else self.image_url(notify_type)
+            image_url = (
+                None if not self.include_image else self.image_url(notify_type)
+            )
 
             if image_url:
-                url_args['icon'] = image_url
+                url_args["icon"] = image_url
 
             # prepare payload
             payload = {}
 
             # Prepare the URL
-            url = '%s?%s' % (self.notify_url, NotifyJoin.urlencode(url_args))
+            url = f"{self.notify_url}?{NotifyJoin.urlencode(url_args)}"
 
-            self.logger.debug('Join POST URL: %s (cert_verify=%r)' % (
-                url, self.verify_certificate,
-            ))
-            self.logger.debug('Join Payload: %s' % str(payload))
+            self.logger.debug(
+                "Join POST URL:"
+                f" {url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(f"Join Payload: {payload!s}")
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -308,34 +320,35 @@ class NotifyJoin(NotifyBase):
 
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = \
-                        NotifyJoin.http_response_code_lookup(
-                            r.status_code, JOIN_HTTP_ERROR_MAP)
+                    status_str = NotifyJoin.http_response_code_lookup(
+                        r.status_code, JOIN_HTTP_ERROR_MAP
+                    )
 
                     self.logger.warning(
-                        'Failed to send Join notification to {}: '
-                        '{}{}error={}.'.format(
+                        "Failed to send Join notification to {}: "
+                        "{}{}error={}.".format(
                             target,
                             status_str,
-                            ', ' if status_str else '',
-                            r.status_code))
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
 
-                    self.logger.debug(
-                        'Response Details:\r\n{}'.format(r.content))
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info('Sent Join notification to %s.' % target)
+                    self.logger.info(f"Sent Join notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    'A Connection error occurred sending Join:%s '
-                    'notification.' % target
+                    f"A Connection error occurred sending Join:{target} "
+                    "notification."
                 )
-                self.logger.debug('Socket Exception: %s' % str(e))
+                self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
                 has_error = True
@@ -345,83 +358,81 @@ class NotifyJoin(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
         # Define any URL parameters
         params = {
-            'priority':
-                JOIN_PRIORITIES[self.template_args['priority']['default']]
+            "priority": (
+                JOIN_PRIORITIES[self.template_args["priority"]["default"]]
                 if self.priority not in JOIN_PRIORITIES
-                else JOIN_PRIORITIES[self.priority],
-            'image': 'yes' if self.include_image else 'no',
+                else JOIN_PRIORITIES[self.priority]
+            ),
+            "image": "yes" if self.include_image else "no",
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        return '{schema}://{apikey}/{targets}/?{params}'.format(
+        return "{schema}://{apikey}/{targets}/?{params}".format(
             schema=self.secure_protocol,
-            apikey=self.pprint(self.apikey, privacy, safe=''),
-            targets='/'.join([NotifyJoin.quote(x, safe='')
-                              for x in self.targets]),
-            params=NotifyJoin.urlencode(params))
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets="/".join(
+                [NotifyJoin.quote(x, safe="") for x in self.targets]
+            ),
+            params=NotifyJoin.urlencode(params),
+        )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this notification."""
         return len(self.targets)
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # Our API Key is the hostname if no user is specified
-        results['apikey'] = \
-            results['user'] if results['user'] else results['host']
+        results["apikey"] = (
+            results["user"] if results["user"] else results["host"]
+        )
 
         # Unquote our API Key
-        results['apikey'] = NotifyJoin.unquote(results['apikey'])
+        results["apikey"] = NotifyJoin.unquote(results["apikey"])
 
         # Set our priority
-        if 'priority' in results['qsd'] and len(results['qsd']['priority']):
-            results['priority'] = \
-                NotifyJoin.unquote(results['qsd']['priority'])
+        if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
+            results["priority"] = NotifyJoin.unquote(
+                results["qsd"]["priority"]
+            )
 
         # Our Devices
-        results['targets'] = list()
-        if results['user']:
+        results["targets"] = []
+        if results["user"]:
             # If a user was defined, then the hostname is actually a target
             # too
-            results['targets'].append(NotifyJoin.unquote(results['host']))
+            results["targets"].append(NotifyJoin.unquote(results["host"]))
 
         # Now fetch the remaining tokens
-        results['targets'].extend(
-            NotifyJoin.split_path(results['fullpath']))
+        results["targets"].extend(NotifyJoin.split_path(results["fullpath"]))
 
         # The 'to' makes it easier to use yaml configuration
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += NotifyJoin.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += NotifyJoin.parse_list(results["qsd"]["to"])
 
         # Include images with our message
-        results['include_image'] = \
-            parse_bool(results['qsd'].get('image', True))
+        results["include_image"] = parse_bool(
+            results["qsd"].get("image", True)
+        )
 
         return results

@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,13 +26,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
+
 import requests
 
 from ..common import NotifyType
-from .base import NotifyBase
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
-
+from ..utils.parse import validate_regex
+from .base import NotifyBase
 
 # Register at https://sct.ftqq.com/
 #   - do as the page describe and you will get the token
@@ -43,72 +42,69 @@ from ..locale import gettext_lazy as _
 
 
 class NotifyServerChan(NotifyBase):
-    """
-    A wrapper for ServerChan Notifications
-    """
+    """A wrapper for ServerChan Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'ServerChan'
+    service_name = "ServerChan"
 
     # The services URL
-    service_url = 'https://sct.ftqq.com/'
+    service_url = "https://sct.ftqq.com/"
 
     # All notification requests are secure
-    secure_protocol = 'schan'
+    secure_protocol = "schan"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_serverchan'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_serverchan"
 
     # ServerChan API
-    notify_url = 'https://sctapi.ftqq.com/{token}.send'
+    notify_url = "https://sctapi.ftqq.com/{token}.send"
 
     # Define object templates
-    templates = (
-        '{schema}://{token}',
-    )
+    templates = ("{schema}://{token}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'token': {
-            'name': _('Token'),
-            'type': 'string',
-            'private': True,
-            'required': True,
-            'regex': (r'^[a-z0-9-]+$', 'i'),
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "token": {
+                "name": _("Token"),
+                "type": "string",
+                "private": True,
+                "required": True,
+                "regex": (r"^[a-z0-9-]+$", "i"),
+            },
         },
-    })
+    )
 
     def __init__(self, token, **kwargs):
-        """
-        Initialize ServerChan Object
-        """
+        """Initialize ServerChan Object."""
         super().__init__(**kwargs)
 
         # Token (associated with project)
         self.token = validate_regex(
-            token, *self.template_tokens['token']['regex'])
+            token, *self.template_tokens["token"]["regex"]
+        )
         if not self.token:
-            msg = 'An invalid ServerChan API Token ' \
-                  '({}) was specified.'.format(token)
+            msg = f"An invalid ServerChan API Token ({token}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform ServerChan Notification
-        """
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+        """Perform ServerChan Notification."""
         payload = {
-            'title': title,
-            'desp': body,
+            "title": title,
+            "desp": body,
         }
 
         # Our Notification URL
         notify_url = self.notify_url.format(token=self.token)
 
         # Some Debug Logging
-        self.logger.debug('ServerChan URL: {} (cert_verify={})'.format(
-            notify_url, self.verify_certificate))
-        self.logger.debug('ServerChan Payload: {}'.format(payload))
+        self.logger.debug(
+            "ServerChan URL:"
+            f" {notify_url} (cert_verify={self.verify_certificate})"
+        )
+        self.logger.debug(f"ServerChan Payload: {payload}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -121,65 +117,61 @@ class NotifyServerChan(NotifyBase):
 
             if r.status_code != requests.codes.ok:
                 # We had a problem
-                status_str = \
-                    NotifyServerChan.http_response_code_lookup(
-                        r.status_code)
+                status_str = NotifyServerChan.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    'Failed to send ServerChan notification: '
-                    '{}{}error={}.'.format(
-                        status_str,
-                        ', ' if status_str else '',
-                        r.status_code))
+                    "Failed to send ServerChan notification: "
+                    "{}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
-                self.logger.debug(
-                    'Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
                 return False
 
             else:
-                self.logger.info('Sent ServerChan notification.')
+                self.logger.info("Sent ServerChan notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occured sending ServerChan '
-                'notification.'
+                "A Connection error occured sending ServerChan notification."
             )
-            self.logger.debug('Socket Exception: %s' % str(e))
+            self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
         return True
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (self.secure_protocol, self.token)
 
     def url(self, privacy=False):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
-        return '{schema}://{token}'.format(
+        return "{schema}://{token}".format(
             schema=self.secure_protocol,
-            token=self.pprint(self.token, privacy, safe=''))
+            token=self.pprint(self.token, privacy, safe=""),
+        )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to substantiate this object.
-        """
+        """Parses the URL and returns enough arguments that can allow us to
+        substantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't parse the URL
             return results
 
-        pattern = 'schan://([a-zA-Z0-9]+)/' + \
-                  ('?' if not url.endswith('/') else '')
+        pattern = "schan://([a-zA-Z0-9]+)/" + (
+            "?" if not url.endswith("/") else ""
+        )
         result = re.match(pattern, url)
-        results['token'] = result.group(1) if result else ''
+        results["token"] = result.group(1) if result else ""
         return results

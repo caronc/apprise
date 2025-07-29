@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -27,53 +26,43 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import re
+
 import requests
 
 from .. import exception
-from .base import NotifyBase
-from ..url import PrivacyMode
-from ..common import NotifyImageSize
-from ..common import NotifyType
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from .base import NotifyBase
 
 
 class XMLPayloadField:
-    """
-    Identifies the fields available in the JSON Payload
-    """
-    VERSION = 'Version'
-    TITLE = 'Subject'
-    MESSAGE = 'Message'
-    MESSAGETYPE = 'MessageType'
+    """Identifies the fields available in the JSON Payload."""
+
+    VERSION = "Version"
+    TITLE = "Subject"
+    MESSAGE = "Message"
+    MESSAGETYPE = "MessageType"
 
 
 # Defines the method to send the notification
-METHODS = (
-    'POST',
-    'GET',
-    'DELETE',
-    'PUT',
-    'HEAD',
-    'PATCH'
-)
+METHODS = ("POST", "GET", "DELETE", "PUT", "HEAD", "PATCH")
 
 
 class NotifyXML(NotifyBase):
-    """
-    A wrapper for XML Notifications
-    """
+    """A wrapper for XML Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = 'XML'
+    service_name = "XML"
 
     # The default protocol
-    protocol = 'xml'
+    protocol = "xml"
 
     # The default secure protocol
-    secure_protocol = 'xmls'
+    secure_protocol = "xmls"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_Custom_XML'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_Custom_XML"
 
     # Support attachments
     attachment_support = True
@@ -86,82 +75,87 @@ class NotifyXML(NotifyBase):
     request_rate_per_sec = 0
 
     # XSD Information
-    xsd_ver = '1.1'
-    xsd_default_url = \
-        'https://raw.githubusercontent.com/caronc/apprise/master' \
-        '/apprise/assets/NotifyXML-{version}.xsd'
+    xsd_ver = "1.1"
+    xsd_default_url = (
+        "https://raw.githubusercontent.com/caronc/apprise/master"
+        "/apprise/assets/NotifyXML-{version}.xsd"
+    )
 
     # Define object templates
     templates = (
-        '{schema}://{host}',
-        '{schema}://{host}:{port}',
-        '{schema}://{user}@{host}',
-        '{schema}://{user}@{host}:{port}',
-        '{schema}://{user}:{password}@{host}',
-        '{schema}://{user}:{password}@{host}:{port}',
+        "{schema}://{host}",
+        "{schema}://{host}:{port}",
+        "{schema}://{user}@{host}",
+        "{schema}://{user}@{host}:{port}",
+        "{schema}://{user}:{password}@{host}",
+        "{schema}://{user}:{password}@{host}:{port}",
     )
 
     # Define our tokens; these are the minimum tokens required required to
     # be passed into this function (as arguments). The syntax appends any
     # previously defined in the base package and builds onto them
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "host": {
+                "name": _("Hostname"),
+                "type": "string",
+                "required": True,
+            },
+            "port": {
+                "name": _("Port"),
+                "type": "int",
+                "min": 1,
+                "max": 65535,
+            },
+            "user": {
+                "name": _("Username"),
+                "type": "string",
+            },
+            "password": {
+                "name": _("Password"),
+                "type": "string",
+                "private": True,
+            },
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
-        },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-        },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-        },
-
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        'method': {
-            'name': _('Fetch Method'),
-            'type': 'choice:string',
-            'values': METHODS,
-            'default': METHODS[0],
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "method": {
+                "name": _("Fetch Method"),
+                "type": "choice:string",
+                "values": METHODS,
+                "default": METHODS[0],
+            },
         },
-    })
+    )
 
     # Define any kwargs we're using
     template_kwargs = {
-        'headers': {
-            'name': _('HTTP Header'),
-            'prefix': '+',
+        "headers": {
+            "name": _("HTTP Header"),
+            "prefix": "+",
         },
-        'payload': {
-            'name': _('Payload Extras'),
-            'prefix': ':',
+        "payload": {
+            "name": _("Payload Extras"),
+            "prefix": ":",
         },
-        'params': {
-            'name': _('GET Params'),
-            'prefix': '-',
+        "params": {
+            "name": _("GET Params"),
+            "prefix": "-",
         },
     }
 
-    def __init__(self, headers=None, method=None, payload=None, params=None,
-                 **kwargs):
-        """
-        Initialize XML Object
+    def __init__(
+        self, headers=None, method=None, payload=None, params=None, **kwargs
+    ):
+        """Initialize XML Object.
 
         headers can be a dictionary of key/value pairs that you want to
         additionally include as part of the server headers to post with
-
         """
         super().__init__(**kwargs)
 
@@ -178,15 +172,18 @@ class NotifyXML(NotifyBase):
     </soapenv:Body>
 </soapenv:Envelope>"""
 
-        self.fullpath = kwargs.get('fullpath')
+        self.fullpath = kwargs.get("fullpath")
         if not isinstance(self.fullpath, str):
-            self.fullpath = ''
+            self.fullpath = ""
 
-        self.method = self.template_args['method']['default'] \
-            if not isinstance(method, str) else method.upper()
+        self.method = (
+            self.template_args["method"]["default"]
+            if not isinstance(method, str)
+            else method.upper()
+        )
 
         if self.method not in METHODS:
-            msg = 'The method specified ({}) is invalid.'.format(method)
+            msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -218,11 +215,11 @@ class NotifyXML(NotifyBase):
             # Store our extra payload entries (but tidy them up since they will
             # become XML Keys (they can't contain certain characters
             for k, v in payload.items():
-                key = re.sub(r'[^A-Za-z0-9_-]*', '', k)
+                key = re.sub(r"[^A-Za-z0-9_-]*", "", k)
                 if not key:
                     self.logger.warning(
-                        'Ignoring invalid XML Stanza element name({})'
-                        .format(k))
+                        f"Ignoring invalid XML Stanza element name({k})"
+                    )
                     continue
 
                 # Any values set in the payload to alter a system related one
@@ -237,39 +234,53 @@ class NotifyXML(NotifyBase):
                     self.payload_extras[key] = v
 
         # Set our xsd url
-        self.xsd_url = None if self.payload_overrides or self.payload_extras \
+        self.xsd_url = (
+            None
+            if self.payload_overrides or self.payload_extras
             else self.xsd_default_url.format(version=self.xsd_ver)
+        )
 
         return
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
-        """
-        Perform XML Notification
-        """
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform XML Notification."""
 
         # Prepare HTTP Headers
         headers = {
-            'User-Agent': self.app_id,
-            'Content-Type': 'application/xml'
+            "User-Agent": self.app_id,
+            "Content-Type": "application/xml",
         }
 
         # Apply any/all header over-rides defined
         headers.update(self.headers)
 
         # Our XML Attachmement subsitution
-        xml_attachments = ''
+        xml_attachments = ""
 
         payload_base = {}
 
         for key, value in (
-                (XMLPayloadField.VERSION, self.xsd_ver),
-                (XMLPayloadField.TITLE, NotifyXML.escape_html(
-                    title, whitespace=False)),
-                (XMLPayloadField.MESSAGE, NotifyXML.escape_html(
-                    body, whitespace=False)),
-                (XMLPayloadField.MESSAGETYPE, NotifyXML.escape_html(
-                    notify_type, whitespace=False))):
+            (XMLPayloadField.VERSION, self.xsd_ver),
+            (
+                XMLPayloadField.TITLE,
+                NotifyXML.escape_html(title, whitespace=False),
+            ),
+            (
+                XMLPayloadField.MESSAGE,
+                NotifyXML.escape_html(body, whitespace=False),
+            ),
+            (
+                XMLPayloadField.MESSAGETYPE,
+                NotifyXML.escape_html(notify_type, whitespace=False),
+            ),
+        ):
 
             if not self.payload_map[key]:
                 # Do not store element in payload response
@@ -277,13 +288,15 @@ class NotifyXML(NotifyBase):
             payload_base[self.payload_map[key]] = value
 
         # Apply our payload extras
-        payload_base.update(
-            {k: NotifyXML.escape_html(v, whitespace=False)
-                for k, v in self.payload_extras.items()})
+        payload_base.update({
+            k: NotifyXML.escape_html(v, whitespace=False)
+            for k, v in self.payload_extras.items()
+        })
 
         # Base Entres
-        xml_base = ''.join(
-            ['<{}>{}</{}>'.format(k, v, k) for k, v in payload_base.items()])
+        xml_base = "".join(
+            [f"<{k}>{v}</{k}>" for k, v in payload_base.items()]
+        )
 
         attachments = []
         if attach and self.attachment_support:
@@ -292,49 +305,61 @@ class NotifyXML(NotifyBase):
                 if not attachment:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access Custom XML attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access Custom XML attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 try:
                     # Prepare our Attachment in Base64
-                    entry = \
-                        '<Attachment filename="{}" mimetype="{}">'.format(
-                            NotifyXML.escape_html(
-                                attachment.name if attachment.name
-                                else f'file{no:03}.dat', whitespace=False),
-                            NotifyXML.escape_html(
-                                attachment.mimetype, whitespace=False))
+                    entry = '<Attachment filename="{}" mimetype="{}">'.format(
+                        NotifyXML.escape_html(
+                            (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            whitespace=False,
+                        ),
+                        NotifyXML.escape_html(
+                            attachment.mimetype, whitespace=False
+                        ),
+                    )
                     entry += attachment.base64()
-                    entry += '</Attachment>'
+                    entry += "</Attachment>"
                     attachments.append(entry)
 
                 except exception.AppriseException:
                     # We could not access the attachment
                     self.logger.error(
-                        'Could not access Custom XML attachment {}.'.format(
-                            attachment.url(privacy=True)))
+                        "Could not access Custom XML attachment"
+                        f" {attachment.url(privacy=True)}."
+                    )
                     return False
 
                 self.logger.debug(
-                    'Appending Custom XML attachment {}'.format(
-                        attachment.url(privacy=True)))
+                    "Appending Custom XML attachment"
+                    f" {attachment.url(privacy=True)}"
+                )
 
             # Update our xml_attachments record:
-            xml_attachments = \
-                '<Attachments format="base64">' + \
-                ''.join(attachments) + '</Attachments>'
+            xml_attachments = (
+                '<Attachments format="base64">'
+                + "".join(attachments)
+                + "</Attachments>"
+            )
 
         re_map = {
-            '{{XSD_URL}}':
-            f' xmlns:xsi="{self.xsd_url}"' if self.xsd_url else '',
-            '{{ATTACHMENTS}}': xml_attachments,
-            '{{CORE}}': xml_base,
+            "{{XSD_URL}}": (
+                f' xmlns:xsi="{self.xsd_url}"' if self.xsd_url else ""
+            ),
+            "{{ATTACHMENTS}}": xml_attachments,
+            "{{CORE}}": xml_base,
         }
 
         # Iterate over above list and store content accordingly
         re_table = re.compile(
-            r'(' + '|'.join(re_map.keys()) + r')',
+            r"(" + "|".join(re_map.keys()) + r")",
             re.IGNORECASE,
         )
 
@@ -343,37 +368,37 @@ class NotifyXML(NotifyBase):
             auth = (self.user, self.password)
 
         # Set our schema
-        schema = 'https' if self.secure else 'http'
+        schema = "https" if self.secure else "http"
 
-        url = '%s://%s' % (schema, self.host)
+        url = f"{schema}://{self.host}"
         if isinstance(self.port, int):
-            url += ':%d' % self.port
+            url += f":{self.port}"
 
         url += self.fullpath
         payload = re_table.sub(lambda x: re_map[x.group()], self.payload)
 
-        self.logger.debug('XML POST URL: %s (cert_verify=%r)' % (
-            url, self.verify_certificate,
-        ))
+        self.logger.debug(
+            f"XML POST URL: {url} (cert_verify={self.verify_certificate!r})"
+        )
 
-        self.logger.debug('XML Payload: %s' % str(payload))
+        self.logger.debug(f"XML Payload: {payload!s}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        if self.method == 'GET':
+        if self.method == "GET":
             method = requests.get
 
-        elif self.method == 'PUT':
+        elif self.method == "PUT":
             method = requests.put
 
-        elif self.method == 'PATCH':
+        elif self.method == "PATCH":
             method = requests.patch
 
-        elif self.method == 'DELETE':
+        elif self.method == "DELETE":
             method = requests.delete
 
-        elif self.method == 'HEAD':
+        elif self.method == "HEAD":
             method = requests.head
 
         else:  # POST
@@ -390,29 +415,30 @@ class NotifyXML(NotifyBase):
             )
             if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem
-                status_str = \
-                    NotifyXML.http_response_code_lookup(r.status_code)
+                status_str = NotifyXML.http_response_code_lookup(r.status_code)
 
                 self.logger.warning(
-                    'Failed to send JSON %s notification: %s%serror=%s.',
+                    "Failed to send JSON %s notification: %s%serror=%s.",
                     self.method,
                     status_str,
-                    ', ' if status_str else '',
-                    str(r.status_code))
+                    ", " if status_str else "",
+                    str(r.status_code),
+                )
 
-                self.logger.debug('Response Details:\r\n{}'.format(r.content))
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
                 # Return; we're done
                 return False
 
             else:
-                self.logger.info('Sent XML %s notification.', self.method)
+                self.logger.info("Sent XML %s notification.", self.method)
 
         except requests.RequestException as e:
             self.logger.warning(
-                'A Connection error occurred sending XML '
-                'notification to %s.' % self.host)
-            self.logger.debug('Socket Exception: %s' % str(e))
+                "A Connection error occurred sending XML "
+                f"notification to {self.host}."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
 
             # Return; we're done
             return False
@@ -421,97 +447,104 @@ class NotifyXML(NotifyBase):
 
     @property
     def url_identifier(self):
-        """
-        Returns all of the identifiers that make this URL unique from
-        another simliar one. Targets or end points should never be identified
-        here.
+        """Returns all of the identifiers that make this URL unique from
+        another simliar one.
+
+        Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.user, self.password, self.host,
+            self.user,
+            self.password,
+            self.host,
             self.port if self.port else (443 if self.secure else 80),
-            self.fullpath.rstrip('/'),
+            self.fullpath.rstrip("/"),
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
         params = {
-            'method': self.method,
+            "method": self.method,
         }
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Append our headers into our parameters
-        params.update({'+{}'.format(k): v for k, v in self.headers.items()})
+        params.update({f"+{k}": v for k, v in self.headers.items()})
 
         # Append our GET params into our parameters
-        params.update({'-{}'.format(k): v for k, v in self.params.items()})
+        params.update({f"-{k}": v for k, v in self.params.items()})
 
         # Append our payload extra's into our parameters
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_extras.items()})
-        params.update(
-            {':{}'.format(k): v for k, v in self.payload_overrides.items()})
+        params.update({f":{k}": v for k, v in self.payload_extras.items()})
+        params.update({f":{k}": v for k, v in self.payload_overrides.items()})
 
         # Determine Authentication
-        auth = ''
+        auth = ""
         if self.user and self.password:
-            auth = '{user}:{password}@'.format(
-                user=NotifyXML.quote(self.user, safe=''),
+            auth = "{user}:{password}@".format(
+                user=NotifyXML.quote(self.user, safe=""),
                 password=self.pprint(
-                    self.password, privacy, mode=PrivacyMode.Secret, safe=''),
+                    self.password, privacy, mode=PrivacyMode.Secret, safe=""
+                ),
             )
         elif self.user:
-            auth = '{user}@'.format(
-                user=NotifyXML.quote(self.user, safe=''),
+            auth = "{user}@".format(
+                user=NotifyXML.quote(self.user, safe=""),
             )
 
         default_port = 443 if self.secure else 80
-
-        return '{schema}://{auth}{hostname}{port}{fullpath}?{params}'.format(
+        return "{schema}://{auth}{hostname}{port}{fullpath}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if self.port is None or self.port == default_port
-                 else ':{}'.format(self.port),
-            fullpath=NotifyXML.quote(self.fullpath, safe='/')
-            if self.fullpath else '/',
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else f":{self.port}"
+            ),
+            fullpath=(
+                NotifyXML.quote(self.fullpath, safe="/")
+                if self.fullpath
+                else "/"
+            ),
             params=NotifyXML.urlencode(params),
         )
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us to re-
+        instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # store any additional payload extra's defined
-        results['payload'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
-                              for x, y in results['qsd:'].items()}
+        results["payload"] = {
+            NotifyXML.unquote(x): NotifyXML.unquote(y)
+            for x, y in results["qsd:"].items()
+        }
 
         # Add our headers that the user can potentially over-ride if they wish
         # to to our returned result set and tidy entries by unquoting them
-        results['headers'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
-                              for x, y in results['qsd+'].items()}
+        results["headers"] = {
+            NotifyXML.unquote(x): NotifyXML.unquote(y)
+            for x, y in results["qsd+"].items()
+        }
 
         # Add our GET paramters in the event the user wants to pass these along
-        results['params'] = {NotifyXML.unquote(x): NotifyXML.unquote(y)
-                             for x, y in results['qsd-'].items()}
+        results["params"] = {
+            NotifyXML.unquote(x): NotifyXML.unquote(y)
+            for x, y in results["qsd-"].items()
+        }
 
         # Set method if not otherwise set
-        if 'method' in results['qsd'] and len(results['qsd']['method']):
-            results['method'] = NotifyXML.unquote(results['qsd']['method'])
+        if "method" in results["qsd"] and len(results["qsd"]["method"]):
+            results["method"] = NotifyXML.unquote(results["qsd"]["method"])
 
         return results
