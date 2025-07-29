@@ -122,6 +122,15 @@ class NotifyWebexTeams(NotifyBase):
         },
     )
 
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "token": {
+                "alias_of": "token",
+            },
+        },
+    )
+
     def __init__(self, token, **kwargs):
         """Initialize Webex Teams Object."""
         super().__init__(**kwargs)
@@ -234,8 +243,14 @@ class NotifyWebexTeams(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # The first token is stored in the hostname
-        results["token"] = NotifyWebexTeams.unquote(results["host"])
+        # Set our token if found as an argument
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["token"] = \
+                NotifyWebexTeams.unquote(results["qsd"]["token"])
+
+        else:
+            # The first token is stored in the hostname
+            results["token"] = NotifyWebexTeams.unquote(results["host"])
 
         return results
 
