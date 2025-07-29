@@ -191,13 +191,13 @@ def test_plugin_google_chat_general(mock_post):
     params = mock_post.call_args_list[0][1]["params"]
     assert params.get("token") == token
     assert params.get("key") == key
-    assert "threadKey" not in params
     payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert "thread" not in payload
     assert payload["text"] == "title\r\ntest body"
 
     mock_post.reset_mock()
 
-    # Test our messaging with the threadKey
+    # Test our messaging with the thread_key
     obj = Apprise.instantiate(f"gchat://{workspace}/{key}/{token}/{threadkey}")
     assert isinstance(obj, NotifyGoogleChat)
     assert (
@@ -216,9 +216,10 @@ def test_plugin_google_chat_general(mock_post):
     params = mock_post.call_args_list[0][1]["params"]
     assert params.get("token") == token
     assert params.get("key") == key
-    assert params.get("threadKey") == threadkey
     payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert "thread" in payload
     assert payload["text"] == "title\r\ntest body"
+    assert payload["thread"].get("thread_key") == threadkey
 
 
 def test_plugin_google_chat_edge_case():
