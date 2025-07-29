@@ -69,7 +69,7 @@ notification services. It supports sending alerts to platforms such as: \
 `ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, `Pushalot`, \
 `PushBullet`, `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, \
 `Pushy`, `PushDeer`, `QQ Push`, `Revolt`, `Reddit`, `Resend`, `Rocket.Chat`, \
-`RSyslog`, `SendGrid`, `ServerChan`, `Seven`, `SFR`, `Signal`, \
+`RSyslog`, `SendGrid`, `ServerChan`, `Seven`, `SFR`, `Signal`, `SIGNL4`, \
 `SimplePush`, `Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, \
 `SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Super Toasty`, \
 `Streamlabs`, `Stride`, `Synology Chat`, `Syslog`, `Techulus Push`, \
