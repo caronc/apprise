@@ -32,7 +32,6 @@
 
 import requests
 from json import dumps
-
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
@@ -103,8 +102,9 @@ class NotifySIGNL4(NotifyBase):
         },
     })
 
-    def __init__(self, secret, service=None, location=None, alerting_scenario=None,
-                 filtering=None, external_id=None, status=None, **kwargs):
+    def __init__(self, secret, service=None, location=None,
+                 alerting_scenario=None, filtering=None,
+                 external_id=None, status=None, **kwargs):
         """
         Initialize SIGNL4 Object
         """
@@ -176,10 +176,9 @@ class NotifySIGNL4(NotifyBase):
         # Prepare our URL
         notify_url = self.service_url + self.secret
 
-        self.logger.debug("SIGNL4 POST URL: %s (cert_verify=%r)" % (
-            notify_url, self.verify_certificate,
-        ))
-        self.logger.debug("SIGNL4 Payload: %s" % str(payload))
+        self.logger.debug("SIGNL4 POST URL: {notify_url} \
+                          (cert_verify={self.verify_certificate}")
+        self.logger.debug("SIGNL4 Payload: {payload}")
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -218,8 +217,8 @@ class NotifySIGNL4(NotifyBase):
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending SIGNL4 "
-                "notification to %s." % self.host)
-            self.logger.debug("Socket Exception: %s" % str(e))
+                "notification to {self.host}.")
+            self.logger.debug("Socket Exception: " + str(e))
 
             # Return; we're done
             return False
@@ -300,21 +299,29 @@ class NotifySIGNL4(NotifyBase):
                 NotifySIGNL4.unquote(results["host"])
 
         if "service" in results["qsd"] and len(results["qsd"]["service"]):
-            results["service"] = NotifySIGNL4.unquote(results["qsd"]["service"])
-        
-        if "location" in results["qsd"] and len(results["qsd"]["location"]):
-            results["location"] = NotifySIGNL4.unquote(results["qsd"]["location"])
+            results["service"] = \
+                NotifySIGNL4.unquote(results["qsd"]["service"])
 
-        if "alerting_scenario" in results["qsd"] and len(results["qsd"]["alerting_scenario"]):
-            results["alerting_scenario"] = NotifySIGNL4.unquote(results["qsd"]["alerting_scenario"])
+        if "location" in results["qsd"] and len(results["qsd"]["location"]):
+            results["location"] = \
+                NotifySIGNL4.unquote(results["qsd"]["location"])
+
+        if "alerting_scenario" in results["qsd"] and \
+            len(results["qsd"]["alerting_scenario"]):
+            results["alerting_scenario"] = \
+                NotifySIGNL4.unquote(results["qsd"]["alerting_scenario"])
 
         if "filtering" in results["qsd"] and len(results["qsd"]["filtering"]):
-            results["filtering"] = NotifySIGNL4.unquote(results["qsd"]["filtering"])
+            results["filtering"] = \
+                NotifySIGNL4.unquote(results["qsd"]["filtering"])
 
-        if "external_id" in results["qsd"] and len(results["qsd"]["external_id"]):
-            results["external_id"] = NotifySIGNL4.unquote(results["qsd"]["external_id"])
+        if "external_id" in results["qsd"] and \
+            len(results["qsd"]["external_id"]):
+            results["external_id"] = \
+                NotifySIGNL4.unquote(results["qsd"]["external_id"])
 
         if "status" in results["qsd"] and len(results["qsd"]["status"]):
-            results["status"] = NotifySIGNL4.unquote(results["qsd"]["status"])
+            results["status"] = \
+                NotifySIGNL4.unquote(results["qsd"]["status"])
 
         return results
