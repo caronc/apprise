@@ -81,6 +81,9 @@ IS_ROOM_ID = re.compile(
     re.I,
 )
 
+# Matrix is_image check
+IS_IMAGE = re.compile(r"^image/.*", re.I)
+
 
 class MatrixMessageType:
     """The Matrix Message types."""
@@ -692,6 +695,9 @@ class NotifyMatrix(NotifyBase):
             # Get our room
             room = rooms.pop(0)
 
+            # Set method according to MatrixVersion
+            method = "PUT" if self.version == MatrixVersion.V3 else "POST"
+
             # Get our room_id from our response
             room_id = self._room_join(room)
             if not room_id:
@@ -717,39 +723,47 @@ class NotifyMatrix(NotifyBase):
                     f"/rooms/{NotifyMatrix.quote(room_id)}/send/m.room.message"
                 )
 
-            if self.version == MatrixVersion.V2:
-                #
-                # Attachments don't work beyond V2 at this time
-                #
-                if image_url:
-                    # Define our payload
-                    image_payload = {
-                        "msgtype": "m.image",
-                        "url": image_url,
-                        "body": f"{title if title else notify_type}",
-                    }
+            if image_url and self.version == MatrixVersion.V2:
+                # Define our payload
+                image_payload = {
+                    "msgtype": "m.image",
+                    "url": image_url,
+                    "body": f"{title if title else notify_type}",
+                }
 
-                    # Post our content
+                # Post our content
+                postokay, response = self._fetch(
+                    path, payload=image_payload)
+                if not postokay:
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+            if attachments:
+                for attachment in attachments:
+                    attachment["room_id"] = room_id
+                    attachment["type"] = "m.room.message"
+
                     postokay, response = self._fetch(
-                        path, payload=image_payload
-                    )
+                        path, payload=attachment, method=method)
+
+                    # Increment the transaction ID to avoid future messages
+                    # being recognized as retransmissions and ignored
+                    if self.version == MatrixVersion.V3 \
+                       and self.access_token != self.password:
+                        self.transaction_id += 1
+                        self.store.set(
+                            "transaction_id", self.transaction_id,
+                            expires=self.default_cache_expiry_sec)
+                        path = "/rooms/{}/send/m.room.message/{}".format(
+                            NotifyMatrix.quote(room_id),
+                            self.transaction_id,
+                        )
+
                     if not postokay:
                         # Mark our failure
                         has_error = True
                         continue
-
-                if attachments:
-                    for attachment in attachments:
-                        attachment["room_id"] = room_id
-                        attachment["type"] = "m.room.message"
-
-                        postokay, response = self._fetch(
-                            path, payload=attachment
-                        )
-                        if not postokay:
-                            # Mark our failure
-                            has_error = True
-                            continue
 
             # Define our payload
             payload = {
@@ -790,7 +804,6 @@ class NotifyMatrix(NotifyBase):
                 })
 
             # Post our content
-            method = "PUT" if self.version == MatrixVersion.V3 else "POST"
             postokay, response = self._fetch(
                 path, payload=payload, method=method
             )
@@ -824,18 +837,14 @@ class NotifyMatrix(NotifyBase):
         """Posts all of the provided attachments."""
 
         payloads = []
-        if self.version != MatrixVersion.V2:
-            self.logger.warning(
-                "Add ?v=2 to Apprise URL to support Attachments"
-            )
-            return next((False for a in attach if not a), [])
 
         for attachment in attach:
             if not attachment:
                 # invalid attachment (bad file)
                 return False
 
-            if not re.match(r"^image/", attachment.mimetype, re.I):
+            if not IS_IMAGE.match(attachment.mimetype) \
+               and self.version == MatrixVersion.V2:
                 # unsuppored at this time
                 continue
 
@@ -849,38 +858,32 @@ class NotifyMatrix(NotifyBase):
             #     "content_uri": "mxc://example.com/a-unique-key"
             # }
 
-            # FUTURE if self.version == MatrixVersion.V3:
-            # FUTURE     # Prepare our payload
-            # FUTURE     payloads.append({
-            # FUTURE         "body": attachment.name,
-            # FUTURE         "info": {
-            # FUTURE             "mimetype": attachment.mimetype,
-            # FUTURE             "size": len(attachment),
-            # FUTURE         },
-            # FUTURE         "msgtype": "m.image",
-            # FUTURE         "url": response.get('content_uri'),
-            # FUTURE     })
+            if self.version == MatrixVersion.V3:
+                # Prepare our payload
+                is_image = IS_IMAGE.match(attachment.mimetype)
+                payloads.append({
+                    "body": attachment.name,
+                    "info": {
+                        "mimetype": attachment.mimetype,
+                        "size": len(attachment),
+                    },
+                    "msgtype": "m.image" if is_image else "m.file",
+                    "url": response.get("content_uri"),
+                })
+                if not is_image:
+                    # Setup `m.file'
+                    payloads[-1]["filename"] = attachment.name
 
-            # FUTURE else:
-            # FUTURE     # Prepare our payload
-            # FUTURE     payloads.append({
-            # FUTURE         "info": {
-            # FUTURE             "mimetype": attachment.mimetype,
-            # FUTURE         },
-            # FUTURE         "msgtype": "m.image",
-            # FUTURE         "body": "tta.webp",
-            # FUTURE         "url": response.get('content_uri'),
-            # FUTURE     })
-
-            # Prepare our payload
-            payloads.append({
-                "info": {
-                    "mimetype": attachment.mimetype,
-                },
-                "msgtype": "m.image",
-                "body": "tta.webp",
-                "url": response.get("content_uri"),
-            })
+            else:
+                # Prepare our payload
+                payloads.append({
+                    "info": {
+                        "mimetype": attachment.mimetype,
+                    },
+                    "msgtype": "m.image",
+                    "body": "tta.webp",
+                    "url": response.get("content_uri"),
+                })
 
         return payloads
 
@@ -1335,12 +1338,11 @@ class NotifyMatrix(NotifyBase):
         status_code = requests.codes.internal_server_error
 
         if path == "/upload":
-            # FUTURE if self.version == MatrixVersion.V3:
-            # FUTURE     url += MATRIX_V3_MEDIA_PATH + path
+            if self.version == MatrixVersion.V3:
+                url += MATRIX_V3_MEDIA_PATH + path
 
-            # FUTURE else:
-            # FUTURE     url += MATRIX_V2_MEDIA_PATH + path
-            url += MATRIX_V2_MEDIA_PATH + path
+            else:
+                url += MATRIX_V2_MEDIA_PATH + path
 
             params.update({"filename": attachment.name})
             with open(attachment.path, "rb") as fp:
