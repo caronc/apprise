@@ -137,10 +137,11 @@ def test_plugin_simplepush_urls():
 
 @pytest.mark.skipif(
     "cryptography" in sys.modules,
-    reason="Requires that cryptography NOT be installed",
-)
-def test_plugin_fcm_cryptography_import_error():
-    """NotifySimplePush() Cryptography loading failure."""
+    reason="Requires that cryptography NOT be installed")
+def test_plugin_simpepush_cryptography_import_error():
+    """
+    NotifySimplePush() Cryptography loading failure
+    """
 
     # Attempt to instantiate our object
     obj = Apprise.instantiate("spush://{}".format("Y" * 14))
@@ -150,10 +151,12 @@ def test_plugin_fcm_cryptography_import_error():
 
 
 @pytest.mark.skipif(
-    "cryptography" not in sys.modules, reason="Requires cryptography"
-)
+    "cryptography" not in sys.modules, reason="Requires cryptography")
 def test_plugin_simplepush_edge_cases():
-    """NotifySimplePush() Edge Cases."""
+    """
+    NotifySimplePush() Edge Cases
+
+    """
 
     # No token
     with pytest.raises(TypeError):

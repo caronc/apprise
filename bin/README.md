@@ -139,7 +139,8 @@ docker-compose run --rm test.py312 bash
 ```
 Once you've entered one of these environments, you can leverage the following command to work with:
 
-1. `bin/test.sh`: runs the full test suite (same as `tox -e qa`)
+1. `bin/test.sh`: runs the full test suite (same as `tox -e qa`) but without coveage
+1. `bin/checkdone.sh`: runs the full test suite (same as `tox -e qa`)
 1. `bin/apprise`: launches the Apprise CLI using the local build (same as `tox -e apprise`)
 1. `ruff check . --fix`: auto-formats the codebase (same as `tox -e format`)
 1. `ruff check .`: performs lint-only validation (same as `tox -e lint`)

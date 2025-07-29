@@ -122,6 +122,15 @@ class NotifyWebexTeams(NotifyBase):
         },
     )
 
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "token": {
+                "alias_of": "token",
+            },
+        },
+    )
+
     def __init__(self, token, **kwargs):
         """Initialize Webex Teams Object."""
         super().__init__(**kwargs)
