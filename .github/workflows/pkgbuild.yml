@@ -19,9 +19,6 @@ jobs:
     container:
       image: ghcr.io/caronc/apprise-rpmbuild:el9
       options: --user root
-      credentials:
-        username: caronc
-        password: ${{ secrets.CR_PAT }}
 
     steps:
       - name: Checkout source
@@ -54,9 +51,6 @@ jobs:
     container:
       image: ghcr.io/caronc/apprise-rpmbuild:el9
       options: --user root
-      credentials:
-        username: caronc
-        password: ${{ secrets.CR_PAT }}
 
     steps:
       - name: Download built RPMs
