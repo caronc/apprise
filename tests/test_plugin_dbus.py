@@ -43,48 +43,47 @@ logging.disable(logging.CRITICAL)
 
 
 @pytest.fixture
-def enabled_dbus_environment(mocker):
-    """Fully mocked D-Bus and GI environment with plugin reloaded and
-    enabled."""
+def enabled_dbus_environment(monkeypatch):
+    """
+    Fully mocked DBus and GI environment that works in local and CI environments.
+    """
 
-    # Step 1: Mock DBus Interface
-    interface_mock = mocker.patch("dbus.Interface", spec=True, Notify=Mock())
-    mocker.patch(
-        "dbus.SessionBus",
-        spec=True,
-        **{"get_object.return_value": interface_mock},
-    )
+    # --- Handle dbus (real or fake) ---
+    try:
+        import dbus
+    except ImportError:
+        dbus = types.ModuleType("dbus")
+        dbus.DBusException = type("DBusException", (Exception,), {})
+        dbus.Interface = Mock()
+        dbus.SessionBus = Mock()
 
-    # Step 2: Inject valid dbus.mainloop.glib and .qt into sys.modules
-    fake_loop = Mock(name="FakeMainLoop")
-    sys.modules["dbus.mainloop.glib"] = types.SimpleNamespace(
-        DBusGMainLoop=lambda: fake_loop
-    )
-    sys.modules["dbus.mainloop.qt"] = types.SimpleNamespace(
-        DBusQtMainLoop=lambda set_as_default=False: fake_loop
-    )
+        sys.modules["dbus"] = dbus
 
-    # Step 3: Mock GI and GdkPixbuf (also covers image handling)
+    # Inject mainloop support if not already present
+    if "dbus.mainloop.glib" not in sys.modules:
+        glib_loop = types.ModuleType("dbus.mainloop.glib")
+        glib_loop.DBusGMainLoop = lambda: Mock(name="FakeLoop")
+        sys.modules["dbus.mainloop.glib"] = glib_loop
+
+    if "dbus.mainloop" not in sys.modules:
+        sys.modules["dbus.mainloop"] = types.ModuleType("dbus.mainloop")
+
+    # Patch specific attributes always, even if real module is present
+    monkeypatch.setattr("dbus.Interface", Mock())
+    monkeypatch.setattr("dbus.SessionBus", Mock())
+    monkeypatch.setattr("dbus.DBusException", type("DBusException", (Exception,), {}))
+
+    # --- Mock GI / GdkPixbuf ---
     gi = types.ModuleType("gi")
-    gi.repository = types.ModuleType("gi.repository")
-
-    mock_pixbuf = Mock()
-    mock_image = Mock()
-    mock_pixbuf.new_from_file.return_value = mock_image
-    mock_image.get_width.return_value = 100
-    mock_image.get_height.return_value = 100
-    mock_image.get_rowstride.return_value = 1
-    mock_image.get_has_alpha.return_value = 0
-    mock_image.get_bits_per_sample.return_value = 8
-    mock_image.get_n_channels.return_value = 1
-    mock_image.get_pixels.return_value = b""
-
-    gi.repository.GdkPixbuf = types.SimpleNamespace(Pixbuf=mock_pixbuf)
     gi.require_version = Mock()
+    gi.repository = types.SimpleNamespace(
+        GdkPixbuf=types.SimpleNamespace(Pixbuf=Mock())
+    )
+
     sys.modules["gi"] = gi
     sys.modules["gi.repository"] = gi.repository
 
-    # Step 4: Reload plugin after all mocks are in place
+    # --- Reload plugin with controlled env ---
     reload_plugin("dbus")
 
 

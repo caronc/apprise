@@ -41,19 +41,20 @@ logging.disable(logging.CRITICAL)
 
 
 @pytest.fixture
-def enabled_glib_environment(mocker):
-    """Mocks a working GI/GLib/Gio environment"""
-    # Patch GLib.Error and Gio
+def enabled_glib_environment(monkeypatch):
+    """
+    Fully mocked GI/GLib/Gio/GdkPixbuf environment for local and CI.
+    """
+    # Step 1: Fake gi and repository
     gi = types.ModuleType("gi")
-    gi.repository = types.SimpleNamespace()
+    gi.require_version = Mock()
 
-    fake_variant = mocker.MagicMock(name="Variant")
-    fake_error_type = type("GLibError", (Exception,), {})
-    fake_pixbuf = mocker.MagicMock(name="Pixbuf")
-    fake_image = mocker.MagicMock(name="PixbufImage")
+    fake_variant = Mock(name="Variant")
+    fake_error = type("GLibError", (Exception,), {})
+    fake_pixbuf = Mock()
+    fake_image = Mock()
+
     fake_pixbuf.new_from_file.return_value = fake_image
-
-    # Provide fake return values
     fake_image.get_width.return_value = 100
     fake_image.get_height.return_value = 100
     fake_image.get_rowstride.return_value = 1
@@ -62,16 +63,17 @@ def enabled_glib_environment(mocker):
     fake_image.get_n_channels.return_value = 1
     fake_image.get_pixels.return_value = b""
 
-    gi.require_version = Mock()
-    gi.repository.GLib = types.SimpleNamespace(
-        Error=fake_error_type, Variant=fake_variant)
-    gi.repository.Gio = mocker.MagicMock(name="Gio")
-    gi.repository.GdkPixbuf = types.SimpleNamespace(
-        Pixbuf=fake_pixbuf)
+    gi.repository = types.SimpleNamespace(
+        Gio=Mock(),
+        GLib=types.SimpleNamespace(Variant=fake_variant, Error=fake_error),
+        GdkPixbuf=types.SimpleNamespace(Pixbuf=fake_pixbuf),
+    )
 
+    # Step 2: Inject into sys.modules
     sys.modules["gi"] = gi
     sys.modules["gi.repository"] = gi.repository
 
+    # Step 3: Reload plugin with all mocks in place
     reload_plugin("glib")
 
 
