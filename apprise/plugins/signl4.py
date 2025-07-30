@@ -102,9 +102,15 @@ class NotifySIGNL4(NotifyBase):
         },
     })
 
-    def __init__(self, secret, service=None, location=None,
-                 alerting_scenario=None, filtering=None,
-                 external_id=None, status=None, **kwargs):
+    def __init__(self,
+                 secret,
+                 service=None,
+                 location=None,
+                 alerting_scenario=None,
+                 filtering=None,
+                 external_id=None,
+                 status=None,
+                 **kwargs):
         """
         Initialize SIGNL4 Object
         """
@@ -242,9 +248,7 @@ class NotifySIGNL4(NotifyBase):
         """
 
         # Define any URL parameters
-        params = {
-            "region": "none",
-        }
+        params = {}
 
         if self.service is not None:
             params["service"] = self.service
@@ -267,7 +271,7 @@ class NotifySIGNL4(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        url = "{schema}://{secret}/"
+        url = "{schema}://{secret}"
 
         return url.format(
             schema=self.secure_protocol,
