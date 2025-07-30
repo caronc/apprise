@@ -36,16 +36,27 @@ from helpers import reload_plugin
 import pytest
 
 import apprise
-from apprise.plugins.dbus import DBusUrgency, NotifyDBus
+from apprise.plugins.dbus import (
+    NOTIFY_DBUS_SUPPORT_ENABLED,
+    DBusUrgency,
+    NotifyDBus,
+)
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
 
 
+if not NOTIFY_DBUS_SUPPORT_ENABLED:
+    pytest.skip(
+        "NotifyDBus is not supported in this environment",
+        allow_module_level=True)
+
+
 @pytest.fixture
 def enabled_dbus_environment(monkeypatch):
     """
-    Fully mocked DBus and GI environment that works in local and CI environments.
+    Fully mocked DBus and GI environment that works in local and CI
+    environments.
     """
 
     # --- Handle dbus (real or fake) ---
@@ -71,7 +82,8 @@ def enabled_dbus_environment(monkeypatch):
     # Patch specific attributes always, even if real module is present
     monkeypatch.setattr("dbus.Interface", Mock())
     monkeypatch.setattr("dbus.SessionBus", Mock())
-    monkeypatch.setattr("dbus.DBusException", type("DBusException", (Exception,), {}))
+    monkeypatch.setattr(
+        "dbus.DBusException", type("DBusException", (Exception,), {}))
 
     # --- Mock GI / GdkPixbuf ---
     gi = types.ModuleType("gi")
@@ -87,9 +99,8 @@ def enabled_dbus_environment(monkeypatch):
     reload_plugin("dbus")
 
 
-def test_plugin_dbus_available():
+def test_plugin_dbus_available(enabled_dbus_environment):
     """Tests DBUS_SUPPORT_ENABLED flag"""
-    reload_plugin("dbus")
     from apprise.plugins import dbus as plugin_dbus
     assert plugin_dbus.NOTIFY_DBUS_SUPPORT_ENABLED is True
 
@@ -99,7 +110,7 @@ def test_plugin_dbus_available():
     "priority=high", "priority=2", "priority=invalid",
 ])
 def test_plugin_dbus_priority_urgency_variants(
-        param, enabled_dbus_environment):
+        enabled_dbus_environment, param):
     """test dbus:// urgency variants"""
     url = f"dbus://_/?{param}"
     obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
@@ -107,9 +118,8 @@ def test_plugin_dbus_priority_urgency_variants(
     assert obj.notify(title="x", body="x", notify_type=apprise.NotifyType.INFO)
 
 
-def test_plugin_dbus_parse_url_arguments():
+def test_plugin_dbus_parse_url_arguments(enabled_dbus_environment):
     """Test dbus:// argument parsing"""
-    reload_plugin("dbus")
     from apprise.plugins.dbus import NotifyDBus
     result = NotifyDBus.parse_url(
         "dbus://_/?urgency=high&x=5&y=5&image=no")
@@ -119,7 +129,7 @@ def test_plugin_dbus_parse_url_arguments():
     assert result["include_image"] is False
 
 
-def test_plugin_dbus_with_gobject_cleanup(mocker):
+def test_plugin_dbus_with_gobject_cleanup(mocker, enabled_dbus_environment):
     """Simulate `gobject` being present in sys.modules."""
     original_gobject = sys.modules.get("gobject")
 
@@ -361,7 +371,8 @@ def test_plugin_dbus_general_failure(enabled_dbus_environment):
         )
 
 
-def test_plugin_dbus_notify_generic_exception(mocker):
+def test_plugin_dbus_notify_generic_exception(
+        mocker, enabled_dbus_environment):
     """Trigger a generic exception in .notify() to hit fallback handler."""
 
     # Step 1: Provide minimal valid dbus/glib environment
@@ -523,7 +534,7 @@ def test_plugin_dbus_disabled_plugin(enabled_dbus_environment):
     ("high", DBusUrgency.HIGH),
     ("invalid", DBusUrgency.NORMAL),
 ])
-def test_plugin_dbus_set_urgency(urgency, expected):
+def test_plugin_dbus_set_urgency(enabled_dbus_environment, urgency, expected):
     """Test the setting of an urgency."""
     assert NotifyDBus(urgency=urgency).urgency == expected
 
@@ -604,7 +615,7 @@ def test_plugin_dbus_module_croaks(monkeypatch):
     assert NotifyDBus.enabled is False
 
 
-def test_plugin_dbus_session_croaks(mocker):
+def test_plugin_dbus_session_croaks(mocker, enabled_dbus_environment):
     """Verify notification fails if DBus session initialization croaks."""
 
     from dbus import DBusException as RealDBusException
