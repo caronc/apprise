@@ -220,10 +220,13 @@ class NotifyGoogleChat(NotifyBase):
             # Prepare our URL Parameters
             "token": self.webhook_token,
             "key": self.webhook_key,
-            "messageReplyOption" : "REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
         }
 
         if self.thread_key:
+            params.update({
+                "messageReplyOption": "REPLY_MESSAGE_FALLBACK_TO_NEW_THREAD",
+            })
+
             payload.update({
                 "thread": {
                     "thread_key": self.thread_key,
