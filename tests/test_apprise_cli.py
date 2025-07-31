@@ -2008,7 +2008,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     @notify(on="clihook")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         # A simple test - print to screen
-        print("{}: {} - {}".format(notify_type, title, body))
+        print("{}: {} - {}".format(notify_type.value, title, body))
 
         # No return (so a return of None) get's translated to True
 
@@ -2016,7 +2016,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     @notify(on="clihookA")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         # A simple test - print to screen
-        print("!! {}: {} - {}".format(notify_type, title, body))
+        print("!! {}: {} - {}".format(notify_type.value, title, body))
 
         # No return (so a return of None) get's translated to True
     """))
@@ -2284,6 +2284,37 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     )
     # Note that the failure of the decorator carries all the way back
     # to the CLI
+    assert result.exit_code == 0
+
+
+    result = runner.invoke(
+        cli.main,
+        [
+            "--plugin-path",
+            join(str(tmpdir), "complex"),
+            "--notification-type", "invalid",
+            "-b",
+            "test body",
+            # our clihook that returns true
+            "clihook1://",
+        ],
+    )
+    # Bad notification type specified
+    assert result.exit_code == 2
+
+    result = runner.invoke(
+        cli.main,
+        [
+            "--plugin-path",
+            join(str(tmpdir), "complex"),
+            "-b",
+            "-i", "warning"
+            "test body",
+            # our clihook that returns true
+            "clihook1://",
+        ],
+    )
+    # Bad notification type specified
     assert result.exit_code == 0
 
     result = runner.invoke(

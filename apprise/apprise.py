@@ -395,7 +395,7 @@ class Apprise:
         self,
         body: Union[str, bytes],
         title: Union[str, bytes] = "",
-        notify_type: common.NotifyType = common.NotifyType.INFO,
+        notify_type: Union[str, common.NotifyType] = common.NotifyType.INFO,
         body_format: Optional[str] = None,
         tag: Any = common.MATCH_ALL_TAG,
         match_always: bool = True,
@@ -525,6 +525,18 @@ class Apprise:
             msg = "No message content specified to deliver"
             logger.error(msg)
             raise TypeError(msg)
+
+        try:
+            notify_type = (
+                notify_type if isinstance(notify_type, common.NotifyType)
+                else common.NotifyType(notify_type.lower())
+            )
+
+        except (AttributeError, ValueError, TypeError):
+            err = (
+                f"An invalid notification type ({notify_type}) was "
+                "specified.")
+            raise TypeError(err) from None
 
         try:
             if title and isinstance(title, bytes):

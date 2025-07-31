@@ -286,10 +286,36 @@ def apprise_test(do_notify):
     assert a.add("good://localhost") is True
     assert len(a) == 1
 
-    # Bad Notification Type is still allowed as it is presumed the user
-    # know's what their doing
+    # Bad Notification Types are not accepted
     assert (
         do_notify(a, title="my title", body="my body", notify_type="bad")
+        is False
+    )
+
+    # Notifications of string type are accepted
+    assert (
+        do_notify(a, title="my title", body="my body", notify_type="warning")
+        is True
+    )
+
+    # Notifications of string type are accepted
+    assert (
+        do_notify(a, title="my title", body="my body", notify_type="warning")
+        is True
+    )
+
+    # Notifications of string type are accepted
+    assert (
+        do_notify(a, title="my title", body="my body", notify_type="warning")
+        is True
+    )
+
+    # Notifications where notify_type is of the NotifyType object is the
+    # preferred choice
+    assert (
+        do_notify(
+            a, title="my title", body="my body",
+            notify_type=NotifyType.WARNING)
         is True
     )
 
