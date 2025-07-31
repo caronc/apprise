@@ -30,10 +30,8 @@
 #   - https://docs.signl4.com/integrations/webhook/webhook.html
 #
 
-from json import dumps
-
 import requests
-
+from json import dumps
 from .base import NotifyBase
 from ..url import PrivacyMode
 from ..common import NotifyType
