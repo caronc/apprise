@@ -54,12 +54,9 @@ from json import dumps
 
 # Disable logging for a cleaner testing output
 import logging
-from unittest import mock
 
 from helpers import AppriseURLTester
-import requests
 
-import apprise
 from apprise.plugins.signl4 import (
     NotifySIGNL4,
     NotifyType,
