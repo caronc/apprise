@@ -77,6 +77,41 @@ def enabled_glib_environment(monkeypatch):
     reload_plugin("glib")
 
 
+def test_plugin_glib_gdkpixbuf_attribute_error(monkeypatch):
+    """Simulate AttributeError from importing GdkPixbuf"""
+
+    # Create gi module
+    gi = types.ModuleType("gi")
+
+    # Create gi.repository mock, but DO NOT include GdkPixbuf
+    gi.repository = types.SimpleNamespace(
+        Gio=Mock(),
+        GLib=types.SimpleNamespace(
+            Variant=Mock(),
+            Error=type("GLibError", (Exception,), {})
+        ),
+        # GdkPixbuf missing entirely triggers AttributeError
+    )
+
+    def fake_require_version(name, version):
+        if name == "GdkPixbuf":
+            # Simulate success in require_version
+            return
+        return
+
+    gi.require_version = Mock(side_effect=fake_require_version)
+
+    # Inject into sys.modules
+    sys.modules["gi"] = gi
+    sys.modules["gi.repository"] = gi.repository
+
+    # Trigger the plugin reload with our patched environment
+    reload_plugin("glib")
+
+    from apprise.plugins import glib as plugin_glib
+    assert plugin_glib.NOTIFY_GLIB_IMAGE_SUPPORT is False
+
+
 def test_plugin_glib_basic_notify(enabled_glib_environment):
     """Basic notification path"""
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
