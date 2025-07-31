@@ -33,44 +33,21 @@ from ..utils.parse import parse_bool
 from .base import NotifyBase
 
 # Default our global support flag
-NOTIFY_DBUS_SUPPORT_ENABLED = False
+NOTIFY_GLIB_SUPPORT_ENABLED = False
 
 # Image support is dependant on the GdkPixbuf library being available
-NOTIFY_DBUS_IMAGE_SUPPORT = False
-
-# Initialize our mainloops
-LOOP_GLIB = None
-LOOP_QT = None
+NOTIFY_GLIB_IMAGE_SUPPORT = False
 
 
 try:
-    # D-Bus Message Bus Daemon 1.12.XX Essentials
-    from dbus import Byte, ByteArray, DBusException, Interface, SessionBus
+    # glib essentials
+    import gi
+    gi.require_version("Gio", "2.0")
+    gi.require_version("GLib", "2.0")
+    from gi.repository import Gio, GLib
 
-    #
-    # now we try to determine which mainloop(s) we can access
-    #
-
-    # glib/dbus
-    try:
-        from dbus.mainloop.glib import DBusGMainLoop
-        LOOP_GLIB = DBusGMainLoop()
-
-    except ImportError:  # pragma: no cover
-        # No problem
-        pass
-
-    # qt
-    try:
-        from dbus.mainloop.qt import DBusQtMainLoop
-        LOOP_QT = DBusQtMainLoop(set_as_default=True)
-
-    except ImportError:
-        # No problem
-        pass
-
-    # We're good as long as at least one
-    NOTIFY_DBUS_SUPPORT_ENABLED = LOOP_GLIB is not None or LOOP_QT is not None
+    # We're good
+    NOTIFY_GLIB_SUPPORT_ENABLED = True
 
     # ImportError: When using gi.repository you must not import static modules
     # like "gobject". Please change all occurrences of "import gobject" to
@@ -81,10 +58,9 @@ try:
 
     try:
         # The following is required for Image/Icon loading only
-        import gi
         gi.require_version("GdkPixbuf", "2.0")
         from gi.repository import GdkPixbuf
-        NOTIFY_DBUS_IMAGE_SUPPORT = True
+        NOTIFY_GLIB_IMAGE_SUPPORT = True
 
     except (ImportError, ValueError, AttributeError):
         # No problem; this will get caught in outer try/catch
@@ -99,75 +75,65 @@ except ImportError:
     # library available to us (or maybe one we don't support)?
     pass
 
-# Define our supported protocols and the loop to assign them.
-# The key to value pairs are the actual supported schema's matched
-# up with the Main Loop they should reference when accessed.
-MAINLOOP_MAP = {
-    "qt": LOOP_QT,
-    "kde": LOOP_QT,
-    "dbus": LOOP_QT if LOOP_QT else LOOP_GLIB,
-}
-
 
 # Urgencies
-class DBusUrgency:
+class GLibUrgency:
     LOW = 0
     NORMAL = 1
     HIGH = 2
 
 
-DBUS_URGENCIES = {
+GLIB_URGENCIES = {
     # Note: This also acts as a reverse lookup mapping
-    DBusUrgency.LOW: "low",
-    DBusUrgency.NORMAL: "normal",
-    DBusUrgency.HIGH: "high",
+    GLibUrgency.LOW: "low",
+    GLibUrgency.NORMAL: "normal",
+    GLibUrgency.HIGH: "high",
 }
 
-DBUS_URGENCY_MAP = {
+GLIB_URGENCY_MAP = {
     # Maps against string 'low'
-    "l": DBusUrgency.LOW,
+    "l": GLibUrgency.LOW,
     # Maps against string 'moderate'
-    "m": DBusUrgency.LOW,
+    "m": GLibUrgency.LOW,
     # Maps against string 'normal'
-    "n": DBusUrgency.NORMAL,
+    "n": GLibUrgency.NORMAL,
     # Maps against string 'high'
-    "h": DBusUrgency.HIGH,
+    "h": GLibUrgency.HIGH,
     # Maps against string 'emergency'
-    "e": DBusUrgency.HIGH,
+    "e": GLibUrgency.HIGH,
 
     # Entries to additionally support (so more like DBus's API)
-    "0": DBusUrgency.LOW,
-    "1": DBusUrgency.NORMAL,
-    "2": DBusUrgency.HIGH,
+    "0": GLibUrgency.LOW,
+    "1": GLibUrgency.NORMAL,
+    "2": GLibUrgency.HIGH,
 }
 
 
-class NotifyDBus(NotifyBase):
-    """A wrapper for local DBus/Qt Notifications."""
+class NotifyGLib(NotifyBase):
+    """
+    A wrapper for local GLib/Gio Notifications
+    """
 
     # Set our global enabled flag
-    enabled = NOTIFY_DBUS_SUPPORT_ENABLED
+    enabled = NOTIFY_GLIB_SUPPORT_ENABLED
 
     requirements = {
         # Define our required packaging in order to work
-        "details": _("libdbus-1.so.x must be installed.")
+        "details": _("libdbus-1.so.x or libdbus-2.so.x must be installed.")
     }
 
     # The default descriptive name associated with the Notification
     service_name = _("DBus Notification")
 
     # The services URL
-    service_url = "http://www.freedesktop.org/Software/dbus/"
+    service_url = \
+        "https://lazka.github.io/pgi-docs/Gio-2.0/classes/DBusProxy.html"
 
     # The default protocols
-    # Python 3 keys() does not return a list object, it is its own dict_keys()
-    # object if we were to reference, we wouldn't be backwards compatible with
-    # Python v2.  So converting the result set back into a list makes us
-    # compatible
-    protocol = list(MAINLOOP_MAP.keys())
+    protocol = ("glib", "gio")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_dbus"
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_glib"
 
     # No throttling required for DBus queries
     request_rate_per_sec = 0
@@ -183,89 +149,67 @@ class NotifyDBus(NotifyBase):
     body_max_line_count = 10
 
     # The following are required to hook into the notifications:
-    dbus_interface = "org.freedesktop.Notifications"
-    dbus_setting_location = "/org/freedesktop/Notifications"
-
-    # No URL Identifier will be defined for this service as there simply isn't
-    # enough details to uniquely identify one dbus:// from another.
-    url_identifier = False
+    glib_interface = "org.freedesktop.Notifications"
+    glib_setting_location = "/org/freedesktop/Notifications"
 
     # Define object templates
-    templates = ("{schema}://",)
-
-    # Define our template arguments
-    template_args = dict(
-        NotifyBase.template_args,
-        **{
-            "urgency": {
-                "name": _("Urgency"),
-                "type": "choice:int",
-                "values": DBUS_URGENCIES,
-                "default": DBusUrgency.NORMAL,
-            },
-            "priority": {
-                # Apprise uses 'priority' everywhere; it's just a nice
-                # consistent feel to be able to use it here as well. Just map
-                # the value back to 'priority'
-                "alias_of": "urgency",
-            },
-            "x": {
-                "name": _("X-Axis"),
-                "type": "int",
-                "min": 0,
-                "map_to": "x_axis",
-            },
-            "y": {
-                "name": _("Y-Axis"),
-                "type": "int",
-                "min": 0,
-                "map_to": "y_axis",
-            },
-            "image": {
-                "name": _("Include Image"),
-                "type": "bool",
-                "default": True,
-                "map_to": "include_image",
-            },
-        },
+    templates = (
+        "{schema}://",
     )
 
-    def __init__(
-        self,
-        urgency=None,
-        x_axis=None,
-        y_axis=None,
-        include_image=True,
-        **kwargs,
-    ):
-        """Initialize DBus Object."""
+    # Define our template arguments
+    template_args = dict(NotifyBase.template_args, **{
+        "urgency": {
+            "name": _("Urgency"),
+            "type": "choice:int",
+            "values": GLIB_URGENCIES,
+            "default": GLibUrgency.NORMAL,
+        },
+        "priority": {
+            # Apprise uses 'priority' everywhere; it's just a nice consistent
+            # feel to be able to use it here as well. Just map the
+            # value back to 'priority'
+            "alias_of": "urgency",
+        },
+        "x": {
+            "name": _("X-Axis"),
+            "type": "int",
+            "min": 0,
+            "map_to": "x_axis",
+        },
+        "y": {
+            "name": _("Y-Axis"),
+            "type": "int",
+            "min": 0,
+            "map_to": "y_axis",
+        },
+        "image": {
+            "name": _("Include Image"),
+            "type": "bool",
+            "default": True,
+            "map_to": "include_image",
+        },
+    })
+
+    def __init__(self, urgency=None, x_axis=None, y_axis=None,
+                 include_image=True, **kwargs):
+        """
+        Initialize DBus Object
+        """
 
         super().__init__(**kwargs)
 
         # Track our notifications
         self.registry = {}
 
-        # Store our schema; default to dbus
-        self.schema = kwargs.get("schema", "dbus")
-
-        if self.schema not in MAINLOOP_MAP:
-            msg = f"The schema specified ({self.schema}) is not supported."
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # The urgency of the message
         self.urgency = int(
-            NotifyDBus.template_args["urgency"]["default"]
-            if urgency is None
-            else next(
-                (
-                    v
-                    for k, v in DBUS_URGENCY_MAP.items()
-                    if str(urgency).lower().startswith(k)
-                ),
-                NotifyDBus.template_args["urgency"]["default"],
-            )
-        )
+            NotifyGLib.template_args["urgency"]["default"]
+            if urgency is None else
+            next((
+                v for k, v in GLIB_URGENCY_MAP.items()
+                if str(urgency).lower().startswith(k)),
+                NotifyGLib.template_args["urgency"]["default"]))
 
         # Our x/y axis settings
         if x_axis or y_axis:
@@ -275,10 +219,8 @@ class NotifyDBus(NotifyBase):
 
             except (TypeError, ValueError):
                 # Invalid x/y values specified
-                msg = (
-                    f"The x,y coordinates specified ({x_axis},{y_axis}) are"
-                    " invalid."
-                )
+                msg = "The x,y coordinates specified ({},{}) are invalid."\
+                    .format(x_axis, y_axis)
                 self.logger.warning(msg)
                 raise TypeError(msg) from None
         else:
@@ -289,15 +231,25 @@ class NotifyDBus(NotifyBase):
         self.include_image = include_image
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
-        """Perform DBus Notification."""
-        # Acquire our session
+        """
+        Perform GLib/Gio Notification
+        """
+        # Acquire our gio interface
         try:
-            session = SessionBus(mainloop=MAINLOOP_MAP[self.schema])
+            gio_iface = Gio.DBusProxy.new_for_bus_sync(
+                Gio.BusType.SESSION,
+                Gio.DBusProxyFlags.NONE,
+                None,
+                self.glib_interface,
+                self.glib_setting_location,
+                self.glib_interface,
+                None,
+            )
 
-        except DBusException as e:
+        except GLib.Error as e:
             # Handle exception
-            self.logger.warning("Failed to send DBus notification.")
-            self.logger.debug(f"DBus Exception: {e}")
+            self.logger.warning("Failed to send GLib/Gio notification.")
+            self.logger.debug(f"GLib/Gio Exception: {e}")
             return False
 
         # If there is no title, but there is a body, swap the two to get rid
@@ -306,60 +258,50 @@ class NotifyDBus(NotifyBase):
             title = body
             body = ""
 
-        # acquire our dbus object
-        dbus_obj = session.get_object(
-            self.dbus_interface,
-            self.dbus_setting_location,
-        )
-
-        # Acquire our dbus interface
-        dbus_iface = Interface(
-            dbus_obj,
-            dbus_interface=self.dbus_interface,
-        )
-
         # image path
-        icon_path = (
-            None
-            if not self.include_image
+        icon_path = None if not self.include_image \
             else self.image_path(notify_type, extension=".ico")
-        )
 
         # Our meta payload
-        meta_payload = {"urgency": Byte(self.urgency)}
+        meta_payload = {
+            "urgency": GLib.Variant("y", self.urgency),
+        }
 
         if not (self.x_axis is None and self.y_axis is None):
             # Set x/y access if these were set
-            meta_payload["x"] = self.x_axis
-            meta_payload["y"] = self.y_axis
+            meta_payload["x"] = GLib.Variant("i", self.x_axis)
+            meta_payload["y"] = GLib.Variant("i", self.y_axis)
 
-        if NOTIFY_DBUS_IMAGE_SUPPORT and icon_path:
+        if NOTIFY_GLIB_IMAGE_SUPPORT and icon_path:
             try:
                 # Use Pixbuf to create the proper image type
                 image = GdkPixbuf.Pixbuf.new_from_file(icon_path)
 
                 # Associate our image to our notification
-                meta_payload["icon_data"] = (
-                    image.get_width(),
-                    image.get_height(),
-                    image.get_rowstride(),
-                    image.get_has_alpha(),
-                    image.get_bits_per_sample(),
-                    image.get_n_channels(),
-                    ByteArray(image.get_pixels()),
+                meta_payload["icon_data"] = GLib.Variant(
+                    "(iiibiiay)",
+                    (
+                        image.get_width(),
+                        image.get_height(),
+                        image.get_rowstride(),
+                        image.get_has_alpha(),
+                        image.get_bits_per_sample(),
+                        image.get_n_channels(),
+                        image.get_pixels(),
+                    ),
                 )
 
             except Exception as e:
                 self.logger.warning(
-                    "Could not load notification icon (%s).", icon_path
-                )
-                self.logger.debug(f"DBus Exception: {e}")
+                    "Could not load notification icon (%s).", icon_path)
+                self.logger.debug(f"GLib/Gio Exception: {e}")
 
         try:
             # Always call throttle() before any remote execution is made
             self.throttle()
 
-            dbus_iface.Notify(
+            gio_iface.Notify(
+                "(susssasa{sv}i)",
                 # Application Identifier
                 self.app_id,
                 # Message ID (0 = New Message)
@@ -378,26 +320,27 @@ class NotifyDBus(NotifyBase):
                 self.message_timeout_ms,
             )
 
-            self.logger.info("Sent DBus notification.")
+            self.logger.info("Sent GLib/Gio notification.")
 
         except Exception as e:
-            self.logger.warning("Failed to send DBus notification.")
-            self.logger.debug(f"DBus Exception: {e}")
+            self.logger.warning("Failed to send GLib/Gio notification.")
+            self.logger.debug(f"GLib/Gio Exception: {e}")
             return False
 
         return True
 
     def url(self, privacy=False, *args, **kwargs):
-        """Returns the URL built dynamically based on specified arguments."""
+        """
+        Returns the URL built dynamically based on specified arguments.
+        """
 
         # Define any URL parameters
         params = {
             "image": "yes" if self.include_image else "no",
-            "urgency": (
-                DBUS_URGENCIES[self.template_args["urgency"]["default"]]
-                if self.urgency not in DBUS_URGENCIES
-                else DBUS_URGENCIES[self.urgency]
-            ),
+            "urgency":
+                GLIB_URGENCIES[self.template_args["urgency"]["default"]]
+                if self.urgency not in GLIB_URGENCIES
+                else GLIB_URGENCIES[self.urgency],
         }
 
         # Extend our parameters
@@ -411,37 +354,40 @@ class NotifyDBus(NotifyBase):
         if self.y_axis:
             params["y"] = str(self.y_axis)
 
-        return f"{self.schema}://_/?{NotifyDBus.urlencode(params)}"
+        schema = self.protocol[0]
+        return f"{schema}://_/?{NotifyGLib.urlencode(params)}"
 
     @staticmethod
     def parse_url(url):
-        """There are no parameters nessisary for this protocol; simply having
-        gnome:// is all you need.
+        """
+        There are no parameters necessary for this protocol; simply having
+        gnome:// is all you need.  This function just makes sure that
+        is in place.
 
-        This function just makes sure that is in place.
         """
 
         results = NotifyBase.parse_url(url, verify_host=False)
 
         # Include images with our message
-        results["include_image"] = parse_bool(
-            results["qsd"].get("image", True)
-        )
+        results["include_image"] = \
+            parse_bool(results["qsd"].get("image", True))
 
-        # DBus supports urgency, but we we also support the keyword priority
-        # so that it is consistent with some of the other plugins
+        # GLib/Gio supports urgency, but we we also support the keyword
+        # priority so that it is consistent with some of the other plugins
         if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
             # We intentionally store the priority in the urgency section
-            results["urgency"] = NotifyDBus.unquote(results["qsd"]["priority"])
+            results["urgency"] = \
+                NotifyGLib.unquote(results["qsd"]["priority"])
 
         if "urgency" in results["qsd"] and len(results["qsd"]["urgency"]):
-            results["urgency"] = NotifyDBus.unquote(results["qsd"]["urgency"])
+            results["urgency"] = \
+                NotifyGLib.unquote(results["qsd"]["urgency"])
 
         # handle x,y coordinates
         if "x" in results["qsd"] and len(results["qsd"]["x"]):
-            results["x_axis"] = NotifyDBus.unquote(results["qsd"].get("x"))
+            results["x_axis"] = NotifyGLib.unquote(results["qsd"].get("x"))
 
         if "y" in results["qsd"] and len(results["qsd"]["y"]):
-            results["y_axis"] = NotifyDBus.unquote(results["qsd"].get("y"))
+            results["y_axis"] = NotifyGLib.unquote(results["qsd"].get("y"))
 
         return results
