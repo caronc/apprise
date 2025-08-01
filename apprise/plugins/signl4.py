@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 # BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
@@ -31,14 +30,16 @@
 #
 
 from json import dumps
+from typing import Any, Optional
 
 import requests
 
-from .base import NotifyBase
-from ..url import PrivacyMode
 from ..common import NotifyType
-from ..utils.parse import validate_regex
 from ..locale import gettext_lazy as _
+from ..url import PrivacyMode
+from ..utils.parse import parse_bool, validate_regex
+from .base import NotifyBase
+
 
 class NotifySIGNL4(NotifyBase):
     """
@@ -49,7 +50,7 @@ class NotifySIGNL4(NotifyBase):
     service_name = "SIGNL4"
 
     # The services URL
-    service_url = "https://connect.signl4.com/webhook/"
+    service_url = "https://signl4.com/"
 
     # Secure Protocol
     secure_protocol = "signl4"
@@ -59,6 +60,9 @@ class NotifySIGNL4(NotifyBase):
 
     # Our event action type
     event_action = "trigger"
+
+    # Our default notification URL
+    notify_url = "https://connect.signl4.com/webhook/{secret}/"
 
     # Define object templates
     templates = (
@@ -79,40 +83,43 @@ class NotifySIGNL4(NotifyBase):
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
         "service": {
-            "name": _("service"),
+            "name": _("Service"),
             "type": "string",
         },
         "location": {
-            "name": _("location"),
+            "name": _("Location"),
             "type": "string",
         },
         "alerting_scenario": {
-            "name": _("alerting_scenario"),
+            "name": _("Alerting Scenario"),
             "type": "string",
         },
         "filtering": {
-            "name": _("filtering"),
+            "name": _("Filtering"),
             "type": "bool",
+            "default": False,
         },
         "external_id": {
-            "name": _("external_id"),
+            "name": _("External ID"),
             "type": "string",
         },
         "status": {
-            "name": _("status"),
+            "name": _("Status"),
             "type": "string",
         },
     })
 
-    def __init__(self,
-                 secret,
-                 service=None,
-                 location=None,
-                 alerting_scenario=None,
-                 filtering=None,
-                 external_id=None,
-                 status=None,
-                 **kwargs):
+    def __init__(
+        self,
+        secret: str,
+        service: Optional[str] = None,
+        location: Optional[str] = None,
+        alerting_scenario: Optional[str] = None,
+        filtering: Optional[bool] = None,
+        external_id: Optional[str] = None,
+        status: Optional[str] = None,
+        **kwargs: Any
+    ) -> None:
         """
         Initialize SIGNL4 Object
         """
@@ -136,7 +143,11 @@ class NotifySIGNL4(NotifyBase):
         self.alerting_scenario = alerting_scenario
 
         # A filtering option for notifications
-        self.filtering = bool(filtering)
+        self.filtering = (
+            self.template_args["filtering"]["default"]
+            if filtering is None
+            else bool(filtering)
+        )
 
         # A external_id option for notifications
         self.external_id = external_id
@@ -160,7 +171,7 @@ class NotifySIGNL4(NotifyBase):
         payload = {
             "title": title if title else self.app_desc,
             "body": body,
-            "X-S4-SourceSystem": "Apprise",
+            "X-S4-SourceSystem": self.app_id,
         }
 
         if self.service:
@@ -182,11 +193,13 @@ class NotifySIGNL4(NotifyBase):
             payload["X-S4-Status"] = self.status
 
         # Prepare our URL
-        notify_url = self.service_url + self.secret
+        notify_url = self.notify_url.format(secret=self.secret)
 
-        self.logger.debug("SIGNL4 POST URL: {notify_url} \
-                          (cert_verify={self.verify_certificate}")
-        self.logger.debug("SIGNL4 Payload: {payload}")
+        self.logger.debug(
+            "SIGNL4 POST URL: %s (cert_verify=%s)",
+            notify_url, self.verify_certificate)
+        self.logger.debug("SIGNL4 Payload: %r", payload)
+
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -214,7 +227,7 @@ class NotifySIGNL4(NotifyBase):
                         ", " if status_str else "",
                         r.status_code))
 
-                self.logger.debug("Response Details:\r\n{}".format(r.content))
+                self.logger.debug("Response Details:\r\n%r", r.content)
 
                 # Return; we're done
                 return False
@@ -225,8 +238,8 @@ class NotifySIGNL4(NotifyBase):
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending SIGNL4 "
-                "notification to {self.host}.")
-            self.logger.debug("Socket Exception: " + str(e))
+                "notification to %s", self.host)
+            self.logger.debug("Socket Exception: %s", str(e))
 
             # Return; we're done
             return False
@@ -261,8 +274,9 @@ class NotifySIGNL4(NotifyBase):
         if self.alerting_scenario is not None:
             params["alerting_scenario"] = self.alerting_scenario
 
-        if self.filtering is not None:
-            params["filtering"] = self.filtering
+        if self.filtering != self.template_args["filtering"]["default"]:
+            # Only add filtering if it is not the default value
+            params["filtering"] = "yes" if self.filtering else "no"
 
         if self.external_id is not None:
             params["external_id"] = self.external_id
@@ -319,7 +333,10 @@ class NotifySIGNL4(NotifyBase):
 
         if "filtering" in results["qsd"] and len(results["qsd"]["filtering"]):
             results["filtering"] = \
-                NotifySIGNL4.unquote(results["qsd"]["filtering"])
+                parse_bool(
+                    NotifySIGNL4.unquote(
+                        results["qsd"]["filtering"],
+                        NotifySIGNL4.template_args["filtering"]["default"]))
 
         if "external_id" in results["qsd"] and \
             len(results["qsd"]["external_id"]):
