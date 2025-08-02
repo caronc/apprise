@@ -175,7 +175,7 @@ class CustomNotifyPlugin(NotifyBase):
                     result = self.__send(
                         body,
                         title,
-                        notify_type,
+                        notify_type.value,
                         *args,
                         meta=self._default_args,
                         **kwargs,
