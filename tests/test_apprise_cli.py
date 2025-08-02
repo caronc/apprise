@@ -2008,7 +2008,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     @notify(on="clihook")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         # A simple test - print to screen
-        print("{}: {} - {}".format(notify_type.value, title, body))
+        print("{}: {} - {}".format(notify_type, title, body))
 
         # No return (so a return of None) get's translated to True
 
@@ -2016,7 +2016,7 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     @notify(on="clihookA")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         # A simple test - print to screen
-        print("!! {}: {} - {}".format(notify_type.value, title, body))
+        print("!! {}: {} - {}".format(notify_type, title, body))
 
         # No return (so a return of None) get's translated to True
     """))
