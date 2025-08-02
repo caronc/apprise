@@ -2028,6 +2028,9 @@ def test_parse_emails():
     assert len(results) == len(emails)
     for email in emails:
         assert email in results
+        is_email = utils.parse.is_email(email)
+        assert is_email
+        assert is_email.get("name")
 
     # pass the entries in as a list
     results = utils.parse.parse_emails(emails)
@@ -2115,7 +2118,8 @@ def test_parse_urls():
     # Commas and spaces found inside URLs are ignored
     urls = [
         (
-            "mailgun://noreply@sandbox.mailgun.org/apikey/?to=test@example.com,test2@example.com,,"
+            "mailgun://noreply@sandbox.mailgun.org/apikey/"
+            "?to=test@example.com,test2@example.com,,"
             " abcd@example.com"
         ),
         (
@@ -3029,7 +3033,8 @@ def test_cwe312_url():
 
     assert (
         utils.cwe312.cwe312_url(
-            "slack://mybot@xoxb-43598234231-3248932482278-BZK5Wj15B9mPh1RkShJoCZ44"
+            "slack://mybot@xoxb-43598234231-3248932482278"
+            "-BZK5Wj15B9mPh1RkShJoCZ44"
             "/lead2gold@gmail.com"
         )
         == "slack://mybot@x...4/l...m"

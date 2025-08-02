@@ -138,6 +138,7 @@ keywords = [
     "RSyslog",
     "Ryver",
     "SendGrid",
+    "SendPulse",
     "ServerChan",
     "SES",
     "Seven",
