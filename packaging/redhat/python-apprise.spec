@@ -78,7 +78,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
 
 Name:           python-%{pypi_name}
-Version:        1.9.3
+Version:        1.9.4
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -214,6 +214,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Sat Aug  2 2025 Chris Caron <lead2gold@gmail.com> - 1.9.4
+- Updated to v1.9.4
+
 * Sun Mar 30 2025 Chris Caron <lead2gold@gmail.com> - 1.9.3
 - Updated to v1.9.3
 
