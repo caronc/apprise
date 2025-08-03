@@ -176,7 +176,7 @@ def test_plugin_glib_send_raises_generic(mocker, enabled_glib_environment):
     # handling is already tested via `GLib.Error` branches or during actual
     # usage of `NotifyGLib.send()`. This test supplements that by simulating
     # the rare fallback case of a non-GLib-related exception during Notify().
-    import gi
+    gi = pytest.importorskip("gi", reason="pygobject not installed")
     if hasattr(gi, "repository"):
         pytest.skip(
             "pygobject introspection active, test won't behave as expected")
@@ -276,8 +276,7 @@ def test_plugin_glib_require_version_valueerror(monkeypatch):
     """Simulate gi.require_version() raising ValueError without reload
     crash."""
 
-    import gi
-
+    gi = pytest.importorskip("gi", reason="pygobject not installed")
     import apprise.plugins.glib as plugin_glib
 
     # Patch require_version after import
