@@ -39,7 +39,7 @@ jobs:
         with:
           name: built-rpms
           path: |
-            dist/**/*.rpm
+            dist/rpm/*/*.rpm
           if-no-files-found: error
           retention-days: 5
 
