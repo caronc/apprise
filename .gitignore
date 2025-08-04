@@ -17,6 +17,7 @@ __pycache__/
 env/
 .venv*
 build/
+BUILD/
 BUILDROOT/
 SOURCES/
 SRPMS/

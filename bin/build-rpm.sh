@@ -27,56 +27,60 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 #!/usr/bin/env bash
-set -e
+set -euo pipefail
 
 # Set Apprise root directory
 APPRISE_DIR="${APPRISE_DIR:-/apprise}"
+DIST_DIR="${DIST_DIR:-$PWD/dist/rpm}"
+SOURCES_DIR="$APPRISE_DIR/SOURCES"
+SRPM_DIR="$DIST_DIR/"
+
 PYTHON=python3
 TOX="tox -c $APPRISE_DIR/tox.ini"
-DIST_DIR="${DIST_DIR:-$PWD/dist}"
-mkdir -p "$DIST_DIR"
 
-echo "==> Cleaning previous builds"
-$TOX -e clean --notest
+if [ ! -d "$DIST_DIR" ]; then
+   echo "==> Cleaning previous builds"
+   $TOX -e clean --notest
 
-echo "==> Linting RPM spec"
-rpmlint "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
+   echo "==> Linting RPM spec"
+   rpmlint "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
 
-echo "==> Running tests"
-$TOX -e py312
+   echo "==> Generating man pages"
+   ronn --roff --organization="Chris Caron <lead2gold@gmail.com>" \
+       "$APPRISE_DIR/packaging/man/apprise.md"
 
-echo "==> Generating man pages"
-ronn --roff --organization="Chris Caron <lead2gold@gmail.com>" \
-    "$APPRISE_DIR/packaging/man/apprise.md"
+   echo "==> Extracting translations"
+   $TOX -e i18n
 
-echo "==> Extracting translations"
-$TOX -e i18n || { echo "Translation extraction failed!" ; exit 1; }
+   echo "==> Compiling translations"
+   $TOX -e compile
 
-echo "==> Compiling translations"
-$TOX -e compile || { echo "Translation compilation failed!" ; exit 1; }
-
-echo "==> Building source distribution"
-$TOX -e build-sdist || { echo "sdist build failed!" ; exit 1; }
+   echo "==> Building source distribution"
+   $TOX -e build-sdist
+fi
 
 VERSION=$(rpmspec -q --qf "%{version}\n" "$APPRISE_DIR/packaging/redhat/python-apprise.spec" | head -n1)
 TARBALL="$APPRISE_DIR/dist/apprise-${VERSION}.tar.gz"
 
 if [[ ! -f "$TARBALL" ]]; then
-  echo "Tarball not found: $TARBALL"
+  echo "❌ Tarball not found: $TARBALL"
   exit 1
 fi
 
-echo "==> Copying tarball to SOURCES directory"
-mkdir -p "$APPRISE_DIR/SOURCES"
-cp "$TARBALL" "$APPRISE_DIR/SOURCES/"
+echo "==> Preparing SOURCES directory"
+mkdir -p "$SOURCES_DIR"
+cp "$TARBALL" "$SOURCES_DIR/"
+find $APPRISE_DIR/packaging/redhat/ -iname '*.patch' -exec cp {} "$SOURCES_DIR" \;
 
-echo "==> Building RPM"
+echo "==> Building RPM (source and binary)"
+mkdir -p "$DIST_DIR"
 rpmbuild --define "_topdir $APPRISE_DIR" \
-         --define "_sourcedir $APPRISE_DIR/SOURCES" \
+         --define "_sourcedir $SOURCES_DIR" \
          --define "_specdir $APPRISE_DIR/packaging/redhat" \
-         --define "_srcrpmdir $APPRISE_DIR/SRPMS" \
+         --define "_srcrpmdir $DIST_DIR" \
          --define "_rpmdir $DIST_DIR" \
          -ba "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
 
 echo "✅ RPM build completed successfully"
-
+echo "📦 Artifacts:"
+find "$DIST_DIR" -type f -name "*.rpm"

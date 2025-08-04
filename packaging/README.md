@@ -1,6 +1,8 @@
 ## Packaging
 This directory contains any supporting files to grant usage of Apprise in various distributions.
 
+Let me know if you'd like to help me host on more platforms or can offer to do it yourself!
+
 ### RPM Based Packages
 * [EPEL](https://fedoraproject.org/wiki/EPEL) based distributions are only supported if they are of v9 or higher. This includes:
    * Red Hat 9.x (or higher)
@@ -17,7 +19,17 @@ Provided you are connected to the [EPEL repositories](https://fedoraproject.org/
 dnf install python3-apprise apprise
 ```
 
-Let me know if you'd like to help me host on more platforms or can offer to do it yourself!
+You can build your own rpm packges with the following:
+```bash
+# EPEL9 (CentOS/Rocky/RedHat/Oracle Linux)
+tox -e build-el9-rpm
+
+# Fedora 42
+tox -e build-f42-rpm
+
+# Fedora Rawhide
+tox -e build-rawhide-rpm
+```
 
 ## Man Pages Information
 The man page were generated using [Ronn](http://github.com/rtomayko/ronn/tree/0.7.3).
