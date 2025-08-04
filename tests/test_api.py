@@ -1058,7 +1058,7 @@ def test_apprise_unique_id():
     obj2 = Apprise.instantiate(url)
     obj2._url_identifier = ("123", b"\0", 42, object)
     assert obj2.url_id() is not None
-    assert obj2.url_id() == obj2.url_id()
+    assert obj1.url_id() == obj2.url_id()
 
     obj3 = Apprise.instantiate(url)
     obj3._url_identifier = {"123", b"\0", 42, object}
