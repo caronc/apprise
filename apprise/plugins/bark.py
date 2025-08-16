@@ -209,6 +209,10 @@ class NotifyBark(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
+            "icon": {
+                "name": _("Icon URL"),
+                "type": "string",
+            },
         },
     )
 
@@ -223,6 +227,7 @@ class NotifyBark(NotifyBase):
         click=None,
         badge=None,
         volume=None,
+        icon=None,
         **kwargs,
     ):
         """Initialize Notify Bark Object."""
@@ -301,6 +306,9 @@ class NotifyBark(NotifyBase):
                     volume,
                 )
 
+        # Icon URL
+        self.icon = icon if isinstance(icon, str) else None
+
         # Level
         self.level = (
             None
@@ -353,7 +361,10 @@ class NotifyBark(NotifyBase):
             None if not self.include_image else self.image_url(notify_type)
         )
 
-        if image_url:
+        # Use custom icon if provided, otherwise use default image
+        if self.icon:
+            payload["icon"] = self.icon
+        elif image_url:
             payload["icon"] = image_url
 
         if self.sound:
@@ -488,6 +499,9 @@ class NotifyBark(NotifyBase):
         if self.group:
             params["group"] = self.group
 
+        if self.icon:
+            params["icon"] = self.icon
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -587,5 +601,11 @@ class NotifyBark(NotifyBase):
         results["include_image"] = parse_bool(
             results["qsd"].get("image", True)
         )
+
+        # Icon URL
+        if "icon" in results["qsd"] and results["qsd"]["icon"]:
+            results["icon"] = NotifyBark.unquote(
+                results["qsd"]["icon"].strip()
+            )
 
         return results

@@ -240,6 +240,20 @@ apprise_url_tests = (
             "test_requests_exceptions": True,
         },
     ),
+    (
+        "bark://192.168.0.6:8081/device_key/?icon=https://example.com/icon.png",
+        {
+            # set custom icon
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?icon=https://example.com/icon.png&image=no",
+        {
+            # set custom icon and disable default image
+            "instance": NotifyBark,
+        },
+    ),
 )
 
 
