@@ -10,6 +10,9 @@ include dev-requirements.txt
 include all-plugin-requirements.txt
 recursive-include tests *
 recursive-include packaging *
+recursive-include apprise/i18n *.pot
+recursive-include apprise/i18n *.po
+recursive-include apprise/i18n */LC_MESSAGES/*.po
 global-exclude *.pyc
 global-exclude *.pyo
 global-exclude __pycache__

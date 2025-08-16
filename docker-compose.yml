@@ -5,6 +5,8 @@ services:
       dockerfile: tests/docker/Dockerfile.py39
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
   test.py310:
     build:
@@ -12,6 +14,8 @@ services:
       dockerfile: tests/docker/Dockerfile.py310
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
   test.py311:
     build:
@@ -19,6 +23,8 @@ services:
       dockerfile: tests/docker/Dockerfile.py311
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
   test.py312:
     build:
@@ -26,6 +32,8 @@ services:
       dockerfile: tests/docker/Dockerfile.py312
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
   rpmbuild.el9:
     build:
@@ -33,6 +41,8 @@ services:
       dockerfile: tests/docker/Dockerfile.el9
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
   rpmbuild.f42:
     build:
@@ -40,6 +50,8 @@ services:
       dockerfile: tests/docker/Dockerfile.f42
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
   rpmbuild.rawhide:
     build:
@@ -47,6 +59,8 @@ services:
       dockerfile: tests/docker/Dockerfile.rawhide
     volumes:
       - ./:/apprise
+    working_dir: /apprise
+    user: "1000:1000"
 
 #
 # Every Day testing
