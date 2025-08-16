@@ -170,7 +170,9 @@ apprise_url_tests = (
     ),
     # Test using a bot-token (also test footer set to no flag)
     (
-        "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no",
+        (
+            "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no"
+            "&timestamp=yes"),
         {
             "instance": NotifySlack,
             "requests_response_text": {
@@ -183,7 +185,15 @@ apprise_url_tests = (
     (
         (
             "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
-            "&to=#chan&blocks=yes&footer=yes"
+            "&to=#chan&blocks=yes&footer=yes&timestamp=no"
+        ),
+        {"instance": NotifySlack, "requests_response_text": "ok"},
+    ),
+    # Test blocks mode with timestamp
+    (
+        (
+            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+            "&to=#chan&blocks=yes&footer=yes&timestamp=yes"
         ),
         {"instance": NotifySlack, "requests_response_text": "ok"},
     ),
