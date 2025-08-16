@@ -1,0 +1,18 @@
+codecov:
+  require_ci_to_pass: false
+
+comment:
+  layout: "reach,diff,flags,files"
+  require_changes: false
+  behavior: new
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+    patch:
+      default:
+        target: auto
+        threshold: 1%
