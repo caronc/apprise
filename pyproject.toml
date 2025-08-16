@@ -347,11 +347,11 @@ section-order = ["future", "standard-library", "third-party", "first-party", "lo
 builtins-ignorelist = ["_"]
 
 [tool.pytest.ini_options]
-addopts = "-ra"
-python_files = ["tests/test_*.py"]
-filterwarnings = ["once::Warning"]
-norecursedirs = ["tests/helpers", "dist", ".tox", ".venv", ".eggs", ".local", "venv"]
+# Keep pytest-cov minimal, let Coverage.py control formatting.
+addopts = "-ra --cov=apprise --cov-branch --cov-report=xml"
 testpaths = ["tests"]
+python_files = ["test_*.py", "tests/test_*.py"]
+filterwarnings = ["once::Warning"]
 
 [tool.coverage.run]
 branch = true
@@ -361,6 +361,7 @@ source = ["apprise"]
 relative_files = true
 
 [tool.coverage.paths]
+# Normalise .tox and site-packages layouts back to 'apprise'
 source = [
     "apprise",
     "/apprise/apprise",
@@ -369,6 +370,20 @@ source = [
 ]
 
 [tool.coverage.report]
+# Controls terminal and XML content when Coverage.py renders reports
 show_missing = true
 skip_covered = true
 skip_empty = true
+precision = 1
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "if __name__ == .__main__.:",
+    "raise NotImplementedError",
+    "pass$",
+]
+
+[tool.coverage.xml]
+# Ensure GitHub Action can find a predictable file
+output = "coverage.xml"
+

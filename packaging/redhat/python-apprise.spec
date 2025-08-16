@@ -205,7 +205,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %endif
 
 # Localised Files
-%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/messages.mo
+%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/apprise.mo
 
 %files -n %{pypi_name}
 %{_bindir}/%{pypi_name}
