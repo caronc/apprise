@@ -4,7 +4,8 @@ codecov:
 comment:
   layout: "reach,diff,flags,files"
   require_changes: false
-  behavior: new
+  behavior: update
+  after_n_builds: 1
 
 coverage:
   status:

@@ -79,7 +79,7 @@ notification services. It supports sending alerts to platforms such as: \
 
 Name:           python-%{pypi_name}
 Version:        1.9.4
-Release:        1%{?dist}
+Release:        3%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
 URL:            https://github.com/caronc/%{pypi_name}
@@ -147,17 +147,7 @@ BuildRequires: python%{python3_pkgversion}-pytest-cov
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
 
 %prep
-%setup -q -n %{pypi_name}-%{version}
-
-# 2023.08.27: This test fails for some uknown reason only during the test
-# section of this RPM, but works completley fine under all other circumstances.
-# As a workaround, just remove the file so it doesn't hold up the RPM
-# Preparation
-%{__rm} tests/test_plugin_bulksms.py
-
-# 2023.08.27: rawhide does not install translationfiles for some reason
-# at this time; remove failing test until this is resolved
-%{__rm} tests/test_apprise_translations.py
+%autosetup -n %{pypi_name}-%{version}
 
 %build
 %if %{legacy_python_build}
@@ -167,13 +157,13 @@ BuildRequires: python%{python3_pkgversion}-pytest-cov
 %pyproject_wheel
 %endif
 
-
 %install
 %if %{legacy_python_build}
 # backwards compatible
 %py3_install
 %else
 %pyproject_install
+%pyproject_save_files apprise
 %endif
 
 %{__install} -p -D -T -m 0644 packaging/man/%{pypi_name}.1 \
@@ -214,6 +204,12 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Sat Aug 16 2025 Chris Caron <lead2gold@gmail.com> - 1.9.4-3
+- Spec file modernization BZ2377453
+
+* Fri Aug 15 2025 Python Maint <python-maint@redhat.com> - 1.9.4-2
+- Rebuilt for Python 3.14.0rc2 bytecode
+
 * Sat Aug  2 2025 Chris Caron <lead2gold@gmail.com> - 1.9.4
 - Updated to v1.9.4
 
