@@ -108,4 +108,8 @@ jobs:
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           file: coverage.xml
+          verbose: false  # Used for debugging only
           fail_ci_if_error: false  # Avoid failing job if Codecov is down
+        env:
+          CODECOV_PR:  ${{ github.event.pull_request.number }}
+          CODECOV_SHA: ${{ github.sha }}
