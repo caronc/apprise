@@ -274,7 +274,7 @@ class NotifySlack(NotifyBase):
             "timestamp": {
                 "name": _("Include Timestamp"),
                 "type": "bool",
-                "default": False,
+                "default": True,
                 "map_to": "include_timestamp",
             },
             "token": {
