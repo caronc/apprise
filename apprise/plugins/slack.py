@@ -430,9 +430,10 @@ class NotifySlack(NotifyBase):
             self.template_args["footer"]["default"] \
             if include_footer is None else include_footer
 
+        # timestamp inclusion (only applicable if footer also defined
         self.include_timestamp = \
             self.template_args["timestamp"]["default"] \
-            if include_timestamp is None and self.include_footer \
+            if include_timestamp is None \
             else include_timestamp
 
         return
