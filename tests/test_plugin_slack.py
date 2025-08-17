@@ -170,7 +170,9 @@ apprise_url_tests = (
     ),
     # Test using a bot-token (also test footer set to no flag)
     (
-        "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no",
+        (
+            "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=no"
+            "&timestamp=yes"),
         {
             "instance": NotifySlack,
             "requests_response_text": {
@@ -179,18 +181,71 @@ apprise_url_tests = (
             },
         },
     ),
-    # Test blocks mode
     (
         (
-            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
-            "&to=#chan&blocks=yes&footer=yes"
-        ),
-        {"instance": NotifySlack, "requests_response_text": "ok"},
+            "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=yes"
+            "&timestamp=yes"),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": {
+                "ok": True,
+                "message": "",
+            },
+        },
     ),
     (
         (
+            "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=yes"
+            "&timestamp=no"),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": {
+                "ok": True,
+                "message": "",
+            },
+        },
+    ),
+    (
+        (
+            "slack://username@xoxb-1234-1234-abc124/#nuxref?footer=yes"
+            "&timestamp=no"),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": {
+                "ok": True,
+                "message": "",
+            },
+        },
+    ),
+    # Test blocks mode with timestamp variation
+    (
+        (
             "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
-            "&to=#chan&blocks=yes&footer=no"
+            "&to=#chan&blocks=yes&footer=yes&timestamp=no"
+        ),
+        {"instance": NotifySlack, "requests_response_text": "ok"},
+    ),
+    # Test blocks mode with another timestamp
+    (
+        (
+            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+            "&to=#chan&blocks=yes&footer=yes&timestamp=yes"
+        ),
+        {"instance": NotifySlack, "requests_response_text": "ok"},
+    ),
+    # footer being disabled means timestamp isn't shown
+    (
+        (
+            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+            "&to=#chan&blocks=yes&footer=no&timestamp=yes"
+        ),
+        {"instance": NotifySlack, "requests_response_text": "ok"},
+    ),
+    # footer and timestamp disabled
+    (
+        (
+            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+            "&to=#chan&blocks=yes&footer=no&timestamp=no"
         ),
         {"instance": NotifySlack, "requests_response_text": "ok"},
     ),

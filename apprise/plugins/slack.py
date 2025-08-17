@@ -271,6 +271,12 @@ class NotifySlack(NotifyBase):
             "to": {
                 "alias_of": "targets",
             },
+            "timestamp": {
+                "name": _("Include Timestamp"),
+                "type": "bool",
+                "default": True,
+                "map_to": "include_timestamp",
+            },
             "token": {
                 "name": _("Token"),
                 "alias_of": ("access_token", "token_a", "token_b", "token_c"),
@@ -327,6 +333,7 @@ class NotifySlack(NotifyBase):
         targets=None,
         include_image=None,
         include_footer=None,
+        include_timestamp=None,
         use_blocks=None,
         **kwargs,
     ):
@@ -422,6 +429,12 @@ class NotifySlack(NotifyBase):
         self.include_footer = \
             self.template_args["footer"]["default"] \
             if include_footer is None else include_footer
+
+        # timestamp inclusion (only applicable if footer also defined
+        self.include_timestamp = \
+            self.template_args["timestamp"]["default"] \
+            if include_timestamp is None \
+            else include_timestamp
 
         return
 
@@ -572,10 +585,9 @@ class NotifySlack(NotifyBase):
                     "title": title,
                     "text": body,
                     "color": self.color(notify_type),
-                    # Time
-                    "ts": time(),
                 }],
             }
+
             # Acquire our to-be footer icon if configured to do so
             image_url = (
                 None if not self.include_image else self.image_url(notify_type)
@@ -592,6 +604,9 @@ class NotifySlack(NotifyBase):
                 # Include the footer only if specified to do so
                 payload["attachments"][0]["footer"] = self.app_id
 
+                if self.include_timestamp:
+                    # Timestamp
+                    payload["attachments"][0]["ts"] = time()
         if (
             attach
             and self.attachment_support
@@ -1115,6 +1130,7 @@ class NotifySlack(NotifyBase):
         params = {
             "image": "yes" if self.include_image else "no",
             "footer": "yes" if self.include_footer else "no",
+            "timestamp": "yes" if self.include_timestamp else "no",
             "blocks": "yes" if self.use_blocks else "no",
         }
 
@@ -1232,6 +1248,11 @@ class NotifySlack(NotifyBase):
         results["include_image"] = \
             parse_bool(results["qsd"].get(
                 "image", NotifySlack.template_args["image"]["default"]))
+
+        results["include_timestamp"] = \
+            parse_bool(results["qsd"].get(
+                "timestamp",
+                NotifySlack.template_args["timestamp"]["default"]))
 
         # Get Payload structure (use blocks?)
         if "blocks" in results["qsd"] and len(results["qsd"]["blocks"]):
