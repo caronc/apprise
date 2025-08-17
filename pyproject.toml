@@ -348,7 +348,7 @@ builtins-ignorelist = ["_"]
 
 [tool.pytest.ini_options]
 # Keep pytest-cov minimal, let Coverage.py control formatting.
-addopts = "-ra --cov=apprise --cov-branch --cov-report=xml"
+addopts = "-ra"
 testpaths = ["tests"]
 python_files = ["test_*.py", "tests/test_*.py"]
 filterwarnings = ["once::Warning"]
