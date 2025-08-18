@@ -37,6 +37,7 @@ from ..asset import AppriseAsset
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..url import URLBase
+from ..utils.time import zoneinfo
 from ..utils.cwe312 import cwe312_url
 from ..utils.parse import GET_SCHEMA_RE, parse_bool, parse_list, parse_urls
 
@@ -890,10 +891,30 @@ class ConfigBase(URLBase):
         # global asset object
         #
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
+        # Prepare our default timezone
+        default_timezone = asset.tzinfo
+
+        # Acquire our asset tokens
         tokens = result.get("asset", None)
         if tokens and isinstance(tokens, dict):
-            for k, v in tokens.items():
 
+            # Prepare our default timezone (if specified)
+            timezone = str(tokens.get('timezone', tokens.get('tz', '')))
+            if timezone:
+                default_timezone = zoneinfo(re.sub(r'[^\w/-]+', '', timezone))
+                if not default_timezone:
+                    ConfigBase.logger.warning(
+                        'Ignored invalid timezone "%s"', timezone)
+                    # Restore our timezone back to what was found in the
+                    # asset object
+                    default_timezone = asset.tzinfo
+                else:
+                    # Set our newly specified timezone
+                    setattr(asset, '_tzinfo', default_timezone)
+
+            # Iterate over remaining tokens
+            for k, v in tokens.items():
                 if k.startswith("_") or k.endswith("_"):
                     # Entries are considered reserved if they start or end
                     # with an underscore

@@ -30,6 +30,7 @@ from collections.abc import Generator
 from functools import partial
 import re
 from typing import Any, ClassVar, Optional, TypedDict, Union
+from zoneinfo import available_timezones
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import (
@@ -141,6 +142,9 @@ class NotifyBase(URLBase):
     # Persistent storage default settings
     persistent_storage = True
 
+    # Timezone Default
+    timezone = 'UTC'
+
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
 
@@ -224,6 +228,17 @@ class NotifyBase(URLBase):
                 # look up default using the following parent class value at
                 # runtime.
                 "_lookup_default": "persistent_storage",
+            },
+            "tz": {
+                "name": _("Timezone"),
+                "type": "choice:string",
+                # Supported timezones
+                "values": available_timezones(),
+                # Provide a default
+                "default": timezone,
+                # look up default using the following parent class value at
+                # runtime.
+                "_lookup_default": "timezone",
             },
         },
     )

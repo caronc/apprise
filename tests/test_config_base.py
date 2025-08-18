@@ -33,6 +33,8 @@ import logging
 import pytest
 import yaml
 
+from datetime import tzinfo
+from apprise.utils.time import zoneinfo
 from apprise import Apprise, AppriseAsset, ConfigFormat
 from apprise.config import ConfigBase
 from apprise.plugins.email import NotifyEmail
@@ -1005,6 +1007,9 @@ asset:
 
   image_path_mask: tmp/path
 
+  # Timezone (supports tz keyword too)
+  tz: America/Montreal
+
   # invalid entry
   theme:
     -
@@ -1042,6 +1047,10 @@ urls:
     # Boolean types stay boolean
     assert asset.async_mode is False
 
+    # Our TimeZone
+    assert isinstance(asset.tzinfo, tzinfo)
+    assert asset.tzinfo.key == zoneinfo('America/Montreal').key
+
     # the theme was not updated and remains the same as it was
     assert asset.theme == AppriseAsset().theme
 
@@ -1066,6 +1075,9 @@ asset:
   app_id: AppriseTest
   app_desc: Apprise Test Notifications
   app_url: http://nuxref.com
+
+  # An invalid timezone
+  timezone: invalid
 
 # Optionally define some global tags to associate with ALL of your
 # urls below.
