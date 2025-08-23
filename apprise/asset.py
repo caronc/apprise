@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from datetime import datetime, tzinfo
 from os.path import abspath, dirname, isfile, join
 import re
 from typing import Any, Optional, Union
@@ -37,6 +38,7 @@ from .common import (
     PersistentStoreMode,
 )
 from .manager_plugins import NotificationManager
+from .utils.time import zoneinfo
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -205,6 +207,14 @@ class AppriseAsset:
     # A unique identifer we can use to associate our calling source
     _uid = str(uuid4())
 
+    # Default timezone to use (pass in timezone value)
+    # A list of timezones can be found here:
+    # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
+    # You can specify things such as 'America/Montreal'
+    # If no timezone is specified, then the one detected on the system
+    # is uzed
+    _tzinfo = None
+
     def __init__(
         self,
         plugin_paths: Optional[list[str]] = None,
@@ -212,6 +222,7 @@ class AppriseAsset:
         storage_mode: Optional[Union[str, PersistentStoreMode]] = None,
         storage_salt: Optional[Union[str, bytes]] = None,
         storage_idlen: Optional[int] = None,
+        timezone: Optional[Union[str, tzinfo]] = None,
         **kwargs: Any
     ) -> None:
         """Asset Initialization."""
@@ -258,6 +269,18 @@ class AppriseAsset:
 
             # Store value
             self.__storage_idlen = storage_idlen
+
+        if isinstance(timezone, tzinfo):
+            self._tzinfo = timezone
+
+        elif timezone is not None:
+            self._tzinfo = zoneinfo(timezone)
+            if not self._tzinfo:
+                raise AttributeError(
+                    "AppriseAsset timezone provided is invalid") from None
+        else:
+            # Default our timezone to what is detected on the system
+            self._tzinfo = datetime.now().astimezone().tzinfo
 
         if storage_salt is not None:
             # Define the number of characters utilized from our namespace lengh
@@ -484,3 +507,8 @@ class AppriseAsset:
         """Return the persistent storage id length."""
 
         return self.__storage_idlen
+
+    @property
+    def tzinfo(self) -> tzinfo:
+        """Return the timezone object"""
+        return self._tzinfo

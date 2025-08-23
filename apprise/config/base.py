@@ -39,6 +39,7 @@ from ..manager_plugins import NotificationManager
 from ..url import URLBase
 from ..utils.cwe312 import cwe312_url
 from ..utils.parse import GET_SCHEMA_RE, parse_bool, parse_list, parse_urls
+from ..utils.time import zoneinfo
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
@@ -890,10 +891,29 @@ class ConfigBase(URLBase):
         # global asset object
         #
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+
+        # Prepare our default timezone
+        default_timezone = asset.tzinfo
+
+        # Acquire our asset tokens
         tokens = result.get("asset", None)
         if tokens and isinstance(tokens, dict):
-            for k, v in tokens.items():
+            raw_tz = tokens.get("timezone", tokens.get("tz"))
+            if isinstance(raw_tz, str):
+                default_timezone = zoneinfo(re.sub(r"[^\w/-]+", "", raw_tz))
+                if not default_timezone:
+                    ConfigBase.logger.warning(
+                        'Ignored invalid timezone "%s"', raw_tz)
+                    default_timezone = asset.tzinfo
+                else:
+                    asset._tzinfo = default_timezone
 
+            elif raw_tz is not None:
+                ConfigBase.logger.warning(
+                    'Ignored invalid timezone "%r"', raw_tz)
+
+            # Iterate over remaining tokens
+            for k, v in tokens.items():
                 if k.startswith("_") or k.endswith("_"):
                     # Entries are considered reserved if they start or end
                     # with an underscore

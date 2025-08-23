@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from datetime import datetime
 from email.header import decode_header
 from inspect import cleandoc
 import logging
@@ -92,6 +93,14 @@ TEST_URLS = (
             "instance": TypeError,
         },
     ),
+    (
+        # invalid Timezone
+        "mailto://user:pass@fastmail.com?tz=invalid",
+        {
+            # An error is thrown for this
+            "instance": TypeError,
+        },
+    ),
     # Pre-Configured Email Services
     (
         "mailto://user:pass@gmail.com",
@@ -130,7 +139,7 @@ TEST_URLS = (
         },
     ),
     (
-        "mailto://user:pass@fastmail.com",
+        "mailto://user:pass@fastmail.com?tz=UTC",
         {
             "instance": email.NotifyEmail,
         },
@@ -829,6 +838,78 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
 
     assert re.match(r".*bcc=qux%40example.org.*", obj.url()) is not None
     assert re.match(r".*cc=baz%40example.org.*", obj.url()) is not None
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_timezone(mock_smtp):
+    """NotifyEmail() Timezone Handling"""
+
+    response = mock.Mock()
+    mock_smtp.return_value = response
+
+    # Loads America/Toronto
+    results = email.NotifyEmail.parse_url(
+        "mailtos://user:pass123@hotmail.com:123"
+        "?tz=Toronto"
+    )
+    assert isinstance(results, dict)
+    # timezone is detected
+    assert "tz" in results
+
+    # Instantiate the object
+    obj = email.NotifyEmail(**results)
+    assert isinstance(obj, email.NotifyEmail)
+    assert obj.tzinfo.key == "America/Toronto"
+    # Verify our URL has defined our timezone
+    # %2F = escaped '/'
+    assert "tz=America%2FToronto" in obj.url()
+
+    # No Timezone setup/default
+    results = email.NotifyEmail.parse_url(
+        "mailtos://user:pass123@hotmail.com:1235"
+    )
+    assert "tz" not in results
+
+    # Instantiate the object
+    obj = email.NotifyEmail(**results)
+    assert isinstance(obj, email.NotifyEmail)
+    # Defaults to our system
+    assert obj.tzinfo == datetime.now().astimezone().tzinfo
+    assert "tz=" not in obj.url()
+
+    # Now we'll work with an Asset to identify how it can hold
+    # our default global variable (initialization proves case
+    # insensitive initialization is supported)
+    asset = AppriseAsset(timezone="aMErica/vanCOUver")
+
+    # Instatiate our object once again using the same variable set
+    # as above
+    obj = email.NotifyEmail(**results, asset=asset)
+    # Defaults to our system
+    # lower() is required since Mac and Window are not case sensitive and will
+    # See output as it was passed in and not corrected per IANA
+    assert obj.tzinfo.key.lower() == "america/vancouver"
+    assert "tz=" not in obj.url()
+
+    # Having ourselves a default variable also does not prevent
+    # anyone from defining their own over-ride is still supported:
+
+    # Loads America/Montreal
+    results = email.NotifyEmail.parse_url(
+        "mailtos://user:pass123@hotmail.com:321"
+        "?tz=Montreal"
+    )
+    assert isinstance(results, dict)
+    # timezone is detected
+    assert "tz" in results
+
+    # Instantiate the object
+    obj = email.NotifyEmail(**results)
+    assert isinstance(obj, email.NotifyEmail)
+    assert obj.tzinfo.key == "America/Montreal"
+    # Verify our URL has defined our timezone
+    # %2F = escaped '/'
+    assert "tz=America%2FMontreal" in obj.url()
 
 
 @mock.patch("smtplib.SMTP")

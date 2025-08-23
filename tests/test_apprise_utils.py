@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from datetime import tzinfo
 from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
@@ -3233,3 +3234,34 @@ def test_bytes_to_str():
     # Support strings too
     assert utils.disk.bytes_to_str("0") == "0.00B"
     assert utils.disk.bytes_to_str("1024") == "1.00KB"
+
+
+def test_time_zoneinfo():
+    """utils: zoneinfo() testing"""
+
+    # Some valid strings
+    assert isinstance(utils.time.zoneinfo("UTC"), tzinfo)
+    assert isinstance(utils.time.zoneinfo("z"), tzinfo)
+    assert isinstance(utils.time.zoneinfo("gmt"), tzinfo)
+    assert isinstance(utils.time.zoneinfo("utc"), tzinfo)
+    assert isinstance(utils.time.zoneinfo("Toronto"), tzinfo)
+    assert isinstance(utils.time.zoneinfo("America/Toronto"), tzinfo)
+    assert isinstance(utils.time.zoneinfo("america/toronto"), tzinfo)
+
+    # Edge Case with time also supported:
+    tz = utils.time.zoneinfo("America/Argentina/Cordoba")
+    isinstance(tz, tzinfo)
+    assert isinstance(utils.time.zoneinfo("Argentina/Cordoba"), tzinfo)
+    assert utils.time.zoneinfo("Argentina/Cordoba").key == tz.key
+    assert isinstance(utils.time.zoneinfo("Cordoba"), tzinfo)
+    assert utils.time.zoneinfo("Cordoba").key == "America/Cordoba"
+
+    # Too ambiguous
+    assert utils.time.zoneinfo("Argentina") is None
+
+    # bad data
+    assert utils.time.zoneinfo(object) is None
+    assert utils.time.zoneinfo(None) is None
+    assert utils.time.zoneinfo(1) is None
+    assert utils.time.zoneinfo("") is None
+    assert utils.time.zoneinfo("invalid") is None
