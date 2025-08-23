@@ -54,10 +54,6 @@ def zoneinfo(name: str) -> Optional[ZoneInfo]:
     try:
         return ZoneInfo(name)
 
-    except ValueError:
-        # Just all around bad data; no need to proceed
-        return None
-
     except ZoneInfoNotFoundError:
         pass
 
