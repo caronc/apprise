@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 import contextlib
+from datetime import timezone as _tz
 from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -40,9 +41,14 @@ def zoneinfo(name: str) -> Optional[ZoneInfo]:
     if not isinstance(name, str):
         return None
 
-    # Normalise common UTC spellings
-    if name.lower() in {"utc", "z", "gmt"}:
-        name = "UTC"
+    raw = name.strip()
+    if not raw:
+        return None
+
+    # Windows-safe: accept UTC family even without tzdata
+    if raw.lower() in {
+            "utc", "z", "gmt", "etc/utc", "etc/gmt", "gmt0", "utc0"}:
+        return _tz.utc
 
     # Try exact match first
     try:

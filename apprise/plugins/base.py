@@ -31,6 +31,7 @@ from datetime import tzinfo
 from functools import partial
 import re
 from typing import Any, ClassVar, Optional, TypedDict, Union
+from zoneinfo import ZoneInfo
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import (
@@ -875,8 +876,8 @@ class NotifyBase(URLBase):
             "overflow": self.overflow_mode.value,
         }
 
-        # Timezone Information
-        if self.__tzinfo:
+        # Timezone Information (if ZoneInfo)
+        if self.__tzinfo and isinstance(self.__tzinfo, ZoneInfo):
             params["tz"] = self.__tzinfo.key
 
         # Persistent Storage Setting

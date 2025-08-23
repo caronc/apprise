@@ -45,6 +45,8 @@ dependencies = [
     "PyYAML",
     # Root certificate authority bundle
     "certifi",
+    # Always ship IANA tzdb on Windows so ZoneInfo works
+    "tzdata; platform_system == 'Windows'",
 ]
 
 # Identifies all of the supported plugins
@@ -220,6 +222,7 @@ all-plugins = [
 ]
 windows = [
     "pywin32",
+    "tzdata",
 ]
 
 [project.urls]
