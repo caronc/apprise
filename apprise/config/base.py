@@ -898,19 +898,15 @@ class ConfigBase(URLBase):
         # Acquire our asset tokens
         tokens = result.get("asset", None)
         if tokens and isinstance(tokens, dict):
-
-            # Prepare our default timezone (if specified)
-            timezone = str(tokens.get("timezone", tokens.get("tz", "")))
+            raw_tz = tokens.get("timezone", tokens.get("tz"))
+            timezone = raw_tz.strip() if isinstance(raw_tz, str) else ""
             if timezone:
                 default_timezone = zoneinfo(re.sub(r"[^\w/-]+", "", timezone))
                 if not default_timezone:
                     ConfigBase.logger.warning(
-                        'Ignored invalid timezone "%s"', timezone)
-                    # Restore our timezone back to what was found in the
-                    # asset object
+                        'Ignored invalid timezone "%s"', raw_tz)
                     default_timezone = asset.tzinfo
                 else:
-                    # Set our newly specified timezone
                     asset._tzinfo = default_timezone
 
             # Iterate over remaining tokens

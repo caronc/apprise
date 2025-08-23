@@ -31,7 +31,6 @@ from datetime import tzinfo
 from functools import partial
 import re
 from typing import Any, ClassVar, Optional, TypedDict, Union
-from zoneinfo import ZoneInfo
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import (
@@ -298,7 +297,6 @@ class NotifyBase(URLBase):
     # automatically initialized by specifying ?tz= on the Apprise URLs
     __tzinfo = None
 
-
     def __init__(self, **kwargs):
         """Initialize some general configuration that will keep things
         consistent when working with the notifiers that will inherit this
@@ -350,17 +348,13 @@ class NotifyBase(URLBase):
 
         if "tz" in kwargs:
             value = kwargs["tz"]
-            if isinstance(value, ZoneInfo):
-                self.__tzinfo = kwargs["tz"]
-
-            else:
-                self.__tzinfo = zoneinfo(value)
-                if not self.__tzinfo:
-                    err = (
-                        f"An invalid notification timezone ({value}) was "
-                        "specified.")
-                    self.logger.warning(err)
-                    raise TypeError(err) from None
+            self.__tzinfo = zoneinfo(value)
+            if not self.__tzinfo:
+                err = (
+                    f"An invalid notification timezone ({value}) was "
+                    "specified.")
+                self.logger.warning(err)
+                raise TypeError(err) from None
 
         if "overflow" in kwargs:
             value = kwargs["overflow"]

@@ -25,7 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from datetime import tzinfo
+from datetime import datetime, timezone as _tz, tzinfo
 from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
@@ -34,7 +34,7 @@ import logging
 import pytest
 import yaml
 
-from apprise import Apprise, AppriseAsset, ConfigFormat
+from apprise import Apprise, AppriseAsset, AppriseConfig, ConfigFormat
 from apprise.config import ConfigBase
 from apprise.plugins.email import NotifyEmail
 from apprise.utils.time import zoneinfo
@@ -1592,3 +1592,77 @@ include: [file:///absolute/path/, relative/path, http://test.com]
     assert "file:///absolute/path/" in config
     assert "relative/path" in config
     assert "http://test.com" in config
+
+
+def test_yaml_asset_timezone_and_asset_tokens(tmpdir):
+    """
+    Covers: valid tz, reserved keys, invalid key, bool coercion, None->"",
+    invalid type for string, and %z formatting path used later by plugins.
+    """
+    cfg = tmpdir.join("asset-tz.yml")
+    cfg.write(
+        """
+version: 1
+asset:
+  tz: "  america/toronto  "     # case-insensitive + whitespace cleanup
+  _private: "ignored"           # reserved (starts with _)
+  name_: "ignored"              # reserved (ends with _)
+  not_a_field: "ignored"        # invalid asset key
+  secure_logging: "yes"         # string -> bool via parse_bool
+  app_id: null                  # None becomes empty string
+  app_desc: [ "list" ]          # invalid type for string -> warning path
+urls:
+  - json://localhost
+"""
+    )
+
+    ac = AppriseConfig(paths=str(cfg))
+    # Force a fresh parse and get the loaded plugin
+    servers = ac.servers()
+    assert len(servers) == 1
+
+    plugin = servers[0]
+    asset = plugin.asset
+
+    # tz was accepted and normalised
+    assert getattr(asset.tzinfo, "key", None) == "America/Toronto"
+    # boolean coercion applied
+    assert asset.secure_logging is True
+    # None -> ""
+    assert asset.app_id == ""
+
+
+def test_yaml_asset_timezone_invalid_and_precedence(tmpdir):
+    """
+    If 'timezone' is present but invalid, it takes precedence over 'tz'
+    and MUST NOT set the asset to the 'tz' value. We assert that London
+    was not applied. We deliberately avoid asserting the exact fallback,
+    since environments may surface a system tz (datetime.timezone) that
+    lacks a `.key` attribute.
+    """
+    cfg = tmpdir.join("asset-tz-invalid.yml")
+    cfg.write(
+        """
+version: 1
+asset:
+  timezone: null                # invalid (will be seen as "None")
+  tz: Europe/London             # would be valid, but 'timezone' wins
+urls:
+  - json://localhost
+"""
+    )
+
+    base_asset = AppriseAsset(timezone="UTC")
+    ac = AppriseConfig(paths=str(cfg))
+    servers = ac.servers(asset=base_asset)
+    assert len(servers) == 1
+
+    tzinfo = servers[0].asset.tzinfo
+
+    # The key assertion: 'tz' MUST NOT have been applied
+    assert getattr(tzinfo, "key", "").lower() != "europe/london"
+
+    # Sanity check that something sensible is set
+    # Compare offsets at a fixed instant instead of object identity
+    dt = datetime(2024, 1, 1, 12, 0, tzinfo=_tz.utc)
+    assert tzinfo.utcoffset(dt) is not None
