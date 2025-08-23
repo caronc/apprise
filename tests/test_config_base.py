@@ -1625,7 +1625,9 @@ urls:
     asset = plugin.asset
 
     # tz was accepted and normalised
-    assert getattr(asset.tzinfo, "key", None) == "America/Toronto"
+    # lower() is required since Mac and Window are not case sensitive and will
+    # See output as it was passed in and not corrected per IANA
+    assert getattr(asset.tzinfo, "key", None).lower() == "america/toronto"
     # boolean coercion applied
     assert asset.secure_logging is True
     # None -> ""
@@ -1666,3 +1668,40 @@ urls:
     # Compare offsets at a fixed instant instead of object identity
     dt = datetime(2024, 1, 1, 12, 0, tzinfo=_tz.utc)
     assert tzinfo.utcoffset(dt) is not None
+
+
+@pytest.mark.parametrize("garbage_yaml", [
+    "123", "3.1415", "true", "[UTC]", "{x: UTC}",
+])
+def test_yaml_asset_tz_garbage_types_only(tmpdir, garbage_yaml):
+    """
+    If only 'tz' is present and it is non-string, it is ignored.
+    We assert it didn't become a real IANA zone (e.g., Europe/London),
+    and that the tzinfo is usable.
+    """
+    cfg = tmpdir.join("asset-tz-garbage-only.yml")
+    cfg.write(
+        f"""
+version: 1
+asset:
+  tz: {garbage_yaml}            # non-string -> warning path
+urls:
+  - json://localhost
+"""
+    )
+
+    base_asset = AppriseAsset(timezone="UTC")
+    ac = AppriseConfig(paths=str(cfg))
+    servers = ac.servers(asset=base_asset)
+    assert len(servers) == 1
+
+    tzinfo = servers[0].asset.tzinfo
+
+    # 1) Did not “accidentally” become a valid IANA from elsewhere.
+    assert getattr(tzinfo, "key", "").lower() != "europe/london"
+
+    # 2) tzinfo is usable (offset resolves at a fixed instant).
+    dt = datetime(2024, 1, 1, 12, 0, tzinfo=_tz.utc)
+    assert tzinfo.utcoffset(dt) is not None
+    # also stable tzname resolution
+    assert isinstance(tzinfo.tzname(dt), str)

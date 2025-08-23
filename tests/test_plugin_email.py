@@ -886,7 +886,9 @@ def test_plugin_email_timezone(mock_smtp):
     # as above
     obj = email.NotifyEmail(**results, asset=asset)
     # Defaults to our system
-    assert obj.tzinfo.key == "America/Vancouver"
+    # lower() is required since Mac and Window are not case sensitive and will
+    # See output as it was passed in and not corrected per IANA
+    assert obj.tzinfo.key.lower() == "america/vancouver"
     assert "tz=" not in obj.url()
 
     # Having ourselves a default variable also does not prevent

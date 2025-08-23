@@ -899,15 +899,18 @@ class ConfigBase(URLBase):
         tokens = result.get("asset", None)
         if tokens and isinstance(tokens, dict):
             raw_tz = tokens.get("timezone", tokens.get("tz"))
-            timezone = raw_tz.strip() if isinstance(raw_tz, str) else ""
-            if timezone:
-                default_timezone = zoneinfo(re.sub(r"[^\w/-]+", "", timezone))
+            if isinstance(raw_tz, str):
+                default_timezone = zoneinfo(re.sub(r"[^\w/-]+", "", raw_tz))
                 if not default_timezone:
                     ConfigBase.logger.warning(
                         'Ignored invalid timezone "%s"', raw_tz)
                     default_timezone = asset.tzinfo
                 else:
                     asset._tzinfo = default_timezone
+
+            elif raw_tz is not None:
+                ConfigBase.logger.warning(
+                    'Ignored invalid timezone "%r"', raw_tz)
 
             # Iterate over remaining tokens
             for k, v in tokens.items():
