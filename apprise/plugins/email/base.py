@@ -25,13 +25,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from datetime import datetime, timezone
+from datetime import datetime
 from email.header import Header
 from email.mime.application import MIMEApplication
 from email.mime.base import MIMEBase
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import formataddr, make_msgid
+from email.utils import format_datetime, formataddr, make_msgid
 import re
 import smtplib
 from typing import Optional
@@ -598,6 +598,7 @@ class NotifyEmail(NotifyBase):
                 headers=headers,
                 names=self.names,
                 pgp=self.pgp if self.use_pgp else None,
+                tzinfo=self.tzinfo,
             ):
                 try:
                     socket.sendmail(
@@ -946,6 +947,9 @@ class NotifyEmail(NotifyBase):
         # Pretty Good Privacy Support; Pass in an
         # ApprisePGPController if you wish to use it
         pgp=None,
+        # Define our timezone; if one isn't provided, then we use
+        # the system time instead
+        tzinfo=None,
     ):
         """
         Generator for emails
@@ -1004,6 +1008,10 @@ class NotifyEmail(NotifyBase):
         if not smtp_host:
             # Generate a host identifier (used for Message-ID Creation)
             smtp_host = from_addr[1].split("@")[1]
+
+        if not tzinfo:
+            # use server time
+            tzinfo = datetime.now().astimezone().tzinfo
 
         logger.debug(f"SMTP Host: {smtp_host}")
 
@@ -1162,9 +1170,7 @@ class NotifyEmail(NotifyBase):
             base["From"] = formataddr(from_addr, charset="utf-8")
             base["To"] = formataddr((to_name, to_addr), charset="utf-8")
             base["Message-ID"] = make_msgid(domain=smtp_host)
-            base["Date"] = datetime.now(timezone.utc).strftime(
-                "%a, %d %b %Y %H:%M:%S +0000"
-            )
+            base["Date"] = format_datetime(datetime.now(tz=tzinfo))
 
             if cc:
                 base["Cc"] = ",".join(_cc)

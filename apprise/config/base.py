@@ -37,9 +37,9 @@ from ..asset import AppriseAsset
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..url import URLBase
-from ..utils.time import zoneinfo
 from ..utils.cwe312 import cwe312_url
 from ..utils.parse import GET_SCHEMA_RE, parse_bool, parse_list, parse_urls
+from ..utils.time import zoneinfo
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
@@ -900,9 +900,9 @@ class ConfigBase(URLBase):
         if tokens and isinstance(tokens, dict):
 
             # Prepare our default timezone (if specified)
-            timezone = str(tokens.get('timezone', tokens.get('tz', '')))
+            timezone = str(tokens.get("timezone", tokens.get("tz", "")))
             if timezone:
-                default_timezone = zoneinfo(re.sub(r'[^\w/-]+', '', timezone))
+                default_timezone = zoneinfo(re.sub(r"[^\w/-]+", "", timezone))
                 if not default_timezone:
                     ConfigBase.logger.warning(
                         'Ignored invalid timezone "%s"', timezone)
@@ -911,7 +911,7 @@ class ConfigBase(URLBase):
                     default_timezone = asset.tzinfo
                 else:
                     # Set our newly specified timezone
-                    setattr(asset, '_tzinfo', default_timezone)
+                    asset._tzinfo = default_timezone
 
             # Iterate over remaining tokens
             for k, v in tokens.items():

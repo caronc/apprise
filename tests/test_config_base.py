@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from datetime import tzinfo
 from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
@@ -33,11 +34,10 @@ import logging
 import pytest
 import yaml
 
-from datetime import tzinfo
-from apprise.utils.time import zoneinfo
 from apprise import Apprise, AppriseAsset, ConfigFormat
 from apprise.config import ConfigBase
 from apprise.plugins.email import NotifyEmail
+from apprise.utils.time import zoneinfo
 
 logging.disable(logging.CRITICAL)
 
@@ -1049,7 +1049,7 @@ urls:
 
     # Our TimeZone
     assert isinstance(asset.tzinfo, tzinfo)
-    assert asset.tzinfo.key == zoneinfo('America/Montreal').key
+    assert asset.tzinfo.key == zoneinfo("America/Montreal").key
 
     # the theme was not updated and remains the same as it was
     assert asset.theme == AppriseAsset().theme

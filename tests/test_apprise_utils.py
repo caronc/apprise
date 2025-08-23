@@ -3236,7 +3236,7 @@ def test_bytes_to_str():
     assert utils.disk.bytes_to_str("1024") == "1.00KB"
 
 
-def test_zoneinfo():
+def test_time_zoneinfo():
     """utils: zoneinfo() testing"""
 
     # Some valid strings
@@ -3247,6 +3247,17 @@ def test_zoneinfo():
     assert isinstance(utils.time.zoneinfo("Toronto"), tzinfo)
     assert isinstance(utils.time.zoneinfo("America/Toronto"), tzinfo)
     assert isinstance(utils.time.zoneinfo("america/toronto"), tzinfo)
+
+    # Edge Case with time also supported:
+    tz = utils.time.zoneinfo("America/Argentina/Cordoba")
+    isinstance(tz, tzinfo)
+    assert isinstance(utils.time.zoneinfo("Argentina/Cordoba"), tzinfo)
+    assert utils.time.zoneinfo("Argentina/Cordoba").key == tz.key
+    assert isinstance(utils.time.zoneinfo("Cordoba"), tzinfo)
+    assert utils.time.zoneinfo("Cordoba").key == "America/Cordoba"
+
+    # Too ambiguous
+    assert utils.time.zoneinfo("Argentina") is None
 
     # bad data
     assert utils.time.zoneinfo(object) is None

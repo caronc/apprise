@@ -1792,6 +1792,7 @@ def test_apprise_details_plugin_verification():
         "schema",
         "fullpath",
         # NotifyBase parameters:
+        "tz",
         "format",
         "overflow",
         "emojis",

@@ -217,7 +217,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "msteams://{}@{}/{}/{}?tz".format(UUID4, UUID4, "z" * 32, UUID4),
+        "msteams://{}@{}/{}/{}?ta".format(UUID4, UUID4, "z" * 32, UUID4),
         {
             "instance": NotifyMSTeams,
             # Throws a series of i/o exceptions with this flag

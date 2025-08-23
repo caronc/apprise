@@ -26,9 +26,10 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
-from datetime import tzinfo
+from datetime import timezone, tzinfo
 import logging
 import sys
+from zoneinfo import ZoneInfo
 
 import pytest
 
@@ -48,6 +49,13 @@ def test_timezone():
     # Default (uses system value)
     asset = AppriseAsset(timezone=None)
     assert isinstance(asset.tzinfo, tzinfo)
+
+    # Timezone can also already be a tzinfo object
+    asset = AppriseAsset(timezone=timezone.utc)
+    assert isinstance(asset.tzinfo, tzinfo)
+    asset = AppriseAsset(timezone=ZoneInfo("America/Toronto"))
+    assert isinstance(asset.tzinfo, tzinfo)
+
 
     with pytest.raises(AttributeError):
         AppriseAsset(timezone=object)

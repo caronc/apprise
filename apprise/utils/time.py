@@ -25,12 +25,13 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 import contextlib
+from typing import Optional
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from ..logger import logger
 
 
-def zoneinfo(name: str) -> ZoneInfo:
+def zoneinfo(name: str) -> Optional[ZoneInfo]:
     """
     More forgiving ZoneInfo instantiation
     - Accepts lower/upper case
@@ -63,7 +64,12 @@ def zoneinfo(name: str) -> ZoneInfo:
             return ZoneInfo(zone)
 
         with contextlib.suppress(IndexError):
-            location = full_zone.split("/")[1:][0]
+
+            # Break our zones and enforce limit
+            zones = full_zone.split("/")[1:3]
+
+            # Possible we'll throw an index error here and that's okay
+            location = zones[-1] if len(zones) == 1 else "/".join(zones)
             if location and location == lowered:
                 return ZoneInfo(zone)
 

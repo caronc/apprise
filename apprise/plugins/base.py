@@ -27,10 +27,11 @@
 
 import asyncio
 from collections.abc import Generator
+from datetime import tzinfo
 from functools import partial
 import re
 from typing import Any, ClassVar, Optional, TypedDict, Union
-from zoneinfo import available_timezones
+from zoneinfo import ZoneInfo
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import (
@@ -46,6 +47,7 @@ from ..locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
 from ..utils.parse import parse_bool
+from ..utils.time import zoneinfo
 
 
 class RequirementsSpec(TypedDict, total=False):
@@ -142,8 +144,9 @@ class NotifyBase(URLBase):
     # Persistent storage default settings
     persistent_storage = True
 
-    # Timezone Default
-    timezone = 'UTC'
+    # Timezone Default; by setting it to None, the timezone detected
+    # on the server is used
+    timezone = None
 
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
@@ -231,9 +234,7 @@ class NotifyBase(URLBase):
             },
             "tz": {
                 "name": _("Timezone"),
-                "type": "choice:string",
-                # Supported timezones
-                "values": available_timezones(),
+                "type": "string",
                 # Provide a default
                 "default": timezone,
                 # look up default using the following parent class value at
@@ -291,6 +292,13 @@ class NotifyBase(URLBase):
     #  restrictions and that of body_maxlen
     overflow_amalgamate_title = False
 
+    # Identifies the timezone to use;  if this is not over-ridden, then the
+    # timezone defined in the AppriseAsset() object is used instead.  The
+    # Below is expected to be in a ZoneInfo type already.  You can have this
+    # automatically initialized by specifying ?tz= on the Apprise URLs
+    __tzinfo = None
+
+
     def __init__(self, **kwargs):
         """Initialize some general configuration that will keep things
         consistent when working with the notifiers that will inherit this
@@ -339,6 +347,20 @@ class NotifyBase(URLBase):
                     "specified.")
                 self.logger.warning(err)
                 raise TypeError(err) from None
+
+        if "tz" in kwargs:
+            value = kwargs["tz"]
+            if isinstance(value, ZoneInfo):
+                self.__tzinfo = kwargs["tz"]
+
+            else:
+                self.__tzinfo = zoneinfo(value)
+                if not self.__tzinfo:
+                    err = (
+                        f"An invalid notification timezone ({value}) was "
+                        "specified.")
+                    self.logger.warning(err)
+                    raise TypeError(err) from None
 
         if "overflow" in kwargs:
             value = kwargs["overflow"]
@@ -859,6 +881,10 @@ class NotifyBase(URLBase):
             "overflow": self.overflow_mode.value,
         }
 
+        # Timezone Information
+        if self.__tzinfo:
+            params["tz"] = self.__tzinfo.key
+
         # Persistent Storage Setting
         if self.persistent_storage != NotifyBase.persistent_storage:
             params["store"] = "yes" if self.persistent_storage else "no"
@@ -924,6 +950,10 @@ class NotifyBase(URLBase):
             results["emojis"] = parse_bool(results["qsd"].get("emojis"))
             # Store our persistent storage boolean
 
+        # Allow overriding the default timezone
+        if "tz" in results["qsd"]:
+            results["tz"] = results["qsd"].get("tz", "")
+
         if "store" in results["qsd"]:
             results["store"] = results["qsd"]["store"]
 
@@ -970,3 +1000,10 @@ class NotifyBase(URLBase):
             )
 
         return self.__store
+
+    @property
+    def tzinfo(self) -> tzinfo:
+        """Returns our tzinfo file associated with this plugin if set
+        otherwise the default timezone is returned.
+        """
+        return self.__tzinfo if self.__tzinfo else self.asset.tzinfo
