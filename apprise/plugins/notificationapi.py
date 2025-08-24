@@ -502,7 +502,7 @@ class NotifyNotificationAPI(NotifyBase):
                         for x in self.sms_targets],
                     [
                         NotifyNotificationAPI.quote(x, safe="")
-                        for x in self.id_targets],
+                        for x["id"] in self.id_targets],
                     )),
             params=NotifyNotificationAPI.urlencode(params),
         )
