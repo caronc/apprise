@@ -25,15 +25,17 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from json import dumps
+from json import dumps, loads
 
 # Disable logging for a cleaner testing output
 import logging
 import os
+from unittest import mock
 
 from helpers import AppriseURLTester
 import requests
 
+from apprise import Apprise, NotifyType
 from apprise.plugins.notificationapi import NotifyNotificationAPI
 
 logging.disable(logging.CRITICAL)
@@ -127,11 +129,11 @@ apprise_url_tests = (
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-     ("napi://user@client_id/cs7/id:chris@example.com", {
+    ("napi://user@client_id/cs7/id:chris@example.com", {
         # An email with a designated to email
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
-    }),
+     }),
     ("napi://user@client_id/cs8/id:user@example.ca"
      "?to=id:Chris<chris@example.com>", {
          # An email with a full name in in To field
@@ -221,3 +223,151 @@ def test_plugin_napi_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_napi_sms_payloads(mock_post):
+    """NotifyNotificationAPI() Testing SMS Payloads."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = NOTIFICATIONAPI_GOOD_RESPONSE
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # Details
+    client_id = "my_id"
+    client_secret = "my_secret"
+    message_type = "apprise-post"
+    phone_no = "userid:+1-555-123-4567"
+
+    obj = Apprise.instantiate(
+        f"napi://{message_type}@{client_id}/{client_secret}/"
+        f"{phone_no}")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    # 2 calls were made, one to perform an email lookup, the second
+    # was the notification itself
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == f"https://api.notificationapi.com/{client_id}/sender"
+    )
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "apprise-post",
+        "to": {
+            "id": "userid",
+            "number": "15551234567",
+        },
+        "parameters": {
+            "appBody": "body",
+            "appTitle": "",
+            "appType": "info",
+            "appId": "Apprise",
+            "appDescription": "Apprise Notifications",
+            "appColor": "#3AA3E3",
+            "appImageUrl": (
+                "https://github.com/caronc/apprise/raw/master/apprise"
+                "/assets/themes/default/apprise-info-72x72.png"),
+            "appUrl": "https://github.com/caronc/apprise"},
+    }
+    headers = mock_post.call_args_list[0][1]["headers"]
+    assert headers == {
+            "User-Agent": "Apprise",
+            "Content-Type": "application/json",
+            "Authorization": "Basic bXlfaWQ6bXlfc2VjcmV0"}
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+
+@mock.patch("requests.post")
+def test_plugin_napi_email_payloads(mock_post):
+    """NotifyNotificationAPI() Testing Email Payloads."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = NOTIFICATIONAPI_GOOD_RESPONSE
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # Details
+    client_id = "my_id_abc"
+    client_secret = "my_secret"
+    message_type = "apprise-post"
+    email = "userid:test@example.ca"
+
+    obj = Apprise.instantiate(
+        f"napi://{message_type}@{client_id}/{client_secret}/"
+        f"{email}?from=Chris<chris@example.eu>&bcc=joe@hidden.com&"
+        f"cc=jason@hidden.com&:customToken=customValue")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    # 2 calls were made, one to perform an email lookup, the second
+    # was the notification itself
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == f"https://api.notificationapi.com/{client_id}/sender"
+    )
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "apprise-post",
+        "to": {
+                "id": "userid",
+                "email": "test@example.ca",
+        },
+        "options": {
+            "email": {
+                "fromAddress": "chris@example.eu",
+                "fromName": "Chris",
+                "ccAddresses": ["jason@hidden.com"],
+                "bccAddresses": ["joe@hidden.com"]}
+        },
+        "parameters": {
+            "customToken": "customValue",
+            "appBody": "body",
+            "appTitle": "",
+            "appType": "info",
+            "appId": "Apprise",
+            "appDescription": "Apprise Notifications",
+            "appColor": "#3AA3E3",
+            "appImageUrl": (
+                "https://github.com/caronc/apprise/raw/master/apprise/"
+                "assets/themes/default/apprise-info-72x72.png"),
+            "appUrl": "https://github.com/caronc/apprise"
+        },
+    }
+    headers = mock_post.call_args_list[0][1]["headers"]
+    assert headers == {
+        "User-Agent": "Apprise",
+        "Content-Type": "application/json",
+        "Authorization": "Basic bXlfaWRfYWJjOm15X3NlY3JldA=="}
+
+    # Reset our mock object
+    mock_post.reset_mock()

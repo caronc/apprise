@@ -501,8 +501,8 @@ class NotifyNotificationAPI(NotifyBase):
                                 x["id"], x["number"]), safe="")
                         for x in self.sms_targets],
                     [
-                        NotifyNotificationAPI.quote(x, safe="")
-                        for x["id"] in self.id_targets],
+                        NotifyNotificationAPI.quote(x["id"], safe="")
+                        for x in self.id_targets],
                     )),
             params=NotifyNotificationAPI.urlencode(params),
         )
@@ -553,8 +553,8 @@ class NotifyNotificationAPI(NotifyBase):
             _payload.update({
                 "options": {
                     "email": {
-                        "fromAddress": self.names[self.from_addr],
-                        "fromName": self.from_addr}}})
+                        "fromAddress": self.from_addr,
+                        "fromName": self.names[self.from_addr]}}})
 
         elif self.cc or self.bcc:
             # Set up shell
@@ -600,7 +600,7 @@ class NotifyNotificationAPI(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        if not (self.email_targets or self.sms_targets):
+        if not (self.email_targets or self.sms_targets or self.id_targets):
             # There is no one to email or send an sms message to; we're done
             self.logger.warning(
                 "There are no NotificationAPI recipients to notify"
