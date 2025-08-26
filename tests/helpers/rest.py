@@ -449,7 +449,8 @@ class AppriseURLTester:
                     body=self.body, title=self.title, notify_type=notify_type
                 )
                 if _resp != notify_response:
-                    raise AssertionError()
+                    raise AssertionError(
+                        f"notify() call; notify_response={_resp} on {url}")
 
                 if notify_response:
                     # If we successfully got a response, there must have been
