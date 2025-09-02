@@ -1046,7 +1046,7 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
     return result
 
 
-def parse_list(*args, cast=None, allow_whitespace=True):
+def parse_list(*args, cast=None, allow_whitespace=True, sort=True):
     """Take a string list and break it into a delimited list of arguments. This
     funciton also supports the processing of a list of delmited strings and
     will always return a unique set of arguments. Duplicates are always
@@ -1081,7 +1081,8 @@ def parse_list(*args, cast=None, allow_whitespace=True):
             )
 
         elif isinstance(arg, (set, list, tuple)):
-            result += parse_list(*arg, allow_whitespace=allow_whitespace)
+            result += parse_list(
+                *arg, allow_whitespace=allow_whitespace, sort=sort)
 
     #
     # filter() eliminates any empty entries
@@ -1089,12 +1090,19 @@ def parse_list(*args, cast=None, allow_whitespace=True):
     # Since Python v3 returns a filter (iterator) whereas Python v2 returned
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
-    return (
-        sorted(filter(bool, list(set(result))))
-        if allow_whitespace
-        else sorted(
-            [x.strip() for x in filter(bool, list(set(result))) if x.strip()]
+    if sort:
+        return (
+            sorted(filter(bool, list(set(result))))
+            if allow_whitespace
+            else sorted(
+                [x.strip() for x in filter(
+                    bool, list(set(result))) if x.strip()]
+            )
         )
+    return (
+        [x for x in filter(bool, list(result))]
+        if allow_whitespace
+        else [x.strip() for x in filter(bool, list(result)) if x.strip()]
     )
 
 

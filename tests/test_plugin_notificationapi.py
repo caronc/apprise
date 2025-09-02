@@ -63,32 +63,36 @@ apprise_url_tests = (
         # Just an Email specified, no client_id or client_secret
         "instance": TypeError,
     }),
-    ("napi://type@client_id/client_secret/id:+15551235555/", {
+    ("napi://user@client_id/cs14/user@example.ca", {
+         # No id matched
+        "instance": TypeError,
+     }),
+    ("napi://type@client_id/client_secret/id/+15551235553/", {
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    ("napi://type@cid/secret/id:user@example.com/", {
+    ("napi://type@cid/secret/id/user1@example.com/", {
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    (("napi://type@cid/secret/id:user@example.com/"
-      "id:+15551235555/id:+15551235534"), {
+    (("napi://type@cid/secret/id10/user2@example.com/"
+      "id5/+15551235555/id8/+15551235534"), {
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    (("napi://type@cid/secret/id:user@example.com/"
+    (("napi://type@cid/secret/id/user3@example.com/"
       "?from=joe@example.ca"), {
         # Set from/source
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    (("napi://type@cid/secret/id:user@example.com/"
+    (("napi://type@cid/secret/id/user4@example.com/"
       "?from=joe@example.ca&bcc=user1@yahoo.ca&cc=user2@yahoo.ca"), {
         # Set from/source
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    ("napi://?id=ci&secret=cs&to=id:user@example.com&type=type", {
+    ("napi://?id=ci&secret=cs&to=id,user5@example.com&type=type", {
         # use just kwargs
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
@@ -99,90 +103,90 @@ apprise_url_tests = (
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
         "notify_response": False,
     }),
-    ("napi://user@client_id/cs2/id:user@example.ca"
+    ("napi://user@client_id/cs2/id/user6@example.ca"
      "?bcc=invalid", {
          # A good email with a bad Blind Carbon Copy
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs3/id:user@example.ca"
+    ("napi://user@client_id/cs3/id/user8@example.ca"
      "?cc=l2g@nuxref.com", {
          # A good email with Carbon Copy
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs4/id:user@example.ca"
+    ("napi://user@client_id/cs4/id/user9@example.ca"
      "?cc=Chris<l2g@nuxref.com>", {
          # A good email with Carbon Copy
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs5/id:user@example.ca"
+    ("napi://user@client_id/cs5/id/user10@example.ca"
      "?cc=invalid", {
          # A good email with Carbon Copy
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs6/id:user@example.ca"
+    ("napi://user@client_id/cs6/id/user11@example.ca"
      "?to=invalid", {
          # an invalid to email
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs7/id:chris@example.com", {
+    ("napi://user@client_id/cs7/id/chris1@example.com", {
         # An email with a designated to email
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs8/id:user@example.ca"
-     "?to=id:Chris<chris@example.com>", {
+    ("napi://user@client_id/cs8/id1/user12@example.ca"
+     "?to=id,Chris<chris2@example.com>", {
          # An email with a full name in in To field
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs9/id:user@example.ca"
-     "id:chris@example.com/id:chris2@example.com/id:+15552341234", {
+    ("napi://user@client_id/cs9/id2/user13@example.ca/"
+     "id/kris@example.com/id/chris2@example.com/id/+15552341234", {
          # Several emails to notify
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs10/id:user@example.ca"
-     "?cc=Chris<chris@example.com>", {
+    ("napi://user@client_id/cs10/id/user14@example.ca"
+     "?cc=Chris<chris10@example.com>", {
          # An email with a full name in cc
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs11/id:user@example.ca"
-     "?cc=chris@example.com", {
+    ("napi://user@client_id/cs11/id/user15@example.ca"
+     "?cc=chris12@example.com", {
          # An email with a full name in cc
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs12/id:user@example.ca"
-     "?bcc=Chris<chris@example.com>", {
+    ("napi://user@client_id/cs12/id/user16@example.ca"
+     "?bcc=Chris<chris14@example.com>", {
          # An email with a full name in bcc
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs13/id:user@example.ca"
-     "?bcc=chris@example.com", {
+    ("napi://user@client_id/cs13/id/user@example.ca"
+     "?bcc=chris13@example.com", {
          # An email with a full name in bcc
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs14/id:user@example.ca"
-     "?to=Chris<chris@example.com>", {
+    ("napi://user@client_id/cs14/id/user@example.ca"
+     "?to=Chris<chris9@example.com>,id14", {
          # An email with a full name in bcc
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs15/id:user@example.ca"
-     "?to=chris@example.com", {
+    ("napi://user@client_id/cs15/id"
+     "?to=user@example.com", {
          # An email with a full name in bcc
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
-    ("napi://user@client_id/cs16/id:user@example.ca"
+    ("napi://user@client_id/cs16/id/user@example.ca"
      "?template=1234&+sub=value&+sub2=value2", {
          # A good email with a template + substitutions
          "instance": NotifyNotificationAPI,
@@ -191,21 +195,21 @@ apprise_url_tests = (
          # Our expected url(privacy=True) startswith() response:
          "privacy_url": "napi://user@c...d/c...6/",
      }),
-    ("napi://user@client_id/cs17/id:user@example.ca", {
+    ("napi://user@client_id/cs17/id/user@example.ca", {
         "instance": NotifyNotificationAPI,
         # force a failure
         "response": False,
         "requests_response_code": requests.codes.internal_server_error,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    ("napi://user@client_id/cs18/id:user@example.ca", {
+    ("napi://user@client_id/cs18/id/user@example.ca", {
         "instance": NotifyNotificationAPI,
         # throw a bizzare code forcing us to fail to look it up
         "response": False,
         "requests_response_code": 999,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    ("napi://user@client_id/cs19/id:user@example.ca", {
+    ("napi://user@client_id/cs19/id/user@example.ca", {
         "instance": NotifyNotificationAPI,
         # Throws a series of connection and transfer exceptions when this flag
         # is set and tests that we gracfully handle them
@@ -240,11 +244,11 @@ def test_plugin_napi_sms_payloads(mock_post):
     client_id = "my_id"
     client_secret = "my_secret"
     message_type = "apprise-post"
-    phone_no = "userid:+1-555-123-4567"
+    targets = "userid/+1-555-123-4567"
 
     obj = Apprise.instantiate(
         f"napi://{message_type}@{client_id}/{client_secret}/"
-        f"{phone_no}")
+        f"{targets}?mode=template")
     assert isinstance(obj, NotifyNotificationAPI)
     assert isinstance(obj.url(), str)
 
@@ -270,7 +274,7 @@ def test_plugin_napi_sms_payloads(mock_post):
         "type": "apprise-post",
         "to": {
             "id": "userid",
-            "number": "15551234567",
+            "number": "+15551234567",
         },
         "parameters": {
             "appBody": "body",
@@ -309,12 +313,12 @@ def test_plugin_napi_email_payloads(mock_post):
     client_id = "my_id_abc"
     client_secret = "my_secret"
     message_type = "apprise-post"
-    email = "userid:test@example.ca"
+    targets = "userid/test@example.ca"
 
     obj = Apprise.instantiate(
         f"napi://{message_type}@{client_id}/{client_secret}/"
-        f"{email}?from=Chris<chris@example.eu>&bcc=joe@hidden.com&"
-        f"cc=jason@hidden.com&:customToken=customValue")
+        f"{targets}?from=Chris<chris@example.eu>&bcc=joe@hidden.com&"
+        f"cc=jason@hidden.com&:customToken=customValue&mode=template")
     assert isinstance(obj, NotifyNotificationAPI)
     assert isinstance(obj.url(), str)
 
