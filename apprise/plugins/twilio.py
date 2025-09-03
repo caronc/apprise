@@ -357,7 +357,8 @@ class NotifyTwilio(NotifyBase):
                 )
                 continue
 
-            # We can't send twilio WhatsApp using short-codes as our source
+            # We can't use WhatsApp using short-codes as our source or
+            # for phone calls
             if ((len(self.source) in (5, 6)
                  or self.method == TwilioNotificationMethod.CALL)
                     and mode is TwilioMessageMode.WHATSAPP):
@@ -409,8 +410,8 @@ class NotifyTwilio(NotifyBase):
         # Set up our authentication. Prefer the API Key if provided.
         auth = (self.apikey or self.account_sid, self.auth_token)
 
-        if len(targets) == 0:
-            # No sources specified, use our own phone no
+        if len(targets) == 0 and self.method != TwilioNotificationMethod.CALL:
+            # No sources specified, use our own phone only with messages
             targets.append((self.default_mode, self.source))
 
         while len(targets):

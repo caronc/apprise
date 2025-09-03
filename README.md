@@ -205,7 +205,7 @@ Currently, Apprise only supports phone calls with Twilio. Notifications consist 
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
-| [Twilio](https://github.com/caronc/apprise/wiki/Notify_twilio) | twilio://  | (TCP) 443   | twilio://AccountSid:AuthToken@FromPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?apikey=Key&method=call<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN?method=call
+| [Twilio](https://github.com/caronc/apprise/wiki/Notify_twilio) | twilio://  | (TCP) 443   | twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?apikey=Key&method=call
 
 ## Custom Notifications
 
