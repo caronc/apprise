@@ -199,6 +199,14 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 
 Apprise have some email services built right into it (such as yahoo, fastmail, hotmail, gmail, etc) that greatly simplify the mailto:// service.  See more details [here](https://github.com/caronc/apprise/wiki/Notify_email).
 
+## Phone Call Notifications
+
+Currently, Apprise only supports phone calls with Twilio. Notifications consist of a single `body` in xml format which is no more then 4000 characters in length.
+
+| Notification Service | Service ID | Default Port | Example Syntax |
+| -------------------- | ---------- | ------------ | -------------- |
+| [Twilio](https://github.com/caronc/apprise/wiki/Notify_twilio) | twilio://  | (TCP) 443   | twilio://AccountSid:AuthToken@FromPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN?method=call<br/>twilio://AccountSid:AuthToken@FromPhoneNo/ToPhoneNo?apikey=Key&method=call<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo?method=call<br/>twilio://AccountSid:AuthToken@ShortCode/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN?method=call
+
 ## Custom Notifications
 
 | Post Method          | Service ID | Default Port | Example Syntax |
