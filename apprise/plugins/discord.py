@@ -183,6 +183,11 @@ class NotifyDiscord(NotifyBase):
                 "type": "bool",
                 "default": True,
             },
+            "flags": {
+                "name": _("Discord Flags"),
+                "type": "int",
+                "min": 0,
+            },
             "image": {
                 "name": _("Include Image"),
                 "type": "bool",
@@ -205,6 +210,7 @@ class NotifyDiscord(NotifyBase):
         avatar_url=None,
         href=None,
         thread=None,
+        flags=None,
         **kwargs,
     ):
         """Initialize Discord Object."""
@@ -258,6 +264,21 @@ class NotifyDiscord(NotifyBase):
         # A URL to have the title link to
         self.href = href
 
+        # A URL to have the title link to
+        if flags:
+            try:
+                self.flags = int(flags)
+                if self.flags < NotifyDiscord.template_args["flags"]["min"]:
+                    raise ValueError()
+
+            except (TypeError, ValueError):
+                msg = "An invalid Discord flags setting " \
+                      "({}) was specified.".format(flags)
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.flags = None
+
         # For Tracking Purposes
         self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -283,6 +304,10 @@ class NotifyDiscord(NotifyBase):
             # for the whole message before continuing. Otherwise, we wait
             "wait": self.tts is False,
         }
+
+        if self.flags:
+            # Set our flag if defined:
+            payload['flags'] = self.flags
 
         # Acquire image_url
         image_url = self.image_url(notify_type)
@@ -626,6 +651,9 @@ class NotifyDiscord(NotifyBase):
         if self.avatar_url:
             params["avatar_url"] = self.avatar_url
 
+        if self.flags:
+            params["flags"] = str(self.flags)
+
         if self.href:
             params["href"] = self.href
 
@@ -717,6 +745,10 @@ class NotifyDiscord(NotifyBase):
         if "botname" in results["qsd"]:
             # Alias to User
             results["user"] = NotifyDiscord.unquote(results["qsd"]["botname"])
+
+        if "flags" in results["qsd"]:
+            # Alias to User
+            results["flags"] = NotifyDiscord.unquote(results["qsd"]["flags"])
 
         # Extract avatar url if it was specified
         if "avatar_url" in results["qsd"]:

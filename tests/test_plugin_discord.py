@@ -165,6 +165,34 @@ apprise_url_tests = (
             "requests_response_code": requests.codes.no_content,
         },
     ),
+    (
+        "discord://{}/{}?flags=1".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            "instance": NotifyDiscord,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    (
+        "discord://{}/{}?flags=-1".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            # invalid flags specified (variation 1)
+            "instance": TypeError,
+        },
+    ),
+    (
+        "discord://{}/{}?flags=invalid".format(
+            "i" * 24, "t" * 64
+        ),
+        {
+            # invalid flags specified (variation 2)
+            "instance": TypeError,
+        },
+    ),
+
     # different format support
     (
         "discord://{}/{}?format=markdown".format("i" * 24, "t" * 64),
