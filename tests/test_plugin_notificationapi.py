@@ -63,25 +63,103 @@ apprise_url_tests = (
         # Just an Email specified, no client_id or client_secret
         "instance": TypeError,
     }),
-    ("napi://user@client_id/cs14/user@example.ca", {
-         # No id matched
+    ("napi://user@client_id/cs14a/user@example.ca", {
+        # No id matched
         "instance": TypeError,
-     }),
-    ("napi://type@client_id/client_secret/id/+15551235553/", {
+    }),
+    ("napi://user@client_id/cs14b/+15551235553", {
+        # No id matched
+        "instance": TypeError,
+    }),
+    ("napi://user@client_id/cs14c/+15551235553/user@example.ca", {
+        # No id matched
+        "instance": TypeError,
+    }),
+
+    ("napi://type@client_id/client_secret/id/+15551235553/?mode=invalid", {
+        # Invalid mode
+        "instance": TypeError,
+    }),
+    ("napi://type@client_id/client_secret/id/+15551235553/?region=invalid", {
+        # Invalid region
+        "instance": TypeError,
+    }),
+    ((
+        "napi://type@client_id/client_secret/id/user@example.ca/"
+        "user2@example.ca"
+        ), {
+        # to many emails assigned to id (variation 1)
+        "instance": TypeError,
+    }),
+    ((
+        "napi://type@client_id/client_secret/user@example.ca/"
+        "user2@example.ca"
+        ), {
+        # to many emails assigned to id (variation 2)
+        "instance": TypeError,
+    }),
+    ((
+        "napi://type@client_id/client_secret/id/+15551235553/"
+        "+15551235555"
+        ), {
+        # to many phone no's assigned to id (variation 1)
+        "instance": TypeError,
+    }),
+    ((
+        "napi://type@client_id/client_secret/+15551235553/"
+        "+15551235555"
+        ), {
+        # to many phone no's assigned to id (variation 2)
+        "instance": TypeError,
+    }),
+    ("napi://type@client_id/client_secret/id/+15551235553/?mode=invalid", {
+        # Invalid mode
+        "instance": TypeError,
+    }),
+    ("napi://client_id/client_secret/id/+15551231234/?type=*(", {
+        # Invalid type
+        "instance": TypeError,
+    }),
+    ("napi://client_id/client_secret/id/+15551231234/?channels=bad", {
+        # Invalid channel
+        "instance": TypeError,
+    }),
+    ("napi://?secret=cs&to=id,user404@example.com&type=typed", {
+        # No id found
+        "instance": TypeError,
+    }),
+    ("napi://client_id/client_secret/id/g@rb@ge/+15551235553/", {
+        # g@rb@ge enry ignored
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
-    ("napi://type@cid/secret/id/user1@example.com/", {
+    ("napi://cid/secret/id/user1@example.com/?type=apprise-msg", {
+        "instance": NotifyNotificationAPI,
+        "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+    }),
+    ("notificationapi://cid/secret/id/user1@example.com", {
+        # Support full schema:// of notificationapi://
+        "instance": NotifyNotificationAPI,
+        "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+    }),
+    ("napi://cid/secret/id/id2/user1@example.com", {
+        # two id's in a row
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
     (("napi://type@cid/secret/id10/user2@example.com/"
-      "id5/+15551235555/id8/+15551235534"), {
+      "id5/+15551235555/id8/+15551235534"
+      "?reply=Chris<chris@example.com>"), {
+        "instance": NotifyNotificationAPI,
+        "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+    }),
+    (("napi://type@cid/secret/abc1/user1@example.com/"
+      "id5/+15551235555/?from=Chris&reply=Christopher"), {
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
     (("napi://type@cid/secret/id/user3@example.com/"
-      "?from=joe@example.ca"), {
+      "?from=joe@example.ca&reply=user@abc.com"), {
         # Set from/source
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
@@ -91,16 +169,41 @@ apprise_url_tests = (
         # Set from/source
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        # Our expected url(privacy=True) startswith() response:
+        "privacy_url": "napi://type@c...d/s...t/",
     }),
-    ("napi://?id=ci&secret=cs&to=id,user5@example.com&type=type", {
+    ("napi://?id=ci&secret=cs&to=id,user5@example.com&type=typec", {
         # use just kwargs
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        # Our expected url(privacy=True) startswith() response:
+        "privacy_url": "napi://typec@c...i/c...s/",
     }),
-    ("napi://?id=ci&secret=cs&type=test-type", {
+    ("napi://id?secret=cs&to=id,user5@example.com&type=typeb", {
+        # id is pull from the host
+        "instance": NotifyNotificationAPI,
+        "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        # Our expected url(privacy=True) startswith() response:
+        "privacy_url": "napi://typeb@i...d/c...s/",
+    }),
+    ("napi://secret?id=ci&to=id,user5@example.com&type=typea", {
+        # id pulled from kwargs still allows secret to be the
+        # next parsed entry from cli
+        "instance": NotifyNotificationAPI,
+        "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        # Our expected url(privacy=True) startswith() response:
+        "privacy_url": "napi://typea@c...i/s...t/",
+    }),
+    ("napi://?id=ci&secret=cs&type=test-type&region=eu", {
         # No targets specified
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        "notify_response": False,
+    }),
+    ("napi://?id=ci&secret=cs&to=id,user5@example.com&type=typec", {
+        # bad response
+        "instance": NotifyNotificationAPI,
+        "requests_response_text": NOTIFICATIONAPI_BAD_RESPONSE,
         "notify_response": False,
     }),
     ("napi://user@client_id/cs2/id/user6@example.ca"
@@ -111,6 +214,12 @@ apprise_url_tests = (
      }),
     ("napi://user@client_id/cs3/id/user8@example.ca"
      "?cc=l2g@nuxref.com", {
+         # A good email with Carbon Copy
+         "instance": NotifyNotificationAPI,
+         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+     }),
+    ("napi://client_id/cs3/id/user8@example.ca"
+     "?channels=email,sms,slack,mobile_push,web_push,inapp", {
          # A good email with Carbon Copy
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
@@ -145,7 +254,8 @@ apprise_url_tests = (
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
      }),
     ("napi://user@client_id/cs9/id2/user13@example.ca/"
-     "id/kris@example.com/id/chris2@example.com/id/+15552341234", {
+     "id/kris@example.com/id/chris2@example.com/id/+15552341234"
+     "?:token=value", {
          # Several emails to notify
          "instance": NotifyNotificationAPI,
          "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
@@ -230,8 +340,8 @@ def test_plugin_napi_urls():
 
 
 @mock.patch("requests.post")
-def test_plugin_napi_sms_payloads(mock_post):
-    """NotifyNotificationAPI() Testing SMS Payloads."""
+def test_plugin_napi_template_sms_payloads(mock_post):
+    """NotifyNotificationAPI() Testing Template SMS Payloads."""
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -261,8 +371,7 @@ def test_plugin_napi_sms_payloads(mock_post):
         is True
     )
 
-    # 2 calls were made, one to perform an email lookup, the second
-    # was the notification itself
+    # delivery of message
     assert mock_post.call_count == 1
     assert (
         mock_post.call_args_list[0][0][0]
@@ -299,8 +408,8 @@ def test_plugin_napi_sms_payloads(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_napi_email_payloads(mock_post):
-    """NotifyNotificationAPI() Testing Email Payloads."""
+def test_plugin_napi_template_email_payloads(mock_post):
+    """NotifyNotificationAPI() Testing Template Email Payloads."""
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
@@ -331,8 +440,7 @@ def test_plugin_napi_email_payloads(mock_post):
         is True
     )
 
-    # 2 calls were made, one to perform an email lookup, the second
-    # was the notification itself
+    # delivery of message
     assert mock_post.call_count == 1
     assert (
         mock_post.call_args_list[0][0][0]
@@ -375,3 +483,191 @@ def test_plugin_napi_email_payloads(mock_post):
 
     # Reset our mock object
     mock_post.reset_mock()
+
+
+@mock.patch("requests.post")
+def test_plugin_napi_message_payloads(mock_post):
+    """NotifyNotificationAPI() Testing Message Payloads."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = NOTIFICATIONAPI_GOOD_RESPONSE
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # Details
+    client_id = "my_id_abc"
+    client_secret = "my_secret"
+    message_type = "apprise-post"
+    targets = "userid/test@example.ca/+15551239876"
+
+    obj = Apprise.instantiate(
+        f"napi://{message_type}@{client_id}/{client_secret}/"
+        f"{targets}?from=Chris<chris@example.eu>&bcc=joe@hidden.com"
+        f"&mode=message")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    # delivery of message
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == f"https://api.notificationapi.com/{client_id}/sender"
+    )
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "apprise-post",
+        "to": {
+            "id": "userid",
+            "email": "test@example.ca",
+            "number": "+15551239876",
+        },
+        "email": {
+            "subject": "Apprise",
+            "html": "body",
+            "senderName": "chris@example.eu",
+            "senderEmail": "Chris",
+        },
+        "options": {
+            "email": {
+                "fromAddress": "chris@example.eu",
+                "fromName": "Chris",
+                "bccAddresses": ["joe@hidden.com"],
+            },
+        },
+    }
+    headers = mock_post.call_args_list[0][1]["headers"]
+    assert headers == {
+        "User-Agent": "Apprise",
+        "Content-Type": "application/json",
+        "Authorization": "Basic bXlfaWRfYWJjOm15X3NlY3JldA=="}
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # Reversing the sms with email causes auto-detection channel to
+    # be sms instead of email
+    targets = "userid/+15551239876/test@example.ca"
+
+    obj = Apprise.instantiate(
+        f"napi://{client_id}/{client_secret}/"
+        f"{targets}?from=Chris<chris@example.eu>&bcc=joe@hidden.com")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    # delivery of message
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == f"https://api.notificationapi.com/{client_id}/sender"
+    )
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "apprise",
+        "to": {
+            "id": "userid",
+            "number": "+15551239876",
+            "email": "test@example.ca",
+        },
+        "sms": {"message": "body"},
+        "options": {
+            "email": {
+                "fromAddress": "chris@example.eu",
+                "fromName": "Chris",
+                "bccAddresses": ["joe@hidden.com"]},
+        },
+    }
+
+    headers = mock_post.call_args_list[0][1]["headers"]
+    assert headers == {
+        "User-Agent": "Apprise",
+        "Content-Type": "application/json",
+        "Authorization": "Basic bXlfaWRfYWJjOm15X3NlY3JldA=="}
+
+    # Reset our mock object
+    mock_post.reset_mock()
+
+    # Experiment with fixed channels:
+    obj = Apprise.instantiate(
+        f"napi://{message_type}@{client_id}/{client_secret}/"
+        f"{targets}?from=Chris<chris@example.eu>&bcc=joe@hidden.com"
+        f"&mode=message&channels=sms,slack")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    # delivery of message
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == f"https://api.notificationapi.com/{client_id}/sender"
+    )
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "apprise-post",
+        "to": {
+            "id": "userid",
+            "email": "test@example.ca",
+            "number": "+15551239876",
+        },
+        "slack": {"text": "body"},
+        "sms": {"message": "body"},
+        "options": {
+            "email": {
+                "fromAddress": "chris@example.eu",
+                "fromName": "Chris",
+                "bccAddresses": ["joe@hidden.com"],
+            },
+        },
+    }
+
+    headers = mock_post.call_args_list[0][1]["headers"]
+    assert headers == {
+        "User-Agent": "Apprise",
+        "Content-Type": "application/json",
+        "Authorization": "Basic bXlfaWRfYWJjOm15X3NlY3JldA=="}
+
+
+def test_plugin_napi_edge_cases():
+    """
+    NotifyNotificationAPI() Edge Cases
+
+    """
+    client_id = "my_id_abc"
+    client_secret = "my_secret"
+    targets = ["userid", "test@example.ca", "+15551239876"]
+
+    # Tests case where tokens is == None
+    obj = NotifyNotificationAPI(client_id, client_secret, targets=targets)
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)

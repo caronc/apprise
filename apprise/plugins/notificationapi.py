@@ -32,6 +32,7 @@ from __future__ import annotations
 
 import base64
 from email.utils import formataddr
+from itertools import chain
 from json import dumps, loads
 import re
 
@@ -51,7 +52,7 @@ from .base import NotifyBase
 
 # Used to detect ID
 IS_VALID_ID_RE = re.compile(
-    r"^\s*(@|%40)?(?P<id>[\w_-]+)\s*", re.I)
+    r"^\s*(@|%40)?(?P<id>[\w_-]+)\s*$", re.I)
 
 
 class NotificationAPIRegion:
@@ -85,7 +86,7 @@ class NotificationAPIChannel:
     INAPP = "inapp"
     WEB_PUSH = "web_push"
     MOBILE_PUSH = "mobile_push"
-    SLACK = "mobile_push"
+    SLACK = "slack"
 
 
 # A List of our channels we can use for verification
@@ -209,10 +210,6 @@ class NotifyNotificationAPI(NotifyBase):
             "type": "choice:string",
             "values": NOTIFICATIONAPI_MODES,
         },
-        "base_url": {
-            "name": _("Base URL Override"),
-            "type": "string",
-        },
         "to": {
             "alias_of": "targets",
         },
@@ -328,7 +325,6 @@ class NotifyNotificationAPI(NotifyBase):
             self.message_type = self.default_message_type
 
         else:
-            # Validate information
             self.message_type = validate_regex(
                 message_type, *self.template_tokens["type"]["regex"])
             if not self.message_type:
@@ -382,6 +378,9 @@ class NotifyNotificationAPI(NotifyBase):
                 raise TypeError(msg) from None
             self.channels.add(channel)
 
+        # Used for URL generation afterwards only
+        self._invalid_targets = []
+
         if targets:
             current_target = {}
             for entry in parse_list(targets, sort=False):
@@ -417,7 +416,7 @@ class NotifyNotificationAPI(NotifyBase):
                 if result:
                     if "number" not in current_target:
                         current_target["number"] = \
-                            ('+' if entry[0] == '+' else '') + result["full"]
+                            ("+" if entry[0] == "+" else "") + result["full"]
                         if not self.channels:
                             self.channels.add(NotificationAPIChannel.SMS)
                             self.logger.info(
@@ -448,17 +447,17 @@ class NotifyNotificationAPI(NotifyBase):
                         current_target["id"] = result.group("id")
                         continue
 
-                    elif "id" in current_target:
-                        # Store and move on
-                        self.targets.append(current_target)
-                        current_target = {
-                            "id": result.group("id")
-                        }
-                        continue
+                    # Store id in next target and move on
+                    self.targets.append(current_target)
+                    current_target = {
+                        "id": result.group("id")
+                    }
+                    continue
 
                 self.logger.warning(
-                    "Ignoring invalid NotificationAPI target "
+                    "Dropped invalid NotificationAPI target "
                     f"({entry}) specified")
+                self._invalid_targets.append(entry)
                 continue
 
             if "id" in current_target:
@@ -508,14 +507,6 @@ class NotifyNotificationAPI(NotifyBase):
         self.tokens = {}
         if isinstance(tokens, dict):
             self.tokens.update(tokens)
-
-        elif tokens:
-            msg = (
-                "The specified NotificationAPI Template Tokens "
-                f"({tokens}) are not identified as a dictionary."
-            )
-            self.logger.warning(msg)
-            raise TypeError(msg)
 
         return
 
@@ -572,7 +563,7 @@ class NotifyNotificationAPI(NotifyBase):
 
         if self.channels:
             # Prepare our default channel
-            params["channels"] = self.channels
+            params["channels"] = ",".join(self.channels)
 
         if self.region != self.template_args["region"]["default"]:
             # Prepare our default region
@@ -589,8 +580,8 @@ class NotifyNotificationAPI(NotifyBase):
 
         targets = []
         for target in self.targets:
-            if "id" in target:
-                targets.append(f"@{target['id']}")
+            # ID is always present
+            targets.append(f"@{target['id']}")
             if "number" in target:
                 targets.append(f"{target['number']}")
             if "email" in target:
@@ -603,7 +594,8 @@ class NotifyNotificationAPI(NotifyBase):
             mtype=mtype,
             cid=self.pprint(self.client_id, privacy, safe=""),
             secret=self.pprint(self.client_secret, privacy, safe=""),
-            targets=NotifyNotificationAPI.quote("/".join(targets), safe="/"),
+            targets=NotifyNotificationAPI.quote("/".join(
+                chain(targets, self._invalid_targets)), safe="/"),
             params=NotifyNotificationAPI.urlencode(params),
         )
 
@@ -649,9 +641,9 @@ class NotifyNotificationAPI(NotifyBase):
                 if self.notify_format == NotifyFormat.HTML else body
 
             for channel in self.channels:
-                # Python v3.10 supports `match/case` but since Apprise aims to be
-                # compatible with Python v3.9+, we must use if/else for the time
-                # being
+                # Python v3.10 supports `match/case` but since Apprise aims to
+                # be compatible with Python v3.9+, we must use if/else for the
+                # time being
                 if channel == NotificationAPIChannel.SMS:
                     _payload.update({
                         NotificationAPIChannel.SMS: {
@@ -703,7 +695,7 @@ class NotifyNotificationAPI(NotifyBase):
                         },
                     })
 
-                elif channel == NotificationAPIChannel.SLACK:
+                else:  # channel == NotificationAPIChannel.SLACK
                     _payload.update({
                         NotificationAPIChannel.SLACK: {
                             "text": (title + "\n" + text_body)
@@ -883,8 +875,10 @@ class NotifyNotificationAPI(NotifyBase):
         results["client_secret"] = None
 
         # Prepare our targets (starting with our host)
-        results["targets"] = [
-            NotifyNotificationAPI.unquote(results["host"])]
+        results["targets"] = []
+        if results["host"]:
+            results["targets"].append(
+                NotifyNotificationAPI.unquote(results["host"]))
 
         # For tracking email sources
         results["from_addr"] = None
@@ -919,13 +913,9 @@ class NotifyNotificationAPI(NotifyBase):
             results["region"] = \
                 NotifyNotificationAPI.unquote(results["qsd"]["region"])
 
-        if "channel" in results["qsd"] and len(results["qsd"]["channel"]):
-            results["channel"] = \
-                NotifyNotificationAPI.unquote(results["qsd"]["channel"])
-
-        if "type" in results["qsd"] and len(results["qsd"]["type"]):
-            results["message_type"] = \
-                NotifyNotificationAPI.unquote(results["qsd"]["type"])
+        if "channels" in results["qsd"] and len(results["qsd"]["channels"]):
+            results["channels"] = \
+                NotifyNotificationAPI.unquote(results["qsd"]["channels"])
 
         if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
             results["mode"] = \
@@ -934,6 +924,11 @@ class NotifyNotificationAPI(NotifyBase):
         if "reply" in results["qsd"] and len(results["qsd"]["reply"]):
             results["reply_to"] = \
                 NotifyNotificationAPI.unquote(results["qsd"]["reply"])
+
+        # Handling of Message Type
+        if "type" in results["qsd"] and len(results["qsd"]["type"]):
+            results["message_type"] = \
+                NotifyNotificationAPI.unquote(results["qsd"]["type"])
 
         elif results["user"]:
             # Pull from user
