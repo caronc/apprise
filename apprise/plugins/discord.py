@@ -275,7 +275,7 @@ class NotifyDiscord(NotifyBase):
                 msg = "An invalid Discord flags setting " \
                       "({}) was specified.".format(flags)
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise TypeError(msg) from None
         else:
             self.flags = None
 
@@ -307,7 +307,7 @@ class NotifyDiscord(NotifyBase):
 
         if self.flags:
             # Set our flag if defined:
-            payload['flags'] = self.flags
+            payload["flags"] = self.flags
 
         # Acquire image_url
         image_url = self.image_url(notify_type)
