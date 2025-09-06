@@ -207,7 +207,11 @@ class AppriseURLTester:
             if instance is not None:
                 # We're done (assuming this is what we were
                 # expecting)
-                raise AssertionError()
+                raise AssertionError(
+                    f"URL: {url} / Expected instance of "
+                    "NoneType but got {}".format(
+                        url, str(obj) if isinstance(obj, type)
+                        else type(obj)))
             # We're done because we got the results we expected
             return
 
@@ -216,7 +220,11 @@ class AppriseURLTester:
             raise AssertionError()
 
         if not isinstance(obj, instance):
-            raise AssertionError()
+            raise AssertionError(
+                "URL: {} / Expected instance of {}, but got {}".format(
+                    url, str(instance) if isinstance(instance, type)
+                    else type(instance), str(obj) if isinstance(obj, type)
+                    else type(obj)))
 
         if isinstance(obj, NotifyBase):
             # Ensure we are not performing any type of thorttling
@@ -250,9 +258,9 @@ class AppriseURLTester:
                 privacy_url
             ):
                 raise AssertionError(
-                    "Privacy URL:"
+                    f"URL: {url} generated an unexpected Privacy URL:"
                     f" '{obj.url(privacy=True)[:len(privacy_url)]}' !="
-                    f" expected '{privacy_url}'"
+                    f" (expected) '{privacy_url}'"
                 )
 
             if url_matches:
@@ -272,21 +280,21 @@ class AppriseURLTester:
             # Our new object should produce the same url identifier
             elif obj.url_identifier != obj_cmp.url_identifier:
                 raise AssertionError(
-                    f"URL Identifier: '{obj_cmp.url_identifier}' != expected"
-                    f" '{obj.url_identifier}'"
+                    f"URL {url} url_identifier(): '{obj_cmp.url_identifier}' "
+                    f"!= expected '{obj.url_identifier}'"
                 )
 
             # Back our check up
             if obj.url_id() != obj_cmp.url_id():
                 raise AssertionError(
-                    f"URL ID(): '{obj_cmp.url_id()}' != expected"
-                    f" '{obj.url_id()}'"
+                    f"URL: {url} url_id() produced: '{obj_cmp.url_id()}' "
+                    f"!= expected '{obj.url_id()}'"
                 )
 
             # Verify there is no change from the old and the new
             if len(obj) != len(obj_cmp):
                 raise AssertionError(
-                    f"Target miscount {len(obj)} != {len(obj_cmp)}"
+                    f"URL: {url} target miscount {len(obj)} != {len(obj_cmp)}"
                 )
 
             # Tidy our object

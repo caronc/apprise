@@ -1971,7 +1971,8 @@ def test_apprise_details_plugin_verification():
                     assert section != "tokens"
 
                     # must be a string
-                    assert isinstance(arg["alias_of"], (str, list, tuple, set))
+                    assert isinstance(arg["alias_of"], (
+                        str, list, tuple, set, frozenset))
 
                     aliases = (
                         [arg["alias_of"]]
@@ -2101,7 +2102,8 @@ def test_apprise_details_plugin_verification():
 
         # Template verification
         assert "templates" in entry["details"]
-        assert isinstance(entry["details"]["templates"], (set, tuple, list))
+        assert isinstance(
+            entry["details"]["templates"], (set, tuple, list, frozenset))
 
         # Iterate over our templates and parse our arguments
         for template in entry["details"]["templates"]:

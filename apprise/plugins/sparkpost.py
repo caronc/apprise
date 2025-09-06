@@ -144,6 +144,8 @@ class NotifySparkPost(NotifyBase):
     notify_format = NotifyFormat.HTML
 
     # Define object templates
+    #
+    # Targets must be in the format: id:email or id:sms
     templates = (
         "{schema}://{user}@{host}:{apikey}/",
         "{schema}://{user}@{host}:{apikey}/{targets}",

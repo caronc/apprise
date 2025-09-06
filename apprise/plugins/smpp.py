@@ -196,17 +196,15 @@ class NotifySMPP(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         return (
-            "{schema}://{user}:{password}@{host}/{source}/{targets}/?{params}"
+            "{schema}://{user}:{password}@{host}/{source}/{targets}?{params}"
         ).format(
             schema=self.secure_protocol if self.secure else self.protocol,
             user=self.user,
             password=self.password,
             host=f"{self.host}:{self.port}" if self.port else self.host,
             source=self.source,
-            targets="/".join([
-                NotifySMPP.quote(t, safe="")
-                for t in chain(self.targets, self._invalid_targets)
-            ]),
+            targets=NotifySMPP.quote("/".join(
+                chain(self.targets, self._invalid_targets)), safe="/"),
             params=self.urlencode(params),
         )
 

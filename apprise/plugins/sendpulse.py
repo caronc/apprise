@@ -60,7 +60,7 @@ class NotifySendPulse(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://github.com/caronc/apprise/wiki/Notify_sendpulse"
 
-    # Default to markdown
+    # Default to html
     notify_format = NotifyFormat.HTML
 
     # The default Email API URL to use
@@ -87,9 +87,6 @@ class NotifySendPulse(NotifyBase):
     # Below states that 10 seconds bfore our token expiry, we'll
     # attempt to renew it
     token_expiry_edge = 10
-
-    # Support attachments
-    attachment_support = True
 
     # The default subject to use if one isn't specified.
     default_empty_subject = "<no subject>"
