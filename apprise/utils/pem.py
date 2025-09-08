@@ -659,7 +659,9 @@ class ApprisePEMController:
                 return None
 
         # 3. Generate ephemeral EC private key
-        ephemeral_private_key = ec.generate_private_key(ec.SECP256R1())
+        ephemeral_private_key = ec.generate_private_key(
+            ec.SECP256R1(), default_backend()
+        )
 
         # 4. Derive shared secret
         shared_secret = ephemeral_private_key.exchange(ec.ECDH(), public_key)
@@ -769,12 +771,14 @@ class ApprisePEMController:
             length=32,
             salt=salt,
             info=b"ecies-encryption",
+            backend=default_backend(),
         ).derive(shared_secret)
 
         # 6. Decrypt using AES-GCM
         decryptor = Cipher(
             algorithms.AES(derived_key),
             modes.GCM(iv, tag),
+            backend=default_backend(),
         ).decryptor()
 
         try:
