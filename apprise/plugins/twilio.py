@@ -525,6 +525,8 @@ class NotifyTwilio(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        params["method"] = self.method
+
         if self.apikey is not None:
             # apikey specified; pass it back on the url
             params["apikey"] = self.apikey
