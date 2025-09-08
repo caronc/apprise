@@ -298,8 +298,8 @@ class AppriseURLTester:
             # object
             for key, val in _self.items():
                 # Test that our object has the desired key
-                assert hasattr(key, obj) is True
-                assert getattr(key, obj) == val
+                assert hasattr(obj, key) is True
+                assert getattr(obj, key) == val
 
         try:
             self.__notify(url, obj, meta, asset)
