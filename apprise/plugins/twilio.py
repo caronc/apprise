@@ -269,12 +269,6 @@ class NotifyTwilio(NotifyBase):
         else:
             self.method = self.template_args["method"]["default"]
 
-        # Set body max length according to the notification method
-        if self.method == TwilioNotificationMethod.SMS:
-            self.body_maxlen = self.body_sms_maxlen
-        else:
-            self.body_maxlen = self.body_call_maxlen
-
         # Detect mode
         result = MODE_DETECT_RE.match(source)
         if not result:
@@ -504,6 +498,14 @@ class NotifyTwilio(NotifyBase):
                 continue
 
         return not has_error
+
+    @property
+    def body_maxlen(self):
+        """The maximum allowable characters allowed in the body per message.
+        It is dependent on the notification method."""
+        return self.body_sms_maxlen \
+            if self.method == TwilioNotificationMethod.SMS \
+            else self.body_call_maxlen
 
     @property
     def url_identifier(self):
