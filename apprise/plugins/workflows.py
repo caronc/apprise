@@ -39,8 +39,8 @@
 # https://prod-161.westeurope.logic.azure.com:443/\
 #       powerautomate/automations/direct/\
 #       workflows/643e69f83c8944438d68119179a10a64/triggers/manual/\
-#       paths/invoke?api-version=2022-03-01-preview&sp=%2Ftriggers%2Fmanual%2Frun&\
-#       sv=1.0&sig=KODuebWbDGYFr0z0eu-6Rj8aUKz7108W3wrNJZxFE5A
+#       paths/invoke?api-version=2022-03-01-preview&sp=%2Ftriggers%2Fmanual%2F\
+#       run&sv=1.0&sig=KODuebWbDGYFr0z0eu-6Rj8aUKz7108W3wrNJZxFE5A
 #
 # Yes... The URL is that big... But it looks like this (greatly simplified):
 # https://HOST:PORT/workflows/ABCD/triggers/manual/path/...sig=DEFG
@@ -518,11 +518,12 @@ class NotifyWorkflows(NotifyBase):
             )
 
         # Store our version if it differs from default
-        if self.api_version != self.template_args["ver"]["default"]:
+        if (self.api_version != self.template_args["ver"]["default"]) and \
+                ((not self.power_automate) or \
+                (self.api_version != self.template_args["ver"]["pa_default"])):
             # But only do so if we're not using power automate with the
             # default version for that.
-            if not self.power_automate or self.api_version != self.template_args["ver"]["pa_default"]:
-                params["ver"] = self.api_version
+            params["ver"] = self.api_version
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -563,7 +564,8 @@ class NotifyWorkflows(NotifyBase):
         # Support Power Automate?
         results["power_automate"] = parse_bool(
             results["qsd"].get(
-                "power_automate", NotifyWorkflows.template_args["power_automate"]["default"]
+                "power_automate",
+                NotifyWorkflows.template_args["power_automate"]["default"]
             )
         )
 
