@@ -296,7 +296,7 @@ class AppriseURLTester:
         if _self:
             # Iterate over our expected entries inside of our
             # object
-            for key, val in self.items():
+            for key, val in _self.items():
                 # Test that our object has the desired key
                 assert hasattr(key, obj) is True
                 assert getattr(key, obj) == val
