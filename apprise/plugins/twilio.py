@@ -29,10 +29,11 @@
 # AUTH_TOKEN and ACCOUNT SID right from your console/dashboard at:
 #     https://www.twilio.com/console
 #
-# You will also need to send the SMS From a phone number or account id name.
+# You will also need to send the SMS or do the call From a phone number or
+# account id name.
 
-# This is identified as the source (or where the SMS message will originate
-# from). Activated phone numbers can be found on your dashboard here:
+# This is identified as the source (or where the SMS message or the call will
+# originate from). Activated phone numbers can be found on your dashboard here:
 #  - https://www.twilio.com/console/phone-numbers/incoming
 #
 # Alternatively, you can open your wallet and request a different Twilio
@@ -56,6 +57,19 @@ from .base import NotifyBase
 # Twilio Mode Detection
 MODE_DETECT_RE = re.compile(
     r"\s*((?P<mode>[^:]+)\s*:\s*)?(?P<phoneno>.+)$", re.I
+)
+
+
+class TwilioNotificationMethod:
+    """Twilio Notification Method."""
+
+    SMS = "sms"
+    CALL = "call"
+
+
+TWILIO_NOTIFICATION_METHODS = (
+    TwilioNotificationMethod.SMS,
+    TwilioNotificationMethod.CALL,
 )
 
 
@@ -92,13 +106,21 @@ class NotifyTwilio(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://github.com/caronc/apprise/wiki/Notify_twilio"
 
-    # Twilio uses the http protocol with JSON requests
-    notify_url = (
+    # Twilio uses the http protocol with JSON message requests
+    notify_sms_url = (
         "https://api.twilio.com/2010-04-01/Accounts/{sid}/Messages.json"
     )
 
-    # The maximum length of the body
-    body_maxlen = 160
+    # Twilio uses the http protocol with JSON call requests
+    notify_call_url = (
+        "https://api.twilio.com/2010-04-01/Accounts/{sid}/Calls.json"
+    )
+
+    # The maximum length of the sms body
+    body_sms_maxlen = 160
+
+    # The maximum length of the call body in xml format
+    body_call_maxlen = 4000
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.
@@ -177,6 +199,12 @@ class NotifyTwilio(NotifyBase):
                 "private": True,
                 "regex": (r"^SK[a-f0-9]+$", "i"),
             },
+            "method": {
+                "name": _("Notification Method: sms or call"),
+                "type": "choice:string",
+                "values": TWILIO_NOTIFICATION_METHODS,
+                "default": TWILIO_NOTIFICATION_METHODS[0],
+            },
         },
     )
 
@@ -187,6 +215,7 @@ class NotifyTwilio(NotifyBase):
         source,
         targets=None,
         apikey=None,
+        method=None,
         **kwargs,
     ):
         """Initialize Twilio Object."""
@@ -220,6 +249,26 @@ class NotifyTwilio(NotifyBase):
             apikey, *self.template_args["apikey"]["regex"]
         )
 
+        # Set notification method
+        if isinstance(method, str) and method:
+            self.method = next((
+                a
+                for a in TWILIO_NOTIFICATION_METHODS
+                if a.startswith(method.lower())
+            ),
+                None,
+            )
+
+            if self.method not in TWILIO_NOTIFICATION_METHODS:
+                msg = (
+                    f"The Twilio notification method specified ({method}) "
+                    "is invalid."
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.method = self.template_args["method"]["default"]
+
         # Detect mode
         result = MODE_DETECT_RE.match(source)
         if not result:
@@ -237,6 +286,16 @@ class NotifyTwilio(NotifyBase):
             if result.group("mode") and result.group("mode")[0].lower() == "w"
             else TwilioMessageMode.TEXT
         )
+
+        # Check compatibility between notification method and mode
+        if self.method == TwilioNotificationMethod.CALL and \
+                self.default_mode == TwilioMessageMode.WHATSAPP:
+            msg = (
+                "The notification method Call is not valid along "
+                "message mode Whatsapp."
+            )
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         result = is_phone_no(result.group("phoneno"), min_len=5)
         if not result:
@@ -292,14 +351,15 @@ class NotifyTwilio(NotifyBase):
                 )
                 continue
 
-            # We can't send twilio messages using short-codes as our source
-            if (
-                len(self.source) in (5, 6)
-                and mode is TwilioMessageMode.WHATSAPP
-            ):
+            # We can't use WhatsApp using short-codes as our source or
+            # for phone calls
+            if ((len(self.source) in (5, 6)
+                 or self.method == TwilioNotificationMethod.CALL)
+                    and mode is TwilioMessageMode.WHATSAPP):
                 self.logger.warning(
-                    "Dropped WhatsApp phone # "
-                    f"({entry}) because source provided was a short-code.",
+                    f"Dropped WhatsApp phone # ({entry}) because source"
+                    " provided is a short-code or because notification"
+                    " method is phone call.",
                 )
                 continue
 
@@ -327,15 +387,16 @@ class NotifyTwilio(NotifyBase):
         }
 
         # Prepare our payload
-        payload = {
-            "Body": body,
-            # The From and To gets populated in the loop below
-            "From": None,
-            "To": None,
-        }
+        payload = {}
 
-        # Prepare our Twilio URL
-        url = self.notify_url.format(sid=self.account_sid)
+        # Prepare our Twilio URL and payload parameter according
+        # to notification method
+        if self.method == TwilioNotificationMethod.SMS:
+            url = self.notify_sms_url.format(sid=self.account_sid)
+            payload["Body"] = body
+        else:
+            url = self.notify_call_url.format(sid=self.account_sid)
+            payload["Twiml"] = body
 
         # Create a copy of the targets list
         targets = list(self.targets)
@@ -343,8 +404,8 @@ class NotifyTwilio(NotifyBase):
         # Set up our authentication. Prefer the API Key if provided.
         auth = (self.apikey or self.account_sid, self.auth_token)
 
-        if len(targets) == 0:
-            # No sources specified, use our own phone no
+        if len(targets) == 0 and self.method != TwilioNotificationMethod.CALL:
+            # No sources specified, use our own phone only with messages
             targets.append((self.default_mode, self.source))
 
         while len(targets):
@@ -439,6 +500,14 @@ class NotifyTwilio(NotifyBase):
         return not has_error
 
     @property
+    def body_maxlen(self):
+        """The maximum allowable characters allowed in the body per message.
+        It is dependent on the notification method."""
+        return self.body_sms_maxlen \
+            if self.method == TwilioNotificationMethod.SMS \
+            else self.body_call_maxlen
+
+    @property
     def url_identifier(self):
         """Returns all of the identifiers that make this URL unique from
         another simliar one.
@@ -457,6 +526,8 @@ class NotifyTwilio(NotifyBase):
 
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
+
+        params["method"] = self.method
 
         if self.apikey is not None:
             # apikey specified; pass it back on the url
@@ -544,5 +615,10 @@ class NotifyTwilio(NotifyBase):
             results["targets"] += NotifyTwilio.parse_phone_no(
                 results["qsd"]["to"], prefix=True
             )
+
+        # Notification method
+        if "method" in results["qsd"] and len(results["qsd"]["method"]):
+            # Extract the notification method from an argument
+            results["method"] = NotifyTwilio.unquote(results["qsd"]["method"])
 
         return results

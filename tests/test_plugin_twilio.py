@@ -36,7 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise
-from apprise.plugins.twilio import NotifyTwilio
+from apprise.plugins.twilio import NotifyTwilio, TwilioNotificationMethod
 
 logging.disable(logging.CRITICAL)
 
@@ -143,6 +143,29 @@ apprise_url_tests = (
         },
     ),
     (
+        "twilio://AC{}:{}@{}?method=sms".format("a" * 32, "b" * 32, "5" * 11),
+        {
+            # Specify explicitly notification method sms
+            "instance": NotifyTwilio,
+        },
+    ),
+    (
+        "twilio://AC{}:{}@{}?method=mms".format("a" * 32, "b" * 32, "5" * 11),
+        {
+            # Invalid notification method
+            "instance": TypeError,
+        },
+    ),
+    (
+        "twilio://AC{}:{}@{}?method=call".format(
+            "a" * 32, "b" * 32, "w:" + "5" * 11
+        ),
+        {
+            # Incompatibility between Whatsapp mode and CALL method
+            "instance": TypeError,
+        },
+    ),
+    (
         "twilio://_?sid=AC{}&token={}&from={}".format(
             "a" * 32, "b" * 32, "5" * 11
         ),
@@ -176,6 +199,15 @@ apprise_url_tests = (
         ),
         {
             # use to=
+            "instance": NotifyTwilio,
+        },
+    ),
+    (
+        "twilio://_?sid=AC{}&token={}&from={}&to={}method=call".format(
+            "a" * 32, "b" * 32, "5" * 11, "7" * 13
+        ),
+        {
+            # Specify notification method call
             "instance": NotifyTwilio,
         },
     ),
@@ -250,10 +282,21 @@ def test_plugin_twilio_auth(mock_post):
     # Send Notification
     assert obj.send(body=message_contents) is True
 
+    # Variation of initialization with method call
+    obj = Apprise.instantiate(
+        f"twilio://{account_sid}:{auth_token}@{source}/{dest}?method=call"
+    )
+    assert isinstance(obj, NotifyTwilio)
+    assert isinstance(obj.url(), str)
+
+    # Send Notification
+    assert obj.send(body=message_contents) is True
+
     # Validate expected call parameters
-    assert mock_post.call_count == 2
+    assert mock_post.call_count == 3
     first_call = mock_post.call_args_list[0]
     second_call = mock_post.call_args_list[1]
+    third_call = mock_post.call_args_list[2]
 
     # URL and message parameters are the same for both calls
     assert (
@@ -268,19 +311,31 @@ def test_plugin_twilio_auth(mock_post):
         == message_contents
     )
     assert (
+        third_call[0][0]
+        == ("https://api.twilio.com/2010-04-01/Accounts"
+        f"/{account_sid}/Calls.json")
+    )
+    assert (
+        third_call[1]["data"]["Twiml"]
+        == message_contents
+    )
+    assert (
         first_call[1]["data"]["From"]
         == second_call[1]["data"]["From"]
+        == third_call[1]["data"]["From"]
         == "+15551233456"
     )
     assert (
         first_call[1]["data"]["To"]
         == second_call[1]["data"]["To"]
+        == third_call[1]["data"]["To"]
         == "+15559876543"
     )
 
     # Auth differs depending on if API Key is used
     assert first_call[1]["auth"] == (account_sid, auth_token)
     assert second_call[1]["auth"] == (apikey, auth_token)
+    assert third_call[1]["auth"] == (account_sid, auth_token)
 
 
 @mock.patch("requests.post")
@@ -298,6 +353,7 @@ def test_plugin_twilio_edge_cases(mock_post):
     account_sid = "AC{}".format("b" * 32)
     auth_token = "{}".format("b" * 32)
     source = "+1 (555) 123-3456"
+    whatsapp_source = "w:" + "+1 (555) 123-3456"
 
     # No account_sid specified
     with pytest.raises(TypeError):
@@ -310,6 +366,13 @@ def test_plugin_twilio_edge_cases(mock_post):
     # Source is bad
     with pytest.raises(TypeError):
         NotifyTwilio(account_sid=account_sid, auth_token=auth_token, source="")
+
+    # Incompatibility between mode and method
+    with pytest.raises(TypeError):
+        NotifyTwilio(
+            account_sid=account_sid, auth_token=auth_token,
+            source=whatsapp_source, method=TwilioNotificationMethod.CALL
+        )
 
     # a error response
     response.status_code = 400
