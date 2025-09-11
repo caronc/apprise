@@ -684,7 +684,7 @@ class NotifySparkPost(NotifyBase):
                 payload["content"]["headers"] = headers
 
             # Send our message
-            status_code, response = self.__post(
+            status_code, _response = self.__post(
                 payload, self.sparkpost_retry_attempts
             )
 

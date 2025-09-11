@@ -584,7 +584,7 @@ class NotifyTwitter(NotifyBase):
                 target["recipient_id"] = user_id
 
                 # Send Twitter DM
-                postokay, response = self._fetch(
+                postokay, _response = self._fetch(
                     self.twitter_dm,
                     payload=payload,
                 )

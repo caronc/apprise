@@ -212,7 +212,7 @@ class NotifyRevolt(NotifyBase):
         has_error = False
         channel_ids = list(self.targets)
         for channel_id in channel_ids:
-            postokay, response = self._send(payload, channel_id)
+            postokay, _response = self._send(payload, channel_id)
             if not postokay:
                 # Failed to send message
                 has_error = True

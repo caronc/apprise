@@ -527,7 +527,7 @@ class NotifyReddit(NotifyBase):
                     "text": body,
                 })
 
-            postokay, response = self._fetch(self.submit_url, payload=payload)
+            postokay, _response = self._fetch(self.submit_url, payload=payload)
             # only toggle has_error flag if we had an error
             if not postokay:
                 # Mark our failure

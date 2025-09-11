@@ -657,7 +657,7 @@ class NotifyPushSafer(NotifyBase):
                 payload["v"] = str(self.vibration)
 
             if not attachments:
-                okay, response = self._send(payload)
+                okay, _response = self._send(payload)
                 if not okay:
                     has_error = True
                     continue
@@ -685,7 +685,7 @@ class NotifyPushSafer(NotifyBase):
                             f'Added attachment ({filename}) to "{recipient}".'
                         )
 
-                    okay, response = self._send(_payload)
+                    okay, _response = self._send(_payload)
                     if not okay:
                         has_error = True
                         continue

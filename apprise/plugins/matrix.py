@@ -732,7 +732,7 @@ class NotifyMatrix(NotifyBase):
                 }
 
                 # Post our content
-                postokay, response = self._fetch(
+                postokay, _response = self._fetch(
                     path, payload=image_payload)
                 if not postokay:
                     # Mark our failure
@@ -744,7 +744,7 @@ class NotifyMatrix(NotifyBase):
                     attachment["room_id"] = room_id
                     attachment["type"] = "m.room.message"
 
-                    postokay, response = self._fetch(
+                    postokay, _response = self._fetch(
                         path, payload=attachment, method=method)
 
                     # Increment the transaction ID to avoid future messages
@@ -804,7 +804,7 @@ class NotifyMatrix(NotifyBase):
                 })
 
             # Post our content
-            postokay, response = self._fetch(
+            postokay, _response = self._fetch(
                 path, payload=payload, method=method
             )
 
@@ -1814,7 +1814,7 @@ class NotifyMatrix(NotifyBase):
         #
         verify_url = f"{base_url}/_matrix/client/versions"
         # Post our content
-        code, response = self._fetch(
+        code, _response = self._fetch(
             None, method="GET", url_override=verify_url
         )
         if code != requests.codes.ok:
@@ -1856,7 +1856,7 @@ class NotifyMatrix(NotifyBase):
             verify_url = f"{identity_url}/_matrix/identity/v2"
 
             # Post our content
-            code, response = self._fetch(
+            code, _response = self._fetch(
                 None, method="GET", url_override=verify_url
             )
             if code != requests.codes.ok:

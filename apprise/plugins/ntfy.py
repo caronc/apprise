@@ -478,7 +478,7 @@ class NotifyNtfy(NotifyBase):
                         f" {attachment.url(privacy=True)}"
                     )
 
-                    okay, response = self._send(
+                    okay, _response = self._send(
                         topic,
                         body=_body,
                         title=_title,
@@ -490,7 +490,7 @@ class NotifyNtfy(NotifyBase):
                         return False
             else:
                 # Send our Notification Message
-                okay, response = self._send(
+                okay, _response = self._send(
                     topic, body=body, title=title, image_url=image_url
                 )
                 if not okay:
