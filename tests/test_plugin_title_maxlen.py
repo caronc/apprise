@@ -57,7 +57,7 @@ def request_mock(mocker):
 def test_plugin_title_maxlen(request_mock):
     """Plugin title maxlen blending support."""
     # Load our configuration
-    result, config = ConfigBase.config_parse_yaml(cleandoc("""
+    result, _ = ConfigBase.config_parse_yaml(cleandoc("""
     urls:
 
       # Our JSON plugin allows for a title definition; we enforce a html format
@@ -103,7 +103,7 @@ def test_plugin_title_maxlen(request_mock):
     #
     # Reverse the configuration file and expect the same results
     #
-    result, config = ConfigBase.config_parse_yaml(cleandoc("""
+    result, _config = ConfigBase.config_parse_yaml(cleandoc("""
     urls:
 
       # Telegram has a title_maxlen of 0

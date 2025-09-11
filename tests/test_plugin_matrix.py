@@ -585,7 +585,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
         "retry_after_ms": 1,
     })
 
-    code, response = obj._fetch("/retry/apprise/unit/test")
+    code, _response = obj._fetch("/retry/apprise/unit/test")
     assert code is False
 
     request.content = dumps(
@@ -595,11 +595,11 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
             }
         }
     )
-    code, response = obj._fetch("/retry/apprise/unit/test")
+    code, _response = obj._fetch("/retry/apprise/unit/test")
     assert code is False
 
     request.content = dumps({"error": {}})
-    code, response = obj._fetch("/retry/apprise/unit/test")
+    code, _response = obj._fetch("/retry/apprise/unit/test")
     assert code is False
     del obj
 

@@ -573,7 +573,7 @@ class NotifySendPulse(NotifyBase):
                 payload["email"]["bcc"].append(item)
 
             # Perform our post
-            success, response = self._fetch(
+            success, _response = self._fetch(
                 self.notify_email_url, payload, target, retry=1)
             if not success:
                 has_error = True

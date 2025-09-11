@@ -369,7 +369,7 @@ class NotifyTwist(NotifyBase):
             return True
 
         # Send Logout Message
-        postokay, response = self._fetch("users/logout")
+        _postokay, _response = self._fetch("users/logout")
 
         # reset our token
         self.token = None
@@ -600,7 +600,7 @@ class NotifyTwist(NotifyBase):
                 "content": body,
             }
 
-            postokay, response = self._fetch(
+            postokay, _response = self._fetch(
                 "threads/add",
                 payload=payload,
             )

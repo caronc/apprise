@@ -542,7 +542,7 @@ class NotifySES(NotifyBase):
                 quote(from_name, " "), quote(self.from_addr, "@ ")
             )
 
-            (result, response) = self._post(payload=payload, to=to_addr)
+            (result, _response) = self._post(payload=payload, to=to_addr)
             if not result:
                 # Mark our failure
                 has_error = True

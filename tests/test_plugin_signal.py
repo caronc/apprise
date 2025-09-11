@@ -277,7 +277,7 @@ def test_plugin_signal_yaml_config(request_mock):
     """NotifySignalAPI() YAML Configuration."""
 
     # Load our configuration
-    result, config = ConfigBase.config_parse_yaml(cleandoc("""
+    result, _ = ConfigBase.config_parse_yaml(cleandoc("""
     urls:
       - signal://signal:8080/+1234567890:
          - to: +0987654321
@@ -301,7 +301,7 @@ def test_plugin_signal_yaml_config(request_mock):
     #
 
     # Load our configuration
-    result, config = ConfigBase.config_parse_yaml(cleandoc("""
+    result, _config = ConfigBase.config_parse_yaml(cleandoc("""
     urls:
       - signal://signal:8080/+1234567890/+0987654321:
          - tag: signal
