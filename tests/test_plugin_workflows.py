@@ -136,12 +136,32 @@ apprise_url_tests = (
         },
     ),
     (
-        "workflows://host:443/workflow1e/signature/?power_automate=yes",
+        "workflows://host:443/workflow1e/signature/?powerautomate=yes",
         {
             # support power_automate flag
             "instance": NotifyWorkflows,
-            # Our expected power_automate flag (defaults to False)
-            "self": {"power_automate": True},
+        },
+    ),
+    (
+        "workflows://host:443/workflow1e/signature/?pa=yes&ver=1995-01-01",
+        {
+            # support power_automate flag with ver flag
+            "instance": NotifyWorkflows,
+        },
+    ),
+    (
+        "workflows://host:443/workflow1e/signature/?pa=yes&version=1995-01-01",
+        {
+            # support power_automate flag with version flag
+            "instance": NotifyWorkflows,
+        },
+    ),
+
+    (
+        "workflows://host:443/workflow1e/signature/?pa=yes",
+        {
+            # support power_automate flag
+            "instance": NotifyWorkflows,
         },
     ),
     # Support native URLs
@@ -171,8 +191,6 @@ apprise_url_tests = (
         {
             # Power-Automate alternative URL - All tokens provided - we're good
             "instance": NotifyWorkflows,
-            # Our expected power_automate flag (defaults to False)
-            "self": {"power_automate": True},
         },
     ),
     (

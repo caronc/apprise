@@ -70,6 +70,14 @@ from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
 
 
+class APIVersion:
+    """
+    Define API Versions
+    """
+    WORKFLOW = "2016-06-01"
+    POWER_AUTOMATE = "2022-03-01-preview"
+
+
 class NotifyWorkflows(NotifyBase):
     """A wrapper for Microsoft Workflows (MS Teams) Notifications."""
 
@@ -156,17 +164,17 @@ class NotifyWorkflows(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
-            "power_automate": {
-                "name": _("Power Automate"),
+            "pa": {
+                "name": _("Use Power Automate URL"),
                 "type": "bool",
                 "default": False,
                 "map_to": "power_automate",
             },
+            "powerautomate": {"alias_of": "pa"},
             "wrap": {
                 "name": _("Wrap Text"),
                 "type": "bool",
                 "default": True,
-                "map_to": "wrap",
             },
             "template": {
                 "name": _("Template Path"),
@@ -181,11 +189,9 @@ class NotifyWorkflows(NotifyBase):
             "ver": {
                 "name": _("API Version"),
                 "type": "string",
-                "default": "2016-06-01",
-                "pa_default": "2022-03-01-preview",
                 "map_to": "version",
             },
-            "api-version": {"alias_of": "ver"},
+            "version": {"alias_of": "ver"},
         },
     )
 
@@ -239,7 +245,7 @@ class NotifyWorkflows(NotifyBase):
         self.power_automate = bool(
             power_automate
             if power_automate is not None
-            else self.template_args["power_automate"]["default"]
+            else self.template_args["pa"]["default"]
         )
 
         # Wrap Text
@@ -257,11 +263,10 @@ class NotifyWorkflows(NotifyBase):
 
         # Prepare Version
         # The default is taken from the template_args
-        default_api_version = self.template_args["ver"]["default"]
-
-        # If using power_automate, the API version required is different.
-        if self.power_automate:
-            default_api_version = self.template_args["ver"]["pa_default"]
+        # - If using power_automate, the API version required is different.
+        default_api_version = (
+            APIVersion.POWER_AUTOMATE
+            if self.power_automate else APIVersion.WORKFLOW)
 
         self.api_version = (
             version
@@ -509,7 +514,7 @@ class NotifyWorkflows(NotifyBase):
         params = {
             "image": "yes" if self.include_image else "no",
             "wrap": "yes" if self.wrap else "no",
-            "power_automate": "yes" if self.power_automate else "no",
+            "pa": "yes" if self.power_automate else "no",
         }
 
         if self.template:
@@ -518,9 +523,10 @@ class NotifyWorkflows(NotifyBase):
             )
 
         # Store our version if it differs from default
-        if (self.api_version != self.template_args["ver"]["default"]) and \
-                ((not self.power_automate) or \
-                (self.api_version != self.template_args["ver"]["pa_default"])):
+        if (self.api_version != APIVersion.WORKFLOW
+            and not self.power_automate) or (
+                self.api_version != APIVersion.POWER_AUTOMATE
+                and self.power_automate):
             # But only do so if we're not using power automate with the
             # default version for that.
             params["ver"] = self.api_version
@@ -561,11 +567,14 @@ class NotifyWorkflows(NotifyBase):
             )
         )
 
-        # Support Power Automate?
+        # Support Power Automate URL
         results["power_automate"] = parse_bool(
             results["qsd"].get(
-                "power_automate",
-                NotifyWorkflows.template_args["power_automate"]["default"]
+                "powerautomate",
+                results["qsd"].get(
+                    "pa",
+                    NotifyWorkflows.template_args["pa"]["default"]
+                )
             )
         )
 
@@ -617,9 +626,9 @@ class NotifyWorkflows(NotifyBase):
             )
 
         # Version
-        if "api-version" in results["qsd"] and results["qsd"]["api-version"]:
+        if "version" in results["qsd"] and results["qsd"]["version"]:
             results["version"] = NotifyWorkflows.unquote(
-                results["qsd"]["api-version"]
+                results["qsd"]["version"]
             )
 
         elif "ver" in results["qsd"] and results["qsd"]["ver"]:
@@ -636,7 +645,8 @@ class NotifyWorkflows(NotifyBase):
         Support parsing the webhook straight out of workflows
             https://HOST:443/workflows/WORKFLOWID/triggers/manual/paths/invoke
             or
-            https://HOST:443/powerautomate/automations/direct/workflows/WORKFLOWID/triggers/manual/paths/invoke
+            https://HOST:443/powerautomate/automations/direct/workflows
+            /WORKFLOWID/triggers/manual/paths/invoke
         """
 
         # Match our workflows webhook URL and re-assemble
@@ -656,14 +666,14 @@ class NotifyWorkflows(NotifyBase):
         if result:
             # Determine if we're using power automate or not
             power_automate = (
-                "&power_automate=yes"
+                "&pa=yes"
                 if result.group("power_automate")
                 else ""
             )
 
             # Construct our URL
             return NotifyWorkflows.parse_url(
-                "{schema}://{host}{port}/{workflow}/{params}{power_automate}"
+                "{schema}://{host}{port}/{workflow}/{params}{pa}"
                 .format(
                     schema=NotifyWorkflows.secure_protocol[0],
                     host=result.group("host"),
@@ -674,7 +684,7 @@ class NotifyWorkflows(NotifyBase):
                     ),
                     workflow=result.group("workflow"),
                     params=result.group("params"),
-                    power_automate=power_automate,
+                    pa=power_automate,
                 )
             )
         return None
