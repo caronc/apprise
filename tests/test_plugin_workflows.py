@@ -135,6 +135,27 @@ apprise_url_tests = (
             "privacy_url": "workflow://host:443/w...b/s...e/",
         },
     ),
+    (
+        "workflows://host:443/workflow1e/signature/?powerautomate=yes",
+        {
+            # support power_automate flag
+            "instance": NotifyWorkflows,
+        },
+    ),
+    (
+        "workflows://host:443/workflow1e/signature/?pa=yes&ver=1995-01-01",
+        {
+            # support power_automate flag with ver flag
+            "instance": NotifyWorkflows,
+        },
+    ),
+    (
+        "workflows://host:443/workflow1e/signature/?pa=yes",
+        {
+            # support power_automate flag
+            "instance": NotifyWorkflows,
+        },
+    ),
     # Support native URLs
     (
         (
@@ -148,6 +169,20 @@ apprise_url_tests = (
             "instance": NotifyWorkflows,
             # Our expected url(privacy=True) startswith() response
             "privacy_url": "workflow://server.azure.com:443/6...4/K...u/",
+        },
+    ),
+    (
+        (
+            "https://server.azure.com:443/"
+            "powerautomate/automations/direct/"
+            "workflows/643e69f83c8944/"
+            "triggers/manual/paths/invoke?"
+            "api-version=2022-03-01-preview&sp=%2Ftriggers%2Fmanual%2Frun&"
+            "sv=1.0&sig=KODuebWbDGYFr0z0eu"
+        ),
+        {
+            # Power-Automate alternative URL - All tokens provided - we're good
+            "instance": NotifyWorkflows,
         },
     ),
     (

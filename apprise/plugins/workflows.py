@@ -29,11 +29,18 @@
 #  https://support.microsoft.com/en-us/office/browse-and-add-workflows-\
 #       in-microsoft-teams-4998095c-8b72-4b0e-984c-f2ad39e6ba9a
 
-# Your webhook will look somthing like this:
+# Your webhook will look somthing like this (legacy):
 # https://prod-161.westeurope.logic.azure.com:443/\
 #       workflows/643e69f83c8944438d68119179a10a64/triggers/manual/\
 #       paths/invoke?api-version=2016-06-01&sp=%2Ftriggers%2Fmanual%2Frun&\
 #       sv=1.0&sig=KODuebWbDGYFr0z0eu-6Rj8aUKz7108W3wrNJZxFE5A
+#
+# Or it may now look something like this:
+# https://prod-161.westeurope.logic.azure.com:443/\
+#       powerautomate/automations/direct/\
+#       workflows/643e69f83c8944438d68119179a10a64/triggers/manual/\
+#       paths/invoke?api-version=2022-03-01-preview&sp=%2Ftriggers%2Fmanual%2F\
+#       run&sv=1.0&sig=KODuebWbDGYFr0z0eu-6Rj8aUKz7108W3wrNJZxFE5A
 #
 # Yes... The URL is that big... But it looks like this (greatly simplified):
 # https://HOST:PORT/workflows/ABCD/triggers/manual/path/...sig=DEFG
@@ -61,6 +68,14 @@ from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
+
+
+class APIVersion:
+    """
+    Define API Versions
+    """
+    WORKFLOW = "2016-06-01"
+    POWER_AUTOMATE = "2022-03-01-preview"
 
 
 class NotifyWorkflows(NotifyBase):
@@ -149,11 +164,17 @@ class NotifyWorkflows(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
+            "pa": {
+                "name": _("Use Power Automate URL"),
+                "type": "bool",
+                "default": False,
+                "map_to": "power_automate",
+            },
+            "powerautomate": {"alias_of": "pa"},
             "wrap": {
                 "name": _("Wrap Text"),
                 "type": "bool",
                 "default": True,
-                "map_to": "wrap",
             },
             "template": {
                 "name": _("Template Path"),
@@ -168,7 +189,6 @@ class NotifyWorkflows(NotifyBase):
             "ver": {
                 "name": _("API Version"),
                 "type": "string",
-                "default": "2016-06-01",
                 "map_to": "version",
             },
             "api-version": {"alias_of": "ver"},
@@ -188,6 +208,7 @@ class NotifyWorkflows(NotifyBase):
         workflow,
         signature,
         include_image=None,
+        power_automate=None,
         version=None,
         template=None,
         tokens=None,
@@ -220,6 +241,13 @@ class NotifyWorkflows(NotifyBase):
             else self.template_args["image"]["default"]
         )
 
+        # Power Automate status
+        self.power_automate = bool(
+            power_automate
+            if power_automate is not None
+            else self.template_args["pa"]["default"]
+        )
+
         # Wrap Text
         self.wrap = bool(
             wrap if wrap is not None else self.template_args["wrap"]["default"]
@@ -234,10 +262,16 @@ class NotifyWorkflows(NotifyBase):
             self.template[0].max_file_size = self.max_workflows_template_size
 
         # Prepare Version
+        # The default is taken from the template_args
+        # - If using power_automate, the API version required is different.
+        default_api_version = (
+            APIVersion.POWER_AUTOMATE
+            if self.power_automate else APIVersion.WORKFLOW)
+
         self.api_version = (
             version
             if version is not None
-            else self.template_args["ver"]["default"]
+            else default_api_version
         )
 
         # Template functionality
@@ -379,11 +413,20 @@ class NotifyWorkflows(NotifyBase):
             "sig": self.signature,
         }
 
+        # The URL changes depending on whether we're using power automate or
+        # not
+        path = (
+            "/powerautomate/automations/direct"
+            if self.power_automate
+            else ""
+        )
+
         notify_url = (
-            "https://{host}{port}/workflows/{workflow}/"
+            "https://{host}{port}{path}/workflows/{workflow}/"
             "triggers/manual/paths/invoke".format(
                 host=self.host,
                 port="" if not self.port else f":{self.port}",
+                path=path,
                 workflow=self.workflow,
             )
         )
@@ -471,6 +514,7 @@ class NotifyWorkflows(NotifyBase):
         params = {
             "image": "yes" if self.include_image else "no",
             "wrap": "yes" if self.wrap else "no",
+            "pa": "yes" if self.power_automate else "no",
         }
 
         if self.template:
@@ -479,7 +523,12 @@ class NotifyWorkflows(NotifyBase):
             )
 
         # Store our version if it differs from default
-        if self.api_version != self.template_args["ver"]["default"]:
+        if (self.api_version != APIVersion.WORKFLOW
+            and not self.power_automate) or (
+                self.api_version != APIVersion.POWER_AUTOMATE
+                and self.power_automate):
+            # But only do so if we're not using power automate with the
+            # default version for that.
             params["ver"] = self.api_version
 
         # Extend our parameters
@@ -515,6 +564,17 @@ class NotifyWorkflows(NotifyBase):
         results["include_image"] = parse_bool(
             results["qsd"].get(
                 "image", NotifyWorkflows.template_args["image"]["default"]
+            )
+        )
+
+        # Support Power Automate URL
+        results["power_automate"] = parse_bool(
+            results["qsd"].get(
+                "powerautomate",
+                results["qsd"].get(
+                    "pa",
+                    NotifyWorkflows.template_args["pa"]["default"]
+                )
             )
         )
 
@@ -584,12 +644,17 @@ class NotifyWorkflows(NotifyBase):
         """
         Support parsing the webhook straight out of workflows
             https://HOST:443/workflows/WORKFLOWID/triggers/manual/paths/invoke
+            or
+            https://HOST:443/powerautomate/automations/direct/workflows
+            /WORKFLOWID/triggers/manual/paths/invoke
         """
 
         # Match our workflows webhook URL and re-assemble
         result = re.match(
             r"^https?://(?P<host>[A-Z0-9_.-]+)"
             r"(?P<port>:[1-9][0-9]{0,5})?"
+            # The new URL structure includes /powerautomate/automations/direct
+            r"(?P<power_automate>/powerautomate/automations/direct)?"
             r"/workflows/"
             r"(?P<workflow>[A-Z0-9_-]+)"
             r"/triggers/manual/paths/invoke/?"
@@ -599,9 +664,17 @@ class NotifyWorkflows(NotifyBase):
         )
 
         if result:
+            # Determine if we're using power automate or not
+            power_automate = (
+                "&pa=yes"
+                if result.group("power_automate")
+                else ""
+            )
+
             # Construct our URL
             return NotifyWorkflows.parse_url(
-                "{schema}://{host}{port}/{workflow}/{params}".format(
+                "{schema}://{host}{port}/{workflow}/{params}{pa}"
+                .format(
                     schema=NotifyWorkflows.secure_protocol[0],
                     host=result.group("host"),
                     port=(
@@ -611,6 +684,7 @@ class NotifyWorkflows(NotifyBase):
                     ),
                     workflow=result.group("workflow"),
                     params=result.group("params"),
+                    pa=power_automate,
                 )
             )
         return None
