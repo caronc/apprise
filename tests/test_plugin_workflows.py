@@ -150,14 +150,6 @@ apprise_url_tests = (
         },
     ),
     (
-        "workflows://host:443/workflow1e/signature/?pa=yes&version=1995-01-01",
-        {
-            # support power_automate flag with version flag
-            "instance": NotifyWorkflows,
-        },
-    ),
-
-    (
         "workflows://host:443/workflow1e/signature/?pa=yes",
         {
             # support power_automate flag

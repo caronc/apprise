@@ -191,7 +191,7 @@ class NotifyWorkflows(NotifyBase):
                 "type": "string",
                 "map_to": "version",
             },
-            "version": {"alias_of": "ver"},
+            "api-version": {"alias_of": "ver"},
         },
     )
 
@@ -626,9 +626,9 @@ class NotifyWorkflows(NotifyBase):
             )
 
         # Version
-        if "version" in results["qsd"] and results["qsd"]["version"]:
+        if "api-version" in results["qsd"] and results["qsd"]["api-version"]:
             results["version"] = NotifyWorkflows.unquote(
-                results["qsd"]["version"]
+                results["qsd"]["api-version"]
             )
 
         elif "ver" in results["qsd"] and results["qsd"]["ver"]:
