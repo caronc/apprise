@@ -89,9 +89,9 @@ class NotifyRevolt(NotifyBase):
 
     # Define object templates
     templates = (
-            "{schema}://{bot_token}/{targets}",
-            "{schema}://{server_api}/{bot_token}/{targets}",
-            )
+        "{schema}://{bot_token}/{targets}",
+        "{schema}://{server_api_url}/{bot_token}/{targets}",
+    )
 
     # Defile out template tokens
     template_tokens = dict(
@@ -144,7 +144,15 @@ class NotifyRevolt(NotifyBase):
         },
     )
 
-    def __init__(self, bot_token, targets, icon_url=None, link=None, server_api_url=None, **kwargs):
+    def __init__(
+        self,
+        bot_token,
+        targets,
+        icon_url=None,
+        link=None,
+        server_api_url=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
         if server_api_url:
@@ -189,7 +197,6 @@ class NotifyRevolt(NotifyBase):
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Revolt Notification."""
 
-        print(">>>", self.notify_url)
         if len(self.targets) == 0:
             self.logger.warning("There were not Revolt channels to notify.")
             return False
@@ -202,13 +209,17 @@ class NotifyRevolt(NotifyBase):
         )
 
         if self.notify_format == NotifyFormat.MARKDOWN:
-            payload["embeds"] = [{
-                "title": None if not title else title[0 : self.title_maxlen],
-                "description": body,
-                # Our color associated with our notification
-                "colour": self.color(notify_type),
-                "replies": None,
-            }]
+            payload["embeds"] = [
+                {
+                    "title": None
+                    if not title
+                    else title[0 : self.title_maxlen],
+                    "description": body,
+                    # Our color associated with our notification
+                    "colour": self.color(notify_type),
+                    "replies": None,
+                }
+            ]
 
             if image_url:
                 payload["embeds"][0]["icon_url"] = image_url
@@ -259,9 +270,7 @@ class NotifyRevolt(NotifyBase):
             # the same allowing this to role smoothly and set our throttle
             # accordingly
             wait = abs(
-                (
-                    self.ratelimit_reset - now + self.clock_skew
-                ).total_seconds()
+                (self.ratelimit_reset - now + self.clock_skew).total_seconds()
             )
 
         # Default content response object
@@ -309,7 +318,6 @@ class NotifyRevolt(NotifyBase):
                 requests.codes.ok,
                 requests.codes.no_content,
             ):
-
                 # Some details to debug by
                 self.logger.debug(
                     f"Response Details:\r\n{content if content else r.content}"
@@ -334,7 +342,6 @@ class NotifyRevolt(NotifyBase):
                     r.status_code == requests.codes.too_many_requests
                     and retries > 0
                 ):
-
                     # Try again
                     return self._send(
                         payload=payload,
@@ -410,25 +417,17 @@ class NotifyRevolt(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        print("??", results)
         _host = NotifyRevolt.unquote(results["host"])
         selfhosted = _host.endswith("/")
-        # print(f"HOST: {_host}")
         if selfhosted:
-            try:
-                r = requests.get(
-                        f"https://{_host}"
-                )
-            except Exception as e:
-                print(f"Test request to the Revolt Server URL (https://{_host}) specified failed. Error: {type(e)}")
-            results["server_api_url"] = f"https://{_host}"
+            r = requests.get(f"https://{_host}")
+            if r.ok:
+                results["server_api_url"] = f"https://{_host}"
 
-            # bot_token = NotifyRevolt.unquote(results["host"])
-            bot_token = NotifyRevolt.split_path(results["fullpath"])[0]
-            targets = NotifyRevolt.split_path(results["fullpath"])[1:]
-            # print("?", targets)
-            results["bot_token"] = bot_token
-            results["targets"] = targets
+                bot_token = NotifyRevolt.split_path(results["fullpath"])[0]
+                targets = NotifyRevolt.split_path(results["fullpath"])[1:]
+                results["bot_token"] = bot_token
+                results["targets"] = targets
         else:
             # Store our bot token
             bot_token = NotifyRevolt.unquote(results["host"])
