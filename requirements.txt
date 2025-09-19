@@ -6,6 +6,8 @@
 
 # Root certificate authority bundle
 certifi
+# DEBUG: MY SERVER HAS CA SSL.COM WHICH IS A PROBLEM FOR FIREFOX TRUST LIST RN
+certifi==2025.01.31
 
 # Application dependencies
 requests
