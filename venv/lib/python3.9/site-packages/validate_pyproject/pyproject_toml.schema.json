@@ -1,0 +1,94 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://packaging.python.org/en/latest/specifications/declaring-build-dependencies/",
+  "title": "Data structure for ``pyproject.toml`` files",
+  "$$description": [
+    "File format containing build-time configurations for the Python ecosystem. ",
+    ":pep:`517` initially defined a build-system independent format for source trees",
+    "which was complemented by :pep:`518` to provide a way of specifying dependencies ",
+    "for building Python projects.",
+    "Please notice the ``project`` table (as initially defined in  :pep:`621`) is not included",
+    "in this schema and should be considered separately."
+  ],
+
+  "type": "object",
+  "additionalProperties": false,
+
+  "properties": {
+    "build-system": {
+      "type": "object",
+      "description": "Table used to store build-related data",
+      "additionalProperties": false,
+
+      "properties": {
+        "requires": {
+          "type": "array",
+          "$$description": [
+            "List of dependencies in the :pep:`508` format required to execute the build",
+            "system. Please notice that the resulting dependency graph",
+            "**MUST NOT contain cycles**"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "build-backend": {
+          "type": "string",
+          "description":
+            "Python object that will be used to perform the build according to :pep:`517`",
+          "format": "pep517-backend-reference"
+        },
+        "backend-path": {
+          "type": "array",
+          "$$description": [
+            "List of directories to be prepended to ``sys.path`` when loading the",
+            "back-end, and running its hooks"
+          ],
+          "items": {
+            "type": "string",
+            "$comment": "Should be a path (TODO: enforce it with format?)"
+          }
+        }
+      },
+      "required": ["requires"]
+    },
+
+    "project": {
+      "$ref": "https://packaging.python.org/en/latest/specifications/pyproject-toml/"
+    },
+
+    "tool": {
+      "type": "object"
+    },
+    "dependency-groups": {
+      "type": "object",
+      "description": "Dependency groups following PEP 735",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])$": {
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "string",
+                "description": "Python package specifiers following PEP 508",
+                "format": "pep508"
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "include-group": {
+                    "description": "Another dependency group to include in this one",
+                    "type": "string",
+                    "pattern": "^([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9._-]*[a-zA-Z0-9])$"
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

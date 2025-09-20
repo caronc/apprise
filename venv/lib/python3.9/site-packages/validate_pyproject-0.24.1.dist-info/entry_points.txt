@@ -1,0 +1,12 @@
+[console_scripts]
+validate-pyproject = validate_pyproject.cli:main
+
+[repo_review.checks]
+validate_pyproject = validate_pyproject.repo_review:repo_review_checks
+
+[repo_review.families]
+validate_pyproject = validate_pyproject.repo_review:repo_review_families
+
+[validate_pyproject.tool_schema]
+distutils = validate_pyproject.api:load_builtin_plugin
+setuptools = validate_pyproject.api:load_builtin_plugin
