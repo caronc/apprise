@@ -1,0 +1,243 @@
+Metadata-Version: 2.1
+Name: validate-pyproject
+Version: 0.24.1
+Summary: Validation library and CLI tool for checking on 'pyproject.toml' files using JSON Schema
+Author-email: Anderson Bravalheri <andersonbravalheri@gmail.com>
+License: MPL-2.0 and MIT and BSD-3-Clause
+Project-URL: Homepage, https://github.com/abravalheri/validate-pyproject/
+Project-URL: Documentation, https://validate-pyproject.readthedocs.io/
+Project-URL: Source, https://github.com/abravalheri/validate-pyproject
+Project-URL: Tracker, https://github.com/abravalheri/validate-pyproject/issues
+Project-URL: Changelog, https://validate-pyproject.readthedocs.io/en/latest/changelog.html
+Project-URL: Download, https://pypi.org/project/validate-pyproject/#files
+Classifier: Development Status :: 4 - Beta
+Classifier: Intended Audience :: Developers
+Classifier: Operating System :: OS Independent
+Classifier: Programming Language :: Python
+Classifier: Topic :: Software Development :: Quality Assurance
+Classifier: Typing :: Typed
+Requires-Python: >=3.8
+Description-Content-Type: text/x-rst
+License-File: LICENSE.txt
+License-File: NOTICE.txt
+License-File: AUTHORS.rst
+Requires-Dist: fastjsonschema <=3,>=2.16.2
+Provides-Extra: all
+Requires-Dist: packaging >=24.2 ; extra == 'all'
+Requires-Dist: trove-classifiers >=2021.10.20 ; extra == 'all'
+Requires-Dist: tomli >=1.2.1 ; (python_version < "3.11") and extra == 'all'
+Provides-Extra: store
+Requires-Dist: validate-pyproject-schema-store ; extra == 'store'
+
+.. These are examples of badges you might want to add to your README:
+   please update the URLs accordingly
+
+    .. image:: https://img.shields.io/conda/vn/conda-forge/validate-pyproject.svg
+        :alt: Conda-Forge
+        :target: https://anaconda.org/conda-forge/validate-pyproject
+    .. image:: https://pepy.tech/badge/validate-pyproject/month
+        :alt: Monthly Downloads
+        :target: https://pepy.tech/project/validate-pyproject
+    .. image:: https://img.shields.io/twitter/url/http/shields.io.svg?style=social&label=Twitter
+        :alt: Twitter
+        :target: https://twitter.com/validate-pyproject
+
+.. image:: https://img.shields.io/badge/-PyScaffold-005CA0?logo=pyscaffold
+    :alt: Project generated with PyScaffold
+    :target: https://pyscaffold.org/
+.. image:: https://api.cirrus-ci.com/github/abravalheri/validate-pyproject.svg?branch=main
+    :alt: Built Status
+    :target: https://cirrus-ci.com/github/abravalheri/validate-pyproject
+.. image:: https://readthedocs.org/projects/validate-pyproject/badge/?version=latest
+    :alt: ReadTheDocs
+    :target: https://validate-pyproject.readthedocs.io
+.. image:: https://img.shields.io/coveralls/github/abravalheri/validate-pyproject/main.svg
+    :alt: Coveralls
+    :target: https://coveralls.io/r/abravalheri/validate-pyproject
+.. image:: https://img.shields.io/pypi/v/validate-pyproject.svg
+    :alt: PyPI-Server
+    :target: https://pypi.org/project/validate-pyproject/
+
+|
+
+==================
+validate-pyproject
+==================
+
+
+    Automated checks on ``pyproject.toml`` powered by JSON Schema definitions
+
+
+.. important:: This project is **experimental** and under active development.
+   Issue reports and contributions are very welcome.
+
+
+Description
+===========
+
+With the approval of `PEP 517`_ and `PEP 518`_, the Python community shifted
+towards a strong focus on standardisation for packaging software, which allows
+more freedom when choosing tools during development and make sure packages
+created using different technologies can interoperate without the need for
+custom installation procedures.
+
+This shift became even more clear when `PEP 621`_ was also approved, as a
+standardised way of specifying project metadata and dependencies.
+
+``validate-pyproject`` was born in this context, with the mission of validating
+``pyproject.toml`` files, and make sure they are compliant with the standards
+and PEPs. Behind the scenes, ``validate-pyproject`` relies on `JSON Schema`_
+files, which, in turn, are also a standardised way of checking if a given data
+structure complies with a certain specification.
+
+
+.. _installation:
+
+Usage
+=====
+
+The easiest way of using ``validate-pyproject`` is via CLI.
+To get started, you need to install the package, which can be easily done
+using |pipx|_:
+
+.. code-block:: bash
+
+    $ pipx install 'validate-pyproject[all]'
+
+Now you can use ``validate-pyproject`` as a command line tool:
+
+.. code-block:: bash
+
+    # in you terminal
+    $ validate-pyproject --help
+    $ validate-pyproject path/to/your/pyproject.toml
+
+You can also use ``validate-pyproject`` in your Python scripts or projects:
+
+.. _example-api:
+
+.. code-block:: python
+
+    # in your python code
+    from validate_pyproject import api, errors
+
+    # let's assume that you have access to a `loads` function
+    # responsible for parsing a string representing the TOML file
+    # (you can check the `toml` or `tomli` projects for that)
+    pyproject_as_dict = loads(pyproject_toml_str)
+
+    # now we can use validate-pyproject
+    validator = api.Validator()
+
+    try:
+        validator(pyproject_as_dict)
+    except errors.ValidationError as ex:
+        print(f"Invalid Document: {ex.message}")
+
+To do so, don't forget to add it to your `virtual environment`_ or specify it as a
+`project`_ or `library dependency`_.
+
+.. note::
+   When you install ``validate-pyproject[all]``, the packages ``tomli``,
+   ``packaging`` and ``trove-classifiers`` will be automatically pulled as
+   dependencies. ``tomli`` is a lightweight parser for TOML, while
+   ``packaging`` and ``trove-classifiers`` are used to validate aspects of `PEP
+   621`_.
+
+   If you are only interested in using the Python API and wants to keep the
+   dependencies minimal, you can also install ``validate-pyproject``
+   (without the ``[all]`` extra dependencies group).
+
+   If you don't install ``trove-classifiers``, ``validate-pyproject`` will
+   try to download a list of valid classifiers directly from PyPI
+   (to prevent that, set the environment variable
+   ``NO_NETWORK`` or ``VALIDATE_PYPROJECT_NO_NETWORK``).
+
+   On the other hand, if ``validate-pyproject`` cannot find a copy of
+   ``packaging`` in your environment, the validation will fail.
+
+More details about ``validate-pyproject`` and its Python API can be found in
+`our docs`_, which includes a description of the `used JSON schemas`_,
+instructions for using it in a |pre-compiled way|_ and information about
+extending the validation with your own plugins_.
+
+.. _pyscaffold-notes:
+
+.. tip::
+   If you consider contributing to this project, have a look on our
+   `contribution guides`_.
+
+Plugins
+=======
+
+The `validate-pyproject-schema-store`_ plugin has a vendored copy of
+pyproject.toml related `SchemaStore`_ entries.  You can even install this using
+the ``[store]`` extra:
+
+    $ pipx install 'validate-pyproject[all,store]'
+
+Some of the tools in SchemaStore also have integrated validate-pyproject
+plugins, like ``cibuildwheel`` and ``scikit-build-core``. However, unless you
+want to pin an exact version of those tools, the SchemaStore copy is lighter
+weight than installing the entire package.
+
+If you want to write a custom plugin for your tool, please consider also contributing a copy to SchemaStore.
+
+pre-commit
+==========
+
+``validate-pyproject`` can be installed as a pre-commit hook:
+
+.. code-block:: yaml
+
+    ---
+    repos:
+      - repo: https://github.com/abravalheri/validate-pyproject
+        rev: <insert current version here>
+        hooks:
+          - id: validate-pyproject
+            # Optional extra validations from SchemaStore:
+            additional_dependencies: ["validate-pyproject-schema-store[all]"]
+
+By default, this ``pre-commit`` hook will only validate the ``pyproject.toml``
+file at the root of the project repository.
+You can customize that by defining a `custom regular expression pattern`_ using
+the ``files`` parameter.
+
+You can also use ``pre-commit autoupdate`` to update to the latest stable
+version of ``validate-pyproject`` (recommended).
+
+You can also use `validate-pyproject-schema-store`_ as a pre-commit hook, which
+allows pre-commit to pin and update that instead of ``validate-pyproject`` itself.
+
+Note
+====
+
+This project and its sister project ini2toml_ were initially created in the
+context of PyScaffold, with the purpose of helping migrating existing projects
+to `PEP 621`_-style configuration when it is made available on ``setuptools``.
+For details and usage information on PyScaffold see https://pyscaffold.org/.
+
+
+.. |pipx| replace:: ``pipx``
+.. |pre-compiled way| replace:: *pre-compiled* way
+
+
+.. _contribution guides: https://validate-pyproject.readthedocs.io/en/latest/contributing.html
+.. _custom regular expression pattern: https://pre-commit.com/#regular-expressions
+.. _our docs: https://validate-pyproject.readthedocs.io
+.. _ini2toml: https://ini2toml.readthedocs.io
+.. _JSON Schema: https://json-schema.org/
+.. _library dependency: https://setuptools.pypa.io/en/latest/userguide/dependency_management.html
+.. _PEP 517: https://peps.python.org/pep-0517/
+.. _PEP 518: https://peps.python.org/pep-0518/
+.. _PEP 621: https://peps.python.org/pep-0621/
+.. _pipx: https://pipx.pypa.io/stable/
+.. _project: https://packaging.python.org/tutorials/managing-dependencies/
+.. _setuptools: https://setuptools.pypa.io/en/stable/
+.. _used JSON schemas: https://validate-pyproject.readthedocs.io/en/latest/schemas.html
+.. _pre-compiled way: https://validate-pyproject.readthedocs.io/en/latest/embedding.html
+.. _plugins: https://validate-pyproject.readthedocs.io/en/latest/dev-guide.html
+.. _virtual environment: https://realpython.com/python-virtual-environments-a-primer/
+.. _validate-pyproject-schema-store: https://github.com/henryiii/validate-pyproject-schema-store
+.. _SchemaStore: https://www.schemastore.org

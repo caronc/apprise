@@ -1,0 +1,370 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+
+  "$id": "https://packaging.python.org/en/latest/specifications/pyproject-toml/",
+  "title": "Package metadata stored in the ``project`` table",
+  "$$description": [
+    "Data structure for the **project** table inside ``pyproject.toml``",
+    "(as initially defined in :pep:`621`)"
+  ],
+
+  "type": "object",
+  "properties": {
+    "name": {
+       "type": "string",
+       "description":
+         "The name (primary identifier) of the project. MUST be statically defined.",
+       "format": "pep508-identifier"
+    },
+    "version": {
+      "type": "string",
+      "description": "The version of the project as supported by :pep:`440`.",
+      "format": "pep440"
+    },
+    "description": {
+      "type": "string",
+      "$$description": [
+        "The `summary description of the project",
+        "<https://packaging.python.org/specifications/core-metadata/#summary>`_"
+      ]
+    },
+    "readme": {
+      "$$description": [
+        "`Full/detailed description of the project in the form of a README",
+        "<https://peps.python.org/pep-0621/#readme>`_",
+        "with meaning similar to the one defined in `core metadata's Description",
+        "<https://packaging.python.org/specifications/core-metadata/#description>`_"
+      ],
+      "oneOf": [
+        {
+          "type": "string",
+          "$$description": [
+            "Relative path to a text file (UTF-8) containing the full description",
+            "of the project. If the file path ends in case-insensitive ``.md`` or",
+            "``.rst`` suffixes, then the content-type is respectively",
+            "``text/markdown`` or ``text/x-rst``"
+          ]
+        },
+        {
+          "type": "object",
+          "allOf": [
+            {
+              "anyOf": [
+                {
+                  "properties": {
+                    "file": {
+                      "type": "string",
+                      "$$description": [
+                        "Relative path to a text file containing the full description",
+                        "of the project."
+                      ]
+                    }
+                  },
+                  "required": ["file"]
+                },
+                {
+                  "properties": {
+                    "text": {
+                      "type": "string",
+                      "description": "Full text describing the project."
+                    }
+                  },
+                  "required": ["text"]
+                }
+              ]
+            },
+            {
+              "properties": {
+                "content-type" : {
+                  "type": "string",
+                  "$$description": [
+                    "Content-type (:rfc:`1341`) of the full description",
+                    "(e.g. ``text/markdown``). The ``charset`` parameter is assumed",
+                    "UTF-8 when not present."
+                  ],
+                  "$comment": "TODO: add regex pattern or format?"
+                }
+              },
+              "required": ["content-type"]
+            }
+          ]
+        }
+      ]
+    },
+    "requires-python": {
+      "type": "string",
+      "format": "pep508-versionspec",
+      "$$description": [
+        "`The Python version requirements of the project",
+        "<https://packaging.python.org/specifications/core-metadata/#requires-python>`_."
+      ]
+    },
+    "license": {
+      "description":
+        "`Project license <https://peps.python.org/pep-0621/#license>`_.",
+      "oneOf": [
+        {
+          "type": "string",
+          "description": "An SPDX license identifier",
+          "format": "SPDX"
+        },
+        {
+          "type": "object",
+          "properties": {
+            "file": {
+              "type": "string",
+              "$$description": [
+                "Relative path to the file (UTF-8) which contains the license for the",
+                "project."
+              ]
+            }
+          },
+          "required": ["file"]
+        },
+        {
+          "type": "object",
+          "properties": {
+            "text": {
+              "type": "string",
+              "$$description": [
+                "The license of the project whose meaning is that of the",
+                "`License field from the core metadata",
+                "<https://packaging.python.org/specifications/core-metadata/#license>`_."
+              ]
+            }
+          },
+          "required": ["text"]
+        }
+      ]
+    },
+    "license-files": {
+      "description": "Paths or globs to paths of license files",
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "authors": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/author"},
+      "$$description": [
+        "The people or organizations considered to be the 'authors' of the project.",
+        "The exact meaning is open to interpretation (e.g. original or primary authors,",
+        "current maintainers, or owners of the package)."
+      ]
+    },
+    "maintainers": {
+      "type": "array",
+      "items": {"$ref": "#/definitions/author"},
+      "$$description": [
+        "The people or organizations considered to be the 'maintainers' of the project.",
+        "Similarly to ``authors``, the exact meaning is open to interpretation."
+      ]
+    },
+    "keywords": {
+      "type": "array",
+      "items": {"type": "string"},
+      "description":
+        "List of keywords to assist searching for the distribution in a larger catalog."
+    },
+    "classifiers": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "format": "trove-classifier",
+        "description": "`PyPI classifier <https://pypi.org/classifiers/>`_."
+      },
+      "$$description": [
+        "`Trove classifiers <https://pypi.org/classifiers/>`_",
+        "which apply to the project."
+      ]
+    },
+    "urls": {
+      "type": "object",
+      "description": "URLs associated with the project in the form ``label => value``.",
+      "additionalProperties": false,
+      "patternProperties": {
+        "^.+$": {"type": "string", "format": "url"}
+      }
+    },
+    "scripts": {
+      "$ref": "#/definitions/entry-point-group",
+      "$$description": [
+        "Instruct the installer to create command-line wrappers for the given",
+        "`entry points <https://packaging.python.org/specifications/entry-points/>`_."
+      ]
+    },
+    "gui-scripts": {
+      "$ref": "#/definitions/entry-point-group",
+      "$$description": [
+        "Instruct the installer to create GUI wrappers for the given",
+        "`entry points <https://packaging.python.org/specifications/entry-points/>`_.",
+        "The difference between ``scripts`` and ``gui-scripts`` is only relevant in",
+        "Windows."
+      ]
+    },
+    "entry-points": {
+      "$$description": [
+        "Instruct the installer to expose the given modules/functions via",
+        "``entry-point`` discovery mechanism (useful for plugins).",
+        "More information available in the `Python packaging guide",
+        "<https://packaging.python.org/specifications/entry-points/>`_."
+      ],
+      "propertyNames": {"format": "python-entrypoint-group"},
+      "additionalProperties": false,
+      "patternProperties": {
+        "^.+$": {"$ref": "#/definitions/entry-point-group"}
+      }
+    },
+    "dependencies": {
+      "type": "array",
+      "description": "Project (mandatory) dependencies.",
+      "items": {"$ref": "#/definitions/dependency"}
+    },
+    "optional-dependencies": {
+      "type": "object",
+      "description": "Optional dependency for the project",
+      "propertyNames": {"format": "pep508-identifier"},
+      "additionalProperties": false,
+      "patternProperties": {
+        "^.+$": {
+          "type": "array",
+          "items": {"$ref": "#/definitions/dependency"}
+        }
+      }
+    },
+    "dynamic": {
+      "type": "array",
+      "$$description": [
+        "Specifies which fields are intentionally unspecified and expected to be",
+        "dynamically provided by build tools"
+      ],
+      "items": {
+        "enum": [
+          "version",
+          "description",
+          "readme",
+          "requires-python",
+          "license",
+          "license-files",
+          "authors",
+          "maintainers",
+          "keywords",
+          "classifiers",
+          "urls",
+          "scripts",
+          "gui-scripts",
+          "entry-points",
+          "dependencies",
+          "optional-dependencies"
+        ]
+      }
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false,
+  "allOf": [
+    {
+      "if": {
+        "not": {
+          "required": ["dynamic"],
+          "properties": {
+            "dynamic": {
+              "contains": {"const": "version"},
+              "$$description": ["version is listed in ``dynamic``"]
+            }
+          }
+        },
+        "$$comment": [
+          "According to :pep:`621`:",
+          "    If the core metadata specification lists a field as \"Required\", then",
+          "    the metadata MUST specify the field statically or list it in dynamic",
+          "In turn, `core metadata`_ defines:",
+          "    The required fields are: Metadata-Version, Name, Version.",
+          "    All the other fields are optional.",
+          "Since ``Metadata-Version`` is defined by the build back-end, ``name`` and",
+          "``version`` are the only mandatory information in ``pyproject.toml``.",
+          ".. _core metadata: https://packaging.python.org/specifications/core-metadata/"
+        ]
+      },
+      "then": {
+        "required": ["version"],
+        "$$description": ["version should be statically defined in the ``version`` field"]
+      }
+    },
+    {
+      "if": {
+        "required": ["license-files"]
+      },
+      "then": {
+        "properties": {
+          "license": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  ],
+
+  "definitions": {
+    "author": {
+      "$id": "#/definitions/author",
+      "title": "Author or Maintainer",
+      "$comment": "https://peps.python.org/pep-0621/#authors-maintainers",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "$$description": [
+            "MUST be a valid email name, i.e. whatever can be put as a name, before an",
+            "email, in :rfc:`822`."
+          ]
+        },
+        "email": {
+          "type": "string",
+          "format": "idn-email",
+          "description": "MUST be a valid email address"
+        }
+      },
+      "anyOf": [
+        { "required": ["name"] },
+        { "required": ["email"] }
+      ]
+    },
+    "entry-point-group": {
+      "$id": "#/definitions/entry-point-group",
+      "title": "Entry-points",
+      "type": "object",
+      "$$description": [
+        "Entry-points are grouped together to indicate what sort of capabilities they",
+        "provide.",
+        "See the `packaging guides",
+        "<https://packaging.python.org/specifications/entry-points/>`_",
+        "and `setuptools docs",
+        "<https://setuptools.pypa.io/en/latest/userguide/entry_point.html>`_",
+        "for more information."
+      ],
+      "propertyNames": {"format": "python-entrypoint-name"},
+      "additionalProperties": false,
+      "patternProperties": {
+        "^.+$": {
+          "type": "string",
+          "$$description": [
+            "Reference to a Python object. It is either in the form",
+            "``importable.module``, or ``importable.module:object.attr``."
+          ],
+          "format": "python-entrypoint-reference",
+          "$comment": "https://packaging.python.org/specifications/entry-points/"
+        }
+      }
+    },
+    "dependency": {
+      "$id": "#/definitions/dependency",
+      "title": "Dependency",
+      "type": "string",
+      "description": "Project dependency specification according to PEP 508",
+      "format": "pep508"
+    }
+  }
+}

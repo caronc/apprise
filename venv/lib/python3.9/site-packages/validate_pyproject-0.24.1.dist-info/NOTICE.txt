@@ -1,0 +1,52 @@
+'validate-pyproject' is licensed under the MPL-2.0 license, with the following
+copyright notice:
+
+  Copyright (c) 2021, Anderson Bravalheri
+
+see the LICENSE.txt file for details.
+
+----------------------------------------------------------------------
+
+A few extra files, derived from other opensource projects are collocated in
+this code base ('tests/examples' and 'tests/invalid-examples') exclusively for
+testing purposes during development:
+
+- 'atoml/pyproject.toml' from https://github.com/forstming/atoml, licensed under MIT
+- 'flit/pyproject.toml' from https://github.com/takluyver/flit, licensed under BSD-3-Clause
+- 'pdm/pyproject.toml' from https://github.com/pdm-project/pdm, licensed under MIT
+- 'trampolim/pyproject.toml' from https://github.com/FFY00/trampolim, licensed under MIT
+
+These files are not part of the 'validate-pyproject' project and not meant
+for distribution (as part of the 'validate-pyproject' software package).
+The original licenses for each one of these files can be found inside the
+respective directory under 'tests/examples'.
+
+----------------------------------------------------------------------
+
+'validate-project' also includes code based on/derived from the PyScaffold
+project. PyScaffold is licensed under the MIT license; see below for details.
+
+***
+
+The MIT License (MIT)
+
+Copyright (c) 2018-present, PyScaffold contributors
+Copyright (c) 2014-2018 Blue Yonder GmbH
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
