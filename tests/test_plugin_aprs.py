@@ -80,6 +80,12 @@ def test_plugin_aprs_urls(mock_create_connection):
     )
     assert instance.notify("test") is True
 
+    # 1N3 callsigns
+    instance = apprise.Apprise.instantiate(
+        "aprs://D1JSL-15:12345@D1ABC"
+    )
+    assert isinstance(instance, NotifyAprs)
+
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC?delay=3.0"
     )
