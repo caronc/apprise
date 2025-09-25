@@ -139,6 +139,10 @@ class NotifyMattermost(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
+            "icon_emoji": {
+                "name": _("Icon Emoji"),
+                "type": "string",
+            },
             "to": {
                 "alias_of": "channels",
             },
@@ -151,6 +155,7 @@ class NotifyMattermost(NotifyBase):
         fullpath=None,
         channels=None,
         include_image=False,
+        icon_emoji=None,
         **kwargs,
     ):
         """Initialize Mattermost Object."""
@@ -183,6 +188,9 @@ class NotifyMattermost(NotifyBase):
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
 
+        # Set the icon emoji
+        self.icon_emoji = icon_emoji
+
         return
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
@@ -206,16 +214,19 @@ class NotifyMattermost(NotifyBase):
         payload = {
             "text": body,
             "icon_url": None,
+            "icon_emoji": None,
         }
 
-        # Acquire our image url if configured to do so
-        image_url = (
-            None if not self.include_image else self.image_url(notify_type)
-        )
-
-        if image_url:
-            # Set our image configuration if told to do so
-            payload["icon_url"] = image_url
+        # Set icon emoji if provided (takes priority over image_url)
+        if self.icon_emoji:
+            payload["icon_emoji"] = self.icon_emoji
+        else:
+            # Only set icon_url if no emoji is specified
+            image_url = (
+                None if not self.include_image else self.image_url(notify_type)
+            )
+            if image_url:
+                payload["icon_url"] = image_url
 
         # Set our user
         payload["username"] = self.user if self.user else self.app_id
@@ -422,6 +433,10 @@ class NotifyMattermost(NotifyBase):
                 "image", NotifyMattermost.template_args["image"]["default"]
             )
         )
+
+        # Icon emoji support
+        if "icon_emoji" in results["qsd"] and len(results["qsd"]["icon_emoji"]):
+            results["icon_emoji"] = NotifyMattermost.unquote(results["qsd"]["icon_emoji"])
 
         return results
 
