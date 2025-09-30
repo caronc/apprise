@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apprise 1.4.5\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2025-08-03 13:22+0000\n"
+"POT-Creation-Date: 2025-09-30 11:34-0400\n"
 "PO-Revision-Date: 2019-05-24 20:00-0400\n"
 "Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
 "Language: en\n"
@@ -89,7 +89,7 @@ msgstr "User Name"
 #: apprise/plugins/simplepush.py:101 apprise/plugins/smsmanager.py:106
 #: apprise/plugins/smtp2go.py:116 apprise/plugins/sparkpost.py:167
 #: apprise/plugins/splunk.py:165 apprise/plugins/techuluspush.py:97
-#: apprise/plugins/twilio.py:175 apprise/plugins/vapid/__init__.py:152
+#: apprise/plugins/twilio.py:197 apprise/plugins/vapid/__init__.py:152
 #: apprise/plugins/vonage.py:80
 msgid "API Key"
 msgstr "API Key"
@@ -126,7 +126,7 @@ msgstr "Target Phone No"
 #: apprise/plugins/smpp.py:128 apprise/plugins/smseagle.py:170
 #: apprise/plugins/smsmanager.py:119 apprise/plugins/sns.py:138
 #: apprise/plugins/telegram.py:372 apprise/plugins/threema.py:115
-#: apprise/plugins/twilio.py:152 apprise/plugins/twist.py:123
+#: apprise/plugins/twilio.py:174 apprise/plugins/twist.py:123
 #: apprise/plugins/twitter.py:168 apprise/plugins/vapid/__init__.py:158
 #: apprise/plugins/voipms.py:107 apprise/plugins/vonage.py:108
 #: apprise/plugins/whatsapp.py:126 apprise/plugins/wxpusher.py:139
@@ -172,7 +172,7 @@ msgstr "Secure Mode"
 #: apprise/plugins/pushjet.py:71 apprise/plugins/rocketchat.py:120
 #: apprise/plugins/rsyslog.py:180 apprise/plugins/signal_api.py:93
 #: apprise/plugins/smseagle.py:133 apprise/plugins/synology.py:83
-#: apprise/plugins/workflows.py:110 apprise/plugins/xbmc.py:96
+#: apprise/plugins/workflows.py:125 apprise/plugins/xbmc.py:96
 msgid "Hostname"
 msgstr "Hostname"
 
@@ -191,7 +191,7 @@ msgstr "Hostname"
 #: apprise/plugins/rocketchat.py:125 apprise/plugins/rsyslog.py:185
 #: apprise/plugins/signal_api.py:98 apprise/plugins/smpp.py:108
 #: apprise/plugins/smseagle.py:138 apprise/plugins/synology.py:88
-#: apprise/plugins/workflows.py:115 apprise/plugins/xbmc.py:101
+#: apprise/plugins/workflows.py:130 apprise/plugins/xbmc.py:101
 msgid "Port"
 msgstr "Port"
 
@@ -234,7 +234,7 @@ msgstr "Password"
 #: apprise/plugins/gotify.py:123 apprise/plugins/notica.py:119
 #: apprise/plugins/notifiarr.py:91 apprise/plugins/ntfy.py:230
 #: apprise/plugins/pushme.py:62 apprise/plugins/ryver.py:99
-#: apprise/plugins/serverchan.py:70 apprise/plugins/slack.py:275
+#: apprise/plugins/serverchan.py:70 apprise/plugins/slack.py:281
 #: apprise/plugins/synology.py:103 apprise/plugins/webexteams.py:116
 #: apprise/plugins/zulip.py:136
 msgid "Token"
@@ -320,7 +320,7 @@ msgid "Group"
 msgstr "Group"
 
 #: apprise/plugins/bark.py:207 apprise/plugins/dbus.py:225
-#: apprise/plugins/discord.py:187 apprise/plugins/fcm/__init__.py:197
+#: apprise/plugins/discord.py:192 apprise/plugins/fcm/__init__.py:197
 #: apprise/plugins/flock.py:136 apprise/plugins/glib.py:187
 #: apprise/plugins/gnome.py:153 apprise/plugins/growl.py:175
 #: apprise/plugins/join.py:182 apprise/plugins/line.py:108
@@ -330,27 +330,36 @@ msgstr "Group"
 #: apprise/plugins/one_signal.py:155 apprise/plugins/pagerduty.py:191
 #: apprise/plugins/ryver.py:124 apprise/plugins/slack.py:252
 #: apprise/plugins/telegram.py:383 apprise/plugins/vapid/__init__.py:204
-#: apprise/plugins/windows.py:106 apprise/plugins/workflows.py:147
+#: apprise/plugins/windows.py:106 apprise/plugins/workflows.py:162
 #: apprise/plugins/xbmc.py:129
 msgid "Include Image"
 msgstr "Include Image"
 
-#: apprise/plugins/base.py:184
+#: apprise/plugins/bark.py:213 apprise/plugins/revolt.py:128
+msgid "Icon URL"
+msgstr ""
+
+#: apprise/plugins/base.py:191
 msgid "Overflow Mode"
 msgstr "Overflow Mode"
 
-#: apprise/plugins/base.py:199
+#: apprise/plugins/base.py:206
 msgid "Notify Format"
 msgstr "Notify Format"
 
-#: apprise/plugins/base.py:209
+#: apprise/plugins/base.py:216
 #, fuzzy
 msgid "Interpret Emojis"
 msgstr "Target Emails"
 
-#: apprise/plugins/base.py:219
+#: apprise/plugins/base.py:226
 msgid "Persistent Storage"
 msgstr ""
+
+#: apprise/plugins/base.py:236
+#, fuzzy
+msgid "Timezone"
+msgstr "Server Timeout"
 
 #: apprise/plugins/bulksms.py:123 apprise/plugins/bulkvs.py:103
 #: apprise/plugins/burstsms.py:124 apprise/plugins/clickatell.py:83
@@ -362,7 +371,7 @@ msgstr ""
 #: apprise/plugins/signal_api.py:120 apprise/plugins/sinch.py:127
 #: apprise/plugins/smpp.py:121 apprise/plugins/smseagle.py:149
 #: apprise/plugins/smsmanager.py:112 apprise/plugins/sns.py:125
-#: apprise/plugins/threema.py:98 apprise/plugins/twilio.py:139
+#: apprise/plugins/threema.py:98 apprise/plugins/twilio.py:161
 #: apprise/plugins/voipms.py:100 apprise/plugins/vonage.py:101
 #: apprise/plugins/whatsapp.py:119
 msgid "Target Phone No"
@@ -378,7 +387,7 @@ msgstr "Target Topic"
 #: apprise/plugins/httpsms.py:83 apprise/plugins/httpsms.py:115
 #: apprise/plugins/signal_api.py:113 apprise/plugins/sinch.py:120
 #: apprise/plugins/smpp.py:114 apprise/plugins/smsmanager.py:137
-#: apprise/plugins/twilio.py:132 apprise/plugins/voipms.py:94
+#: apprise/plugins/twilio.py:154 apprise/plugins/voipms.py:94
 #: apprise/plugins/vonage.py:94
 msgid "From Phone No"
 msgstr "From Phone No"
@@ -539,6 +548,10 @@ msgstr "Footer Logo"
 #, fuzzy
 msgid "Use Fields"
 msgstr "To User ID"
+
+#: apprise/plugins/discord.py:187
+msgid "Discord Flags"
+msgstr ""
 
 #: apprise/plugins/emby.py:112
 msgid "Modal"
@@ -777,7 +790,7 @@ msgid "Email Header"
 msgstr "HTTP Header"
 
 #: apprise/plugins/mailgun.py:208 apprise/plugins/msteams.py:222
-#: apprise/plugins/sparkpost.py:221 apprise/plugins/workflows.py:181
+#: apprise/plugins/sparkpost.py:221 apprise/plugins/workflows.py:201
 #, fuzzy
 msgid "Template Tokens"
 msgstr "Remove Tokens"
@@ -898,7 +911,7 @@ msgstr "Token C"
 msgid "Token D"
 msgstr "Token C"
 
-#: apprise/plugins/msteams.py:212 apprise/plugins/workflows.py:159
+#: apprise/plugins/msteams.py:212 apprise/plugins/workflows.py:180
 msgid "Template Path"
 msgstr ""
 
@@ -1120,7 +1133,7 @@ msgid "Auth ID"
 msgstr "Account SID"
 
 #: apprise/plugins/plivo.py:98 apprise/plugins/sinch.py:113
-#: apprise/plugins/twilio.py:125
+#: apprise/plugins/twilio.py:147
 msgid "Auth Token"
 msgstr "Auth Token"
 
@@ -1250,10 +1263,6 @@ msgstr "Source JID"
 #, fuzzy
 msgid "Channel ID"
 msgstr "To Channel ID"
-
-#: apprise/plugins/revolt.py:128
-msgid "Icon URL"
-msgstr ""
 
 #: apprise/plugins/revolt.py:130
 msgid "Embed URL"
@@ -1403,11 +1412,11 @@ msgstr ""
 msgid "Event"
 msgstr "Events"
 
-#: apprise/plugins/sinch.py:106 apprise/plugins/twilio.py:118
+#: apprise/plugins/sinch.py:106 apprise/plugins/twilio.py:140
 msgid "Account SID"
 msgstr "Account SID"
 
-#: apprise/plugins/sinch.py:134 apprise/plugins/twilio.py:146
+#: apprise/plugins/sinch.py:134 apprise/plugins/twilio.py:168
 msgid "Target Short Code"
 msgstr "Target Short Code"
 
@@ -1428,6 +1437,11 @@ msgstr "Include Image"
 #: apprise/plugins/slack.py:266
 msgid "Use Blocks"
 msgstr ""
+
+#: apprise/plugins/slack.py:275
+#, fuzzy
+msgid "Include Timestamp"
+msgstr "Include Image"
 
 #: apprise/plugins/smpp.py:61
 msgid "SMPP"
@@ -1562,6 +1576,10 @@ msgstr ""
 msgid "Target Threema ID"
 msgstr "Target Tag ID"
 
+#: apprise/plugins/twilio.py:203
+msgid "Notification Method: sms or call"
+msgstr ""
+
 #: apprise/plugins/twist.py:118
 #, fuzzy
 msgid "Target Channel ID"
@@ -1611,20 +1629,24 @@ msgstr "From Phone No"
 msgid "A local Microsoft Windows environment is required."
 msgstr ""
 
-#: apprise/plugins/workflows.py:122
+#: apprise/plugins/workflows.py:137
 #, fuzzy
 msgid "Workflow ID"
 msgstr "Overflow Mode"
 
-#: apprise/plugins/workflows.py:130
+#: apprise/plugins/workflows.py:145
 msgid "Signature"
 msgstr ""
 
-#: apprise/plugins/workflows.py:153
+#: apprise/plugins/workflows.py:168
+msgid "Use Power Automate URL"
+msgstr ""
+
+#: apprise/plugins/workflows.py:175
 msgid "Wrap Text"
 msgstr ""
 
-#: apprise/plugins/workflows.py:169
+#: apprise/plugins/workflows.py:190
 #, fuzzy
 msgid "API Version"
 msgstr "Version"
