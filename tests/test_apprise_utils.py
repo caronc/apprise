@@ -3253,8 +3253,20 @@ def test_time_zoneinfo():
     isinstance(tz, tzinfo)
     assert isinstance(utils.time.zoneinfo("Argentina/Cordoba"), tzinfo)
     assert utils.time.zoneinfo("Argentina/Cordoba").key == tz.key
-    assert isinstance(utils.time.zoneinfo("Cordoba"), tzinfo)
-    assert utils.time.zoneinfo("Cordoba").key == "America/Cordoba"
+    # "America/Cordoba" has been obsoleted by IANA in facor of
+    #  "America/Argentina/Cordoba", however the IANA database
+    #  instance used is system-dependent, so these tests have
+    #  different results depending on the system running them
+    if utils.time.zoneinfo("Cordoba") is not None:
+        # the system has the obsolete "America/Cordoba" entry
+        assert isinstance(utils.time.zoneinfo("Cordoba"), tzinfo)
+        assert utils.time.zoneinfo("Cordoba").key == "America/Cordoba"
+    else:
+        assert utils.time.zoneinfo("Cordoba") is None
+        # the utils helper should still resolve this abbreviated (and
+        #  lowercase) form
+        assert utils.time.zoneinfo("argentina/cordoba").key == \
+            "America/Argentina/Cordoba"
 
     # Too ambiguous
     assert utils.time.zoneinfo("Argentina") is None
