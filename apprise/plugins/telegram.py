@@ -825,7 +825,6 @@ class NotifyTelegram(NotifyBase):
 
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
-
             if (
                 body_format not in (None, NotifyFormat.MARKDOWN)
                 and self.markdown_ver == TelegramMarkdownVersion.TWO
@@ -841,11 +840,9 @@ class NotifyTelegram(NotifyBase):
             _payload["text"] = body
 
         else:  # HTML
-
             # Use Telegram's HTML mode
             _payload["parse_mode"] = "HTML"
             for r, v, m in self.__telegram_escape_html_entries:
-
                 if "html" in m:
                     # Handle special cases where we need to alter new lines
                     # for presentation purposes
@@ -918,7 +915,6 @@ class NotifyTelegram(NotifyBase):
                     payload=caption_payload,
                     attach=attach,
                 ):
-
                     has_error = True
                     continue
 
@@ -1018,16 +1014,19 @@ class NotifyTelegram(NotifyBase):
         # Send our attachments now (if specified and if it exists)
         for no, attachment in enumerate(attach, start=1):
             payload = payload if payload and no == 1 else {}
-            payload.update({
-                "title": (
-                    attachment.name if attachment.name else f"file{no:03}.dat"
-                )
-            })
+            payload.update(
+                {
+                    "title": (
+                        attachment.name
+                        if attachment.name
+                        else f"file{no:03}.dat"
+                    )
+                }
+            )
 
             if not self.send_media(
                 target, notify_type, payload=payload, attach=attachment
             ):
-
                 # We failed; don't continue
                 has_error = True
                 break
@@ -1069,14 +1068,16 @@ class NotifyTelegram(NotifyBase):
             topic = _topic if _topic else self.topic
 
             targets.append(
-                "".join([
-                    (
-                        NotifyTelegram.quote(f"{chat_id}", safe="@")
-                        if isinstance(chat_id, str)
-                        else f"{chat_id}"
-                    ),
-                    "" if not topic else f":{topic}",
-                ])
+                "".join(
+                    [
+                        (
+                            NotifyTelegram.quote(f"{chat_id}", safe="@")
+                            if isinstance(chat_id, str)
+                            else f"{chat_id}"
+                        ),
+                        "" if not topic else f":{topic}",
+                    ]
+                )
             )
 
         # No need to check the user token because the user automatically gets

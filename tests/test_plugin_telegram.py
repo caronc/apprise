@@ -438,9 +438,11 @@ def test_plugin_telegram_general(mock_post):
     response.status_code = requests.codes.internal_server_error
 
     # a error response
-    response.content = dumps({
-        "description": "test",
-    })
+    response.content = dumps(
+        {
+            "description": "test",
+        }
+    )
     mock_post.return_value = response
 
     # No image asset
@@ -492,58 +494,64 @@ def test_plugin_telegram_general(mock_post):
     # the creating of a Telegram Notification without providing a chat ID.
     # We're testing the error handling of this bot detection section of the
     # code
-    mock_post.return_value.content = dumps({
-        "ok": True,
-        "result": [
-            {
-                "update_id": 645421319,
-                # Entry without `message` in it
-            },
-            {
-                # Entry without `from` in `message`
-                "update_id": 645421320,
-                "message": {
-                    "message_id": 2,
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+            "result": [
+                {
+                    "update_id": 645421319,
+                    # Entry without `message` in it
                 },
-            },
-            {
-                "update_id": 645421321,
-                "message": {
-                    "message_id": 2,
-                    "from": {
-                        "id": 532389719,
-                        "is_bot": False,
-                        "first_name": "Chris",
-                        "language_code": "en-US",
+                {
+                    # Entry without `from` in `message`
+                    "update_id": 645421320,
+                    "message": {
+                        "message_id": 2,
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
                     },
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
                 },
-            },
-        ],
-    })
+                {
+                    "update_id": 645421321,
+                    "message": {
+                        "message_id": 2,
+                        "from": {
+                            "id": 532389719,
+                            "is_bot": False,
+                            "first_name": "Chris",
+                            "language_code": "en-US",
+                        },
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
+                    },
+                },
+            ],
+        }
+    )
     mock_post.return_value.status_code = requests.codes.ok
 
     obj = NotifyTelegram(bot_token=bot_token, targets="12345")
@@ -636,10 +644,12 @@ def test_plugin_telegram_general(mock_post):
     assert obj.targets[0] == ("532389719", None)
 
     # Do the test again, but without the expected (parsed response)
-    mock_post.return_value.content = dumps({
-        "ok": True,
-        "result": [],
-    })
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+            "result": [],
+        }
+    )
 
     # No user will be detected now
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
@@ -649,35 +659,39 @@ def test_plugin_telegram_general(mock_post):
     assert len(obj.targets) == 0
 
     # Do the test again, but with ok not set to True
-    mock_post.return_value.content = dumps({
-        "ok": False,
-        "result": [
-            {
-                "update_id": 645421321,
-                "message": {
-                    "message_id": 2,
-                    "from": {
-                        "id": 532389719,
-                        "is_bot": False,
-                        "first_name": "Chris",
-                        "language_code": "en-US",
+    mock_post.return_value.content = dumps(
+        {
+            "ok": False,
+            "result": [
+                {
+                    "update_id": 645421321,
+                    "message": {
+                        "message_id": 2,
+                        "from": {
+                            "id": 532389719,
+                            "is_bot": False,
+                            "first_name": "Chris",
+                            "language_code": "en-US",
+                        },
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
                     },
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
                 },
-            },
-        ],
-    })
+            ],
+        }
+    )
 
     # No user will be detected now
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
@@ -688,9 +702,11 @@ def test_plugin_telegram_general(mock_post):
 
     # An edge case where no results were provided; this will probably never
     # happen, but it helps with test coverage completeness
-    mock_post.return_value.content = dumps({
-        "ok": True,
-    })
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+        }
+    )
 
     # No user will be detected now
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
@@ -763,35 +779,39 @@ def test_plugin_telegram_formatting(mock_post):
     mock_post.return_value.content = "{}"
 
     # Simple success response
-    mock_post.return_value.content = dumps({
-        "ok": True,
-        "result": [
-            {
-                "update_id": 645421321,
-                "message": {
-                    "message_id": 2,
-                    "from": {
-                        "id": 532389719,
-                        "is_bot": False,
-                        "first_name": "Chris",
-                        "language_code": "en-US",
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+            "result": [
+                {
+                    "update_id": 645421321,
+                    "message": {
+                        "message_id": 2,
+                        "from": {
+                            "id": 532389719,
+                            "is_bot": False,
+                            "first_name": "Chris",
+                            "language_code": "en-US",
+                        },
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
                     },
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
                 },
-            },
-        ],
-    })
+            ],
+        }
+    )
     mock_post.return_value.status_code = requests.codes.ok
 
     results = NotifyTelegram.parse_url("tgram://123456789:abcdefg_hijklmnop/")
@@ -918,8 +938,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert (
-        payload["text"]
-        == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -958,8 +977,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert (
-        payload["text"]
-        == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -1001,8 +1019,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert (
-        payload["text"]
-        == "<b>\r\n<b>🚨 Another Change detected for "
+        payload["text"] == "<b>\r\n<b>🚨 Another Change detected for "
         "<i>Apprise Test Title</i></b>\r\n</b>\r\n<i>"
         '<a href="http://localhost">Apprise Body Title</a>'
         '</i> had <a href="http://127.0.0.2">a change</a>\r\n'
@@ -1116,8 +1133,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a MARKDOWN mode
     assert (
-        payload["text"]
-        == "# A Great Title\r\n"
+        payload["text"] == "# A Great Title\r\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.2)"
     )
@@ -1150,8 +1166,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a MARKDOWN mode
     assert (
-        payload["text"]
-        == "\\# A Great Title\r\n"
+        payload["text"] == "\\# A Great Title\r\n"
         "\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had "
         "\\[a change\\]\\(http://127\\.0\\.0\\.2\\)"
     )
@@ -1177,8 +1192,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # No escaping in this circumstance
     assert (
-        payload["text"]
-        == "# A Great Title\r\n"
+        payload["text"] == "# A Great Title\r\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.2)"
     )
@@ -1202,8 +1216,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # No escaping in this circumstance
     assert (
-        payload["text"]
-        == "# A Great Title\r\n"
+        payload["text"] == "# A Great Title\r\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.2)"
     )
@@ -1267,8 +1280,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a HTML mode
     assert (
-        payload["text"]
-        == "<b>Test Message Title</b>\r\n"
+        payload["text"] == "<b>Test Message Title</b>\r\n"
         "Test Message Body &lt;br/&gt; ok&lt;/br&gt;"
     )
 
@@ -1310,35 +1322,39 @@ def test_plugin_telegram_html_formatting(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Simple success response
-    mock_post.return_value.content = dumps({
-        "ok": True,
-        "result": [
-            {
-                "update_id": 645421321,
-                "message": {
-                    "message_id": 2,
-                    "from": {
-                        "id": 532389719,
-                        "is_bot": False,
-                        "first_name": "Chris",
-                        "language_code": "en-US",
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+            "result": [
+                {
+                    "update_id": 645421321,
+                    "message": {
+                        "message_id": 2,
+                        "from": {
+                            "id": 532389719,
+                            "is_bot": False,
+                            "first_name": "Chris",
+                            "language_code": "en-US",
+                        },
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
                     },
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
                 },
-            },
-        ],
-    })
+            ],
+        }
+    )
 
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/")
@@ -1420,35 +1436,39 @@ def test_plugin_telegram_threads(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Simple success response
-    mock_post.return_value.content = dumps({
-        "ok": True,
-        "result": [
-            {
-                "update_id": 645421321,
-                "message": {
-                    "message_id": 2,
-                    "from": {
-                        "id": 532389719,
-                        "is_bot": False,
-                        "first_name": "Chris",
-                        "language_code": "en-US",
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+            "result": [
+                {
+                    "update_id": 645421321,
+                    "message": {
+                        "message_id": 2,
+                        "from": {
+                            "id": 532389719,
+                            "is_bot": False,
+                            "first_name": "Chris",
+                            "language_code": "en-US",
+                        },
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
                     },
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
                 },
-            },
-        ],
-    })
+            ],
+        }
+    )
 
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/?thread=1234")
@@ -1527,35 +1547,39 @@ def test_plugin_telegram_markdown_v2(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Simple success response
-    mock_post.return_value.content = dumps({
-        "ok": True,
-        "result": [
-            {
-                "update_id": 645421321,
-                "message": {
-                    "message_id": 2,
-                    "from": {
-                        "id": 532389719,
-                        "is_bot": False,
-                        "first_name": "Chris",
-                        "language_code": "en-US",
+    mock_post.return_value.content = dumps(
+        {
+            "ok": True,
+            "result": [
+                {
+                    "update_id": 645421321,
+                    "message": {
+                        "message_id": 2,
+                        "from": {
+                            "id": 532389719,
+                            "is_bot": False,
+                            "first_name": "Chris",
+                            "language_code": "en-US",
+                        },
+                        "chat": {
+                            "id": 532389719,
+                            "first_name": "Chris",
+                            "type": "private",
+                        },
+                        "date": 1519694394,
+                        "text": "/start",
+                        "entities": [
+                            {
+                                "offset": 0,
+                                "length": 6,
+                                "type": "bot_command",
+                            }
+                        ],
                     },
-                    "chat": {
-                        "id": 532389719,
-                        "first_name": "Chris",
-                        "type": "private",
-                    },
-                    "date": 1519694394,
-                    "text": "/start",
-                    "entities": [{
-                        "offset": 0,
-                        "length": 6,
-                        "type": "bot_command",
-                    }],
                 },
-            },
-        ],
-    })
+            ],
+        }
+    )
 
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/?mdv=2&format=markdown")
@@ -1573,8 +1597,7 @@ def test_plugin_telegram_markdown_v2(mock_post):
 
     # Our content is escapped properly
     assert (
-        payload["text"]
-        == "\\# my message\r\n"
+        payload["text"] == "\\# my message\r\n"
         "\\#\\# more content\r\n\\# already escaped hashtag"
     )
 
