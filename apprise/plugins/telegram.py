@@ -307,19 +307,6 @@ class NotifyTelegram(NotifyBase):
             " -",
             {},
         ),
-        # convert pre tags to code (supported by Telegram)
-        (
-            re.compile(r"<\s*pre([^a-z0-9>][^>]*)?>", (re.I | re.M | re.S)),
-            "{}<code>",
-            {"html": "\r\n"},
-        ),
-        (
-            re.compile(
-                r"<\s*/\s*pre([^a-z0-9>][^>]*)?>", (re.I | re.M | re.S)
-            ),
-            "</code>{}",
-            {"html": "\r\n"},
-        ),
         # New Lines
         (
             re.compile(
