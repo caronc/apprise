@@ -328,8 +328,8 @@ class NotifyAppriseAPI(NotifyBase):
             # Apprise API Payload
             "title": title,
             "body": body,
-            "type": notify_type,
-            "format": self.notify_format,
+            "type": notify_type.value,
+            "format": self.notify_format.value,
         }
 
         if self.method == AppriseAPIMethod.JSON:
