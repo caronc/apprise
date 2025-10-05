@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 import os
 from unittest import mock
@@ -273,11 +274,93 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_apprise_urls():
+def test_plugin_apprise_api_urls():
     """NotifyAppriseAPI() General Checks."""
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_payload_check(mock_post):
+    """NotifyAppriseAPI() payload checks"""
+
+    okay_response = requests.Request()
+
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate(
+        "apprise://user@localhost/mytoken1/?method=form"
+    )
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # Test URL with Attachment
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://localhost/notify/mytoken1"
+    assert details[1]["data"] == {
+        "title": "title",
+        "body": "body",
+        "type": "info",
+        "format": "text",
+    }
+    assert "X-Apprise-ID" in details[1]["headers"]
+    assert details[1]["headers"].get("User-Agent") == "Apprise"
+    assert details[1]["headers"].get("Accept") == "application/json"
+    assert details[1]["headers"].get("X-Apprise-Recursion-Count") == "1"
+
+    mock_post.reset_mock()
+
+    obj = Apprise.instantiate(
+        "apprise://user@localhost/mytoken1/?method=json"
+    )
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://localhost/notify/mytoken1"
+    data = loads(details[1]["data"])
+    assert "attachments" in data
+    assert isinstance(data["attachments"], list)
+    assert len(data["attachments"]) == 1
+
+    # Remove our attachment to make the next assert easier
+    del data["attachments"]
+    assert data == {
+        "title": "title",
+        "body": "body",
+        "type": "info",
+        "format": "text",
+    }
+    assert "X-Apprise-ID" in details[1]["headers"]
+    assert details[1]["headers"].get("User-Agent") == "Apprise"
+    assert details[1]["headers"].get("Accept") == "application/json"
+    assert details[1]["headers"].get("X-Apprise-Recursion-Count") == "1"
 
 
 @mock.patch("requests.post")
