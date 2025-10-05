@@ -199,7 +199,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 
 %files -n python%{python3_pkgversion}-%{pypi_name}
 %license LICENSE
-%doc README.md ACKNOWLEDGEMENTS.md CONTRIBUTING.md
+%doc SECURITY.md README.md ACKNOWLEDGEMENTS.md CONTRIBUTING.md
 %{python3_sitelib}/%{pypi_name}/
 # Exclude i18n as it is handled below with the lang(spoken) tag below
 %exclude %{python3_sitelib}/%{pypi_name}/cli.*

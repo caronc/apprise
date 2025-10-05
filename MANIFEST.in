@@ -2,12 +2,15 @@ include LICENSE
 include README.md
 include CONTRIBUTING.md
 include ACKNOWLEDGEMENTS.md
+include SECURITY.md
 include pyproject.toml
 include tox.ini
+include babel.cfg
 include requirements.txt
 include win-requirements.txt
 include dev-requirements.txt
 include all-plugin-requirements.txt
+include apprise/py.typed
 recursive-include tests *
 recursive-include packaging *
 recursive-include apprise/i18n *.pot
