@@ -1685,7 +1685,6 @@ def test_is_call_sign_no():
     assert utils.parse.is_call_sign(42) is False
 
     # To short or 2 long
-    assert utils.parse.is_call_sign("DF1AB") is False
     assert utils.parse.is_call_sign("DF1ABCX") is False
     assert utils.parse.is_call_sign("DF1ABCEFG") is False
     assert utils.parse.is_call_sign("1ABCX") is False
@@ -1693,6 +1692,31 @@ def test_is_call_sign_no():
     assert utils.parse.is_call_sign("XXXXXX") is False
 
     # Some valid checks
+    # 1x2
+    result = utils.parse.is_call_sign("A0AF")
+    assert isinstance(result, dict)
+    assert result["callsign"] == "A0AF"
+    assert result["ssid"] == ""
+
+    # 2x1
+    result = utils.parse.is_call_sign("AA0A")
+    assert isinstance(result, dict)
+    assert result["callsign"] == "AA0A"
+    assert result["ssid"] == ""
+
+    # 2x2
+    result = utils.parse.is_call_sign("AA0AF")
+    assert isinstance(result, dict)
+    assert result["callsign"] == "AA0AF"
+    assert result["ssid"] == ""
+
+    # 1x3
+    result = utils.parse.is_call_sign("K0ACL")
+    assert isinstance(result, dict)
+    assert result["callsign"] == "K0ACL"
+    assert result["ssid"] == ""
+
+    # 2x3
     result = utils.parse.is_call_sign("DF1ABC")
     assert isinstance(result, dict)
     assert result["callsign"] == "DF1ABC"
