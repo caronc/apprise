@@ -208,21 +208,16 @@ def test_plugin_gatewayapi_edge_cases(mock_post):
     # We know there are 2 valid targets (garbage entry excluded)
     assert len(obj) == 2
 
-    # Test our call count
-    assert mock_post.call_count == 2
+    # Test our call count - should be 1 call with both recipients batched
+    assert mock_post.call_count == 1
 
-    # Test first call
+    # Test the single call contains both recipients
     details = mock_post.call_args_list[0]
     payload = details[1]["data"]
     assert payload["message"] == "title\r\nbody"
     assert payload["recipients.0.msisdn"] == 15551231234
+    assert payload["recipients.1.msisdn"] == 15555555555
     assert "sender" not in payload
-
-    # Test second call
-    details = mock_post.call_args_list[1]
-    payload = details[1]["data"]
-    assert payload["message"] == "title\r\nbody"
-    assert payload["recipients.0.msisdn"] == 15555555555
 
     # Verify our URL looks good (check for privacy masking)
     url = obj.url(privacy=True)
@@ -286,8 +281,8 @@ def test_plugin_gatewayapi_edge_cases(mock_post):
 
     assert obj.notify(body="test", title="title", notify_type=NotifyType.INFO) is True
 
-    # Test our call count
-    assert mock_post.call_count == 2
+    # Test our call count - should be 1 call with both recipients batched
+    assert mock_post.call_count == 1
 
     # Reset mock
     mock_post.reset_mock()
@@ -398,7 +393,8 @@ def test_plugin_gatewayapi_url_parsing(mock_post):
     assert obj is not None
     assert len(obj) == 2
     assert obj.notify(body="test", notify_type=NotifyType.INFO) is True
-    assert mock_post.call_count == 2
+    # Should be 1 call with both recipients batched
+    assert mock_post.call_count == 1
 
     # Reset mock
     mock_post.reset_mock()
@@ -499,6 +495,42 @@ def test_plugin_gatewayapi_empty_targets(mock_post):
 
     # No API calls should be made
     assert mock_post.call_count == 0
+
+
+@mock.patch("requests.post")
+def test_plugin_gatewayapi_batching(mock_post):
+    """NotifyGatewayAPI() batching multiple recipients in single request."""
+
+    apikey = "h" * 32
+    targets = ["+15551234567", "+15559876543", "+15551111111"]
+
+    # Prepare our response
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # Test with multiple targets - should batch all in one request
+    obj = Apprise.instantiate("gatewayapi://{}@{}/{}/{}".format(
+        apikey, targets[0], targets[1], targets[2]
+    ))
+    assert obj is not None
+    assert len(obj) == 3
+
+    assert obj.notify(body="test message", notify_type=NotifyType.INFO) is True
+
+    # Should be exactly 1 API call with all recipients
+    assert mock_post.call_count == 1
+
+    # Verify all recipients are in the single request payload
+    details = mock_post.call_args_list[0]
+    payload = details[1]["data"]
+    assert payload["message"] == "test message"
+    assert payload["recipients.0.msisdn"] == 15551234567
+    assert payload["recipients.1.msisdn"] == 15559876543
+    assert payload["recipients.2.msisdn"] == 15551111111
+
+    # Verify authentication
+    assert details[1]["auth"] == (apikey, "")
 
 
 @mock.patch("requests.post")

@@ -175,90 +175,83 @@ class NotifyGatewayAPI(NotifyBase):
             self.logger.warning("There are no GatewayAPI targets to notify")
             return False
 
-        # error tracking (used for function return)
-        has_error = False
-
         # Prepare our headers
         headers = {
             "User-Agent": self.app_id,
         }
 
-        # Prepare our targets
-        targets = list(self.targets)
-        while len(targets):
-            # Get our target to notify
-            target = targets.pop(0)
+        # Prepare our payload with all recipients in a single request
+        payload = {
+            "message": body,
+        }
 
-            # Prepare our payload
-            payload = {
-                "message": body,
-                "recipients.0.msisdn": int(target),
-            }
+        # Add all recipients using array indexing
+        for idx, target in enumerate(self.targets):
+            payload[f"recipients.{idx}.msisdn"] = int(target)
 
-            # Add sender if specified
-            if self.source:
-                payload["sender"] = self.source
+        # Add sender if specified
+        if self.source:
+            payload["sender"] = self.source
 
-            # Some Debug Logging
-            self.logger.debug(
-                "GatewayAPI POST URL:"
-                f" {self.notify_url} (cert_verify={self.verify_certificate})"
+        # Some Debug Logging
+        self.logger.debug(
+            "GatewayAPI POST URL:"
+            f" {self.notify_url} (cert_verify={self.verify_certificate})"
+        )
+        self.logger.debug(f"GatewayAPI Payload: {payload}")
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+        try:
+            r = requests.post(
+                self.notify_url,
+                data=payload,
+                headers=headers,
+                auth=(self.apikey, ""),
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
             )
-            self.logger.debug(f"GatewayAPI Payload: {payload}")
 
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
-            try:
-                r = requests.post(
-                    self.notify_url,
-                    data=payload,
-                    headers=headers,
-                    auth=(self.apikey, ""),
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                )
+            if r.status_code not in (
+                requests.codes.ok,
+                requests.codes.created,
+            ):
+                # We had a problem
+                status_str = NotifyBase.http_response_code_lookup(r.status_code)
 
-                if r.status_code not in (
-                    requests.codes.ok,
-                    requests.codes.created,
-                ):
-                    # We had a problem
-                    status_str = NotifyBase.http_response_code_lookup(r.status_code)
+                # set up our status code to use
+                status_code = r.status_code
 
-                    # set up our status code to use
-                    status_code = r.status_code
-
-                    self.logger.warning(
-                        "Failed to send GatewayAPI notification to {}: "
-                        "{}{}error={}.".format(
-                            target,
-                            status_str,
-                            ", " if status_str else "",
-                            status_code,
-                        )
-                    )
-
-                    self.logger.debug(f"Response Details:\r\n{r.content}")
-
-                    # Mark our failure
-                    has_error = True
-                    continue
-
-                else:
-                    self.logger.info(f"Sent GatewayAPI notification to {target}.")
-
-            except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred sending GatewayAPI: to %s ",
-                    target,
+                    "Failed to send GatewayAPI notification to {}: "
+                    "{}{}error={}.".format(
+                        ", ".join(self.targets),
+                        status_str,
+                        ", " if status_str else "",
+                        status_code,
+                    )
                 )
-                self.logger.debug(f"Socket Exception: {e!s}")
 
-                # Mark our failure
-                has_error = True
-                continue
+                self.logger.debug(f"Response Details:\r\n{r.content}")
 
-        return not has_error
+                return False
+
+            else:
+                self.logger.info(
+                    "Sent GatewayAPI notification to {} target(s).".format(
+                        len(self.targets)
+                    )
+                )
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A Connection error occurred sending GatewayAPI notification"
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
+
+            return False
+
+        return True
 
     @property
     def url_identifier(self):
