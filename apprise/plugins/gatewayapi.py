@@ -120,8 +120,29 @@ class NotifyGatewayAPI(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # The sender (optional)
-        self.source = source
+        # Validate the sender (optional)
+        # GatewayAPI allows:
+        # - Alphanumeric: up to 11 characters
+        # - Numeric only: up to 15 digits
+        self.source = None
+        if source:
+            # Try alphanumeric format first (up to 11 chars)
+            self.source = validate_regex(
+                source, regex=r'^[A-Za-z0-9]{1,11}$', flags=0
+            )
+
+            if not self.source:
+                # Try numeric-only format (up to 15 digits)
+                self.source = validate_regex(
+                    source, regex=r'^[0-9]{1,15}$', flags=0
+                )
+
+            if not self.source:
+                self.logger.warning(
+                    f"Invalid sender '{source}' specified. Sender must be "
+                    "alphanumeric (1-11 chars) or numeric (1-15 digits). "
+                    "Using default sender."
+                )
 
         # Parse our targets
         self.targets = []
