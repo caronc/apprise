@@ -666,8 +666,8 @@ class NotifyNotificationAPI(NotifyBase):
 
                     if self.from_addr:
                         _payload[NotificationAPIChannel.EMAIL].update({
-                            "senderName": self.from_addr,
-                            "senderEmail": self.names[self.from_addr],
+                            "senderEmail": self.from_addr,
+                            "senderName": self.names[self.from_addr],
                         })
 
                 elif channel == NotificationAPIChannel.INAPP:
@@ -775,16 +775,13 @@ class NotifyNotificationAPI(NotifyBase):
         }
 
         for payload in self.gen_payload(
-                body, title="", notify_type=NotifyType.INFO, **kwargs):
+                body, title=title, notify_type=notify_type, **kwargs):
             # Perform our post
             self.logger.debug(
-                "NotifiationAPI POST URL: {} (cert_verify={!r})".format(
+                "NotificationAPI POST URL: {} (cert_verify={!r})".format(
                     url, self.verify_certificate))
             self.logger.debug(
-                "NotifiationAPI Payload: %s", str(payload["to"]["id"]))
-
-            # TODO: Prepare our default response
-            # response = {}
+                "NotificationAPI Payload: %s", str(payload["to"]["id"]))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -798,9 +795,6 @@ class NotifyNotificationAPI(NotifyBase):
                 )
 
                 try:
-                    # TODO: Use response variable to assist in status
-                    # handling
-                    # response = loads(r.content)
                     loads(r.content)
 
                 except (AttributeError, TypeError, ValueError):
@@ -809,7 +803,7 @@ class NotifyNotificationAPI(NotifyBase):
                     #  - TypeError = r.content is None
                     #  - AttributeError = r is None
                     self.logger.warning(
-                        "Invalid response from NotifiationAPI server.")
+                        "Invalid response from NotificationAPI server.")
                     self.logger.debug(
                         "Response Details:\r\n{}".format(r.content))
 
@@ -828,7 +822,7 @@ class NotifyNotificationAPI(NotifyBase):
                             status_code)
 
                     self.logger.warning(
-                        "Failed to send NotifiationAPI notification to %s: "
+                        "Failed to send NotificationAPI notification to %s: "
                         "%s%serror=%d",
                         payload["to"]["id"],
                         status_str,
@@ -842,12 +836,12 @@ class NotifyNotificationAPI(NotifyBase):
 
                 else:
                     self.logger.info(
-                        "Sent NotifiationAPI notification to %s.",
+                        "Sent NotificationAPI notification to %s.",
                         payload["to"]["id"])
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred sending NotifiationAPI "
+                    "A Connection error occurred sending NotificationAPI "
                     "notification to %s.", payload["to"]["id"])
                 self.logger.debug("Socket Exception: {}".format(str(e)))
 

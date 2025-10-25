@@ -387,7 +387,7 @@ def test_plugin_napi_template_sms_payloads(mock_post):
         },
         "parameters": {
             "appBody": "body",
-            "appTitle": "",
+            "appTitle": "title",
             "appType": "info",
             "appId": "Apprise",
             "appDescription": "Apprise Notifications",
@@ -464,7 +464,7 @@ def test_plugin_napi_template_email_payloads(mock_post):
         "parameters": {
             "customToken": "customValue",
             "appBody": "body",
-            "appTitle": "",
+            "appTitle": "title",
             "appType": "info",
             "appId": "Apprise",
             "appDescription": "Apprise Notifications",
@@ -534,10 +534,10 @@ def test_plugin_napi_message_payloads(mock_post):
             "number": "+15551239876",
         },
         "email": {
-            "subject": "Apprise",
+            "subject": "title",
             "html": "body",
-            "senderName": "chris@example.eu",
-            "senderEmail": "Chris",
+            "senderName": "Chris",
+            "senderEmail": "chris@example.eu",
         },
         "options": {
             "email": {
@@ -590,7 +590,7 @@ def test_plugin_napi_message_payloads(mock_post):
             "number": "+15551239876",
             "email": "test@example.ca",
         },
-        "sms": {"message": "body"},
+        "sms": {"message": "title\nbody"},
         "options": {
             "email": {
                 "fromAddress": "chris@example.eu",
@@ -640,8 +640,8 @@ def test_plugin_napi_message_payloads(mock_post):
             "email": "test@example.ca",
             "number": "+15551239876",
         },
-        "slack": {"text": "body"},
-        "sms": {"message": "body"},
+        "slack": {"text": "title\nbody"},
+        "sms": {"message": "title\nbody"},
         "options": {
             "email": {
                 "fromAddress": "chris@example.eu",
