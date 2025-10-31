@@ -604,7 +604,7 @@ class NotifyNtfy(NotifyBase):
 
         if self.__tags:
             headers["X-Tags"] = ",".join(self.__tags)
-        
+
         if self.actions:
             headers["X-Actions"] = self.actions
 
@@ -894,7 +894,7 @@ class NotifyNtfy(NotifyBase):
 
         if "actions" in results["qsd"] and len(results["qsd"]["actions"]):
             results["actions"] = NotifyNtfy.unquote(results["qsd"]["actions"])
-        
+
         # Boolean to include an image or not
         results["include_image"] = parse_bool(
             results["qsd"].get(
