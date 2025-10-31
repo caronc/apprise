@@ -288,6 +288,10 @@ class NotifyNtfy(NotifyBase):
                 "name": _("Tags"),
                 "type": "string",
             },
+            "actions": {
+                "name": _("Actions"),
+                "type": "string",
+            },
             "mode": {
                 "name": _("Mode"),
                 "type": "choice:string",
@@ -319,6 +323,7 @@ class NotifyNtfy(NotifyBase):
         email=None,
         priority=None,
         tags=None,
+        actions=None,
         mode=None,
         include_image=True,
         avatar_url=None,
@@ -401,6 +406,9 @@ class NotifyNtfy(NotifyBase):
 
         # Any optional tags to attach to the notification
         self.__tags = parse_list(tags)
+
+        # Action buttons
+        self.actions = actions
 
         # Avatar URL
         # This allows a user to provide an over-ride to the otherwise
@@ -596,6 +604,9 @@ class NotifyNtfy(NotifyBase):
 
         if self.__tags:
             headers["X-Tags"] = ",".join(self.__tags)
+        
+        if self.actions:
+            headers["X-Actions"] = self.actions
 
         self.logger.debug(
             "ntfy POST URL:"
@@ -778,6 +789,9 @@ class NotifyNtfy(NotifyBase):
         if self.__tags:
             params["tags"] = ",".join(self.__tags)
 
+        if self.actions is not None:
+            params["actions"] = self.actions
+
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Determine Authentication
@@ -878,6 +892,9 @@ class NotifyNtfy(NotifyBase):
                 NotifyNtfy.unquote(results["qsd"]["tags"])
             )
 
+        if "actions" in results["qsd"] and len(results["qsd"]["actions"]):
+            results["actions"] = NotifyNtfy.unquote(results["qsd"]["actions"])
+        
         # Boolean to include an image or not
         results["include_image"] = parse_bool(
             results["qsd"].get(
