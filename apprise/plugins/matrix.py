@@ -296,7 +296,7 @@ class NotifyMatrix(NotifyBase):
                 "name": _("Matrix API Verion"),
                 "type": "choice:string",
                 "values": MATRIX_VERSIONS,
-                "default": MatrixVersion.V3,
+                "default": MatrixVersion.V4,
             },
             "msgtype": {
                 "name": _("Message Type"),
