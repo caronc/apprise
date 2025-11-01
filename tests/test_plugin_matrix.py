@@ -140,6 +140,16 @@ apprise_url_tests = (
         },
     ),
     (
+        "matrix://user:token@localhost:123/#general/?version=4",
+        {
+            # Provide version over-ride (using version=)
+            "instance": NotifyMatrix,
+            # Our response expected server response
+            "requests_response_text": MATRIX_GOOD_RESPONSE,
+            "privacy_url": "matrix://user:****@localhost:123",
+        },
+    ),
+    (
         "matrix://user:token@localhost:123/#general/?version=3",
         {
             # Provide version over-ride (using version=)
@@ -1003,6 +1013,125 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
 @mock.patch("requests.put")
 @mock.patch("requests.post")
+def test_plugin_matrix_attachments_api_v4(mock_post, mock_put):
+    """NotifyMatrix() Attachment Checks (v4)"""
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+
+    # Prepare a bad response
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.internal_server_error
+
+    # Prepare Mock return object
+    mock_post.return_value = response
+    mock_put.return_value = response
+
+    # Instantiate our object
+    obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=4")
+
+    # attach our content
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    # Test our call count
+    assert mock_put.call_count == 2
+    assert mock_post.call_count == 3
+    assert mock_post.call_args_list[0][0][0] == \
+        "http://localhost/_matrix/client/v4/login"
+    # currently media uploads are still handled by v3
+    assert mock_post.call_args_list[1][0][0] == \
+        "http://localhost/_matrix/media/v3/upload"
+    assert mock_post.call_args_list[2][0][0] == \
+        "http://localhost/_matrix/client/v4/join/%23general%3Alocalhost"
+    assert mock_put.call_args_list[0][0][0] == \
+        "http://localhost/_matrix/client/v4/rooms/%21abc123%3Alocalhost/" \
+        "send/m.room.message/0"
+    assert mock_put.call_args_list[1][0][0] == \
+        "http://localhost/_matrix/client/v4/rooms/%21abc123%3Alocalhost/" \
+        "send/m.room.message/1"
+
+    # Attach a zip file type
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
+    )
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    # An invalid attachment will cause a failure
+    path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
+    attach = AppriseAttachment(path)
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=path,
+        )
+        is False
+    )
+
+    # update our attachment to be valid
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    mock_put.return_value = None
+    mock_post.return_value = None
+
+    # Throw an exception on the first call to requests.post()
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        # Reset our value
+        mock_put.reset_mock()
+        mock_post.reset_mock()
+
+        mock_post.side_effect = [side_effect]
+
+        assert obj.send(body="test", attach=attach) is False
+
+    # Throw an exception on the second call to requests.post()
+    for side_effect in (requests.RequestException(), OSError(), bad_response):
+        # Reset our value
+        mock_put.reset_mock()
+        mock_post.reset_mock()
+
+        mock_put.side_effect = [side_effect, response]
+        mock_post.side_effect = [response, side_effect, response]
+
+        # We'll fail now because of our error handling
+        assert obj.send(body="test", attach=attach) is False
+
+    # handle a bad response
+    mock_put.side_effect = [bad_response, response]
+    mock_post.side_effect = [response, bad_response, response]
+
+    # We'll fail now because of an internal exception
+    assert obj.send(body="test", attach=attach) is False
+
+    # Force a object removal (thus a logout call)
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.post")
 def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     """NotifyMatrix() Attachment Checks (v3)"""
 
@@ -1536,6 +1665,213 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 
     # Force __del__() call
     del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_transaction_ids_api_v4_no_cache(
+    mock_post, mock_get, mock_put
+):
+    """NotifyMatrix() Transaction ID Checks (v4)"""
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+
+    # Prepare a bad response
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.internal_server_error
+
+    # Prepare Mock return object
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_put.return_value = response
+
+    # For each element is 1 batch that is ran
+    # the number defined is the number of notifications to send
+    batch = [10, 1, 5]
+
+    for notifications in batch:
+        # Instantiate our object
+        obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=4")
+
+        # Ensure mode is memory
+        assert obj.store.mode == PersistentStoreMode.MEMORY
+
+        # Performs a login
+        assert (
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            is True
+        )
+        assert mock_get.call_count == 0
+        assert mock_post.call_count == 2
+        assert (
+            mock_post.call_args_list[0][0][0]
+            == "http://localhost/_matrix/client/v4/login"
+        )
+        assert (
+            mock_post.call_args_list[1][0][0]
+            == "http://localhost/_matrix/client/v4/join/%23general%3Alocalhost"
+        )
+        assert mock_put.call_count == 1
+        assert (
+            mock_put.call_args_list[0][0][0]
+            == "http://localhost/_matrix/client/v4/rooms/"
+            + "%21abc123%3Alocalhost/send/m.room.message/0"
+        )
+
+        for no, _ in enumerate(range(notifications), start=1):
+            # Clean our slate
+            mock_post.reset_mock()
+            mock_get.reset_mock()
+            mock_put.reset_mock()
+
+            assert (
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+                is True
+            )
+
+            assert mock_get.call_count == 0
+            assert mock_post.call_count == 0
+            assert mock_put.call_count == 1
+            assert (
+                mock_put.call_args_list[0][0][0]
+                == "http://localhost/_matrix/client/v4/rooms/"
+                + f"%21abc123%3Alocalhost/send/m.room.message/{no}"
+            )
+
+        mock_post.reset_mock()
+        mock_get.reset_mock()
+        mock_put.reset_mock()
+
+        # Force a object removal (thus a logout call)
+        del obj
+
+        assert mock_get.call_count == 0
+        assert mock_post.call_count == 1
+        assert (
+            mock_post.call_args_list[0][0][0]
+            == "http://localhost/_matrix/client/v4/logout"
+        )
+        mock_post.reset_mock()
+        assert mock_put.call_count == 0
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_transaction_ids_api_v4_w_cache(
+    mock_post, mock_get, mock_put, tmpdir
+):
+    """NotifyMatrix() Transaction ID Checks (v4)"""
+
+    # Prepare a good response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+
+    # Prepare a bad response
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.internal_server_error
+
+    # Prepare Mock return object
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_put.return_value = response
+
+    # For each element is 1 batch that is ran
+    # the number defined is the number of notifications to send
+    batch = [10, 1, 5]
+
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+    mock_put.reset_mock()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    # Message Counter
+    transaction_id = 1
+
+    for no, notifications in enumerate(batch):
+        # Instantiate our object
+        obj = Apprise.instantiate(
+            "matrix://user:pass@localhost/#general?v=4", asset=asset
+        )
+
+        # Ensure mode is flush
+        assert obj.store.mode == PersistentStoreMode.FLUSH
+
+        # Performs a login
+        assert (
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            is True
+        )
+        assert mock_get.call_count == 0
+        if no == 0:
+            # first entry
+            assert mock_post.call_count == 2
+            assert (
+                mock_post.call_args_list[0][0][0]
+                == "http://localhost/_matrix/client/v4/login"
+            )
+            assert (
+                mock_post.call_args_list[1][0][0]
+                == "http://localhost/_matrix/client/v4/"
+                "join/%23general%3Alocalhost"
+            )
+            assert mock_put.call_count == 1
+            assert (
+                mock_put.call_args_list[0][0][0]
+                == "http://localhost/_matrix/client/v4/rooms/"
+                + "%21abc123%3Alocalhost/send/m.room.message/0"
+            )
+
+        for no, _ in enumerate(range(notifications), start=transaction_id):
+            # Clean our slate
+            mock_post.reset_mock()
+            mock_get.reset_mock()
+            mock_put.reset_mock()
+
+            assert (
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+                is True
+            )
+
+            # Increment transaction counter
+            transaction_id += 1
+
+            assert mock_get.call_count == 0
+            assert mock_post.call_count == 0
+            assert mock_put.call_count == 1
+            assert (
+                mock_put.call_args_list[0][0][0]
+                == "http://localhost/_matrix/client/v4/rooms/"
+                + f"%21abc123%3Alocalhost/send/m.room.message/{no}"
+            )
+
+        # Increment transaction counter
+        transaction_id += 1
+
+        mock_post.reset_mock()
+        mock_get.reset_mock()
+        mock_put.reset_mock()
+
+        # Force a object removal
+        # Biggest takeaway is that a logout no longer happens
+        del obj
+
+        assert mock_get.call_count == 0
+        assert mock_post.call_count == 0
+        assert mock_put.call_count == 0
 
 
 @mock.patch("requests.put")

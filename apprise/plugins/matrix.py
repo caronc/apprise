@@ -53,9 +53,12 @@ from .base import NotifyBase
 MATRIX_V1_WEBHOOK_PATH = "/api/v1/matrix/hook"
 MATRIX_V2_API_PATH = "/_matrix/client/r0"
 MATRIX_V3_API_PATH = "/_matrix/client/v3"
-MATRIX_V3_MEDIA_PATH = "/_matrix/media/v3"
+MATRIX_V4_API_PATH = "/_matrix/client/v4"
 MATRIX_V2_MEDIA_PATH = "/_matrix/media/r0"
-
+MATRIX_V3_MEDIA_PATH = "/_matrix/media/v3"
+# As of today, Matrix media endpoints remain stable on v3 for uploads.
+# If/when media v4 becomes available, this can be bumped with no logic changes.
+MATRIX_V4_MEDIA_PATH = MATRIX_V3_MEDIA_PATH
 
 class MatrixDiscoveryException(AppriseException):
     """Apprise Matrix Exception Class."""
@@ -106,11 +109,15 @@ class MatrixVersion:
     # Version 3
     V3 = "3"
 
+    # Version 4
+    V4 = "4"
+
 
 # webhook modes are placed into this list for validation purposes
 MATRIX_VERSIONS = (
     MatrixVersion.V2,
     MatrixVersion.V3,
+    MatrixVersion.V4,
 )
 
 
@@ -696,7 +703,11 @@ class NotifyMatrix(NotifyBase):
             room = rooms.pop(0)
 
             # Set method according to MatrixVersion
-            method = "PUT" if self.version == MatrixVersion.V3 else "POST"
+            method = (
+                "PUT"
+                if self.version in (MatrixVersion.V3, MatrixVersion.V4)
+                else "POST"
+            )
 
             # Get our room_id from our response
             room_id = self._room_join(room)
@@ -714,7 +725,7 @@ class NotifyMatrix(NotifyBase):
             )
 
             # Build our path
-            if self.version == MatrixVersion.V3:
+            if self.version in (MatrixVersion.V3, MatrixVersion.V4):
                 path = f"/rooms/{NotifyMatrix.quote(room_id)}" \
                     f"/send/m.room.message/{self.transaction_id}"
 
@@ -749,7 +760,7 @@ class NotifyMatrix(NotifyBase):
 
                     # Increment the transaction ID to avoid future messages
                     # being recognized as retransmissions and ignored
-                    if self.version == MatrixVersion.V3 \
+                    if self.version in (MatrixVersion.V3, MatrixVersion.V4) \
                        and self.access_token != self.password:
                         self.transaction_id += 1
                         self.store.set(
@@ -811,7 +822,7 @@ class NotifyMatrix(NotifyBase):
             # Increment the transaction ID to avoid future messages being
             # recognized as retransmissions and ignored
             if (
-                self.version == MatrixVersion.V3
+                self.version in (MatrixVersion.V3, MatrixVersion.V4)
                 and self.access_token != self.password
             ):
                 self.transaction_id += 1
@@ -957,7 +968,7 @@ class NotifyMatrix(NotifyBase):
 
         if self.user and self.password:
             # Prepare our Authentication Payload
-            if self.version == MatrixVersion.V3:
+            if self.version in (MatrixVersion.V3, MatrixVersion.V4):
                 payload = {
                     "type": "m.login.password",
                     "identifier": {
@@ -1338,7 +1349,10 @@ class NotifyMatrix(NotifyBase):
         status_code = requests.codes.internal_server_error
 
         if path == "/upload":
-            if self.version == MatrixVersion.V3:
+            if self.version == MatrixVersion.V4:
+                url += MATRIX_V4_MEDIA_PATH + path
+
+            elif self.version == MatrixVersion.V3:
                 url += MATRIX_V3_MEDIA_PATH + path
 
             else:
@@ -1352,7 +1366,10 @@ class NotifyMatrix(NotifyBase):
             headers["Content-Type"] = attachment.mimetype
 
         elif not url_override:
-            if self.version == MatrixVersion.V3:
+            if self.version == MatrixVersion.V4:
+                url += MATRIX_V4_API_PATH + path
+
+            elif self.version == MatrixVersion.V3:
                 url += MATRIX_V3_API_PATH + path
 
             else:
