@@ -408,7 +408,7 @@ class NotifyNtfy(NotifyBase):
         self.__tags = parse_list(tags)
 
         # Action buttons
-        self.actions = actions
+        self.__actions = actions
 
         # Avatar URL
         # This allows a user to provide an over-ride to the otherwise
@@ -605,8 +605,8 @@ class NotifyNtfy(NotifyBase):
         if self.__tags:
             headers["X-Tags"] = ",".join(self.__tags)
 
-        if self.actions:
-            headers["X-Actions"] = self.actions
+        if self.__actions:
+            headers["X-Actions"] = self.__actions
 
         self.logger.debug(
             "ntfy POST URL:"
@@ -789,8 +789,8 @@ class NotifyNtfy(NotifyBase):
         if self.__tags:
             params["tags"] = ",".join(self.__tags)
 
-        if self.actions is not None:
-            params["actions"] = self.actions
+        if self.__actions is not None:
+            params["actions"] = self.__actions
 
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
