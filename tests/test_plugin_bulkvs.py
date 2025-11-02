@@ -134,7 +134,7 @@ apprise_url_tests = (
         "bulkvs://{}:{}@{}".format("a" * 10, "b" * 10, "5" * 11),
         {
             "instance": NotifyBulkVS,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -144,7 +144,7 @@ apprise_url_tests = (
         {
             "instance": NotifyBulkVS,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

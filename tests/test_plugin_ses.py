@@ -224,7 +224,7 @@ apprise_url_tests = (
             "instance": NotifySES,
             # Our response expected server response
             "requests_response_text": AWS_SES_GOOD_RESPONSE,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -239,7 +239,7 @@ apprise_url_tests = (
             # Our response expected server response
             "requests_response_text": AWS_SES_GOOD_RESPONSE,
             # Throws a series of connection and transfer exceptions when this
-            # flag is set and tests that we gracfully handle them
+            # flag is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

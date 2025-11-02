@@ -121,7 +121,7 @@ apprise_url_tests = (
         "threema://*THEGWID@secret/16134443333",
         {
             "instance": NotifyThreema,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },

@@ -350,7 +350,7 @@ apprise_url_tests = (
         "opsgenie://apikey/#team/user/",
         {
             "instance": NotifyOpsgenie,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "notify_type": NotifyType.FAILURE,
             # Our response expected server response
             "requests_response_text": OPSGENIE_GOOD_RESPONSE,
@@ -366,7 +366,7 @@ apprise_url_tests = (
             # Our response expected server response
             "requests_response_text": OPSGENIE_GOOD_RESPONSE,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
