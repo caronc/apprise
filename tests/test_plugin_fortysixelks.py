@@ -77,7 +77,7 @@ apprise_url_tests = (
     ("46elks://user:pass@+15551234567",
         {
             "instance": Notify46Elks,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         }),
@@ -85,7 +85,7 @@ apprise_url_tests = (
         {
             "instance": Notify46Elks,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         }),
 )
@@ -101,10 +101,6 @@ def test_plugin_46elks_urls():
 @mock.patch("requests.post")
 def test_plugin_46elks_edge_cases(mock_post):
     """Notify46Elks() Edge Cases."""
-
-    """
-    Successful POST returns True
-    """
 
     user = "user1"
     password = "pass123"
