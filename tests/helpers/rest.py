@@ -118,11 +118,17 @@ class AppriseURLTester:
     def run(self, url, meta, tmpdir, mock_request, mock_post, mock_get):
         """Run a specific test."""
 
+        if meta is False:
+            # Prepare a default structure to make life easy
+            meta = {
+                "instance": TypeError,
+            }
+
         # Our expected instance
-        instance = meta.get("instance", None)
+        instance = meta.get("instance")
 
         # Our expected server objects
-        _self = meta.get("self", None)
+        _self = meta.get("self")
 
         # Our expected privacy url
         # Don't set this if don't need to check it's value

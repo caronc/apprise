@@ -152,6 +152,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
+| [46Elks](https://github.com/caronc/apprise/wiki/Notify_46elks) | 46elks://  | (TCP) 443   | 46elks://user:pass@ToPhoneNo
 | [Africas Talking](https://github.com/caronc/apprise/wiki/Notify_africas_talking) | atalk://  | (TCP) 443   | atalk://AppUser@ApiKey/ToPhoneNo<br/>atalk://AppUser@ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Automated Packet Reporting System (ARPS)](https://github.com/caronc/apprise/wiki/Notify_aprs)  | aprs:// | (TCP) 10152 | aprs://user:pass@callsign<br/>aprs://user:pass@callsign1/callsign2/callsignN
 | [AWS SNS](https://github.com/caronc/apprise/wiki/Notify_sns)  | sns://   | (TCP) 443   | sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo<br/>sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo1/+PhoneNo2/+PhoneNoN<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic1/Topic2/TopicN
