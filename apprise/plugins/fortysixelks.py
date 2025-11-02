@@ -252,7 +252,7 @@ class Notify46Elks(NotifyBase):
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending 46elks"
-                    f"notification to {target}."
+                    f" notification to {target}."
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
 
@@ -265,7 +265,7 @@ class Notify46Elks(NotifyBase):
     @property
     def url_identifier(self):
         """Returns all of the identifiers that make this URL unique from
-        another simliar one.
+        another similar one.
 
         Targets or end points should never be identified here.
         """

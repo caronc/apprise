@@ -131,6 +131,7 @@ def test_plugin_46elks_edge_cases(mock_post):
     # Test
     details = mock_post.call_args_list[0]
     headers = details[1]["headers"]
+    assert headers["User-Agent"] == "Apprise"
     payload = details[1]["data"]
     assert "from" not in payload
     assert payload["to"] == phone
