@@ -789,7 +789,7 @@ class NotifyNtfy(NotifyBase):
         if self.__tags:
             params["tags"] = ",".join(self.__tags)
 
-        if self.__actions is not None:
+        if self.__actions:
             params["actions"] = self.__actions
 
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
