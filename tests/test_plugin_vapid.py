@@ -119,7 +119,7 @@ apprise_url_tests = (
         "vapid://user@example.uk/newuser@example.uk",
         {
             "instance": NotifyVapid,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -129,7 +129,7 @@ apprise_url_tests = (
         {
             "instance": NotifyVapid,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
@@ -327,7 +327,7 @@ def test_plugin_vapid_urls_with_required_assets(
             "vapid://user@example.com/user1",
             {
                 "instance": NotifyVapid,
-                # throw a bizzare code forcing us to fail to look it up
+                # throw a bizarre code forcing us to fail to look it up
                 "response": False,
                 "requests_response_code": 999,
             },
@@ -337,7 +337,7 @@ def test_plugin_vapid_urls_with_required_assets(
             {
                 "instance": NotifyVapid,
                 # Throws a series of connection and transfer exceptions
-                # when this flag is set and tests that we gracfully handle them
+                # when this flag is set and tests that we gracefully handle them
                 "test_requests_exceptions": True,
             },
         ),
