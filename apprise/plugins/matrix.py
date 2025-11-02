@@ -72,17 +72,18 @@ MATRIX_HTTP_ERROR_MAP = {
 
 # Matrix Room Syntax
 IS_ROOM_ALIAS = re.compile(
-    r"^\s*(#|%23)?(?P<room>[a-z0-9-]+)((:|%3A)"
-    r"(?P<home_server>[a-z0-9.-]+))?\s*$",
+    r"^\s*(#|%23)?(?P<room>[A-Za-z0-9._=-]+)((:|%3A)"
+    r"(?P<home_server>[A-Za-z0-9.-]+))?\s*$",
     re.I,
 )
 
 # Room ID MUST start with an exclamation to avoid ambiguity
 IS_ROOM_ID = re.compile(
-    r"^\s*(!|&#33;|%21)(?P<room>[a-z0-9-]+)((:|%3A)"
-    r"(?P<home_server>[a-z0-9.-]+))?\s*$",
+    r"^\s*(!|&#33;|%21)(?P<room>[A-Za-z0-9._=-]+)((:|%3A)"
+    r"(?P<home_server>[A-Za-z0-9.-]+))?\s*$",
     re.I,
 )
+
 
 # Matrix is_image check
 IS_IMAGE = re.compile(r"^image/.*", re.I)
@@ -261,7 +262,7 @@ class NotifyMatrix(NotifyBase):
             "target_room_alias": {
                 "name": _("Target Room Alias"),
                 "type": "string",
-                "prefix": "!",
+                "prefix": "#",
                 "map_to": "targets",
             },
             "targets": {
