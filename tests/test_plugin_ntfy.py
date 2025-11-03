@@ -149,6 +149,14 @@ apprise_url_tests = (
             "requests_response_text": GOOD_RESPONSE_TEXT,
         },
     ),
+    # Actions
+    (
+        "ntfy://localhost/topic1/?actions=view%2CExample%2Chttp://www.example.com/%3Bview%2CTest%2Chttp://www.test.com/",
+        {
+            "instance": NotifyNtfy,
+            "requests_response_text": GOOD_RESPONSE_TEXT,
+        },
+    ),
     # Delay
     (
         "ntfy://localhost/topic1/?delay=3600",
