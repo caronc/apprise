@@ -64,7 +64,7 @@ apprise_url_tests = (
     }),
 
     # invalid phone no
-    ("46elks://user:pass@234512", {
+    ("46elks://user:pass@Acme/234512", {
         "instance": Notify46Elks,
         "notify_response": False,
     }),
@@ -72,7 +72,7 @@ apprise_url_tests = (
     (("https://user1:pass@"
       "api.46elks.com/a1/sms?to=+15551234511&from=Acme"), {
         "instance": Notify46Elks,
-        "privacy_url": "46elks://user1:****@+15551234511",
+        "privacy_url": "46elks://user1:****@Acme/+15551234511",
     }),
     ("46elks://user:pass@+15551234567",
         {
@@ -129,8 +129,8 @@ def test_plugin_46elks_edge_cases(mock_post):
     headers = details[1]["headers"]
     assert headers["User-Agent"] == "Apprise"
     payload = details[1]["data"]
-    assert "from" not in payload
     assert payload["to"] == phone
+    assert payload["from"] == phone
     assert payload["message"] == "title\r\nbody"
 
     # Verify our URL looks good

@@ -27,7 +27,7 @@
 """
 46elks SMS Notification Service.
 
-Minimal URL formats:
+Minimal URL formats (source ends up being target):
   - 46elks://user:pass@/+15551234567
   - 46elks://user:pass@/+15551234567/+46701234567
   - 46elks://user:pass@/+15551234567?from=Acme
@@ -76,7 +76,10 @@ class Notify46Elks(NotifyBase):
     body_maxlen = 160
 
     # Define object templates
-    templates = ("{schema}://{user}:{password}@/{targets}",)
+    templates = (
+        "{schema}://{user}:{password}@/{from_phone}",
+        "{schema}://{user}:{password}@/{from_phone}/{targets}",
+    )
 
     # Define our template tokens
     template_tokens = dict(
@@ -92,6 +95,12 @@ class Notify46Elks(NotifyBase):
                 "type": "string",
                 "private": True,
                 "required": True,
+            },
+            "from_phone": {
+                "name": _("From Phone No"),
+                "type": "string",
+                "required": True,
+                "map_to": "source",
             },
             "target_phone": {
                 "name": _("Target Phone"),
@@ -113,10 +122,7 @@ class Notify46Elks(NotifyBase):
                 "alias_of": "targets",
             },
             "from": {
-                # Your registered short code or alphanumeric
-                "name": _("From"),
-                "type": "string",
-                "map_to": "sender",
+                "alias_of": "from_phone",
             },
         },
     )
@@ -124,18 +130,19 @@ class Notify46Elks(NotifyBase):
     def __init__(
         self,
         targets: Optional[Iterable[str]] = None,
-        sender: Optional[str] = None,
+        source: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         """
         Initialise 46elks notifier.
 
         :param targets: Iterable of phone numbers. E.164 is recommended.
-        :param sender: Optional sender ID or E.164 number.
+        :param source: Optional source ID or E.164 number.
         """
         super().__init__(**kwargs)
 
-        self.sender: Optional[str] = (sender or "").strip() or None
+        # Prepare our source
+        self.source: Optional[str] = (source or "").strip() or None
 
         if not self.password:
             msg = "No 46elks password was specified."
@@ -149,6 +156,9 @@ class Notify46Elks(NotifyBase):
 
         # Parse our targets
         self.targets = []
+
+        if not targets and is_phone_no(self.source):
+            targets = [self.source]
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:
@@ -197,11 +207,9 @@ class Notify46Elks(NotifyBase):
             # Prepare our payload
             payload = {
                 "to": target,
+                "from": self.source,
                 "message": body,
             }
-
-            if self.sender:
-                payload["from"] = self.sender
 
             self.logger.debug(
                 "46elks POST URL:"
@@ -269,7 +277,7 @@ class Notify46Elks(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (self.secure_protocol, self.user, self.password, self.sender)
+        return (self.secure_protocol, self.user, self.password, self.source)
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
@@ -277,16 +285,20 @@ class Notify46Elks(NotifyBase):
         # Initialize our parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        if self.sender:
-            params["from"] = self.sender
+        # Apprise URL can be condensed and target can be eliminated if its
+        # our source phone no
+        targets = (
+            [] if len(self.targets) == 1 and
+            self.source in self.targets else self.targets)
 
-        return "{schema}://{user}:{password}@{targets}?{params}".format(
+        return "{schema}://{user}:{pw}@{source}/{targets}?{params}".format(
             schema=self.secure_protocol,
             user=self.quote(self.user, safe=""),
-            password=self.pprint(
+            source=self.source if self.source else "",
+            pw=self.pprint(
                 self.password, privacy, mode=PrivacyMode.Secret, safe=""),
             targets="/".join(
-                [Notify46Elks.quote(x, safe="+") for x in self.targets]
+                [Notify46Elks.quote(x, safe="+") for x in targets]
             ),
             params=Notify46Elks.urlencode(params),
         )
@@ -336,22 +348,19 @@ class Notify46Elks(NotifyBase):
         # Prepare our targets
         results["targets"] = []
 
-        # This means our host is actually a phone number (target)
-        if results["host"]:
-            results["targets"].append(
-                Notify46Elks.unquote(results["host"])
+        # The 'from' makes it easier to use yaml configuration
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["source"] = Notify46Elks.unquote(
+                results["qsd"]["from"]
             )
+
+        elif results["host"]:
+            results["source"] = Notify46Elks.unquote(results["host"])
 
         # Store our remaining targets found on path
         results["targets"].extend(
             Notify46Elks.split_path(results["fullpath"])
         )
-
-        # The 'from' makes it easier to use yaml configuration
-        if "from" in results["qsd"] and len(results["qsd"]["from"]):
-            results["sender"] = Notify46Elks.unquote(
-                results["qsd"]["from"]
-            )
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration
