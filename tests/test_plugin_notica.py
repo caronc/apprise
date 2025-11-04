@@ -173,7 +173,7 @@ apprise_url_tests = (
         "notica://%s" % ("d" * 7),
         {
             "instance": NotifyNotica,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -183,7 +183,7 @@ apprise_url_tests = (
         {
             "instance": NotifyNotica,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
