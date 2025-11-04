@@ -337,7 +337,8 @@ def test_plugin_vapid_urls_with_required_assets(
             {
                 "instance": NotifyVapid,
                 # Throws a series of connection and transfer exceptions
-                # when this flag is set and tests that we gracefully handle them
+                # when this flag is set and tests that we gracefully handle
+                # them
                 "test_requests_exceptions": True,
             },
         ),
