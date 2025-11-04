@@ -350,8 +350,8 @@ apprise_url_tests = (
         "tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes",
         {
             "instance": NotifyTelegram,
-            # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracefully handle them without images set
+            # Throws a series of i/o exceptions with this flag is set and
+            # tests that we gracefully handle them without images set
             "include_image": True,
             "test_requests_exceptions": True,
         },
