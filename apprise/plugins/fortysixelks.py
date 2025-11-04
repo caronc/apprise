@@ -61,7 +61,7 @@ class Notify46Elks(NotifyBase):
     service_url = "https://46elks.com"
 
     # The default secure protocol
-    secure_protocol = "46elks"
+    secure_protocol = ("46elks", "elks")
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://github.com/caronc/apprise/wiki/Notify_46elks"
@@ -277,7 +277,7 @@ class Notify46Elks(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (self.secure_protocol, self.user, self.password, self.source)
+        return (self.secure_protocol[0], self.user, self.password, self.source)
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
@@ -292,7 +292,7 @@ class Notify46Elks(NotifyBase):
             self.source in self.targets else self.targets)
 
         return "{schema}://{user}:{pw}@{source}/{targets}?{params}".format(
-            schema=self.secure_protocol,
+            schema=self.secure_protocol[0],
             user=self.quote(self.user, safe=""),
             source=self.source if self.source else "",
             pw=self.pprint(
@@ -328,7 +328,7 @@ class Notify46Elks(NotifyBase):
         if result:
             return Notify46Elks.parse_url(
                 "{schema}://{credentials}@/{params}".format(
-                    schema=Notify46Elks.secure_protocol,
+                    schema=Notify46Elks.secure_protocol[0],
                     credentials=result.group("credentials"),
                     params=result.group("params"),
                 )

@@ -57,6 +57,11 @@ apprise_url_tests = (
         "instance": Notify46Elks,
     }),
 
+    # Support elks:// too!
+    ("elks://user:pass@+15551234123/", {
+        "instance": Notify46Elks,
+    }),
+
     # Privacy mode redacts password
     ("46elks://user:pass@+15551234512", {
         "privacy_url": "46elks://user:****@+15551234512",
