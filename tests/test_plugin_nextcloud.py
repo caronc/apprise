@@ -1,4 +1,4 @@
-# BSD 2-Clause License
+﻿# BSD 2-Clause License
 #
 # Apprise - Push Notification Library.
 # Copyright (c) 2025, Chris Caron <lead2gold@gmail.com>
@@ -26,8 +26,8 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
-import logging
 import json as _json
+import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -279,7 +279,10 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
         if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
             # Return JSON for group
             j = {
-                "ocs": {"meta": {"status": "ok", "statuscode": 100}, "data": {"users": ["user1", "user2"]}}
+                "ocs": {
+                    "meta": {"status": "ok", "statuscode": 100},
+                    "data": {"users": ["user1", "user2"]},
+                }
             }
             resp.status_code = requests.codes.ok
             resp.json = lambda: j
@@ -287,7 +290,10 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
             return resp
         if "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
             j = {
-                "ocs": {"meta": {"status": "ok", "statuscode": 100}, "data": {"users": ["user1", "user3"]}}
+                "ocs": {
+                    "meta": {"status": "ok", "statuscode": 100},
+                    "data": {"users": ["user1", "user3"]},
+                }
             }
             resp.status_code = requests.codes.ok
             resp.json = lambda: j
@@ -306,13 +312,16 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
         host="localhost",
         user="admin",
         password="pass",
-        targets=["group:devs", "all", "user4"],
+        targets=["#devs", "all", "user4"],
     )
 
     assert isinstance(obj, NotifyNextcloud)
 
     # Send notification
-    assert obj.send(body="body", title="title", notify_type=NotifyType.INFO) is True
+    assert (
+        obj.send(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # Expected resolved users (deduplicated): user1, user2, user3, user4
     # Hence 4 POST calls
@@ -321,6 +330,99 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
     # Validate calls were made to expected endpoints
     called_urls = [c[0][0] for c in mock_post.call_args_list]
     for u in ("user1", "user2", "user3", "user4"):
+        assert any(u in url for url in called_urls)
+
+
+    # Removed XML/v2 fallback tests during simplification
+    pass
+
+
+@mock.patch("requests.post")
+@mock.patch("requests.get")
+def test_plugin_nextcloud_groups_variant_paths(mock_get, mock_post):
+    """No v2/XML fallbacks; ensure v1+json used."""
+
+    post_resp = mock.Mock()
+    post_resp.content = ""
+    post_resp.status_code = requests.codes.ok
+    mock_post.return_value = post_resp
+
+    def get_side_effect(url, *args, **kwargs):
+        resp = mock.Mock()
+        # Default json() to empty
+        resp.json = lambda: {}
+
+        if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
+            resp.status_code = requests.codes.ok
+            import json as _json
+            payload = {"ocs": {"data": {"users": ["u1"]}}}
+            resp.json = lambda: payload
+            resp.content = _json.dumps(payload).encode()
+            return resp
+
+        if "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
+            resp.status_code = requests.codes.ok
+            import json as _json
+            payload = {"ocs": {"data": {"users": ["u2"]}}}
+            resp.json = lambda: payload
+            resp.content = _json.dumps(payload).encode()
+            return resp
+
+        resp.status_code = 500
+        resp.content = b""
+        return resp
+
+    mock_get.side_effect = get_side_effect
+
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["#devs", "all"],
+    )
+    assert obj.send(body="b", title="t", notify_type=NotifyType.INFO) is True
+
+    # Expect users u1 (group) and u2 (all)
+    assert mock_post.call_count == 2
+    called_urls = [c[0][0] for c in mock_post.call_args_list]
+    for u in ("u1", "u2"):
+        assert any(u in url for url in called_urls)
+
+
+@mock.patch("requests.post")
+@mock.patch("requests.get")
+def test_plugin_nextcloud_groups_errors_and_dedup(mock_get, mock_post):
+    """Non-200/exception paths return empty lists and dedup still applies."""
+
+    post_resp = mock.Mock()
+    post_resp.content = ""
+    post_resp.status_code = requests.codes.ok
+    mock_post.return_value = post_resp
+
+    # Non-200 for group and users; JSON invalid
+    def get_side_effect(url, *args, **kwargs):
+        resp = mock.Mock()
+        resp.status_code = 401
+        resp.content = b"<ocs><data></data></ocs>"
+        # Return empty/invalid JSON to drive empty path
+        resp.json = lambda: {}
+        return resp
+
+    mock_get.side_effect = get_side_effect
+
+    # Provide duplicates alongside failing expansions
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["#devs", "all", "user1", "user1", "user2"],
+    )
+    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
+
+    # Only direct users remain after failed expansions; duplicates removed
+    assert mock_post.call_count == 2
+    called_urls = [c[0][0] for c in mock_post.call_args_list]
+    for u in ("user1", "user2"):
         assert any(u in url for url in called_urls)
 
     mock_post.reset_mock()
@@ -342,3 +444,69 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
         == "http://localhost/a/longer/path/abcd/"
         "ocs/v2.php/apps/notifications/api/v2/admin_notifications/admin"
     )
+
+
+@mock.patch("requests.post")
+@mock.patch("requests.get")
+def test_req_exception_and_empty_targets(mock_get, mock_post):
+    """RequestException returns empty expansion; direct users send."""
+
+    post_resp = mock.Mock()
+    post_resp.content = ""
+    post_resp.status_code = requests.codes.ok
+    mock_post.return_value = post_resp
+
+    def get_side_effect(url, *args, **kwargs):
+        raise requests.RequestException("boom")
+
+    mock_get.side_effect = get_side_effect
+
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["", "   ", "#DevTeam", "#", "userX"],
+    )
+
+    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
+    assert mock_post.call_count == 1
+    assert "userX" in mock_post.call_args_list[0][0][0]
+
+
+@mock.patch("requests.post")
+@mock.patch("requests.get")
+def test_plugin_nextcloud_json_empty_returns_empty(mock_get, mock_post):
+    """Invalid/empty JSON returns empty; direct users still send."""
+
+    post_resp = mock.Mock()
+    post_resp.content = ""
+    post_resp.status_code = requests.codes.ok
+    mock_post.return_value = post_resp
+
+    def get_side_effect(url, *args, **kwargs):
+        resp = mock.Mock()
+        resp.json = lambda: {}
+        resp.status_code = requests.codes.ok
+        resp.content = b"{}"
+        return resp
+
+    mock_get.side_effect = get_side_effect
+
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["#broken", "all", "userZ"],
+    )
+
+    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
+    # Only direct userZ posts because both expansions return empty
+    assert mock_post.call_count == 1
+    assert "userZ" in mock_post.call_args_list[0][0][0]
+
+
+
+
+
+
+

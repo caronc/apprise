@@ -89,7 +89,7 @@ The table below identifies the services this tool supports and some example serv
 | [Microsoft Teams](https://github.com/caronc/apprise/wiki/Notify_msteams) | msteams://  | (TCP) 443   | msteams://TokenA/TokenB/TokenC/
 | [Misskey](https://github.com/caronc/apprise/wiki/Notify_misskey) | misskey:// or misskeys://| (TCP) 80 or 443  | misskey://access_token@hostname
 | [MQTT](https://github.com/caronc/apprise/wiki/Notify_mqtt) | mqtt://  or mqtts:// | (TCP) 1883 or 8883   | mqtt://hostname/topic<br />mqtt://user@hostname/topic<br />mqtts://user:pass@hostname:9883/topic
-| [Nextcloud](https://github.com/caronc/apprise/wiki/Notify_nextcloud) | ncloud:// or nclouds:// | (TCP) 80 or 443 | ncloud://adminuser:pass@host/User<br/>nclouds://adminuser:pass@host/User1/User2/UserN<br/>ncloud://adminuser:pass@host/group:DevTeam<br/>ncloud://adminuser:pass@host/all
+| [Nextcloud](https://github.com/caronc/apprise/wiki/Notify_nextcloud) | ncloud:// or nclouds:// | (TCP) 80 or 443 | ncloud://adminuser:pass@host/User<br/>nclouds://adminuser:pass@host/User1/User2/UserN
 | [NextcloudTalk](https://github.com/caronc/apprise/wiki/Notify_nextcloudtalk) | nctalk:// or nctalks:// | (TCP) 80 or 443 | nctalk://user:pass@host/RoomId<br/>nctalks://user:pass@host/RoomId1/RoomId2/RoomIdN
 | [Notica](https://github.com/caronc/apprise/wiki/Notify_notica) | notica://  | (TCP) 443   | notica://Token/
 | [Notifiarr](https://github.com/caronc/apprise/wiki/Notify_notifiarr) | notifiarr:// | (TCP) 443 | notifiarr://apikey/#channel<br />notifiarr://apikey/#channel1/#channel2/#channeln
@@ -207,34 +207,6 @@ Apprise have some email services built right into it (such as yahoo, fastmail, h
 | [JSON](https://github.com/caronc/apprise/wiki/Notify_Custom_JSON)       | json:// or jsons://   | (TCP) 80 or 443 | json://hostname<br />json://user@hostname<br />json://user:password@hostname:port<br />json://hostname/a/path/to/post/to
 | [XML](https://github.com/caronc/apprise/wiki/Notify_Custom_XML)         | xml:// or xmls://   | (TCP) 80 or 443 | xml://hostname<br />xml://user@hostname<br />xml://user:password@hostname:port<br />xml://hostname/a/path/to/post/to
 
-
-## Nextcloud: Groups and Everyone
-
-Apprise’s Nextcloud plugin supports targeting individual users, groups, and everyone:
-
-- Individual users: `ncloud://admin:pass@host/user1/user2`
-- Group by name: `ncloud://admin:pass@host/group:DevTeam`
-- Everyone: `ncloud://admin:pass@host/all` (aliases: `everyone`, `*`)
-- Mixed targets (deduplicated): `ncloud://admin:pass@host/group:DevTeam/user3/all`
-
-Notes and requirements:
-
-- Enable Nextcloud’s provisioning API: `occ app:enable provisioning_api`.
-- Use credentials with permission to list users (typically an admin).
-- If Nextcloud runs under a sub-path, set `url_prefix` (e.g. `?url_prefix=/nc`).
-- The plugin expands `group:<name>` and `all` by querying OCS endpoints over HTTP or HTTPS, preferring JSON (`?format=json`) and falling back to XML. Supported URL variants include `v1.php` and `v2.php`.
-- Each resolved user receives one notification; duplicates are removed automatically.
-
-Examples:
-
-```
-ncloud://admin:pass@host/group:DevTeam
-nclouds://admin:pass@host/user1/user2
-ncloud://admin:pass@host/group:DevTeam/user3/all
-ncloud://admin:pass@host:8080/group:Ops?url_prefix=/nextcloud
-```
-
-Security tip: avoid placing credentials directly on the command line; prefer Apprise config files or environment-variable-based configs.
 
 # Installation
 

@@ -26,7 +26,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import requests
-import xml.etree.ElementTree as ET
 
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
@@ -40,7 +39,7 @@ class NotifyNextcloud(NotifyBase):
 
     Targets can be individual users, groups, or everyone:
     - user: specify one or more usernames as path segments
-    - group: prefix with ``group:`` (e.g., ``group:DevTeam``)
+    - group: prefix with a hash (e.g., ``#DevTeam``)
     - everyone: use ``all`` (aliases: ``everyone``, ``*``)
 
     Group and everyone expansion uses Nextcloud's OCS provisioning API and
@@ -110,6 +109,11 @@ class NotifyNextcloud(NotifyBase):
                 "name": _("Targets"),
                 "type": "list:string",
                 "required": True,
+            },
+            "target_group": {
+                "name": _("Target Group"),
+                "type": "string",
+                "map_to": "targets",
             },
         },
     )
@@ -212,10 +216,7 @@ class NotifyNextcloud(NotifyBase):
             self.logger.debug(f"Resolution Exception: {e!s}")
             return False
 
-        # Create a copy of the targets list
-        targets = list(targets)
-        while len(targets):
-            target = targets.pop(0)
+        for target in targets:
 
             # Prepare our Payload
             payload = {
@@ -320,19 +321,21 @@ class NotifyNextcloud(NotifyBase):
         """Resolve group and 'all' targets to concrete user IDs.
 
         Supported special targets:
-        - group:<name>  -> expanded to the users in the group
-        - all|everyone|* -> expanded to all users
+        - #<name>          -> expanded to the users in the group
+        - all|everyone|*   -> expanded to all users
         """
 
         resolved = []
         seen = set()
 
         # Prepare base URL fragments
-        base = (
-            "https" if self.secure else "http"
-        ) + "://" + (
-            self.host if not isinstance(self.port, int) else f"{self.host}:{self.port}"
+        scheme = "https" if self.secure else "http"
+        host_port = (
+            self.host
+            if not isinstance(self.port, int)
+            else f"{self.host}:{self.port}"
         )
+        base = f"{scheme}://{host_port}"
         if self.url_prefix:
             base = f"{base}/{self.url_prefix}"
 
@@ -340,14 +343,14 @@ class NotifyNextcloud(NotifyBase):
         headers = {
             "User-Agent": self.app_id,
             "OCS-APIREQUEST": "true",
-            # Prefer JSON, but accept XML as fallback
-            "Accept": "application/json, application/xml",
+            # Prefer JSON
+            "Accept": "application/json",
         }
 
         auth = (self.user, self.password) if self.user else None
 
         def _parse_users_response(resp):
-            # Try JSON first
+            # Parse JSON only
             try:
                 j = resp.json()
                 data = j.get("ocs", {}).get("data", {})
@@ -355,63 +358,33 @@ class NotifyNextcloud(NotifyBase):
                 if isinstance(users, list):
                     return [str(u).strip() for u in users if str(u).strip()]
             except Exception:
-                # Ignore JSON parsing errors and try XML as a fallback
-                pass
-
-            # Fallback to XML
-            try:
-                root = ET.fromstring(resp.content)
-            except ET.ParseError:
                 return []
-
-            # Known structures: .//data/users/element or .//users/element
-            users = []
-            for path in (".//data/users/element", ".//users/element", ".//data/users/user"):
-                for el in root.findall(path):
-                    if el.text and el.text.strip():
-                        users.append(el.text.strip())
-                if users:
-                    break
-            return users
-
-        def _ocs_get_user_list(url_candidates):
-            # Try each candidate, preferring JSON via format param
-            for u in url_candidates:
-                for candidate in (f"{u}?format=json", u):
-                    self.logger.debug("Nextcloud OCS GET: %s", candidate)
-                    self.throttle()
-                    try:
-                        r = requests.get(
-                            candidate,
-                            headers=headers,
-                            auth=auth,
-                            verify=self.verify_certificate,
-                            timeout=self.request_timeout,
-                        )
-                    except requests.RequestException as e:
-                        self.logger.debug(f"OCS GET Exception: {e!s}")
-                        continue
-
-                    if r.status_code != requests.codes.ok:
-                        self.logger.debug(
-                            "OCS GET non-200 at %s: %d", candidate, r.status_code
-                        )
-                        continue
-
-                    users = _parse_users_response(r)
-                    if users:
-                        return users
             return []
 
         def list_group_users(group_name):
             q = NotifyNextcloud.quote(group_name)
-            urls = [
-                f"{base}/ocs/v1.php/cloud/groups/{q}",
-                f"{base}/ocs/v1.php/cloud/groups/{q}/users",
-                f"{base}/ocs/v2.php/cloud/groups/{q}",
-                f"{base}/ocs/v2.php/cloud/groups/{q}/users",
-            ]
-            users = _ocs_get_user_list(urls)
+            url = f"{base}/ocs/v1.php/cloud/groups/{q}?format=json"
+            self.logger.debug("Nextcloud OCS GET: %s", url)
+            self.throttle()
+            try:
+                r = requests.get(
+                    url,
+                    headers=headers,
+                    auth=auth,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                )
+            except requests.RequestException as e:
+                self.logger.debug(f"OCS GET Exception: {e!s}")
+                return []
+
+            if r.status_code != requests.codes.ok:
+                self.logger.debug(
+                    "OCS GET non-200 at %s: %d", url, r.status_code
+                )
+                return []
+
+            users = _parse_users_response(r)
             if not users:
                 self.logger.warning(
                     "Failed to list users for Nextcloud group '%s'", group_name
@@ -419,11 +392,28 @@ class NotifyNextcloud(NotifyBase):
             return users
 
         def list_all_users():
-            urls = [
-                f"{base}/ocs/v1.php/cloud/users",
-                f"{base}/ocs/v2.php/cloud/users",
-            ]
-            users = _ocs_get_user_list(urls)
+            url = f"{base}/ocs/v1.php/cloud/users?format=json"
+            self.logger.debug("Nextcloud OCS GET: %s", url)
+            self.throttle()
+            try:
+                r = requests.get(
+                    url,
+                    headers=headers,
+                    auth=auth,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                )
+            except requests.RequestException as e:
+                self.logger.debug(f"OCS GET Exception: {e!s}")
+                return []
+
+            if r.status_code != requests.codes.ok:
+                self.logger.debug(
+                    "OCS GET non-200 at %s: %d", url, r.status_code
+                )
+                return []
+
+            users = _parse_users_response(r)
             if not users:
                 self.logger.warning("Failed to list all Nextcloud users")
             return users
@@ -433,9 +423,9 @@ class NotifyNextcloud(NotifyBase):
             if not t:
                 continue
 
-            # group:<name>
-            if t.lower().startswith("group:"):
-                group_name = t.split(":", 1)[1].strip()
+            # group identified by leading '#'
+            if t.startswith("#"):
+                group_name = t[1:].strip()
                 if not group_name:
                     continue
                 for u in list_group_users(group_name):
