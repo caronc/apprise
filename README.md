@@ -222,7 +222,7 @@ Notes and requirements:
 - Enable Nextcloud’s provisioning API: `occ app:enable provisioning_api`.
 - Use credentials with permission to list users (typically an admin).
 - If Nextcloud runs under a sub-path, set `url_prefix` (e.g. `?url_prefix=/nc`).
-- The plugin expands `group:<name>` and `all` by querying OCS endpoints over HTTPS, preferring JSON (`?format=json`) and falling back to XML. Supported URL variants include `v1.php` and `v2.php`.
+- The plugin expands `group:<name>` and `all` by querying OCS endpoints over HTTP or HTTPS, preferring JSON (`?format=json`) and falling back to XML. Supported URL variants include `v1.php` and `v2.php`.
 - Each resolved user receives one notification; duplicates are removed automatically.
 
 Examples:

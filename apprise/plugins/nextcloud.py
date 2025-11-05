@@ -355,6 +355,7 @@ class NotifyNextcloud(NotifyBase):
                 if isinstance(users, list):
                     return [str(u).strip() for u in users if str(u).strip()]
             except Exception:
+                # Ignore JSON parsing errors and try XML as a fallback
                 pass
 
             # Fallback to XML
