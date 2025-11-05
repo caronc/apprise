@@ -258,7 +258,71 @@ def test_plugin_nextcloud_url_prefix(mock_post):
         mock_post.call_args_list[0][0][0]
         == "http://localhost/abcd/ocs/v2.php/apps/"
         "admin_notifications/api/v1/notifications/admin"
+)
+
+
+@mock.patch("requests.post")
+@mock.patch("requests.get")
+def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
+    """NotifyNextcloud() Group and All user expansion."""
+
+    # Mock POST success
+    post_resp = mock.Mock()
+    post_resp.content = ""
+    post_resp.status_code = requests.codes.ok
+    mock_post.return_value = post_resp
+
+    # Mock GET responses for group and users listing
+    def get_side_effect(url, *args, **kwargs):
+        resp = mock.Mock()
+        if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
+            # Return JSON for group
+            j = {
+                "ocs": {"meta": {"status": "ok", "statuscode": 100}, "data": {"users": ["user1", "user2"]}}
+            }
+            resp.status_code = requests.codes.ok
+            import json as _json
+            resp.json = lambda: j
+            resp.content = _json.dumps(j).encode()
+            return resp
+        if "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
+            j = {
+                "ocs": {"meta": {"status": "ok", "statuscode": 100}, "data": {"users": ["user1", "user3"]}}
+            }
+            resp.status_code = requests.codes.ok
+            import json as _json
+            resp.json = lambda: j
+            resp.content = _json.dumps(j).encode()
+            return resp
+        # default
+        resp.status_code = requests.codes.ok
+        resp.content = b""
+        resp.json = lambda: {}
+        return resp
+
+    mock_get.side_effect = get_side_effect
+
+    # Instantiate with a mix of targets: group, all, and direct user
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["group:devs", "all", "user4"],
     )
+
+    assert isinstance(obj, NotifyNextcloud)
+
+    # Send notification
+    assert obj.send(body="body", title="title", notify_type=NotifyType.INFO) is True
+
+    # Expected resolved users (deduplicated): user1, user2, user3, user4
+    # Hence 4 POST calls
+    assert mock_post.call_count == 4
+
+    # Validate calls were made to expected endpoints
+    called_urls = [c[0][0] for c in mock_post.call_args_list]
+    for u in ("user1", "user2", "user3", "user4"):
+        assert any(u in url for url in called_urls)
 
     mock_post.reset_mock()
 
