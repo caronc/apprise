@@ -27,6 +27,7 @@
 
 # Disable logging for a cleaner testing output
 import logging
+import json as _json
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -281,7 +282,6 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
                 "ocs": {"meta": {"status": "ok", "statuscode": 100}, "data": {"users": ["user1", "user2"]}}
             }
             resp.status_code = requests.codes.ok
-            import json as _json
             resp.json = lambda: j
             resp.content = _json.dumps(j).encode()
             return resp
@@ -290,7 +290,6 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
                 "ocs": {"meta": {"status": "ok", "statuscode": 100}, "data": {"users": ["user1", "user3"]}}
             }
             resp.status_code = requests.codes.ok
-            import json as _json
             resp.json = lambda: j
             resp.content = _json.dumps(j).encode()
             return resp
