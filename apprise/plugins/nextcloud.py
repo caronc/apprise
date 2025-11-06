@@ -25,13 +25,23 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from itertools import chain
+import re
+
 import requests
 
-from ..common import NotifyType
+from ..common import NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
 from .base import NotifyBase
+
+# Is Group Detection
+IS_GROUP = re.compile(
+    r"^\s*((#|%23)(?P<group>[A-Za-z0-9_-]+)|"
+    r"((#|%23)?(?P<all>all|everyone|[*])))\s*$",
+    re.I,
+)
 
 
 class NotifyNextcloud(NotifyBase):
@@ -67,6 +77,16 @@ class NotifyNextcloud(NotifyBase):
 
     # Defines the maximum allowable characters per message.
     body_maxlen = 4000
+
+    # Our default is to no not use persistent storage beyond in-memory
+    # reference
+    storage_mode = PersistentStoreMode.AUTO
+
+    # Defines how long we cache our discovery for
+    group_discovery_cache_length_sec = 86400
+
+    # unique identifier to cache the 'all' group category
+    all_group_id = "all"
 
     # Define object templates
     templates = (
@@ -105,15 +125,16 @@ class NotifyNextcloud(NotifyBase):
                 "type": "string",
                 "map_to": "targets",
             },
-            "targets": {
-                "name": _("Targets"),
-                "type": "list:string",
-                "required": True,
-            },
             "target_group": {
                 "name": _("Target Group"),
                 "type": "string",
                 "map_to": "targets",
+                "prefix": "#",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+                "required": True,
             },
         },
     )
@@ -161,7 +182,26 @@ class NotifyNextcloud(NotifyBase):
         super().__init__(**kwargs)
 
         # Store our targets
-        self.targets = parse_list(targets)
+        self.targets = []
+        self.groups = set()
+
+        for target in parse_list(targets):
+            results = IS_GROUP.match(target)
+            if results:
+                group_id = (
+                    self.all_group_id
+                    if results.group("all") else results.group("group"))
+                if group_id not in self.groups:
+                    self.groups.add(group_id)
+                    self.logger.info("Added Nextcloud group '%s'", group_id)
+
+                else:
+                    self.logger.warning(
+                        "Ignored duplicate Nextcloud group '%s'", group_id)
+                continue
+
+            # Store our target
+            self.targets.append(target)
 
         self.version = self.template_args["version"]["default"]
         if version is not None:
@@ -191,11 +231,6 @@ class NotifyNextcloud(NotifyBase):
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Nextcloud Notification."""
 
-        if len(self.targets) == 0:
-            # There were no services to notify
-            self.logger.warning("There were no Nextcloud targets to notify.")
-            return False
-
         # Prepare our Header
         headers = {
             "User-Agent": self.app_id,
@@ -208,16 +243,25 @@ class NotifyNextcloud(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # Resolve groups / everyone keywords into user targets
-        try:
-            targets = self._resolve_targets(self.targets)
-        except Exception as e:  # pragma: no cover - defensive guard
-            self.logger.warning("Failed to resolve Nextcloud targets")
-            self.logger.debug(f"Resolution Exception: {e!s}")
+        # Create a copy of our targets
+        targets = set(self.targets)
+
+        if self.groups:
+            # Append our group lookup
+            try:
+                targets |= self.grouped_targets()
+
+            except Exception as e:  # pragma: no cover - defensive guard
+                self.logger.warning("Failed to resolve Nextcloud targets")
+                self.logger.debug(f"Resolution Exception: {e!s}")
+                return False
+
+        if not targets:
+            # There were no services to notify
+            self.logger.warning("There were no Nextcloud targets to notify.")
             return False
 
         for target in targets:
-
             # Prepare our Payload
             payload = {
                 "shortMessage": title if title else self.app_desc,
@@ -317,16 +361,13 @@ class NotifyNextcloud(NotifyBase):
 
         return not has_error
 
-    def _resolve_targets(self, targets):
-        """Resolve group and 'all' targets to concrete user IDs.
+    def grouped_targets(self):
+        """Resolve our groups if defined; leverage our cache if present
+        for speed
 
-        Supported special targets:
-        - #<name>          -> expanded to the users in the group
-        - all|everyone|*   -> expanded to all users
         """
 
-        resolved = []
-        seen = set()
+        targets = set()
 
         # Prepare base URL fragments
         scheme = "https" if self.secure else "http"
@@ -356,13 +397,26 @@ class NotifyNextcloud(NotifyBase):
                 data = j.get("ocs", {}).get("data", {})
                 users = data.get("users")
                 if isinstance(users, list):
-                    return [str(u).strip() for u in users if str(u).strip()]
-            except Exception:
-                return []
-            return []
+                    return {
+                        str(u).strip() for u in users if str(u).strip()}
 
-        def list_group_users(group_name):
-            q = NotifyNextcloud.quote(group_name)
+            except Exception:
+                return set()
+
+            return set()
+
+        def list_group_users(group):
+            """
+            Lists users associated with a provided group
+            """
+
+            # Check our cache
+            targets = self.store.get(group)
+            if targets is not None:
+                # Returned cached value
+                return set(targets)
+
+            q = NotifyNextcloud.quote(group)
             url = f"{base}/ocs/v1.php/cloud/groups/{q}?format=json"
             self.logger.debug("Nextcloud OCS GET: %s", url)
             self.throttle()
@@ -376,22 +430,33 @@ class NotifyNextcloud(NotifyBase):
                 )
             except requests.RequestException as e:
                 self.logger.debug(f"OCS GET Exception: {e!s}")
-                return []
+                return set()
 
             if r.status_code != requests.codes.ok:
                 self.logger.debug(
                     "OCS GET non-200 at %s: %d", url, r.status_code
                 )
-                return []
+                return set()
 
             users = _parse_users_response(r)
             if not users:
                 self.logger.warning(
-                    "Failed to list users for Nextcloud group '%s'", group_name
+                    "Failed to list users for Nextcloud group '%s'", group
                 )
+
+            self.store.set(
+                group, users, expires=self.group_discovery_cache_length_sec)
             return users
 
         def list_all_users():
+            """
+            List all users and return a set
+            """
+            # Check our cache
+            targets = self.store.get(self.all_group_id)
+            if targets is not None:
+                return set(targets)
+
             url = f"{base}/ocs/v1.php/cloud/users?format=json"
             self.logger.debug("Nextcloud OCS GET: %s", url)
             self.throttle()
@@ -405,49 +470,45 @@ class NotifyNextcloud(NotifyBase):
                 )
             except requests.RequestException as e:
                 self.logger.debug(f"OCS GET Exception: {e!s}")
-                return []
+                return set()
 
             if r.status_code != requests.codes.ok:
-                self.logger.debug(
-                    "OCS GET non-200 at %s: %d", url, r.status_code
+                status_str = NotifyNextcloud.http_response_code_lookup(
+                    r.status_code
                 )
-                return []
+
+                self.logger.warning(
+                    "Failed to list Nextcloud v{} users:"
+                    "{}{}error={}.".format(
+                        self.version,
+                        status_str,
+                        ", " if status_str else "",
+                        r.status_code,
+                    )
+                )
+
+                self.logger.debug(f"Response Details:\r\n{r.content}")
+                return set()
 
             users = _parse_users_response(r)
             if not users:
                 self.logger.warning("Failed to list all Nextcloud users")
+
+            else:
+                self.store.set(
+                    self.all_group_id,
+                    users, expires=self.group_discovery_cache_length_sec)
             return users
 
-        EVERYONE = {"all", "everyone", "*"}
-        for t in parse_list(targets):
-            if not t:
-                continue
+        for group in self.groups:
+            if group == self.all_group_id:
+                targets |= list_all_users()
 
-            # group identified by leading '#'
-            if t.startswith("#"):
-                group_name = t[1:].strip()
-                if not group_name:
-                    continue
-                for u in list_group_users(group_name):
-                    if u not in seen:
-                        seen.add(u)
-                        resolved.append(u)
-                continue
+            else:
+                # regular username
+                targets |= list_group_users(group)
 
-            # all/everyone/*
-            if t.lower() in EVERYONE:
-                for u in list_all_users():
-                    if u not in seen:
-                        seen.add(u)
-                        resolved.append(u)
-                continue
-
-            # regular username
-            if t not in seen:
-                seen.add(t)
-                resolved.append(t)
-
-        return resolved
+        return targets
 
     @property
     def url_identifier(self):
@@ -462,6 +523,7 @@ class NotifyNextcloud(NotifyBase):
             self.password,
             self.host,
             self.port,
+            self.url_prefix,
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -493,6 +555,8 @@ class NotifyNextcloud(NotifyBase):
                 user=NotifyNextcloud.quote(self.user, safe=""),
             )
 
+        group_prefix = self.template_tokens["target_group"]["prefix"]
+
         default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}/{targets}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
@@ -505,7 +569,16 @@ class NotifyNextcloud(NotifyBase):
                 if self.port is None or self.port == default_port
                 else f":{self.port}"
             ),
-            targets="/".join([NotifyNextcloud.quote(x) for x in self.targets]),
+            targets="/".join([
+                NotifyNextcloud.quote(x, safe=group_prefix)
+                for x in chain(
+                    # Groups are prefixed with a pound/hashtag symbol
+                    [f"{group_prefix}{x}" for x in self.groups],
+                    # Users
+                    self.targets,
+                )
+            ]),
+
             params=NotifyNextcloud.urlencode(params),
         )
 

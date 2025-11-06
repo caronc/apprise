@@ -469,7 +469,7 @@ def test_req_exception_and_empty_targets(mock_get, mock_post):
     )
 
     assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
-    assert mock_post.call_count == 1
+    assert mock_post.call_count == 2
     assert "userX" in mock_post.call_args_list[0][0][0]
 
 
