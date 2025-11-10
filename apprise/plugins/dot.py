@@ -30,24 +30,25 @@
 #      https://dot.mindreset.tech/docs/service/studio/api/image_api
 #
 # Text API Fields:
-#   - refreshNow: bool, optional, default true; show content immediately; controls when the message appears
-#   - deviceId: string, required; device serial number; distinguishes different devices
-#   - title: string, optional; text title; rendered on the screen as the title line
-#   - message: string, optional; text content; rendered on the screen as the body
-#   - signature: string, optional; text signature; rendered on the screen as the footer/signature line
-#   - icon: string, optional; base64-encoded PNG icon (40px × 40px); rendered in the lower-left corner
-#   - link: string, optional; http/https URL or custom scheme; tap-to-interact target
+#   - refreshNow (bool, optional, default true): controls display timing.
+#   - deviceId (string, required): unique device serial.
+#   - title (string, optional): title text shown on screen.
+#   - message (string, optional): body text shown on screen.
+#   - signature (string, optional): footer/signature text.
+#   - icon (string, optional): base64 PNG icon (40px x 40px).
+#   - link (string, optional): tap-to-interact target URL.
 #
 # Image API Fields:
-#   - refreshNow: bool, optional, default true; show content immediately; controls when the image appears
-#   - deviceId: string, required; device serial number; distinguishes different devices
-#   - image: string, required; base64-encoded PNG image (296px × 152px); rendered on the screen as the image payload
-#   - link: string, optional; http/https URL or custom scheme; tap-to-interact target
-#   - border: number, optional, default 0; 0 = white border, 1 = black border; controls the frame color
-#   - ditherType: string, optional, default DIFFUSION; dithering mode (DIFFUSION, ORDERED, NONE); controls dithering strategy
-#   - ditherKernel: string, optional, default FLOYD_STEINBERG; dithering kernel (THRESHOLD, ATKINSON, BURKES, FLOYD_STEINBERG, SIERRA2, STUCKI, JARVIS_JUDICE_NINKE, DIFFUSION_ROW, DIFFUSION_COLUMN, DIFFUSION_2D); controls dithering algorithm
-#
-import base64
+#   - refreshNow (bool, optional, default true): controls display timing.
+#   - deviceId (string, required): unique device serial.
+#   - image (string, required): base64 PNG image (296px x 152px).
+#   - link (string, optional): tap-to-interact target URL.
+#   - border (number, optional, default 0): 0=white, 1=black frame.
+#   - ditherType (string, optional, default DIFFUSION): dithering mode.
+#   - ditherKernel (string, optional, default FLOYD_STEINBERG): dithering kernel.
+
+from contextlib import suppress
+
 import json
 
 import requests
@@ -85,7 +86,7 @@ class NotifyDot(NotifyBase):
 
     # The default descriptive name associated with the Notification
     service_name = "Dot."
-    # Dot devices are marketed as "Quote/0"; keep this alias for discoverability
+    # Alias: devices marketed as "Quote/0" remain discoverable.
 
     # The services URL
     service_url = "https://dot.mindreset.tech"
@@ -195,8 +196,9 @@ class NotifyDot(NotifyBase):
         },
     )
     # Note:
-    # - icon (Text API): base64-encoded PNG icon (40px × 40px) rendered in the lower-left corner
-    # - image (Image API): base64-encoded PNG image (296px × 152px) delivered via the image parameter or runtime attachments
+    # - icon (Text API): base64 PNG icon (40px x 40px) in lower-left corner.
+    # - image (Image API): base64 PNG image (296px x 152px) supplied via
+    #   configuration `image` or runtime attachments.
 
     def __init__(
         self,
@@ -204,6 +206,8 @@ class NotifyDot(NotifyBase):
         device_id=None,
         mode=DEFAULT_MODE,
         refresh_now=True,
+        title=None,
+        message=None,
         signature=None,
         icon=None,
         link=None,
@@ -219,11 +223,15 @@ class NotifyDot(NotifyBase):
         # API Key (from user)
         self.apikey = apikey
 
-        # Device ID (Device Serial Number - uniquely identifies the Dot device)
+        # Device ID tracks the Dot hardware serial.
         self.device_id = device_id
 
-        # Refresh Now flag (whether to display immediately; controls the display timing; default True)
+        # Refresh Now flag: True shows content immediately (default).
         self.refresh_now = parse_bool(refresh_now, default=True)
+
+        # Optional default title/message used when notify inputs are empty.
+        self.default_title = title if isinstance(title, str) else None
+        self.default_message = message if isinstance(message, str) else None
 
         # API mode ("text" or "image")
         self.mode = (
@@ -241,25 +249,26 @@ class NotifyDot(NotifyBase):
                 self.mode,
             )
 
-        # Signature (Text API field: footer/signature string rendered on screen)
+        # Signature text used by the Text API footer.
         self.signature = signature if isinstance(signature, str) else None
 
-        # Icon (Text API field: base64-encoded PNG icon 40px × 40px rendered in the lower-left corner)
-        # Note: this is distinct from the Image API "image" field
+        # Icon for the Text API (base64 PNG 40x40, lower-left corner).
+        # Note: distinct from the Image API "image" field.
         self.icon = icon if isinstance(icon, str) else None
 
-        # Image Data (Image API field: base64-encoded PNG image 296px × 152px)
+        # Image payload for the Image API (base64 PNG 296x152).
         self.image_data = image_data if isinstance(image_data, str) else None
         if self.mode == "text" and self.image_data:
             self.logger.warning(
-                "Image data provided in text mode; ignoring configurable image payload."
+                "Image data provided in text mode; ignoring configurable"
+                " image payload."
             )
             self.image_data = None
 
-        # Link (http/https URL or custom scheme used for tap-to-interact navigation)
+        # Link for tap-to-interact navigation.
         self.link = link if isinstance(link, str) else None
 
-        # Border (Image API field: 0 = white border, 1 = black border; default 0)
+        # Border for the Image API (0=white, 1=black; default 0).
         try:
             self.border = int(border)
             if self.border not in (0, 1):
@@ -267,11 +276,12 @@ class NotifyDot(NotifyBase):
         except (TypeError, ValueError):
             self.border = 0
             self.logger.warning(
-                "The specified Dot border ({}) is not valid. Must be 0 or 1. Using default 0.",
+                "The specified Dot border (%s) is not valid. Must be 0 or 1. "
+                "Using default 0.",
                 border,
             )
 
-        # Dither Type (Image API field: dithering mode; DIFFUSION, ORDERED, NONE; default DIFFUSION)
+        # Dither type for the Image API (DIFFUSION/ORDERED/NONE; default DIFFUSION).
         self.dither_type = (
             dither_type.upper()
             if isinstance(dither_type, str)
@@ -279,7 +289,7 @@ class NotifyDot(NotifyBase):
             else "DIFFUSION"
         )
 
-        # Dither Kernel (Image API field: dithering kernel; THRESHOLD, ATKINSON, BURKES, FLOYD_STEINBERG, SIERRA2, STUCKI, JARVIS_JUDICE_NINKE, DIFFUSION_ROW, DIFFUSION_COLUMN, DIFFUSION_2D; default FLOYD_STEINBERG)
+        # Dither kernel for the Image API (default FLOYD_STEINBERG).
         self.dither_kernel = (
             dither_kernel.upper()
             if isinstance(dither_kernel, str)
@@ -341,14 +351,14 @@ class NotifyDot(NotifyBase):
                 return False
 
             # Use Image API
-            # Image API fields:
-            # - refreshNow: bool, controls whether the device displays immediately
-            # - deviceId: string, identifies the Dot device (required)
-            # - image: string, base64-encoded PNG image (296px × 152px) rendered on the screen (required)
-            # - link: string, optional tap-to-interact target
-            # - border: number, optional frame color (0 = white, 1 = black)
-            # - ditherType: string, optional dithering mode (DIFFUSION, ORDERED, NONE)
-            # - ditherKernel: string, optional dithering kernel (THRESHOLD, ATKINSON, BURKES, FLOYD_STEINBERG, SIERRA2, STUCKI, JARVIS_JUDICE_NINKE, DIFFUSION_ROW, DIFFUSION_COLUMN, DIFFUSION_2D)
+            # Image API payload:
+            #   refreshNow: display timing control.
+            #   deviceId: Dot device serial (required).
+            #   image: base64 PNG 296x152 (required).
+            #   link: optional tap target.
+            #   border: optional frame color.
+            #   ditherType: optional dithering mode.
+            #   ditherKernel: optional dithering kernel.
             payload = {
                 "refreshNow": self.refresh_now,
                 "deviceId": self.device_id,
@@ -377,14 +387,14 @@ class NotifyDot(NotifyBase):
                     "Attachments supplied but ignored in Dot text mode."
                 )
             # Use Text API
-            # Text API fields:
-            # - refreshNow: bool, controls whether the device displays immediately
-            # - deviceId: string, identifies the Dot device (required)
-            # - title: string, optional title rendered on screen
-            # - message: string, optional body text rendered on screen
-            # - signature: string, optional footer rendered on screen
-            # - icon: string, optional base64-encoded PNG icon (40px × 40px) rendered in the lower-left corner
-            # - link: string, optional tap-to-interact target
+            # Text API payload:
+            #   refreshNow: display timing control.
+            #   deviceId: Dot device serial (required).
+            #   title: optional title on screen.
+            #   message: optional body on screen.
+            #   signature: optional footer text.
+            #   icon: optional base64 PNG icon (40x40).
+            #   link: optional tap target.
             payload = {
                 "refreshNow": self.refresh_now,
                 "deviceId": self.device_id,
@@ -394,9 +404,13 @@ class NotifyDot(NotifyBase):
                 payload["title"] = title  # Title displayed on screen
             elif self.app_desc:
                 payload["title"] = self.app_desc
+            elif self.default_title:
+                payload["title"] = self.default_title
 
             if body:
                 payload["message"] = body  # Body text displayed on screen
+            elif self.default_message:
+                payload["message"] = self.default_message
 
             if self.signature:
                 payload["signature"] = (
@@ -554,59 +568,68 @@ class NotifyDot(NotifyBase):
         results["path"] = remaining_path
 
         # Extract API key from user
-        if "user" in results and results["user"]:
-            results["apikey"] = NotifyDot.unquote(results["user"])
+        user = results.get("user")
+        if user:
+            results["apikey"] = NotifyDot.unquote(user)
 
         # Extract device ID from hostname
-        if "host" in results and results["host"]:
-            results["device_id"] = NotifyDot.unquote(results["host"])
+        host = results.get("host")
+        if host:
+            results["device_id"] = NotifyDot.unquote(host)
 
         # Refresh Now
-        if "refresh" in results["qsd"] and results["qsd"]["refresh"]:
-            results["refresh_now"] = parse_bool(
-                results["qsd"]["refresh"].strip()
-            )
+        refresh_value = results["qsd"].get("refresh")
+        if refresh_value:
+            results["refresh_now"] = parse_bool(refresh_value.strip())
 
         # Signature
-        if "signature" in results["qsd"] and results["qsd"]["signature"]:
-            results["signature"] = NotifyDot.unquote(
-                results["qsd"]["signature"].strip()
-            )
+        signature_value = results["qsd"].get("signature")
+        if signature_value:
+            results["signature"] = NotifyDot.unquote(signature_value.strip())
 
         # Icon
-        if "icon" in results["qsd"] and results["qsd"]["icon"]:
-            results["icon"] = NotifyDot.unquote(results["qsd"]["icon"].strip())
+        icon_value = results["qsd"].get("icon")
+        if icon_value:
+            results["icon"] = NotifyDot.unquote(icon_value.strip())
 
         # Link
-        if "link" in results["qsd"] and results["qsd"]["link"]:
-            results["link"] = NotifyDot.unquote(results["qsd"]["link"].strip())
+        link_value = results["qsd"].get("link")
+        if link_value:
+            results["link"] = NotifyDot.unquote(link_value.strip())
 
         # Border
-        if "border" in results["qsd"] and results["qsd"]["border"]:
-            try:
-                results["border"] = int(results["qsd"]["border"].strip())
-            except (TypeError, ValueError):
-                pass
+        border_value = results["qsd"].get("border")
+        if border_value:
+            with suppress(TypeError, ValueError):
+                results["border"] = int(border_value.strip())
 
         # Dither Type
-        if "dither_type" in results["qsd"] and results["qsd"]["dither_type"]:
+        dither_type_value = results["qsd"].get("dither_type")
+        if dither_type_value:
             results["dither_type"] = NotifyDot.unquote(
-                results["qsd"]["dither_type"].strip()
+                dither_type_value.strip()
             )
 
         # Dither Kernel
-        if (
-            "dither_kernel" in results["qsd"]
-            and results["qsd"]["dither_kernel"]
-        ):
+        dither_kernel_value = results["qsd"].get("dither_kernel")
+        if dither_kernel_value:
             results["dither_kernel"] = NotifyDot.unquote(
-                results["qsd"]["dither_kernel"].strip()
+                dither_kernel_value.strip()
             )
 
         # Image (Image API)
-        if "image" in results["qsd"] and results["qsd"]["image"]:
-            results["image_data"] = NotifyDot.unquote(
-                results["qsd"]["image"].strip()
-            )
+        image_value = results["qsd"].get("image")
+        if image_value:
+            results["image_data"] = NotifyDot.unquote(image_value.strip())
+
+        # Title
+        title_value = results["qsd"].get("title")
+        if title_value:
+            results["title"] = NotifyDot.unquote(title_value.strip())
+
+        # Message
+        message_value = results["qsd"].get("message")
+        if message_value:
+            results["message"] = NotifyDot.unquote(message_value.strip())
 
         return results
