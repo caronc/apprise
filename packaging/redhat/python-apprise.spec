@@ -56,26 +56,27 @@
 Apprise is a Python package that simplifies access to many popular \
 notification services. It supports sending alerts to platforms such as: \
 \
-`46elks`, `AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`,
-`Bark`, `BlueSky`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, `Clickatell`, \
-`ClickSend`, `DAPNET`, `DingTalk`, `Discord`, `Dot. (Quote/0)`, `E-Mail`, `Emby`, `FCM`, \
-`Feishu`, `Flock`, `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, \
-`Guilded`, `Home Assistant`, `httpSMS`, `IFTTT`, `Join`, `Kavenegar`, `KODI`, \
-`Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
-`Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
+`46elks`, `AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`, \
+`Bark`, `BlueSky`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, \
+`Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
+`Dot. (Quote/0)`, `E-Mail`, `Emby`, `FCM`, `Feishu`, `Flock`, \
+`Free Mobile`, `Google Chat`, `Gotify`, `Growl`, `Guilded`, \
+`Home Assistant`, `httpSMS`, `IFTTT`, `Join`, `Kavenegar`, `KODI`, \
+`Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, \
+`Mastodon`, `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
 `Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, \
 `Nextcloud`, `NextcloudTalk`, `Notica`, `Notifiarr`, `Notifico`, `ntfy`, \
 `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, `PagerTree`, \
 `ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, `Pushalot`, \
 `PushBullet`, `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, \
-`Pushy`, `PushDeer`, `QQ Push`, `Revolt`, `Reddit`, `Resend`, `Rocket.Chat`, \
-`RSyslog`, `SendGrid`, `SendPulse`, `ServerChan`, `Seven`, `SFR`, `Signal`, \
-`SIGNL4`, `SimplePush`, `Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, \
-`SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Super Toasty`, \
-`Streamlabs`, `Stride`, `Synology Chat`, `Syslog`, `Techulus Push`, \
-`Telegram`, `Threema Gateway`, `Twilio`, `Twitter`, `Twist`, `Vapid`, \
-`VictorOps`, `Voipms`, `Vonage`, `WebPush`, `WeCom Bot`, `WhatsApp`, \
-`Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
+`Pushy`, `PushDeer`, `QQ Push`, `Revolt`, `Reddit`, `Resend`, \
+`Rocket.Chat`, `RSyslog`, `SendGrid`, `SendPulse`, `ServerChan`, `Seven`, \
+`SFR`, `Signal`, `SIGNL4`, `SimplePush`, `Sinch`, `Slack`, `SMPP`, \
+`SMSEagle`, `SMS Manager`, `SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, \
+`Spug Push`, `Super Toasty`, `Streamlabs`, `Stride`, `Synology Chat`, \
+`Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, `Twilio`, \
+`Twitter`, `Twist`, `Vapid`, `VictorOps`, `Voipms`, `Vonage`, `WebPush`, \
+`WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
 
 Name:           python-%{pypi_name}
 Version:        1.9.5

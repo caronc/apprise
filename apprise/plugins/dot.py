@@ -45,10 +45,10 @@
 #   - link (string, optional): tap-to-interact target URL.
 #   - border (number, optional, default 0): 0=white, 1=black frame.
 #   - ditherType (string, optional, default DIFFUSION): dithering mode.
-#   - ditherKernel (string, optional, default FLOYD_STEINBERG): dithering kernel.
+#   - ditherKernel (string, optional, default FLOYD_STEINBERG):
+#     dithering kernel.
 
 from contextlib import suppress
-
 import json
 
 import requests
@@ -281,7 +281,8 @@ class NotifyDot(NotifyBase):
                 border,
             )
 
-        # Dither type for the Image API (DIFFUSION/ORDERED/NONE; default DIFFUSION).
+        # Dither type for Image API (DIFFUSION/ORDERED/NONE;
+        # default DIFFUSION).
         self.dither_type = (
             dither_type.upper()
             if isinstance(dither_type, str)
