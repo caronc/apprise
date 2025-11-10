@@ -450,3 +450,119 @@ def test_notify_dot_url_generation_with_link():
     url_image = dot_image.url()
     assert "border=0" in url_image
 
+
+def test_notify_dot_default_title_only():
+    """Test all title fallback scenarios."""
+    # Test 1: With provided title
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        title="my_default_title",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Send with a provided title
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(body="test", title="provided_title")
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert payload["title"] == "provided_title"
+
+    # Test 2: Without provided title, should fallback to app_desc
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(body="test", title="")
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    # Should use app_desc when no title provided
+    assert "title" in payload
+
+
+def test_notify_dot_image_mode_no_border():
+    """Test image mode with border=None to skip border in payload."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        mode="image",
+        image_data="base64img",
+    )
+    # Manually set border to None
+    dot.border = None
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(body="test", title="test")
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    # Border should not be in payload when None
+    assert "border" not in payload
+
+
+def test_notify_dot_image_mode_no_dither():
+    """Test image mode with no dither_type/dither_kernel."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        mode="image",
+        image_data="base64img",
+    )
+    # Manually set to None to test the conditional branches
+    dot.dither_type = None
+    dot.dither_kernel = None
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(body="test", title="test")
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    # Dither fields should not be in payload when None
+    assert "ditherType" not in payload
+    assert "ditherKernel" not in payload
+
+
+def test_notify_dot_text_mode_no_optional_fields():
+    """Test text mode with no signature, icon, or link."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(body="test body", title="test title")
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert "signature" not in payload
+    assert "icon" not in payload
+    # Link should not be in payload when not set
+    assert payload.get("link") is None or "link" not in payload
+
+
+def test_notify_dot_url_generation_without_defaults():
+    """Test URL generation without default dither values."""
+    # Test with DIFFUSION (default) - should not appear in URL
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        mode="image",
+        image_data="img",
+        dither_type="DIFFUSION",
+        dither_kernel="FLOYD_STEINBERG",
+    )
+    url = dot.url()
+    # Default values should not appear in URL
+    assert "dither_type" not in url
+    assert "dither_kernel" not in url
+
