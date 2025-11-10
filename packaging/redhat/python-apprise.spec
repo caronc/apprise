@@ -58,7 +58,7 @@ notification services. It supports sending alerts to platforms such as: \
 \
 `46elks`, `AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`,
 `Bark`, `BlueSky`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, `Clickatell`, \
-`ClickSend`, `DAPNET`, `DingTalk`, `Discord`, `E-Mail`, `Emby`, `FCM`, \
+`ClickSend`, `DAPNET`, `DingTalk`, `Discord`, `Dot. (Quote/0)`, `E-Mail`, `Emby`, `FCM`, \
 `Feishu`, `Flock`, `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, \
 `Guilded`, `Home Assistant`, `httpSMS`, `IFTTT`, `Join`, `Kavenegar`, `KODI`, \
 `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
