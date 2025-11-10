@@ -110,14 +110,14 @@ PHONE_NO_WPREFIX_DETECTION_RE = re.compile(
 # Quick sanity check - does this look like a valid callsign before we
 # bother parsing it
 IS_CALL_SIGN = re.compile(
-    r"^(?P<callsign>[a-z]{1,3}[0-9][a-z]{1,3})"
-    r"(?P<ssid>-(?:[0-9]|1[0-5]))?\s*$",
+    r"^(?P<callsign>[0-9a-z]{1,2}[0-9][a-z0-9]{1,3})"
+    r"(-(?P<ssid>[0-9]{1,2}))?\s*$",
     re.I,
 )
 
 # Regex to split multiple callsigns from a single string
 CALL_SIGN_DETECTION_RE = re.compile(
-    r"\s*([a-z0-9]{1,2}[0-9][a-z0-9]{1,3}(?:-(?:[0-9]|1[0-5]))?)"
+    r"\s*([0-9a-z]{1,2}[0-9][a-z0-9]{1,3}(?:-(?:[0-9]{1,2}))?)"
     r"(?=\s*$|\s*[,;\s]+)",
     re.I,
 )

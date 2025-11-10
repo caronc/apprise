@@ -1710,6 +1710,11 @@ def test_is_call_sign_no():
     assert result["callsign"] == "AA0AF"
     assert result["ssid"] == ""
 
+    result = utils.parse.is_call_sign("AA0AF-23")
+    assert isinstance(result, dict)
+    assert result["callsign"] == "AA0AF"
+    assert result["ssid"] == "23"
+
     # 1x3
     result = utils.parse.is_call_sign("K0ACL")
     assert isinstance(result, dict)
@@ -1725,7 +1730,7 @@ def test_is_call_sign_no():
     # Get our SSID
     result = utils.parse.is_call_sign("DF1ABC-14")
     assert result["callsign"] == "DF1ABC"
-    assert result["ssid"] == "-14"
+    assert result["ssid"] == "14"
 
 
 def test_is_phone_no():
@@ -1881,6 +1886,12 @@ def test_parse_call_sign():
     assert len(results) == 2
     assert "0A1DEF" in results
     assert "DF1ABC" in results
+
+    results = utils.parse.parse_call_sign("AA0A, A0AF-12, GARBAGE")
+    assert isinstance(results, list)
+    assert len(results) == 2
+    assert "AA0A" in results
+    assert "A0AF-12" in results
 
 
 def test_parse_phone_no():
