@@ -254,6 +254,20 @@ apprise_url_tests = (
             "instance": NotifyBark,
         },
     ),
+    (
+        "bark://192.168.0.6:8081/device_key/?call=1",
+        {
+            # set call parameter to repeat ringtone
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?call=1&sound=alarm&level=critical",
+        {
+            # set call parameter with other parameters
+            "instance": NotifyBark,
+        },
+    ),
 )
 
 
