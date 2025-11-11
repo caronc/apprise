@@ -505,6 +505,62 @@ def test_plugin_nextcloud_json_empty_returns_empty(mock_get, mock_post):
     assert "userZ" in mock_post.call_args_list[0][0][0]
 
 
+@mock.patch("requests.post")
+@mock.patch("requests.get")
+def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
+    """Cache hits avoid repeat OCS lookups."""
+
+    # First round of GETs return users for group and all
+    def get_side_effect(url, *args, **kwargs):
+        resp = mock.Mock()
+        resp.status_code = requests.codes.ok
+        if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
+            j = {
+                "ocs": {
+                    "meta": {"status": "ok", "statuscode": 100},
+                    "data": {"users": ["g1", "g2"]},
+                }
+            }
+        elif "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
+            j = {
+                "ocs": {
+                    "meta": {"status": "ok", "statuscode": 100},
+                    "data": {"users": ["a1", "a2"]},
+                }
+            }
+        else:
+            j = {"ocs": {"data": {"users": []}}}
+        resp.json = lambda: j
+        import json as _j
+        resp.content = _j.dumps(j).encode()
+        return resp
+
+    mock_get.side_effect = get_side_effect
+
+    post_resp = mock.Mock()
+    post_resp.content = ""
+    post_resp.status_code = requests.codes.ok
+    mock_post.return_value = post_resp
+
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["#devs", "all"],
+    )
+
+    # First send: resolves via OCS; expect 2 GETs (group + all)
+    assert obj.send(body="b", title="t", notify_type=NotifyType.INFO) is True
+    assert mock_get.call_count >= 2
+    called = "".join(c[0][0] for c in mock_get.call_args_list)
+    assert "/cloud/groups/" in called and "/cloud/users" in called
+
+    # Second send: should use cache; no additional GETs
+    prev = mock_get.call_count
+    assert obj.send(body="b2", title="t2", notify_type=NotifyType.INFO) is True
+    assert mock_get.call_count == prev
+
+
 
 
 
