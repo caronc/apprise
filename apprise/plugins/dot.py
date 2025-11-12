@@ -100,6 +100,9 @@ class NotifyDot(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
 
+    # Support Attachments
+    attachment_support = True
+
     # Supported API modes
     SUPPORTED_MODES = ("text", "image")
     DEFAULT_MODE = "text"
@@ -183,8 +186,11 @@ class NotifyDot(NotifyBase):
     )
     # Note:
     # - icon (Text API): base64 PNG icon (40px x 40px) in lower-left corner.
+    #   Can be provided via `icon` parameter or first attachment.
     # - image (Image API): base64 PNG image (296px x 152px) supplied via
-    #   configuration `image` or runtime attachments.
+    #   configuration `image` parameter or first attachment.
+    # - Only the first attachment is used; multiple attachments trigger a
+    #   warning.
 
     def __init__(
         self,
@@ -195,9 +201,9 @@ class NotifyDot(NotifyBase):
         signature=None,
         icon=None,
         link=None,
-        border=0,
-        dither_type="DIFFUSION",
-        dither_kernel="FLOYD_STEINBERG",
+        border=None,
+        dither_type=None,
+        dither_kernel=None,
         image_data=None,
         **kwargs,
     ):
@@ -248,35 +254,14 @@ class NotifyDot(NotifyBase):
         # Link for tap-to-interact navigation.
         self.link = link if isinstance(link, str) else None
 
-        # Border for the Image API (0=white, 1=black; default 0).
-        try:
-            self.border = int(border)
-            if self.border not in (0, 1):
-                raise ValueError()
-        except (TypeError, ValueError):
-            self.border = 0
-            self.logger.warning(
-                "The specified Dot border (%s) is not valid. Must be 0 or 1. "
-                "Using default 0.",
-                border,
-            )
+        # Border for the Image API
+        self.border = border
 
-        # Dither type for Image API (DIFFUSION/ORDERED/NONE;
-        # default DIFFUSION).
-        self.dither_type = (
-            dither_type.upper()
-            if isinstance(dither_type, str)
-            and dither_type.upper() in DOT_DITHER_TYPES
-            else "DIFFUSION"
-        )
+        # Dither type for Image API
+        self.dither_type = dither_type
 
-        # Dither kernel for the Image API (default FLOYD_STEINBERG).
-        self.dither_kernel = (
-            dither_kernel.upper()
-            if isinstance(dither_kernel, str)
-            and dither_kernel.upper() in DOT_DITHER_KERNELS
-            else "FLOYD_STEINBERG"
-        )
+        # Dither kernel for the Image API
+        self.dither_kernel = dither_kernel
 
         # Text API endpoint
         self.text_api_url = "https://dot.mindreset.tech/api/open/text"
@@ -322,14 +307,21 @@ class NotifyDot(NotifyBase):
                 self.image_data if isinstance(self.image_data, str) else None
             )
 
-            if not image_data and attach:
-                for attachment in attach:
-                    try:
+            # Use first attachment as image if no image_data provided
+            # attachment.base64() returns base64-encoded string for API
+            if not image_data and attach and self.attachment_support:
+                if len(attach) > 1:
+                    self.logger.warning(
+                        "Multiple attachments provided; only the first "
+                        "one will be used as image."
+                    )
+                try:
+                    attachment = attach[0]
+                    if attachment:
+                        # Convert attachment to base64-encoded string
                         image_data = attachment.base64()
-                        if image_data:
-                            break
-                    except Exception:
-                        continue
+                except Exception as e:
+                    self.logger.warning(f"Failed to process attachment: {e!s}")
 
             if not image_data:
                 self.logger.warning(
@@ -353,26 +345,20 @@ class NotifyDot(NotifyBase):
             }
 
             if self.link:
-                payload["link"] = self.link  # Tap-to-interact destination
+                payload["link"] = self.link
 
             if self.border is not None:
-                payload["border"] = self.border  # Frame color selection
+                payload["border"] = self.border
 
-            if self.dither_type:
-                payload["ditherType"] = self.dither_type  # Dithering mode
+            if self.dither_type is not None:
+                payload["ditherType"] = self.dither_type
 
-            if self.dither_kernel:
-                payload["ditherKernel"] = (
-                    self.dither_kernel
-                )  # Dithering kernel
+            if self.dither_kernel is not None:
+                payload["ditherKernel"] = self.dither_kernel
 
             api_url = self.image_api_url
 
         else:
-            if attach:
-                self.logger.debug(
-                    "Attachments supplied but ignored in Dot text mode."
-                )
             # Use Text API
             # Text API payload:
             #   refreshNow: display timing control.
@@ -398,9 +384,26 @@ class NotifyDot(NotifyBase):
                     self.signature
                 )  # Footer/signature displayed on screen
 
-            if self.icon:
+            # Use first attachment as icon if no icon provided
+            # attachment.base64() returns base64-encoded string for API
+            icon_data = self.icon
+            if not icon_data and attach and self.attachment_support:
+                if len(attach) > 1:
+                    self.logger.warning(
+                        "Multiple attachments provided; only the first "
+                        "one will be used as icon."
+                    )
+                try:
+                    attachment = attach[0]
+                    if attachment:
+                        # Convert attachment to base64-encoded string
+                        icon_data = attachment.base64()
+                except Exception as e:
+                    self.logger.warning(f"Failed to process attachment: {e!s}")
+
+            if icon_data:
                 # Text API icon payload
-                payload["icon"] = self.icon
+                payload["icon"] = icon_data
 
             if self.link:
                 payload["link"] = self.link

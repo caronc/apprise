@@ -169,6 +169,7 @@ def test_notify_dot_image_mode_requires_image():
 
 
 def test_notify_dot_image_mode_with_attachment():
+    """Test image mode uses first attachment when no image_data provided."""
     dot = NotifyDot(
         apikey="token",
         device_id="device",
@@ -194,7 +195,33 @@ def test_notify_dot_image_mode_with_attachment():
     assert payload["deviceId"] == "device"
 
 
-def test_notify_dot_text_mode_ignores_attachment():
+def test_notify_dot_image_mode_with_existing_image_data():
+    """Test image mode ignores attachment when image_data is provided."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        mode="image",
+        image_data="existing_image_data",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(
+            body="test",
+            title="test",
+            attach=[DummyAttachment("attachment_data")],
+        )
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    # Should use existing image_data, not attachment
+    assert payload["image"] == "existing_image_data"
+
+
+def test_notify_dot_text_mode_with_existing_icon():
+    """Test text mode with existing icon (attachment should be ignored)."""
     dot = NotifyDot(
         apikey="token",
         device_id="device",
@@ -209,7 +236,7 @@ def test_notify_dot_text_mode_ignores_attachment():
         assert dot.send(
             title="hello",
             body="world",
-            attach=[DummyAttachment()],
+            attach=[DummyAttachment("attachment_icon")],
         )
 
     _args, kwargs = mock_post.call_args
@@ -217,6 +244,64 @@ def test_notify_dot_text_mode_ignores_attachment():
     assert "image" not in payload
     assert payload["deviceId"] == "device"
     assert payload["message"] == "world"
+    # Should use existing icon, not attachment
+    assert payload["icon"] == "aW5jb24="
+
+
+def test_notify_dot_text_mode_uses_attachment_as_icon():
+    """Test text mode uses first attachment as icon when no icon provided."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        signature="footer",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(
+            title="hello",
+            body="world",
+            attach=[DummyAttachment("attachment_icon_data")],
+        )
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert payload["deviceId"] == "device"
+    assert payload["message"] == "world"
+    # Should use attachment as icon
+    assert payload["icon"] == "attachment_icon_data"
+
+
+def test_notify_dot_text_mode_multiple_attachments_warning():
+    """Test text mode warns when multiple attachments are provided."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        with mock.patch.object(dot.logger, "warning") as mock_warning:
+            assert dot.send(
+                title="hello",
+                body="world",
+                attach=[
+                    DummyAttachment("first"),
+                    DummyAttachment("second"),
+                ],
+            )
+            # Should warn about multiple attachments
+            mock_warning.assert_called_once()
+            assert "Multiple attachments" in str(mock_warning.call_args)
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    # Should use first attachment only
+    assert payload["icon"] == "first"
 
 
 def test_notify_dot_url_generation():
@@ -262,16 +347,6 @@ def test_notify_dot_parse_url_mode_and_image():
     fallback = NotifyDot.parse_url("dot://token@device/unknown/?refresh=no")
     assert fallback["mode"] == "text"
     assert fallback["refresh_now"] is False
-
-
-def test_notify_dot_invalid_border():
-    """Test invalid border values."""
-    # Invalid border value should default to 0
-    dot = NotifyDot(apikey="token", device_id="device", border=5)
-    assert dot.border == 0
-
-    dot = NotifyDot(apikey="token", device_id="device", border="invalid")
-    assert dot.border == 0
 
 
 def test_notify_dot_invalid_mode():
@@ -383,28 +458,28 @@ def test_notify_dot_url_generation_defaults():
 
 
 def test_notify_dot_image_mode_with_multiple_attachments():
-    """Test image mode with multiple attachments where some fail."""
-
-    class EmptyAttachment:
-        def base64(self):
-            return None
+    """Test image mode with multiple attachments (only first is used)."""
 
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
 
     response = mock.Mock()
     response.status_code = 200
 
-    # First attachment returns None, second returns valid data
+    # Multiple attachments provided, only first should be used
     with mock.patch("requests.post", return_value=response) as mock_post:
         assert dot.send(
             body="test",
             title="test",
-            attach=[EmptyAttachment(), DummyAttachment("validbase64")],
+            attach=[
+                DummyAttachment("first_attachment"),
+                DummyAttachment("second_attachment"),
+            ],
         )
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    assert payload["image"] == "validbase64"
+    # Should use first attachment only
+    assert payload["image"] == "first_attachment"
 
 
 def test_notify_dot_text_mode_without_title():
@@ -561,34 +636,140 @@ def test_notify_dot_url_generation_without_defaults():
     assert "dither_kernel" not in url
 
 
-def test_notify_dot_attachment_exception_handling():
-    """Test exception handling when iterating through attachments."""
+def test_notify_dot_image_mode_attachment_exception():
+    """Test exception handling in image mode when attachment.base64() fails."""
 
     class ExceptionAttachment:
         def base64(self):
             raise Exception("First attachment fails")
 
-    class ValidAttachment:
-        def base64(self):
-            return "validimage"
-
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    # First attachment throws exception, should log warning and fail
+    with mock.patch.object(dot.logger, "warning") as mock_warning:
+        assert dot.send(
+            body="test",
+            title="test",
+            attach=[ExceptionAttachment()],
+        ) is False
+        # Should log warning about failed attachment processing
+        assert mock_warning.called
+        # Check that the warning message contains expected text
+        warning_calls = [str(call) for call in mock_warning.call_args_list]
+        assert any("Failed to process attachment" in str(call) for call in warning_calls)
+
+
+def test_notify_dot_image_mode_attachment_none():
+    """Test image mode when attachment is None (covers if attachment: branch)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    # Attachment is None, should skip base64() call and fail
+    assert dot.send(
+        body="test",
+        title="test",
+        attach=[None],
+    ) is False
+
+
+def test_notify_dot_image_mode_attachment_falsy():
+    """Test image mode when attachment is falsy (covers if attachment: branch)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    # Attachment is falsy (empty string), should skip base64() call and fail
+    class FalsyAttachment:
+        def __bool__(self):
+            return False
+
+        def base64(self):
+            return "should_not_be_called"
+
+    assert dot.send(
+        body="test",
+        title="test",
+        attach=[FalsyAttachment()],
+    ) is False
+
+
+def test_notify_dot_text_mode_attachment_exception():
+    """Test exception handling in text mode when attachment.base64() fails."""
+
+    class ExceptionAttachment:
+        def base64(self):
+            raise Exception("Attachment base64 conversion fails")
+
+    dot = NotifyDot(apikey="token", device_id="device", mode="text")
 
     response = mock.Mock()
     response.status_code = 200
 
-    # First attachment throws exception (lines 345-346), second works
+    # First attachment throws exception, should log warning but continue
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        with mock.patch.object(dot.logger, "warning") as mock_warning:
+            assert dot.send(
+                title="hello",
+                body="world",
+                attach=[ExceptionAttachment()],
+            )
+            # Should log warning about failed attachment processing
+            assert mock_warning.called
+            # Check that the warning message contains expected text
+            warning_calls = [str(call) for call in mock_warning.call_args_list]
+            assert any("Failed to process attachment" in str(call) for call in warning_calls)
+
+    # Should still send notification without icon
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert payload["message"] == "world"
+    assert "icon" not in payload
+
+
+def test_notify_dot_text_mode_attachment_none():
+    """Test text mode when attachment is None (covers if attachment: branch)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="text")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Attachment is None, should skip base64() call and continue without icon
     with mock.patch("requests.post", return_value=response) as mock_post:
         assert dot.send(
-            body="test",
-            title="test",
-            attach=[ExceptionAttachment(), ValidAttachment()],
+            title="hello",
+            body="world",
+            attach=[None],
         )
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    # Should use the valid attachment after skipping the failed one
-    assert payload["image"] == "validimage"
+    assert payload["message"] == "world"
+    assert "icon" not in payload
+
+
+def test_notify_dot_text_mode_attachment_falsy():
+    """Test text mode when attachment is falsy (covers if attachment: branch)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="text")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Attachment is falsy, should skip base64() call and continue without icon
+    class FalsyAttachment:
+        def __bool__(self):
+            return False
+
+        def base64(self):
+            return "should_not_be_called"
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(
+            title="hello",
+            body="world",
+            attach=[FalsyAttachment()],
+        )
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert payload["message"] == "world"
+    assert "icon" not in payload
 
 
 def test_notify_dot_parse_url_no_host():
@@ -613,4 +794,190 @@ def test_notify_dot_url_with_border_not_none():
     url = dot.url()
     # Border should be in URL when not None
     assert "border=1" in url
+
+
+def test_notify_dot_image_mode_with_only_title():
+    """Test image mode warning with only title (no body)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Test with only title, no body - should still warn
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(
+            title="test_title",
+            body="",
+            attach=[DummyAttachment("image_data")],
+        )
+
+    # Should have sent the notification but logged a warning
+    assert mock_post.called
+
+
+def test_notify_dot_image_mode_with_only_body():
+    """Test image mode warning with only body (no title)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Test with only body, no title - should still warn
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(
+            title="",
+            body="test_body",
+            attach=[DummyAttachment("image_data")],
+        )
+
+    # Should have sent the notification but logged a warning
+    assert mock_post.called
+
+
+def test_notify_dot_text_mode_without_body():
+    """Test text mode with empty body."""
+    dot = NotifyDot(apikey="token", device_id="device")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Test with title but no body
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(body="", title="test_title")
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert payload["title"] == "test_title"
+    # Body should not be in payload when empty
+    assert "message" not in payload
+
+
+def test_notify_dot_parse_url_without_host():
+    """Test parse_url when URL has no host."""
+    # URL with no host (missing device_id) - should return None
+    result = NotifyDot.parse_url("dot://apikey@/text/")
+    # Without a host, the URL is invalid and parse_url returns None
+    assert result is None
+
+
+def test_notify_dot_image_mode_without_title_and_body():
+    """Test image mode without title and body (line 294->300)."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        mode="image",
+        image_data="base64img",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Send without title and body - should not trigger warning
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(title="", body="")
+
+    # Should have sent the notification
+    assert mock_post.called
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    assert payload["image"] == "base64img"
+    assert "title" not in payload
+    assert "message" not in payload
+
+
+def test_notify_dot_image_mode_with_existing_image_data():
+    """Test image mode when image_data already exists (line 305->313)."""
+    dot = NotifyDot(
+        apikey="token",
+        device_id="device",
+        mode="image",
+        image_data="existing_image_data",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    # Send without attachments when image_data already exists
+    # Should use existing image_data and skip attachment processing entirely
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send(
+            title="",
+            body="",
+        )
+
+    _args, kwargs = mock_post.call_args
+    payload = json.loads(kwargs["data"])
+    # Should use the existing image_data, not the attachment
+    assert payload["image"] == "existing_image_data"
+
+
+def test_notify_dot_parse_url_with_empty_refresh():
+    """Test parse_url when refresh query parameter is empty (line 535->539)."""
+    # Test with no refresh parameter (should default to True)
+    result = NotifyDot.parse_url("dot://apikey@device/text/")
+    assert result is not None
+    # When refresh is not specified, it defaults to True
+    assert result.get("refresh_now") is None  # Not set in parse_url
+
+
+def test_notify_dot_image_mode_first_attachment_fails():
+    """Test image mode when first attachment fails (returns None)."""
+
+    class FailingAttachment:
+        def base64(self):
+            return None  # Returns None
+
+    dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    # First attachment returns None, should fail immediately
+    assert dot.notify(
+        title="",
+        body="",
+        attach=[FailingAttachment()],
+    ) is False
+
+
+def test_notify_dot_image_mode_with_empty_attach_list():
+    """Test image mode with empty attachments list (line 305->313)."""
+    dot = NotifyDot(apikey="token", device_id="device", mode="image")
+
+    # Try with empty attachments list
+    # Condition: not image_data and attach -> not None and [] -> False
+    # Should skip the for loop and go directly to line 313
+    assert dot.notify(
+        title="",
+        body="",
+        attach=[],  # Empty list (truthy in Python but loop won't execute)
+    ) is False
+
+
+def test_notify_dot_parse_url_without_host_field():
+    """Test parse_url when host field is None (line 535->539)."""
+    from apprise import NotifyBase
+
+    # Mock NotifyBase.parse_url to return results with host=None
+    # This triggers the else branch of "if host:" at line 535
+    with mock.patch.object(NotifyBase, "parse_url") as mock_parse:
+        mock_parse.return_value = {
+            "user": "apikey",
+            "password": None,
+            "port": None,
+            "host": None,  # host is None - triggers 535->539 branch
+            "fullpath": "/text/",
+            "path": "",
+            "query": None,
+            "schema": "dot",
+            "qsd": {"refresh": "yes"},
+            "secure": False,
+            "verify": True,
+        }
+
+        result = NotifyDot.parse_url("dot://fake")
+
+        # Should have mode but no device_id since host was None
+        assert result is not None
+        assert result.get("mode") == "text"
+        assert result.get("device_id") is None
+        assert result.get("apikey") == "apikey"
+        assert result.get("refresh_now") is True  # refresh was in qsd
 

@@ -28,24 +28,27 @@ System Administrators and DevOps who wish to send a notification now no longer n
 
 # Table of Contents
 <!--ts-->
-* [Supported Notifications](#supported-notifications)
-  * [Productivity Based Notifications](#productivity-based-notifications)
-  * [SMS Notifications](#sms-notifications)
-  * [Desktop Notifications](#desktop-notifications)
-  * [Email Notifications](#email-notifications)
-  * [Custom Notifications](#custom-notifications)
-* [Installation](#installation)
-* [Command Line Usage](#command-line-usage)
-  * [Configuration Files](#cli-configuration-files)
-  * [File Attachments](#cli-file-attachments)
-  * [Loading Custom Notifications/Hooks](#cli-loading-custom-notificationshooks)
-  * [Environment Variables](#cli-environment-variables)
-* [Developer API Usage](#developer-api-usage)
-  * [Configuration Files](#api-configuration-files)
-  * [File Attachments](#api-file-attachments)
-  * [Loading Custom Notifications/Hooks](#api-loading-custom-notificationshooks)
-* [Persistent Storage](#persistent-storage)
-* [More Supported Links and Documentation](#want-to-learn-more)
+- [Table of Contents](#table-of-contents)
+- [Supported Notifications](#supported-notifications)
+  - [Productivity Based Notifications](#productivity-based-notifications)
+  - [SMS Notifications](#sms-notifications)
+  - [Desktop Notifications](#desktop-notifications)
+  - [Email Notifications](#email-notifications)
+  - [Custom Notifications](#custom-notifications)
+- [Installation](#installation)
+- [Command Line Usage](#command-line-usage)
+  - [CLI Configuration Files](#cli-configuration-files)
+  - [CLI File Attachments](#cli-file-attachments)
+  - [CLI Loading Custom Notifications/Hooks](#cli-loading-custom-notificationshooks)
+  - [CLI Environment Variables](#cli-environment-variables)
+- [Developer API Usage](#developer-api-usage)
+  - [API Configuration Files](#api-configuration-files)
+  - [API File Attachments](#api-file-attachments)
+  - [API Loading Custom Notifications/Hooks](#api-loading-custom-notificationshooks)
+- [Persistent Storage](#persistent-storage)
+  - [CLI Persistent Storage Commands](#cli-persistent-storage-commands)
+  - [API Persistent Storage Commands](#api-persistent-storage-commands)
+- [Want To Learn More?](#want-to-learn-more)
 <!--te-->
 
 # Supported Notifications
@@ -64,7 +67,7 @@ The table below identifies the services this tool supports and some example serv
 | [BlueSky](https://github.com/caronc/apprise/wiki/Notify_bluesky) | bluesky://  | (TCP) 443   | bluesky://Handle:AppPw<br />bluesky://Handle:AppPw/TargetHandle<br />bluesky://Handle:AppPw/TargetHandle1/TargetHandle2/TargetHandleN
 | [Chanify](https://github.com/caronc/apprise/wiki/Notify_chanify) | chantify://    | (TCP) 443    | chantify://token
 | [Discord](https://github.com/caronc/apprise/wiki/Notify_discord)  | discord://   | (TCP) 443   | discord://webhook_id/webhook_token<br />discord://avatar@webhook_id/webhook_token
-| [Dot.](https://dot.mindreset.tech/docs/service/studio/api/text_api)  | dot:// | (TCP) 443 | dot://apikey@device_id/text/<br />dot://apikey@device_id/image/?image=base64OfImage<br />**Note**: `device_id` is the Quote/0 hardware serial
+| [Dot.](https://dot.mindreset.tech/docs/service/studio/api/text_api)  | dot:// | (TCP) 443 | dot://apikey@device_id/text/<br />dot://apikey@device_id/image/<br />**Note**: `device_id` is the Quote/0 hardware serial
 | [Emby](https://github.com/caronc/apprise/wiki/Notify_emby)  | emby:// or embys:// | (TCP) 8096 | emby://user@hostname/<br />emby://user:password@hostname
 | [Enigma2](https://github.com/caronc/apprise/wiki/Notify_enigma2)  | enigma2:// or enigma2s:// | (TCP) 80 or 443 | enigma2://hostname
 | [FCM](https://github.com/caronc/apprise/wiki/Notify_fcm) | fcm://    | (TCP) 443    | fcm://project@apikey/DEVICE_ID<br />fcm://project@apikey/#TOPIC<br/>fcm://project@apikey/DEVICE_ID1/#topic1/#topic2/DEVICE_ID2/
