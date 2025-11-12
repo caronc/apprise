@@ -91,10 +91,7 @@ class NotifyDot(NotifyBase):
     # The services URL
     service_url = "https://dot.mindreset.tech"
 
-    # The default protocol
-    protocol = "dot"
-
-    # The default secure protocol
+    # All notification requests are secure
     secure_protocol = "dot"
 
     # A URL that takes you to the setup/help of the specific protocol
@@ -108,10 +105,7 @@ class NotifyDot(NotifyBase):
     DEFAULT_MODE = "text"
 
     # Define object templates
-    templates = (
-        "{schema}://{apikey}@{device_id}/{mode}",
-        "{schema}://{apikey}@{device_id}/{mode}/",
-    )
+    templates = ("{schema}://{apikey}@{device_id}/{mode}/",)
 
     # Define our template arguments
     template_tokens = dict(
@@ -148,14 +142,6 @@ class NotifyDot(NotifyBase):
                 "type": "bool",
                 "default": True,
                 "map_to": "refresh_now",
-            },
-            "title": {
-                "name": _("Text Title"),
-                "type": "string",
-            },
-            "message": {
-                "name": _("Text Content"),
-                "type": "string",
             },
             "signature": {
                 "name": _("Text Signature"),
@@ -206,8 +192,6 @@ class NotifyDot(NotifyBase):
         device_id=None,
         mode=DEFAULT_MODE,
         refresh_now=True,
-        title=None,
-        message=None,
         signature=None,
         icon=None,
         link=None,
@@ -228,10 +212,6 @@ class NotifyDot(NotifyBase):
 
         # Refresh Now flag: True shows content immediately (default).
         self.refresh_now = parse_bool(refresh_now, default=True)
-
-        # Optional default title/message used when notify inputs are empty.
-        self.default_title = title if isinstance(title, str) else None
-        self.default_message = message if isinstance(message, str) else None
 
         # API mode ("text" or "image")
         self.mode = (
@@ -332,6 +312,12 @@ class NotifyDot(NotifyBase):
         }
 
         if self.mode == "image":
+            if title or body:
+                self.logger.warning(
+                    "Title and body are not supported in image mode "
+                    "and will be ignored."
+                )
+
             image_data = (
                 self.image_data if isinstance(self.image_data, str) else None
             )
@@ -402,16 +388,10 @@ class NotifyDot(NotifyBase):
             }
 
             if title:
-                payload["title"] = title  # Title displayed on screen
-            elif self.app_desc:
-                payload["title"] = self.app_desc
-            elif self.default_title:
-                payload["title"] = self.default_title
+                payload["title"] = title
 
             if body:
-                payload["message"] = body  # Body text displayed on screen
-            elif self.default_message:
-                payload["message"] = self.default_message
+                payload["message"] = body
 
             if self.signature:
                 payload["signature"] = (
@@ -481,7 +461,7 @@ class NotifyDot(NotifyBase):
         another similar one.
         """
         return (
-            self.protocol,
+            self.secure_protocol,
             self.apikey,
             self.device_id,
             self.mode,
@@ -527,7 +507,7 @@ class NotifyDot(NotifyBase):
         mode_segment = f"/{self.mode}/"
 
         return "{schema}://{apikey}@{device_id}{mode}?{params}".format(
-            schema=self.protocol,
+            schema=self.secure_protocol,
             apikey=self.pprint(
                 self.apikey, privacy, mode=PrivacyMode.Secret, safe=""
             ),
@@ -622,15 +602,5 @@ class NotifyDot(NotifyBase):
         image_value = results["qsd"].get("image")
         if image_value:
             results["image_data"] = NotifyDot.unquote(image_value.strip())
-
-        # Title
-        title_value = results["qsd"].get("title")
-        if title_value:
-            results["title"] = NotifyDot.unquote(title_value.strip())
-
-        # Message
-        message_value = results["qsd"].get("message")
-        if message_value:
-            results["message"] = NotifyDot.unquote(message_value.strip())
 
         return results

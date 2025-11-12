@@ -294,26 +294,24 @@ def test_notify_dot_image_data_in_text_mode():
     assert dot.image_data is None
 
 
-def test_notify_dot_default_title_message():
-    """Test default title and message fallback."""
+def test_notify_dot_text_mode_with_title_and_body():
+    """Test text mode with title and body."""
     dot = NotifyDot(
         apikey="token",
         device_id="device",
-        title="default_title",
-        message="default_message",
     )
 
     response = mock.Mock()
     response.status_code = 200
 
-    # Test with empty body and title
+    # Test with title and body provided at runtime
     with mock.patch("requests.post", return_value=response) as mock_post:
-        assert dot.send(body="", title="")
+        assert dot.send(body="test_body", title="test_title")
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    # Should use default message when body is empty
-    assert payload["message"] == "default_message"
+    assert payload["message"] == "test_body"
+    assert payload["title"] == "test_title"
 
 
 def test_notify_dot_no_device_id():
@@ -328,7 +326,7 @@ def test_notify_dot_parse_url_with_all_params():
     result = NotifyDot.parse_url(
         "dot://apikey@device/image/?refresh=yes&signature=sig&icon=icon_b64"
         "&link=https://example.com&border=1&dither_type=ORDERED"
-        "&dither_kernel=ATKINSON&image=img_b64&title=test_title&message=test_msg"
+        "&dither_kernel=ATKINSON&image=img_b64"
     )
     assert result["mode"] == "image"
     assert result["refresh_now"] is True
@@ -339,8 +337,6 @@ def test_notify_dot_parse_url_with_all_params():
     assert result["dither_type"] == "ORDERED"
     assert result["dither_kernel"] == "ATKINSON"
     assert result["image_data"] == "img_b64"
-    assert result["title"] == "test_title"
-    assert result["message"] == "test_msg"
 
 
 def test_notify_dot_url_identifier():
@@ -411,21 +407,21 @@ def test_notify_dot_image_mode_with_multiple_attachments():
     assert payload["image"] == "validbase64"
 
 
-def test_notify_dot_text_mode_fallback_to_app_desc():
-    """Test text mode fallback to app_desc when title is empty."""
+def test_notify_dot_text_mode_without_title():
+    """Test text mode without title (title is optional)."""
     dot = NotifyDot(apikey="token", device_id="device")
 
     response = mock.Mock()
     response.status_code = 200
 
-    # Test with empty title, should fallback to app_desc
+    # Test with empty title - title should not be in payload
     with mock.patch("requests.post", return_value=response) as mock_post:
         assert dot.send(body="test message", title="")
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    # Should have app_desc as title
-    assert "title" in payload
+    # Title should not be in payload when empty
+    assert "title" not in payload
     assert payload["message"] == "test message"
 
 
@@ -451,19 +447,17 @@ def test_notify_dot_url_generation_with_link():
     assert "border=0" in url_image
 
 
-def test_notify_dot_default_title_only():
-    """Test all title fallback scenarios."""
-    # Test 1: With provided title
+def test_notify_dot_title_handling():
+    """Test title handling in text mode."""
     dot = NotifyDot(
         apikey="token",
         device_id="device",
-        title="my_default_title",
     )
 
     response = mock.Mock()
     response.status_code = 200
 
-    # Send with a provided title
+    # Test 1: With provided title
     with mock.patch("requests.post", return_value=response) as mock_post:
         assert dot.send(body="test", title="provided_title")
 
@@ -471,14 +465,14 @@ def test_notify_dot_default_title_only():
     payload = json.loads(kwargs["data"])
     assert payload["title"] == "provided_title"
 
-    # Test 2: Without provided title, should fallback to app_desc
+    # Test 2: Without provided title, should not include title in payload
     with mock.patch("requests.post", return_value=response) as mock_post:
         assert dot.send(body="test", title="")
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    # Should use app_desc when no title provided
-    assert "title" in payload
+    # Title should not be in payload when empty
+    assert "title" not in payload
 
 
 def test_notify_dot_image_mode_no_border():
