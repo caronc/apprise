@@ -107,18 +107,18 @@ PHONE_NO_WPREFIX_DETECTION_RE = re.compile(
     re.I,
 )
 
-# A simple verification check to make sure the content specified
-# rougly conforms to a ham radio call sign before we parse it further
+# Quick sanity check - does this look like a valid callsign before we
+# bother parsing it
 IS_CALL_SIGN = re.compile(
-    r"^(?P<callsign>[a-z0-9]{2,3}[0-9][a-z0-9]{3})"
-    r"(?P<ssid>-[a-z0-9]{1,2})?\s*$",
+    r"^(?P<callsign>[0-9a-z]{1,2}[0-9][a-z0-9]{1,3})"
+    r"(-(?P<ssid>[0-9]{1,2}))?\s*$",
     re.I,
 )
 
-# Regular expression used to destinguish between multiple ham radio call signs
+# Regex to split multiple callsigns from a single string
 CALL_SIGN_DETECTION_RE = re.compile(
-    r"\s*([a-z0-9]{2,3}[0-9][a-z0-9]{3}(?:-[a-z0-9]{1,2})?)"
-    r"(?=$|[\s,]+[a-z0-9]{4,6})",
+    r"\s*([0-9a-z]{1,2}[0-9][a-z0-9]{1,3}(?:-(?:[0-9]{1,2}))?)"
+    r"(?=\s*$|\s*[,;\s]+)",
     re.I,
 )
 
