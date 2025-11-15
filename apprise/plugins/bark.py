@@ -215,7 +215,8 @@ class NotifyBark(NotifyBase):
             },
             "call": {
                 "name": _("Call"),
-                "type": "string",
+                "type": "bool",
+                "default": False,
             },
         },
     )
@@ -311,8 +312,8 @@ class NotifyBark(NotifyBase):
                     volume,
                 )
 
-        # Call - when set to "1", notification ringtone will repeat
-        self.call = call if isinstance(call, str) else None
+        # Call
+        self.call = parse_bool(call)
 
         # Icon URL
         self.icon = icon if isinstance(icon, str) else None
@@ -397,7 +398,7 @@ class NotifyBark(NotifyBase):
             payload["volume"] = self.volume
 
         if self.call:
-            payload["call"] = self.call
+            payload["call"] = 1
 
         auth = None
         if self.user:
@@ -514,7 +515,7 @@ class NotifyBark(NotifyBase):
             params["icon"] = self.icon
 
         if self.call:
-            params["call"] = self.call
+            params["call"] = "yes"
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -623,9 +624,8 @@ class NotifyBark(NotifyBase):
             )
 
         # Call
-        if "call" in results["qsd"] and results["qsd"]["call"]:
-            results["call"] = NotifyBark.unquote(
-                results["qsd"]["call"].strip()
-            )
+        results["call"] = parse_bool(
+            results["qsd"].get("call", False)
+        )
 
         return results
