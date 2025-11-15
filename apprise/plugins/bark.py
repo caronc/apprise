@@ -213,6 +213,11 @@ class NotifyBark(NotifyBase):
                 "name": _("Icon URL"),
                 "type": "string",
             },
+            "call": {
+                "name": _("Call"),
+                "type": "bool",
+                "default": False,
+            },
         },
     )
 
@@ -228,6 +233,7 @@ class NotifyBark(NotifyBase):
         badge=None,
         volume=None,
         icon=None,
+        call=None,
         **kwargs,
     ):
         """Initialize Notify Bark Object."""
@@ -305,6 +311,9 @@ class NotifyBark(NotifyBase):
                     "Must be between 0 and 10",
                     volume,
                 )
+
+        # Call
+        self.call = parse_bool(call)
 
         # Icon URL
         self.icon = icon if isinstance(icon, str) else None
@@ -387,6 +396,9 @@ class NotifyBark(NotifyBase):
 
         if self.volume:
             payload["volume"] = self.volume
+
+        if self.call:
+            payload["call"] = 1
 
         auth = None
         if self.user:
@@ -502,6 +514,9 @@ class NotifyBark(NotifyBase):
         if self.icon:
             params["icon"] = self.icon
 
+        if self.call:
+            params["call"] = "yes"
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -607,5 +622,10 @@ class NotifyBark(NotifyBase):
             results["icon"] = NotifyBark.unquote(
                 results["qsd"]["icon"].strip()
             )
+
+        # Call
+        results["call"] = parse_bool(
+            results["qsd"].get("call", False)
+        )
 
         return results
