@@ -462,17 +462,11 @@ class NotifyMatrix(NotifyBase):
             # Acquire our access token from our URL
             access_token = self.password if self.password else self.user
 
-            default_port = 443 if self.secure else 80
-
             # Prepare our URL
-            url = "{schema}://{hostname}:{port}{webhook_path}/{token}".format(
+            url = "{schema}://{hostname}{port}{webhook_path}/{token}".format(
                 schema="https" if self.secure else "http",
                 hostname=self.host,
-                port=(
-                    ""
-                    if self.port is None or self.port == default_port
-                    else self.port
-                ),
+                port=("" if not self.port else f":{self.port}"),
                 webhook_path=MATRIX_V1_WEBHOOK_PATH,
                 token=access_token,
             )
@@ -1568,7 +1562,6 @@ class NotifyMatrix(NotifyBase):
                     ),
                 )
 
-        default_port = 443 if self.secure else 80
         return "{schema}://{auth}{hostname}{port}/{rooms}?{params}".format(
             schema=self.secure_protocol if self.secure else self.protocol,
             auth=auth,
@@ -1577,11 +1570,7 @@ class NotifyMatrix(NotifyBase):
                 if self.mode != MatrixWebhookMode.T2BOT
                 else self.pprint(self.access_token, privacy, safe="")
             ),
-            port=(
-                ""
-                if self.port is None or self.port == default_port
-                else f":{self.port}"
-            ),
+            port=("" if not self.port else f":{self.port}"),
             rooms=NotifyMatrix.quote("/".join(self.rooms)),
             params=NotifyMatrix.urlencode(params),
         )
@@ -1724,9 +1713,14 @@ class NotifyMatrix(NotifyBase):
             # We can use our cached value and return early
             return base_url
 
-        # 1. Extract the server name from the user's Matrix ID by splitting
         # the Matrix ID at the first colon.
-        verify_url = f"https://{self.host}/.well-known/matrix/client"
+        verify_url = \
+            "{schema}://{hostname}{port}/.well-known/matrix/client".format(
+                schema="https" if self.secure else "http",
+                hostname=self.host,
+                port=("" if not self.port else f":{self.port}"),
+            )
+
         code, wk_response = self._fetch(
             None, method="GET", url_override=verify_url
         )
@@ -1910,15 +1904,10 @@ class NotifyMatrix(NotifyBase):
 
         # If we get hear, we need to build our URL dynamically based on what
         # was provided to us during the plugins initialization
-        default_port = 443 if self.secure else 80
         return "{schema}://{hostname}{port}".format(
             schema="https" if self.secure else "http",
             hostname=self.host,
-            port=(
-                ""
-                if self.port is None or self.port == default_port
-                else f":{self.port}"
-            ),
+            port=("" if not self.port else f":{self.port}"),
         )
 
     @property
