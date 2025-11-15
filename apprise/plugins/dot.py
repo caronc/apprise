@@ -95,7 +95,7 @@ class NotifyDot(NotifyBase):
     secure_protocol = "dot"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://dot.mindreset.tech/docs/service/studio/api/text_api"
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_dot"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
@@ -105,6 +105,7 @@ class NotifyDot(NotifyBase):
 
     # Supported API modes
     SUPPORTED_MODES = ("text", "image")
+
     DEFAULT_MODE = "text"
 
     # Define object templates
