@@ -122,7 +122,6 @@ BuildRequires: python%{python3_pkgversion}-yaml
 BuildRequires: python%{python3_pkgversion}-babel
 BuildRequires: python%{python3_pkgversion}-cryptography
 BuildRequires: python%{python3_pkgversion}-certifi
-BuildRequires: python%{python3_pkgversion}-paho-mqtt
 BuildRequires: python%{python3_pkgversion}-tox
 Requires: python%{python3_pkgversion}-requests
 Requires: python%{python3_pkgversion}-requests-oauthlib
