@@ -309,7 +309,7 @@ apprise_url_tests = (
         "tgram://123456789:abcdefg_hijklmnop/lead2gold/",
         {
             "instance": NotifyTelegram,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -318,7 +318,7 @@ apprise_url_tests = (
         "tgram://123456789:abcdefg_hijklmnop/lead2gold/",
         {
             "instance": NotifyTelegram,
-            # throw a bizzare code forcing us to fail to look it up without
+            # throw a bizarre code forcing us to fail to look it up without
             # having an image included
             "include_image": False,
             "response": False,
@@ -330,7 +330,7 @@ apprise_url_tests = (
         "tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes",
         {
             "instance": NotifyTelegram,
-            # throw a bizzare code forcing us to fail to look it up without
+            # throw a bizarre code forcing us to fail to look it up without
             # having an image included
             "include_image": True,
             "response": False,
@@ -342,7 +342,7 @@ apprise_url_tests = (
         {
             "instance": NotifyTelegram,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
@@ -350,8 +350,8 @@ apprise_url_tests = (
         "tgram://123456789:abcdefg_hijklmnop/lead2gold/?image=Yes",
         {
             "instance": NotifyTelegram,
-            # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them without images set
+            # Throws a series of i/o exceptions with this flag is set and
+            # tests that we gracefully handle them without images set
             "include_image": True,
             "test_requests_exceptions": True,
         },

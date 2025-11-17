@@ -66,7 +66,7 @@ apprise_url_tests = (
         "seven://{}/15551232000".format("a" * 25),
         {
             "instance": NotifySeven,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
