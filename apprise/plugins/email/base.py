@@ -1027,7 +1027,7 @@ class NotifyEmail(NotifyBase):
             # Strip target out of bcc list if in To
             _bcc = bcc - {to_addr}
 
-            # Strip target out of reply_to list if in To (no need to Reply-To the recipient)
+            # Strip target out of reply_to list if in To
             _reply_to = reply_to - {to_addr}
 
             # Format our cc addresses to support the Name field
