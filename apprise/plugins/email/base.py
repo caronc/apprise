@@ -1042,11 +1042,11 @@ class NotifyEmail(NotifyBase):
                 for addr in _bcc
             ]
 
-            if reply_to:
+            if _reply_to:
                 # Format our reply-to addresses to support the Name field
                 reply_to = [
                     formataddr((names.get(addr, False), addr), charset="utf-8")
-                    for addr in reply_to
+                    for addr in _reply_to
                 ]
 
             logger.debug(
@@ -1175,8 +1175,8 @@ class NotifyEmail(NotifyBase):
             if cc:
                 base["Cc"] = ",".join(_cc)
 
-            if reply_to:
-                base["Reply-To"] = ",".join(_reply_to)
+            if _reply_to:
+                base["Reply-To"] = ",".join(reply_to)
 
             yield EmailMessage(
                 recipient=to_addr,
