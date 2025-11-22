@@ -30,8 +30,12 @@ from inspect import cleandoc
 
 # Disable logging for a cleaner testing output
 import logging
+from typing import Any
+from unittest.mock import Mock
 
 import pytest
+from pytest_mock import MockerFixture
+import requests
 import yaml
 
 from apprise import Apprise, AppriseAsset, AppriseConfig, ConfigFormat
@@ -40,6 +44,40 @@ from apprise.plugins.email import NotifyEmail
 from apprise.utils.time import zoneinfo
 
 logging.disable(logging.CRITICAL)
+
+
+@pytest.fixture
+def requests_remote_config(mocker: MockerFixture) -> Mock:
+    """
+    Patch requests.post globally.
+
+    The config loader will still go through its normal HTTP logic, but all
+    outbound GETs will receive controlled in-memory responses.
+    """
+
+    def fake_post(url: str, *args: Any, **kwargs: Any) -> requests.Response:
+        if url == "http://localhost:8000/get/test-001":
+            body = cleandoc("""
+                json://localhost
+                form://localhost
+                """)
+        elif url == "http://localhost:8000/get/test-002":
+            body = cleandoc("""
+                xml://localhost
+                """)
+        else:
+            pytest.fail(f"Unexpected URL fetched: {url!r}")
+
+        resp = requests.Response()
+        resp.status_code = requests.codes.ok
+        resp.url = url
+        resp._content = body.encode("utf-8")  # type: ignore[attr-defined]
+        resp.encoding = "utf-8"
+        return resp
+
+    # Patch the actual requests.post symbol that ConfigHTTP uses internally
+    mock_post: Mock = mocker.patch("requests.post", side_effect=fake_post)
+    return mock_post
 
 
 def test_config_base():
@@ -1247,6 +1285,48 @@ include:
     assert "http://localhost/apprise/cfg01" in config
     assert "http://localhost/apprise/cfg02" in config
     assert "http://localhost/apprise/cfg03" in config
+
+
+def test_config_base_config_parse_yaml_includes(
+    requests_remote_config: Mock,
+) -> None:
+    """
+    API: ConfigBase.config_parse_yaml_includes
+
+    Verify that HTTP include entries are fetched via requests.get and that
+    the remote config bodies are parsed into json:// and xml:// notifiers.
+    """
+
+    # general reference used below
+    asset = AppriseAsset()
+
+    # Initialize our apprise configuration
+    ac = AppriseConfig(asset=asset, recursion=1)
+
+    # Add our entry
+    ac.add_config(cleandoc("""
+        # Include our Apprise Configuration from 2 locations
+        include:
+           - http://localhost:8000/get/test-001
+           - http://localhost:8000/get/test-002
+
+        # no further URLs defined
+    """))
+
+    # Force a fresh parse and get the loaded plugin
+    servers = ac.servers()
+
+    # the following will return
+    assert len(servers) == 3
+
+    # representation for NotifyBase subclasses.
+    urls = {n.url() for n in servers}
+
+    # The *exact* URL string may include extra params depending on defaults,
+    # so we check using containment instead of strict equality.
+    assert any(u.startswith("json://localhost") for u in urls)
+    assert any(u.startswith("xml://localhost") for u in urls)
+    assert any(u.startswith("form://localhost") for u in urls)
 
 
 def test_yaml_vs_text_tagging():
