@@ -299,7 +299,7 @@ class AppriseConfig:
         if not (instance.config_format and \
                 instance.config_format.value in common.CONFIG_FORMATS):
             logger.warning(
-                "The format of the configuration could not be deteced."
+                "The format of the configuration could not be detected."
             )
             return False
 
