@@ -58,14 +58,14 @@ NOTIFY_CUSTOM_DEL_TOKENS = re.compile(r"^-(?P<key>.*)\s*")
 NOTIFY_CUSTOM_COLON_TOKENS = re.compile(r"^:(?P<key>.*)\s*")
 
 # Used for attempting to acquire the schema if the URL can't be parsed.
-GET_SCHEMA_RE = re.compile(r"\s*(?P<schema>[a-z0-9]{1,12})://.*$", re.I)
+GET_SCHEMA_RE = re.compile(r"\s*(?P<schema>[a-z0-9]{1,32})://.*$", re.I)
 
 # Used for validating that a provided entry is indeed a schema
 # this is slightly different then the GET_SCHEMA_RE above which
 # insists the schema is only valid with a :// entry.  this one
 # extrapolates the individual entries
 URL_DETAILS_RE = re.compile(
-    r"\s*(?P<schema>[a-z0-9]{1,12})(://(?P<base>.*))?$", re.I
+    r"\s*(?P<schema>[a-z0-9]{1,32})(://(?P<base>.*))?$", re.I
 )
 
 # Regular expression based and expanded from:
@@ -124,7 +124,7 @@ CALL_SIGN_DETECTION_RE = re.compile(
 
 # Regular expression used to destinguish between multiple URLs
 URL_DETECTION_RE = re.compile(
-    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{1,12}?:\/\/)", re.I
+    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{1,32}?:\/\/)", re.I
 )
 
 EMAIL_DETECTION_RE = re.compile(
@@ -1046,7 +1046,7 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
     return result
 
 
-def parse_list(*args, cast=None, allow_whitespace=True):
+def parse_list(*args, cast=None, allow_whitespace=True, sort=True):
     """Take a string list and break it into a delimited list of arguments. This
     funciton also supports the processing of a list of delmited strings and
     will always return a unique set of arguments. Duplicates are always
@@ -1081,7 +1081,8 @@ def parse_list(*args, cast=None, allow_whitespace=True):
             )
 
         elif isinstance(arg, (set, list, tuple)):
-            result += parse_list(*arg, allow_whitespace=allow_whitespace)
+            result += parse_list(
+                *arg, allow_whitespace=allow_whitespace, sort=sort)
 
     #
     # filter() eliminates any empty entries
@@ -1089,12 +1090,19 @@ def parse_list(*args, cast=None, allow_whitespace=True):
     # Since Python v3 returns a filter (iterator) whereas Python v2 returned
     # a list, we need to change it into a list object to remain compatible with
     # both distribution types.
-    return (
-        sorted(filter(bool, list(set(result))))
-        if allow_whitespace
-        else sorted(
-            [x.strip() for x in filter(bool, list(set(result))) if x.strip()]
+    if sort:
+        return (
+            sorted(filter(bool, list(set(result))))
+            if allow_whitespace
+            else sorted(
+                [x.strip() for x in filter(
+                    bool, list(set(result))) if x.strip()]
+            )
         )
+    return (
+        list(filter(bool, list(result)))
+        if allow_whitespace
+        else [x.strip() for x in filter(bool, list(result)) if x.strip()]
     )
 
 
