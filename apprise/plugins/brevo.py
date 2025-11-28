@@ -325,14 +325,20 @@ class NotifyBrevo(NotifyBase):
             "subject": title if title else self.default_empty_subject,
         }
         # Body selection
-        if self.notify_format == NotifyFormat.HTML:
+        use_html = self.notify_format == NotifyFormat.HTML
+
+        if use_html:
+            # body already normalised; keep your existing logic
+            _payload["htmlContent"] = body
             _payload["textContent"] = convert_between(
                 NotifyFormat.HTML, NotifyFormat.TEXT, body
             )
-            _payload["htmlContent"] = body
-
         else:
+            # Plain text requested, but Brevo still wants HTML
             _payload["textContent"] = body
+            _payload["htmlContent"] = convert_between(
+                NotifyFormat.TEXT, NotifyFormat.HTML, body
+            )
 
         if attach and self.attachment_support:
             attachments = []
@@ -373,7 +379,7 @@ class NotifyBrevo(NotifyBase):
 
             # Append our attachments to the payload
             _payload.update({
-                "attachments": attachments,
+                "attachment": attachments,
             })
 
         if self.reply_to:
