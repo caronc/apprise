@@ -26,15 +26,21 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
-import json as _json
+from json import dumps
 import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, NotifyType
+from apprise import Apprise, AppriseAsset, NotifyType, PersistentStoreMode
 from apprise.plugins.nextcloud import NotifyNextcloud
+
+NEXTCLOUD_GOOD_RESPONSE = dumps({
+    "ocs": {
+        "meta": {"status": "ok", "statuscode": 100},
+        "data": {"users": ["user1", "user2"]},
+    }})
 
 logging.disable(logging.CRITICAL)
 
@@ -46,12 +52,15 @@ apprise_url_tests = (
         "ncloud://:@/",
         {
             "instance": None,
+            # Our response expected server response
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://",
         {
             "instance": None,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
@@ -59,6 +68,7 @@ apprise_url_tests = (
         {
             # No hostname
             "instance": None,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
@@ -69,6 +79,7 @@ apprise_url_tests = (
             # Since there are no targets specified we expect a False return on
             # send()
             "notify_response": False,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
@@ -76,6 +87,7 @@ apprise_url_tests = (
         {
             # An invalid version was specified
             "instance": TypeError,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
@@ -83,6 +95,7 @@ apprise_url_tests = (
         {
             # An invalid version was specified
             "instance": TypeError,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
@@ -90,88 +103,122 @@ apprise_url_tests = (
         {
             # An invalid version was specified
             "instance": TypeError,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://localhost/admin",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user@localhost/admin",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user@localhost?to=user1,user2",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user@localhost?to=user1,user2&version=20",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user@localhost?to=user1,user2&version=21",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user@localhost?to=user1&version=20&url_prefix=/abcd",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user@localhost?to=user1&version=21&url_prefix=/abcd",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user:pass@localhost/user1/user2",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
             # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "ncloud://user:****@localhost/user1/user2",
+            "privacy_url": "ncloud://user:****@localhost/@user1/@user2",
+        },
+    ),
+    (
+        "ncloud://user:pass@localhost/#group1/#group2/#group1",
+        {
+            # Test groups, but also note a duplicate group provided
+            "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
+            "privacy_url": "ncloud://user:****@localhost/#group",
         },
     ),
     (
         "ncloud://user:pass@localhost:8080/admin",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "nclouds://user:pass@localhost/admin",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
             # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "nclouds://user:****@localhost/admin",
+            "privacy_url": "nclouds://user:****@localhost/@admin",
         },
     ),
     (
         "nclouds://user:pass@localhost:8080/admin/",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
+    (
+        "nclouds://user:pass@localhost:8080/#group/",
+        {
+            "instance": NotifyNextcloud,
+            # Invalid JSON Response
+            "requests_response_text": "{",
+            # We will fail to make the notify() call due to our bad response
+            "notify_response": False,
+        },
+    ),
+
     (
         "ncloud://localhost:8080/admin?+HeaderKey=HeaderValue",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
         },
     ),
     (
         "ncloud://user:pass@localhost:8081/admin",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
             # force a failure
             "response": False,
             "requests_response_code": requests.codes.internal_server_error,
@@ -181,6 +228,7 @@ apprise_url_tests = (
         "ncloud://user:pass@localhost:8082/admin",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
             # throw a bizzare code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
@@ -190,6 +238,7 @@ apprise_url_tests = (
         "ncloud://user:pass@localhost:8083/user1/user2/user3",
         {
             "instance": NotifyNextcloud,
+            "requests_response_text": NEXTCLOUD_GOOD_RESPONSE,
             # Throws a series of i/o exceptions with this flag
             # is set and tests that we gracfully handle them
             "test_requests_exceptions": True,
@@ -258,8 +307,7 @@ def test_plugin_nextcloud_url_prefix(mock_post):
     assert (
         mock_post.call_args_list[0][0][0]
         == "http://localhost/abcd/ocs/v2.php/apps/"
-        "admin_notifications/api/v1/notifications/admin"
-)
+        "admin_notifications/api/v1/notifications/admin")
 
 
 @mock.patch("requests.post")
@@ -276,7 +324,7 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
     # Mock GET responses for group and users listing
     def get_side_effect(url, *args, **kwargs):
         resp = mock.Mock()
-        if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
+        if "/ocs/v1.php/cloud/groups/" in url:
             # Return JSON for group
             j = {
                 "ocs": {
@@ -286,9 +334,10 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
             }
             resp.status_code = requests.codes.ok
             resp.json = lambda: j
-            resp.content = _json.dumps(j).encode()
+            resp.content = dumps(j).encode()
             return resp
-        if "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
+
+        elif "/ocs/v1.php/cloud/users" in url:
             j = {
                 "ocs": {
                     "meta": {"status": "ok", "statuscode": 100},
@@ -297,7 +346,7 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
             }
             resp.status_code = requests.codes.ok
             resp.json = lambda: j
-            resp.content = _json.dumps(j).encode()
+            resp.content = dumps(j).encode()
             return resp
         # default
         resp.status_code = requests.codes.ok
@@ -333,39 +382,39 @@ def test_plugin_nextcloud_groups_and_all(mock_get, mock_post):
         assert any(u in url for url in called_urls)
 
 
-    # Removed XML/v2 fallback tests during simplification
-    pass
-
-
 @mock.patch("requests.post")
 @mock.patch("requests.get")
-def test_plugin_nextcloud_groups_variant_paths(mock_get, mock_post):
-    """No v2/XML fallbacks; ensure v1+json used."""
+def test_plugin_nextcloud_persistent_storage(mock_get, mock_post, tmpdir):
+    """Testing persistent storage"""
 
     post_resp = mock.Mock()
     post_resp.content = ""
     post_resp.status_code = requests.codes.ok
     mock_post.return_value = post_resp
 
+    # Set up persistent storage
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
     def get_side_effect(url, *args, **kwargs):
         resp = mock.Mock()
         # Default json() to empty
         resp.json = lambda: {}
 
-        if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
+        if "/ocs/v1.php/cloud/groups" in url:
             resp.status_code = requests.codes.ok
-            import json as _json
             payload = {"ocs": {"data": {"users": ["u1"]}}}
             resp.json = lambda: payload
-            resp.content = _json.dumps(payload).encode()
+            resp.content = dumps(payload).encode()
             return resp
 
-        if "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
+        elif "/ocs/v1.php/cloud/users" in url:
             resp.status_code = requests.codes.ok
-            import json as _json
             payload = {"ocs": {"data": {"users": ["u2"]}}}
             resp.json = lambda: payload
-            resp.content = _json.dumps(payload).encode()
+            resp.content = dumps(payload).encode()
             return resp
 
         resp.status_code = 500
@@ -379,14 +428,39 @@ def test_plugin_nextcloud_groups_variant_paths(mock_get, mock_post):
         user="admin",
         password="pass",
         targets=["#devs", "all"],
+        asset=asset,
     )
-    assert obj.send(body="b", title="t", notify_type=NotifyType.INFO) is True
+    # We failed to get our list
+    assert obj.send(
+        body="body", title="title", notify_type=NotifyType.INFO) is True
+
+    # User and Group looked up
+    assert mock_get.call_count == 2
 
     # Expect users u1 (group) and u2 (all)
     assert mock_post.call_count == 2
     called_urls = [c[0][0] for c in mock_post.call_args_list]
     for u in ("u1", "u2"):
         assert any(u in url for url in called_urls)
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    obj = NotifyNextcloud(
+        host="localhost",
+        user="admin",
+        password="pass",
+        targets=["#devs",],
+        asset=asset,
+    )
+    # We succeeded this time
+    assert obj.send(
+        body="body", title="title", notify_type=NotifyType.INFO) is True
+
+    # Expect users u1 (group) only and pulled from cache
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0].endswith("/u1")
 
 
 @mock.patch("requests.post")
@@ -417,38 +491,22 @@ def test_plugin_nextcloud_groups_errors_and_dedup(mock_get, mock_post):
         password="pass",
         targets=["#devs", "all", "user1", "user1", "user2"],
     )
-    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
 
-    # Only direct users remain after failed expansions; duplicates removed
-    assert mock_post.call_count == 2
-    called_urls = [c[0][0] for c in mock_post.call_args_list]
-    for u in ("user1", "user2"):
-        assert any(u in url for url in called_urls)
+    # We failed to hit the server for data
+    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is False
 
-    mock_post.reset_mock()
+    # we have no control over the order, but we know that on the first
+    # GET call, we'd have gotten a 401 response; so we'd have stopped from
+    # that point further
+    assert mock_get.call_count == 1
 
-    # instantiate our object (without a batch mode)
-    obj = Apprise.instantiate(
-        "ncloud://localhost/admin/?version=21&url_prefix=a/longer/path/abcd/"
-    )
-
-    assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
-        is True
-    )
-
-    # Not set to batch, so we send 2 different messages
-    assert mock_post.call_count == 1
-    assert (
-        mock_post.call_args_list[0][0][0]
-        == "http://localhost/a/longer/path/abcd/"
-        "ocs/v2.php/apps/notifications/api/v2/admin_notifications/admin"
-    )
+    # Nothing notified
+    assert mock_post.call_count == 0
 
 
 @mock.patch("requests.post")
 @mock.patch("requests.get")
-def test_req_exception_and_empty_targets(mock_get, mock_post):
+def test_plugin_nextcloud_req_exception_and_empty_targets(mock_get, mock_post):
     """RequestException returns empty expansion; direct users send."""
 
     post_resp = mock.Mock()
@@ -468,9 +526,13 @@ def test_req_exception_and_empty_targets(mock_get, mock_post):
         targets=["", "   ", "#DevTeam", "#", "userX"],
     )
 
-    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
-    assert mock_post.call_count == 2
-    assert "userX" in mock_post.call_args_list[0][0][0]
+    # Our Group inquiry failed to respond
+    assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is False
+    assert mock_post.call_count == 0
+    assert mock_get.call_count == 1
+    assert mock_get.call_args_list[0][0][0] \
+        == "http://localhost/ocs/v1.php/cloud/groups/DevTeam"
+    assert mock_get.call_args_list[0][1]["params"].get("format") == "json"
 
 
 @mock.patch("requests.post")
@@ -499,10 +561,21 @@ def test_plugin_nextcloud_json_empty_returns_empty(mock_get, mock_post):
         targets=["#broken", "all", "userZ"],
     )
 
+    # Our notification
     assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
     # Only direct userZ posts because both expansions return empty
+    assert mock_get.call_count == 2
+    assert any("/cloud/users" in call[0][0]
+               for call in mock_get.call_args_list)
+    assert any("/cloud/groups/broken" in call[0][0]
+               for call in mock_get.call_args_list)
+
+    # userZ would get a notification
+    assert mock_get.call_count == 2
+    called = "".join(c[0][0] for c in mock_get.call_args_list)
+    assert "/cloud/groups/" in called and "/cloud/users" in called
     assert mock_post.call_count == 1
-    assert "userZ" in mock_post.call_args_list[0][0][0]
+    assert mock_post.call_args_list[0][0][0].endswith("/userZ")
 
 
 @mock.patch("requests.post")
@@ -514,14 +587,14 @@ def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
     def get_side_effect(url, *args, **kwargs):
         resp = mock.Mock()
         resp.status_code = requests.codes.ok
-        if "/ocs/v1.php/cloud/groups/" in url and "?format=json" in url:
+        if "/ocs/v1.php/cloud/groups" in url:
             j = {
                 "ocs": {
                     "meta": {"status": "ok", "statuscode": 100},
                     "data": {"users": ["g1", "g2"]},
                 }
             }
-        elif "/ocs/v1.php/cloud/users" in url and "?format=json" in url:
+        elif "/ocs/v1.php/cloud/users" in url:
             j = {
                 "ocs": {
                     "meta": {"status": "ok", "statuscode": 100},
@@ -546,23 +619,42 @@ def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
         host="localhost",
         user="admin",
         password="pass",
-        targets=["#devs", "all"],
+        targets=["#devs", "all", "@joe"],
     )
 
     # First send: resolves via OCS; expect 2 GETs (group + all)
     assert obj.send(body="b", title="t", notify_type=NotifyType.INFO) is True
-    assert mock_get.call_count >= 2
+    assert mock_get.call_count == 2
     called = "".join(c[0][0] for c in mock_get.call_args_list)
     assert "/cloud/groups/" in called and "/cloud/users" in called
 
-    # Second send: should use cache; no additional GETs
-    prev = mock_get.call_count
+    # we sent 4 notifications
+    assert mock_post.call_count == 5
+    expected_users = {"a1", "a2", "g1", "g2", "joe"}
+
+    # Extract the user segment from the URL of each call
+    actual_users = {
+        call[0][0].split("/")[-1]
+        for call in mock_post.call_args_list
+    }
+
+    # Assert that the set of actual users matches the set of expected users
+    assert actual_users == expected_users
+
+    # Reset our mock object
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
     assert obj.send(body="b2", title="t2", notify_type=NotifyType.INFO) is True
-    assert mock_get.call_count == prev
+    # Cached responses were used to get our user information
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 5
 
+    # We can re-verify our notifications went as expected:
+    actual_users = {
+        call[0][0].split("/")[-1]
+        for call in mock_post.call_args_list
+    }
 
-
-
-
-
-
+    # Assert that the set of actual users matches the set of expected users
+    assert actual_users == expected_users
