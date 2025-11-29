@@ -216,16 +216,20 @@ class NotifySendGrid(NotifyBase):
         )
 
         # Validate recipients (to:) and drop bad ones:
-        for recipient in parse_list(targets):
+        if targets:
+            for recipient in parse_list(targets):
 
-            result = is_email(recipient)
-            if result:
-                self.targets.append(result["full_email"])
-                continue
+                result = is_email(recipient)
+                if result:
+                    self.targets.append(result["full_email"])
+                    continue
 
-            self.logger.warning(
-                f"Dropped invalid email ({recipient}) specified.",
-            )
+                self.logger.warning(
+                    f"Dropped invalid email ({recipient}) specified.",
+                )
+        else:
+            # add ourselves
+            self.targets.append(self.from_email)
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_list(cc):
@@ -251,10 +255,6 @@ class NotifySendGrid(NotifyBase):
                 "Dropped invalid Blind Carbon Copy email "
                 f"({recipient}) specified.",
             )
-
-        if len(self.targets) == 0:
-            # Notify ourselves
-            self.targets.append(self.from_email)
 
         return
 
@@ -311,7 +311,7 @@ class NotifySendGrid(NotifyBase):
 
     def __len__(self):
         """Returns the number of targets associated with this notification."""
-        return len(self.targets)
+        return max(1, len(self.targets))
 
     def send(
         self,
@@ -322,6 +322,12 @@ class NotifySendGrid(NotifyBase):
         **kwargs,
     ):
         """Perform SendGrid Notification."""
+
+        if not self.targets:
+            # There is no one to email; we're done
+            self.logger.warning(
+                "There are no SendGrid email recipients to notify")
+            return False
 
         headers = {
             "User-Agent": self.app_id,

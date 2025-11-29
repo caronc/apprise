@@ -96,6 +96,14 @@ apprise_url_tests = (
         },
     ),
     (
+        "sendgrid://abcd:user@example.com/bademailaddress",
+        {
+            # won't be able to send email
+            "instance": NotifySendGrid,
+            "notify_response": False,
+        },
+    ),
+    (
         (
             "sendgrid://abcd:user@example.com/newuser@example.com"
             "?bcc=l2g@nuxref.com"
