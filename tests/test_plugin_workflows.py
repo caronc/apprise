@@ -264,6 +264,130 @@ def simple_template(tmpdir):
     return template
 
 
+def test_plugin_workflows_simple_test(
+    request_mock, workflows_url,
+):
+    """
+    NotifyWorkflows() simple testing
+    """
+    # Instantiate our URL
+    obj = Apprise.instantiate(workflows_url)
+    assert isinstance(obj, NotifyWorkflows)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    assert request_mock.called is True
+    assert request_mock.call_args_list[0][0][0].startswith(
+        "https://host:443/workflows/workflow/triggers/manual/paths/invoke"
+    )
+    payload = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "contentUrl": None,
+                "content": {
+                    "$schema":
+                    "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "type": "AdaptiveCard",
+                    "version": "1.4",
+                    "body": [
+                        {
+                            "type": "Image",
+                            "url": "https://github.com/caronc/apprise/raw/"
+                            "master/apprise/assets/themes/default/"
+                            "apprise-info-32x32.png",
+                            "height": "32px",
+                            "altText": "info",
+                        }, {
+                            "type": "TextBlock",
+                            # Verify our Title is set
+                            "text": "title",
+                            "style": "heading",
+                            "weight": "Bolder",
+                            "size": "Large",
+                            "id": "title",
+                        }, {
+                            "type": "TextBlock",
+                            # Verify our Body is set
+                            "text": "body",
+                            "style": "default",
+                            "wrap": True,
+                            "id": "body",
+                        },
+                    ],
+                    "msteams": {
+                        "width": "full"
+                    },
+                },
+            },
+        ],
+    }
+
+    request_mock.reset_mock()
+
+    # Instantiate our URL
+    obj = Apprise.instantiate(f"{workflows_url}?pa=yes")
+    assert isinstance(obj, NotifyWorkflows)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    assert request_mock.called is True
+    assert request_mock.call_args_list[0][0][0].startswith(
+        "https://host:443/powerautomate/automations/direct/"
+        "workflows/workflow/triggers/manual/paths/invoke"
+    )
+    payload = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "message",
+        "attachments": [
+            {
+                "contentType": "application/vnd.microsoft.card.adaptive",
+                "contentUrl": None,
+                "content": {
+                    "$schema": "http://adaptivecards.io/schemas/"
+                    "adaptive-card.json",
+                    "type": "AdaptiveCard",
+                    "version": "1.4",
+                    "body": [
+                        {
+                            "type": "Image",
+                            "url": "https://github.com/caronc/apprise/raw/"
+                            "master/apprise/assets/themes/default/"
+                            "apprise-info-32x32.png",
+                            "height": "32px",
+                            "altText": "info",
+                        }, {
+                            "type": "TextBlock",
+                            # Verify our Title is set
+                            "text": "title",
+                            "style": "heading",
+                            "weight": "Bolder",
+                            "size": "Large",
+                            "id": "title",
+                        }, {
+                            "type": "TextBlock",
+                            # Verify our Body is set
+                            "text": "body",
+                            "style": "default",
+                            "wrap": True,
+                            "id": "body",
+                        },
+                    ],
+                    "msteams": {
+                        "width": "full",
+                    },
+                },
+            },
+        ],
+    }
+
+
 def test_plugin_workflows_templating_basic_success(
     request_mock, workflows_url, tmpdir
 ):
