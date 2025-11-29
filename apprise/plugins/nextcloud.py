@@ -41,7 +41,7 @@ from .base import NotifyBase
 # Is Group Detection
 IS_GROUP = re.compile(
     r"^\s*((#|%23)(?P<group>[a-z0-9_-]+)|"
-    r"((#|%23)?(?P<all>all|everyone|[*])))\s*$",
+    r"((#|%23)?(?P<all>all|everyone|\*)))\s*$",
     re.I,
 )
 
