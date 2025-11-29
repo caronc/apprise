@@ -259,7 +259,7 @@ apprise_url_tests = (
             "requests_response_text": {
                 "status": 0,
             },
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -274,7 +274,7 @@ apprise_url_tests = (
                 "status": 0,
             },
             # Throws a series of connection and transfer exceptions when this
-            # flag is set and tests that we gracfully handle them
+            # flag is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
