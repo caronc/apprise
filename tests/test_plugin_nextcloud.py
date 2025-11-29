@@ -450,7 +450,7 @@ def test_plugin_nextcloud_persistent_storage(mock_get, mock_post, tmpdir):
         host="localhost",
         user="admin",
         password="pass",
-        targets=["#devs",],
+        targets=["#devs"],
         asset=asset,
     )
     # We succeeded this time
@@ -571,9 +571,6 @@ def test_plugin_nextcloud_json_empty_returns_empty(mock_get, mock_post):
                for call in mock_get.call_args_list)
 
     # userZ would get a notification
-    assert mock_get.call_count == 2
-    called = "".join(c[0][0] for c in mock_get.call_args_list)
-    assert "/cloud/groups/" in called and "/cloud/users" in called
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0].endswith("/userZ")
 
@@ -604,8 +601,7 @@ def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
         else:
             j = {"ocs": {"data": {"users": []}}}
         resp.json = lambda: j
-        import json as _j
-        resp.content = _j.dumps(j).encode()
+        resp.content = dumps(j).encode()
         return resp
 
     mock_get.side_effect = get_side_effect

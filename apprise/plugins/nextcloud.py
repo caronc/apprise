@@ -90,7 +90,7 @@ class NotifyNextcloud(NotifyBase):
     # Defines the maximum allowable characters per message.
     body_maxlen = 4000
 
-    # Our default is to no not use persistent storage beyond in-memory
+    # Our default is to not use persistent storage beyond in-memory
     # reference
     storage_mode = PersistentStoreMode.AUTO
 
@@ -285,15 +285,16 @@ class NotifyNextcloud(NotifyBase):
         if target:
             # Nextcloud URL based on version used
             query = f'v{self.version} Notify "{target}"'
+            esc_target = NotifyNextcloud.quote(target)
             url = (
                 f"{base}/ocs/v2.php/"
                 "apps/admin_notifications/"
-                f"api/v1/notifications/{target}"
+                f"api/v1/notifications/{esc_target}"
                 if self.version < 21
                 else (
                     f"{base}/ocs/v2.php/"
                     "apps/notifications/"
-                    f"api/v2/admin_notifications/{target}"
+                    f"api/v2/admin_notifications/{esc_target}"
                 )
             )
 
