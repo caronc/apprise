@@ -32,20 +32,20 @@ ENV container=docker
 
 # Basic build tooling and RPM stack
 RUN \
-	rm -f /lib/systemd/system/multi-user.target.wants/*;\
-	rm -f /etc/systemd/system/*.wants/*;\
-	rm -f /lib/systemd/system/local-fs.target.wants/*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-	rm -f /lib/systemd/system/basic.target.wants/*;\
-	rm -f /lib/systemd/system/anaconda.target.wants/*; \
-   echo "assumeyes=1" >> /etc/yum.conf; \
-   dnf -y update && \
-   dnf install -y epel-release; \
-   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
-                  dnf-plugins-core 'dnf-command(config-manager)' \
-                 'dnf-command(builddep)' sudo rsync rpmdevtools; \
-   dnf config-manager --set-enabled crb
+    rm -f /lib/systemd/system/multi-user.target.wants/*;\
+    rm -f /etc/systemd/system/*.wants/*;\
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*;\
+    rm -f /lib/systemd/system/anaconda.target.wants/*; \
+    echo "assumeyes=1" >> /etc/yum.conf; \
+    dnf -y update && \
+    dnf install -y epel-release; \
+    dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
+    dnf-plugins-core 'dnf-command(config-manager)' \
+    'dnf-command(builddep)' sudo rsync rpmdevtools; \
+    dnf config-manager --set-enabled crb
 
 # Place our build file into the path
 COPY bin/build-rpm.sh /usr/bin

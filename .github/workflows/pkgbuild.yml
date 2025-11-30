@@ -46,6 +46,8 @@ jobs:
         with:
           name: built-rpms-${{ matrix.dist }}
           path: ./dist/${{ matrix.dist }}
+          if-no-files-found: error
+          retention-days: 5
 
   verify:
     name: Verify RPMs (${{ matrix.dist }})

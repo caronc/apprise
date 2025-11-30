@@ -32,19 +32,19 @@ ENV container=docker
 
 # Basic build tooling and RPM stack
 RUN \
-	rm -f /lib/systemd/system/multi-user.target.wants/*;\
-	rm -f /etc/systemd/system/*.wants/*;\
-	rm -f /lib/systemd/system/local-fs.target.wants/*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
-	rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
-	rm -f /lib/systemd/system/basic.target.wants/*;\
-	rm -f /lib/systemd/system/anaconda.target.wants/*; \
-   echo "assumeyes=1" >> /etc/yum.conf; \
+    rm -f /lib/systemd/system/multi-user.target.wants/*;\
+    rm -f /etc/systemd/system/*.wants/*;\
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*;\
+    rm -f /lib/systemd/system/anaconda.target.wants/*; \
+    echo "assumeyes=1" >> /etc/yum.conf; \
     dnf -y update && \
     dnf install -y epel-release; \
     dnf install -y rpm-build python3-pip \
-                   dnf-plugins-core 'dnf-command(config-manager)' \
-                  'dnf-command(builddep)' sudo rsync rpmdevtools && \
+    dnf-plugins-core 'dnf-command(config-manager)' \
+    'dnf-command(builddep)' sudo rsync rpmdevtools && \
     dnf config-manager --set-enabled crb && \
     dnf -y install pyproject-rpm-macros rpmlint rubygem-ronn-ng && \
     dnf clean all
