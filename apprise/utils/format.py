@@ -140,7 +140,7 @@ def smart_split(
     """
 
     if not text or limit <= 0:
-        return [text]
+        return [""]
 
     result: list[str] = []
     start = 0
