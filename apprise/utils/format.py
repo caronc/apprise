@@ -34,7 +34,7 @@ from apprise.common import NotifyFormat
 # Characters we can apply a new line to if found
 PUNCTUATION_CHARS = ".!?:;"
 PUNCT_SPLIT_PATTERN = re.compile(
-    f"[{re.escape(PUNCTUATION_CHARS)}][ \t\r\n]+"
+    f"[{re.escape(PUNCTUATION_CHARS)}][ \t\r\n\x0b\x0c]+"
 )
 
 # Support HTML entities (&...;)
@@ -146,7 +146,7 @@ def smart_split(
     start = 0
     length = len(text)
 
-    while start < length:
+    while start < length:   # pragma: no branch
         remaining = length - start
         if remaining <= limit:
             result.append(text[start:])

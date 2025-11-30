@@ -351,3 +351,22 @@ def test_smart_split_markdown_guard_split_at_start_is_reset() -> None:
 
     # Re-joining all chunks must restore the original text
     assert "".join(chunks) == text
+
+
+def test_smart_split_uses_punctuation_branch_on_rare_whitespace() -> None:
+    """
+    When punctuation is followed by rare whitespace (vertical tab / form feed)
+    and there are no spaces/tabs/newlines, we should use the punctuation
+    + whitespace split branch.
+    """
+    vt = "\x0b"  # vertical tab
+    text = f"Hello.{vt}World"
+    # Window includes 'Hello.' and the VT
+    limit = len("Hello.") + 1
+
+    chunks = smart_split(text, limit, body_format=NotifyFormat.TEXT)
+
+    assert "".join(chunks) == text
+    # We expect the first chunk to end after the rare whitespace
+    assert chunks[0] == f"Hello.{vt}"
+    assert chunks[1] == "World"
