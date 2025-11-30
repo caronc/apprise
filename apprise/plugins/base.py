@@ -46,6 +46,7 @@ from ..common import (
 from ..locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
+from ..utils.format import smart_split
 from ..utils.parse import parse_bool
 from ..utils.time import zoneinfo
 
@@ -582,38 +583,30 @@ class NotifyBase(URLBase):
         overflow: Optional[Union[str, OverflowMode]] = None,
         body_format: Optional[NotifyFormat] = None,
     ) -> list[dict[str, str]]:
-        """Takes the message body and title as input.  This function then
-        applies any defined overflow restrictions associated with the
-        notification service and may alter the message if/as required.
-
-        The function will always return a list object in the following
-        structure:
-            [
-                {
-                    title: 'the title goes here',
-                    body: 'the message body goes here',
-                },
-                {
-                    title: 'the title goes here',
-                    body: 'the continued message body goes here',
-                },
-
-            ]
         """
+        Apply overflow behaviour (UPSTREAM, TRUNCATE, SPLIT) to title/body.
 
-        response = []
+        This preserves the legacy policy (title amalgamation, counters,
+        title-once vs repeated title) but uses smart_split() instead of naive
+        fixed-width slicing for SPLIT mode.
+        """
+        response: list[dict[str, str]] = []
 
-        # tidy
+        # Tidy
         title = "" if not title else title.strip()
         body = "" if not body else body.rstrip()
 
+        # Default overflow mode
         if overflow is None:
-            # default
             overflow = self.overflow_mode
 
+        # Default effective body format
+        if body_format is None:
+            body_format = self.notify_format
+
+        # If the service does not support a title, amalgamate into body
         if self.title_maxlen <= 0 and len(title) > 0:
             if self.notify_format == NotifyFormat.HTML:
-                # Content is appended to body as html
                 body = (
                     f"<{self.default_html_tag_id}>{title}"
                     f"</{self.default_html_tag_id}>"
@@ -624,32 +617,27 @@ class NotifyBase(URLBase):
                 self.notify_format == NotifyFormat.MARKDOWN
                 and body_format == NotifyFormat.TEXT
             ):
-                # Content is appended to body as markdown
+                # Preserve legacy behaviour: convert title to Markdown heading
                 title = title.lstrip("\r\n \t\v\f#-")
                 if title:
-                    # Content is appended to body as text
                     body = f"# {title}\r\n{body}"
 
             else:
-                # Content is appended to body as text
                 body = f"{title}\r\n{body}"
 
             title = ""
 
-        # Enforce the line count first always
+        # Enforce line count
         if self.body_max_line_count > 0:
-            # Limit results to just the first 2 line otherwise
-            # there is just to much content to display
-            body = re.split(r"\r*\n", body)
-            body = "\r\n".join(body[0 : self.body_max_line_count])
+            lines = re.split(r"\r*\n", body)
+            body = "\r\n".join(lines[0 : self.body_max_line_count])
 
+        # UPSTREAM mode: do not touch content
         if overflow == OverflowMode.UPSTREAM:
-            # Nothing more to do
             response.append({"body": body, "title": title})
             return response
 
-        # a value of '2' allows for the \r\n that is applied when
-        # amalgamating the title
+        # a value of '2' allows for the \r\n that is applied when amalgamating
         overflow_buffer = (
             max(2, self.overflow_buffer)
             if (self.title_maxlen == 0 and len(title))
@@ -657,12 +645,10 @@ class NotifyBase(URLBase):
         )
 
         #
-        # If we reach here in our code, then we're using TRUNCATE, or SPLIT
-        # actions which require some math to handle the data
+        # TRUNCATE and SPLIT require sizing logic
         #
 
-        # Handle situations where our body and title are amalamated into one
-        # calculation
+        # Handle situations where body and title are amalgamated
         title_maxlen = (
             self.title_maxlen
             if not self.overflow_amalgamate_title
@@ -674,9 +660,9 @@ class NotifyBase(URLBase):
         )
 
         if len(title) > title_maxlen:
-            # Truncate our Title
             title = title[:title_maxlen].rstrip()
 
+        # Compute body_maxlen as per legacy logic
         if (
             self.overflow_amalgamate_title
             and (self.body_maxlen - overflow_buffer) >= title_maxlen
@@ -687,60 +673,58 @@ class NotifyBase(URLBase):
                 else (self.body_maxlen - title_maxlen)
             ) - overflow_buffer
         else:
-            # status quo
             body_maxlen = (
                 self.body_maxlen
                 if not self.overflow_amalgamate_title
                 else (self.body_maxlen - overflow_buffer)
             )
 
+        # If the body fits, we are done
         if body_maxlen > 0 and len(body) <= body_maxlen:
             response.append({"body": body, "title": title})
             return response
 
+        # TRUNCATE mode: legacy hard truncation (no smart-splitting)
         if overflow == OverflowMode.TRUNCATE:
-            # Truncate our body and return
             response.append({
                 "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
                 "title": title,
             })
-            # For truncate mode, we're done now
             return response
 
+        #
+        # SPLIT mode
+        #
+
+        # Detect if we only display our title once or not (legacy logic)
         if self.overflow_display_title_once is None:
-            # Detect if we only display our title once or not:
             overflow_display_title_once = bool(
                 self.overflow_amalgamate_title
                 and body_maxlen < self.overflow_display_count_threshold
             )
         else:
-            # Take on defined value
-
             overflow_display_title_once = self.overflow_display_title_once
 
-        # If we reach here, then we are in SPLIT mode.
-        # For here, we want to split the message as many times as we have to
-        # in order to fit it within the designated limits.
+        # SPLIT mode with repeated title (with/without counter)
         if not overflow_display_title_once and not (
-            # edge case that can occur when overflow_display_title_once is
-            # forced off, but no body exists
+            # edge case: amalgamated title but no body space
             self.overflow_amalgamate_title
             and body_maxlen <= 0
         ):
-
+            # Decide whether to show a counter (legacy condition)
             show_counter = (
                 title
                 and len(body) > body_maxlen
                 and (
                     (
                         self.overflow_amalgamate_title
-                        and body_maxlen
-                        >= self.overflow_display_count_threshold
+                        and body_maxlen >=
+                        self.overflow_display_count_threshold
                     )
                     or (
                         not self.overflow_amalgamate_title
-                        and title_maxlen
-                        > self.overflow_display_count_threshold
+                        and title_maxlen >
+                        self.overflow_display_count_threshold
                     )
                 )
                 and (
@@ -751,100 +735,99 @@ class NotifyBase(URLBase):
                 )
             )
 
-            count = 0
+            effective_body_maxlen = body_maxlen
+            if show_counter:
+                # introduce padding for the counter
+                effective_body_maxlen -= overflow_buffer
+
+            # Use smart splitting instead of naive slicing
+            chunks = smart_split(
+                body,
+                effective_body_maxlen,
+                body_format,
+            )
+            count = len(chunks)
+
             template = ""
             if show_counter:
-                # introduce padding
-                body_maxlen -= overflow_buffer
-
-                count = int(len(body) / body_maxlen) + (
-                    1 if len(body) % body_maxlen else 0
-                )
-
-                # Detect padding and prepare template
                 digits = len(str(count))
-                template = f" [{{:0{digits}d}}/{{:0{digits}d}}]"
-
-                # Update our counter
                 overflow_display_count_width = 4 + (digits * 2)
+
                 if (
                     overflow_display_count_width
                     <= self.overflow_max_display_count_width
                 ):
+                    # Truncate title further if needed to make room for counter
                     if (
                         len(title)
                         > title_maxlen - overflow_display_count_width
                     ):
-                        # Truncate our title further
                         title = title[
                             : title_maxlen - overflow_display_count_width
                         ]
-
-                else:  # Way to many messages to display
+                    template = f" [{{:0{digits}d}}/{{:0{digits}d}}]"
+                else:
+                    # Too many messages; fall back to repeated title without
+                    # counter displayed
                     show_counter = False
 
-            response = [
-                {
-                    "body": (
-                        body[i : i + body_maxlen]
-                        .lstrip("\r\n\x0b\x0c")
-                        .rstrip()
-                    ),
-                    "title": (
-                        title
-                        + (
-                            ""
-                            if not show_counter
-                            else template.format(idx, count)
-                        )
-                    ),
-                }
-                for idx, i in enumerate(
-                    range(0, len(body), body_maxlen), start=1
-                )
-            ]
-
-        else:  # Display title once and move on
             response = []
-            try:
-                i = range(0, len(body), body_maxlen)[0]
+            for idx, chunk_body in enumerate(chunks, start=1):
+                suffix = template.format(idx, count) if show_counter else ""
+                response.append({
+                    "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
+                    "title": f"{title}{suffix}",
+                })
+
+        else:
+            #
+            # SPLIT mode, display title once and move on
+            # (this covers both overflow_display_title_once=True
+            #  and the edge case body_maxlen <= 0 with amalgamated title)
+            #
+            response = []
+            consumed = 0
+            remainder = body
+
+            if body_maxlen > 0 and body:
+                # First chunk uses body_maxlen (which already accounts for
+                # the title)
+                first_chunks = smart_split(
+                    body,
+                    body_maxlen,
+                    body_format,
+                )
+                first_body = first_chunks[0] if first_chunks else ""
+                consumed = len(first_body)
+                remainder = body[consumed:]
 
                 response.append({
-                    "body": (
-                        body[i : i + body_maxlen]
-                        .lstrip("\r\n\x0b\x0c")
-                        .rstrip()
-                    ),
+                    "body": first_body.lstrip("\r\n\x0b\x0c").rstrip(),
                     "title": title,
                 })
 
-            except (ValueError, IndexError):
-                # IndexError:
-                #  - This happens if there simply was no body to display
-
-                # ValueError:
-                #  - This happens when body_maxlen < 0 (due to title being
-                #    so large)
-
-                # No worries; send title along
+            else:
+                # body_maxlen <= 0 or no body; send title only, still honouring
+                # body
                 response.append({
                     "body": "",
                     "title": title,
                 })
+                # remainder stays as full body; will be split below
 
-                # Ensure our start is set properly
-                body_maxlen = 0
-
-            # Now re-calculate based on the increased length
-            for i in range(body_maxlen, len(body), self.body_maxlen):
-                response.append({
-                    "body": (
-                        body[i : i + self.body_maxlen]
-                        .lstrip("\r\n\x0b\x0c")
-                        .rstrip()
-                    ),
-                    "title": "",
-                })
+            # Remaining chunks: no title, use the full body_maxlen of the
+            # service
+            if remainder:
+                more_chunks = smart_split(
+                    remainder,
+                    self.body_maxlen,
+                    body_format,
+                )
+                for chunk_body in more_chunks:
+                    response.append({
+                        "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
+                        "title": "",
+                    })
 
         return response
 

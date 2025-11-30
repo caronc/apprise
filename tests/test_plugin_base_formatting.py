@@ -47,6 +47,31 @@ from apprise import (
 logging.disable(logging.CRITICAL)
 
 
+def assert_body(
+    source: str,
+    offset: int,
+    chunk_body: str,
+) -> int:
+    """
+    Assert that `chunk_body` comes from `source` starting at `offset`,
+    accounting for leading/trailing vertical whitespace that _apply_overflow
+    trims away. Returns the updated offset.
+    """
+    segment = source[offset : offset + len(chunk_body)]
+    ws_diff = len(segment) - len(
+        segment.lstrip("\r\n\x0b\x0c").rstrip()
+    )
+
+    assert (
+        source[offset : offset + len(chunk_body) + ws_diff]
+        .lstrip("\r\n\x0b\x0c")
+        .rstrip()
+        == chunk_body
+    )
+
+    return offset + len(chunk_body) + ws_diff
+
+
 def test_notify_overflow_truncate_with_amalgamation():
     """
     API: Overflow With Amalgamation Truncate Functionality Testing
@@ -648,8 +673,8 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -667,12 +692,11 @@ def test_notify_overflow_split_with_amalgamation():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
     # a lot of space for the [xx/xx] entries (no truncation needed)
@@ -680,9 +704,9 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title[:20])
-    offset = 0
     c_len = len(" [X/X]")
-    assert len(chunks) == 5
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -691,13 +715,13 @@ def test_notify_overflow_split_with_amalgamation():
         # Our title has a counter added to it
         assert title[:20] == chunk.get("title")[:-c_len]
         assert chunk.get("title")[-c_len:] == f" [{idx:01}/{len(chunks):01}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     #
     # Test forcing overflow_display_title_once
@@ -731,8 +755,8 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -748,12 +772,11 @@ def test_notify_overflow_split_with_amalgamation():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Test larger messages
     # and that the body remains untouched
@@ -784,9 +807,9 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
     c_len = len(" [XXXX/XXXX]")
-    assert len(chunks) == 2048
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -799,23 +822,11 @@ def test_notify_overflow_split_with_amalgamation():
         assert chunk.get("title")[-c_len:] == f" [{idx:04}/{len(chunks):04}]"
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
     new_body = body * 2500
@@ -823,8 +834,8 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 10240
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -834,23 +845,11 @@ def test_notify_overflow_split_with_amalgamation():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Test larger messages
     # and that the body remains untouched
@@ -881,8 +880,8 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 36
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -898,23 +897,11 @@ def test_notify_overflow_split_with_amalgamation():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Next Test: Append title to body + split body
@@ -972,22 +959,13 @@ def test_notify_overflow_split_with_amalgamation():
 
         # Our title is empty every time
         assert chunk.get("title") == ""
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(bulk[offset : len(_body) + offset]) - len(
-            bulk[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            bulk,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            bulk[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Test case where our title_len is shorter then the value
@@ -1022,8 +1000,8 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 7
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1033,21 +1011,11 @@ def test_notify_overflow_split_with_amalgamation():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Scenario where the title length is larger than the body
@@ -1081,8 +1049,8 @@ def test_notify_overflow_split_with_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 22
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1099,21 +1067,11 @@ def test_notify_overflow_split_with_amalgamation():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
 
 def test_notify_overflow_split_with_amalgamation_force_title_always():
@@ -1253,8 +1211,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1272,12 +1230,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
     # a lot of space for the [xx/xx] entries (no truncation needed)
@@ -1296,13 +1253,13 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
         # Our title has a counter added to it
         assert title[:20] == chunk.get("title")[:-c_len]
         assert chunk.get("title")[-c_len:] == f" [{idx:01}/{len(chunks):01}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     #
     # Test forcing overflow_display_title_once
@@ -1336,8 +1293,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1353,12 +1310,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Test larger messages
     # and that the body remains untouched
@@ -1392,9 +1348,9 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
     c_len = len(" [XXXX/XXXX]")
-    assert len(chunks) == 2048
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1407,23 +1363,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
         assert chunk.get("title")[-c_len:] == f" [{idx:04}/{len(chunks):04}]"
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
     new_body = body * 2500
@@ -1431,8 +1375,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 10240
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1442,23 +1386,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Test larger messages
     # and that the body remains untouched
@@ -1492,11 +1424,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
+
     # overflow_display_title_once whle set to False is still ignored
     # because our title_maxlen > body_maxlen and a full title was
     # provided
-    assert len(chunks) == 36
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1512,30 +1444,17 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     chunks = obj._apply_overflow(body=new_body, title=title)
     offset = 0
     # overflow_display_title_once whle set to False is still ignored
     # because our title_maxlen > body_maxlen and a full title was
     # provided
-    assert len(chunks) == 36
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1551,34 +1470,21 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Run again but with a smaller title
     #
     chunks = obj._apply_overflow(body=new_body, title=title[:30])
-    offset = 0
     # overflow_display_title_once whle set to False is still ignored
     # because our body_maxlen (after title has been calculated with it)
     # is less then the overflow_display_count_threshold; hence a message
     # must be a certain minimum size in order to kick in
-    assert len(chunks) == 48
+    offset = 0
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1589,21 +1495,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
         assert title[:30] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset].rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Next Test: Append title to body + split body
@@ -1664,22 +1560,13 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
 
         # Our title is empty every time
         assert chunk.get("title") == ""
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(bulk[offset : len(_body) + offset]) - len(
-            bulk[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            bulk,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            bulk[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Test case where our title_len is shorter then the value
@@ -1717,8 +1604,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 7
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1728,21 +1615,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Scenario where the title length is larger than the body
@@ -1779,12 +1656,12 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
 
     # overflow_display_title_once whle set to False is still ignored
     # because our title_maxlen > body_maxlen and a full title was
     # provided
-    assert len(chunks) == 22
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1801,21 +1678,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_always():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
 
 def test_notify_overflow_split_with_amalgamation_force_title_once():
@@ -1955,8 +1822,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -1974,12 +1841,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
     # a lot of space for the [xx/xx] entries (no truncation needed)
@@ -2005,12 +1871,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[:20] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     #
     # Test forcing overflow_display_title_once
@@ -2044,8 +1909,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2061,12 +1926,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Test larger messages
     # and that the body remains untouched
@@ -2100,8 +1964,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 1281
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2115,25 +1979,12 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             # The body length prevails due to our amalgamation flag
             assert len(chunk.get("title")) == obj.title_maxlen
             assert title[: obj.title_maxlen] == chunk.get("title")
-
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
     new_body = body * 2500
@@ -2141,8 +1992,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 6401
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2158,23 +2009,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Test larger messages
     # and that the body remains untouched
@@ -2208,8 +2047,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 36
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2225,23 +2064,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Next Test: Append title to body + split body
@@ -2302,22 +2129,13 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
 
         # Our title is empty every time
         assert chunk.get("title") == ""
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(bulk[offset : len(_body) + offset]) - len(
-            bulk[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            bulk,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            bulk[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Test case where our title_len is shorter then the value
@@ -2355,8 +2173,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2372,21 +2190,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Scenario where the title length is larger than the body
@@ -2423,8 +2231,8 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 22
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2441,21 +2249,11 @@ def test_notify_overflow_split_with_amalgamation_force_title_once():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
 
 def test_notify_overflow_split_no_amalgamation():
@@ -2586,9 +2384,9 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
-    offset = 0
     c_len = len(" [X/X]")
-    assert len(chunks) == 4
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2597,13 +2395,13 @@ def test_notify_overflow_split_no_amalgamation():
         # Our title has a counter added to it
         assert title[:-c_len] == chunk.get("title")[:-c_len]
         assert chunk.get("title")[-c_len:] == f" [{idx:01}/{len(chunks):01}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
     # a lot of space for the [xx/xx] entries (no truncation needed)
@@ -2611,8 +2409,8 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title[:20])
+
     offset = 0
-    assert len(chunks) == 4
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2621,13 +2419,13 @@ def test_notify_overflow_split_no_amalgamation():
         # Our title has a counter added to it
         assert title[:20] == chunk.get("title")[:-c_len]
         assert chunk.get("title")[-c_len:] == f" [{idx:01}/{len(chunks):01}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Test larger messages
     # and that the body remains untouched
@@ -2658,9 +2456,9 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
     c_len = len(" [XXXX/XXXX]")
-    assert len(chunks) == 1280
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2670,24 +2468,13 @@ def test_notify_overflow_split_no_amalgamation():
             title[: obj.title_maxlen][:-c_len] == chunk.get("title")[:-c_len]
         )
         assert chunk.get("title")[-c_len:] == f" [{idx:04}/{len(chunks):04}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
     new_body = body * 4500
@@ -2695,8 +2482,8 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 11520
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2704,24 +2491,13 @@ def test_notify_overflow_split_no_amalgamation():
 
         # Our title has no counter added to it
         assert title[: obj.title_maxlen] == chunk.get("title")
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Test larger messages
     # and that the body remains untouched
@@ -2752,9 +2528,9 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
-    assert len(chunks) == 35
     c_len = len(" [XX/XX]")
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2765,24 +2541,13 @@ def test_notify_overflow_split_no_amalgamation():
             title[: obj.title_maxlen][:-c_len] == chunk.get("title")[:-c_len]
         )
         assert chunk.get("title")[-c_len:] == f" [{idx:02}/{len(chunks):02}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Next Test: Append title to body + split body
@@ -2842,21 +2607,11 @@ def test_notify_overflow_split_no_amalgamation():
         assert chunk.get("title") == ""
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(bulk[offset : len(_body) + offset]) - len(
-            bulk[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            bulk,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            bulk[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Test case where our title_len is shorter then the value
@@ -2891,8 +2646,8 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 4
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2902,12 +2657,11 @@ def test_notify_overflow_split_no_amalgamation():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     #
     # Scenario where the title length is larger than the body
@@ -2941,8 +2695,8 @@ def test_notify_overflow_split_no_amalgamation():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 21
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -2952,21 +2706,11 @@ def test_notify_overflow_split_no_amalgamation():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
 
 def test_notify_overflow_split_no_amalgamation_force_title_always():
@@ -3106,9 +2850,9 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
-    offset = 0
     c_len = len(" [X/X]")
-    assert len(chunks) == 4
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3117,13 +2861,13 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
         # Our title has a counter added to it
         assert title[:-c_len] == chunk.get("title")[:-c_len]
         assert chunk.get("title")[-c_len:] == f" [{idx:01}/{len(chunks):01}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
     # a lot of space for the [xx/xx] entries (no truncation needed)
@@ -3131,8 +2875,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title[:20])
+
     offset = 0
-    assert len(chunks) == 4
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3141,13 +2885,13 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
         # Our title has a counter added to it
         assert title[:20] == chunk.get("title")[:-c_len]
         assert chunk.get("title")[-c_len:] == f" [{idx:01}/{len(chunks):01}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Test larger messages
     # and that the body remains untouched
@@ -3181,9 +2925,9 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
     c_len = len(" [XXXX/XXXX]")
-    assert len(chunks) == 1280
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3193,24 +2937,13 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
             title[: obj.title_maxlen][:-c_len] == chunk.get("title")[:-c_len]
         )
         assert chunk.get("title")[-c_len:] == f" [{idx:04}/{len(chunks):04}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
     new_body = body * 4500
@@ -3218,8 +2951,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 11520
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3227,24 +2960,13 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
 
         # Our title has no counter added to it
         assert title[: obj.title_maxlen] == chunk.get("title")
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Test larger messages
     # and that the body remains untouched
@@ -3278,9 +3000,9 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
-    offset = 0
-    assert len(chunks) == 35
     c_len = len(" [XX/XX]")
+
+    offset = 0
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3291,24 +3013,13 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
             title[: obj.title_maxlen][:-c_len] == chunk.get("title")[:-c_len]
         )
         assert chunk.get("title")[-c_len:] == f" [{idx:02}/{len(chunks):02}]"
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Next Test: Append title to body + split body
@@ -3371,21 +3082,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
         assert chunk.get("title") == ""
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(bulk[offset : len(_body) + offset]) - len(
-            bulk[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            bulk,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            bulk[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Test case where our title_len is shorter then the value
@@ -3423,8 +3124,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 4
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3434,12 +3135,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     #
     # Scenario where the title length is larger than the body
@@ -3476,8 +3176,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 21
     for _idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3487,21 +3187,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_always():
         assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
 
 def test_notify_overflow_split_no_amalgamation_force_title_once():
@@ -3641,8 +3331,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3660,12 +3350,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Another edge case where the title just isn't that long leaving
     # a lot of space for the [xx/xx] entries (no truncation needed)
@@ -3674,7 +3363,6 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title[:20])
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3692,12 +3380,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[:20] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     #
     # Test forcing overflow_display_title_once
@@ -3732,7 +3419,6 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3748,12 +3434,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-        assert (
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
-            == _body
+        offset = assert_body(
+            body,
+            offset,
+            chunk.get("body"),
         )
-        offset += len(_body)
 
     # Test larger messages
     # and that the body remains untouched
@@ -3787,8 +3472,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 1281
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3806,23 +3491,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Body chunk is beyond 4 digits, so [XXXX/XXXX] is turned off
     new_body = body * 2500
@@ -3830,8 +3503,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
+
     offset = 0
-    assert len(chunks) == 6401
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3849,23 +3522,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     # Test larger messages
     # and that the body remains untouched
@@ -3900,7 +3561,6 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body=new_body, title="")
     chunks = obj._apply_overflow(body=new_body, title=title)
     offset = 0
-    assert len(chunks) == 36
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -3916,23 +3576,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(new_body[offset : len(_body) + offset]) - len(
-            new_body[offset : len(_body) + offset]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            new_body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Next Test: Append title to body + split body
@@ -3993,22 +3641,13 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
 
         # Our title is empty every time
         assert chunk.get("title") == ""
+
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(bulk[offset : len(_body) + offset]) - len(
-            bulk[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            bulk,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            bulk[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Test case where our title_len is shorter then the value
@@ -4046,8 +3685,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 5
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -4065,21 +3704,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.title_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
     #
     # Scenario where the title length is larger than the body
@@ -4116,8 +3745,8 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
     chunks = obj._apply_overflow(body="", title="")
     chunks = obj._apply_overflow(body=body, title="")
     chunks = obj._apply_overflow(body=body, title=title)
+
     offset = 0
-    assert len(chunks) == 22
     for idx, chunk in enumerate(chunks, start=1):
         # Verification
         assert len(chunk.get("title")) <= obj.title_maxlen
@@ -4134,21 +3763,11 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
             assert title[: obj.body_maxlen] == chunk.get("title")
 
         # Our body is only broken up; not lost
-        _body = chunk.get("body")
-
-        # Un-used whitespace is always cleaned up; make sure we account for
-        # this in our new calculation
-        ws_diff = len(body[offset : len(_body) + offset]) - len(
-            body[offset : len(_body) + offset].lstrip("\r\n\x0b\x0c").rstrip()
+        offset = assert_body(
+            new_body,
+            offset,
+            chunk.get("body"),
         )
-
-        assert (
-            body[offset : len(_body) + offset + ws_diff]
-            .lstrip("\r\n\x0b\x0c")
-            .rstrip()
-            == _body
-        )
-        offset += len(_body) + ws_diff
 
 
 def test_notify_markdown_general():
