@@ -586,9 +586,21 @@ class NotifyBase(URLBase):
         """
         Apply overflow behaviour (UPSTREAM, TRUNCATE, SPLIT) to title/body.
 
-        This preserves the legacy policy (title amalgamation, counters,
-        title-once vs repeated title) but uses smart_split() instead of naive
-        fixed-width slicing for SPLIT mode.
+        Takes the message body and title as input.  This function then
+        applies any defined overflow restrictions associated with the
+        notification service and may alter the message if/as required.
+        The function will always return a list object in the following
+        structure:
+            [
+                {
+                    title: 'the title goes here',
+                    body: 'the message body goes here',
+                },
+                {
+                    title: 'the title goes here',
+                    body: 'the continued message body goes here',
+                },
+            ]
         """
         response: list[dict[str, str]] = []
 
@@ -617,7 +629,7 @@ class NotifyBase(URLBase):
                 self.notify_format == NotifyFormat.MARKDOWN
                 and body_format == NotifyFormat.TEXT
             ):
-                # Preserve legacy behaviour: convert title to Markdown heading
+                # Content is appended to body as markdown
                 title = title.lstrip("\r\n \t\v\f#-")
                 if title:
                     body = f"# {title}\r\n{body}"
@@ -660,6 +672,7 @@ class NotifyBase(URLBase):
         )
 
         if len(title) > title_maxlen:
+            # Truncate our title
             title = title[:title_maxlen].rstrip()
 
         # Compute body_maxlen as per legacy logic
@@ -667,12 +680,14 @@ class NotifyBase(URLBase):
             self.overflow_amalgamate_title
             and (self.body_maxlen - overflow_buffer) >= title_maxlen
         ):
+            # status quo
             body_maxlen = (
                 self.body_maxlen
                 if not title
                 else (self.body_maxlen - title_maxlen)
             ) - overflow_buffer
         else:
+            # If the body fits, we're done
             body_maxlen = (
                 self.body_maxlen
                 if not self.overflow_amalgamate_title
@@ -684,7 +699,7 @@ class NotifyBase(URLBase):
             response.append({"body": body, "title": title})
             return response
 
-        # TRUNCATE mode: legacy hard truncation (no smart-splitting)
+        # TRUNCATE mode: hard truncation (no smart-splitting)
         if overflow == OverflowMode.TRUNCATE:
             response.append({
                 "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
@@ -698,6 +713,7 @@ class NotifyBase(URLBase):
 
         # Detect if we only display our title once or not (legacy logic)
         if self.overflow_display_title_once is None:
+            # Detect if we only display our title once or not:
             overflow_display_title_once = bool(
                 self.overflow_amalgamate_title
                 and body_maxlen < self.overflow_display_count_threshold
@@ -728,10 +744,10 @@ class NotifyBase(URLBase):
                     )
                 )
                 and (
-                    title_maxlen
-                    > (self.overflow_max_display_count_width + overflow_buffer)
-                    and self.title_maxlen
-                    >= self.overflow_display_count_threshold
+                    title_maxlen >
+                    (self.overflow_max_display_count_width + overflow_buffer)
+                    and self.title_maxlen >=
+                    self.overflow_display_count_threshold
                 )
             )
 
