@@ -1,5 +1,5 @@
 #
-# Verify on CI/GHA that package building works.
+# Verify on CI/GHA that RPM package building works.
 #
 name: RPM Packaging
 
@@ -13,11 +13,16 @@ on:
 jobs:
 
   build:
-    name: Build RPMs
+    name: Build RPMs (${{ matrix.dist }})
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        dist: [el9, el10]
+
     container:
-      image: ghcr.io/caronc/apprise-rpmbuild:el9
+      image: ghcr.io/caronc/apprise-rpmbuild:${{ matrix.dist }}
       options: --user root
 
     steps:
@@ -28,46 +33,50 @@ jobs:
         run: ./bin/build-rpm.sh
         env:
           APPRISE_DIR: ${{ github.workspace }}
+          # Drop RPMs into dist/<dist> inside the workspace
+          DIST_DIR: ${{ github.workspace }}/dist/${{ matrix.dist }}
 
       - name: Show RPMs found for upload
         run: |
-          echo "Listing dist/**/*.rpm:"
-          find dist -type f -name '*.rpm'
+          echo "Listing dist/${{ matrix.dist }}/**/*.rpm:"
+          find dist/${{ matrix.dist }} -type f -name '*.rpm'
 
       - name: Upload RPM Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: built-rpms
-          path: |
-            dist/rpm/*/*.rpm
-          if-no-files-found: error
-          retention-days: 5
+          name: built-rpms-${{ matrix.dist }}
+          path: ./dist/${{ matrix.dist }}
 
   verify:
-    name: Verify RPMs
+    name: Verify RPMs (${{ matrix.dist }})
     needs: build
     runs-on: ubuntu-latest
 
+    strategy:
+      fail-fast: false
+      matrix:
+        dist: [el9, el10]
+
     container:
-      image: ghcr.io/caronc/apprise-rpmbuild:el9
+      image: ghcr.io/caronc/apprise-rpmbuild:${{ matrix.dist }}
       options: --user root
 
     steps:
       - name: Download built RPMs
         uses: actions/download-artifact@v4
         with:
-          name: built-rpms
+          name: built-rpms-${{ matrix.dist }}
           path: ./dist
 
       - name: Lint RPMs
         run: rpmlint ./dist/**/*.rpm
-      
+
       - name: Install and verify RPMs
         run: |
           echo "Installing RPMs from: ./dist/"
           find ./dist -name '*.rpm'
           dnf install -y ./dist/**/*.rpm
           apprise --version
-      
+
       - name: Check Installed Files
         run: rpm -qlp ./dist/**/*.rpm

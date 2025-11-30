@@ -27,7 +27,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Base
-FROM rockylinux/rockylinux:9
+FROM rockylinux/rockylinux:10
 ENV container=docker
 
 # Basic build tooling and RPM stack
@@ -40,12 +40,14 @@ RUN \
 	rm -f /lib/systemd/system/basic.target.wants/*;\
 	rm -f /lib/systemd/system/anaconda.target.wants/*; \
    echo "assumeyes=1" >> /etc/yum.conf; \
-   dnf -y update && \
-   dnf install -y epel-release; \
-   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
-                  dnf-plugins-core 'dnf-command(config-manager)' \
-                 'dnf-command(builddep)' sudo rsync rpmdevtools; \
-   dnf config-manager --set-enabled crb
+    dnf -y update && \
+    dnf install -y epel-release; \
+    dnf install -y rpm-build python3-pip \
+                   dnf-plugins-core 'dnf-command(config-manager)' \
+                  'dnf-command(builddep)' sudo rsync rpmdevtools && \
+    dnf config-manager --set-enabled crb && \
+    dnf -y install pyproject-rpm-macros rpmlint rubygem-ronn-ng && \
+    dnf clean all
 
 # Place our build file into the path
 COPY bin/build-rpm.sh /usr/bin
@@ -53,8 +55,9 @@ COPY packaging/redhat/python-apprise.spec /
 RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y && dnf clean all
 
-# RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=el9
+# RPM build structure setup
+ENV FLAVOR=rpmbuild OS=centos DIST=el10
+
 RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
     echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 
