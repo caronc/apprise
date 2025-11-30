@@ -589,6 +589,7 @@ class NotifyBase(URLBase):
         Takes the message body and title as input.  This function then
         applies any defined overflow restrictions associated with the
         notification service and may alter the message if/as required.
+
         The function will always return a list object in the following
         structure:
             [
