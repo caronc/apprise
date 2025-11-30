@@ -25,7 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 from apprise import NotifyFormat
-from apprise.utils.format import smart_split
+from apprise.utils.format import html_adjust, markdown_adjust, smart_split
 
 
 def test_smart_split_prefers_newlines_over_spaces_and_punctuation():
@@ -262,4 +262,92 @@ def test_smart_split_very_long_limit() -> None:
     chunks = smart_split(text, 10_000, body_format=NotifyFormat.TEXT)
 
     assert chunks == [text]
+    assert "".join(chunks) == text
+
+
+def test_html_adjust_guard_paths_and_no_entity() -> None:
+    """
+    Cover the early-return guard in html_adjust and the path where there is
+    no '&' at all in the search window.
+    """
+    text = "abcdef"
+
+    # split_at <= window_start -> early-return unchanged
+    assert html_adjust(text, window_start=2, split_at=2) == 2
+
+    # split_at beyond the end of the text -> early-return unchanged
+    assert html_adjust(
+        text, window_start=0, split_at=len(text) + 5) == len(text) + 5
+
+    # No '&' in window, nothing to adjust
+    assert html_adjust(text, window_start=0, split_at=3) == 3
+
+
+def test_html_adjust_inside_and_at_boundary_of_entity() -> None:
+    """
+    Exercise the path where html_adjust moves the split back to '&' when the
+    split falls inside an entity, and the path where the split is exactly at
+    the entity boundary and should not move.
+    """
+    text = "1234&nbsp;5678"
+    # indexes: 0..3 '1234', 4 '&', 5 'n', 6 'b', 7 's', 8 'p', 9 ';', 10 '5'...
+
+    # Split inside '&nbsp;' (at index 8) -> move back to '&' (index 4)
+    assert html_adjust(text, window_start=0, split_at=8) == 4
+
+    # Split exactly after the ';' (index 10) -> already outside entity
+    assert html_adjust(text, window_start=0, split_at=10) == 10
+
+
+def test_markdown_adjust_guard_and_no_construct() -> None:
+    """
+    Cover the guard in markdown_adjust and the case where there is no
+    '[' or '!' in the window.
+    """
+    text = "plain text"
+
+    # split_at <= window_start -> early-return unchanged
+    assert markdown_adjust(text, window_start=4, split_at=4) == 4
+
+    # split_at past the end -> early-return unchanged
+    assert markdown_adjust(
+        text, window_start=0, split_at=len(text) + 3) == len(text) + 3
+
+    # No markdown constructs -> nothing to adjust
+    assert markdown_adjust(text, window_start=0, split_at=5) == 5
+
+
+def test_markdown_adjust_inside_construct_moves_to_start() -> None:
+    """
+    Exercise the positive path in markdown_adjust where the split lands
+    inside a [text](url) construct and the function moves the split
+    back to the start of the construct.
+    """
+    link = "[link](https://example.com)"
+    # Choose a split point inside the URL
+    split_at = link.index("(") + 3  # somewhere inside "(https..."
+    adjusted = markdown_adjust(link, window_start=0, split_at=split_at)
+
+    # Should move back to the '[' at index 0
+    assert adjusted == 0
+
+
+def test_smart_split_markdown_guard_split_at_start_is_reset() -> None:
+    """
+    Cover the smart_split guard 'if split_at <= start: split_at = orig_split'.
+
+    We force markdown_adjust to move the split back to the window start,
+    then verify smart_split resets to the original split so progress is
+    still made and chunks join back to the original text.
+    """
+    text = "[link](https://example.com)"
+    limit = 5  # will cause the first soft split to land inside the link
+
+    chunks = smart_split(text, limit, body_format=NotifyFormat.MARKDOWN)
+
+    # We should never get stuck; all chunks must be non-empty
+    assert len(chunks) >= 2
+    assert all(chunks)
+
+    # Re-joining all chunks must restore the original text
     assert "".join(chunks) == text
