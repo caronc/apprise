@@ -49,6 +49,14 @@ jobs:
           if-no-files-found: error
           retention-days: 5
 
+      - name: Upload rpmlint config files
+        uses: actions/upload-artifact@v4
+        with:
+          # Upload the specific files needed for verification
+          name: rpmlint-config-${{ matrix.dist }}
+          path: ./packaging/redhat/python-apprise.rpmlintrc.${{ matrix.dist }}
+          retention-days: 5
+
   verify:
     name: Verify RPMs (${{ matrix.dist }})
     needs: build
@@ -70,8 +78,25 @@ jobs:
           name: built-rpms-${{ matrix.dist }}
           path: ./dist
 
+      - name: Download rpmlint config files
+        uses: actions/download-artifact@v4
+        with:
+          name: rpmlint-config-${{ matrix.dist }}
+          # Download files directly into the correct directory
+          path: ./packaging/redhat
+
       - name: Lint RPMs
-        run: rpmlint ./dist/**/*.rpm
+        run: |
+          set -e
+          RC_FILE="./packaging/redhat/python-apprise.rpmlintrc.${{ matrix.dist }}"
+
+          if rpmlint --help 2>&1 | grep -q -- '--rpmlintrc'; then
+            echo "Using rpmlint --rpmlintrc with $RC_FILE"
+            rpmlint --rpmlintrc "$RC_FILE" ./dist/**/*.rpm
+          else
+            echo "Using rpmlint v1.x on older distribution"
+            rpmlint -f "$RC_FILE" ./dist/**/*.rpm
+          fi
 
       - name: Install and verify RPMs
         run: |

@@ -45,21 +45,20 @@ RUN dnf download -y --destdir BZ2216807 --resolve dnf-data && \
     rpm -Uhi --force BZ2216807/*
 
 RUN \
-	rm -f /usr/lib/systemd/system/multi-user.target.wants/*;\
-	rm -f /etc/systemd/system/*.wants/*;\
-	rm -f /usr/lib/systemd/system/local-fs.target.wants/*; \
-	rm -f /usr/lib/systemd/system/sockets.target.wants/*udev*; \
-	rm -f /usr/lib/systemd/system/sockets.target.wants/*initctl*; \
-	rm -f /usr/lib/systemd/system/basic.target.wants/*;\
-	rm -f /usr/lib/systemd/system/anaconda.target.wants/*; \
-   echo "assumeyes=1" >> /etc/dnf/dnf.conf; \
-   dnf install -y epel-release; \
-   dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
-                  dnf-plugins-core 'dnf-command(config-manager)' \
-                 'dnf-command(builddep)' sudo rsync rpmdevtools
+    rm -f /usr/lib/systemd/system/multi-user.target.wants/*;\
+    rm -f /etc/systemd/system/*.wants/*;\
+    rm -f /usr/lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /usr/lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /usr/lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /usr/lib/systemd/system/basic.target.wants/*;\
+    rm -f /usr/lib/systemd/system/anaconda.target.wants/*; \
+    echo "assumeyes=1" >> /etc/dnf/dnf.conf; \
+    dnf install -y epel-release; \
+    dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
+    dnf-plugins-core 'dnf-command(config-manager)' \
+    'dnf-command(builddep)' sudo rsync rpmdevtools
 
 # Place our build file into the path
-COPY bin/build-rpm.sh /usr/bin
 COPY packaging/redhat/python-apprise.spec /
 RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y && dnf clean all

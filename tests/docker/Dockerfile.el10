@@ -50,7 +50,6 @@ RUN \
     dnf clean all
 
 # Place our build file into the path
-COPY bin/build-rpm.sh /usr/bin
 COPY packaging/redhat/python-apprise.spec /
 RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y && dnf clean all

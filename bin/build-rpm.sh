@@ -43,7 +43,7 @@ if [ ! -d "$DIST_DIR" ]; then
    $TOX -e clean --notest
 
    echo "==> Linting RPM spec"
-   rpmlint "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
+       rpmlint "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
 
    echo "==> Generating man pages"
    ronn --roff --organization="Chris Caron <lead2gold@gmail.com>" \

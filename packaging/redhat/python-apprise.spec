@@ -43,13 +43,15 @@
 
 %global pypi_name apprise
 
-# Handle rpmlint false positives
+# Handle rpmlint false positives (only valid in RHEL9)
 # - Prevent warnings:
 #    en_US ntfy -> notify
 #    en_US httpSMS -> HTTP
+#
 # rpmlint: ignore-spelling httpSMS ntfy
 
 # - RHEL9 does not recognize: BSD-2-Clause which is correct
+#
 # rpmlint: ignore invalid-license
 
 %global common_description %{expand: \
@@ -95,7 +97,7 @@ Provides: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
 %package -n %{pypi_name}
 Summary: Notify messaging platforms from the command line
 
-Requires: python%{python3_pkgversion}-click >= 5.0
+Requires: python3dist(click) >= 5.0
 Requires: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
 
 %description -n %{pypi_name}
@@ -109,34 +111,37 @@ Summary: A simple wrapper to many popular notification services used today
 
 BuildRequires: gettext
 BuildRequires: python%{python3_pkgversion}-devel
+
 %if %{legacy_python_build}
-# backwards compatible
-BuildRequires: python%{python3_pkgversion}-setuptools
+BuildRequires: python3dist(setuptools)
 %endif
-BuildRequires: python%{python3_pkgversion}-wheel
-BuildRequires: python%{python3_pkgversion}-requests
-BuildRequires: python%{python3_pkgversion}-requests-oauthlib
-BuildRequires: python%{python3_pkgversion}-click >= 5.0
-BuildRequires: python%{python3_pkgversion}-markdown
-BuildRequires: python%{python3_pkgversion}-yaml
-BuildRequires: python%{python3_pkgversion}-babel
-BuildRequires: python%{python3_pkgversion}-cryptography
-BuildRequires: python%{python3_pkgversion}-certifi
-BuildRequires: python%{python3_pkgversion}-tox
-Requires: python%{python3_pkgversion}-requests
-Requires: python%{python3_pkgversion}-requests-oauthlib
-Requires: python%{python3_pkgversion}-markdown
-Requires: python%{python3_pkgversion}-cryptography
-Requires: python%{python3_pkgversion}-certifi
-Requires: python%{python3_pkgversion}-yaml
-Recommends: python%{python3_pkgversion}-paho-mqtt
+
+BuildRequires: python3dist(wheel)
+BuildRequires: python3dist(requests)
+BuildRequires: python3dist(requests-oauthlib)
+BuildRequires: python3dist(click) >= 5.0
+BuildRequires: python3dist(markdown)
+BuildRequires: python3dist(pyyaml)
+BuildRequires: python3dist(babel)
+BuildRequires: python3dist(cryptography)
+BuildRequires: python3dist(certifi)
+BuildRequires: python3dist(tox)
 
 %if %{with tests}
-BuildRequires: python%{python3_pkgversion}-pytest
-BuildRequires: python%{python3_pkgversion}-pytest-mock
-BuildRequires: python%{python3_pkgversion}-pytest-runner
-BuildRequires: python%{python3_pkgversion}-pytest-cov
+BuildRequires: python3dist(pytest)
+BuildRequires: python3dist(pytest-mock)
+BuildRequires: python3dist(pytest-runner)
+BuildRequires: python3dist(pytest-cov)
 %endif
+
+Requires: python3dist(requests)
+Requires: python3dist(requests-oauthlib)
+Requires: python3dist(markdown)
+Requires: python3dist(cryptography)
+Requires: python3dist(certifi)
+Requires: python3dist(pyyaml)
+
+Recommends: python3dist(paho-mqtt)
 
 %if 0%{?legacy_python_build} == 0
 # Logic for non-RHEL ≤ 9 systems
