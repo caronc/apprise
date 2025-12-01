@@ -89,13 +89,13 @@ URL:            https://github.com/caronc/%{pypi_name}
 Source0:        %{url}/archive/v%{version}/%{pypi_name}-%{version}.tar.gz
 BuildArch:      noarch
 
-Obsoletes: python%{python3_pkgversion}-%{pypi_name} < %{version}-%{release}
-Provides: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
-
 %description %{common_description}
 
 %package -n %{pypi_name}
 Summary: Notify messaging platforms from the command line
+
+Obsoletes: %{pypi_name} < %{version}-%{release}
+Provides: %{pypi_name} = %{version}-%{release}
 
 Requires: python3dist(click) >= 5.0
 Requires: python%{python3_pkgversion}-%{pypi_name} = %{version}-%{release}
@@ -107,6 +107,8 @@ services.
 
 %package -n python%{python3_pkgversion}-%{pypi_name}
 Summary: A simple wrapper to many popular notification services used today
+
+Obsoletes: python%{python3_pkgversion}-%{pypi_name} < %{version}-%{release}
 %{?python_provide:%python_provide python%{python3_pkgversion}-%{pypi_name}}
 
 BuildRequires: gettext
@@ -208,6 +210,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/
 # Exclude i18n as it is handled below with the lang(spoken) tag below
 %exclude %{python3_sitelib}/%{pypi_name}/cli.*
+%exclude %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 # Handle egg-info to dist-info transfer
 %if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
@@ -218,7 +221,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 
 %if %{legacy_python_build}
 # Legacy: include all compiled locales that we produced under the package tree
-%{python3_sitelib}/%{pypi_name}/i18n/*/LC_MESSAGES/apprise.mo
+%lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/apprise.mo
 %else
 # Localised Files
 %exclude %{python3_sitelib}/%{pypi_name}/i18n/
@@ -228,7 +231,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %files -n %{pypi_name}
 %{_bindir}/%{pypi_name}
 %{_mandir}/man1/%{pypi_name}.1*
-%{python3_sitelib}/%{pypi_name}/cli.*
+%{python3_sitelib}/%{pypi_name}/cli.py
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
