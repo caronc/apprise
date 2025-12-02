@@ -115,10 +115,13 @@ to safely test builds:
 
 ```bash
 # Build RPM for EL9
-docker-compose run --rm rpmbuild.el9 build-rpm.sh
+docker-compose run --rm rpmbuild.el9 /apprise/bin/build-rpm.sh
+
+# Build RPM for EL10
+docker-compose run --rm rpmbuild.el10 /apprise/bin/build-rpm.sh
 
 # Build RPM for Fedora 42
-docker-compose run --rm rpmbuild.f42 build-rpm.sh
+docker-compose run --rm rpmbuild.f42 /apprise/bin/build-rpm.sh
 ```
 
 ## 📦 Specific Environment Emulation

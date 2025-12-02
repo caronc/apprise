@@ -26,45 +26,37 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-## The following was added to accomodate:
-#   https://bugzilla.redhat.com/show_bug.cgi?id=2216807
-#
-# the switch was added and it didn't work:
-#  dnf update -y --setopt=protected_packages=,
-#
-# The second work-around was to add --skip-broken
-# This also didn't work.  the final option was to download the RPMs in
-# advance and just force them.
-#
 # Base
-FROM fedora:rawhide
+FROM rockylinux/rockylinux:10
 ENV container=docker
 
-# https://bugzilla.redhat.com/show_bug.cgi?id=2216807 workaround
-RUN dnf download -y --destdir BZ2216807 --resolve dnf-data && \
-    rpm -Uhi --force BZ2216807/*
-
+# Basic build tooling and RPM stack
 RUN \
-    rm -f /usr/lib/systemd/system/multi-user.target.wants/*;\
+    rm -f /lib/systemd/system/multi-user.target.wants/*;\
     rm -f /etc/systemd/system/*.wants/*;\
-    rm -f /usr/lib/systemd/system/local-fs.target.wants/*; \
-    rm -f /usr/lib/systemd/system/sockets.target.wants/*udev*; \
-    rm -f /usr/lib/systemd/system/sockets.target.wants/*initctl*; \
-    rm -f /usr/lib/systemd/system/basic.target.wants/*;\
-    rm -f /usr/lib/systemd/system/anaconda.target.wants/*; \
-    echo "assumeyes=1" >> /etc/dnf/dnf.conf; \
+    rm -f /lib/systemd/system/local-fs.target.wants/*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*udev*; \
+    rm -f /lib/systemd/system/sockets.target.wants/*initctl*; \
+    rm -f /lib/systemd/system/basic.target.wants/*;\
+    rm -f /lib/systemd/system/anaconda.target.wants/*; \
+    echo "assumeyes=1" >> /etc/yum.conf; \
+    dnf -y update && \
     dnf install -y epel-release; \
-    dnf install -y rpm-build rpmlint python3-pip rubygem-ronn \
+    dnf install -y rpm-build python3-pip \
     dnf-plugins-core 'dnf-command(config-manager)' \
-    'dnf-command(builddep)' sudo rsync rpmdevtools
+    'dnf-command(builddep)' sudo rsync rpmdevtools && \
+    dnf config-manager --set-enabled crb && \
+    dnf -y install pyproject-rpm-macros rpmlint rubygem-ronn-ng && \
+    dnf clean all
 
 # Place our build file into the path
 COPY packaging/redhat/python-apprise.spec /
 RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y && dnf clean all
 
-# RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=rawhide
+# RPM build structure setup
+ENV FLAVOR=rpmbuild OS=centos DIST=el10
+
 RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
     echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 

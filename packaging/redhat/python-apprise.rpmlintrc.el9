@@ -1,0 +1,7 @@
+from Config import *
+
+# Ignore false-positive spelling errors on brand names
+addFilter('spelling-error.*ntfy')
+addFilter('spelling-error.*httpSMS')
+addFilter('invalid-license BSD-2-Clause')
+addFilter('obsolete-not-provided python.*-apprise')

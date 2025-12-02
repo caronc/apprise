@@ -5,11 +5,11 @@ Let me know if you'd like to help me host on more platforms or can offer to do i
 
 ### RPM Based Packages
 * [EPEL](https://fedoraproject.org/wiki/EPEL) based distributions are only supported if they are of v9 or higher. This includes:
-   * Red Hat 9.x (or higher)
-   * Scientific OS 9.x (or higher)
-   * Oracle Linux 9.x (or higher)
-   * Rocky Linux 9.x (or higher)
-   * Alma Linux 9.x (or higher)
+   * Red Hat 10.x (or higher)
+   * Scientific OS 10.x (or higher)
+   * Oracle Linux 10.x (or higher)
+   * Rocky Linux 10.x (or higher)
+   * Alma Linux 110.x (or higher)
    * Fedora 29 (or higher)
 
 Provided you are connected to the [EPEL repositories](https://fedoraproject.org/wiki/EPEL), the following will just work for you:
@@ -21,7 +21,10 @@ dnf install python3-apprise apprise
 
 You can build your own rpm packges with the following:
 ```bash
-# EPEL9 (CentOS/Rocky/RedHat/Oracle Linux)
+# EPEL10 (Rocky/RedHat/Oracle Linux)
+tox -e build-el10-rpm
+
+# EPEL9 (Rocky/RedHat/Oracle Linux)
 tox -e build-el9-rpm
 
 # Fedora 42

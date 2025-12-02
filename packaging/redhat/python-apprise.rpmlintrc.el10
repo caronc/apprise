@@ -1,0 +1,4 @@
+from Config import *
+
+# Ignore false-positive spelling errors on brand names
+addFilter('spelling-error.*ntfy')
