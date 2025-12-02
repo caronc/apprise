@@ -402,7 +402,7 @@ class NotifyNextcloud(NotifyBase):
                         targets |= self.all_users()
 
                     else:
-                        # regular username
+                        # specific group
                         targets |= self.users_by_group(group)
 
             except NextcloudGroupDiscoveryException:
