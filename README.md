@@ -93,6 +93,7 @@ The table below identifies the services this tool supports and some example serv
 | [Nextcloud](https://github.com/caronc/apprise/wiki/Notify_nextcloud) | ncloud:// or nclouds:// | (TCP) 80 or 443 | ncloud://adminuser:pass@host/User<br/>nclouds://adminuser:pass@host/User1/User2/UserN
 | [NextcloudTalk](https://github.com/caronc/apprise/wiki/Notify_nextcloudtalk) | nctalk:// or nctalks:// | (TCP) 80 or 443 | nctalk://user:pass@host/RoomId<br/>nctalks://user:pass@host/RoomId1/RoomId2/RoomIdN
 | [Notica](https://github.com/caronc/apprise/wiki/Notify_notica) | notica://  | (TCP) 443   | notica://Token/
+| [NotificationAPI](https://github.com/caronc/apprise/wiki/Notify_notificationapi) | napi://  | (TCP) 443   | napi://ClientID/ClientSecret/Target<br />napi://ClientID/ClientSecret/Target1/Target2/TargetN<br />napi://MessageType@ClientID/ClientSecret/Target
 | [Notifiarr](https://github.com/caronc/apprise/wiki/Notify_notifiarr) | notifiarr:// | (TCP) 443 | notifiarr://apikey/#channel<br />notifiarr://apikey/#channel1/#channel2/#channeln
 | [Notifico](https://github.com/caronc/apprise/wiki/Notify_notifico) | notifico://  | (TCP) 443   | notifico://ProjectID/MessageHook/
 | [ntfy](https://github.com/caronc/apprise/wiki/Notify_ntfy) | ntfy://  | (TCP) 80 or 443   | ntfy://topic/<br/>ntfys://topic/
