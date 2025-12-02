@@ -43,7 +43,7 @@
 
 %global pypi_name apprise
 
-# Handle rpmlint false positives (only valid in RHEL9)
+# Handle rpmlint false positives
 # - Prevent warnings:
 #    en_US ntfy -> notify
 #    en_US httpSMS -> HTTP
@@ -212,17 +212,14 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %exclude %{python3_sitelib}/%{pypi_name}/cli.*
 %exclude %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
-# Handle egg-info to dist-info transfer
-%if 0%{?fedora} >= 40 || 0%{?rhel} >= 10
-%{python3_sitelib}/apprise-*.dist-info/
-%else
-%{python3_sitelib}/apprise-*.egg-info
-%endif
-
 %if %{legacy_python_build}
+# Handle egg-info vs. dist-info based on build backend
+%{python3_sitelib}/apprise-*.egg-info
 # Legacy: include all compiled locales that we produced under the package tree
 %lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/apprise.mo
 %else
+# Handle egg-info vs. dist-info based on build backend
+%{python3_sitelib}/apprise-*.dist-info/
 # Localised Files
 %exclude %{python3_sitelib}/%{pypi_name}/i18n/
 %lang(en) %{python3_sitelib}/%{pypi_name}/i18n/en/LC_MESSAGES/apprise.mo
