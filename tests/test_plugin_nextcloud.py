@@ -624,7 +624,7 @@ def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
     called = "".join(c[0][0] for c in mock_get.call_args_list)
     assert "/cloud/groups/" in called and "/cloud/users" in called
 
-    # we sent 4 notifications
+    # we sent 5 notifications
     assert mock_post.call_count == 5
     expected_users = {"a1", "a2", "g1", "g2", "joe"}
 
