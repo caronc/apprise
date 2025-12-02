@@ -129,7 +129,7 @@ apprise_url_tests = (
         "instance": TypeError,
     }),
     ("napi://client_id/client_secret/id/g@rb@ge/+15551235553/", {
-        # g@rb@ge enry ignored
+        # g@rb@ge entry ignored
         "instance": NotifyNotificationAPI,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
