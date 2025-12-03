@@ -172,7 +172,7 @@ apprise_url_tests = (
         "kodi://user:pass@localhost:8082",
         {
             "instance": NotifyXBMC,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -182,7 +182,7 @@ apprise_url_tests = (
         {
             "instance": NotifyXBMC,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
@@ -280,7 +280,7 @@ apprise_url_tests = (
         "xbmc://user:pass@localhost:8082",
         {
             "instance": NotifyXBMC,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -290,7 +290,7 @@ apprise_url_tests = (
         {
             "instance": NotifyXBMC,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

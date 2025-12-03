@@ -198,7 +198,7 @@ apprise_url_tests = (
         {
             "instance": NotifyEnigma2,
             "requests_response_text": {"result": True},
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -209,7 +209,7 @@ apprise_url_tests = (
             "instance": NotifyEnigma2,
             "requests_response_text": {"result": True},
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

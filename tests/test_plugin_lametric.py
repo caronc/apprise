@@ -295,7 +295,7 @@ apprise_url_tests = (
         f"lametrics://{UUID4}@example.ca/",
         {
             "instance": NotifyLametric,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
             # Our expected url(privacy=True) startswith() response:
@@ -307,7 +307,7 @@ apprise_url_tests = (
         {
             "instance": NotifyLametric,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

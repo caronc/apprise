@@ -311,7 +311,7 @@ class NotifySES(NotifyBase):
             result = is_email(reply_to)
             if not result:
                 msg = "An invalid AWS Reply To ({}) was specified.".format(
-                    f"{self.user}@{self.host}"
+                    f"{reply_to}"
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)

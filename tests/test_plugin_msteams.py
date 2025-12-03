@@ -211,7 +211,7 @@ apprise_url_tests = (
         "msteams://{}@{}/{}/{}?ty".format(UUID4, UUID4, "y" * 32, UUID4),
         {
             "instance": NotifyMSTeams,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -221,7 +221,7 @@ apprise_url_tests = (
         {
             "instance": NotifyMSTeams,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

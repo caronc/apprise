@@ -191,7 +191,7 @@ apprise_url_tests = (
         {
             "instance": NotifyMastodon,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),

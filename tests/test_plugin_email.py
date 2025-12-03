@@ -392,7 +392,7 @@ TEST_URLS = (
         {
             "instance": email.NotifyEmail,
             # Throws a series of i/o exceptions with this flag
-            # is set and tests that we gracfully handle them
+            # is set and tests that we gracefully handle them
             "test_smtplib_exceptions": True,
         },
     ),
