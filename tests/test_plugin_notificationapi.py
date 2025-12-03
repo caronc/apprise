@@ -314,7 +314,7 @@ apprise_url_tests = (
     }),
     ("napi://user@client_id/cs18/id/user@example.ca", {
         "instance": NotifyNotificationAPI,
-        # throw a bizzare code forcing us to fail to look it up
+        # throw a bizarre code forcing us to fail to look it up
         "response": False,
         "requests_response_code": 999,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
@@ -322,7 +322,7 @@ apprise_url_tests = (
     ("napi://user@client_id/cs19/id/user@example.ca", {
         "instance": NotifyNotificationAPI,
         # Throws a series of connection and transfer exceptions when this flag
-        # is set and tests that we gracfully handle them
+        # is set and tests that we gracefully handle them
         "test_requests_exceptions": True,
         "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
     }),
