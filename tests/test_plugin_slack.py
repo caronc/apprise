@@ -74,6 +74,13 @@ apprise_url_tests = (
         },
     ),
     (
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/?mode=invalid",
+        {
+            # invalid Mode provided
+            "instance": TypeError,
+        },
+    ),
+    (
         "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#hmm/#-invalid-",
         {
             # No username specified; this is still okay as we sub in
@@ -217,6 +224,22 @@ apprise_url_tests = (
             },
         },
     ),
+    # Testing modes
+    (
+        (
+            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+            "&to=#chan&mode=hook"
+        ),
+        {"instance": NotifySlack, "requests_response_text": "ok"},
+    ),
+    # Forced mode on a url that does not have enough details to accomodate
+    (
+        (
+            "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+            "&to=#chan&mode=bot"
+        ),
+        {"instance": TypeError},
+    ),
     # Test blocks mode with timestamp variation
     (
         (
@@ -325,6 +348,17 @@ apprise_url_tests = (
         {
             "instance": NotifySlack,
             "requests_response_text": "ok",
+            "url_matches": "mode=hook",
+        },
+    ),
+    (
+        "https://hooks.slack-gov.com/services/{}/{}/{}".format(
+            "A" * 9, "B" * 9, "c" * 24
+        ),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": "ok",
+            "url_matches": "mode=gov-hook",
         },
     ),
     # Native URL Support with arguments

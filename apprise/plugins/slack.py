@@ -102,7 +102,12 @@ class SlackMode:
 
     # We're dealing with a webhook
     # Our token looks like: T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7
-    WEBHOOK = "webhook"
+    WEBHOOK = "hook"
+
+    # Government Webhook
+    # Our token still looks like: T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7
+    # however we have a different URL we post to
+    WEBHOOK_GOV = "gov-hook"
 
     # We're dealing with a bot (using the OAuth Access Token)
     # Our token looks like: xoxp-1234-1234-1234-abc124 or
@@ -113,6 +118,7 @@ class SlackMode:
 # Define our Slack Modes
 SLACK_MODES = (
     SlackMode.WEBHOOK,
+    SlackMode.WEBHOOK_GOV,
     SlackMode.BOT,
 )
 
@@ -140,8 +146,9 @@ class NotifySlack(NotifyBase):
     attachment_support = True
 
     # The maximum targets to include when doing batch transfers
-    # Slack Webhook URL
+    # Slack Webhook URLs
     webhook_url = "https://hooks.slack.com/services"
+    webhook_gov_url = "https://hooks.slack-gov.com/services"
 
     # Slack API URL (used with Bots)
     api_url = "https://slack.com/api/{}"
@@ -277,6 +284,12 @@ class NotifySlack(NotifyBase):
                 "default": True,
                 "map_to": "include_timestamp",
             },
+            "mode": {
+                "name": _("Message Mode"),
+                "type": "choice:string",
+                "values": SLACK_MODES,
+                # mode is detected if not specified
+            },
             "token": {
                 "name": _("Token"),
                 "alias_of": ("access_token", "token_a", "token_b", "token_c"),
@@ -335,15 +348,28 @@ class NotifySlack(NotifyBase):
         include_footer=None,
         include_timestamp=None,
         use_blocks=None,
+        mode=None,
         **kwargs,
     ):
         """Initialize Slack Object."""
         super().__init__(**kwargs)
 
-        # Setup our mode
-        self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
+        # Store our webhook mode
+        if mode and isinstance(mode, str):
+            self.mode = next(
+                (a for a in SLACK_MODES if a.startswith(mode)), None
+            )
+            if self.mode not in SLACK_MODES:
+                msg = (
+                    f"The Slack mode specified ({mode}) is invalid."
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
-        if self.mode is SlackMode.WEBHOOK:
+        else:  # Detect
+            self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
+
+        if self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
             self.access_token = None
             self.token_a = validate_regex(
                 token_a, *self.template_tokens["token_a"]["regex"]
@@ -411,7 +437,7 @@ class NotifySlack(NotifyBase):
             # a flag lower to not set the channels
             self.channels.append(
                 None
-                if self.mode is SlackMode.WEBHOOK
+                if self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV)
                 else self.default_notification_channel
             )
 
@@ -610,7 +636,7 @@ class NotifySlack(NotifyBase):
         if (
             attach
             and self.attachment_support
-            and self.mode is SlackMode.WEBHOOK
+            and self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV)
         ):
             # Be friendly; let the user know why they can't send their
             # attachments if using the Webhook mode
@@ -620,6 +646,12 @@ class NotifySlack(NotifyBase):
         if self.mode is SlackMode.WEBHOOK:
             url = (
                 f"{self.webhook_url}/{self.token_a}"
+                f"/{self.token_b}/{self.token_c}"
+            )
+
+        elif self.mode is SlackMode.WEBHOOK_GOV:
+            url = (
+                f"{self.webhook_gov_url}/{self.token_a}"
                 f"/{self.token_b}/{self.token_c}"
             )
 
@@ -1132,6 +1164,7 @@ class NotifySlack(NotifyBase):
             "footer": "yes" if self.include_footer else "no",
             "timestamp": "yes" if self.include_timestamp else "no",
             "blocks": "yes" if self.use_blocks else "no",
+            "mode": self.mode,
         }
 
         # Extend our parameters
@@ -1144,7 +1177,7 @@ class NotifySlack(NotifyBase):
                 botname=NotifySlack.quote(self.user, safe=""),
             )
 
-        if self.mode == SlackMode.WEBHOOK:
+        if self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
             return (
                 "{schema}://{botname}{token_a}/{token_b}/{token_c}/"
                 "{targets}/?{params}".format(
@@ -1263,16 +1296,22 @@ class NotifySlack(NotifyBase):
             parse_bool(results["qsd"].get(
                 "footer", NotifySlack.template_args["footer"]["default"]))
 
+        # Get Mode
+        if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
+            results["mode"] = NotifySlack.unquote(results["qsd"]["mode"])
+
         return results
 
     @staticmethod
     def parse_native_url(url):
         """
-        Support https://hooks.slack.com/services/TOKEN_A/TOKEN_B/TOKEN_C
+        Supports:
+          - https://hooks.slack.com/services/TOKEN_A/TOKEN_B/TOKEN_C
+          - https://hooks.slack-gov.com/services/TOKEN_A/TOKEN_B/TOKEN_C
         """
 
         result = re.match(
-            r"^https?://hooks\.slack\.com/services/"
+            r"^https?://(?P<host>hooks\.slack(?P<gov>-gov)?\.com)/services/"
             r"(?P<token_a>[A-Z0-9]+)/"
             r"(?P<token_b>[A-Z0-9]+)/"
             r"(?P<token_c>[A-Z0-9]+)/?"
@@ -1282,17 +1321,24 @@ class NotifySlack(NotifyBase):
         )
 
         if result:
+            params = (
+                ""
+                if not result.group("params")
+                else result.group("params")
+            )
+
+            if result.group("gov"):
+                # provide gov parameters
+                params = ("?" if not params else "&") + \
+                    f"mode={SlackMode.WEBHOOK_GOV}"
+
             return NotifySlack.parse_url(
                 "{schema}://{token_a}/{token_b}/{token_c}/{params}".format(
                     schema=NotifySlack.secure_protocol,
                     token_a=result.group("token_a"),
                     token_b=result.group("token_b"),
                     token_c=result.group("token_c"),
-                    params=(
-                        ""
-                        if not result.group("params")
-                        else result.group("params")
-                    ),
+                    params=params,
                 )
             )
 
