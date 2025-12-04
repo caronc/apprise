@@ -28,6 +28,7 @@
 # API Reference: https://developers.brevo.com/reference/getting-started-1
 
 from json import dumps
+from os.path import splitext
 
 import requests
 
@@ -45,6 +46,23 @@ BREVO_HTTP_ERROR_MAP = {
     402: "Payment Required - Plan limitation or credit issue.",
     429: "Too Many Requests - Rate limit exceeded.",
 }
+
+# Comprehensive list of Brevo-supported extensions for Transactional Emails
+# Source: Brevo API Documentation & Transactional Attachment Guidelines
+BREVO_VALID_EXTENSIONS = (
+    # Documents & Text
+    "xlsx", "xls", "ods", "docx", "docm", "doc", "csv", "pdf", "txt",
+    "rtf", "msg", "pub", "mobi", "ppt", "pptx", "eps", "odt", "ics",
+    "xml", "css", "html", "htm", "shtml",
+    # Images
+    "gif", "jpg", "jpeg", "png", "tif", "tiff", "bmp", "cgm",
+    # Archives
+    "zip", "tar", "ez", "pkpass",
+    # Audio
+    "mp3", "m4a", "m4v", "wma", "ogg", "flac", "wav", "aif", "aifc", "aiff",
+    # Video
+    "mp4", "mov", "avi", "mkv", "mpeg", "mpg", "wmv"
+)
 
 
 class NotifyBrevo(NotifyBase):
@@ -354,14 +372,30 @@ class NotifyBrevo(NotifyBase):
                     )
                     return False
 
+                # Brevo does not track content/mime type and relies 100%
+                # entirely on the filename extension as to whether or not it
+                # will accept it or not.
+                #
+                # The below prepares a safe_name (which can't be .dat like
+                # other plugins since Brevo rejects that type). For this
+                # reason .txt is chosen intentionally for this circumstance.
+
+                # Use the attachment name if available, otherwise default to a
+                # generic name
+                raw_name = attachment.name \
+                    if attachment.name else f"file{no:03}.txt"
+
+                # If the filename does NOT match a supported extension, append
+                # .txt
+                _, ext = splitext(raw_name)
+                safe_name = f"{raw_name}.txt" if (
+                    not ext or ext[1:].lower()
+                    not in BREVO_VALID_EXTENSIONS) else raw_name
+
                 try:
                     attachments.append({
                         "content": attachment.base64(),
-                        "name": (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
+                        "name": safe_name,
                     })
 
                 except exception.AppriseException:
