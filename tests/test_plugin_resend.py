@@ -50,27 +50,27 @@ apprise_url_tests = (
     (
         "resend://",
         {
-            "instance": None,
+            "instance": TypeError,
         },
     ),
     (
         "resend://:@/",
         {
-            "instance": None,
+            "instance": TypeError,
         },
     ),
     (
         "resend://abcd",
         {
             # Just an broken email (no api key or email)
-            "instance": None,
+            "instance": TypeError,
         },
     ),
     (
         "resend://abcd@host",
         {
             # Just an Email specified, no API Key
-            "instance": None,
+            "instance": TypeError,
         },
     ),
     (
@@ -93,6 +93,42 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
+        },
+    ),
+    (
+        "resend://abcd:user@example.com/newuser@example.com?name=Jessica",
+        {
+            # A good email
+            "instance": NotifyResend,
+            "privacy_url": \
+                "resend://a...d:user@example.com/newuser@example.com",
+            "url_matches": r"name=Jessica",
+        },
+    ),
+    (
+        (
+            "resend://abcd@newuser%40example.com?name=Ralph"
+            "&from=user2@example.ca"
+        ),
+        {
+            # A good email
+            "instance": NotifyResend,
+            "privacy_url": \
+                "resend://a...d:user2@example.ca/",
+            "url_matches": r"name=Ralph",
+        },
+    ),
+    (
+        (
+            "resend://?apikey=abcd&from=Joe<user@example.com>"
+            "&to=newuser@example.com"
+         ),
+        {
+            # A good email
+            "instance": NotifyResend,
+            "privacy_url": \
+                "resend://a...d:user@example.com/newuser@example.com",
+            "url_matches": r"name=Joe",
         },
     ),
     (
@@ -163,26 +199,26 @@ def test_plugin_resend_edge_cases(mock_post, mock_get):
 
     # no apikey
     with pytest.raises(TypeError):
-        NotifyResend(apikey=None, from_email="user@example.com")
+        NotifyResend(apikey=None, from_addr="user@example.com")
 
     # invalid from email
     with pytest.raises(TypeError):
-        NotifyResend(apikey="abcd", from_email="!invalid")
+        NotifyResend(apikey="abcd", from_addr="!invalid")
 
     # no email
     with pytest.raises(TypeError):
-        NotifyResend(apikey="abcd", from_email=None)
+        NotifyResend(apikey="abcd", from_addr=None)
 
     # Invalid To email address
     NotifyResend(
-        apikey="abcd", from_email="user@example.com", targets="!invalid"
+        apikey="abcd", from_addr="user@example.com", targets="!invalid"
     )
 
     # Test invalid bcc/cc entries mixed with good ones
     assert isinstance(
         NotifyResend(
             apikey="abcd",
-            from_email="l2g@example.com",
+            from_addr="l2g@example.com",
             bcc=("abc@def.com", "!invalid"),
             cc=("abc@test.org", "!invalid"),
         ),

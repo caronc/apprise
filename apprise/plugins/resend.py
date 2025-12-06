@@ -31,14 +31,15 @@
 # to work.
 #
 # The schema to use the plugin looks like this:
-#    {schema}://{apikey}:{from_email}
+#    {schema}://{apikey}:{from_addr}
 #
-# Your {from_email} must be comprissed of your Resend Authenticated
+# Your {from_addr} must be comprissed of your Resend Authenticated
 # Domain.
 
 # Simple API Reference:
 #  - https://resend.com/onboarding
 
+from email.utils import formataddr
 from json import dumps
 
 import requests
@@ -92,8 +93,8 @@ class NotifyResend(NotifyBase):
 
     # Define object templates
     templates = (
-        "{schema}://{apikey}:{from_email}",
-        "{schema}://{apikey}:{from_email}/{targets}",
+        "{schema}://{apikey}:{from_addr}",
+        "{schema}://{apikey}:{from_addr}/{targets}",
     )
 
     # Define our template arguments
@@ -107,7 +108,7 @@ class NotifyResend(NotifyBase):
                 "required": True,
                 "regex": (r"^[A-Z0-9._-]+$", "i"),
             },
-            "from_email": {
+            "from_addr": {
                 "name": _("Source Email"),
                 "type": "string",
                 "required": True,
@@ -139,11 +140,21 @@ class NotifyResend(NotifyBase):
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
             },
+            "from": {
+                "map_to": "from_addr",
+            },
+            "name": {
+                "name": _("From Name"),
+                "map_to": "from_addr",
+            },
+            "apikey": {
+                "map_to": "apikey",
+            },
         },
     )
 
     def __init__(
-        self, apikey, from_email, targets=None, cc=None, bcc=None, **kwargs
+        self, apikey, from_addr, targets=None, cc=None, bcc=None, **kwargs
     ):
         """Initialize Notify Resend Object."""
         super().__init__(**kwargs)
@@ -157,15 +168,6 @@ class NotifyResend(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        result = is_email(from_email)
-        if not result:
-            msg = f"Invalid ~From~ email specified: {from_email}"
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # Store email address
-        self.from_email = result["full_email"]
-
         # Acquire Targets (To Emails)
         self.targets = []
 
@@ -175,17 +177,34 @@ class NotifyResend(NotifyBase):
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
-        # Validate recipients (to:) and drop bad ones:
-        for recipient in parse_list(targets):
+        result = is_email(from_addr)
+        if not result:
+            # Invalid from
+            msg = "Invalid ~From~ email specified: {}".format(from_addr)
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
-            result = is_email(recipient)
-            if result:
-                self.targets.append(result["full_email"])
-                continue
+        # initialize our from address
+        self.from_addr = (
+            result["name"] if result["name"] is not None else False,
+            result["full_email"],
+        )
 
-            self.logger.warning(
-                f"Dropped invalid email ({recipient}) specified.",
-            )
+        if targets:
+            # Validate recipients (to:) and drop bad ones:
+            for recipient in parse_list(targets):
+
+                result = is_email(recipient)
+                if result:
+                    self.targets.append(result["full_email"])
+                    continue
+
+                self.logger.warning(
+                    f"Dropped invalid email ({recipient}) specified.",
+                )
+        else:
+            # If our target email list is empty we want to add ourselves to it
+            self.targets.append(self.from_addr[1])
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_list(cc):
@@ -212,10 +231,6 @@ class NotifyResend(NotifyBase):
                 f"({recipient}) specified.",
             )
 
-        if len(self.targets) == 0:
-            # Notify ourselves
-            self.targets.append(self.from_email)
-
         return
 
     @property
@@ -225,7 +240,7 @@ class NotifyResend(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (self.secure_protocol, self.apikey, self.from_email)
+        return (self.secure_protocol, self.apikey, self.from_addr)
 
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
@@ -244,19 +259,22 @@ class NotifyResend(NotifyBase):
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = not (
-            len(self.targets) == 1 and self.targets[0] == self.from_email
-        )
+            len(self.targets) == 1 and self.targets[0] == self.from_addr[1])
 
-        return "{schema}://{apikey}:{from_email}/{targets}?{params}".format(
+        if self.from_addr[0] and self.from_addr[0] != self.app_id:
+            # A custom name was provided
+            params["name"] = self.from_addr[0]
+
+        return "{schema}://{apikey}:{from_addr}/{targets}?{params}".format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=""),
             # never encode email since it plays a huge role in our hostname
-            from_email=self.from_email,
+            from_addr=self.from_addr[1],
             targets=(
                 ""
                 if not has_targets
                 else "/".join(
-                    [NotifyResend.quote(x, safe="") for x in self.targets]
+                    [NotifyResend.quote(x, safe="@") for x in self.targets]
                 )
             ),
             params=NotifyResend.urlencode(params),
@@ -285,8 +303,12 @@ class NotifyResend(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        # Prepare our from_name
+        self.from_addr[0] \
+            if self.from_addr[0] is not False else self.app_id
+
         _payload = {
-            "from": self.from_email,
+            "from": formataddr(self.from_addr, charset="utf-8"),
             # A subject is a requirement, so if none is specified we must
             # set a default with at least 1 character or Resend will deny
             # our request
@@ -422,13 +444,13 @@ class NotifyResend(NotifyBase):
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # Our URL looks like this:
-        #    {schema}://{apikey}:{from_email}/{targets}
+        #    {schema}://{apikey}:{from_addr}/{targets}
         #
         # which actually equates to:
         #    {schema}://{user}:{password}@{host}/{email1}/{email2}/etc..
@@ -436,25 +458,38 @@ class NotifyResend(NotifyBase):
         #                 |       |         |
         #              apikey     -from addr-
 
-        if not results.get("user"):
-            # An API Key as not properly specified
-            return None
-
-        if not results.get("password"):
-            # A From Email was not correctly specified
-            return None
-
         # Prepare our API Key
-        results["apikey"] = NotifyResend.unquote(results["user"])
+        if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
+            results["apikey"] = \
+                NotifyResend.unquote(results["qsd"]["apikey"])
 
-        # Prepare our From Email Address
-        results["from_email"] = "{}@{}".format(
-            NotifyResend.unquote(results["password"]),
-            NotifyResend.unquote(results["host"]),
-        )
+        else:
+            results["apikey"] = NotifyResend.unquote(results["user"])
+
+        # Our Targets
+        results["targets"] = []
+
+        # Attempt to detect 'from' email address
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["from_addr"] = NotifyResend.unquote(results["qsd"]["from"])
+            results["targets"].append(NotifyResend.unquote(results["host"]))
+
+        else:
+            # Prepare our From Email Address
+            results["from_addr"] = "{}@{}".format(
+                NotifyResend.unquote(
+                    results["password"]
+                    if results["password"] else results["user"]),
+                NotifyResend.unquote(results["host"]),
+            )
+
+        if "name" in results["qsd"] and len(results["qsd"]["name"]):
+            results["from_addr"] = formataddr((
+                NotifyResend.unquote(results["qsd"]["name"]),
+                results["from_addr"]), charset="utf-8")
 
         # Acquire our targets
-        results["targets"] = NotifyResend.split_path(results["fullpath"])
+        results["targets"].extend(NotifyResend.split_path(results["fullpath"]))
 
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):

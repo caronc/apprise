@@ -263,7 +263,12 @@ class AppriseURLTester:
 
             if url_matches:
                 # Assess that our URL matches a set regex
-                assert re.search(url_matches, obj.url())
+                if not re.search(url_matches, obj.url()):
+                    raise AssertionError(
+                        f"URL: {url} generated an reloadable "
+                        f"url() of {obj.url()} that does not match "
+                        f"'{url_matches}'"
+                    )
 
             # Instantiate the exact same object again using the URL
             # from the one that was already created properly
@@ -293,7 +298,9 @@ class AppriseURLTester:
             # Verify there is no change from the old and the new
             if len(obj) != len(obj_cmp):
                 raise AssertionError(
-                    f"URL: {url} target miscount {len(obj)} != {len(obj_cmp)}"
+                    f"URL: {url} generated an reloadable "
+                    f"url() of {obj.url()} produced target miscount "
+                    f"{len(obj)} != {len(obj_cmp)}"
                 )
 
             # Tidy our object
