@@ -43,6 +43,7 @@
 #    - https://discord.com/developers/docs/resources/webhook
 #
 from datetime import datetime, timedelta, timezone
+from itertools import chain
 from json import dumps
 import re
 
@@ -51,12 +52,12 @@ import requests
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool, validate_regex
+from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
 
 # Used to detect user/role IDs
 USER_ROLE_DETECTION_RE = re.compile(
-    r"\s*(?:<@(?P<role>&?)(?P<id>[0-9]+)>|@(?P<value>[a-z0-9]+))", re.I
+    r"\s*(?:<?@(?P<role>&?)(?P<id>[0-9]+)>?|@(?P<value>[a-z0-9]+))", re.I
 )
 
 
@@ -194,6 +195,10 @@ class NotifyDiscord(NotifyBase):
                 "default": False,
                 "map_to": "include_image",
             },
+            "ping": {
+                "name": _("Ping Users/Roles"),
+                "type": "list:string",
+            },
         },
     )
 
@@ -211,6 +216,7 @@ class NotifyDiscord(NotifyBase):
         href=None,
         thread=None,
         flags=None,
+        ping=None,
         **kwargs,
     ):
         """Initialize Discord Object."""
@@ -285,6 +291,9 @@ class NotifyDiscord(NotifyBase):
         # Default to 1.0
         self.ratelimit_remaining = 1.0
 
+        # Ping targets (raw tokens from URL, already split by parse_list)
+        self.ping = parse_list(ping)
+
         return
 
     def send(
@@ -323,6 +332,9 @@ class NotifyDiscord(NotifyBase):
 
         # Associate our thread_id with our message
         params = {"thread_id": self.thread_id} if self.thread_id else None
+
+        # Apply any pingable content to the payload
+        payload.update(self.ping_payload(body, " ".join(self.ping)))
 
         if body:
             # our fields variable
@@ -383,34 +395,7 @@ class NotifyDiscord(NotifyBase):
                 # not markdown
                 payload["content"] = (
                     body if not title else f"{title}\r\n{body}"
-                )
-
-            # parse for user id's <@123> and role IDs <@&456>
-            results = USER_ROLE_DETECTION_RE.findall(body)
-            if results:
-                payload["allow_mentions"] = {
-                    "parse": [],
-                    "users": [],
-                    "roles": [],
-                }
-
-                _content = []
-                for is_role, no, value in results:
-                    if value:
-                        payload["allow_mentions"]["parse"].append(value)
-                        _content.append(f"@{value}")
-
-                    elif is_role:
-                        payload["allow_mentions"]["roles"].append(no)
-                        _content.append(f"<@&{no}>")
-
-                    else:  # is_user
-                        payload["allow_mentions"]["users"].append(no)
-                        _content.append(f"<@{no}>")
-
-                if self.notify_format == NotifyFormat.MARKDOWN:
-                    # Add pingable elements to content field
-                    payload["content"] = "👉 " + " ".join(_content)
+                ) + payload.get("content", "")
 
             if not self._send(payload, params=params):
                 # We failed to post our message
@@ -660,6 +645,9 @@ class NotifyDiscord(NotifyBase):
         if self.thread_id:
             params["thread"] = self.thread_id
 
+        if self.ping:
+            params["ping"] = ",".join(self.ping)
+
         # Ensure our botname is set
         botname = f"{self.user}@" if self.user else ""
 
@@ -771,6 +759,10 @@ class NotifyDiscord(NotifyBase):
             # Markdown is implied
             results["format"] = NotifyFormat.MARKDOWN
 
+        # Extract ping targets, comma/space separated
+        if "ping" in results["qsd"]:
+            results["ping"] = NotifyDiscord.unquote(results["qsd"]["ping"])
+
         return results
 
     @staticmethod
@@ -805,6 +797,59 @@ class NotifyDiscord(NotifyBase):
             )
 
         return None
+
+    def ping_payload(self, *args):
+        """
+        Takes a body and applies the payload associated with pinging
+        the users detected within
+        """
+
+        # initialize a payload object we can prepare
+        payload = {}
+
+        roles = set()
+        users = set()
+        parse = set()
+
+        for arg in args:
+            # parse for user id's <@123> and role IDs <@&456>
+            results = USER_ROLE_DETECTION_RE.findall(arg)
+            if not results:
+                continue
+
+            _content = []
+            for is_role, no, value in results:
+                if value:
+                    parse.add(value)
+                    _content.append(f"@{value}")
+
+                elif is_role:
+                    roles.add(no)
+                    _content.append(f"<@&{no}>")
+
+                else:  # is_user
+                    users.add(no)
+                    _content.append(f"<@{no}>")
+
+        if not (roles or users or parse):
+            # Nothing to add
+            return payload
+
+        # First time through...
+        payload["allow_mentions"] = {
+            "parse": list(parse),
+            "users": list(users),
+            "roles": list(roles),
+        }
+
+        # Add pingable elements to content field
+        payload["content"] = "👉 " + " ".join(chain(
+            [f"@{value}" for value in parse],
+            [f"<@&{value}>" for value in roles],
+            [f"<@{value}>" for value in users],
+        ))
+
+        return payload
 
     @staticmethod
     def extract_markdown_sections(markdown):
