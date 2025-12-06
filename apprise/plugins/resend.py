@@ -31,14 +31,15 @@
 # to work.
 #
 # The schema to use the plugin looks like this:
-#    {schema}://{apikey}:{from_email}
+#    {schema}://{apikey}:{from_addr}
 #
-# Your {from_email} must be comprissed of your Resend Authenticated
+# Your {from_addr} must be comprissed of your Resend Authenticated
 # Domain.
 
 # Simple API Reference:
 #  - https://resend.com/onboarding
 
+from email.utils import formataddr
 from json import dumps
 
 import requests
@@ -46,7 +47,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_list, validate_regex
+from ..utils.parse import is_email, parse_emails, validate_regex
 from .base import NotifyBase
 
 RESEND_HTTP_ERROR_MAP = {
@@ -92,8 +93,8 @@ class NotifyResend(NotifyBase):
 
     # Define object templates
     templates = (
-        "{schema}://{apikey}:{from_email}",
-        "{schema}://{apikey}:{from_email}/{targets}",
+        "{schema}://{apikey}:{from_addr}",
+        "{schema}://{apikey}:{from_addr}/{targets}",
     )
 
     # Define our template arguments
@@ -107,7 +108,7 @@ class NotifyResend(NotifyBase):
                 "required": True,
                 "regex": (r"^[A-Z0-9._-]+$", "i"),
             },
-            "from_email": {
+            "from_addr": {
                 "name": _("Source Email"),
                 "type": "string",
                 "required": True,
@@ -139,12 +140,27 @@ class NotifyResend(NotifyBase):
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
             },
+            "reply": {
+                "name": _("Reply To"),
+                "type": "list:string",
+                "map_to": "reply_to",
+            },
+            "from": {
+                "map_to": "from_addr",
+            },
+            "name": {
+                "name": _("From Name"),
+                "map_to": "from_addr",
+            },
+            "apikey": {
+                "map_to": "apikey",
+            },
         },
     )
 
     def __init__(
-        self, apikey, from_email, targets=None, cc=None, bcc=None, **kwargs
-    ):
+        self, apikey, from_addr, targets=None, cc=None, bcc=None,
+        reply_to=None, **kwargs):
         """Initialize Notify Resend Object."""
         super().__init__(**kwargs)
 
@@ -157,15 +173,6 @@ class NotifyResend(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        result = is_email(from_email)
-        if not result:
-            msg = f"Invalid ~From~ email specified: {from_email}"
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # Store email address
-        self.from_email = result["full_email"]
-
         # Acquire Targets (To Emails)
         self.targets = []
 
@@ -175,24 +182,59 @@ class NotifyResend(NotifyBase):
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
-        # Validate recipients (to:) and drop bad ones:
-        for recipient in parse_list(targets):
+        # Acquire Reply To
+        self.reply_to = set()
 
-            result = is_email(recipient)
-            if result:
-                self.targets.append(result["full_email"])
-                continue
+        # For tracking our email -> name lookups
+        self.names = {}
 
-            self.logger.warning(
-                f"Dropped invalid email ({recipient}) specified.",
-            )
+        result = is_email(from_addr)
+        if not result:
+            # Invalid from
+            msg = "Invalid ~From~ email specified: {}".format(from_addr)
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # initialize our from address
+        self.from_addr = (
+            result["name"] if result["name"] is not None else False,
+            result["full_email"],
+        )
+
+        # Update our Name if specified
+        self.names[self.from_addr[1]] = (
+            result["name"] if result["name"] else False
+        )
+
+        # Acquire our targets
+        targets = parse_emails(targets)
+        if targets:
+            # Validate recipients (to:) and drop bad ones:
+            for recipient in targets:
+
+                result = is_email(recipient)
+                if result:
+                    self.targets.append(result["full_email"])
+                    continue
+
+                self.logger.warning(
+                    f"Dropped invalid email ({recipient}) specified.",
+                )
+        else:
+            # If our target email list is empty we want to add ourselves to it
+            self.targets.append(self.from_addr[1])
 
         # Validate recipients (cc:) and drop bad ones:
-        for recipient in parse_list(cc):
+        for recipient in parse_emails(cc):
 
             result = is_email(recipient)
             if result:
                 self.cc.add(result["full_email"])
+
+                # Index our name (if one exists)
+                self.names[result["full_email"]] = (
+                    result["name"] if result["name"] else False
+                )
                 continue
 
             self.logger.warning(
@@ -200,7 +242,7 @@ class NotifyResend(NotifyBase):
             )
 
         # Validate recipients (bcc:) and drop bad ones:
-        for recipient in parse_list(bcc):
+        for recipient in parse_emails(bcc):
 
             result = is_email(recipient)
             if result:
@@ -212,9 +254,23 @@ class NotifyResend(NotifyBase):
                 f"({recipient}) specified.",
             )
 
-        if len(self.targets) == 0:
-            # Notify ourselves
-            self.targets.append(self.from_email)
+        # Validate recipients (reply-to:) and drop bad ones:
+        for recipient in parse_emails(reply_to):
+            result = is_email(recipient)
+            if result:
+                self.reply_to.add(result["full_email"])
+
+                # Index our name (if one exists)
+                self.names[result["full_email"]] = (
+                    result["name"] if result["name"] else False
+                )
+                continue
+
+            self.logger.warning(
+                "Dropped invalid Reply To email ({}) specified.".format(
+                    recipient
+                ),
+            )
 
         return
 
@@ -225,7 +281,7 @@ class NotifyResend(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (self.secure_protocol, self.apikey, self.from_email)
+        return (self.secure_protocol, self.apikey, self.from_addr)
 
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
@@ -233,30 +289,53 @@ class NotifyResend(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        if len(self.cc) > 0:
+        if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join(self.cc)
+            params["cc"] = ",".join([
+                formataddr(
+                    (self.names.get(e, False), e),
+                    # Swap comma for it's escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset="utf-8",
+                ).replace(",", "%2C")
+                for e in self.cc
+            ])
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
             params["bcc"] = ",".join(self.bcc)
 
+        if self.reply_to:
+            # Handle our Reply-To Addresses
+            params["reply"] = ",".join([
+                formataddr(
+                    (self.names.get(e, False), e),
+                    # Swap comma for its escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset="utf-8",
+                ).replace(",", "%2C")
+                for e in self.reply_to
+            ])
+
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = not (
-            len(self.targets) == 1 and self.targets[0] == self.from_email
-        )
+            len(self.targets) == 1 and self.targets[0] == self.from_addr[1])
 
-        return "{schema}://{apikey}:{from_email}/{targets}?{params}".format(
+        if self.from_addr[0] and self.from_addr[0] != self.app_id:
+            # A custom name was provided
+            params["name"] = self.from_addr[0]
+
+        return "{schema}://{apikey}:{from_addr}/{targets}?{params}".format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=""),
             # never encode email since it plays a huge role in our hostname
-            from_email=self.from_email,
+            from_addr=self.from_addr[1],
             targets=(
                 ""
                 if not has_targets
                 else "/".join(
-                    [NotifyResend.quote(x, safe="") for x in self.targets]
+                    [NotifyResend.quote(x, safe="@") for x in self.targets]
                 )
             ),
             params=NotifyResend.urlencode(params),
@@ -285,8 +364,12 @@ class NotifyResend(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        # Prepare our from_name
+        self.from_addr[0] \
+            if self.from_addr[0] is not False else self.app_id
+
         _payload = {
-            "from": self.from_email,
+            "from": formataddr(self.from_addr, charset="utf-8"),
             # A subject is a requirement, so if none is specified we must
             # set a default with at least 1 character or Resend will deny
             # our request
@@ -351,14 +434,34 @@ class NotifyResend(NotifyBase):
             cc = self.cc - self.bcc - {target}
             bcc = self.bcc - {target}
 
+            # handle our reply to
+            reply_to = self.reply_to - {target}
+
+            # Format our cc addresses to support the Name field
+            cc = [
+                formataddr((self.names.get(addr, False), addr),
+                           charset="utf-8")
+                for addr in cc
+            ]
+
+            # Format our reply-to addresses to support the Name field
+            reply_to = [
+                formataddr((self.names.get(addr, False), addr),
+                           charset="utf-8")
+                for addr in reply_to
+            ]
+
             # Set our target
             payload["to"] = target
 
-            if len(cc):
-                payload["cc"] = list(cc)
+            if cc:
+                payload["cc"] = cc
 
             if len(bcc):
                 payload["bcc"] = list(bcc)
+
+            if reply_to:
+                payload["reply_to"] = reply_to
 
             self.logger.debug(
                 "Resend POST URL:"
@@ -422,13 +525,13 @@ class NotifyResend(NotifyBase):
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
-        results = NotifyBase.parse_url(url)
+        results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
         # Our URL looks like this:
-        #    {schema}://{apikey}:{from_email}/{targets}
+        #    {schema}://{apikey}:{from_addr}/{targets}
         #
         # which actually equates to:
         #    {schema}://{user}:{password}@{host}/{email1}/{email2}/etc..
@@ -436,25 +539,41 @@ class NotifyResend(NotifyBase):
         #                 |       |         |
         #              apikey     -from addr-
 
-        if not results.get("user"):
-            # An API Key as not properly specified
-            return None
-
-        if not results.get("password"):
-            # A From Email was not correctly specified
-            return None
-
         # Prepare our API Key
-        results["apikey"] = NotifyResend.unquote(results["user"])
+        if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
+            results["apikey"] = \
+                NotifyResend.unquote(results["qsd"]["apikey"])
 
-        # Prepare our From Email Address
-        results["from_email"] = "{}@{}".format(
-            NotifyResend.unquote(results["password"]),
-            NotifyResend.unquote(results["host"]),
-        )
+        else:
+            results["apikey"] = NotifyResend.unquote(results["user"])
+
+        # Our Targets
+        results["targets"] = []
+
+        # Attempt to detect 'from' email address
+        if "from" in results["qsd"] and len(results["qsd"]["from"]):
+            results["from_addr"] = NotifyResend.unquote(results["qsd"]["from"])
+
+            if results.get("host"):
+                results["targets"].append(
+                    NotifyResend.unquote(results["host"]))
+
+        else:
+            # Prepare our From Email Address
+            results["from_addr"] = "{}@{}".format(
+                NotifyResend.unquote(
+                    results["password"]
+                    if results["password"] else results["user"]),
+                NotifyResend.unquote(results["host"]),
+            )
+
+        if "name" in results["qsd"] and len(results["qsd"]["name"]):
+            results["from_addr"] = formataddr((
+                NotifyResend.unquote(results["qsd"]["name"]),
+                results["from_addr"]), charset="utf-8")
 
         # Acquire our targets
-        results["targets"] = NotifyResend.split_path(results["fullpath"])
+        results["targets"].extend(NotifyResend.split_path(results["fullpath"]))
 
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
@@ -467,5 +586,9 @@ class NotifyResend(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
             results["bcc"] = NotifyResend.parse_list(results["qsd"]["bcc"])
+
+        # Handle Reply To Addresses
+        if "reply" in results["qsd"] and len(results["qsd"]["reply"]):
+            results["reply_to"] = results["qsd"]["reply"]
 
         return results
