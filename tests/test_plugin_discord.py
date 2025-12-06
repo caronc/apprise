@@ -88,7 +88,7 @@ apprise_url_tests = (
     ),
     # test image= field
     (
-        "discord://{}/{}?format=markdown&footer=Yes&image=Yes".format(
+        "discord://{}/{}?format=markdown&footer=Yes&image=Yes&ping=Joe".format(
             "i" * 24, "t" * 64
         ),
         {
@@ -403,6 +403,55 @@ def test_plugin_discord_notifications(mock_post):
     assert len(payload["allow_mentions"]["parse"]) == 2
     assert "everyone" in payload["allow_mentions"]["parse"]
     assert "admin" in payload["allow_mentions"]["parse"]
+
+    # Reset our object
+    mock_post.reset_mock()
+
+    # Test our header parsing when not lead with a header
+    body = """ """
+
+    results = NotifyDiscord.parse_url(
+        # & -> %26 for role otherwise & separates our URL from further parsing
+        f"discord://{webhook_id}/{webhook_token}/?ping=@joe,<@321>,<@%26654>"
+    )
+
+    assert isinstance(results, dict)
+    assert results["user"] is None
+    assert results["webhook_id"] == webhook_id
+    assert results["webhook_token"] == webhook_token
+    assert results["password"] is None
+    assert results["port"] is None
+    assert results["host"] == webhook_id
+    assert results["fullpath"] == f"/{webhook_token}/"
+    assert results["path"] == f"/{webhook_token}/"
+    assert results["query"] is None
+    assert results["schema"] == "discord"
+    assert results["url"] == f"discord://{webhook_id}/{webhook_token}/"
+    instance = NotifyDiscord(**results)
+    assert isinstance(instance, NotifyDiscord)
+
+    response = instance.send(body=body)
+    assert response is True
+    assert mock_post.call_count == 1
+
+    details = mock_post.call_args_list[0]
+    assert (
+        details[0][0]
+        == f"https://discord.com/api/webhooks/{webhook_id}/{webhook_token}"
+    )
+
+    payload = loads(details[1]["data"])
+
+    assert "allow_mentions" in payload
+    assert len(payload["allow_mentions"]["users"]) == 1
+    assert "321" in payload["allow_mentions"]["users"]
+    assert "<@321>" in payload["content"]
+    assert len(payload["allow_mentions"]["roles"]) == 1
+    assert "654" in payload["allow_mentions"]["roles"]
+    assert "<@&654>" in payload["content"]
+    assert len(payload["allow_mentions"]["parse"]) == 1
+    assert "joe" in payload["allow_mentions"]["parse"]
+    assert "@joe" in payload["content"]
 
 
 @mock.patch("requests.post")
