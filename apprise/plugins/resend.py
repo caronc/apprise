@@ -47,7 +47,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_email, parse_list, validate_regex
+from ..utils.parse import is_email, parse_emails, validate_regex
 from .base import NotifyBase
 
 RESEND_HTTP_ERROR_MAP = {
@@ -140,6 +140,11 @@ class NotifyResend(NotifyBase):
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
             },
+            "reply": {
+                "name": _("Reply To"),
+                "type": "list:string",
+                "map_to": "reply_to",
+            },
             "from": {
                 "map_to": "from_addr",
             },
@@ -154,8 +159,8 @@ class NotifyResend(NotifyBase):
     )
 
     def __init__(
-        self, apikey, from_addr, targets=None, cc=None, bcc=None, **kwargs
-    ):
+        self, apikey, from_addr, targets=None, cc=None, bcc=None,
+        reply_to=None, **kwargs):
         """Initialize Notify Resend Object."""
         super().__init__(**kwargs)
 
@@ -177,6 +182,12 @@ class NotifyResend(NotifyBase):
         # Acquire Blind Carbon Copies
         self.bcc = set()
 
+        # Acquire Reply To
+        self.reply_to = set()
+
+        # For tracking our email -> name lookups
+        self.names = {}
+
         result = is_email(from_addr)
         if not result:
             # Invalid from
@@ -190,9 +201,16 @@ class NotifyResend(NotifyBase):
             result["full_email"],
         )
 
+        # Update our Name if specified
+        self.names[self.from_addr[1]] = (
+            result["name"] if result["name"] else False
+        )
+
+        # Acquire our targets
+        targets = parse_emails(targets)
         if targets:
             # Validate recipients (to:) and drop bad ones:
-            for recipient in parse_list(targets):
+            for recipient in targets:
 
                 result = is_email(recipient)
                 if result:
@@ -207,11 +225,16 @@ class NotifyResend(NotifyBase):
             self.targets.append(self.from_addr[1])
 
         # Validate recipients (cc:) and drop bad ones:
-        for recipient in parse_list(cc):
+        for recipient in parse_emails(cc):
 
             result = is_email(recipient)
             if result:
                 self.cc.add(result["full_email"])
+
+                # Index our name (if one exists)
+                self.names[result["full_email"]] = (
+                    result["name"] if result["name"] else False
+                )
                 continue
 
             self.logger.warning(
@@ -219,7 +242,7 @@ class NotifyResend(NotifyBase):
             )
 
         # Validate recipients (bcc:) and drop bad ones:
-        for recipient in parse_list(bcc):
+        for recipient in parse_emails(bcc):
 
             result = is_email(recipient)
             if result:
@@ -229,6 +252,24 @@ class NotifyResend(NotifyBase):
             self.logger.warning(
                 "Dropped invalid Blind Carbon Copy email "
                 f"({recipient}) specified.",
+            )
+
+        # Validate recipients (reply-to:) and drop bad ones:
+        for recipient in parse_emails(reply_to):
+            result = is_email(recipient)
+            if result:
+                self.reply_to.add(result["full_email"])
+
+                # Index our name (if one exists)
+                self.names[result["full_email"]] = (
+                    result["name"] if result["name"] else False
+                )
+                continue
+
+            self.logger.warning(
+                "Dropped invalid Reply To email ({}) specified.".format(
+                    recipient
+                ),
             )
 
         return
@@ -248,13 +289,33 @@ class NotifyResend(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
-        if len(self.cc) > 0:
+        if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join(self.cc)
+            params["cc"] = ",".join([
+                formataddr(
+                    (self.names.get(e, False), e),
+                    # Swap comma for it's escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset="utf-8",
+                ).replace(",", "%2C")
+                for e in self.cc
+            ])
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
             params["bcc"] = ",".join(self.bcc)
+
+        if self.reply_to:
+            # Handle our Reply-To Addresses
+            params["reply"] = ",".join([
+                formataddr(
+                    (self.names.get(e, False), e),
+                    # Swap comma for its escaped url code (if detected) since
+                    # we're using that as a delimiter
+                    charset="utf-8",
+                ).replace(",", "%2C")
+                for e in self.reply_to
+            ])
 
         # a simple boolean check as to whether we display our target emails
         # or not
@@ -373,14 +434,34 @@ class NotifyResend(NotifyBase):
             cc = self.cc - self.bcc - {target}
             bcc = self.bcc - {target}
 
+            # handle our reply to
+            reply_to = self.reply_to - {target}
+
+            # Format our cc addresses to support the Name field
+            cc = [
+                formataddr((self.names.get(addr, False), addr),
+                           charset="utf-8")
+                for addr in cc
+            ]
+
+            # Format our reply-to addresses to support the Name field
+            reply_to = [
+                formataddr((self.names.get(addr, False), addr),
+                           charset="utf-8")
+                for addr in reply_to
+            ]
+
             # Set our target
             payload["to"] = target
 
-            if len(cc):
-                payload["cc"] = list(cc)
+            if cc:
+                payload["cc"] = cc
 
             if len(bcc):
                 payload["bcc"] = list(bcc)
+
+            if reply_to:
+                payload["reply_to"] = reply_to
 
             self.logger.debug(
                 "Resend POST URL:"
@@ -472,7 +553,10 @@ class NotifyResend(NotifyBase):
         # Attempt to detect 'from' email address
         if "from" in results["qsd"] and len(results["qsd"]["from"]):
             results["from_addr"] = NotifyResend.unquote(results["qsd"]["from"])
-            results["targets"].append(NotifyResend.unquote(results["host"]))
+
+            if results.get("host"):
+                results["targets"].append(
+                    NotifyResend.unquote(results["host"]))
 
         else:
             # Prepare our From Email Address
@@ -502,5 +586,9 @@ class NotifyResend(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
             results["bcc"] = NotifyResend.parse_list(results["qsd"]["bcc"])
+
+        # Handle Reply To Addresses
+        if "reply" in results["qsd"] and len(results["qsd"]["reply"]):
+            results["reply_to"] = results["qsd"]["reply"]
 
         return results

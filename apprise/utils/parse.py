@@ -414,7 +414,7 @@ def is_email(address):
             "name": (
                 ""
                 if match.group("name") is None
-                else match.group("name").strip()
+                else match.group("name").rstrip(" \t\r\n\x0b\x0c+")
             ),
             # The email address
             "email": match.group("email"),
@@ -424,7 +424,7 @@ def is_email(address):
             "label": (
                 ""
                 if match.group("label") is None
-                else match.group("label").strip()
+                else match.group("label").strip(" \t\r\n\x0b\x0c+")
             ),
             # The user (which does not include the label) from the email
             # parsed.

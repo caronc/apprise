@@ -89,25 +89,25 @@ apprise_url_tests = (
         },
     ),
     (
-        "resend://abcd:user@example.com/newuser@example.com",
+        "resend://abcd:user@example.com/newuser1@example.com",
         {
             # A good email
             "instance": NotifyResend,
         },
     ),
     (
-        "resend://abcd:user@example.com/newuser@example.com?name=Jessica",
+        "resend://abcd:user@example.com/newuser2@example.com?name=Jessica",
         {
             # A good email
             "instance": NotifyResend,
             "privacy_url": \
-                "resend://a...d:user@example.com/newuser@example.com",
+                "resend://a...d:user@example.com/newuser2@example.com",
             "url_matches": r"name=Jessica",
         },
     ),
     (
         (
-            "resend://abcd@newuser%40example.com?name=Ralph"
+            "resend://abcd@newuser4%40example.com?name=Ralph"
             "&from=user2@example.ca"
         ),
         {
@@ -121,19 +121,42 @@ apprise_url_tests = (
     (
         (
             "resend://?apikey=abcd&from=Joe<user@example.com>"
-            "&to=newuser@example.com"
+            "&to=newuser5@example.com"
          ),
         {
             # A good email
             "instance": NotifyResend,
             "privacy_url": \
-                "resend://a...d:user@example.com/newuser@example.com",
+                "resend://a...d:user@example.com/newuser5@example.com",
             "url_matches": r"name=Joe",
         },
     ),
     (
         (
-            "resend://abcd:user@example.com/newuser@example.com"
+            "resend://?apikey=abcd&from=Joe<user@example.com>"
+            "&reply=John<newuser6@example.com>"
+         ),
+        {
+            # A good email
+            "instance": NotifyResend,
+            "privacy_url": \
+                "resend://a...d:user@example.com",
+            "url_matches": r"reply=John",
+        },
+    ),
+    (
+        (
+            "resend://?apikey=abcd&from=Joe<user@example.com>"
+            "&reply=garbage%"
+         ),
+        {
+            # A good email but has a garbage reply-to value
+            "instance": NotifyResend,
+        },
+    ),
+    (
+        (
+            "resend://abcd:user@example.com/newuser7@example.com"
             "?bcc=l2g@nuxref.com"
         ),
         {
@@ -142,21 +165,32 @@ apprise_url_tests = (
         },
     ),
     (
-        "resend://abcd:user@example.com/newuser@example.com?cc=l2g@nuxref.com",
+        "resend://abcd:user@example.com/newuser8@example.com?cc=l2g@nuxref.com",
         {
             # A good email with Carbon Copy
             "instance": NotifyResend,
         },
     ),
     (
-        "resend://abcd:user@example.com/newuser@example.com?to=l2g@nuxref.com",
+        (
+            "resend://abcd:user@example.com/newuser8@example.com?"
+            "cc=Chris<l2g@nuxref.com>"
+        ),
+        {
+            # A good email with Carbon Copy + Name
+            "instance": NotifyResend,
+        },
+    ),
+
+    (
+        "resend://abcd:user@example.com/newuser9@example.com?to=l2g@nuxref.com",
         {
             # A good email with Carbon Copy
             "instance": NotifyResend,
         },
     ),
     (
-        "resend://abcd:user@example.ca/newuser@example.ca",
+        "resend://abcd:user@example.ca/newuser0@example.ca",
         {
             "instance": NotifyResend,
             # force a failure
@@ -165,7 +199,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "resend://abcd:user@example.uk/newuser@example.uk",
+        "resend://abcd:user@example.uk/newuser01@example.uk",
         {
             "instance": NotifyResend,
             # throw a bizarre code forcing us to fail to look it up
@@ -174,7 +208,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "resend://abcd:user@example.au/newuser@example.au",
+        "resend://abcd:user@example.au/newuser02@example.au",
         {
             "instance": NotifyResend,
             # Throws a series of i/o exceptions with this flag

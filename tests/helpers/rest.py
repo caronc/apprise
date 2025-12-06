@@ -261,14 +261,13 @@ class AppriseURLTester:
                     f" expected '{privacy_url}'"
                 )
 
-            if url_matches:
-                # Assess that our URL matches a set regex
-                if not re.search(url_matches, obj.url()):
-                    raise AssertionError(
-                        f"URL: {url} generated an reloadable "
-                        f"url() of {obj.url()} that does not match "
-                        f"'{url_matches}'"
-                    )
+            # Assess that our URL matches a set regex
+            if url_matches and not re.search(url_matches, obj.url()):
+                raise AssertionError(
+                    f"URL: {url} generated an reloadable "
+                    f"url() of {obj.url()} that does not match "
+                    f"'{url_matches}'"
+                )
 
             # Instantiate the exact same object again using the URL
             # from the one that was already created properly
