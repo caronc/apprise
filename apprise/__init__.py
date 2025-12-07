@@ -26,11 +26,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 __title__ = "Apprise"
-__version__ = "1.9.5"
+__description__: str = \
+    "Push Notifications that work with just about every platform!"
+__version__ = "1.9.6"
 __author__ = "Chris Caron"
-__license__ = "BSD 2-Clause"
-__copywrite__ = "Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>"
 __email__ = "lead2gold@gmail.com"
+__license__ = "BSD 2-Clause"
+__copyright__ = "Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>"
 __status__ = "Production"
 
 from . import decorators, exception

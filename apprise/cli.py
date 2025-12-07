@@ -41,7 +41,7 @@ from . import (
     AppriseAsset,
     AppriseConfig,
     PersistentStore,
-    __copywrite__,
+    __copyright__,
     __license__,
     __title__,
     __version__,
@@ -249,7 +249,7 @@ def print_version_msg():
     """Prints version message when -V or --version is specified."""
     result = []
     result.append(f"{__title__} v{__version__}")
-    result.append(__copywrite__)
+    result.append(__copyright__)
     result.append(f"This code is licensed under the {__license__} License.")
     click.echo("\n".join(result))
 

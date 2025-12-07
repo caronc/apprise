@@ -81,7 +81,7 @@ notification services. It supports sending alerts to platforms such as: \
 `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
 
 Name:           python-%{pypi_name}
-Version:        1.9.5
+Version:        1.9.6
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -232,6 +232,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Sun Dec  7 2025 Chris Caron <lead2gold@gmail.com> - 1.9.6-1
+- Updated to v1.9.6
+
 * Tue Sep 30 2025 Chris Caron <lead2gold@gmail.com> - 1.9.5-1
 - Updated to v1.9.5
 

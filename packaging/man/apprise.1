@@ -1,5 +1,5 @@
-.\" generated with Ronn-NG/v0.9.1
-.\" http://github.com/apjanke/ronn-ng/tree/0.9.1
+.\" generated with Ronn-NG/v0.10.1
+.\" http://github.com/apjanke/ronn-ng/tree/0.10.1
 .TH "APPRISE" "1" "September 2025" "Chris Caron <lead2gold@gmail.com>"
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
@@ -10,15 +10,15 @@
 .br
 .SH "DESCRIPTION"
 \fBApprise\fR allows you to send a notification to \fIalmost all\fR of the most popular notification services available to us today such as: Discord, Telegram, Pushbullet, Slack, Twitter, etc\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
 One notification library to rule them all\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
 A common and intuitive notification syntax\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
 Supports the handling of images (to the notification services that will accept them)\.
-.IP "\[ci]" 4
-It\'s incredibly lightweight\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
+It's incredibly lightweight\.
+.IP "\(bu" 4
 Amazing response times because all messages sent asynchronously\.
 .IP "" 0
 .SH "OPTIONS"
@@ -97,17 +97,17 @@ The \fBstorage\fR action has the following sub actions:
 \fBclean\fR: Removes all persistent storage reguardless of age\.
 .SH "EXIT STATUS"
 \fBapprise\fR exits with a status of:
-.IP "\[ci]" 4
+.IP "\(bu" 4
 \fB0\fR if all of the notifications were sent successfully\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
 \fB1\fR if one or more notifications could not be sent\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
 \fB2\fR if there was an error specified on the command line such as not providing an valid argument\.
-.IP "\[ci]" 4
+.IP "\(bu" 4
 \fB3\fR if there was one or more Apprise Service URLs successfully loaded but none could be notified due to user filtering (via tags)\.
 .IP "" 0
 .SH "SERVICE URLS"
-There are to many service URL and combinations to list here\. It\'s best to visit the Apprise GitHub page \fIhttps://github\.com/caronc/apprise/wiki#notification\-services\fR and see what\'s available\.
+There are to many service URL and combinations to list here\. It's best to visit the Apprise GitHub page \fIhttps://github\.com/caronc/apprise/wiki#notification\-services\fR and see what's available\.
 .P
 The \fBenvironment variable\fR of \fBAPPRISE_URLS\fR (comma/space delimited) can be specified to provide the default set of URLs you wish to notify if none are otherwise specified\.
 .SH "EXAMPLES"
@@ -120,7 +120,7 @@ $ apprise \-vv \-t "my title" \-b "my notification body" \e
 .fi
 .IP "" 0
 .P
-If you don\'t specify a \fB\-\-body\fR (\fB\-b\fR) then stdin is used allowing you to use the tool as part of your every day administration:
+If you don't specify a \fB\-\-body\fR (\fB\-b\fR) then stdin is used allowing you to use the tool as part of your every day administration:
 .IP "" 4
 .nf
 $ cat /proc/cpuinfo | apprise \-vv \-t "cpu info" \e
@@ -174,7 +174,7 @@ $ apprise storage prune \-\-storage\-prune\-days=10
 .fi
 .IP "" 0
 .SH "CUSTOM PLUGIN/NOTIFICATIONS"
-Apprise can additionally allow you to define your own custom \fBschema://\fR entries that you can trigger on and call services you\'ve defined\.
+Apprise can additionally allow you to define your own custom \fBschema://\fR entries that you can trigger on and call services you've defined\.
 .P
 By default \fBapprise\fR looks in the following local locations for custom plugin files and loads them:
 .IP "" 4
