@@ -23,7 +23,6 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import six
 import sys
 import ssl
 import mock
@@ -180,10 +179,10 @@ def test_plugin_xmpp_general(tmpdir):
         assert obj.enabled is True
 
         # Test url() call
-        assert isinstance(obj.url(), six.string_types) is True
+        assert isinstance(obj.url(), str) is True
 
         # Test url(privacy=True) call
-        assert isinstance(obj.url(privacy=True), six.string_types) is True
+        assert isinstance(obj.url(privacy=True), str) is True
 
         assert obj.url(privacy=True).startswith(privacy_url)
 

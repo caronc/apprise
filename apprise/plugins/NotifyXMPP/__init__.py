@@ -25,11 +25,11 @@
 
 import re
 
-from ..NotifyBase import NotifyBase
-from ...URLBase import PrivacyMode
+from ..base import NotifyBase
+from ...url import PrivacyMode
 from ...common import NotifyType
-from ...utils import parse_list
-from ...AppriseLocale import gettext_lazy as _
+from ...utils.parse import parse_list
+from ...locale import gettext_lazy as _
 from .SliXmppAdapter import SliXmppAdapter
 
 # xep string parser
