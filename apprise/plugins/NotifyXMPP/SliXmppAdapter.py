@@ -170,10 +170,10 @@ class SliXmppAdapter(object):
                         'no local CA certificate file')
                     return False
 
-        # If the user specified a port, skip SRV resolving, otherwise it is a
-        # lot easier to let slixmpp handle DNS instead of the user.
-        self.override_connection = \
-            None if not self.port else (self.host, self.port)
+        # If the user specified a port, skip SRV resolving by leaving the host set,
+        # otherwise it is a lot easier to let slixmpp handle DNS instead of the user.
+        if not self.port:
+            self.host = None
 
         # We're good
         return True
@@ -184,10 +184,7 @@ class SliXmppAdapter(object):
 
         """
 
-        # Instruct slixmpp to connect to the XMPP service.
-        if not self.xmpp.connect(
-                self.override_connection, use_ssl=self.secure):
-            return False
+        self.xmpp.connect(self.host, self.port)
 
         # Run the asyncio event loop, and return once disconnected,
         # for any reason.
