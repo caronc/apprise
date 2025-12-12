@@ -203,7 +203,6 @@ class SliXmppAdapter(object):
             targets.append(self.jid)
 
         while len(targets) > 0:
-
             # Get next target (via JID)
             target = targets.pop(0)
 
@@ -215,9 +214,7 @@ class SliXmppAdapter(object):
                 mto=target, msubject=self.subject,
                 mbody=self.body, mtype='chat')
 
-        # Using wait=True ensures that the send queue will be
-        # emptied before ending the session.
-        self.xmpp.disconnect(wait=True)
+        self.xmpp.disconnect()
 
         # Toggle our success flag
         self.success = True
