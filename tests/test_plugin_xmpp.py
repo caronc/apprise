@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2020 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
@@ -23,31 +22,33 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import sys
-import ssl
-import mock
-import pytest
-import apprise
-
 # Disable logging for a cleaner testing output
 import logging
+import ssl
+import sys
+from unittest import mock
+
+import pytest
+
+import apprise
+
 logging.disable(logging.CRITICAL)
 
 
 @pytest.mark.skipif(
-    'slixmpp' in sys.modules, reason="Requires that slixmpp NOT be installed")
+    "slixmpp" in sys.modules, reason="Requires that slixmpp NOT be installed")
 def test_plugin_xmpp_slixmpp_import_error():
     """
     NotifyXMPP() 'slixmpp' Import Error
 
     """
     # Without the slixmpp library, we can not load our object
-    obj = apprise.Apprise.instantiate('xmpp://user:pass@localhost')
+    obj = apprise.Apprise.instantiate("xmpp://user:pass@localhost")
     assert obj is None
 
 
 @pytest.mark.skipif(
-    'slixmpp' not in sys.modules, reason="Requires slixmpp")
+    "slixmpp" not in sys.modules, reason="Requires slixmpp")
 def test_plugin_xmpp_general(tmpdir):
     """
     NotifyXMPP() General Checks
@@ -70,14 +71,14 @@ def test_plugin_xmpp_general(tmpdir):
     apprise.plugins.NotifyBase.request_rate_per_sec = 0
 
     # Create our instance
-    obj = apprise.Apprise.instantiate('xmpp://', suppress_exceptions=False)
+    obj = apprise.Apprise.instantiate("xmpp://", suppress_exceptions=False)
 
     # Not possible because no password or host was specified
     assert obj is None
 
     with pytest.raises(TypeError):
         apprise.Apprise.instantiate(
-            'xmpp://hostname', suppress_exceptions=False)
+            "xmpp://hostname", suppress_exceptions=False)
 
     # SSL Flags
     if hasattr(ssl, "PROTOCOL_TLS"):
@@ -86,7 +87,7 @@ def test_plugin_xmpp_general(tmpdir):
         del ssl.PROTOCOL_TLS
 
         # Test our URL
-        url = 'xmpps://user:pass@127.0.0.1'
+        url = "xmpps://user:pass@127.0.0.1"
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
         # Test we loaded
@@ -95,24 +96,24 @@ def test_plugin_xmpp_general(tmpdir):
         # Check that it found our mocked environments
         assert obj.enabled is True
 
-        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+        with mock.patch("slixmpp.ClientXMPP") as mock_stream:
             client_stream = mock.Mock()
             client_stream.connect.return_value = True
             mock_stream.return_value = client_stream
 
             # We fail because we could not verify the host
             assert obj.notify(
-                title='title', body='body',
+                title="title", body="body",
                 notify_type=apprise.NotifyType.INFO) is False
 
         # Restore the variable for remaining tests
-        setattr(ssl, 'PROTOCOL_TLS', ssl_temp_swap)
+        ssl.PROTOCOL_TLS = ssl_temp_swap
 
     else:
         # Handle case where it is not missing
-        setattr(ssl, 'PROTOCOL_TLS', ssl.PROTOCOL_TLSv1)
+        ssl.PROTOCOL_TLS = ssl.PROTOCOL_TLSv1
         # Test our URL
-        url = 'xmpps://user:pass@localhost'
+        url = "xmpps://user:pass@localhost"
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
         # Test we loaded
@@ -121,13 +122,13 @@ def test_plugin_xmpp_general(tmpdir):
         # Check that it found our mocked environments
         assert obj.enabled is True
 
-        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+        with mock.patch("slixmpp.ClientXMPP") as mock_stream:
             client_stream = mock.Mock()
             client_stream.connect.return_value = True
             mock_stream.return_value = client_stream
 
             assert obj.notify(
-                title='title', body='body',
+                title="title", body="body",
                 notify_type=apprise.NotifyType.INFO) is True
 
         # Restore settings as they were
@@ -135,40 +136,40 @@ def test_plugin_xmpp_general(tmpdir):
 
     urls = (
         {
-            'u': 'xmpp://user:pass@localhost',
-            'p': 'xmpp://user:****@localhost',
+            "u": "xmpp://user:pass@localhost",
+            "p": "xmpp://user:****@localhost",
         }, {
-            'u': 'xmpp://user:pass@localhost?'
-                 'xep=30,199,garbage,xep_99999999',
-            'p': 'xmpp://user:****@localhost',
+            "u": "xmpp://user:pass@localhost?"
+                 "xep=30,199,garbage,xep_99999999",
+            "p": "xmpp://user:****@localhost",
         }, {
-            'u': 'xmpps://user:pass@localhost?xep=ignored&verify=no',
-            'p': 'xmpps://user:****@localhost',
+            "u": "xmpps://user:pass@localhost?xep=ignored&verify=no",
+            "p": "xmpps://user:****@localhost",
         }, {
-            'u': 'xmpps://user:pass@localhost/?verify=false&to='
-                 'user@test.com, user2@test.com/resource',
-                 'p': 'xmpps://user:****@localhost',
+            "u": "xmpps://user:pass@localhost/?verify=false&to="
+                 "user@test.com, user2@test.com/resource",
+                 "p": "xmpps://user:****@localhost",
         }, {
-            'u': 'xmpps://user:pass@localhost:5226?'
-                 'jid=user@test.com&verify=no',
-            'p': 'xmpps://user:****@localhost:5226',
+            "u": "xmpps://user:pass@localhost:5226?"
+                 "jid=user@test.com&verify=no",
+            "p": "xmpps://user:****@localhost:5226",
         }, {
-            'u': 'xmpps://user:pass@localhost?jid=user@test.com&verify=False',
-            'p': 'xmpps://user:****@localhost',
+            "u": "xmpps://user:pass@localhost?jid=user@test.com&verify=False",
+            "p": "xmpps://user:****@localhost",
         }, {
-            'u': 'xmpps://user:pass@localhost?verify=False',
-            'p': 'xmpps://user:****@localhost',
+            "u": "xmpps://user:pass@localhost?verify=False",
+            "p": "xmpps://user:****@localhost",
         }, {
-            'u': 'xmpp://user:pass@localhost?to=user@test.com&verify=no',
-            'p': 'xmpp://user:****@localhost',
+            "u": "xmpp://user:pass@localhost?to=user@test.com&verify=no",
+            "p": "xmpp://user:****@localhost",
         }
     )
 
     # Try Different Variations of our URL
     for entry in urls:
 
-        url = entry['u']
-        privacy_url = entry['p']
+        url = entry["u"]
+        privacy_url = entry["p"]
 
         obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
 
@@ -186,67 +187,66 @@ def test_plugin_xmpp_general(tmpdir):
 
         assert obj.url(privacy=True).startswith(privacy_url)
 
-        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+        with mock.patch("slixmpp.ClientXMPP") as mock_stream:
             client_stream = mock.Mock()
             client_stream.connect.return_value = True
             mock_stream.return_value = client_stream
 
-            print(obj.url())
             # test notifications
             assert obj.notify(
-                title='title', body='body',
+                title="title", body="body",
                 notify_type=apprise.NotifyType.INFO) is True
 
             # test notification without a title
             assert obj.notify(
-                title='', body='body',
+                title="", body="body",
                 notify_type=apprise.NotifyType.INFO) is True
 
         # Test Connection Failure
-        with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+        with mock.patch("slixmpp.ClientXMPP") as mock_stream:
             client_stream = mock.Mock()
             client_stream.connect.return_value = False
             mock_stream.return_value = client_stream
 
             # test notifications
             assert obj.notify(
-                title='title', body='body',
+                title="title", body="body",
                 notify_type=apprise.NotifyType.INFO) is False
 
     # Toggle our enabled flag
     obj.enabled = False
 
-    with mock.patch('slixmpp.ClientXMPP') as mock_client:
+    with mock.patch("slixmpp.ClientXMPP") as mock_client:
         # Allow a connection to succeed
         mock_client.connect.return_value = True
 
         # Verify that we can't send content now
         assert obj.notify(
-            title='', body='body',
+            title="", body="body",
             notify_type=apprise.NotifyType.INFO) is False
 
     # Toggle it back so it doesn't disrupt other testing
     obj.enabled = True
 
     # create an empty file for now
-    ca_cert = tmpdir.mkdir("apprise_slixmpp_test").join('ca_cert')
-    ca_cert.write('')
+    ca_cert = tmpdir.mkdir("apprise_slixmpp_test").join("ca_cert")
+    ca_cert.write("")
 
     # Update our path
     apprise.plugins.SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = \
         [str(ca_cert), ]
 
     obj = apprise.Apprise.instantiate(
-        'xmpps://user:pass@localhost/user@test.com?verify=yes',
+        "xmpps://user:pass@localhost/user@test.com?verify=yes",
         suppress_exceptions=False)
     assert isinstance(obj, apprise.plugins.NotifyXMPP) is True
 
-    with mock.patch('slixmpp.ClientXMPP') as mock_client:
+    with mock.patch("slixmpp.ClientXMPP") as mock_client:
         # Allow a connection to succeed
         mock_client.connect.return_value = True
         # Our notification now should be able to get a ca_cert to reference
         assert obj.notify(
-            title='', body='body', notify_type=apprise.NotifyType.INFO) is True
+            title="", body="body", notify_type=apprise.NotifyType.INFO) is True
 
     # Restore our CA Certificates from backup
     apprise.plugins.SliXmppAdapter.CA_CERTIFICATE_FILE_LOCATIONS = \
@@ -254,7 +254,7 @@ def test_plugin_xmpp_general(tmpdir):
 
 
 @pytest.mark.skipif(
-    'slixmpp' not in sys.modules, reason="Requires slixmpp")
+    "slixmpp" not in sys.modules, reason="Requires slixmpp")
 def test_plugin_xmpp_slixmpp_callbacks():
     """
     NotifyXMPP() slixmpp callback tests
@@ -271,22 +271,22 @@ def test_plugin_xmpp_slixmpp_callbacks():
         return
 
     kwargs = {
-        'host': 'localhost',
-        'port': 5555,
-        'secure': False,
-        'verify_certificate': False,
-        'xep': [
+        "host": "localhost",
+        "port": 5555,
+        "secure": False,
+        "verify_certificate": False,
+        "xep": [
             # xep_0030: Service Discovery
             30,
             # xep_0199: XMPP Ping
             199,
         ],
-        'jid': 'user@localhost',
-        'password': 'secret!',
-        'body': 'my message to delivery!',
-        'targets': ['user2@localhost'],
-        'before_message': dummy_before_message,
-        'logger': None,
+        "jid": "user@localhost",
+        "password": "secret!",
+        "body": "my message to delivery!",
+        "targets": ["user2@localhost"],
+        "before_message": dummy_before_message,
+        "logger": None,
     }
 
     # Set success flag
@@ -295,7 +295,7 @@ def test_plugin_xmpp_slixmpp_callbacks():
     # Enforce Adapter
     apprise.plugins.NotifyXMPP._adapter = apprise.plugins.SliXmppAdapter
 
-    with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+    with mock.patch("slixmpp.ClientXMPP") as mock_stream:
         client_stream = mock.Mock()
         client_stream.send_message.return_value = True
         mock_stream.return_value = client_stream
@@ -311,14 +311,14 @@ def test_plugin_xmpp_slixmpp_callbacks():
         assert adapter.success is True
 
     # Now we'll do a test with no one to notify
-    kwargs['targets'] = []
+    kwargs["targets"] = []
     adapter = apprise.plugins.SliXmppAdapter(**kwargs)
     assert isinstance(adapter, apprise.plugins.SliXmppAdapter)
 
     # success flag should be back to a False state
     assert adapter.success is False
 
-    with mock.patch('slixmpp.ClientXMPP') as mock_stream:
+    with mock.patch("slixmpp.ClientXMPP") as mock_stream:
         client_stream = mock.Mock()
         client_stream.send_message.return_value = True
         mock_stream.return_value = client_stream
@@ -327,7 +327,7 @@ def test_plugin_xmpp_slixmpp_callbacks():
         assert adapter.success is True
 
     # Restore our target, but set up invalid xep codes
-    kwargs['targets'] = ['user2@localhost']
-    kwargs['xep'] = [1, 999]
+    kwargs["targets"] = ["user2@localhost"]
+    kwargs["xep"] = [1, 999]
     with pytest.raises(ValueError):
         apprise.plugins.SliXmppAdapter(**kwargs)

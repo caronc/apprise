@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2022 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
@@ -23,18 +22,18 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import ssl
-from os.path import isfile
 import logging
-
+from os.path import isfile
+import ssl
 
 # Default our global support flag
 SLIXMPP_SUPPORT_AVAILABLE = False
 
 try:
     # Import slixmpp if available
-    import slixmpp
     import asyncio
+
+    import slixmpp
 
     SLIXMPP_SUPPORT_AVAILABLE = True
 
@@ -44,7 +43,7 @@ except ImportError:
     pass
 
 
-class SliXmppAdapter(object):
+class SliXmppAdapter:
     """
     Wrapper to slixmpp
 
@@ -57,10 +56,10 @@ class SliXmppAdapter(object):
     success = False
 
     # The default protocol
-    protocol = 'xmpp'
+    protocol = "xmpp"
 
     # The default secure protocol
-    secure_protocol = 'xmpps'
+    secure_protocol = "xmpps"
 
     # Taken from https://golang.org/src/crypto/x509/root_linux.go
     CA_CERTIFICATE_FILE_LOCATIONS = [
@@ -110,8 +109,8 @@ class SliXmppAdapter(object):
         self.logger = logger or logging.getLogger(__name__)
 
         # Use the Apprise log handlers for configuring the slixmpp logger.
-        apprise_logger = logging.getLogger('apprise')
-        sli_logger = logging.getLogger('slixmpp')
+        apprise_logger = logging.getLogger("apprise")
+        sli_logger = logging.getLogger("slixmpp")
         for handler in apprise_logger.handlers:
             sli_logger.addHandler(handler)
         sli_logger.setLevel(apprise_logger.level)
@@ -137,12 +136,12 @@ class SliXmppAdapter(object):
         for xep in self.xep:
             # Load xep entries
             try:
-                self.xmpp.register_plugin('xep_{0:04d}'.format(xep))
+                self.xmpp.register_plugin("xep_{:04d}".format(xep))
 
             except slixmpp.plugins.base.PluginNotFound:
                 self.logger.warning(
-                    'Could not register plugin {}'.format(
-                        'xep_{0:04d}'.format(xep)))
+                    "Could not register plugin {}".format(
+                        "xep_{:04d}".format(xep)))
                 return False
 
         if self.secure:
@@ -164,12 +163,13 @@ class SliXmppAdapter(object):
 
                 if self.xmpp.ca_certs is None:
                     self.logger.warning(
-                        'XMPP Secure comunication can not be verified; '
-                        'no local CA certificate file')
+                        "XMPP Secure comunication can not be verified; "
+                        "no local CA certificate file")
                     return False
 
-        # If the user specified a port, skip SRV resolving by leaving the host set,
-        # otherwise it is a lot easier to let slixmpp handle DNS instead of the user.
+        # If the user specified a port, skip SRV resolving
+        # by leaving the host set, otherwise it is a lot easier
+        # to let slixmpp handle DNS instead of the user.
         if not self.port:
             self.host = None
 
@@ -213,7 +213,7 @@ class SliXmppAdapter(object):
             # The message we wish to send, and the JID that will receive it.
             self.xmpp.send_message(
                 mto=target, msubject=self.subject,
-                mbody=self.body, mtype='chat')
+                mbody=self.body, mtype="chat")
 
         self.xmpp.disconnect()
 

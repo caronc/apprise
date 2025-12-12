@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 #
 # Copyright (C) 2019 Chris Caron <lead2gold@gmail.com>
 # All rights reserved.
@@ -25,15 +24,15 @@
 
 import re
 
-from ..base import NotifyBase
-from ...url import PrivacyMode
 from ...common import NotifyType
-from ...utils.parse import parse_list
 from ...locale import gettext_lazy as _
+from ...url import PrivacyMode
+from ...utils.parse import parse_list
+from ..base import NotifyBase
 from .SliXmppAdapter import SliXmppAdapter
 
 # xep string parser
-XEP_PARSE_RE = re.compile('^[^1-9]*(?P<xep>[1-9][0-9]{0,3})$')
+XEP_PARSE_RE = re.compile("^[^1-9]*(?P<xep>[1-9][0-9]{0,3})$")
 
 
 class NotifyXMPP(NotifyBase):
@@ -45,25 +44,25 @@ class NotifyXMPP(NotifyBase):
 
     requirements = {
         # Define our required packaging in order to work
-        'packages_required': [
+        "packages_required": [
             "slixmpp; python_version >= '3.7'",
         ]
     }
 
     # The default descriptive name associated with the Notification
-    service_name = 'XMPP'
+    service_name = "XMPP"
 
     # The services URL
-    service_url = 'https://xmpp.org/'
+    service_url = "https://xmpp.org/"
 
     # The default protocol
-    protocol = 'xmpp'
+    protocol = "xmpp"
 
     # The default secure protocol
-    secure_protocol = 'xmpps'
+    secure_protocol = "xmpps"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = 'https://github.com/caronc/apprise/wiki/Notify_xmpp'
+    setup_url = "https://github.com/caronc/apprise/wiki/Notify_xmpp"
 
     # Lower throttle rate for XMPP
     request_rate_per_sec = 0.5
@@ -73,61 +72,61 @@ class NotifyXMPP(NotifyBase):
 
     # Define object templates
     templates = (
-        '{schema}://{user}:{password}@{host}',
-        '{schema}://{user}:{password}@{host}:{port}',
-        '{schema}://{user}:{password}@{host}/{targets}',
-        '{schema}://{user}:{password}@{host}:{port}/{targets}',
+        "{schema}://{user}:{password}@{host}",
+        "{schema}://{user}:{password}@{host}:{port}",
+        "{schema}://{user}:{password}@{host}/{targets}",
+        "{schema}://{user}:{password}@{host}:{port}/{targets}",
     )
 
     # Define our tokens
     template_tokens = dict(NotifyBase.template_tokens, **{
-        'host': {
-            'name': _('Hostname'),
-            'type': 'string',
-            'required': True,
+        "host": {
+            "name": _("Hostname"),
+            "type": "string",
+            "required": True,
         },
-        'port': {
-            'name': _('Port'),
-            'type': 'int',
-            'min': 1,
-            'max': 65535,
+        "port": {
+            "name": _("Port"),
+            "type": "int",
+            "min": 1,
+            "max": 65535,
         },
-        'user': {
-            'name': _('Username'),
-            'type': 'string',
-            'required': True,
+        "user": {
+            "name": _("Username"),
+            "type": "string",
+            "required": True,
         },
-        'password': {
-            'name': _('Password'),
-            'type': 'string',
-            'private': True,
-            'required': True,
+        "password": {
+            "name": _("Password"),
+            "type": "string",
+            "private": True,
+            "required": True,
         },
-        'target_jid': {
-            'name': _('Target JID'),
-            'type': 'string',
-            'map_to': 'targets',
+        "target_jid": {
+            "name": _("Target JID"),
+            "type": "string",
+            "map_to": "targets",
         },
-        'targets': {
-            'name': _('Targets'),
-            'type': 'list:string',
+        "targets": {
+            "name": _("Targets"),
+            "type": "list:string",
         },
     })
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
-        'to': {
-            'alias_of': 'targets',
+        "to": {
+            "alias_of": "targets",
         },
-        'xep': {
-            'name': _('XEP'),
-            'type': 'list:string',
-            'prefix': 'xep-',
-            'regex': (r'^[1-9][0-9]{0,3}$', 'i'),
+        "xep": {
+            "name": _("XEP"),
+            "type": "list:string",
+            "prefix": "xep-",
+            "regex": (r"^[1-9][0-9]{0,3}$", "i"),
         },
-        'jid': {
-            'name': _('Source JID'),
-            'type': 'string',
+        "jid": {
+            "name": _("Source JID"),
+            "type": "string",
         },
     })
 
@@ -135,7 +134,7 @@ class NotifyXMPP(NotifyBase):
         """
         Initialize XMPP Object
         """
-        super(NotifyXMPP, self).__init__(**kwargs)
+        super().__init__(**kwargs)
 
         # JID Details:
         #  - JID's normally have an @ symbol in them, but it is not required
@@ -174,7 +173,7 @@ class NotifyXMPP(NotifyBase):
             # is specified then the user field acts as the password instead
             # so we know that if there is no user specified, our url was
             # really busted up.
-            msg = 'You must specify a XMPP password'
+            msg = "You must specify a XMPP password"
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -196,8 +195,8 @@ class NotifyXMPP(NotifyBase):
             for xep in _xep:
                 result = XEP_PARSE_RE.match(xep)
                 if result is not None:
-                    self.xep.append(int(result.group('xep')))
-                    self.logger.debug('Loaded XMPP {}'.format(xep))
+                    self.xep.append(int(result.group("xep")))
+                    self.logger.debug("Loaded XMPP {}".format(xep))
 
                 else:
                     self.logger.warning(
@@ -208,9 +207,9 @@ class NotifyXMPP(NotifyBase):
             self.targets = parse_list(targets)
 
         else:
-            self.targets = list()
+            self.targets = []
 
-    def send(self, body, title='', notify_type=NotifyType.INFO, **kwargs):
+    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """
         Perform XMPP Notification
         """
@@ -219,7 +218,7 @@ class NotifyXMPP(NotifyBase):
         jid = self.jid
         password = self.password
         if not jid:
-            jid = '{}@{}'.format(self.user, self.host)
+            jid = "{}@{}".format(self.user, self.host)
 
         try:
             # Communicate with XMPP.
@@ -248,31 +247,31 @@ class NotifyXMPP(NotifyBase):
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         if self.jid:
-            params['jid'] = self.jid
+            params["jid"] = self.jid
 
         if self.xep:
             # xep are integers, so we need to just iterate over a list and
             # switch them to a string
-            params['xep'] = ','.join([str(xep) for xep in self.xep])
+            params["xep"] = ",".join([str(xep) for xep in self.xep])
 
         # Target JID(s) can clash with our existing paths, so we just use comma
         # and/or space as a delimiters - %20 = space
-        jids = '%20'.join([NotifyXMPP.quote(x, safe='') for x in self.targets])
+        jids = "%20".join([NotifyXMPP.quote(x, safe="") for x in self.targets])
 
         default_schema = self.secure_protocol if self.secure else self.protocol
 
-        auth = '{user}:{password}'.format(
-            user=NotifyXMPP.quote(self.user, safe=''),
+        auth = "{user}:{password}".format(
+            user=NotifyXMPP.quote(self.user, safe=""),
             password=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=''))
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""))
 
-        return '{schema}://{auth}@{hostname}{port}/{jids}?{params}'.format(
+        return "{schema}://{auth}@{hostname}{port}/{jids}?{params}".format(
             auth=auth,
             schema=default_schema,
             # never encode hostname since we're expecting it to be a valid one
             hostname=self.host,
-            port='' if not self.port
-                 else ':{}'.format(self.port),
+            port="" if not self.port
+                 else ":{}".format(self.port),
             jids=jids,
             params=NotifyXMPP.urlencode(params),
         )
@@ -291,20 +290,20 @@ class NotifyXMPP(NotifyBase):
 
         # Get our targets; we ignore path slashes since they identify
         # our resources
-        results['targets'] = NotifyXMPP.parse_list(results['fullpath'])
+        results["targets"] = NotifyXMPP.parse_list(results["fullpath"])
 
         # Over-ride the xep plugins
-        if 'xep' in results['qsd'] and len(results['qsd']['xep']):
-            results['xep'] = \
-                NotifyXMPP.parse_list(results['qsd']['xep'])
+        if "xep" in results["qsd"] and len(results["qsd"]["xep"]):
+            results["xep"] = \
+                NotifyXMPP.parse_list(results["qsd"]["xep"])
 
         # Over-ride the default (and detected) jid
-        if 'jid' in results['qsd'] and len(results['qsd']['jid']):
-            results['jid'] = NotifyXMPP.unquote(results['qsd']['jid'])
+        if "jid" in results["qsd"] and len(results["qsd"]["jid"]):
+            results["jid"] = NotifyXMPP.unquote(results["qsd"]["jid"])
 
         # Over-ride the default (and detected) jid
-        if 'to' in results['qsd'] and len(results['qsd']['to']):
-            results['targets'] += \
-                NotifyXMPP.parse_list(results['qsd']['to'])
+        if "to" in results["qsd"] and len(results["qsd"]["to"]):
+            results["targets"] += \
+                NotifyXMPP.parse_list(results["qsd"]["to"])
 
         return results
