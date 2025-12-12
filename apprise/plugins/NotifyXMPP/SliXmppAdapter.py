@@ -188,7 +188,7 @@ class SliXmppAdapter(object):
 
         # Run the asyncio event loop, and return once disconnected,
         # for any reason.
-        self.xmpp.process(forever=False)
+        asyncio.get_event_loop().run_until_complete(self.xmpp.disconnected)
 
         return self.success
 
