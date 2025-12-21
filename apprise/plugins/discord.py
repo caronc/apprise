@@ -42,10 +42,13 @@
 # API Documentation on Webhooks:
 #    - https://discord.com/developers/docs/resources/webhook
 #
+from __future__ import annotations
+
 from datetime import datetime, timedelta, timezone
 from itertools import chain
 from json import dumps
 import re
+from typing import Any
 
 import requests
 
@@ -55,7 +58,7 @@ from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
 
-# Used to detect user/role IDs
+# Used to detect user/role IDs and @here/@everyone tokens.
 USER_ROLE_DETECTION_RE = re.compile(
     r"\s*(?:<?@(?P<role>&?)(?P<id>[0-9]+)>?|@(?P<value>[a-z0-9]+))", re.I
 )
@@ -195,6 +198,9 @@ class NotifyDiscord(NotifyBase):
                 "default": False,
                 "map_to": "include_image",
             },
+            # Explicit ping targets. Examples:
+            #  - ping=12345,67890
+            #  - ping=<@12345>,<@&67890>,@here
             "ping": {
                 "name": _("Ping Users/Roles"),
                 "type": "list:string",
@@ -204,21 +210,21 @@ class NotifyDiscord(NotifyBase):
 
     def __init__(
         self,
-        webhook_id,
-        webhook_token,
-        tts=False,
-        avatar=True,
-        footer=False,
-        footer_logo=True,
-        include_image=False,
-        fields=True,
-        avatar_url=None,
-        href=None,
-        thread=None,
-        flags=None,
-        ping=None,
-        **kwargs,
-    ):
+        webhook_id: str,
+        webhook_token: str,
+        tts: bool = False,
+        avatar: bool = True,
+        footer: bool = False,
+        footer_logo: bool = True,
+        include_image: bool = False,
+        fields: bool = True,
+        avatar_url: str | None = None,
+        href: str | None = None,
+        thread: str | None = None,
+        flags: int | None = None,
+        ping: list[str] | None = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Discord Object."""
         super().__init__(**kwargs)
 
@@ -226,8 +232,8 @@ class NotifyDiscord(NotifyBase):
         self.webhook_id = validate_regex(webhook_id)
         if not self.webhook_id:
             msg = (
-                f"An invalid Discord Webhook ID ({webhook_id}) was specified."
-            )
+                f"An invalid Discord Webhook ID ({webhook_id}) was "
+                "specified.")
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -278,36 +284,35 @@ class NotifyDiscord(NotifyBase):
                     raise ValueError()
 
             except (TypeError, ValueError):
-                msg = "An invalid Discord flags setting " \
-                      "({}) was specified.".format(flags)
+                msg = (
+                    f"An invalid Discord flags setting ({flags}) was "
+                    "specified.")
                 self.logger.warning(msg)
                 raise TypeError(msg) from None
         else:
             self.flags = None
 
-        # For Tracking Purposes
+        # Ping targets (tokens from URL, already split by parse_list)
+        self.ping: list[str] = parse_list(ping)
+
         self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Default to 1.0
         self.ratelimit_remaining = 1.0
 
-        # Ping targets (raw tokens from URL, already split by parse_list)
-        self.ping = parse_list(ping)
-
         return
 
     def send(
         self,
-        body,
-        title="",
-        notify_type=NotifyType.INFO,
-        attach=None,
-        **kwargs,
-    ):
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        attach: list[AttachBase] | None = None,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Discord Notification."""
 
-        payload = {
-            # Text-To-Speech
+        payload: dict[str, Any] = {
             "tts": self.tts,
             # If Text-To-Speech is set to True, then we do not want to wait
             # for the whole message before continuing. Otherwise, we wait
@@ -333,12 +338,24 @@ class NotifyDiscord(NotifyBase):
         # Associate our thread_id with our message
         params = {"thread_id": self.thread_id} if self.thread_id else None
 
-        # Apply any pingable content to the payload
-        payload.update(self.ping_payload(body, " ".join(self.ping)))
+        # Ping handling rules:
+        # - If ping= is set, it is an additive if in MARKDOWN mode otherwise
+        #   it is explicit for TEXT/HTML formats.
+        # - Otherwise, ping detection only happens in MARKDOWN mode
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            if self.ping:
+                payload.update(self.ping_payload(body, " ".join(self.ping)))
+            else:
+                payload.update(self.ping_payload(body))
+
+        # TEXT/HTML: no body parsing, ping= is exclusive
+        elif self.ping:
+            payload.update(self.ping_payload(" ".join(self.ping)))
+
 
         if body:
-            # our fields variable
-            fields = []
+            # Track extra embed fields (if used)
+            fields: list[dict[str, str]] = []
 
             if self.notify_format == NotifyFormat.MARKDOWN:
                 # Use embeds for payload
@@ -387,12 +404,13 @@ class NotifyDiscord(NotifyBase):
                         payload["embeds"][0]["fields"] = fields[
                             : self.discord_max_fields
                         ]
-
-                        # Remove entry from head of fields
-                        fields = fields[self.discord_max_fields:]
-
+                        fields = fields[self.discord_max_fields :]
             else:
-                # not markdown
+                # TEXT or HTML:
+                # - No ping detection unless ping= was provided.
+                # - If ping= was provided, ping_payload() already generated
+                #   payload["content"] starting with "👉 ...", and we append
+                #   it.
                 payload["content"] = (
                     body if not title else f"{title}\r\n{body}"
                 ) + payload.get("content", "")
@@ -401,7 +419,7 @@ class NotifyDiscord(NotifyBase):
                 # We failed to post our message
                 return False
 
-            # Process any remaining fields IF set
+            # Send remaining fields (if any)
             if fields:
                 payload["embeds"][0]["description"] = ""
                 for i in range(0, len(fields), self.discord_max_fields):
@@ -426,9 +444,7 @@ class NotifyDiscord(NotifyBase):
             # Remove our text/title based content for attachment use
             #
             payload.pop("embeds", None)
-
             payload.pop("content", None)
-
             payload.pop("allow_mentions", None)
 
             #
@@ -445,7 +461,14 @@ class NotifyDiscord(NotifyBase):
         # Otherwise return
         return True
 
-    def _send(self, payload, attach=None, params=None, rate_limit=1, **kwargs):
+    def _send(
+        self,
+        payload: dict[str, Any],
+        attach: AttachBase | None = None,
+        params: dict[str, str] | None = None,
+        rate_limit: int = 1,
+        **kwargs: Any,
+    ) -> bool:
         """Wrapper to the requests (post) object."""
 
         # Our headers
@@ -464,8 +487,7 @@ class NotifyDiscord(NotifyBase):
         )
         self.logger.debug(f"Discord Payload: {payload!s}")
 
-        # By default set wait to None
-        wait = None
+        wait: float | None = None
 
         if self.ratelimit_remaining <= 0.0:
             # Determine how long we should wait for or if we should wait at
@@ -511,8 +533,8 @@ class NotifyDiscord(NotifyBase):
                         # file handle is safely closed in `finally`; inline
                         # open is intentional
                         open(attach.path, "rb"),  # noqa: SIM115
-                    )}
-
+                    )
+                }
             else:
                 headers["Content-Type"] = "application/json; charset=utf-8"
 
@@ -620,11 +642,10 @@ class NotifyDiscord(NotifyBase):
 
         return True
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
-        # Define any URL parameters
-        params = {
+        params: dict[str, str] = {
             "tts": "yes" if self.tts else "no",
             "avatar": "yes" if self.avatar else "no",
             "footer": "yes" if self.footer else "no",
@@ -646,6 +667,7 @@ class NotifyDiscord(NotifyBase):
             params["thread"] = self.thread_id
 
         if self.ping:
+            # Let Apprise urlencode handle list formatting
             params["ping"] = ",".join(self.ping)
 
         # Ensure our botname is set
@@ -655,31 +677,24 @@ class NotifyDiscord(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         return (
-            "{schema}://{botname}{webhook_id}/{webhook_token}/?{params}"
-            .format(
+            "{schema}://{bname}{webhook_id}/{webhook_token}/?{params}".format(
                 schema=self.secure_protocol,
-                botname=botname,
+                bname=botname,
                 webhook_id=self.pprint(self.webhook_id, privacy, safe=""),
                 webhook_token=self.pprint(
-                    self.webhook_token, privacy, safe=""
-                ),
+                    self.webhook_token, privacy, safe=""),
                 params=NotifyDiscord.urlencode(params),
             )
         )
 
     @property
-    def url_identifier(self):
-        """Returns all of the identifiers that make this URL unique from
-        another simliar one.
-
-        Targets or end points should never be identified here.
-        """
+    def url_identifier(self) -> tuple[str, str, str]:
+        """Returns all of the identifiers that make this URL unique."""
         return (self.secure_protocol, self.webhook_id, self.webhook_token)
 
     @staticmethod
-    def parse_url(url):
-        """Parses the URL and returns enough arguments that can allow us to re-
-        instantiate this object.
+    def parse_url(url: str) -> dict[str, Any] | None:
+        """Parses the URL and returns arguments for instantiating this object.
 
         Syntax:
           discord://webhook_id/webhook_token
@@ -766,7 +781,7 @@ class NotifyDiscord(NotifyBase):
         return results
 
     @staticmethod
-    def parse_native_url(url):
+    def parse_native_url(url: str) -> dict[str, Any] | None:
         """
         Support https://discord.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
         Support Legacy URL as well:
@@ -798,18 +813,21 @@ class NotifyDiscord(NotifyBase):
 
         return None
 
-    def ping_payload(self, *args):
+    def ping_payload(self, *args: str) -> dict[str, Any]:
         """
-        Takes a body and applies the payload associated with pinging
-        the users detected within
+        Takes one or more strings and applies the payload associated with
+        pinging the users detected within.
+
+        This returns a dict that may contain:
+          - allow_mentions
+          - content (starting with "👉 " and containing mention tokens)
         """
 
-        # initialize a payload object we can prepare
-        payload = {}
+        payload: dict[str, Any] = {}
 
-        roles = set()
-        users = set()
-        parse = set()
+        roles: set[str] = set()
+        users: set[str] = set()
+        parse: set[str] = set()
 
         for arg in args:
             # parse for user id's <@123> and role IDs <@&456>
@@ -817,45 +835,42 @@ class NotifyDiscord(NotifyBase):
             if not results:
                 continue
 
-            _content = []
             for is_role, no, value in results:
                 if value:
                     parse.add(value)
-                    _content.append(f"@{value}")
 
                 elif is_role:
                     roles.add(no)
-                    _content.append(f"<@&{no}>")
 
                 else:  # is_user
                     users.add(no)
-                    _content.append(f"<@{no}>")
 
         if not (roles or users or parse):
             # Nothing to add
             return payload
 
-        # First time through...
         payload["allow_mentions"] = {
             "parse": list(parse),
             "users": list(users),
             "roles": list(roles),
         }
 
-        # Add pingable elements to content field
-        payload["content"] = "👉 " + " ".join(chain(
-            [f"@{value}" for value in parse],
-            [f"<@&{value}>" for value in roles],
-            [f"<@{value}>" for value in users],
-        ))
+        payload["content"] = "👉 " + " ".join(
+            chain(
+                [f"@{value}" for value in parse],
+                [f"<@&{value}>" for value in roles],
+                [f"<@{value}>" for value in users],
+            )
+        )
 
         return payload
 
     @staticmethod
-    def extract_markdown_sections(markdown):
-        """Takes a string in a markdown type format and extracts the headers
-        and their corresponding sections into individual fields that get passed
-        as an embed entry to Discord."""
+    def extract_markdown_sections(
+            markdown: str) -> tuple[str, list[dict[str, str]]]:
+        """Extract headers and their corresponding sections into embed
+        fields."""
+
         # Search for any header information found without it's own section
         # identifier
         match = re.match(
@@ -877,7 +892,7 @@ class NotifyDiscord(NotifyBase):
         )
 
         common = regex.finditer(markdown)
-        fields = []
+        fields: list[dict[str, str]] = []
         for el in common:
             d = el.groupdict()
 
