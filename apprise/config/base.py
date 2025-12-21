@@ -214,6 +214,11 @@ class ConfigBase(URLBase):
         # Execute our config parse function which always returns a tuple
         # of our servers and our configuration
         servers, configs = fn(content=content, asset=asset)
+
+        # Free memory
+        del content
+
+        # Add entry to our server list
         self._cached_servers.extend(servers)
 
         # Configuration files were detected; recursively populate them
@@ -308,9 +313,6 @@ class ConfigBase(URLBase):
                 # if we reach here, we can now add this servers found
                 # in this configuration file to our list
                 self._cached_servers.extend(cfg_plugin.servers(asset=asset))
-
-                # We no longer need our configuration object
-                del cfg_plugin
 
             else:
                 # CWE-312 (Secure Logging) Handling
@@ -955,7 +957,7 @@ class ConfigBase(URLBase):
         #
         global_tags = set()
 
-        tags = result.get("tag", None)
+        tags = result.get("tag", result.get("tags", None))
         if tags and isinstance(tags, (list, tuple, str)):
             # Store any preset tags
             global_tags = set(parse_list(tags, cast=str))
@@ -1233,6 +1235,20 @@ class ConfigBase(URLBase):
                         set(parse_list(_results["tag"], cast=str))
                         | global_tags
                     )
+                    if "tags" in _results:
+                        ConfigBase.logger.warning((
+                            "URL #{}: {} contains both 'tag' and 'tags' "
+                            "keyword").format(no + 1, url))
+                        del _results["tags"]
+
+                elif "tags" in _results:
+                    # Tidy our list up
+                    _results["tag"] = (
+                        set(parse_list(_results["tags"], cast=str))
+                        | global_tags
+                    )
+                    # Should not carry forward
+                    del _results["tags"]
 
                 else:
                     # Just use the global settings
@@ -1321,6 +1337,7 @@ class ConfigBase(URLBase):
             # if we reach here, we successfully loaded our data
             servers.append(plugin)
 
+        preloaded.clear()
         return (servers, configs)
 
     def pop(self, index: int = -1) -> object:

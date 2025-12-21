@@ -1785,3 +1785,117 @@ urls:
     assert tzinfo.utcoffset(dt) is not None
     # also stable tzname resolution
     assert isinstance(tzinfo.tzname(dt), str)
+
+def test_config_base_parse_yaml_file05_tags_alias_dict_form(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#5)
+
+    Validate `tags` is accepted as an alias of `tag` in the dict form:
+      - "schema://...":
+           tags: a-tag
+
+    Also implicitly verifies `tags` does not leak into plugin kwargs, because
+    plugin instantiation would fail if an unexpected kwarg is passed through.
+    """
+    t = tmpdir.mkdir("tags-alias-dict-form").join("apprise.yml")
+    t.write("""urls:
+  - pover://nsisxnvnqixq39t0cw54pxieyvtdd9@2jevtmstfg5a7hfxndiybasttxxfku:
+      tags: test1
+  - pover://rg8ta87qngcrkc6t4qbykxktou0uug@tqs3i88xlufexwl8t4asglt4zp5wfn:
+      tags: test2
+  - pover://jcqgnlyq2oetea4qg3iunahj8d5ijm@evalvutkhc8ipmz2lcgc70wtsm0qpb:
+      tags: test3
+""")
+
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # All entries should load
+    assert len(ac.servers()) == 3
+
+    a = Apprise()
+    assert a.add(servers=ac) is True
+    assert len(a) == 3
+
+    # Verify tag matching works
+    assert sum(1 for _ in a.find("no-match")) == 0
+    assert sum(1 for _ in a.find("all")) == 3
+    assert sum(1 for _ in a.find("test1")) == 1
+    assert sum(1 for _ in a.find("test2")) == 1
+    assert sum(1 for _ in a.find("test3")) == 1
+    assert sum(1 for _ in a.find("test1, test3")) == 2
+
+
+def test_config_base_parse_yaml_file06_tags_alias_list_form(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#6)
+
+    Validate `tags` is accepted as an alias of `tag` in the list-of-dicts form:
+      - "schema://...":
+          - tags: a-tag
+          - tags: another-tag
+
+    Expected behaviour: expands into multiple entries (one per list item),
+    and each is tagged appropriately.
+    """
+    t = tmpdir.mkdir("tags-alias-list-form").join("apprise.yml")
+    t.write("""urls:
+  - pover://nsisxnvnqixq39t0cw54pxieyvtdd9@2jevtmstfg5a7hfxndiybasttxxfku:
+    - tags: test1
+    - tags: test2
+  - pover://jcqgnlyq2oetea4qg3iunahj8d5ijm@evalvutkhc8ipmz2lcgc70wtsm0qpb:
+    - tags: test3
+""")
+
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # First URL expands to 2, second expands to 1
+    assert len(ac.servers()) == 3
+
+    a = Apprise()
+    assert a.add(servers=ac) is True
+    assert len(a) == 3
+
+    # Verify tag matching works across expanded entries
+    assert sum(1 for _ in a.find("test1")) == 1
+    assert sum(1 for _ in a.find("test2")) == 1
+    assert sum(1 for _ in a.find("test3")) == 1
+    assert sum(1 for _ in a.find("test1, test2")) == 2
+
+
+def test_config_base_parse_yaml_file07_tag_priority_over_tags(tmpdir):
+    """
+    API: ConfigBase.parse_yaml_file (#7)
+
+    Validate priority: when both `tag` and `tags` are present, `tag` wins.
+
+    This must remain true to preserve the original documented behaviour.
+    """
+    t = tmpdir.mkdir("tag-priority-over-tags").join("apprise.yml")
+    t.write("""urls:
+  - pover://nsisxnvnqixq39t0cw54pxieyvtdd9@2jevtmstfg5a7hfxndiybasttxxfku:
+      tag: primary
+      tags: secondary
+""")
+
+    ac = AppriseConfig(paths=str(t))
+
+    # The number of configuration files that exist
+    assert len(ac) == 1
+
+    # Entry should load successfully
+    assert len(ac.servers()) == 1
+
+    a = Apprise()
+    assert a.add(servers=ac) is True
+    assert len(a) == 1
+
+    # Tag priority check
+    assert sum(1 for _ in a.find("primary")) == 1
+    assert sum(1 for _ in a.find("secondary")) == 0
+
