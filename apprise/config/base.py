@@ -955,7 +955,7 @@ class ConfigBase(URLBase):
         #
         global_tags = set()
 
-        tags = result.get("tag", None)
+        tags = result.get("tag", result.get("tags", None))
         if tags and isinstance(tags, (list, tuple, str)):
             # Store any preset tags
             global_tags = set(parse_list(tags, cast=str))
@@ -1231,6 +1231,13 @@ class ConfigBase(URLBase):
                     # Tidy our list up
                     _results["tag"] = (
                         set(parse_list(_results["tag"], cast=str))
+                        | global_tags
+                    )
+
+                elif "tags" in _results:
+                    # Tidy our list up
+                    _results["tag"] = (
+                        set(parse_list(_results["tags"], cast=str))
                         | global_tags
                     )
 
