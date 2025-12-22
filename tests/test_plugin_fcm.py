@@ -305,6 +305,7 @@ def mock_post_legacy(mocker):
 
     response = mock.Mock()
     response.status_code = requests.codes.ok
+    response.content = b""
     mock_thing.return_value = response
 
     return mock_thing
@@ -837,6 +838,7 @@ def test_plugin_fcm_keyfile_parse_token_failures(mock_post):
     to get our token generated."""
 
     mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.content = b""
 
     oauth = GoogleOAuth()
     assert oauth.load(FCM_KEYFILE) is True
@@ -862,8 +864,8 @@ def test_plugin_fcm_keyfile_parse_token_failures(mock_post):
     # Throw an exception on the first call to requests.post()
     for side_effect in (
         requests.RequestException(),
-        bad_response_1,
-        bad_response_2,
+        [bad_response_1],
+        [bad_response_2],
     ):
         mock_post.side_effect = side_effect
 
@@ -1046,6 +1048,7 @@ def test_plugin_fcm_edge_cases(mock_post):
     # Prepare a good response
     response = mock.Mock()
     response.status_code = requests.codes.ok
+    response.content = b""
     mock_post.return_value = response
 
     # this tests an edge case where verify if the data_kwargs is a dictionary
