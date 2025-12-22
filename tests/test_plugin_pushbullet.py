@@ -261,7 +261,7 @@ def test_plugin_pushbullet_attachments(mock_post):
         "file_type": "image/jpeg",
         "file_url": "https://dl.pushb.com/abc/cat.jpg",
         "upload_url": "https://upload.pushbullet.com/abcd123",
-    }).encode('utf-8')
+    }).encode("utf-8")
     response.status_code = requests.codes.ok
     mock_post.return_value = response
 
@@ -361,7 +361,7 @@ def test_plugin_pushbullet_attachments(mock_post):
         "file_type": "image/jpeg",
         "file_url": "https://dl.pushb.com/abc/cat.jpg",
         "upload_url": "https://upload.pushbullet.com/abcd123",
-    }).encode('utf-8')
+    }).encode("utf-8")
     bad_response.status_code = requests.codes.internal_server_error
     bad_response.headers = {}
 
@@ -372,7 +372,8 @@ def test_plugin_pushbullet_attachments(mock_post):
     bad_json_response.headers = {}
 
     # Throw an exception on the first call to requests.post()
-    for side_effect in (requests.RequestException(), OSError(), [bad_response]):
+    for side_effect in (
+            requests.RequestException(), OSError(), [bad_response]):
         mock_post.reset_mock()
         mock_post.side_effect = side_effect
 
