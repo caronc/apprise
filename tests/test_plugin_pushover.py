@@ -287,7 +287,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     # Prepare a bad response
     bad_response = mock.Mock()
-    response.content = dumps(
+    bad_response.content = dumps(
         {"status": 1, "request": "647d2300-702c-4b38-8b2f-d56326ae460b"}
     )
     bad_response.status_code = requests.codes.internal_server_error

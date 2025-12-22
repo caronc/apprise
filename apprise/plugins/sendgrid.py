@@ -475,7 +475,8 @@ class NotifySendGrid(NotifyBase):
                         )
                     )
 
-                    self.logger.debug(f"Response Details:\r\n{r.content}")
+                    self.logger.debug(
+                        "Response Details:\r\n%r", (r.content or b"")[:2000])
 
                     # Mark our failure
                     has_error = True

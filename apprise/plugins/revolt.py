@@ -302,8 +302,8 @@ class NotifyRevolt(NotifyBase):
 
                 # Some details to debug by
                 self.logger.debug(
-                    f"Response Details:\r\n{content if content else r.content}"
-                )
+                    "Response Details:\r\n%r",
+                    content if content else (r.content or b"")[:2000])
 
                 # We had a problem
                 status_str = NotifyBase.http_response_code_lookup(

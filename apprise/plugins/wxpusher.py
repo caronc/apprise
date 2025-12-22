@@ -306,8 +306,8 @@ class NotifyWxPusher(NotifyBase):
                 )
 
                 self.logger.debug(
-                    f"Response Details:\r\n{content if content else r.content}"
-                )
+                    "Response Details:\r\n%r",
+                    content if content else (r.content or b"")[:2000])
 
                 # Mark our failure
                 return False
