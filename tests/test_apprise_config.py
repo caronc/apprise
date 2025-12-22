@@ -28,6 +28,7 @@
 # Disable logging for a cleaner testing output
 import logging
 import sys
+import time
 from unittest import mock
 
 import pytest
@@ -1423,3 +1424,109 @@ def test_apprise_config_template_parse(tmpdir):
     assert ac[0][3].service_plan_id == "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
     assert ac[0][3].source == "+10005243890"
     assert ac[0][3].targets[0] == "+11235551234"
+
+
+def test_config_base_yaml_trace_logging(tmpdir):
+    """
+    ConfigBase: cover TRACE-only logging path in YAML parsing
+
+    This specifically targets:
+      if ConfigBase.logger.isEnabledFor(logging.TRACE):
+          ConfigBase.logger.trace(...)
+    """
+    t = tmpdir.mkdir("trace-logging").join("apprise.yml")
+    t.write("""urls:
+  - json://localhost
+""")
+
+    # Patch logger methods to force and observe TRACE logging behaviour
+    with mock.patch.object(
+        ConfigBase.logger,
+        "isEnabledFor",
+        side_effect=lambda level: level == logging.TRACE,
+    ), mock.patch.object(ConfigBase.logger, "trace") as m_trace:
+        ac = AppriseConfig(paths=str(t))
+        assert len(ac) == 1
+        assert len(ac.servers()) == 1
+
+        # We expect our TRACE log call to have happened at least once
+        assert m_trace.called is True
+
+
+def test_config_base_clear_cache(tmpdir):
+    """
+    ConfigBase: cover clear_cache() behaviour
+    """
+    t = tmpdir.mkdir("clear-cache").join("apprise.yml")
+    t.write("""urls:
+  - json://localhost
+""")
+
+    ac = AppriseConfig(paths=str(t))
+
+    # Trigger a load to populate cache inside the config instance
+    assert len(ac.servers()) == 1
+
+    # The underlying config object should have cached state
+    cfg = ac[0]
+    assert isinstance(cfg, ConfigBase)
+    assert isinstance(getattr(cfg, "_cached_servers", None), list)
+    assert getattr(cfg, "_cached_time", None) is not None
+
+    # Now clear it and confirm it resets as expected
+    cfg.clear_cache()
+    assert getattr(cfg, "_cached_servers", None) is None
+    assert getattr(cfg, "_cached_time", None) is None
+
+
+def test_config_base_parse_url_cache_variants():
+    """
+    ConfigBase.parse_url(): cover cache parsing for int and bool values
+    """
+    # Integer cache value
+    r = ConfigBase.parse_url("file:///tmp/apprise.yml?cache=60")
+    assert isinstance(r, dict)
+    assert r.get("cache") == 60
+
+    # Boolean cache value (non-int)
+    r = ConfigBase.parse_url("file:///tmp/apprise.yml?cache=no")
+    assert isinstance(r, dict)
+    assert r.get("cache") is False
+
+    r = ConfigBase.parse_url("file:///tmp/apprise.yml?cache=yes")
+    assert isinstance(r, dict)
+    assert r.get("cache") is True
+
+
+def test_config_base_parse_url_invalid_format_removed():
+    """
+    ConfigBase.parse_url(): cover invalid format handling (format removed)
+    """
+    r = ConfigBase.parse_url(
+        "file:///tmp/apprise.yml?format=definitely-not-a-format")
+    assert isinstance(r, dict)
+
+    # Invalid format should be dropped from results
+    assert "format" not in r
+
+
+def test_config_base_expired_with_int_cache(monkeypatch):
+    """
+    ConfigBase.expired(): cover int cache expiry checks
+
+    Simulate time movement to ensure both non-expired and expired paths.
+    """
+    cb = ConfigBase(cache=30)
+
+    # Seed cache
+    cb._cached_servers = []
+    cb._cached_time = 1000.0
+
+    # Within cache window
+    monkeypatch.setattr(time, "time", lambda: 1020.0)
+    assert cb.expired() is False
+
+    # Beyond cache window
+    monkeypatch.setattr(time, "time", lambda: 1031.0)
+    assert cb.expired() is True
+
