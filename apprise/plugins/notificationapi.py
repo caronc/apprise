@@ -805,7 +805,7 @@ class NotifyNotificationAPI(NotifyBase):
                     self.logger.warning(
                         "Invalid response from NotificationAPI server.")
                     self.logger.debug(
-                        "Response Details:\r\n{}".format(r.content))
+                        "Response Details:\r\n%r", (r.content or b"")[:2000])
 
                     # Record our failure
                     has_error = True
@@ -828,8 +828,9 @@ class NotifyNotificationAPI(NotifyBase):
                         status_str,
                         ", " if status_str else "",
                         status_code)
+
                     self.logger.debug(
-                        "Response Details:\r\n%s", str(r.content))
+                        "Response Details:\r\n%r", (r.content or b"")[:2000])
 
                     # Record our failure
                     has_error = True

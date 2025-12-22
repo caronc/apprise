@@ -281,7 +281,8 @@ class GoogleOAuth:
                     f"Failed to update FCM Access Token error={r.status_code}."
                 )
 
-                logger.debug("Response Details:\r\n%s", r.content)
+                logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000])
                 return None
 
         except requests.RequestException as e:
