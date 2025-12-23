@@ -381,7 +381,7 @@ class NotifyWhatsApp(NotifyBase):
                         "text": (
                             body
                             if self.components[key] == "body"
-                            else notify_type
+                            else notify_type.value
                         ),
                     })
 

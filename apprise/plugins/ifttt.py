@@ -199,7 +199,7 @@ class NotifyIFTTT(NotifyBase):
         payload = {
             self.ifttt_default_title_key: title,
             self.ifttt_default_body_key: body,
-            self.ifttt_default_type_key: notify_type,
+            self.ifttt_default_type_key: notify_type.value,
         }
 
         # Add any new tokens expected (this can also potentially override

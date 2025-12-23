@@ -189,6 +189,17 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
         is True
     )
 
+    # Validate outbound payload does not leak NotifyType Enum
+    assert mock_post.call_count >= 1
+    call = mock_post.call_args_list[-1]
+    payload = call[1].get("json") or call[1].get("data") or ""
+    payload_text = payload if isinstance(payload, str) else str(payload)
+
+    assert "NotifyType." not in payload_text
+    # If JSON dict is used:
+    if isinstance(payload, dict):
+        assert NotifyType.INFO.value in payload_text
+
     # Test the addition of tokens
     obj = NotifyIFTTT(
         webhook_id=webhook_id,

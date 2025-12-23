@@ -288,7 +288,7 @@ class NotifyNotifiarr(NotifyBase):
             # prepare Notifiarr Object
             payload = {
                 "source": self.source if self.source else self.app_id,
-                "type": notify_type,
+                "type": notify_type.value,
                 "notification": {
                     "update": bool(self.event),
                     "name": self.app_id,

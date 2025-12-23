@@ -231,7 +231,7 @@ class NotifyMSG91(NotifyBase):
             "mobiles": None,
             # Keyword Tokens
             MSG91PayloadField.BODY: body,
-            MSG91PayloadField.MESSAGETYPE: notify_type,
+            MSG91PayloadField.MESSAGETYPE: notify_type.value,
         }
 
         # Prepare Recipient Payload Object

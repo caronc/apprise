@@ -253,7 +253,7 @@ class NotifyJSON(NotifyBase):
             JSONPayloadField.TITLE: title,
             JSONPayloadField.MESSAGE: body,
             JSONPayloadField.ATTACHMENTS: attachments,
-            JSONPayloadField.MESSAGETYPE: notify_type,
+            JSONPayloadField.MESSAGETYPE: notify_type.value,
         }
 
         for key, value in self.payload_extras.items():

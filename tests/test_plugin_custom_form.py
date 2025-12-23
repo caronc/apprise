@@ -480,6 +480,8 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
     # `message`
     assert "msg" in details[1]["data"]
     assert details[1]["data"]["msg"] == "body"
+    assert details[1]["data"]["type"] == NotifyType.INFO.value
+    assert "NotifyType." not in str(details[1]["data"])
 
     assert instance.url(privacy=False).startswith(
         "form://localhost:8080/command?"

@@ -347,7 +347,7 @@ class NotifyForm(NotifyBase):
             (FORMPayloadField.VERSION, self.form_version),
             (FORMPayloadField.TITLE, title),
             (FORMPayloadField.MESSAGE, body),
-            (FORMPayloadField.MESSAGETYPE, notify_type),
+            (FORMPayloadField.MESSAGETYPE, notify_type.value),
         ):
 
             if not self.payload_map[key]:

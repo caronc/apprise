@@ -35,7 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, NotifyType
 from apprise.plugins.whatsapp import NotifyWhatsApp
 
 logging.disable(logging.CRITICAL)
@@ -321,3 +321,35 @@ def test_plugin_whatsapp_edge_cases(mock_post):
 
     # We will fail with the above error code
     assert obj.notify("title", "body", "info") is False
+
+
+@mock.patch("requests.post")
+def test_plugin_whatsapp_template_notify_type_value(mock_post):
+    response = mock.Mock()
+    response.content = ""
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    token = "b" * 32
+    from_phone_id = "12345"
+    target = "+1 (555) 987-6543"
+
+    # Map notify_type -> {{2}}, body -> {{3}}
+    obj = Apprise.instantiate(
+        f"whatsapp://template:{token}@{from_phone_id}/"
+        f"{target}?:type=2&:body=3"
+    )
+    assert isinstance(obj, NotifyWhatsApp)
+
+    assert obj.send(
+        body="test", title="t", notify_type=NotifyType.INFO) is True
+
+    call = mock_post.call_args_list[0]
+    assert "NotifyType." not in call[1]["data"]
+
+    payload = loads(call[1]["data"])
+    params = payload["template"]["components"][0]["parameters"]
+
+    # Ensure values are injected, not literal strings
+    assert params[0]["text"] == NotifyType.INFO.value
+    assert params[1]["text"] == "test"

@@ -283,6 +283,7 @@ def test_plugin_workflows_simple_test(
         "https://host:443/workflows/workflow/triggers/manual/paths/invoke"
     )
     payload = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert "NotifyType." not in request_mock.call_args_list[0][1]["data"]
     assert payload == {
         "type": "message",
         "attachments": [
@@ -301,7 +302,7 @@ def test_plugin_workflows_simple_test(
                             "master/apprise/assets/themes/default/"
                             "apprise-info-32x32.png",
                             "height": "32px",
-                            "altText": "info",
+                            "altText": NotifyType.INFO.value,
                         }, {
                             "type": "TextBlock",
                             # Verify our Title is set
@@ -343,6 +344,8 @@ def test_plugin_workflows_simple_test(
         "workflows/workflow/triggers/manual/paths/invoke"
     )
     payload = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert "NotifyType." not in request_mock.call_args_list[0][1]["data"]
+
     assert payload == {
         "type": "message",
         "attachments": [
@@ -435,6 +438,7 @@ def test_plugin_workflows_templating_basic_success(
 
     # Our Posted JSON Object
     posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert "NotifyType." not in request_mock.call_args_list[0][1]["data"]
     assert "summary" in posted_json
     assert posted_json["summary"] == "Apprise"
     assert posted_json["themeColor"] == "#3AA3E3"
@@ -553,6 +557,7 @@ def test_plugin_workflows_templating_target_success(
 
     # Our Posted JSON Object
     posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert "NotifyType." not in request_mock.call_args_list[0][1]["data"]
     assert "summary" in posted_json
     assert posted_json["summary"] == "Apprise Notifications"
     assert posted_json["themeColor"] == "#3AA3E3"

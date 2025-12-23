@@ -278,7 +278,7 @@ class NotifyXML(NotifyBase):
             ),
             (
                 XMLPayloadField.MESSAGETYPE,
-                NotifyXML.escape_html(notify_type, whitespace=False),
+                NotifyXML.escape_html(notify_type.value, whitespace=False),
             ),
         ):
 

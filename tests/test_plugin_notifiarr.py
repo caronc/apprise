@@ -35,6 +35,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
+from apprise import NotifyType
 from apprise.plugins.notifiarr import NotifyNotifiarr
 
 logging.disable(logging.CRITICAL)
@@ -264,6 +265,7 @@ def test_plugin_notifiarr_notifications(mock_post):
     assert mock_post.call_count == 1
 
     details = mock_post.call_args_list[0]
+    assert "NotifyType." not in details[1]["data"]
     assert details[0][0] == "https://notifiarr.com/api/v1/notification/apprise"
 
     payload = loads(details[1]["data"])
@@ -271,7 +273,7 @@ def test_plugin_notifiarr_notifications(mock_post):
     # First role and first user stored
     assert payload == {
         "source": "Apprise",
-        "type": "info",
+        "type": NotifyType.INFO.value,
         "notification": {"update": False, "name": "Apprise", "event": ""},
         "discord": {
             "color": "#3AA3E3",
