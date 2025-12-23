@@ -267,6 +267,8 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     dataset = json.loads(details[1]["data"])
     assert dataset["title"] == "title"
     assert "message" not in dataset
+    # Ensure NotifyType does not leak as an Enum string in JSON
+    assert "NotifyType." not in details[1]["data"]
     assert "msg" in dataset
     # type was set to nothing which implies it should be removed
     assert "type" not in dataset
@@ -296,6 +298,20 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
         "method",
     ):
         assert new_results[k] == results[k]
+
+    mock_get.reset_mock()
+    mock_post.reset_mock()
+
+    results = NotifyJSON.parse_url(
+        "json://localhost:8080/command?:message=msg&method=GET"
+    )
+    instance = NotifyJSON(**results)
+    assert instance.send(title="title", body="body") is True
+    details = mock_get.call_args_list[0]
+    dataset = json.loads(details[1]["data"])
+
+    assert dataset["type"] == NotifyType.INFO.value
+    assert "NotifyType." not in details[1]["data"]
 
 
 @mock.patch("requests.post")

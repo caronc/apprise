@@ -27,9 +27,12 @@
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
+import requests
 
+from apprise import Apprise, NotifyType
 from apprise.plugins.pagerduty import NotifyPagerDuty
 
 logging.disable(logging.CRITICAL)
@@ -189,3 +192,24 @@ def test_plugin_pagerduty_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+@mock.patch("requests.post")
+def test_plugin_pagerduty_notify_type_is_string(mock_post):
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = ""
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate("pagerduty://myroutekey@myapikey")
+    assert isinstance(obj, NotifyPagerDuty)
+
+    assert obj.notify(
+        body="body", title="title", notify_type=NotifyType.INFO) is True
+    assert mock_post.call_count == 1
+
+    call = mock_post.call_args_list[0]
+    # PagerDuty uses JSON payload
+    payload = call[1].get("data") or call[1].get("json")
+    payload_text = payload if isinstance(payload, str) else str(payload)
+
+    assert "NotifyType." not in payload_text

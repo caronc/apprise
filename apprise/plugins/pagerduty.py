@@ -374,7 +374,7 @@ class NotifyPagerDuty(NotifyBase):
         if image_url:
             payload["images"] = [{
                 "src": image_url,
-                "alt": notify_type,
+                "alt": notify_type.value,
             }]
 
         if self.details:

@@ -308,7 +308,7 @@ class NotifyWorkflows(NotifyBase):
                 "type": "Image",
                 "url": image_url,
                 "height": "32px",
-                "altText": notify_type,
+                "altText": notify_type.value,
             })
 
         if title:

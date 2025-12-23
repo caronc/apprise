@@ -35,7 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, NotifyType
 from apprise.plugins.msg91 import NotifyMSG91
 
 logging.disable(logging.CRITICAL)
@@ -210,7 +210,7 @@ def test_plugin_msg91_keywords(mock_post):
 
     # Our base tokens
     assert response["recipients"][0]["body"] == message_contents
-    assert response["recipients"][0]["type"] == "info"
+    assert response["recipients"][0]["type"] == NotifyType.INFO.value
     assert response["recipients"][0]["key"] == "value"
 
     mock_post.reset_mock()
@@ -228,6 +228,7 @@ def test_plugin_msg91_keywords(mock_post):
     # Validate expected call parameters
     assert mock_post.call_count == 1
     first_call = mock_post.call_args_list[0]
+    assert "NotifyType." not in first_call[1]["data"]
 
     # URL and message parameters are the same for both calls
     assert first_call[0][0] == "https://control.msg91.com/api/v5/flow/"
