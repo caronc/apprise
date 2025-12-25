@@ -627,7 +627,7 @@ class NotifySendPulse(NotifyBase):
                 #  - AttributeError = r is None
                 self.logger.warning("Invalid response from SendPulse server.")
                 self.logger.debug(
-                    "Response Details:\r\n{}".format(r.content))
+                    "Response Details:\r\n%r", (r.content or b"")[:2000])
                 return (False, {})
 
             # Reference status code
@@ -662,7 +662,7 @@ class NotifySendPulse(NotifyBase):
                             status_code))
 
                 self.logger.debug(
-                    "Response Details:\r\n{}".format(r.content))
+                    "Response Details:\r\n%r", (r.content or b"")[:2000])
 
             else:
                 if target:

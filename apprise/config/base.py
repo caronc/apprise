@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
+from collections import deque
 import os
 import re
 import time
@@ -34,6 +35,7 @@ import yaml
 
 from .. import common, plugins
 from ..asset import AppriseAsset
+from ..logger import logging
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..url import URLBase
@@ -1210,12 +1212,15 @@ class ConfigBase(URLBase):
             # Track our entries
             entry = 0
 
+            # Prepare our results for post-processing
+            results = deque(results)
+
             while len(results):
                 # Increment our entry count
                 entry += 1
 
                 # Grab our first item
-                _results = results.pop(0)
+                _results = results.popleft()
 
                 if _results["schema"] not in N_MGR:
                     # the arguments are invalid or can not be used.
@@ -1265,16 +1270,15 @@ class ConfigBase(URLBase):
                         )
                         del _results[key]
 
-                ConfigBase.logger.trace(
-                    "URL #{}: {} unpacked as:{}{}".format(
+                if ConfigBase.logger.isEnabledFor(logging.TRACE):
+                    ConfigBase.logger.trace(
+                        "URL #%d: %s unpacked as:%s%s",
                         no + 1,
                         url,
                         os.linesep,
                         os.linesep.join(
-                            [f'{k}="{a}"' for k, a in _results.items()]
-                        ),
+                            [f'{k}="{a}"' for k, a in _results.items()]),
                     )
-                )
 
                 # Prepare our Asset Object
                 _results["asset"] = asset
@@ -1353,6 +1357,11 @@ class ConfigBase(URLBase):
 
         # Pop the element off of the stack
         return self._cached_servers.pop(index)
+
+    def clear_cache(self) -> None:
+        """Cleans cache"""
+        self._cached_servers = None
+        self._cached_time = None
 
     @staticmethod
     def _special_token_handler(
