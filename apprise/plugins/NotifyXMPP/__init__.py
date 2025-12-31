@@ -22,17 +22,12 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 # THE SOFTWARE.
 
-import re
-
 from ...common import NotifyType
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_list
 from ..base import NotifyBase
 from .SliXmppAdapter import SliXmppAdapter
-
-# xep string parser
-XEP_PARSE_RE = re.compile("^[^1-9]*(?P<xep>[1-9][0-9]{0,3})$")
 
 
 class NotifyXMPP(NotifyBase):
@@ -118,19 +113,13 @@ class NotifyXMPP(NotifyBase):
         "to": {
             "alias_of": "targets",
         },
-        "xep": {
-            "name": _("XEP"),
-            "type": "list:string",
-            "prefix": "xep-",
-            "regex": (r"^[1-9][0-9]{0,3}$", "i"),
-        },
         "jid": {
             "name": _("Source JID"),
             "type": "string",
         },
     })
 
-    def __init__(self, targets=None, jid=None, xep=None, **kwargs):
+    def __init__(self, targets=None, jid=None, **kwargs):
         """
         Initialize XMPP Object
         """
@@ -145,7 +134,7 @@ class NotifyXMPP(NotifyBase):
 
         # Since JID's can clash with URLs offered by aprise (specifically the
         # resource paths we need to allow users an alternative character to
-        # represent the slashes. The grammer is defined here:
+        # represent the slashes. The grammar is defined here:
         # https://xmpp.org/extensions/xep-0029.html as follows:
         #
         #     <JID> ::= [<node>"@"]<domain>["/"<resource>]
@@ -177,30 +166,13 @@ class NotifyXMPP(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # See https://xmpp.org/extensions/ for details on xep values
-        if xep is None:
-            # Default xep setting
-            self.xep = [
-                # xep_0030: Service Discovery
-                30,
-                # xep_0199: XMPP Ping
-                199,
-            ]
-
-        else:
-            # Prepare the list
-            _xep = parse_list(xep)
-            self.xep = []
-
-            for xep in _xep:
-                result = XEP_PARSE_RE.match(xep)
-                if result is not None:
-                    self.xep.append(int(result.group("xep")))
-                    self.logger.debug("Loaded XMPP {}".format(xep))
-
-                else:
-                    self.logger.warning(
-                        "Could not load XMPP {}".format(xep))
+        # See https://xmpp.org/extensions/ for details on XEP values
+        self.xep = [
+            # xep_0030: Service Discovery
+            30,
+            # xep_0199: XMPP Ping
+            199,
+        ]
 
         # By default we send ourselves a message
         if targets:
