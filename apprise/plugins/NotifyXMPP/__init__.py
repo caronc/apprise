@@ -248,6 +248,27 @@ class NotifyXMPP(NotifyBase):
             params=NotifyXMPP.urlencode(params),
         )
 
+    @property
+    def url_identifier(self):
+        """
+        Returns a unique identifier for this plugin instance.
+        This is used to uniquely identify this service from another when
+        generating a unique identifier for the persistent storage engine.
+
+        The goal is to return anything unique to this object (in a tuple)
+        If you have tokens and/or keys derived from the Apprise URL,
+        then you would want to include those items as well in this response.
+        """
+        schema = self.secure_protocol if self.secure else self.protocol
+        return (schema, self.user, self.host, self.port, self.targets)
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        # If no targets are specified, the sending user is the target
+        return max(len(self.targets), 1)
+
     @staticmethod
     def parse_url(url):
         """
