@@ -283,7 +283,7 @@ class NotifyXMPP(NotifyBase):
 
         # Get our targets; we ignore path slashes since they identify
         # our resources
-        results["targets"] = NotifyXMPP.parse_list(results["fullpath"])
+        results["targets"] = NotifyXMPP.split_path(results["fullpath"])
 
         # Over-ride the xep plugins
         if "xep" in results["qsd"] and len(results["qsd"]["xep"]):
