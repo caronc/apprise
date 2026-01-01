@@ -155,20 +155,7 @@ Recommends: python3dist(paho-mqtt)
 %description -n python%{python3_pkgversion}-%{pypi_name} %{common_description}
 
 %prep
-<<<<<<< HEAD
 %autosetup -n %{pypi_name}-%{version}
-=======
-%setup -q -n %{pypi_name}-%{version}
-%if 0%{?rhel} && 0%{?rhel} <= 7
-# rhel7 older package work-arounds
-%patch0 -p1
-# rhel7 doesn't like the new asyncio syntax
-rm -f apprise/py3compat/asyncio.py
-# rhel7 doesn't support slixmpp and formatting in place
-# within the dev-requirements.txt file to reference it
-sed -i -e '/^slixmpp.*/d' dev-requirements.txt
-%endif
->>>>>>> parent of fcedb47 (Removal of XMPP support due to instability (#619))
 
 %build
 %if %{legacy_python_build}
