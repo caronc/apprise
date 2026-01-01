@@ -42,6 +42,7 @@ from ..utils.parse import GET_SCHEMA_RE, parse_list
 
 # Used for testing
 from .base import NotifyBase
+from .NotifyXMPP import SliXmppAdapter
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -53,6 +54,8 @@ __all__ = [
     # Reference
     "NotifyImageSize",
     "NotifyType",
+    # slixmpp access points (used for NotifyXMPP Testing)
+    "SliXmppAdapter",
     # Tokenizer
     "url_to_dict",
 ]

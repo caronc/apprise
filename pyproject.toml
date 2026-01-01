@@ -212,6 +212,9 @@ all-plugins = [
     # such as fcm://, splush:// and much more
     "cryptography",
 
+    # Provides xmpp:// support
+    "slixmpp >= 1.12.0",
+
     # provides growl:// support
     "gntp",
     # Provides mqtt:// support
