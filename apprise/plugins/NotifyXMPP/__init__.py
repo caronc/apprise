@@ -40,7 +40,7 @@ class NotifyXMPP(NotifyBase):
     requirements = {
         # Define our required packaging in order to work
         "packages_required": [
-            "slixmpp; python_version >= '3.7'",
+            "slixmpp >= 1.12.0; python_version >= '3.7'",
         ]
     }
 
