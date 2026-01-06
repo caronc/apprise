@@ -41,6 +41,7 @@
 
 from email.utils import formataddr
 from json import dumps
+import logging
 
 import requests
 
@@ -48,6 +49,7 @@ from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 RESEND_HTTP_ERROR_MAP = {
@@ -463,11 +465,18 @@ class NotifyResend(NotifyBase):
             if reply_to:
                 payload["reply_to"] = reply_to
 
-            self.logger.debug(
-                "Resend POST URL:"
-                f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
-            )
-            self.logger.debug("Resend Payload: %s", str(payload))
+            if self.logger.isEnabledFor(logging.DEBUG):
+                # Due to attachments; output can be quite heavy and io
+                # intensive.
+                # To accomodate this, we only show our debug payload
+                # information if required.
+                self.logger.debug(
+                    "Resend POST URL:"
+                    f" {self.notify_url} "
+                    f"(cert_verify={self.verify_certificate!r})"
+                )
+                self.logger.debug(
+                    "Resend Payload: %s", sanitize_payload(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()

@@ -102,6 +102,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyBrevo,
+            "force_debug": True,
         },
     ),
     (

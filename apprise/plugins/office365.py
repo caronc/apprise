@@ -40,6 +40,7 @@
 #
 from datetime import datetime, timedelta
 import json
+import logging
 from uuid import uuid4
 
 import requests
@@ -49,6 +50,7 @@ from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 
@@ -813,12 +815,17 @@ class NotifyOffice365(NotifyBase):
         content = {}
 
         # Some Debug Logging
-        self.logger.debug(
-            "Office 365 %s URL:"
-            f" {url} (cert_verify={self.verify_certificate})",
-            method,
-        )
-        self.logger.debug(f"Office 365 Payload: {payload}")
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(
+                "Office 365 %s URL:"
+                f" {url} (cert_verify={self.verify_certificate})",
+                method,
+            )
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accomodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                "Office 365 Payload: %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()

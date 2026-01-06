@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from json import dumps
+import logging
 
 import requests
 
@@ -33,6 +34,7 @@ from .. import exception
 from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 
@@ -285,10 +287,15 @@ class NotifyJSON(NotifyBase):
 
         url += self.fullpath
 
-        self.logger.debug(
-            f"JSON POST URL: {url} (cert_verify={self.verify_certificate!r})"
-        )
-        self.logger.debug(f"JSON Payload: {payload!s}")
+        if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accomodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                f"JSON POST URL: {url} "
+                f"(cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug("JSON Payload: %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()

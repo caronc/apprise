@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from json import loads
+import logging
 
 import requests
 
@@ -33,6 +34,7 @@ from .. import exception
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 
@@ -718,11 +720,17 @@ class NotifyPushSafer(NotifyBase):
         # Store the payload key
         payload["k"] = self.privatekey
 
-        self.logger.debug(
-            "PushSafer POST URL:"
-            f" {notify_url} (cert_verify={self.verify_certificate!r})"
-        )
-        self.logger.debug(f"PushSafer Payload: {payload!s}")
+        # Some Debug Logging
+        if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accomodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                "PushSafer POST URL:"
+                f" {notify_url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(
+                "PushSafer Payload: %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()

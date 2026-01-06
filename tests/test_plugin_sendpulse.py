@@ -91,6 +91,7 @@ apprise_url_tests = (
         # Set name only
         "instance": NotifySendPulse,
         "requests_response_text": SENDPULSE_GOOD_RESPONSE,
+        "force_debug": True,
     }),
     ("sendpulse://?id=ci&secret=cs&user=chris@example.com", {
         # Set login through user= only

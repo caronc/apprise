@@ -50,6 +50,7 @@
 
 from contextlib import suppress
 import json
+import logging
 
 import requests
 
@@ -57,6 +58,7 @@ from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 # Supported Dither Types
@@ -415,7 +417,8 @@ class NotifyDot(NotifyBase):
             "Dot POST URL:"
             f" {api_url} (cert_verify={self.verify_certificate!r})"
         )
-        self.logger.debug(f"Dot Payload: {json.dumps(payload, indent=2)}")
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug("Dot Payload %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()

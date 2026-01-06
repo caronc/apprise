@@ -56,6 +56,7 @@
 import contextlib
 from email.utils import formataddr
 from json import dumps, loads
+import logging
 
 import requests
 
@@ -63,6 +64,7 @@ from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 # Provide some known codes SparkPost uses and what they translate to:
@@ -381,25 +383,9 @@ class NotifySparkPost(NotifyBase):
             "SparkPost POST URL:"
             f" {url} (cert_verify={self.verify_certificate})"
         )
-
-        if "attachments" in payload["content"]:
-            # Since we print our payload; attachments make it a bit too noisy
-            # we just strip out the data block to accomodate it
-            log_payload = {k: v for k, v in payload.items() if k != "content"}
-            log_payload["content"] = {
-                k: v
-                for k, v in payload["content"].items()
-                if k != "attachments"
-            }
-            log_payload["content"]["attachments"] = [
-                {k: v for k, v in x.items() if k != "data"}
-                for x in payload["content"]["attachments"]
-            ]
-        else:
-            # No tidying is needed
-            log_payload = payload
-
-        self.logger.debug(f"SparkPost Payload: {log_payload}")
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(
+                "SparkPost Payload: %s", sanitize_payload(payload))
 
         wait = None
 

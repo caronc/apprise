@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import logging
 import re
 
 import requests
@@ -33,6 +34,7 @@ from .. import exception
 from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 
@@ -377,11 +379,17 @@ class NotifyXML(NotifyBase):
         url += self.fullpath
         payload = re_table.sub(lambda x: re_map[x.group()], self.payload)
 
-        self.logger.debug(
-            f"XML POST URL: {url} (cert_verify={self.verify_certificate!r})"
-        )
+        if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accomodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                f"XML POST URL: {url} "
+                f"(cert_verify={self.verify_certificate!r})"
+            )
 
-        self.logger.debug(f"XML Payload: {payload!s}")
+            self.logger.debug(
+                "XML Payload: %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()

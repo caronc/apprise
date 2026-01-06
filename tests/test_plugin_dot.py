@@ -100,6 +100,7 @@ apprise_url_tests = (
         {
             # With signature
             "instance": NotifyDot,
+            "force_debug": True,
         },
     ),
     (

@@ -370,6 +370,9 @@ class AppriseURLTester:
         # Don't set this if don't need to check it's value
         check_attachments = meta.get("check_attachments", True)
 
+        # Debug/Trace Monitoring
+        force_debug = meta.get("force_debug", False)
+
         # Allow us to force the server response code to be something other then
         # the defaults
         requests_response_code = meta.get(
@@ -540,15 +543,41 @@ class AppriseURLTester:
                 asset.app_id = None
                 asset.app_desc = app_desc
 
-                # Notify should still work
-                assert (
-                    obj.notify(
-                        body=self.body,
-                        title=self.title,
-                        notify_type=notify_type,
+                if force_debug:
+                    # Enable access to areas otherwise locked away by the log
+                    # level
+                    original_is_enabled_for = obj.logger.isEnabledFor
+                    original_debug = obj.logger.debug
+                    try:
+                        # Force code paths guarded by isEnabledFor(DEBUG)
+                        obj.logger.isEnabledFor = mock.Mock(return_value=True)
+
+                        # Prevent actual logging emission (avoids pytest
+                        # capture closed stream)
+                        obj.logger.debug = mock.Mock()
+
+                        assert (
+                            obj.notify(
+                                body=self.body,
+                                title=self.title,
+                                notify_type=notify_type,
+                            )
+                            == notify_response
+                        )
+
+                    finally:
+                        # Restore
+                        obj.logger.isEnabledFor = original_is_enabled_for
+                        obj.logger.debug = original_debug
+                else:
+                    assert (
+                        obj.notify(
+                            body=self.body,
+                            title=self.title,
+                            notify_type=notify_type,
+                        )
+                        == notify_response
                     )
-                    == notify_response
-                )
 
                 # Restore
                 asset.app_id = app_id

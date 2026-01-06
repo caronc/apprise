@@ -106,6 +106,7 @@ apprise_url_tests = (
         "xml://user@localhost?method=post",
         {
             "instance": NotifyXML,
+            "force_debug": True,
         },
     ),
     (

@@ -111,6 +111,7 @@ apprise_url_tests = (
         {
             # A good email with Blind Carbon Copy
             "instance": NotifySendGrid,
+            "force_debug": True,
         },
     ),
     (
