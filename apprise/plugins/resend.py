@@ -75,7 +75,7 @@ class NotifyResend(NotifyBase):
     secure_protocol = "resend"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_resend"
+    setup_url = "https://appriseit.com/services/resend"
 
     # Default to markdown
     notify_format = NotifyFormat.HTML

@@ -129,7 +129,7 @@ class NotifyNotificationAPI(NotifyBase):
     secure_protocol = ("napi", "notificationapi")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_notificationapi"
+    setup_url = "https://appriseit.com/services/notificationapi"
 
     # If no NotificationAPI Message Type is specified, then the following is
     # used

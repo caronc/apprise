@@ -78,7 +78,7 @@ class NotifyTechulusPush(NotifyBase):
     secure_protocol = "push"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_techulus"
+    setup_url = "https://appriseit.com/services/techulus"
 
     # Techulus Push uses the http protocol with JSON requests
     notify_url = "https://push.techulus.com/api/v1/notify"

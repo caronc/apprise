@@ -51,7 +51,7 @@ class NotifyClickatell(NotifyBase):
     secure_protocol = "clickatell"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_clickatell"
+    setup_url = "https://appriseit.com/services/clickatell"
 
     # Clickatell API Endpoint
     notify_url = "https://platform.clickatell.com/messages/http/send"

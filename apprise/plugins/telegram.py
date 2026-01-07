@@ -137,7 +137,7 @@ class NotifyTelegram(NotifyBase):
     secure_protocol = "tgram"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_telegram"
+    setup_url = "https://appriseit.com/services/telegram"
 
     # Default Notify Format
     notify_format = NotifyFormat.HTML

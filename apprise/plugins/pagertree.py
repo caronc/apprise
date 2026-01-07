@@ -89,7 +89,7 @@ class NotifyPagerTree(NotifyBase):
     secure_protocol = "pagertree"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pagertree"
+    setup_url = "https://appriseit.com/services/pagertree"
 
     # PagerTree uses the http protocol with JSON requests
     notify_url = "https://api.pagertree.com/integration/{}"

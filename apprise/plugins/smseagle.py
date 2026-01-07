@@ -102,7 +102,7 @@ class NotifySMSEagle(NotifyBase):
     secure_protocol = "smseagles"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_smseagle"
+    setup_url = "https://appriseit.com/services/smseagle"
 
     # The path we send our notification to
     notify_path = "/jsonrpc/sms"

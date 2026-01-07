@@ -59,7 +59,7 @@ class NotifyHomeAssistant(NotifyBase):
     default_insecure_port = 8123
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_homeassistant"
+    setup_url = "https://appriseit.com/services/homeassistant"
 
     # Define object templates
     templates = (

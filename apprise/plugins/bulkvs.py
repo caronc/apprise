@@ -56,7 +56,7 @@ class NotifyBulkVS(NotifyBase):
     secure_protocol = "bulkvs"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_bulkvs"
+    setup_url = "https://appriseit.com/services/bulkvs"
 
     # BulkVS uses the http protocol with JSON requests
     notify_url = "https://portal.bulkvs.com/api/v1.0/messageSend"

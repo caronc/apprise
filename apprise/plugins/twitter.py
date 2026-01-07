@@ -76,7 +76,7 @@ class NotifyTwitter(NotifyBase):
     secure_protocol = ("x", "twitter", "tweet")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_twitter"
+    setup_url = "https://appriseit.com/services/twitter"
 
     # Support attachments
     attachment_support = True

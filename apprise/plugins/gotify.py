@@ -102,7 +102,7 @@ class NotifyGotify(NotifyBase):
     secure_protocol = "gotifys"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_gotify"
+    setup_url = "https://appriseit.com/services/gotify"
 
     # Disable throttle rate
     request_rate_per_sec = 0

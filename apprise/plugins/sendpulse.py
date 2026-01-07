@@ -60,7 +60,7 @@ class NotifySendPulse(NotifyBase):
     secure_protocol = "sendpulse"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sendpulse"
+    setup_url = "https://appriseit.com/services/sendpulse"
 
     # Default to markdown
     notify_format = NotifyFormat.HTML

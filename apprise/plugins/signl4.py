@@ -56,7 +56,7 @@ class NotifySIGNL4(NotifyBase):
     secure_protocol = "signl4"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_signl4"
+    setup_url = "https://appriseit.com/services/signl4"
 
     # Our event action type
     event_action = "trigger"

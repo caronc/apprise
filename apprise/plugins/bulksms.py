@@ -86,7 +86,7 @@ class NotifyBulkSMS(NotifyBase):
     secure_protocol = "bulksms"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_bulksms"
+    setup_url = "https://appriseit.com/services/bulksms"
 
     # BulkSMS uses the http protocol with JSON requests
     notify_url = "https://api.bulksms.com/v1/messages"

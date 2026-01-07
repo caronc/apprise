@@ -98,7 +98,7 @@ class NotifyReddit(NotifyBase):
     secure_protocol = "reddit"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_reddit"
+    setup_url = "https://appriseit.com/services/reddit"
 
     # The maximum size of the message
     body_maxlen = 6000

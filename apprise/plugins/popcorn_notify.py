@@ -52,7 +52,7 @@ class NotifyPopcornNotify(NotifyBase):
     secure_protocol = "popcorn"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_popcornnotify"
+    setup_url = "https://appriseit.com/services/popcornnotify"
 
     # PopcornNotify uses the http protocol
     notify_url = "https://popcornnotify.com/notify"

@@ -100,7 +100,7 @@ class NotifyNotifico(NotifyBase):
     secure_protocol = "notifico"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_notifico"
+    setup_url = "https://appriseit.com/services/notifico"
 
     # Plain Text Notification URL
     notify_url = "https://n.tkte.ch/h/{proj}/{hook}"

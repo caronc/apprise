@@ -75,7 +75,7 @@ class NotifyOneSignal(NotifyBase):
     secure_protocol = "onesignal"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_onesignal"
+    setup_url = "https://appriseit.com/services/onesignal"
 
     # Notification
     notify_url = "https://api.onesignal.com/notifications"

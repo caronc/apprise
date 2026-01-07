@@ -73,7 +73,7 @@ class NotifyWhatsApp(NotifyBase):
     fb_graph_version = "v17.0"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_whatsapp"
+    setup_url = "https://appriseit.com/services/whatsapp"
 
     # WhatsApp Message Notification URL
     notify_url = "https://graph.facebook.com/{fb_ver}/{phone_id}/messages"

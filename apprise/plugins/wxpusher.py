@@ -105,7 +105,7 @@ class NotifyWxPusher(NotifyBase):
     secure_protocol = "wxpusher"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_wxpusher"
+    setup_url = "https://appriseit.com/services/wxpusher"
 
     # WxPusher notification endpoint
     notify_url = "https://wxpusher.zjiecode.com/api/send/message"

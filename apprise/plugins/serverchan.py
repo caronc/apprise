@@ -54,7 +54,7 @@ class NotifyServerChan(NotifyBase):
     secure_protocol = "schan"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_serverchan"
+    setup_url = "https://appriseit.com/services/serverchan"
 
     # ServerChan API
     notify_url = "https://sctapi.ftqq.com/{token}.send"

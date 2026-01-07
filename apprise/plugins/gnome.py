@@ -110,7 +110,7 @@ class NotifyGnome(NotifyBase):
     protocol = "gnome"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_gnome"
+    setup_url = "https://appriseit.com/services/gnome"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128

@@ -57,7 +57,7 @@ class NotifyPushed(NotifyBase):
     secure_protocol = "pushed"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushed"
+    setup_url = "https://appriseit.com/services/pushed"
 
     # Pushed uses the http protocol with JSON requests
     notify_url = "https://api.pushed.co/1/push"

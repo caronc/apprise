@@ -64,7 +64,7 @@ class NotifySFR(NotifyBase):
     protocol = "sfr"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sfr"
+    setup_url = "https://appriseit.com/services/sfr"
 
     # SFR api
     notify_url = (

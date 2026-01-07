@@ -101,7 +101,7 @@ class NotifyPagerDuty(NotifyBase):
     secure_protocol = "pagerduty"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pagerduty"
+    setup_url = "https://appriseit.com/services/pagerduty"
 
     # We don't support titles for Pager Duty notifications
     title_maxlen = 0

@@ -67,7 +67,7 @@ class NotifyClickSend(NotifyBase):
     secure_protocol = "clicksend"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_clicksend"
+    setup_url = "https://appriseit.com/services/clicksend"
 
     # ClickSend uses the http protocol with JSON requests
     notify_url = "https://rest.clicksend.com/v3/sms/send"

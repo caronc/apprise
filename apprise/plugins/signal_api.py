@@ -62,7 +62,7 @@ class NotifySignalAPI(NotifyBase):
     secure_protocol = "signals"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_signal"
+    setup_url = "https://appriseit.com/services/signal"
 
     # Support attachments
     attachment_support = True
