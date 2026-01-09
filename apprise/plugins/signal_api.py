@@ -39,7 +39,7 @@ from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
 from ..utils.sanitize import sanitize_payload
-from .base import NotifyBase
+from .base import NotifyBase, NotifyFormat
 
 GROUP_REGEX = re.compile(
     r"^\s*((\@|\%40)?(group\.)|\@|\%40)(?P<group>[a-z0-9_=-]+)", re.I
@@ -276,6 +276,12 @@ class NotifySignalAPI(NotifyBase):
             "Content-Type": "application/json",
         }
 
+        # Support Styled (Markdown formatting)
+        text_mode = (
+            "styled" if self.notify_format == NotifyFormat.MARKDOWN
+            else "normal"
+        )
+
         # Format defined here:
         #   https://bbernhard.github.io/signal-cli-rest-api\
         #       /#/Messages/post_v2_send
@@ -303,6 +309,7 @@ class NotifySignalAPI(NotifyBase):
                 ).rstrip()
             ),
             "number": self.source,
+            "text_mode": text_mode,
             "recipients": [],
         }
 

@@ -39,6 +39,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.config import ConfigBase
+from apprise.plugins.base import NotifyFormat
 from apprise.plugins.signal_api import NotifySignalAPI
 
 logging.disable(logging.CRITICAL)
@@ -122,6 +123,13 @@ apprise_url_tests = (
                 "2" * 11
             ),
         },
+    ),
+    (
+    "signals://localhost/{}/{}?format=markdown".format("1" * 11, "3" * 11),
+    {
+        # Test our markdown flag
+        "instance": NotifySignalAPI,
+    },
     ),
     (
         "signal://localhost:8080/+{}/group.abcd/".format("1" * 11),
@@ -485,3 +493,47 @@ def test_notify_signal_plugin_attachments(request_mock):
         is True
     )
     assert request_mock.call_count == 1
+
+def test_plugin_signal_text_mode_markdown_from_url(request_mock):
+    """NotifySignalAPI() sets text_mode=styled when ?format=markdown"""
+    source = "+1 (555) 123-3456"
+    target = "+1 (555) 987-5432"
+    body = "Body **bold** _italic_"
+    title = "Title"
+
+    aobj = Apprise()
+    # Use URL path tokens, add the markdown format via query string
+    assert aobj.add(
+        f"signals://localhost:231/{source}/{target}?format=markdown")
+    assert aobj.notify(title=title, body=body)
+
+    assert request_mock.call_count == 1
+    details = request_mock.call_args_list[0]
+
+    payload = loads(details[1]["data"])
+    # Core behaviour we are validating
+    assert payload.get("text_mode") == "styled"
+
+
+def test_plugin_signal_text_mode_markdown_from_library(request_mock):
+    """NotifySignalAPI() sets text_mode=styled when class format=MARKDOWN"""
+    source = "+1 (555) 123-3456"
+    target = "+1 (555) 987-5432"
+
+    obj = NotifySignalAPI(
+        host="localhost",
+        port=231,
+        secure=True,
+        source=source,
+        targets=[target],
+        format=NotifyFormat.MARKDOWN,
+    )
+
+    assert obj.notify(title="Title", body="Body **bold** _italic_") is True
+
+    assert request_mock.call_count == 1
+    details = request_mock.call_args_list[0]
+
+    payload = loads(details[1]["data"])
+    # Core behaviour we are validating
+    assert payload.get("text_mode") == "styled"
