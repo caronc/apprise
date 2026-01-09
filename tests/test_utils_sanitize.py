@@ -25,6 +25,9 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+"""Unit tests for :mod:`apprise.utils.sanitize`.
+"""
+
 from __future__ import annotations
 
 from hashlib import sha256
@@ -39,11 +42,14 @@ sys.dont_write_bytecode = True
 
 
 class _ReprOnly:
+    """Helper type that only supports repr(), used to cover fallback paths."""
+
     def __repr__(self) -> str:
         return "<repr-only>"
 
 
 def test_sanitize_payload_passthrough_primitives() -> None:
+    """Primitives should pass through with minimal transformation."""
     assert sanitize_payload(None) is None
     assert sanitize_payload(True) is True
     assert sanitize_payload(False) is False
@@ -52,11 +58,13 @@ def test_sanitize_payload_passthrough_primitives() -> None:
 
 
 def test_sanitize_payload_small_string_passthrough() -> None:
+    """Small strings are not altered, preserving debugging usefulness."""
     s = "hello world"
     assert sanitize_payload(s) == s
 
 
 def test_sanitize_payload_large_string_is_summarized() -> None:
+    """Strings beyond max_str_len are summarized with head/tail previews."""
     opts = SanitizeOptions(max_str_len=64, preview=8)
     s = "x" * 200
     out = sanitize_payload(s, options=opts)
@@ -68,6 +76,7 @@ def test_sanitize_payload_large_string_is_summarized() -> None:
 
 
 def test_sanitize_payload_bytes_are_summarized_and_hash_is_bounded() -> None:
+    """Bytes are always summarized with a bounded sha256 digest."""
     opts = SanitizeOptions(hash_sample_size=8)
     b = b"01234567" + b"EXTRA-DATA"
 
@@ -80,6 +89,7 @@ def test_sanitize_payload_bytes_are_summarized_and_hash_is_bounded() -> None:
 
 
 def test_sanitize_payload_dict_keys_are_sanitised_for_bytes() -> None:
+    """Bytes keys become readable string markers rather than raw bytes."""
     opts = SanitizeOptions(hash_sample_size=16)
 
     bkey = b"abc"
@@ -99,6 +109,7 @@ def test_sanitize_payload_dict_keys_are_sanitised_for_bytes() -> None:
 
 
 def test_sanitize_payload_sequence_types() -> None:
+    """Lists, tuples, sets, and frozensets are walked safely."""
     payload = [1, "x" * 200, b"xyz"]
     opts = SanitizeOptions(max_str_len=64, preview=8)
 
@@ -111,6 +122,7 @@ def test_sanitize_payload_sequence_types() -> None:
     out_t = sanitize_payload(tuple(payload), options=opts)
     assert isinstance(out_t, tuple)
 
+    # Sets are returned as lists for readability in logs.
     out_s = sanitize_payload(set(payload), options=opts)
     assert isinstance(out_s, list)
 
@@ -119,6 +131,7 @@ def test_sanitize_payload_sequence_types() -> None:
 
 
 def test_sanitize_payload_recursive_structure_is_detected() -> None:
+    """Self-referential objects should not trigger infinite recursion."""
     payload: dict[str, object] = {}
     payload["self"] = payload
 
@@ -128,6 +141,7 @@ def test_sanitize_payload_recursive_structure_is_detected() -> None:
 
 
 def test_sanitize_payload_max_depth_truncation() -> None:
+    """Depth limits protect against overly deep nested structures."""
     opts = SanitizeOptions(max_depth=2)
     payload = {"a": {"b": {"c": "d"}}}
 
@@ -139,6 +153,7 @@ def test_sanitize_payload_max_depth_truncation() -> None:
 
 
 def test_sanitize_payload_max_items_truncation_in_list_branch() -> None:
+    """Item limits protect against very large sequences."""
     opts = SanitizeOptions(max_items=2)
     payload = [1, 2, 3, 4]
 
@@ -148,6 +163,7 @@ def test_sanitize_payload_max_items_truncation_in_list_branch() -> None:
 
 
 def test_sanitize_payload_global_item_limit_guard_message() -> None:
+    """The global max_items guard stops work consistently."""
     opts = SanitizeOptions(max_items=1)
     payload = {"a": "x", "b": "y"}
 
@@ -160,13 +176,12 @@ def test_sanitize_payload_global_item_limit_guard_message() -> None:
 
 
 def test_sanitize_payload_falls_back_to_repr_for_unknown_objects() -> None:
+    """Unknown objects are converted with repr() for logging."""
     assert sanitize_payload(_ReprOnly()) == "<repr-only>"
 
 
 def test_sanitize_payload_blob_key_enables_blob_mode_and_summarizes() -> None:
-    # This covers:
-    #  - child_blob_mode = True when key matches _BLOB_KEYWORDS
-    #  - blob_mode string summarization branch (<blob-string ...>)
+    """Blob-like keys enable blob_mode and trigger <blob-string ...>."""
     opts = SanitizeOptions(
         aggressive_blob_keys=True,
         # ensure normal summarization would NOT trigger
@@ -184,7 +199,28 @@ def test_sanitize_payload_blob_key_enables_blob_mode_and_summarizes() -> None:
     assert isinstance(out, dict)
     assert "base64_attachments" in out
     assert isinstance(out["base64_attachments"], str)
-    assert out["base64_attachments"].startswith("<blob-string len=")
+    assert out["base64_attachments"].startswith("<string len=6 blob ")
     assert "head=" in out["base64_attachments"]
     assert "tail=" in out["base64_attachments"]
 
+
+def test_sanitize_payload_dict_key_passthrough_for_non_str_bytes_key() -> None:
+    """
+    Verify non-string, non-bytes dictionary keys are preserved unchanged.
+
+    This exercises the fallback path in _summarize_key(), ensuring unexpected
+    key types (such as integers) are passed through safely during sanitisation.
+    """
+    payload = {
+        # int key triggers the "return k" branch
+        42: "value",
+        # keep a normal key too
+        "k": "v",
+    }
+
+    out = sanitize_payload(payload)
+
+    assert isinstance(out, dict)
+    assert 42 in out
+    assert out[42] == "value"
+    assert out["k"] == "v"
