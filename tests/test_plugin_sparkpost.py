@@ -121,6 +121,7 @@ apprise_url_tests = (
                     "id": "11668787484950529",
                 }
             },
+            "force_debug": True,
         },
     ),
     (

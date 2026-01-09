@@ -168,6 +168,8 @@ apprise_url_tests = (
             # use get args to acomplish the same thing (use source instead of
             # from)
             "instance": NotifySignalAPI,
+            # Run through code with debug logging enabled
+            "force_debug": True,
         },
     ),
     (

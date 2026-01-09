@@ -929,7 +929,7 @@ def test_plugin_discord_markdown_extra(mock_post):
     # Reset our apprise object
     a = Apprise()
 
-    # We want to further test our markdown support to accomodate bug rased on
+    # We want to further test our markdown support to accommodate bug rased on
     # 2022.10.25; see https://github.com/caronc/apprise/issues/717
     assert (
         a.add(
@@ -969,10 +969,12 @@ def test_plugin_discord_attachments(mock_post):
     # Prepare a good response
     response = mock.Mock()
     response.status_code = requests.codes.ok
+    response.content = b""
 
     # Prepare a bad response
     bad_response = mock.Mock()
     bad_response.status_code = requests.codes.internal_server_error
+    bad_response.content = b""
 
     # Prepare Mock return object
     mock_post.return_value = response
@@ -1066,6 +1068,8 @@ def test_plugin_discord_attachments(mock_post):
 
     # handle a bad response
     bad_response = mock.Mock()
+    bad_response.content = b""
+    bad_response.headers = {}
     bad_response.status_code = requests.codes.internal_server_error
     mock_post.side_effect = [response, bad_response]
 

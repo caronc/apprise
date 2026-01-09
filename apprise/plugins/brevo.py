@@ -28,6 +28,7 @@
 # API Reference: https://developers.brevo.com/reference/getting-started-1
 
 from json import dumps
+import logging
 from os.path import splitext
 
 import requests
@@ -37,6 +38,7 @@ from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 # Extend HTTP Error Messages (most common Brevo SMTP errors)
@@ -442,11 +444,19 @@ class NotifyBrevo(NotifyBase):
             if len(bcc):
                 payload["bcc"] = [{"email": email} for email in bcc]
 
-            self.logger.debug(
-                "Brevo POST URL:"
-                f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
-            )
-            self.logger.debug(f"Brevo Payload: {payload!s}")
+            # Some Debug Logging
+            if self.logger.isEnabledFor(logging.DEBUG):
+                # Due to attachments; output can be quite heavy and io
+                # intensive.
+                # To accommodate this, we only show our debug payload
+                # information if required.
+                self.logger.debug(
+                    "Brevo POST URL:"
+                    f" {self.notify_url} "
+                    f"(cert_verify={self.verify_certificate!r})"
+                )
+                self.logger.debug(
+                    "Brevo Payload: %s", sanitize_payload(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -478,7 +488,8 @@ class NotifyBrevo(NotifyBase):
                         )
                     )
 
-                    self.logger.debug(f"Response Details:\r\n{r.content}")
+                    self.logger.debug(
+                        "Response Details:\r\n%r", (r.content or b"")[:2000])
 
                     # Mark our failure
                     has_error = True

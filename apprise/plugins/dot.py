@@ -50,6 +50,7 @@
 
 from contextlib import suppress
 import json
+import logging
 
 import requests
 
@@ -57,6 +58,7 @@ from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 # Supported Dither Types
@@ -411,11 +413,16 @@ class NotifyDot(NotifyBase):
 
             api_url = self.text_api_url
 
-        self.logger.debug(
-            "Dot POST URL:"
-            f" {api_url} (cert_verify={self.verify_certificate!r})"
-        )
-        self.logger.debug(f"Dot Payload: {json.dumps(payload, indent=2)}")
+        # Some Debug Logging
+        if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accommodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                "Dot POST URL:"
+                f" {api_url} (cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug("Dot Payload %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -446,7 +453,8 @@ class NotifyDot(NotifyBase):
                 )
             )
 
-            self.logger.debug(f"Response Details:\r\n{r.content}")
+            self.logger.debug(
+                "Response Details:\r\n%r", (r.content or b"")[:2000])
 
             return False
 

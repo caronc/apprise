@@ -46,6 +46,7 @@
 #       how-to-send-an-email-with-dynamic-transactional-templates/
 
 from json import dumps
+import logging
 
 import requests
 
@@ -53,6 +54,7 @@ from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 # Extend HTTP Error Messages
@@ -440,11 +442,19 @@ class NotifySendGrid(NotifyBase):
                     {"email": email} for email in bcc
                 ]
 
-            self.logger.debug(
-                "SendGrid POST URL:"
-                f" {self.notify_url} (cert_verify={self.verify_certificate!r})"
-            )
-            self.logger.debug(f"SendGrid Payload: {payload!s}")
+            # Some Debug Logging
+            if self.logger.isEnabledFor(logging.DEBUG):
+                # Due to attachments; output can be quite heavy and io
+                # intensive.
+                # To accommodate this, we only show our debug payload
+                # information if required.
+                self.logger.debug(
+                    "SendGrid POST URL:"
+                    f" {self.notify_url} "
+                    f"(cert_verify={self.verify_certificate!r})"
+                )
+                self.logger.debug(
+                    "SendGrid Payload: %s", sanitize_payload(payload))
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -475,7 +485,8 @@ class NotifySendGrid(NotifyBase):
                         )
                     )
 
-                    self.logger.debug(f"Response Details:\r\n{r.content}")
+                    self.logger.debug(
+                        "Response Details:\r\n%r", (r.content or b"")[:2000])
 
                     # Mark our failure
                     has_error = True

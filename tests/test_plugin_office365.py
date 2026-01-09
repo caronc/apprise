@@ -133,6 +133,7 @@ apprise_url_tests = (
             "privacy_url": (
                 "azure://user@example.edu/t...t/a...h/****/email1@test.ca/"
             ),
+            "force_debug": True,
         },
     ),
     (

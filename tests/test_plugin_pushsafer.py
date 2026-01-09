@@ -155,6 +155,7 @@ apprise_url_tests = (
             "requests_response_text": {
                 "status": 1,
             },
+            "force_debug": True,
         },
     ),
     # Invalid priority

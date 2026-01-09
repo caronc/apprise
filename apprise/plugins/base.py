@@ -83,7 +83,7 @@ class NotifyBase(URLBase):
     #
     # Use this section to relay this information to the users of the script to
     # help guide them with what they need to know if they plan on using your
-    # plugin.   The below configuration should otherwise accomodate all normal
+    # plugin.   The below configuration should otherwise accommodate all normal
     # situations and will not requrie any updating:
     requirements: ClassVar[RequirementsSpec] = {
         # Use the description to provide a human interpretable description of

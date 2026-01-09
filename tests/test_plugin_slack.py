@@ -232,7 +232,7 @@ apprise_url_tests = (
         ),
         {"instance": NotifySlack, "requests_response_text": "ok"},
     ),
-    # Forced mode on a url that does not have enough details to accomodate
+    # Forced mode on a url that does not have enough details to accommodate
     (
         (
             "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"

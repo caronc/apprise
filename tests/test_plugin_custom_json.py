@@ -106,6 +106,7 @@ apprise_url_tests = (
         "json://user@localhost?method=post",
         {
             "instance": NotifyJSON,
+            "force_debug": True,
         },
     ),
     (

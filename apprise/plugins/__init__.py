@@ -209,7 +209,7 @@ def details(plugin):
     #
     #            # Use regex if you want to share the regular expression
     #            # required to validate the field. The regex will never
-    #            # accomodate the prefix (if one is specified).  That is
+    #            # accommodate the prefix (if one is specified).  That is
     #            # up to the user building the URLs to include the prefix
     #            # on the URL when constructing it.
     #            # The format is ('regex', 'reg options')
@@ -221,7 +221,7 @@ def details(plugin):
     #
     #            # By default the key of this object is to be interpreted
     #            # as the argument to the notification in question. However
-    #            # To accomodate cases where there are multiple types that
+    #            # To accommodate cases where there are multiple types that
     #            # all map to the same entry, one can find a map_to value.
     #            'map_to': 'function_arg',
     #

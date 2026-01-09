@@ -129,6 +129,7 @@ apprise_url_tests = (
             "instance": NotifySMSEagle,
             # Our response expected server response
             "requests_response_text": SMSEAGLE_GOOD_RESPONSE,
+            "force_debug": True,
         },
     ),
     # Set priority

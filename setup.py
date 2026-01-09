@@ -49,7 +49,7 @@ def read_version() -> str:
 
 # tox is not supported well in RHEL9 so this stub file is the only way to
 # successfully build the RPM; packaging/redhat/python-apprise.spec has
-# been updated accordingly to accomodate reference to this for older
+# been updated accordingly to accommodate reference to this for older
 # versions of the distribution only
 setup(
     name="apprise",

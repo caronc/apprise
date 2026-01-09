@@ -116,6 +116,7 @@ apprise_url_tests = (
             "privacy_url": \
                 "resend://a...d:user2@example.ca/",
             "url_matches": r"name=Ralph",
+            "force_debug": True,
         },
     ),
     (

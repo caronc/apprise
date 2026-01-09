@@ -227,7 +227,8 @@ class NotifySIGNL4(NotifyBase):
                         ", " if status_str else "",
                         r.status_code))
 
-                self.logger.debug("Response Details:\r\n%r", r.content)
+                self.logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000])
 
                 # Return; we're done
                 return False

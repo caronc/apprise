@@ -86,6 +86,7 @@ apprise_url_tests = (
             "instance": NotifyAppriseAPI,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "apprise://localhost/a...a/",
+            "force_debug": True,
         },
     ),
     # A valid URL with long Token

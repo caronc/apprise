@@ -235,7 +235,7 @@ class AttachHTTP(AttachBase):
                                     bytes_written + chunk_size
                                     > self.max_file_size
                                 ):
-                                    # Adjust out next read to accomodate up to
+                                    # Adjust out next read to accommodate up to
                                     # our limit +1. This will prevent us from
                                     # reading to much into our memory buffer
                                     self.max_file_size - bytes_written + 1

@@ -31,6 +31,7 @@
 import base64
 from email.utils import formataddr
 from json import dumps, loads
+import logging
 import re
 
 import requests
@@ -40,6 +41,7 @@ from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..conversion import convert_between
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
 
@@ -598,10 +600,16 @@ class NotifySendPulse(NotifyBase):
         if access_token:
             headers.update({"Authorization": f"Bearer {access_token}"})
 
-        self.logger.debug("SendPulse POST URL: {} (cert_verify={!r})".format(
-            url, self.verify_certificate,
-        ))
-        self.logger.debug("SendPulse Payload: {}".format(str(payload)))
+        # Some Debug Logging
+        if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accommodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                f"SendPulse POST URL: {url}"
+                f"(cert_verify={self.verify_certificate!r})")
+            self.logger.debug(
+                "SendPulse Payload: %s", sanitize_payload(payload))
 
         # Prepare our default response
         response = {}
@@ -627,7 +635,7 @@ class NotifySendPulse(NotifyBase):
                 #  - AttributeError = r is None
                 self.logger.warning("Invalid response from SendPulse server.")
                 self.logger.debug(
-                    "Response Details:\r\n{}".format(r.content))
+                    "Response Details:\r\n%r", (r.content or b"")[:2000])
                 return (False, {})
 
             # Reference status code
@@ -662,7 +670,7 @@ class NotifySendPulse(NotifyBase):
                             status_code))
 
                 self.logger.debug(
-                    "Response Details:\r\n{}".format(r.content))
+                    "Response Details:\r\n%r", (r.content or b"")[:2000])
 
             else:
                 if target:

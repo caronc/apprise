@@ -261,7 +261,7 @@ def test_plugin_pushbullet_attachments(mock_post):
         "file_type": "image/jpeg",
         "file_url": "https://dl.pushb.com/abc/cat.jpg",
         "upload_url": "https://upload.pushbullet.com/abcd123",
-    })
+    }).encode("utf-8")
     response.status_code = requests.codes.ok
     mock_post.return_value = response
 
@@ -361,17 +361,20 @@ def test_plugin_pushbullet_attachments(mock_post):
         "file_type": "image/jpeg",
         "file_url": "https://dl.pushb.com/abc/cat.jpg",
         "upload_url": "https://upload.pushbullet.com/abcd123",
-    })
+    }).encode("utf-8")
     bad_response.status_code = requests.codes.internal_server_error
+    bad_response.headers = {}
 
     # Prepare a bad response
     bad_json_response = mock.Mock()
-    bad_json_response.content = "}"
+    bad_json_response.content = b"}"
     bad_json_response.status_code = requests.codes.ok
+    bad_json_response.headers = {}
 
     # Throw an exception on the first call to requests.post()
-    mock_post.return_value = None
-    for side_effect in (requests.RequestException(), OSError(), bad_response):
+    for side_effect in (
+            requests.RequestException(), OSError(), [bad_response]):
+        mock_post.reset_mock()
         mock_post.side_effect = side_effect
 
         # We'll fail now because of our error handling
@@ -379,6 +382,7 @@ def test_plugin_pushbullet_attachments(mock_post):
 
     # Throw an exception on the second call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.reset_mock()
         mock_post.side_effect = [response, side_effect]
 
         # We'll fail now because of our error handling
@@ -386,6 +390,7 @@ def test_plugin_pushbullet_attachments(mock_post):
 
     # Throw an exception on the third call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.reset_mock()
         mock_post.side_effect = [response, response, side_effect]
 
         # We'll fail now because of our error handling
@@ -393,13 +398,15 @@ def test_plugin_pushbullet_attachments(mock_post):
 
     # Throw an exception on the forth call to requests.post()
     for side_effect in (requests.RequestException(), OSError(), bad_response):
+        mock_post.reset_mock()
         mock_post.side_effect = [response, response, response, side_effect]
 
         # We'll fail now because of our error handling
         assert obj.send(body="test", attach=attach) is False
 
     # Test case where we don't get a valid response back
-    mock_post.side_effect = bad_json_response
+    mock_post.side_effect = None
+    mock_post.return_value = bad_json_response
 
     # We'll fail because of an invalid json object
     assert obj.send(body="test", attach=attach) is False
@@ -419,8 +426,10 @@ def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
     # Prepare Mock
     mock_get.return_value = requests.Request()
     mock_post.return_value = requests.Request()
+    mock_post.content = b""
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
+    mock_get.content = b""
 
     # Invalid Access Token
     with pytest.raises(TypeError):

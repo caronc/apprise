@@ -119,6 +119,7 @@ apprise_url_tests = (
         "?+X-Customer-Campaign-ID=Apprise".format("a" * 32, "b" * 8, "c" * 8),
         {
             "instance": NotifySMTP2Go,
+            "force_debug": True,
         },
     ),
     # bcc and cc
