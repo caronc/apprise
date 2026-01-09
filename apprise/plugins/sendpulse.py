@@ -600,6 +600,7 @@ class NotifySendPulse(NotifyBase):
         if access_token:
             headers.update({"Authorization": f"Bearer {access_token}"})
 
+        # Some Debug Logging
         if self.logger.isEnabledFor(logging.DEBUG):
             # Due to attachments; output can be quite heavy and io intensive
             # To accomodate this, we only show our debug payload information

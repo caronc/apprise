@@ -465,6 +465,7 @@ class NotifyResend(NotifyBase):
             if reply_to:
                 payload["reply_to"] = reply_to
 
+            # Some Debug Logging
             if self.logger.isEnabledFor(logging.DEBUG):
                 # Due to attachments; output can be quite heavy and io
                 # intensive.

@@ -496,12 +496,12 @@ class NotifySMSEagle(NotifyBase):
                 payload["params"][notify_by[category]["target"]] = ",".join(
                     targets[index : index + batch_size]
                 )
+                # Some Debug Logging
                 if self.logger.isEnabledFor(logging.DEBUG):
                     # Due to attachments; output can be quite heavy and io
                     # intensive.
                     # To accomodate this, we only show our debug payload
                     # information if required.
-
                     self.logger.debug(
                         "SMSEagle POST URL:"
                         f" {notify_url} "

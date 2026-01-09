@@ -442,6 +442,7 @@ class NotifySendGrid(NotifyBase):
                     {"email": email} for email in bcc
                 ]
 
+            # Some Debug Logging
             if self.logger.isEnabledFor(logging.DEBUG):
                 # Due to attachments; output can be quite heavy and io
                 # intensive.

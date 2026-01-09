@@ -379,11 +379,14 @@ class NotifySparkPost(NotifyBase):
         url = f"{SPARKPOST_API_LOOKUP[self.region_name]}/transmissions/"
 
         # Some Debug Logging
-        self.logger.debug(
-            "SparkPost POST URL:"
-            f" {url} (cert_verify={self.verify_certificate})"
-        )
         if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accomodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                "SparkPost POST URL:"
+                f" {url} (cert_verify={self.verify_certificate})"
+            )
             self.logger.debug(
                 "SparkPost Payload: %s", sanitize_payload(payload))
 

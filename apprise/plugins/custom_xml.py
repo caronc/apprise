@@ -379,6 +379,7 @@ class NotifyXML(NotifyBase):
         url += self.fullpath
         payload = re_table.sub(lambda x: re_map[x.group()], self.payload)
 
+        # Some Debug Logging
         if self.logger.isEnabledFor(logging.DEBUG):
             # Due to attachments; output can be quite heavy and io intensive
             # To accomodate this, we only show our debug payload information
@@ -387,7 +388,6 @@ class NotifyXML(NotifyBase):
                 f"XML POST URL: {url} "
                 f"(cert_verify={self.verify_certificate!r})"
             )
-
             self.logger.debug(
                 "XML Payload: %s", sanitize_payload(payload))
 

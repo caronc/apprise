@@ -413,11 +413,15 @@ class NotifyDot(NotifyBase):
 
             api_url = self.text_api_url
 
-        self.logger.debug(
-            "Dot POST URL:"
-            f" {api_url} (cert_verify={self.verify_certificate!r})"
-        )
+        # Some Debug Logging
         if self.logger.isEnabledFor(logging.DEBUG):
+            # Due to attachments; output can be quite heavy and io intensive
+            # To accomodate this, we only show our debug payload information
+            # if required.
+            self.logger.debug(
+                "Dot POST URL:"
+                f" {api_url} (cert_verify={self.verify_certificate!r})"
+            )
             self.logger.debug("Dot Payload %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
