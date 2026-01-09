@@ -39,6 +39,7 @@ try:
 
     # require_version() call is required otherwise we generate a warning
     gi.require_version("Notify", "0.7")
+    gi.require_version("GdkPixbuf", "2.0")
 
     # We can import the actual libraries we care about now:
     from gi.repository import GdkPixbuf, Notify
