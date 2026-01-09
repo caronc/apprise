@@ -106,7 +106,7 @@ class NotifyVapid(NotifyBase):
     secure_protocol = "vapid"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/vapid"
+    setup_url = "https://appriseit.com/services/vapid/"
 
     # There is no reason we should exceed 5KB when reading in a PEM file.
     # If it is more than this, then it is not accepted.

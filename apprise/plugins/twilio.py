@@ -104,7 +104,7 @@ class NotifyTwilio(NotifyBase):
     validity_period = 14400
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/twilio"
+    setup_url = "https://appriseit.com/services/twilio/"
 
     # Twilio uses the http protocol with JSON message requests
     notify_sms_url = (

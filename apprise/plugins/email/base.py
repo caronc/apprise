@@ -76,7 +76,7 @@ class NotifyEmail(NotifyBase):
     secure_protocol = "mailtos"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/email"
+    setup_url = "https://appriseit.com/services/email/"
 
     # Support attachments
     attachment_support = True

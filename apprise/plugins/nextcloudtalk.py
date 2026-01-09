@@ -52,7 +52,7 @@ class NotifyNextcloudTalk(NotifyBase):
     secure_protocol = "nctalks"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/nextcloudtalk"
+    setup_url = "https://appriseit.com/services/nextcloudtalk/"
 
     # Nextcloud title length
     title_maxlen = 255

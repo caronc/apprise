@@ -76,7 +76,7 @@ class NotifySimplePush(NotifyBase):
     secure_protocol = "spush"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/simplepush"
+    setup_url = "https://appriseit.com/services/simplepush/"
 
     # SimplePush uses the http protocol with SimplePush requests
     notify_url = "https://api.simplepush.io/send"
@@ -200,8 +200,8 @@ class NotifySimplePush(NotifyBase):
         # In the event the website link above does not exist/work, a screen
         # capture of the reference to the requirement for this encryption
         # can also be found on the Apprise SimplePush Wiki:
-        #   https://appriseit.com/services/simplepush\
-        #       #lock-aes-cbc-128-encryption-weakness
+        #   https://appriseit.com/services/simplepush/\
+        #        #-aes-cbc-128-encryption-weakness
         #
         encryptor = Cipher(
             algorithms.AES(self._key), modes.CBC(self._iv), default_backend()

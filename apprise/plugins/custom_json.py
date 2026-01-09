@@ -65,7 +65,7 @@ class NotifyJSON(NotifyBase):
     secure_protocol = "jsons"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/custom_json"
+    setup_url = "https://appriseit.com/services/json/"
 
     # Support attachments
     attachment_support = True

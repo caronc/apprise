@@ -25,7 +25,7 @@ assignees: ''
 3.
 
 ## Environment
-- Apprise version: <!-- apprise --version or pip show apprise -->
+- Apprise version: <!-- apprise --version OR pip show apprise -->
 - Python version: <!-- python --version -->
 - OS and distribution: <!-- e.g. Ubuntu 24.04, Rocky Linux 9, Windows 11 -->
 - Install method: <!-- pip, distro package, docker, source -->

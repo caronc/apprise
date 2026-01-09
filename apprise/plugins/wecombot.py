@@ -78,7 +78,7 @@ class NotifyWeComBot(NotifyBase):
     secure_protocol = "wecombot"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/wecombot"
+    setup_url = "https://appriseit.com/services/wecombot/"
 
     # Plain Text Notification URL
     notify_url = "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key={key}"

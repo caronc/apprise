@@ -13,7 +13,7 @@ https://github.com/caronc/apprise/discussions
 If you are filing an issue anyway, include:
 
 ## Question
-<!-- Go ahead and ask your question here -->
+<!-- Ask your question here -->
 
 ## Apprise version and environment
 - Apprise version:

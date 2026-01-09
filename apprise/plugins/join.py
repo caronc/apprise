@@ -113,7 +113,7 @@ class NotifyJoin(NotifyBase):
     secure_protocol = "join"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/join"
+    setup_url = "https://appriseit.com/services/join/"
 
     # Join uses the http protocol with JSON requests
     notify_url = (

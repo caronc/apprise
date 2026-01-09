@@ -80,7 +80,7 @@ class NotifyBrevo(NotifyBase):
     secure_protocol = "brevo"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/brevo"
+    setup_url = "https://appriseit.com/services/brevo/"
 
     # Default to markdown
     notify_format = NotifyFormat.HTML

@@ -69,7 +69,7 @@ class NotifyTwist(NotifyBase):
     secure_protocol = "twist"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/twist"
+    setup_url = "https://appriseit.com/services/twist/"
 
     # The maximum size of the message
     body_maxlen = 1000

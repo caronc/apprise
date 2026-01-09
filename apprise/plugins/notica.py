@@ -84,7 +84,7 @@ class NotifyNotica(NotifyBase):
     secure_protocol = "noticas"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/notica"
+    setup_url = "https://appriseit.com/services/notica/"
 
     # Notica URL
     notify_url = "https://notica.us/?{token}"

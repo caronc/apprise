@@ -380,7 +380,7 @@ class NotifyLametric(NotifyBase):
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/lametric"
+    setup_url = "https://appriseit.com/services/lametric/"
 
     # Lametric does have titles when creating a message
     title_maxlen = 0

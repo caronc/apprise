@@ -107,7 +107,7 @@ class NotifyFCM(NotifyBase):
     secure_protocol = "fcm"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/fcm"
+    setup_url = "https://appriseit.com/services/fcm/"
 
     # Project Notification
     # https://firebase.google.com/docs/cloud-messaging/send-message

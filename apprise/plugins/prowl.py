@@ -92,7 +92,7 @@ class NotifyProwl(NotifyBase):
     secure_protocol = "prowl"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/prowl"
+    setup_url = "https://appriseit.com/services/prowl/"
 
     # Prowl uses the http protocol with JSON requests
     notify_url = "https://api.prowlapp.com/publicapi/add"

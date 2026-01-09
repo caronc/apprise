@@ -52,7 +52,7 @@ class NotifyMessageBird(NotifyBase):
     secure_protocol = "msgbird"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/messagebird"
+    setup_url = "https://appriseit.com/services/messagebird/"
 
     # MessageBird uses the http protocol with JSON requests
     notify_url = "https://rest.messagebird.com/messages"

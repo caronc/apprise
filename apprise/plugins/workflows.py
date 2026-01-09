@@ -93,7 +93,7 @@ class NotifyWorkflows(NotifyBase):
     secure_protocol = ("workflow", "workflows")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/workflows"
+    setup_url = "https://appriseit.com/services/workflows/"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_32

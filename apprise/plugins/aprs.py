@@ -121,7 +121,7 @@ class NotifyAprs(NotifyBase):
     secure_protocol = "aprs"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/aprs"
+    setup_url = "https://appriseit.com/services/aprs/"
 
     # APRS default port, supported by all core servers
     # Details: https://www.aprs-is.net/Connecting.aspx

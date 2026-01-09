@@ -23,5 +23,9 @@ assignees: ''
 ## Alternatives considered
 <!-- Any other approaches you considered -->
 
+## Documentation impact
+- Does appriseit.com require updates for this change? Yes / No
+- If yes, please also open (or link) a documentation ticket/PR in apprise-docs.
+
 ## Additional context
 <!-- Links, screenshots, logs, references -->

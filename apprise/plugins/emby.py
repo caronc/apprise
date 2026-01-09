@@ -57,7 +57,7 @@ class NotifyEmby(NotifyBase):
     secure_protocol = "embys"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/emby"
+    setup_url = "https://appriseit.com/services/emby/"
 
     # By default Emby requires you to provide it a device id
     # The following was just a random uuid4 generated one.  There

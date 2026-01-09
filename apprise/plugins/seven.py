@@ -52,7 +52,7 @@ class NotifySeven(NotifyBase):
     secure_protocol = "seven"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/seven"
+    setup_url = "https://appriseit.com/services/seven/"
 
     # Seven uses the http protocol with JSON requests
     notify_url = "https://gateway.seven.io/api/sms"

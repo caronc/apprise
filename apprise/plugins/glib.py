@@ -133,7 +133,7 @@ class NotifyGLib(NotifyBase):
     protocol = ("glib", "gio")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/glib"
+    setup_url = "https://appriseit.com/services/dbus/"
 
     # No throttling required for DBus queries
     request_rate_per_sec = 0

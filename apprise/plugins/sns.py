@@ -79,7 +79,7 @@ class NotifySNS(NotifyBase):
     secure_protocol = "sns"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/sns"
+    setup_url = "https://appriseit.com/services/sns/"
 
     # AWS is pretty good for handling data load so request limits
     # can occur in much shorter bursts

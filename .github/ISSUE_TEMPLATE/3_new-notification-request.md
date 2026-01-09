@@ -15,7 +15,7 @@ assignees: ''
 <!-- If unsure, leave blank and we will suggest one -->
 
 ## Proposed Appriseit service slug
-<!-- Example: foo (maps to https://appriseit.com/services/foo) -->
+<!-- Example: foo (maps to https://appriseit.com/services/foo/) -->
 <!-- If unsure, leave blank and we will suggest one -->
 
 ## Provide details that help development
@@ -24,6 +24,7 @@ assignees: ''
 - Authentication method: <!-- API key, OAuth, webhook, etc -->
 - Rate limits (if known):
 - Message limits (if known): <!-- title/body length, attachments, etc -->
+- Attachments supported: Yes / No / Unknown
 
 ## Example payload or curl snippet (optional)
 <!-- Redact secrets -->
@@ -33,3 +34,7 @@ paste example here
 
 ## Anything else?
 <!-- Features you would like supported, URL parameters, batching, attachments, etc -->
+
+## ☝️ Documentation note
+If this integration is accepted, it must also include an apprise-docs update so the service page exists on appriseit.com.
+If you can contribute docs, open a ticket or PR in: https://github.com/caronc/apprise-docs

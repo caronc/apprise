@@ -51,7 +51,7 @@ class NotifyHttpSMS(NotifyBase):
     secure_protocol = "httpsms"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/httpsms"
+    setup_url = "https://appriseit.com/services/httpsms/"
 
     # HttpSMS uses the http protocol with JSON requests
     notify_url = "https://api.httpsms.com/v1/messages/send"

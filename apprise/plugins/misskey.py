@@ -91,7 +91,7 @@ class NotifyMisskey(NotifyBase):
     secure_protocol = "misskeys"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/misskey"
+    setup_url = "https://appriseit.com/services/misskey/"
 
     # The title is not used
     title_maxlen = 0

@@ -71,7 +71,7 @@ class NotifyOffice365(NotifyBase):
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/office365"
+    setup_url = "https://appriseit.com/services/office365/"
 
     # URL to Microsoft Graph Server
     graph_url = "https://graph.microsoft.com"

@@ -102,7 +102,7 @@ class NotifyMSTeams(NotifyBase):
     secure_protocol = "msteams"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/msteams"
+    setup_url = "https://appriseit.com/services/msteams/"
 
     # MSTeams uses the http protocol with JSON requests
     notify_url_v1 = (
@@ -337,7 +337,7 @@ class NotifyMSTeams(NotifyBase):
             "December 31, 2025. It is advised that you switch to "
             "Microsoft Power Automate (already supported by Apprise as "
             "workflows://. For more information visit: "
-            "https://appriseit.com/services/workflows"
+            "https://appriseit.com/services/workflows/"
         )
 
     def gen_payload(
