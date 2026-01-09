@@ -42,7 +42,7 @@ from .common import ContentLocation
 from .config.base import ConfigBase
 from .conversion import convert_between
 from .emojis import apply_emojis
-from .locale import AppriseLocale
+from .i18n_locale import AppriseLocale
 from .logger import logger
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase

@@ -40,7 +40,7 @@ import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..conversion import convert_between
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import (
     is_email,
     is_phone_no,

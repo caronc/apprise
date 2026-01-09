@@ -47,7 +47,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload

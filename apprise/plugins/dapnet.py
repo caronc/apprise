@@ -51,7 +51,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from ..common import NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_call_sign, parse_bool, parse_call_sign, parse_list
 from .base import NotifyBase

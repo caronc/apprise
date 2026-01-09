@@ -111,7 +111,7 @@ def reload_plugin(name):
     reload(sys.modules["apprise.manager_plugins"])
     reload(sys.modules["apprise.apprise"])
     reload(sys.modules["apprise.utils"])
-    reload(sys.modules["apprise.locale"])
+    reload(sys.modules["apprise.i18n_locale"])
     reload(sys.modules["apprise"])
 
     # Acquire all of the test files we have

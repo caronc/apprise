@@ -44,7 +44,7 @@ import pytest
 import requests
 
 from apprise import NotificationManager, NotifyBase, cli
-from apprise.locale import gettext_lazy as _
+from apprise.i18n_locale import gettext_lazy as _
 from apprise.plugins.base import RequirementsSpec
 
 logging.disable(logging.CRITICAL)

@@ -55,7 +55,7 @@ from apprise import (
     URLBase,
     __version__,
 )
-from apprise.locale import LazyTranslation, gettext_lazy as _
+from apprise.i18n_locale import LazyTranslation, gettext_lazy as _
 from apprise.plugins.base import RequirementsSpec
 from apprise.utils.parse import parse_list
 

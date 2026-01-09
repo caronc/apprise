@@ -30,7 +30,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
 from .base import NotifyBase

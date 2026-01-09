@@ -44,7 +44,7 @@ import requests
 from ..attachment.base import AttachBase
 from ..attachment.memory import AttachMemory
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
     is_hostname,

@@ -39,7 +39,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from .base import NotifyBase
 

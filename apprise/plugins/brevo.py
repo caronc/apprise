@@ -36,7 +36,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase

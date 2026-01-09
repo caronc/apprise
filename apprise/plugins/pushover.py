@@ -34,7 +34,7 @@ import requests
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
 

@@ -34,7 +34,7 @@ import time
 import requests
 
 from ...common import NotifyImageSize, NotifyType, PersistentStoreMode
-from ...locale import gettext_lazy as _
+from ...i18n_locale import gettext_lazy as _
 from ...utils import pem as _pem
 from ...utils.base64 import base64_urlencode
 from ...utils.parse import is_email, parse_bool, parse_list

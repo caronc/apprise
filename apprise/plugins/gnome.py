@@ -26,7 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from ..common import NotifyImageSize, NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import parse_bool
 from .base import NotifyBase
 

@@ -25,7 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from .base import ConfigBase
 
 

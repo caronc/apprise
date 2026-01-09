@@ -34,7 +34,7 @@ from ..common import (
     NotifyImageSize,
     NotifyType,
 )
-from ..locale import LazyTranslation, gettext_lazy as _
+from ..i18n_locale import LazyTranslation, gettext_lazy as _
 from ..logger import logger
 from ..manager_plugins import NotificationManager
 from ..utils.cwe312 import cwe312_url

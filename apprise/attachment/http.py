@@ -34,7 +34,7 @@ import threading
 import requests
 
 from ..common import ContentLocation
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from .base import AttachBase
 

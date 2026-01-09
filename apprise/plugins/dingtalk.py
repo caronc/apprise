@@ -35,7 +35,7 @@ import time
 import requests
 
 from ..common import NotifyFormat, NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase

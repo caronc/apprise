@@ -43,7 +43,7 @@ from ..common import (
     OverflowMode,
     PersistentStoreMode,
 )
-from ..locale import Translatable, gettext_lazy as _
+from ..i18n_locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
 from ..utils.format import smart_split

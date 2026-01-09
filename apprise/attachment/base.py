@@ -33,7 +33,7 @@ import time
 
 from .. import exception
 from ..common import ContentLocation
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import URLBase
 from ..utils.parse import parse_bool
 

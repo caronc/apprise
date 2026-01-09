@@ -74,7 +74,7 @@ import sys
 
 from .. import __version__
 from ..common import NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_call_sign, parse_call_sign
 from .base import NotifyBase

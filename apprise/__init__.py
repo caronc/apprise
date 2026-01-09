@@ -61,7 +61,7 @@ from .common import (
     PersistentStoreMode,
 )
 from .config.base import ConfigBase
-from .locale import AppriseLocale
+from .i18n_locale import AppriseLocale
 
 # Inherit our logging with our additional entries added to it
 from .logger import LogCapture, logger, logging

@@ -39,7 +39,7 @@ from json import loads
 import requests
 
 from ..common import NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from .base import NotifyBase
 

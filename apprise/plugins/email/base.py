@@ -38,7 +38,7 @@ from typing import Optional
 
 from ...common import NotifyFormat, NotifyType, PersistentStoreMode
 from ...conversion import convert_between
-from ...locale import gettext_lazy as _
+from ...i18n_locale import gettext_lazy as _
 from ...logger import logger
 from ...url import PrivacyMode
 from ...utils import pgp as _pgp

@@ -83,7 +83,7 @@ import requests
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
-from ..locale import gettext_lazy as _
+from ..i18n_locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase

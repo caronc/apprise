@@ -34,7 +34,7 @@ from urllib.parse import quote as _quote, unquote as _unquote
 from xml.sax.saxutils import escape as sax_escape
 
 from .asset import AppriseAsset
-from .locale import gettext_lazy as _
+from .i18n_locale import gettext_lazy as _
 from .logger import logger
 from .utils.parse import (
     parse_bool,

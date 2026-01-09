@@ -37,16 +37,16 @@ from unittest import mock
 from helpers import environ
 import pytest
 
-from apprise import locale
+from apprise import i18n_locale
 
 logging.disable(logging.CRITICAL)
 
 
 def test_apprise_trans():
     """
-    API: Test apprise locale object
+    API: Test apprise.i18n_locale object
     """
-    lazytrans = locale.LazyTranslation("Token")
+    lazytrans = i18n_locale.LazyTranslation("Token")
     assert str(lazytrans) == "Token"
 
 
@@ -56,17 +56,17 @@ def test_apprise_trans_gettext_init():
     API: Handle gettext
     """
     # Toggle
-    locale.GETTEXT_LOADED = False
+    i18n_locale.GETTEXT_LOADED = False
 
     # Objects can still be created
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
 
     with al.lang_at("en") as _:
         # functions still behave as normal
         assert _ is None
 
     # Restore the object
-    locale.GETTEXT_LOADED = True
+    i18n_locale.GETTEXT_LOADED = True
 
 
 @pytest.mark.skipif("gettext" not in sys.modules, reason="Requires gettext")
@@ -86,14 +86,14 @@ def test_apprise_trans_gettext_translations(
     mock_gettext_trans.side_effect = FileNotFoundError()
 
     # This throws internally but we handle it gracefully
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
 
     with al.lang_at("en"):
         # functions still behave as normal
         pass
 
     # This throws internally but we handle it gracefully
-    locale.AppriseLocale(language="fr")
+    i18n_locale.AppriseLocale(language="fr")
 
 
 @pytest.mark.skipif(hasattr(ctypes, "windll"), reason="Unique Nux test cases")
@@ -109,7 +109,7 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
     mock_getlocale.return_value = ("en_CA", "UTF-8")
 
     # This throws internally but we handle it gracefully
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
 
     # Edge Cases
     assert al.add("en", set_default=False) is True
@@ -120,7 +120,7 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
         pass
 
     # This throws internally but we handle it gracefully
-    locale.AppriseLocale(language="fr")
+    i18n_locale.AppriseLocale(language="fr")
 
     with al.lang_at("en") as _:
         # functions still behave as normal
@@ -138,17 +138,17 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
     # not have. This is only done to test edge cases when for whatever
     # reason the person who set up apprise does not have the languages
     # installed.
-    fallback = locale.AppriseLocale._default_language
+    fallback = i18n_locale.AppriseLocale._default_language
     mock_getlocale.return_value = None
 
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
         # Our default language
-        locale.AppriseLocale._default_language = "zz"
+        i18n_locale.AppriseLocale._default_language = "zz"
 
         # We will detect the zz since there were no environment variables to
         # help us otherwise
-        assert locale.AppriseLocale.detect_language() is None
-        al = locale.AppriseLocale()
+        assert i18n_locale.AppriseLocale.detect_language() is None
+        al = i18n_locale.AppriseLocale()
 
         # No Language could be set becuause no locale directory exists for this
         assert al.lang is None
@@ -174,12 +174,12 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
 
     with environ("LANGUAGE", "LC_CTYPE", LC_ALL="C.UTF-8", LANG="en_CA"):
         # the UTF-8 entry is skipped over
-        locale.AppriseLocale._default_language = "fr"
+        i18n_locale.AppriseLocale._default_language = "fr"
 
         # We will detect the english language (found in the LANG= environment
         # variable which over-rides the _default
-        assert locale.AppriseLocale.detect_language() == "en"
-        al = locale.AppriseLocale()
+        assert i18n_locale.AppriseLocale.detect_language() == "en"
+        al = i18n_locale.AppriseLocale()
         assert al.lang == "en"
         assert al.gettext("test") == "test"
 
@@ -191,7 +191,7 @@ def test_apprise_trans_gettext_lang_at(mock_getlocale):
         assert al.gettext("test") == "test"
 
         assert al.add("zy", set_default=False) is False
-    locale.AppriseLocale._default_language = fallback
+    i18n_locale.AppriseLocale._default_language = fallback
 
 
 @pytest.mark.skipif("gettext" not in sys.modules, reason="Requires gettext")
@@ -202,17 +202,17 @@ def test_apprise_trans_add():
     """
 
     # This throws internally but we handle it gracefully
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
         # English is the default/fallback type
         assert al.add("en") is True
 
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="C.UTF-8"):
         # Test English Environment
         assert al.add("en") is True
 
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="en_CA.UTF-8"):
         # Test English Environment
         assert al.add("en") is True
@@ -248,30 +248,31 @@ def test_apprise_trans_windows_users_win(mock_getlocale):
 
         with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
             # Our default language
-            locale.AppriseLocale._default_language = "zz"
+            i18n_locale.AppriseLocale._default_language = "zz"
 
             # We will pick up the windll module and detect english
-            assert locale.AppriseLocale.detect_language() == "en"
+            assert i18n_locale.AppriseLocale.detect_language() == "en"
 
         # The below accesses the windows fallback code
         with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="es_AR"):
             # Environment Variable Trumps
-            assert locale.AppriseLocale.detect_language() == "es"
+            assert i18n_locale.AppriseLocale.detect_language() == "es"
 
         # No environment variable, then the Windows environment is used
         with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
             # Windows Environment
-            assert locale.AppriseLocale.detect_language() == "en"
+            assert i18n_locale.AppriseLocale.detect_language() == "en"
 
         assert (
-            locale.AppriseLocale.detect_language(detect_fallback=False) is None
+            i18n_locale.AppriseLocale.detect_language(
+                detect_fallback=False) is None
         )
 
         # 0 = IndexError
         ui_lang.return_value = 0
         with environ("LANGUAGE", "LANG", "LC_ALL", "LC_CTYPE"):
             # We fall back to posix locale
-            assert locale.AppriseLocale.detect_language() == "fr"
+            assert i18n_locale.AppriseLocale.detect_language() == "fr"
 
 
 @pytest.mark.skipif(hasattr(ctypes, "windll"), reason="Unique Nux test cases")
@@ -294,37 +295,38 @@ def test_apprise_trans_windows_users_nux(mock_getlocale):
     windll.kernel32.GetUserDefaultUILanguage.return_value = 4105
 
     # Store default value to not break other tests
-    default_language = locale.AppriseLocale._default_language
+    default_language = i18n_locale.AppriseLocale._default_language
 
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
         # Our default language
-        locale.AppriseLocale._default_language = "zz"
+        i18n_locale.AppriseLocale._default_language = "zz"
 
         # We will pick up the windll module and detect english
-        assert locale.AppriseLocale.detect_language() == "en"
+        assert i18n_locale.AppriseLocale.detect_language() == "en"
 
     # The below accesses the windows fallback code
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", LANG="es_AR"):
         # Environment Variable Trumps
-        assert locale.AppriseLocale.detect_language() == "es"
+        assert i18n_locale.AppriseLocale.detect_language() == "es"
 
     # No environment variable, then the Windows environment is used
     with environ("LANGUAGE", "LC_ALL", "LC_CTYPE", "LANG"):
         # Windows Environment
-        assert locale.AppriseLocale.detect_language() == "en"
+        assert i18n_locale.AppriseLocale.detect_language() == "en"
 
-    assert locale.AppriseLocale.detect_language(detect_fallback=False) is None
+    assert i18n_locale.AppriseLocale.detect_language(
+            detect_fallback=False) is None
 
     # 0 = IndexError
     windll.kernel32.GetUserDefaultUILanguage.return_value = 0
     with environ("LANGUAGE", "LANG", "LC_ALL", "LC_CTYPE"):
         # We fall back to posix locale
-        assert locale.AppriseLocale.detect_language() == "fr"
+        assert i18n_locale.AppriseLocale.detect_language() == "fr"
 
     delattr(ctypes, "windll")
 
     # Restore default value
-    locale.AppriseLocale._default_language = default_language
+    i18n_locale.AppriseLocale._default_language = default_language
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Unique Nux test cases")
@@ -339,11 +341,11 @@ def test_detect_language_using_env(mock_getlocale):
     # then it will resort to the environment variables.
     with environ("LANG", "LANGUAGE", "LC_ALL", "LC_CTYPE"):
         # Language can now be detected in this case
-        assert isinstance(locale.AppriseLocale.detect_language(), str)
+        assert isinstance(i18n_locale.AppriseLocale.detect_language(), str)
 
     # Detect French language.
     with environ("LANGUAGE", "LC_ALL", LC_CTYPE="garbage", LANG="fr_CA"):
-        assert locale.AppriseLocale.detect_language() == "fr"
+        assert i18n_locale.AppriseLocale.detect_language() == "fr"
 
     # The following unsets all environment variables and sets LC_CTYPE
     # This was causing Python 2.7 to internally parse UTF-8 as an invalid
@@ -351,24 +353,24 @@ def test_detect_language_using_env(mock_getlocale):
     # dropped, but just to ensure this issue does not come back, we keep
     # this test:
     with environ(*list(os.environ.keys()), LC_CTYPE="UTF-8"):
-        assert isinstance(locale.AppriseLocale.detect_language(), str)
+        assert isinstance(i18n_locale.AppriseLocale.detect_language(), str)
 
     # Test with absolutely no environment variables what-so-ever
     with environ(*list(os.environ.keys())):
-        assert isinstance(locale.AppriseLocale.detect_language(), str)
+        assert isinstance(i18n_locale.AppriseLocale.detect_language(), str)
 
     # Handle case where getlocale() can't be detected
     mock_getlocale.return_value = None
     with environ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE"):
-        assert locale.AppriseLocale.detect_language() is None
+        assert i18n_locale.AppriseLocale.detect_language() is None
 
     mock_getlocale.return_value = (None, None)
     with environ("LC_ALL", "LC_CTYPE", "LANG", "LANGUAGE"):
-        assert locale.AppriseLocale.detect_language() is None
+        assert i18n_locale.AppriseLocale.detect_language() is None
 
     # if detect_language and windows env fail us, then we don't
     # set up a default language on first load
-    locale.AppriseLocale()
+    i18n_locale.AppriseLocale()
 
 
 @pytest.mark.skipif("gettext" not in sys.modules, reason="Requires gettext")
@@ -388,19 +390,19 @@ def test_apprise_trans_gettext_missing(tmpdir):
     sys.path.insert(0, str(gettext_dir))
 
     # reload our module (forcing the import error when it tries to load gettext
-    reload(sys.modules["apprise.locale"])
-    from apprise import locale
+    reload(sys.modules["apprise.i18n_locale"])
+    from apprise import i18n_locale
 
-    assert locale.GETTEXT_LOADED is False
+    assert i18n_locale.GETTEXT_LOADED is False
 
     # Now roll our changes back
     sys.path.pop(0)
 
     # Reload again (reverting back)
-    reload(sys.modules["apprise.locale"])
-    from apprise import locale
+    reload(sys.modules["apprise.i18n_locale"])
+    from apprise import i18n_locale
 
-    assert locale.GETTEXT_LOADED is True
+    assert i18n_locale.GETTEXT_LOADED is True
 
 
 @mock.patch("gettext.translation")
@@ -411,7 +413,7 @@ def test_apprise_locale_add_existing_language(mock_translation):
     dummy.gettext = lambda x: f"tr:{x}"
     mock_translation.return_value = dummy
 
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
     assert al.add("en", set_default=True) is True
     assert al.add("en", set_default=False) is True
 
@@ -428,6 +430,6 @@ def test_apprise_trans_successful_translation(
     dummy_translation.gettext = lambda x: f"tr:{x}"
     mock_translation.return_value = dummy_translation
 
-    al = locale.AppriseLocale()
+    al = i18n_locale.AppriseLocale()
     assert al.add("en") is True
     assert al.gettext("test") == "tr:test"
