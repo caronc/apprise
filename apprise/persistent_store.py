@@ -549,7 +549,7 @@ class PersistentStore:
             prev_size = os.stat(io_file).st_size
 
         except FileNotFoundError:
-            # No worries, no size to accomodate
+            # No worries, no size to accommodate
             prev_size = 0
 
         except OSError as e:

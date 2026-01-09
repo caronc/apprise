@@ -139,7 +139,7 @@ def sanitize_payload(
         return sha256(b).hexdigest()[:12]
 
     def _summarize_str(s: str) -> str:
-        """Summarise strings longer than opts.max_str_len with a preview."""
+        """Summarize strings longer than opts.max_str_len with a preview."""
         nonlocal items_seen
         items_seen += 1
 
@@ -152,7 +152,7 @@ def sanitize_payload(
         return f"<string len={length} head={head!r} tail={tail!r}>"
 
     def _summarize_bytes(b: bytes) -> str:
-        """Summarise bytes with length and a short bounded sha256 prefix."""
+        """Summarize bytes with length and a short bounded sha256 prefix."""
         nonlocal items_seen
         items_seen += 1
         return f"<bytes len={len(b)} sha256={_hash_bytes(b)}>"
@@ -168,7 +168,7 @@ def sanitize_payload(
         return lk in _BLOB_KEYWORDS
 
     def _summarize_key(k: Any) -> Any:
-        """Summarise keys where needed, preserving readability in logs."""
+        """Summarize keys where needed, preserving readability in logs."""
         if isinstance(k, str):
             # Keys are usually short. Only summarize if they are unexpectedly
             # large to avoid log pollution.

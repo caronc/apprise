@@ -469,7 +469,7 @@ class NotifyResend(NotifyBase):
             if self.logger.isEnabledFor(logging.DEBUG):
                 # Due to attachments; output can be quite heavy and io
                 # intensive.
-                # To accomodate this, we only show our debug payload
+                # To accommodate this, we only show our debug payload
                 # information if required.
                 self.logger.debug(
                     "Resend POST URL:"

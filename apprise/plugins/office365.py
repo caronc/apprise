@@ -817,7 +817,7 @@ class NotifyOffice365(NotifyBase):
         # Some Debug Logging
         if self.logger.isEnabledFor(logging.DEBUG):
             # Due to attachments; output can be quite heavy and io intensive
-            # To accomodate this, we only show our debug payload information
+            # To accommodate this, we only show our debug payload information
             # if required.
             self.logger.debug(
                 "Office 365 %s URL:"

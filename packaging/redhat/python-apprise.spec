@@ -466,7 +466,7 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 * Sun Mar 10 2019 Chris Caron <lead2gold@gmail.com> - 0.7.4-1
 - Updated to v0.7.4
 - Fedora review process added a man page, spec restructuring and 2 patch files
-  to accomodate some valid points brought forth. These have already been pushed
+  to accommodate some valid points brought forth. These have already been pushed
   upstream and will be removed on the next version.
 
 * Fri Feb 22 2019 Chris Caron <lead2gold@gmail.com> - 0.7.3-1

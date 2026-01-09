@@ -26,7 +26,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-## The following was added to accomodate:
+## The following was added to accommodate:
 #   https://bugzilla.redhat.com/show_bug.cgi?id=2216807
 #
 # the switch was added and it didn't work:

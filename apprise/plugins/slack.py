@@ -328,7 +328,7 @@ class NotifySlack(NotifyBase):
 
     # The markdown in slack isn't [desc](url), it's <url|desc>
     #
-    # To accomodate this, we need to ensure we don't escape URLs that match
+    # To accommodate this, we need to ensure we don't escape URLs that match
     _re_url_support = re.compile(
         r"(?P<match>(?:<|\&lt;)?[ \t]*"
         r"(?P<url>(?:https?|mailto)://[^| \n]+)"
