@@ -3,8 +3,8 @@
 
 <!--
   -- Have anything else to describe?
-  -- Define it here; this helps build the wiki item later
---!>
+  -- Define it here; this helps build the documentation site later
+-->
 
 <!-- START OF NEW PLUGIN SECTION
   -- Delete this section if you are not creating a new plugin --
