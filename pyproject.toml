@@ -231,7 +231,7 @@ windows = [
 ]
 
 [project.urls]
-Homepage = "https://apriseit.com"
+Homepage = "https://appriseit.com"
 Source = "https://github.com/caronc/apprise"
 Tracker = "https://github.com/caronc/apprise/issues"
 Documentation = "https://appriseit.com"
