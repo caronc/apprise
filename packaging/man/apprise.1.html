@@ -110,7 +110,7 @@ accept them).</li>
   <var>stdin</var>.</p>
 
 <p><code>-t</code>, <code>--title=</code><var>VALUE</var>:
-  Specify the message title. This field is complete optional.</p>
+  Specify the message title. This field is completely optional.</p>
 
 <p><code>-c</code>, <code>--config=</code><var>CONFIG-URL</var>:
   Specify one or more configuration locations.</p>
@@ -123,7 +123,7 @@ accept them).</li>
   You can create your own notification by simply creating a Python file
   that contains the <code>@notify("schema")</code> decorator.</p>
 
-<p>You can optioanly chose to specify more then one <strong>--plugin-path</strong> (<strong>-P</strong>)
+<p>You can optionally choose to specify more than one <strong>--plugin-path</strong> (<strong>-P</strong>)
   to increase the modules included.</p>
 
 <p><code>-n</code>, <code>--notification-type=</code><var>VALUE</var>:
@@ -138,22 +138,32 @@ accept them).</li>
   Specify the default theme.</p>
 
 <p><code>-g</code>, <code>--tag=</code><var>VALUE</var>:
-  Specify one or more tags to filter which services to notify. Use multiple
-  <strong>--tag</strong> (<strong>-g</strong>) entries to <code>OR</code> the tags together and comma separated
-  to <code>AND</code> them. If no tags are specified then all services are notified.</p>
+  Specify one or more tags to filter which services to notify:</p>
+
+<ul>
+  <li>
+<code>-g "tagA" -g "tagB"</code>: Match tagA <strong>OR</strong> tagB (Union).</li>
+  <li>
+<code>-g "tagA,tagB"</code>: Match tagA <strong>AND</strong> tagB (Strict).</li>
+  <li>
+<code>-g "all"</code>: Notify <strong>ALL</strong> services.</li>
+  <li>
+<code>(Omitted)</code>: Notify <strong>untagged</strong> services only.</li>
+</ul>
 
 <p><code>-Da</code>, <code>--disable-async</code>:
   Send notifications synchronously (one after the other) instead of
   all at once.</p>
 
 <p><code>-R</code>, <code>--recursion-depth</code><var>INTEGER</var>:
-  he number of recursive import entries that can be loaded from within
+  The number of recursive import entries that can be loaded from within
   Apprise configuration. By default this is set to 1. If this is set to
   zero, then import statements found in any configuration is ignored.</p>
 
 <p><code>-e</code>, <code>--interpret-escapes</code>
   Enable interpretation of backslash escapes. For example, this would convert
-  sequences such as \n and \r to their respected ascii new-line and carriage</p>
+  sequences such as \n and \r to their respected ascii new-line and carriage
+  return characters prior to the delivery of the notification.</p>
 
 <p><code>-j</code>, <code>--interpret-emojis</code>
   Enable interpretation of emoji strings. For example, this would convert
@@ -165,7 +175,7 @@ accept them).</li>
 
 <p><code>-SM</code>, <code>--storage-mode=</code><var>MODE</var>:
   Specify the persistent storage operational mode. Possible values are "auto",
-  "flush", and "memory". The default is "auto" not not specified.</p>
+  "flush", and "memory". The default is "auto" if not specified.</p>
 
 <p><code>-SPD</code>, <code>--storage-prune-days=</code><var>INTEGER</var>:
   Define the number of days the storage prune should run using.
@@ -179,8 +189,6 @@ accept them).</li>
 <p><code>-d</code>, <code>--dry-run</code>:
   Perform a trial run but only prints the notification services to-be
   triggered to <strong>stdout</strong>. Notifications are never sent using this mode.</p>
-
-<p>return characters prior to the delivery of the notification.</p>
 
 <p><code>-l</code>, <code>--details</code>
   Prints details about the current services supported by Apprise.</p>
@@ -199,7 +207,7 @@ accept them).</li>
 
 <h2 id="PERSISTENT-STORAGE">PERSISTENT STORAGE</h2>
 
-<p>Persistent storage by default writes to the following location unless the environment variable <code>APPRISE_STORAGE_PATH</code> over-rides it and/or <code>--storage-path</code> (<code>-SP</code>) is specified to over-ride it:</p>
+<p>Persistent storage by default writes to the following location unless the environment variable <code>APPRISE_STORAGE_PATH</code> overrides it and/or <code>--storage-path</code> (<code>-SP</code>) is specified to override it:</p>
 
 <pre><code>~/.local/share/apprise/cache
 </code></pre>
@@ -218,12 +226,12 @@ specify the keyword <strong>storage</strong></p>
   nothing further is identified.</p>
 
 <p><code>prune</code>:
-  Removes all persistent storage that has not been referenced for more then 30
+  Removes all persistent storage that has not been referenced for more than 30
   days. You can optionally set the <code>--storage-prune-days</code> to alter this
   default value.</p>
 
 <p><code>clean</code>:
-  Removes all persistent storage reguardless of age.</p>
+  Removes all persistent storage regardless of age.</p>
 
 <h2 id="EXIT-STATUS">EXIT STATUS</h2>
 
@@ -244,7 +252,7 @@ loaded but none could be notified due to user filtering (via tags).</li>
 
 <h2 id="SERVICE-URLS">SERVICE URLS</h2>
 
-<p>There are to many service URL and combinations to list here. It's best to
+<p>There are too many service URL and combinations to list here. It's best to
 visit the <a href="https://appriseit.com/services/">Apprise GitHub page</a> and see what's available.</p>
 
 <p>The <strong>environment variable</strong> of <code>APPRISE_URLS</code> (comma/space delimited) can be specified to
@@ -280,6 +288,22 @@ notification service URLs and only notify the ones tagged as <em>devops</em>.</p
 <pre><code>$ apprise -vv -t "my title" -b "my notification body" \
    --config=https://localhost/my/apprise/config \
    -t devops
+</code></pre>
+
+<p><strong>Tagging Logic Examples:</strong></p>
+
+<p>Notify any service tagged with "devops" OR "admin" (Union):</p>
+
+<pre><code>$ apprise -vv -t "Union Test" \
+   --config=~/apprise.yml \
+   -g devops -g admin
+</code></pre>
+
+<p>Notify only services tagged with BOTH "devops" AND "critical" (Intersection):</p>
+
+<pre><code>$ apprise -vv -t "Intersection Test" \
+   --config=~/apprise.yml \
+   -g devops,critical
 </code></pre>
 
 <p>Include an attachment:</p>
@@ -341,7 +365,7 @@ def my_wrapper(body, title, notify_type, *args, **kwargs):
 <p>A configuration file can be in the format of either <strong>TEXT</strong> or <strong>YAML</strong> where
 <a href="https://appriseit.com/config/text/">TEXT</a> is the easiest and most ideal solution for most users.  However
 <a href="https://appriseit.com/config/yaml/">YAML</a> configuration files grants the user a bit more leverage and access
-to some of the internal features of Apprise. Reguardless of which format you choose,
+to some of the internal features of Apprise. Regardless of which format you choose,
 both provide the users the ability to leverage <strong>tagging</strong> which adds a more rich and
 powerful notification environment.</p>
 
@@ -392,19 +416,19 @@ configuration that you want and only specifically notify a subset of them:</p>
 <h2 id="ENVIRONMENT-VARIABLES">ENVIRONMENT VARIABLES</h2>
 <p><code>APPRISE_URLS</code>:
   Specify the default URLs to notify IF none are otherwise specified on the command line
-  explicitly.  If the <code>--config</code> (<code>-c</code>) is specified, then this will over-rides any
+  explicitly.  If the <code>--config</code> (<code>-c</code>) is specified, then this will override any
   reference to this variable. Use white space and/or a comma (<code>,</code>) to delimit multiple entries.</p>
 
 <p><code>APPRISE_CONFIG_PATH</code>:
-  Explicitly specify the config search path to use (over-riding the default).
+  Explicitly specify the config search path to use (overriding the default).
   Use a semi-colon (<code>;</code>), line-feed (<code>\n</code>), and/or carriage return (<code>\r</code>) to delimit multiple entries.</p>
 
 <p><code>APPRISE_PLUGIN_PATH</code>:
-  Explicitly specify the custom plugin search path to use (over-riding the default).
+  Explicitly specify the custom plugin search path to use (overriding the default).
   Use a semi-colon (<code>;</code>), line-feed (<code>\n</code>), and/or carriage return (<code>\r</code>) to delimit multiple entries.</p>
 
 <p><code>APPRISE_STORAGE_PATH</code>:
-  Explicitly specify the persistent storage path to use (over-riding the default).</p>
+  Explicitly specify the persistent storage path to use (overriding the default).</p>
 
 <h2 id="BUGS">BUGS</h2>
 

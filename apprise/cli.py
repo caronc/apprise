@@ -60,7 +60,7 @@ from .logger import logger
 from .utils.disk import bytes_to_str, dir_size, path_decode
 from .utils.parse import parse_list
 
-# By default we allow looking 1 level down recursivly in Apprise configuration
+# By default we allow looking 1 level down recursively in Apprise configuration
 # files.
 DEFAULT_RECURSION_DEPTH = 1
 
@@ -74,19 +74,19 @@ DEFAULT_STORAGE_UID_LENGTH = int(
     os.environ.get("APPRISE_STORAGE_UID_LENGTH", 8)
 )
 
-# Defines the envrionment variable to parse if defined. This is ONLY
+# Defines the environment variable to parse if defined. This is ONLY
 # Referenced if:
 # - No Configuration Files were found/loaded/specified
 # - No URLs were provided directly into the CLI Call
 DEFAULT_ENV_APPRISE_URLS = "APPRISE_URLS"
 
-# Defines the over-ride path for the configuration files read
+# Defines the override path for the configuration files read
 DEFAULT_ENV_APPRISE_CONFIG_PATH = "APPRISE_CONFIG_PATH"
 
-# Defines the over-ride path for the plugins to load
+# Defines the override path for the plugins to load
 DEFAULT_ENV_APPRISE_PLUGIN_PATH = "APPRISE_PLUGIN_PATH"
 
-# Defines the over-ride path for the persistent storage
+# Defines the override path for the persistent storage
 DEFAULT_ENV_APPRISE_STORAGE_PATH = "APPRISE_STORAGE_PATH"
 
 # Defines our click context settings adding -h to the additional options that
@@ -229,7 +229,7 @@ class PersistentStorageMode:
     # Prune persistent storage based on age
     PRUNE = "prune"
 
-    # Reset all (reguardless of age)
+    # Reset all (regardless of age)
     CLEAR = "clear"
 
 
@@ -241,7 +241,7 @@ PERSISTENT_STORAGE_MODES = (
 )
 
 if os.environ.get("APPRISE_STORAGE_PATH", "").strip():
-    # Over-ride Default Storage Path
+    # Override Default Storage Path
     DEFAULT_STORAGE_PATH = os.environ.get("APPRISE_STORAGE_PATH")
 
 
@@ -280,7 +280,7 @@ class CustomHelpCommand(click.Command):
                 "For a list of all of the supported services and information"
                 " on how to use "
             ),
-            "them, check out at https://github.com/caronc/apprise",
+            "them, check out https://github.com/caronc/apprise",
         )
 
         for line in content:
@@ -302,7 +302,7 @@ class CustomHelpCommand(click.Command):
                     "list",
                     (
                         "List all URL IDs associated with detected URL(s)."
-                        " This is also the default action ran if nothing is"
+                        " This is also the default action run if nothing is"
                         " provided"
                     ),
                 ),
@@ -407,7 +407,7 @@ class CustomHelpCommand(click.Command):
     "-t",
     default=None,
     type=str,
-    help="Specify the message title. This field is complete optional.",
+    help="Specify the message title. This field is completely optional.",
 )
 @click.option(
     "--plugin-path",
@@ -446,7 +446,7 @@ class CustomHelpCommand(click.Command):
     default=DEFAULT_STORAGE_UID_LENGTH,
     type=int,
     help=(
-        "Define the number of unique characters to store persistentcache in."
+        "Define the number of unique characters to store persistent cache in."
         f" By default this value is {DEFAULT_STORAGE_UID_LENGTH} characters."
     ),
 )
@@ -480,7 +480,7 @@ class CustomHelpCommand(click.Command):
     type=str,
     multiple=True,
     metavar="ATTACHMENT_URL",
-    help="Specify one or more attachment.",
+    help="Specify one or more attachments.",
 )
 @click.option(
     "--notification-type",
@@ -525,10 +525,10 @@ class CustomHelpCommand(click.Command):
     multiple=True,
     metavar="TAG",
     help=(
-        "Specify one or more tags to filter "
-        "which services to notify. Use multiple --tag (-g) entries to "
-        '"OR" the tags together and comma separated to "AND" them. '
-        "If no tags are specified then all services are notified."
+        "Specify one or more tags to filter which services to notify. Use "
+        "multiple --tag (-g) entries to match ANY tag. Use comma separators "
+        "to require ALL tags (strict match). Omit to notify untagged services "
+        'only, or use "all" to notify everything.'
     ),
 )
 @click.option(
@@ -628,8 +628,7 @@ def main(
     URLs the content provided within the title, body and notification-type.
 
     For a list of all of the supported services and information on how to use
-    them, check out at
-    https://github.com/caronc/apprise
+    them, check out https://github.com/caronc/apprise
     """
     # Note: Click ignores the return values of functions it wraps, If you
     #       want to return a specific error code, you must call ctx.exit()
@@ -713,7 +712,7 @@ def main(
         ctx.exit(2)
 
     #
-    # Apply Environment Over-rides if defined
+    # Apply Environment Overrides if defined
     #
     _config_paths = DEFAULT_CONFIG_PATHS
     if "APPRISE_CONFIG" in os.environ:
@@ -770,7 +769,7 @@ def main(
     if storage_uid_length < 2:
         click.echo(
             "The --storage-uid-length (-SUL) value can not be lower "
-            "then two (2)."
+            "than two (2)."
         )
         click.echo("Try 'apprise --help' for more information.")
 
@@ -984,7 +983,7 @@ def main(
         if storage_prune_days < 0:
             click.echo(
                 "The --storage-prune-days (-SPD) value can not be lower "
-                "then zero (0)."
+                "than zero (0)."
             )
             click.echo("Try 'apprise --help' for more information.")
 
@@ -1036,8 +1035,8 @@ def main(
                 }
 
             else:
-                # It's possible to have more then one URL point to the same
-                # location (thus match against the same url id more then once
+                # It's possible to have more than one URL point to the same
+                # location (thus match against the same url id more than once
                 uids[_id]["plugins"].append(plugin)
 
         if action == PersistentStorageMode.LIST:
