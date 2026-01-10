@@ -407,7 +407,7 @@ class CustomHelpCommand(click.Command):
     "-t",
     default=None,
     type=str,
-    help="Specify the message title. This field is complete optional.",
+    help="Specify the message title. This field is completely optional.",
 )
 @click.option(
     "--plugin-path",
