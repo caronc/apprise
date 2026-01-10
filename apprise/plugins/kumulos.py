@@ -65,7 +65,7 @@ class NotifyKumulos(NotifyBase):
     secure_protocol = "kumulos"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_kumulos"
+    setup_url = "https://appriseit.com/services/kumulos/"
 
     # Kumulos uses the http protocol with JSON requests
     notify_url = "https://messages.kumulos.com/v2/notifications"

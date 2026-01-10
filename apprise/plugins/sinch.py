@@ -78,7 +78,7 @@ class NotifySinch(NotifyBase):
     validity_period = 14400
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sinch"
+    setup_url = "https://appriseit.com/services/sinch/"
 
     # Sinch uses the http protocol with JSON requests
     #   - the 'spi' gets substituted with the Service Provider ID

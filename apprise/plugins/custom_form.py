@@ -83,7 +83,7 @@ class NotifyForm(NotifyBase):
     secure_protocol = "forms"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_Custom_Form"
+    setup_url = "https://appriseit.com/services/form/"
 
     # Support attachments
     attachment_support = True

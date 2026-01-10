@@ -81,7 +81,7 @@ class NotifyBurstSMS(NotifyBase):
     default_batch_size = 500
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_burst_sms"
+    setup_url = "https://appriseit.com/services/burstsms/"
 
     # Burst SMS uses the http protocol with JSON requests
     notify_url = "https://api.transmitsms.com/send-sms.json"

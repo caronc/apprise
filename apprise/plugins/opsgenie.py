@@ -189,7 +189,7 @@ class NotifyOpsgenie(NotifyBase):
     secure_protocol = "opsgenie"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_opsgenie"
+    setup_url = "https://appriseit.com/services/opsgenie/"
 
     # The maximum length of the body
     body_maxlen = 15000

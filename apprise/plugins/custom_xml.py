@@ -64,7 +64,7 @@ class NotifyXML(NotifyBase):
     secure_protocol = "xmls"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_Custom_XML"
+    setup_url = "https://appriseit.com/services/xml/"
 
     # Support attachments
     attachment_support = True

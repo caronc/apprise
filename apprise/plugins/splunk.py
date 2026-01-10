@@ -123,7 +123,7 @@ class NotifySplunk(NotifyBase):
     secure_protocol = ("splunk", "victorops")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_splunk"
+    setup_url = "https://appriseit.com/services/splunk/"
 
     # Notification URL
     notify_url = (

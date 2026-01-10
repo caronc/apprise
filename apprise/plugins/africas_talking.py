@@ -96,7 +96,7 @@ class NotifyAfricasTalking(NotifyBase):
     secure_protocol = "atalk"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_africas_talking"
+    setup_url = "https://appriseit.com/services/africas_talking/"
 
     # Africas Talking API Request URLs
     notify_url = {

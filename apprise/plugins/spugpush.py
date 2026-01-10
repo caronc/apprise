@@ -54,7 +54,7 @@ class NotifySpugpush(NotifyBase):
     secure_protocol = "spugpush"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_spugpush"
+    setup_url = "https://appriseit.com/services/spugpush/"
 
     # URL used to send notifications with
     notify_url = "https://push.spug.dev/send/"

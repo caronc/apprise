@@ -157,7 +157,7 @@ The **storage** action has the following sub actions:
 There are to many service URL and combinations to list here. It's best to
 visit the [Apprise GitHub page][serviceurls] and see what's available.
 
-[serviceurls]: https://github.com/caronc/apprise/wiki#notification-services
+[serviceurls]: https://appriseit.com/services/
 
 The **environment variable** of `APPRISE_URLS` (comma/space delimited) can be specified to
 provide the default set of URLs you wish to notify if none are otherwise specified.
@@ -288,10 +288,10 @@ configuration that you want and only specifically notify a subset of them:
         --body "Please go ahead and make dinner without me." \
         --tag=family
 
-[yamlconfig]: https://github.com/caronc/apprise/wiki/config_yaml
-[textconfig]: https://github.com/caronc/apprise/wiki/config_text
-[tagging]: https://github.com/caronc/apprise/wiki/CLI_Usage#label-leverage-tagging
-[pstorage]: https://github.com/caronc/apprise/wiki/persistent_storage
+[yamlconfig]: https://appriseit.com/config/yaml/
+[textconfig]: https://appriseit.com/config/text/
+[tagging]: https://appriseit.com/guides/#leverage-tagging
+[pstorage]: https://appriseit.com/getting-started/persistent-storage/
 
 ## ENVIRONMENT VARIABLES
   `APPRISE_URLS`:
@@ -316,9 +316,10 @@ If you find any bugs, please make them known at:
 <https://github.com/caronc/apprise/issues>
 
 ## DONATIONS
-If you found Apprise useful at all, [please consider donating][donations]!
+If you found Apprise useful at all, [please consider sponsoring][sponsorship] or [donating][donating]!
 
-[donations]: https://github.com/caronc/apprise/wiki/persistent_storage
+[sponsorship]: https://github.com/sponsors/caronc
+[donating]: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MHANV39UZNQ5E
 
 ## COPYRIGHT
 

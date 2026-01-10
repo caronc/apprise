@@ -339,7 +339,7 @@ class NotifyPushSafer(NotifyBase):
     default_pushsafer_icon = 25
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushsafer"
+    setup_url = "https://appriseit.com/services/pushsafer/"
 
     # Defines the hostname to post content to; since this service supports
     # both insecure and secure methods, we set the {schema} just before we

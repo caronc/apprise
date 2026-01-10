@@ -80,7 +80,7 @@ class NotifySMSManager(NotifyBase):
     )
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sms_manager"
+    setup_url = "https://appriseit.com/services/sms_manager/"
 
     # SMS Manager uses the http protocol with JSON requests
     notify_url = "https://http-api.smsmanager.cz/Send"

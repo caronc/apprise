@@ -64,7 +64,7 @@ class Notify46Elks(NotifyBase):
     secure_protocol = ("46elks", "elks")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_46elks"
+    setup_url = "https://appriseit.com/services/46elks/"
 
     # 46elksAPI Request URLs
     notify_url = "https://api.46elks.com/a1/sms"

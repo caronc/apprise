@@ -59,7 +59,7 @@ class NotifyLine(NotifyBase):
     notify_url = "https://api.line.me/v2/bot/message/push"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_line"
+    setup_url = "https://appriseit.com/services/line/"
 
     # We don't support titles for Line notifications
     title_maxlen = 0

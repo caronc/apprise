@@ -58,7 +58,7 @@ class NotifyXBMC(NotifyBase):
     secure_protocol = (xbmc_secure_protocol, kodi_secure_protocol)
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_kodi"
+    setup_url = "https://appriseit.com/services/kodi/"
 
     # Disable throttle rate for XBMC/KODI requests since they are normally
     # local anyway

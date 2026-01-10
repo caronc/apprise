@@ -92,7 +92,7 @@ class NotifyDapnet(NotifyBase):
     secure_protocol = "dapnet"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_dapnet"
+    setup_url = "https://appriseit.com/services/dapnet/"
 
     # Dapnet uses the http protocol with JSON requests
     notify_url = "http://www.hampager.de:8080/calls"

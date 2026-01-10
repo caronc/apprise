@@ -74,7 +74,7 @@ class NotifySMPP(NotifyBase):
     default_secure_port = 3550
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_SMPP"
+    setup_url = "https://appriseit.com/services/smpp/"
 
     # A title can not be used for SMS Messages.  Setting this to zero will
     # cause any title (if defined) to get placed into the message body.

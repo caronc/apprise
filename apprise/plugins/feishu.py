@@ -55,7 +55,7 @@ class NotifyFeishu(NotifyBase):
     secure_protocol = "feishu"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_feishu"
+    setup_url = "https://appriseit.com/services/feishu/"
 
     # Notification URL
     notify_url = "https://open.feishu.cn/open-apis/bot/v2/hook/{token}/"

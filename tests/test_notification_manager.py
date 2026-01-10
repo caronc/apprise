@@ -360,7 +360,7 @@ def test_notification_manager_decorators(tmpdir):
         secure_protocol = 'mytest'
 
         # A URL that takes you to the setup/help of the specific protocol
-        setup_url = 'https://github.com/caronc/apprise/wiki/Notify_mytest'
+        setup_url = 'https://appriseit.com/services/mytest/'
 
         # Define object templates
         templates = (

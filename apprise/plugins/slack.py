@@ -140,7 +140,7 @@ class NotifySlack(NotifyBase):
     request_rate_per_sec = 1.2
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_slack"
+    setup_url = "https://appriseit.com/services/slack/"
 
     # Support attachments
     attachment_support = True

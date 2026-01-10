@@ -105,7 +105,7 @@ class NotifyGrowl(NotifyBase):
     protocol = "growl"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_growl"
+    setup_url = "https://appriseit.com/services/growl/"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72

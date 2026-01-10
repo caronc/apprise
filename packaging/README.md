@@ -20,22 +20,34 @@ dnf install python3-apprise apprise
 ```
 
 You can build your own rpm packges with the following:
-```bash
-# EPEL10 (Rocky/RedHat/Oracle Linux)
-tox -e build-el10-rpm
+* EPEL10 (Rocky/RedHat/Oracle Linux)
+   ```bash
+   tox -e build-el10-rpm
+   ```
 
-# EPEL9 (Rocky/RedHat/Oracle Linux)
-tox -e build-el9-rpm
+* EPEL9 (Rocky/RedHat/Oracle Linux)
+   ```bash
+   tox -e build-el9-rpm
+   ```
 
-# Fedora 42
-tox -e build-f42-rpm
+* Fedora 42
+   ```bash
+   tox -e build-f42-rpm
+   ```
 
-# Fedora Rawhide
-tox -e build-rawhide-rpm
-```
+* Fedora Rawhide
+   ```bash
+   tox -e build-rawhide-rpm
+   ```
 
 ## Man Pages Information
 The man page were generated using [Ronn](http://github.com/rtomayko/ronn/tree/0.7.3).
  - Content is directly written to entries in the **man/\*.md** files _following the
    [the format structure available on the Ronn site](https://github.com/rtomayko/ronn/blob/master/man/ronn.1.ronn)_.
  - Then the following is executed `ronn --roff man/apprise.md` to produce the man/apprise.1 which is used by distributions.
+
+The easiest way to generate the new man page (after updating the `.md` file is:
+```bash
+# rebuild man page
+tox -e man
+```

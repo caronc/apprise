@@ -152,7 +152,7 @@ class NotifyPushover(NotifyBase):
     secure_protocol = "pover"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushover"
+    setup_url = "https://appriseit.com/services/pushover/"
 
     # Pushover uses the http protocol with JSON requests
     notify_url = "https://api.pushover.net/1/messages.json"

@@ -67,7 +67,7 @@ class NotifyDingTalk(NotifyBase):
     secure_protocol = "dingtalk"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_dingtalk"
+    setup_url = "https://appriseit.com/services/dingtalk/"
 
     # DingTalk API
     notify_url = "https://oapi.dingtalk.com/robot/send?access_token={token}"

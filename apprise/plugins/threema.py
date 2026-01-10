@@ -63,7 +63,7 @@ class NotifyThreema(NotifyBase):
     secure_protocol = "threema"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_threema"
+    setup_url = "https://appriseit.com/services/threema/"
 
     # Threema Gateway uses the http protocol with JSON requests
     notify_url = "https://msgapi.threema.ch/send_simple"

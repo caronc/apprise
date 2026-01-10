@@ -74,7 +74,7 @@ class NotifyParsePlatform(NotifyBase):
     secure_protocol = "parseps"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_parseplatform"
+    setup_url = "https://appriseit.com/services/parseplatform/"
 
     # Define object templates
     templates = (

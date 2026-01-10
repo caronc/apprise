@@ -152,7 +152,7 @@ class NotifyRSyslog(NotifyBase):
     protocol = "rsyslog"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_rsyslog"
+    setup_url = "https://appriseit.com/services/rsyslog/"
 
     # Disable throttle rate for RSyslog requests
     request_rate_per_sec = 0

@@ -79,7 +79,7 @@ class NotifySMTP2Go(NotifyBase):
     request_rate_per_sec = 0.20
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_smtp2go"
+    setup_url = "https://appriseit.com/services/smtp2go/"
 
     # Notify URL
     notify_url = "https://api.smtp2go.com/v3/email/send"

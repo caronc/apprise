@@ -1,15 +1,31 @@
 ---
 name: 💡 Enhancement Request
-about: Got a great idea? Let us know!
+about: Suggest an improvement to Apprise
 title: ''
 labels: 'enhancement'
 assignees: ''
 
 ---
 
-:bulb: **The Idea**
-<!-- Share your thoughts; try to be detailed if you can -->
+## The idea
+<!-- What should Apprise do, and why is it valuable? -->
 
-:hammer: **Breaking Feature**
-<!-- Would your idea disrupt or drastically change the flow
-   of Apprise or how it currently works? If so explain it here.  -->
+## Use-case
+<!-- Real-world scenario, who benefits, and how -->
+
+## Proposed change
+<!-- API, CLI, URL format, configuration, behaviours -->
+
+## Compatibility impact
+- Would this be a breaking change? Yes / No
+- If yes, describe what breaks and any migration path.
+
+## Alternatives considered
+<!-- Any other approaches you considered -->
+
+## Documentation impact
+- Does appriseit.com require updates for this change? Yes / No
+- If yes, please also open (or link) a documentation ticket/PR in apprise-docs.
+
+## Additional context
+<!-- Links, screenshots, logs, references -->

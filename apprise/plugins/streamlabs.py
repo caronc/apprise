@@ -86,7 +86,7 @@ class NotifyStreamlabs(NotifyBase):
     secure_protocol = "strmlabs"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_streamlabs"
+    setup_url = "https://appriseit.com/services/streamlabs/"
 
     # Streamlabs Api endpoint
     notify_url = "https://streamlabs.com/api/v1.0/"

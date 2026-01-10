@@ -140,7 +140,7 @@ class NotifySparkPost(NotifyBase):
     default_batch_size = 2000
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sparkpost"
+    setup_url = "https://appriseit.com/services/sparkpost/"
 
     # Default Notify Format
     notify_format = NotifyFormat.HTML

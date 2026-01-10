@@ -69,7 +69,7 @@ class NotifyWindows(NotifyBase):
     protocol = "windows"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_windows"
+    setup_url = "https://appriseit.com/services/windows/"
 
     # Disable throttle rate for Windows requests since they are normally
     # local anyway

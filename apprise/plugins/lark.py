@@ -52,7 +52,7 @@ class NotifyLark(NotifyBase):
     secure_protocol = "lark"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_lark"
+    setup_url = "https://appriseit.com/services/lark/"
 
     # This is the static part of the webhook URL; only the token varies.
     notify_url = "https://open.larksuite.com/open-apis/bot/v2/hook/"

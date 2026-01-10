@@ -100,7 +100,7 @@ class NotifyMastodon(NotifyBase):
     secure_protocol = ("mastodons", "toots")
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_mastodon"
+    setup_url = "https://appriseit.com/services/mastodon/"
 
     # Support attachments
     attachment_support = True

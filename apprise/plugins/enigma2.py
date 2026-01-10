@@ -75,7 +75,7 @@ class NotifyEnigma2(NotifyBase):
     secure_protocol = "enigma2s"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_enigma2"
+    setup_url = "https://appriseit.com/services/enigma2/"
 
     # Enigma2 does not support a title
     title_maxlen = 0

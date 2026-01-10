@@ -59,7 +59,7 @@ class NotifyRevolt(NotifyBase):
     secure_protocol = "revolt"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_revolt"
+    setup_url = "https://appriseit.com/services/revolt/"
 
     # Revolt Channel Message
     notify_url = "https://api.revolt.chat/"

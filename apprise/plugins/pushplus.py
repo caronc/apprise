@@ -54,7 +54,7 @@ class NotifyPushplus(NotifyBase):
     secure_protocol = "pushplus"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushplus"
+    setup_url = "https://appriseit.com/services/pushplus/"
 
     # URL used to send notifications with
     notify_url = "https://www.pushplus.plus/send"

@@ -77,7 +77,7 @@ class NotifyGoogleChat(NotifyBase):
     secure_protocol = "gchat"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_googlechat"
+    setup_url = "https://appriseit.com/services/googlechat/"
 
     # Google Chat Webhook
     notify_url = "https://chat.googleapis.com/v1/spaces/{workspace}/messages"

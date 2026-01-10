@@ -1,20 +1,40 @@
 ---
 name: 📣 New Notification Request
-about: Suggest a new notification service that you'd like to see Apprise support
+about: Request a new notification service integration
 title: ''
 labels: ['enhancement', 'new-notification']
 assignees: ''
 
 ---
 
-:loudspeaker: **What is the name of the service?**
-<!--  Name of Service  -->
+## What is the name of the service?
+<!-- Name of Service -->
 
-:link: **Provide some details about the service that can help with it's development.**
-- Homepage: <!-- e.g https://discordapp.com/ -->
-- API Reference: <!-- e.g https://discordapp.com/developers/docs/intro -->
+## Proposed Apprise schema (service id)
+<!-- Example: foo:// or foos:// -->
+<!-- If unsure, leave blank and we will suggest one -->
 
-:bulb: **Anything else?**
-<!-- Are there certain features you'd definitely like to see that this service offers?
-      Share your thoughts and expectations. Got suggestions or features you'd like
-      to see available to you on the Apprise URL?  Share those too! -->
+## Proposed Appriseit service slug
+<!-- Example: foo (maps to https://appriseit.com/services/foo/) -->
+<!-- If unsure, leave blank and we will suggest one -->
+
+## Provide details that help development
+- Homepage:
+- Official API docs:
+- Authentication method: <!-- API key, OAuth, webhook, etc -->
+- Rate limits (if known):
+- Message limits (if known): <!-- title/body length, attachments, etc -->
+- Attachments supported: Yes / No / Unknown
+
+## Example payload or curl snippet (optional)
+<!-- Redact secrets -->
+```text
+paste example here
+```
+
+## Anything else?
+<!-- Features you would like supported, URL parameters, batching, attachments, etc -->
+
+## ☝️ Documentation note
+If this integration is accepted, it must also include an apprise-docs update so the service page exists on appriseit.com.
+If you can contribute docs, open a ticket or PR in: https://github.com/caronc/apprise-docs

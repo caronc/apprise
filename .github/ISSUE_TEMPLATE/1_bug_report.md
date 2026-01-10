@@ -1,25 +1,38 @@
 ---
 name: 🐛 Bug Report
-about: Report any errors and problems
+about: Report errors and problems in Apprise
 title: ''
 labels: 'bug'
 assignees: ''
 
 ---
 
-:mega: **Notification Service(s) Impacted**
-<!-- Discord, Telegram, Pushbullet, etc  -->
+## Notification Service(s) Impacted
+<!-- Example: Discord, Telegram, Pushbullet, etc -->
+<!-- If unknown, write "Unknown" and include your failing URL schema below -->
 
-:lady_beetle: **Describe the bug**
-<!-- A clear and concise description of the problem. -->
+## What happened
+<!-- Describe the bug and what you expected to happen -->
 
-:bulb: **Screenshots and Logs**
-<!-- If applicable, add screenshots or share logs help explain your problem. -->
-<!-- be careful not to reveal anything personal in the logs such as a password or api key. -->
+## Apprise URL(s) involved (redact secrets)
+<!-- Include schema and structure, redact tokens/passwords -->
+<!-- Example: discord://webhook_id/webhook_token -->
+<!-- Example: mailto://user:****@example.com?to=a@example.com -->
 
-:computer: **Your System Details:**
- - OS: [e.g. RedHat v8.0]
- - Python Version: [e.g. Python v2.7]
+## Steps to reproduce
+1.
+2.
+3.
 
-:crystal_ball: **Additional context**
-Add any other context about the problem here.
+## Environment
+- Apprise version: <!-- apprise --version OR pip show apprise -->
+- Python version: <!-- python --version -->
+- OS and distribution: <!-- e.g. Ubuntu 24.04, Rocky Linux 9, Windows 11 -->
+- Install method: <!-- pip, distro package, docker, source -->
+- If using Docker: image/tag:
+
+## Logs (redact secrets)
+<!-- Include -vv output if possible -->
+```text
+paste logs here
+```

@@ -120,7 +120,7 @@ class NotifySyslog(NotifyBase):
     protocol = "syslog"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_syslog"
+    setup_url = "https://appriseit.com/services/syslog/"
 
     # No URL Identifier will be defined for this service as there simply isn't
     # enough details to uniquely identify one dbus:// from another.

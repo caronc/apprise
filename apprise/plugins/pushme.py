@@ -46,7 +46,7 @@ class NotifyPushMe(NotifyBase):
     protocol = "pushme"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_pushme"
+    setup_url = "https://appriseit.com/services/pushme/"
 
     # PushMe URL
     notify_url = "https://push.i-i.me/"

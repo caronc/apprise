@@ -74,7 +74,7 @@ class NotifyMSG91(NotifyBase):
     secure_protocol = "msg91"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_msg91"
+    setup_url = "https://appriseit.com/services/msg91/"
 
     # MSG91 uses the http protocol with JSON requests
     notify_url = "https://control.msg91.com/api/v5/flow/"

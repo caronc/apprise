@@ -112,7 +112,7 @@ class NotifyBark(NotifyBase):
     secure_protocol = "barks"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_bark"
+    setup_url = "https://appriseit.com/services/bark/"
 
     # Allows the user to specify the NotifyImageSize object; this is supported
     # through the webhook

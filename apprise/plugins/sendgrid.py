@@ -84,7 +84,7 @@ class NotifySendGrid(NotifyBase):
     secure_protocol = "sendgrid"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_sendgrid"
+    setup_url = "https://appriseit.com/services/sendgrid/"
 
     # Default to markdown
     notify_format = NotifyFormat.HTML

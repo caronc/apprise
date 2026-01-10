@@ -1,75 +1,70 @@
-## Description:
-**Related issue (if applicable):** #<!--apprise issue number goes here-->
+## Description
+**Related issue (if applicable):** #<!-- apprise issue number goes here -->
 
-<!-- Have anything else to describe? Define it here; this helps build the wiki item later
+<!--
+  -- Have anything else to describe?
+  -- Define it here; this helps build the documentation site later
+-->
+
+<!-- START OF NEW PLUGIN SECTION
   -- Delete this section if you are not creating a new plugin --
 
 ## *ServiceName* Notifications
 * **Source**: https://official.website.example.ca
-* **Icon Support**: Yes / No
+* **Image Support**: Yes / No
 * **Message Format**: Plain Text / HTML / Markdown
-* **Message Limit**: nn Characters
+* **Message Limit**: nn characters
 
-Describe your service here..
+Describe your service here.
 
-### 🛠️ Setup Instructions
+## Account Setup
+1. Visit the service portal and sign in using your account credentials.
+2. Generate and copy your token, key, or credentials.
 
-1. Visit [service.site](https://example.ca/) and sign in using your account credentials.
-2. Once logged in, generate and copy your **token** ...
-
----
-
-### ✅ Apprise Support
-
-### Syntax
+## Syntax
 
 Valid syntax is as follows:
 - `service://{variable}`
 
----
-
-### 🔐 Parameter Breakdown
+## Parameter Breakdown
 
 | Variable  | Required |  Description   |
 |-----------|----------|----------------|
 | variable1 | Yes      | Your variable1 |
 | variable2 | No       | Your variable2 |
 
----
+## Examples
 
-### 📦 Examples
-
-Sends a simple example
+Sends a simple example:
 ```bash
 apprise -vv -t "Title" -b "Message content" \
     service://token
 ```
 
 ## New Service Completion Status
-<!-- This section is only applicable if you're adding a new service -->
-* [ ] apprise/plugins/<!--new plugin name -->.py
-* [ ] pypackage.toml update `keywords` section to identify our new service
-    - add new service into this file (alphabetically).
+* [ ] apprise/plugins/--new_plugin_name.py
+* [ ] pyproject.toml
+    - Update keywords section to identify the new service (alphabetically).
 * [ ] README.md
-    - add entry for new service to table (as a quick reference)
+    - Add entry for the new service (quick reference only).
 * [ ] packaging/redhat/python-apprise.spec
     - add new service into the `%global common_description`
 
- -- END OF NEW PLUGIN SECTION - REMOVE ABOVE SECION IF NOT A NEW PLUGIN -->
+END OF NEW PLUGIN SECTION -->
 
+<!-- The following must be completed or your PR cannot be merged -->
 ## Checklist
-<!-- The following must be completed or your PR can't be merged -->
-* [ ] The code change is tested and works locally.
-* [ ] There is no commented out code in this PR.
-* [ ] No lint errors (use `tox -e lint` and even `tox -e format` to autofix what it can)
-* [ ] Test coverage added (use `tox -e minimal`)
+* [ ] Documentation ticket created (if applicable):** [apprise-docs/##](https://github.com/caronc/apprise-docs/issue/<!--apprise-docs issue number goes here-->)
+* [ ] The change is tested and works locally.
+* [ ] No commented-out code in this PR.
+* [ ] No lint errors (use `tox -e lint` and optionally `tox -e format`).
+* [ ] Test coverage added or updated (use `tox -e minimal`).
 
 ## Testing
-<!-- If this your code is testable by other users of the program
-     it would be really helpful to define this here -->
-Anyone can help test this source code as follows:
+<!-- If your change is testable by others, define how to validate it here -->
+Anyone can help test as follows:
 ```bash
-# Create a virtual environment to work in as follows:
+# Create a virtual environment
 python3 -m venv apprise
 
 # Change into our new directory
@@ -81,12 +76,7 @@ source bin/activate
 # Install the branch
 pip install git+https://github.com/caronc/apprise.git@<this.branch-name>
 
-# Test out the changes with the following command:
-apprise -t "Test Title" -b "Test Message" \
-  <apprise url related to ticket>
-
-# If you have cloned the branch and have tox available to you
-# the following can also allow you to test:
+# If you have cloned the branch and have tox available to you:
 tox -e apprise -- -t "Test Title" -b "Test Message" \
-          <apprise url related to ticket>
+    <apprise url related to this change>
 ```

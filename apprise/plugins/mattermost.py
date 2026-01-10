@@ -66,7 +66,7 @@ class NotifyMattermost(NotifyBase):
     secure_protocol = "mmosts"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_mattermost"
+    setup_url = "https://appriseit.com/services/mattermost/"
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72

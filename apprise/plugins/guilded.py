@@ -59,7 +59,7 @@ class NotifyGuilded(discord.NotifyDiscord):
     service_url = "https://guilded.gg/"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_guilded"
+    setup_url = "https://appriseit.com/services/guilded/"
 
     # The default secure protocol
     secure_protocol = "guilded"

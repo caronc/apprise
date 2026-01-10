@@ -63,7 +63,7 @@ class NotifyNotifiarr(NotifyBase):
     secure_protocol = "notifiarr"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_notifiarr"
+    setup_url = "https://appriseit.com/services/notifiarr/"
 
     # The Notification URL
     notify_url = "https://notifiarr.com/api/v1/notification/apprise"

@@ -45,8 +45,9 @@ class CustomNotifyPlugin(NotifyBase):
     This gets initialized based on @notify decorator definitions
     """
 
-    # Our Custom notification
-    service_url = "https://github.com/caronc/apprise/wiki/Custom_Notification"
+    # Our Custom notification; identify the URL users can go to learn
+    # more about the service this wrapper supports:
+    service_url = "https://appriseit.com/dev/decorator/"
 
     # Over-ride our category since this inheritance of the NotifyBase class
     # should be treated differently.

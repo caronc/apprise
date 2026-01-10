@@ -52,7 +52,7 @@ class NotifyQQ(NotifyBase):
     secure_protocol = "qq"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_qq"
+    setup_url = "https://appriseit.com/services/qq/"
 
     # URL used to send notifications with
     notify_url = "https://qmsg.zendee.cn/send/"
