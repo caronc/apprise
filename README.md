@@ -225,7 +225,7 @@ Apprise is also packaged as an RPM and available through [EPEL](https://docs.fed
 # Redhat/CentOS 7.x users
 yum install apprise
 
-# Redhat/CentOS 8.x+ and/or Fedora Users
+# Redhat/Rocky Linux 8.x+ and/or Fedora Users
 dnf install apprise
 ```
 
@@ -302,6 +302,26 @@ apprise -vv -t 'my title' -b 'my notification body' \
    --config=/path/to/my/config.yml \
    --config=https://localhost/my/apprise/config
 ```
+
+## CLI Tagging Support
+
+Apprise allows you to tag your services in your configuration to organize them (e.g., `family`, `devops`, `critical`). You can then filter which services to notify using the `--tag` (`-g`) switch.
+
+It is important to understand how Apprise handles multiple tags:
+
+* **OR Logic (Union)**: To notify services that have *either* Tag A **OR** Tag B, specify the `-g` switch multiple times.
+* **AND Logic (Intersection)**: To notify services that have *both* Tag A **AND** Tag B, separate the tags with a comma.
+
+```bash
+# OR Logic: Notify any service tagged 'devops' OR 'admin'
+apprise -vv -t "Union Test" \
+   --config=~/apprise.yml \
+   -g devops -g admin
+
+# AND Logic: Notify only services tagged with BOTH 'devops' AND 'critical'
+apprise -vv -t "Intersection Test" \
+   --config=~/apprise.yml \
+   -g devops,critical
 
 ## CLI File Attachments
 

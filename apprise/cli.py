@@ -525,10 +525,10 @@ class CustomHelpCommand(click.Command):
     multiple=True,
     metavar="TAG",
     help=(
-        "Specify one or more tags to filter "
-        "which services to notify. Use multiple --tag (-g) entries to "
-        '"OR" the tags together and comma separated to "AND" them. '
-        "If no tags are specified then all services are notified."
+        "Specify one or more tags to filter which services to notify. Use "
+        "multiple --tag (-g) entries to match ANY tag. Use comma separators "
+        "to require ALL tags (strict match). Omit to notify untagged services "
+        'only, or use "all" to notify everything.'
     ),
 )
 @click.option(
