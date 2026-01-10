@@ -451,7 +451,7 @@ class PluginManager(metaclass=Singleton):
 
         return None
 
-    def add(self, plugin, schemas=None, url=None, send_func=None):
+    def add(self, plugin, schemas=None, url=None, send_func=None, force=False):
         """Ability to manually add Notification services to our stack."""
 
         if not self:
@@ -485,15 +485,44 @@ class PluginManager(metaclass=Singleton):
         # Valdation
         conflict = [s for s in schemas if s in self]
         if conflict:
-            # we're already handling this schema
-            logger.warning(
-                "The schema(s) (%s) are already defined and could not be "
-                "loaded from %s%s.",
-                ", ".join(conflict),
-                "custom notify function " if send_func else "",
-                send_func.__name__ if send_func else plugin.__class__.__name__,
-            )
-            return False
+            if force:
+                # Force implies that we unmap any conflicting schema entries
+                # at the Apprise level, but we do not unload any previously
+                # imported modules. This ensures other classes can safely
+                # subclass from prior notify classes.
+                logger.debug(
+                    "The schema(s) (%s) are already defined and will be "
+                    "force loaded; overriding %s%s.",
+                    ", ".join(conflict),
+                    "custom notify function " if send_func else "",
+                    send_func.__name__ if send_func
+                    else plugin.__class__.__name__,
+                )
+                self.remove(*conflict, unload=False)
+
+            else:
+                logger.warning(
+                    "The schema(s) (%s) are already defined and could not be "
+                    "loaded from %s%s.",
+                    ", ".join(conflict),
+                    "custom notify function " if send_func else "",
+                    send_func.__name__ if send_func
+                    else plugin.__class__.__name__,
+                )
+                return False
+
+            # Re-check for conflicts after unmapping
+            conflict = [s for s in schemas if s in self]
+            if conflict:
+                logger.warning(
+                    "The schema(s) (%s) are already defined and could not be "
+                    "loaded from %s%s.",
+                    ", ".join(conflict),
+                    "custom notify function " if send_func else "",
+                    send_func.__name__ if send_func
+                    else plugin.__class__.__name__,
+                )
+                return False
 
         if send_func:
             # Acquire the function name
@@ -549,7 +578,7 @@ class PluginManager(metaclass=Singleton):
 
         return True
 
-    def remove(self, *schemas):
+    def remove(self, *schemas, unload=True):
         """Removes a loaded element (if defined)"""
         if not self:
             # Lazy load
@@ -557,7 +586,7 @@ class PluginManager(metaclass=Singleton):
 
         for schema in schemas:
             with contextlib.suppress(KeyError):
-                del self[schema]
+                self._unmap_schema(schema, unload=unload)
 
     def plugins(self, include_disabled=True):
         """Return all of our loaded plugins."""
@@ -644,65 +673,10 @@ class PluginManager(metaclass=Singleton):
         return schema in self._schema_map
 
     def __delitem__(self, schema):
-        if not self:
-            # Lazy load
-            self.load_modules()
-
-        # Get our plugin (otherwise we throw a KeyError) which is
-        # intended on del action that doesn't align
-        plugin = self._schema_map[schema]
-
-        # Our list of all schema entries
-        p_schemas = {schema}
-
-        for key in list(self._module_map.keys()):
-            if plugin in self._module_map[key]["plugin"]:
-                # Remove our plugin
-                self._module_map[key]["plugin"].remove(plugin)
-
-                # Custom Plugin Entry; Clean up cross reference
-                module_pyname = self._module_map[key]["path"]
-                if (
-                    not self._module_map[key]["native"]
-                    and module_pyname in self._custom_module_map
-                ):
-
-                    del self._custom_module_map[module_pyname]["notify"][
-                        schema
-                    ]
-
-                    if not self._custom_module_map[module_pyname]["notify"]:
-                        #
-                        # Last custom loaded element
-                        #
-
-                        # Free up custom object entry
-                        del self._custom_module_map[module_pyname]
-
-                if not self._module_map[key]["plugin"]:
-                    #
-                    # Last element
-                    #
-                    if self._module_map[key]["native"]:
-                        # Get our plugin's schema list
-                        p_schemas = {
-                            s
-                            for s in parse_list(
-                                plugin.secure_protocol, plugin.protocol
-                            )
-                            if s in self._schema_map
-                        }
-
-                    # free system memory
-                    if self._module_map[key]["module"]:
-                        del sys.modules[self._module_map[key]["path"]]
-
-                    # free last remaining pointer in module map
-                    del self._module_map[key]
-
-        for schema in p_schemas:
-            # Final Tidy
-            del self._schema_map[schema]
+        """
+        removes schema map and also unloads it from memory
+        """
+        self._unmap_schema(schema, unload=True)
 
     def __setitem__(self, schema, plugin):
         """Support fast assigning of Plugin/Notification Objects."""
@@ -731,6 +705,76 @@ class PluginManager(metaclass=Singleton):
 
         if not self.add(plugin, schemas=p_schemas):
             raise KeyError("Conflicting Assignment")
+
+    def _unmap_schema(self, schema, *, unload=True):
+        """Unmap a schema entry without necessarily unloading modules.
+
+        This function removes the schema mapping and updates internal cross
+        references. When unload is True (default), modules are removed from
+        sys.modules when they are no longer referenced by Apprise. When unload
+        is False, the unmapping is performed but any imported modules remain
+        intact in sys.modules.
+        """
+
+        if not self:
+            # Lazy load
+            self.load_modules()
+
+        # Get our plugin (otherwise we throw a KeyError) which is intended on
+        # unmap action that doesn't align.
+        plugin = self._schema_map[schema]
+
+        # Our list of all schema entries
+        p_schemas = {schema}
+
+        for key in list(self._module_map.keys()):
+            if plugin in self._module_map[key]["plugin"]:
+                # Remove our plugin
+                self._module_map[key]["plugin"].remove(plugin)
+
+                # Custom Plugin Entry; Clean up cross reference
+                module_pyname = self._module_map[key]["path"]
+                if (
+                    not self._module_map[key]["native"]
+                    and module_pyname in self._custom_module_map
+                ):
+
+                    del self._custom_module_map[module_pyname][
+                        "notify"][schema]
+
+                    if not self._custom_module_map[module_pyname]["notify"]:
+                        #
+                        # Last custom loaded element
+                        #
+
+                        # Free up custom object entry
+                        del self._custom_module_map[module_pyname]
+
+                if not self._module_map[key]["plugin"]:
+                    #
+                    # Last element
+                    #
+                    if self._module_map[key]["native"]:
+                        # Get our plugin's schema list
+                        p_schemas = {
+                            s
+                            for s in parse_list(
+                                plugin.secure_protocol, plugin.protocol
+                            )
+                            if s in self._schema_map
+                        }
+
+                    # Free system memory only when unload=True
+                    if unload and self._module_map[key]["module"]:
+                        with contextlib.suppress(KeyError):
+                            del sys.modules[self._module_map[key]["path"]]
+
+                    # Free last remaining pointer in module map
+                    del self._module_map[key]
+
+        for schema in p_schemas:
+            # Final tidy
+            del self._schema_map[schema]
 
     def __getitem__(self, schema):
         """Returns the indexed plugin identified by the schema specified."""
