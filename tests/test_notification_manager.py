@@ -239,6 +239,48 @@ def test_notification_manager_general():
     assert "goods" not in N_MGR
 
 
+def test_notification_manager_add_force_overrides_schema_without_unload():
+    """Verify add(force=True) overrides existing schema without unloading."""
+    import sys
+
+    from apprise.plugins import N_MGR
+
+    class NotifyDiscordCustom:
+        """A minimal custom discord override used for testing."""
+
+        protocol = "discord"
+        secure_protocol = None
+        service_name = "Discord (Custom)"
+
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def send(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "discord://"
+
+    # Ensure native modules are loaded
+    N_MGR.unload_modules()
+    N_MGR.load_modules()
+
+    # Confirm 'discord' is available and capture its module name
+    assert "discord" in N_MGR
+    native_plugin = N_MGR["discord"]
+    native_module = native_plugin.__module__
+    assert native_module in sys.modules
+
+    # A normal add should fail due to the conflict
+    assert N_MGR.add(NotifyDiscordCustom, schemas="discord") is False
+
+    # A forced add should succeed and must not unload the native module
+    assert N_MGR.add(
+        NotifyDiscordCustom, schemas="discord", force=True) is True
+    assert N_MGR["discord"] is NotifyDiscordCustom
+    assert native_module in sys.modules
+
+
 def test_notification_manager_module_loading(tmpdir):
     """
     N_MGR: Notification Manager Module Loading
@@ -399,3 +441,44 @@ def test_notification_manager_decorators(tmpdir):
     # Simple test to make sure we can handle duplicate entries loaded
     N_MGR.load_modules(path=str(notify_base), force=True)
     N_MGR.load_modules(path=str(notify_base), force=True)
+
+
+def test_notification_manager_add_force_returns_false_if_conflict_persists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    N_MGR.add(force=True) must still fail safely if conflicts persist after the
+    attempted unmap.
+
+    This explicitly targets the defensive re-check branch in add().
+    """
+    # Ensure native modules are loaded and we have a known schema to collide on
+    N_MGR.unload_modules()
+    N_MGR.load_modules()
+    assert "discord" in N_MGR
+
+    class NotifyDiscordCustom:
+        protocol = "discord"
+        secure_protocol = None
+        service_name = "Discord (Custom)"
+
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def send(self, *args, **kwargs) -> bool:
+            return True
+
+        def url(self, **kwargs) -> str:
+            return "discord://"
+
+    # Simulate an unmap failure by making remove() a no-op.
+    # This ensures the conflict remains on the re-check and triggers the
+    # warning + return False branch.
+    def _noop_remove(*args, **kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(N_MGR, "remove", _noop_remove)
+
+    assert (
+        N_MGR.add(NotifyDiscordCustom, schemas="discord", force=True) is False
+    )
