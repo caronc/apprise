@@ -1,0 +1,44 @@
+# LoC = Lines of Code
+name: LoC Badge
+
+on:
+  # Manual only
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  loc-badge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate LoC badge (Apprise library only)
+        uses: alexispurslane/GHA-LoC-Badge@v2.0.0
+
+        id: badge
+        with:
+          debug: true
+          # Run from the root of the repo so the pattern paths are exact
+          directory: ./
+          badge: .github/badges/loc.svg
+          patterns: "apprise/**/*.py"
+          ignore: "__pycache__"
+
+      - name: Print the output
+        run: |
+          echo "Scanned: ${{ steps.badge.outputs.counted_files }}";
+          echo "Line Count: ${{ steps.badge.outputs.total_lines }}";
+
+      - name: Create PR (if changed)
+        uses: peter-evans/create-pull-request@v7
+        with:
+          commit-message: "Update Lines of Code (LoC) badge"
+          title: "Update LoC badge"
+          body: "Automated update of the Lines of Code badge."
+          branch: "automation/loc-badge"
+          delete-branch: true
+          add-paths: ".github/badges/loc.svg"
