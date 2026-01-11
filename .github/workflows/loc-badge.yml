@@ -1,0 +1,44 @@
+# LoC = Lines of Code
+name: LoC Badge
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+  schedule:
+    # Weekly refresh (GitHub image cache plus badge freshness)
+    - cron: "0 3 * * 1"
+
+permissions:
+  contents: write
+
+jobs:
+  loc-badge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Generate LoC badge (Python Files Only)
+        uses: alexispurslane/GHA-LoC-Badge@v2.0.0
+
+        id: badge
+        with:
+          debug: false
+          directory: ./apprise
+          badge: ./output/loc.svg
+          # cloc patterns; pipe-separated like a .gitignore file
+          patterns: "*.py"
+          ignore: "i18n|assets|__pycache__|.github|.tox|.venv|venv|build|dist"
+      - name: Install badge artefact
+        run: |
+          mkdir -p .github/badges
+          mv -f ./output/loc.svg .github/badges/loc.svg
+
+      - name: Commit badge (if changed)
+        uses: EndBug/add-and-commit@v9
+        with:
+          add: ".github/badges/loc.svg"
+          message: "Update LoC badge"
+          default_author: github_actions
