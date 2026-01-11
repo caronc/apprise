@@ -30,6 +30,7 @@ from json import dumps, loads
 # Disable logging for a cleaner testing output
 import logging
 import os
+from typing import Union
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -1860,7 +1861,7 @@ def test_plugin_matrix_no_room_create_on_non_not_found_join(
     produces misleading follow-up errors like M_ROOM_IN_USE.
     """
 
-    def _resp(status_code: int, content: str | bytes) -> mock.Mock:
+    def _resp(status_code: int, content: Union[str, bytes]) -> mock.Mock:
         r = mock.Mock()
         r.status_code = status_code
         if isinstance(content, str):
@@ -1917,7 +1918,7 @@ def test_plugin_matrix_room_create_on_not_found_join(
 ) -> None:
     """Attempt room creation only when join reports 404 / M_NOT_FOUND."""
 
-    def _resp(status_code: int, content: str | bytes) -> mock.Mock:
+    def _resp(status_code: int, content: Union[str, bytes]) -> mock.Mock:
         r = mock.Mock()
         r.status_code = status_code
         if isinstance(content, str):
