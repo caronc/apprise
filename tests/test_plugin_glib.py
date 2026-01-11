@@ -323,3 +323,38 @@ def test_plugin_glib_gdkpixbuf_require_version_valueerror(monkeypatch):
     # Step 4: Confirm GdkPixbuf image support was not enabled
     from apprise.plugins import glib as plugin_glib
     assert plugin_glib.NOTIFY_GLIB_IMAGE_SUPPORT is False
+
+
+def test_plugin_glib_notify_generic_exception(
+        mocker, enabled_glib_environment):
+    """
+    Test that a generic exception occurring during the notification send
+    is caught and handled (returning False).
+    """
+    import gi
+
+    # 1. Create a mock object to act as the DBus Proxy
+    mock_proxy = mocker.Mock()
+
+    # 2. Force the Notify method to raise a generic Exception
+    #    This triggers the 'except Exception as e:'
+    mock_proxy.Notify.side_effect = Exception("Simulated Generic Failure")
+
+    # 3. Patch the Gio constructor to return our crashing mock
+    #    The code calls: Gio.DBusProxy.new_for_bus_sync(...)
+    gi.repository.Gio.DBusProxy.new_for_bus_sync.return_value = mock_proxy
+
+    # 4. Instantiate the plugin
+    from apprise.plugins.glib import NotifyGLib
+    obj = NotifyGLib(targets=["glib://"])
+
+    # 5. Spy on the logger to ensure the warning is logged
+    logger_spy = mocker.spy(obj, "logger")
+
+    # 6. Execute notify()
+    #    It should catch the exception and return False
+    assert obj.notify(title="Title", body="Body") is False
+
+    # 7. Verify the specific log message from glib.py
+    logger_spy.warning.assert_called_with(
+        "Failed to send GLib/Gio notification.")

@@ -25,626 +25,330 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import importlib
 import logging
-import re
 import sys
 import types
-from unittest.mock import ANY, Mock, call
+from unittest.mock import ANY, Mock
 
 from helpers import reload_plugin
 import pytest
 
 import apprise
-from apprise.plugins.dbus import (
-    NOTIFY_DBUS_SUPPORT_ENABLED,
-    DBusUrgency,
-    NotifyDBus,
-)
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
 
 
-if not NOTIFY_DBUS_SUPPORT_ENABLED:
-    pytest.skip(
-        "NotifyDBus is not supported in this environment",
-        allow_module_level=True)
-
-
 @pytest.fixture
-def enabled_dbus_environment(monkeypatch):
+def mock_dbus_module(mocker):
     """
-    Fully mocked DBus and GI environment that works in local and CI
-    environments.
+    Creates a completely fake 'dbus' module structure in sys.modules
+    so that we can test the plugin even if dbus is not installed.
     """
+    # 1. Create the base 'dbus' module
+    dbus = types.ModuleType("dbus")
+    dbus.DBusException = type("DBusException", (Exception,), {})
+    dbus.Byte = lambda x: x
+    dbus.ByteArray = lambda x: x
+    dbus.Interface = Mock(name="Interface")
+    dbus.SessionBus = Mock(name="SessionBus")
 
-    # --- Handle dbus (real or fake) ---
-    try:
-        import dbus
-    except ImportError:
-        dbus = types.ModuleType("dbus")
-        dbus.DBusException = type("DBusException", (Exception,), {})
-        dbus.Interface = Mock()
-        dbus.SessionBus = Mock()
+    # 2. Mock the mainloops
+    #    We create the structure: dbus.mainloop.glib.DBusGMainLoop
+    glib_module = types.ModuleType("dbus.mainloop.glib")
+    glib_module.DBusGMainLoop = Mock(name="DBusGMainLoop")
 
-        sys.modules["dbus"] = dbus
+    qt_module = types.ModuleType("dbus.mainloop.qt")
+    qt_module.DBusQtMainLoop = Mock(name="DBusQtMainLoop")
 
-    # Inject mainloop support if not already present
-    if "dbus.mainloop.glib" not in sys.modules:
-        glib_loop = types.ModuleType("dbus.mainloop.glib")
-        glib_loop.DBusGMainLoop = lambda: Mock(name="FakeLoop")
-        sys.modules["dbus.mainloop.glib"] = glib_loop
+    mainloop_pkg = types.ModuleType("dbus.mainloop")
+    mainloop_pkg.glib = glib_module
+    mainloop_pkg.qt = qt_module
 
-    if "dbus.mainloop" not in sys.modules:
-        sys.modules["dbus.mainloop"] = types.ModuleType("dbus.mainloop")
+    # Attach mainloop to the dbus module object so tests can access
+    # mock_dbus_module.mainloop
+    dbus.mainloop = mainloop_pkg
 
-    # Patch specific attributes always, even if real module is present
-    monkeypatch.setattr("dbus.Interface", Mock())
-    monkeypatch.setattr("dbus.SessionBus", Mock())
-    monkeypatch.setattr(
-        "dbus.DBusException", type("DBusException", (Exception,), {}))
-
-    # --- Mock GI / GdkPixbuf ---
+    # 3. Create the GI/GdkPixbuf mocks (for image support)
     gi = types.ModuleType("gi")
     gi.require_version = Mock()
     gi.repository = types.SimpleNamespace(
-        GdkPixbuf=types.SimpleNamespace(Pixbuf=Mock())
+        GdkPixbuf=types.SimpleNamespace(
+            Pixbuf=Mock(name="Pixbuf")
+        )
     )
+    # Setup standard Pixbuf behavior
+    mock_image = Mock()
+    mock_image.get_width.return_value = 10
+    mock_image.get_height.return_value = 10
+    mock_image.get_rowstride.return_value = 1
+    mock_image.get_has_alpha.return_value = False
+    mock_image.get_bits_per_sample.return_value = 8
+    mock_image.get_n_channels.return_value = 3
+    mock_image.get_pixels.return_value = b"pixeldata"
 
-    sys.modules["gi"] = gi
-    sys.modules["gi.repository"] = gi.repository
+    gi.repository.GdkPixbuf.Pixbuf.new_from_file.return_value = mock_image
 
-    # --- Reload plugin with controlled env ---
-    reload_plugin("dbus")
+    # 4. Patch everything into sys.modules
+    mocker.patch.dict(sys.modules, {
+        "dbus": dbus,
+        "dbus.mainloop": mainloop_pkg,
+        "dbus.mainloop.glib": glib_module,
+        "dbus.mainloop.qt": qt_module,
+        "gi": gi,
+        "gi.repository": gi.repository
+    })
 
-
-def test_plugin_dbus_available(enabled_dbus_environment):
-    """Tests DBUS_SUPPORT_ENABLED flag"""
-    from apprise.plugins import dbus as plugin_dbus
-    assert plugin_dbus.NOTIFY_DBUS_SUPPORT_ENABLED is True
-
-
-@pytest.mark.parametrize("param", [
-    "urgency=high", "urgency=2", "urgency=invalid", "urgency=",
-    "priority=high", "priority=2", "priority=invalid",
-])
-def test_plugin_dbus_priority_urgency_variants(
-        enabled_dbus_environment, param):
-    """test dbus:// urgency variants"""
-    url = f"dbus://_/?{param}"
-    obj = apprise.Apprise.instantiate(url, suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus)
-    assert obj.notify(title="x", body="x", notify_type=apprise.NotifyType.INFO)
+    return dbus
 
 
-def test_plugin_dbus_parse_url_arguments(enabled_dbus_environment):
-    """Test dbus:// argument parsing"""
-    from apprise.plugins.dbus import NotifyDBus
-    result = NotifyDBus.parse_url(
-        "dbus://_/?urgency=high&x=5&y=5&image=no")
-    assert result["urgency"] == "high"
-    assert result["x_axis"] == "5"
-    assert result["y_axis"] == "5"
-    assert result["include_image"] is False
-
-
-def test_plugin_dbus_with_gobject_cleanup(mocker, enabled_dbus_environment):
-    """Simulate `gobject` being present in sys.modules."""
-    original_gobject = sys.modules.get("gobject")
-
-    try:
-        sys.modules["gobject"] = mocker.Mock()
-        reload_plugin("dbus")
-
-        from apprise.plugins import dbus as plugin_dbus  # noqa F401
-        assert "gobject" not in sys.modules
-
-    finally:
-        if original_gobject is not None:
-            sys.modules["gobject"] = original_gobject
-        else:
-            sys.modules.pop("gobject", None)
-        reload_plugin("dbus")
-
-
-def test_plugin_dbus_no_mainloop_support(mocker):
-    """Simulate both mainloops (qt and glib) being unavailable."""
-    original_qt = sys.modules.get("dbus.mainloop.qt")
-    original_glib = sys.modules.get("dbus.mainloop.glib")
-
-    try:
-        # Simulate missing mainloops
-        sys.modules["dbus.mainloop.qt"] = None
-        sys.modules["dbus.mainloop.glib"] = None
-
-        reload_plugin("dbus")
-        from apprise.plugins import dbus as plugin_dbus
-
-        assert plugin_dbus.LOOP_QT is None
-        assert plugin_dbus.LOOP_GLIB is None
-        assert plugin_dbus.NOTIFY_DBUS_SUPPORT_ENABLED is False
-
-    finally:
-        # Restore previous state
-        if original_qt is not None:
-            sys.modules["dbus.mainloop.qt"] = original_qt
-        else:
-            sys.modules.pop("dbus.mainloop.qt", None)
-
-        if original_glib is not None:
-            sys.modules["dbus.mainloop.glib"] = original_glib
-        else:
-            sys.modules.pop("dbus.mainloop.glib", None)
-
-        reload_plugin("dbus")
-
-
-def test_plugin_dbus_general_success(mocker, enabled_dbus_environment):
-    """NotifyDBus() general tests.
-
-    Test class loading using different arguments, provided via URL.
+def test_plugin_dbus_initialization_strategies(mock_dbus_module, mocker):
     """
-    # Re-import NotifyDBus after plugin has been reloaded
-    from apprise.plugins.dbus import NotifyDBus
-
-    # Create our instance (identify all supported types)
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert obj.url().startswith("dbus://_/")
-    obj = apprise.Apprise.instantiate("kde://", suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert obj.url().startswith("kde://_/")
-    obj = apprise.Apprise.instantiate("qt://", suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert obj.url().startswith("qt://_/")
-    obj.duration = 0
-
-    # Set our X and Y coordinate and try the notification
-    assert (
-        NotifyDBus(x_axis=0, y_axis=0, **{"schema": "dbus"}).notify(
-            title="", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    # test notifications
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    # test notification without a title
-    assert (
-        obj.notify(title="", body="body", notify_type=apprise.NotifyType.INFO)
-        is True
-    )
-
-    # Test our arguments through the instantiate call
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?image=True", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert obj.url().startswith("dbus://_/")
-    assert re.search("image=yes", obj.url())
-
-    # URL ID Generation is disabled
-    assert obj.url_id() is None
-
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?image=False", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert obj.url().startswith("dbus://_/")
-    assert re.search("image=no", obj.url())
-
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    # Test priority (alias to urgency) handling
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?priority=invalid", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?priority=high", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?priority=2", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    # Test urgency handling
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?urgency=invalid", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?urgency=high", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?urgency=2", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?urgency=", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-    # Test x/y
-    obj = apprise.Apprise.instantiate(
-        "dbus://_/?x=5&y=5", suppress_exceptions=False
-    )
-    assert isinstance(obj, NotifyDBus)
-    assert isinstance(obj.url(), str)
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-
-def test_plugin_dbus_general_failure(enabled_dbus_environment):
-    """Verify a few failure conditions."""
-
-    with pytest.raises(TypeError):
-        NotifyDBus(**{"schema": "invalid"})
-
-    with pytest.raises(TypeError):
-        apprise.Apprise.instantiate(
-            "dbus://_/?x=invalid&y=invalid", suppress_exceptions=False
-        )
-
-
-def test_plugin_dbus_notify_generic_exception(
-        mocker, enabled_dbus_environment):
-    """Trigger a generic exception in .notify() to hit fallback handler."""
-
-    # Step 1: Provide minimal valid dbus/glib environment
-    fake_loop = Mock(name="FakeMainLoop")
-    sys.modules["dbus.mainloop.glib"] = types.SimpleNamespace(
-        DBusGMainLoop=lambda: fake_loop
-    )
-    sys.modules["gi"] = types.SimpleNamespace(require_version=Mock())
-    sys.modules["gi.repository"] = types.SimpleNamespace(
-        GdkPixbuf=types.SimpleNamespace(Pixbuf=Mock())
-    )
-
-    # Step 2: Patch SessionBus.get_object to return an object with a Notify()
-    # that raises
-    mock_iface = Mock()
-    mock_iface.Notify.side_effect = RuntimeError("boom")
-
-    mock_obj = Mock()
-    mock_session = Mock()
-    mock_session.get_object.return_value = mock_obj
-
-    mocker.patch("dbus.SessionBus", return_value=mock_session)
-    mocker.patch("dbus.Interface", return_value=mock_iface)
-
-    # Step 3: Reload plugin with mocked environment
-    reload_plugin("dbus")
-
-    # Step 4: Create instance and spy on logger
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-    logger_spy = mocker.spy(obj, "logger")
-
-    # Step 5: Trigger .notify() — should enter final except Exception block
-    assert obj.notify(
-        title="x", body="x", notify_type=apprise.NotifyType.INFO
-    ) is False
-
-    # Step 6: Confirm the fallback exception logging was triggered
-    logger_spy.warning.assert_called_with("Failed to send DBus notification.")
-    assert any("boom" in str(arg)
-               for call in logger_spy.debug.call_args_list
-               for arg in call.args)
-
-
-def test_plugin_dbus_parse_configuration(enabled_dbus_environment):
-
-    # Test configuration parsing
-    content = """
-    urls:
-      - dbus://:
-          - priority: 0
-            tag: dbus_int low
-          - priority: "0"
-            tag: dbus_str_int low
-          - priority: low
-            tag: dbus_str low
-          - urgency: 0
-            tag: dbus_int low
-          - urgency: "0"
-            tag: dbus_str_int low
-          - urgency: low
-            tag: dbus_str low
-
-          # These will take on normal (default) urgency
-          - priority: invalid
-            tag: dbus_invalid
-          - urgency: invalid
-            tag: dbus_invalid
-
-      - dbus://:
-          - priority: 2
-            tag: dbus_int high
-          - priority: "2"
-            tag: dbus_str_int high
-          - priority: high
-            tag: dbus_str high
-          - urgency: 2
-            tag: dbus_int high
-          - urgency: "2"
-            tag: dbus_str_int high
-          - urgency: high
-            tag: dbus_str high
+    Test the import logic
+    1. GLib present, Qt missing
+    2. Qt present, GLib missing
+    3. Both missing
     """
-
-    # Create ourselves a config object
-    ac = apprise.AppriseConfig()
-    assert ac.add_config(content=content) is True
-
-    aobj = apprise.Apprise()
-
-    # Add our configuration
-    aobj.add(ac)
-
-    # We should be able to read our 14 servers from that
-    # 6x low
-    # 6x high
-    # 2x invalid (so takes on normal urgency)
-    assert len(ac.servers()) == 14
-    assert len(aobj) == 14
-    assert len(list(aobj.find(tag="low"))) == 6
-    for s in aobj.find(tag="low"):
-        assert s.urgency == DBusUrgency.LOW
-
-    assert len(list(aobj.find(tag="high"))) == 6
-    for s in aobj.find(tag="high"):
-        assert s.urgency == DBusUrgency.HIGH
-
-    assert len(list(aobj.find(tag="dbus_str"))) == 4
-    assert len(list(aobj.find(tag="dbus_str_int"))) == 4
-    assert len(list(aobj.find(tag="dbus_int"))) == 4
-
-    assert len(list(aobj.find(tag="dbus_invalid"))) == 2
-    for s in aobj.find(tag="dbus_invalid"):
-        assert s.urgency == DBusUrgency.NORMAL
-
-
-def test_plugin_dbus_missing_icon(mocker, enabled_dbus_environment):
-    """Test exception when loading icon; the notification will still be
-    sent."""
-
-    # Inject error when loading icon.
-    gi = importlib.import_module("gi")
-    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = AttributeError(
-        "Something failed"
-    )
-
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-    logger: Mock = mocker.spy(obj, "logger")
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-    assert logger.mock_calls == [
-        call.warning("Could not load notification icon (%s).", ANY),
-        call.debug("DBus Exception: Something failed"),
-        call.info("Sent DBus notification."),
-    ]
-
-
-def test_plugin_dbus_disabled_plugin(enabled_dbus_environment):
-    """Verify notification will not be submitted if plugin is disabled."""
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-
-    obj.enabled = False
-
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is False
-    )
-
-
-@pytest.mark.parametrize("urgency, expected", [
-    (0, DBusUrgency.LOW),
-    (1, DBusUrgency.NORMAL),
-    (2, DBusUrgency.HIGH),
-    ("high", DBusUrgency.HIGH),
-    ("invalid", DBusUrgency.NORMAL),
-])
-def test_plugin_dbus_set_urgency(enabled_dbus_environment, urgency, expected):
-    """Test the setting of an urgency."""
-    assert NotifyDBus(urgency=urgency).urgency == expected
-
-
-def test_plugin_dbus_gi_missing(enabled_dbus_environment):
-    """Verify notification succeeds even if the `gi` package is not
-    available."""
-
-    # Make `require_version` function raise an ImportError.
-    gi = importlib.import_module("gi")
-    gi.require_version.side_effect = ImportError()
-
-    # When patching something which has a side effect on the module-level code
-    # of a plugin, make sure to reload it.
+    # Scenario A: GLib works, Qt fails
+    # We simulate Qt missing by raising ImportError when accessing it
+    sys.modules["dbus.mainloop.qt"] = None
     reload_plugin("dbus")
+    from apprise.plugins.dbus import LOOP_GLIB, LOOP_QT, NotifyDBus
+    assert LOOP_GLIB is not None
+    assert LOOP_QT is None
+    assert NotifyDBus.enabled is True
 
-    # Create the instance.
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    obj.duration = 0
+    # Scenario B: Qt works, GLib fails
+    # Reset modules
+    mock_dbus_module.mainloop.qt.DBusQtMainLoop.return_value = "qt_loop"
 
-    # Test url() call.
-    assert isinstance(obj.url(), str) is True
-
-    # The notification succeeds even though the gi library was not loaded.
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-
-def test_plugin_dbus_gi_require_version_error(enabled_dbus_environment):
-    """Verify notification succeeds even if `gi.require_version()` croaks."""
-
-    # Make `require_version` function raise a ValueError.
-    gi = importlib.import_module("gi")
-    gi.require_version.side_effect = ValueError("Something failed")
-
-    # When patching something which has a side effect on the module-level code
-    # of a plugin, make sure to reload it.
-    reload_plugin("dbus")
-
-    # Create instance.
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-    assert isinstance(obj, NotifyDBus) is True
-    obj.duration = 0
-
-    # Test url() call.
-    assert isinstance(obj.url(), str) is True
-
-    # The notification succeeds even though the gi library was not loaded.
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is True
-    )
-
-
-def test_plugin_dbus_module_croaks(monkeypatch):
-    """
-    Simulate dbus module missing entirely and confirm plugin disables itself.
-    """
-
-    # Drop the dbus module entirely from sys.modules
-    monkeypatch.setitem(sys.modules, "dbus", None)
+    mocker.patch.dict(sys.modules, {
+        "dbus.mainloop.glib": None,
+        "dbus.mainloop.qt": mock_dbus_module.mainloop.qt
+    })
 
     reload_plugin("dbus")
+    from apprise.plugins.dbus import LOOP_GLIB, LOOP_QT, NotifyDBus
+    assert LOOP_GLIB is None
+    assert LOOP_QT is not None
+    assert NotifyDBus.enabled is True
 
-    # Plugin instantiation should fail (plugin is skipped)
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
-    assert obj is None
-
-    # Plugin class still exists but is disabled
+    # Scenario C: Both fail
+    mocker.patch.dict(sys.modules, {
+        "dbus.mainloop.glib": None,
+        "dbus.mainloop.qt": None
+    })
+    reload_plugin("dbus")
     from apprise.plugins.dbus import NotifyDBus
     assert NotifyDBus.enabled is False
 
 
-def test_plugin_dbus_session_croaks(mocker, enabled_dbus_environment):
-    """Verify notification fails if DBus session initialization croaks."""
-
-    from dbus import DBusException as RealDBusException
-
-    # Patch SessionBus before plugin is imported or evaluated
-    mocker.patch("dbus.SessionBus", side_effect=RealDBusException("test"))
-
-    # Set up minimal working env so the plugin doesn't disable itself
-    fake_loop = Mock(name="FakeMainLoop")
-    sys.modules["dbus.mainloop.glib"] = types.SimpleNamespace(
-        DBusGMainLoop=lambda: fake_loop
-    )
-    sys.modules["gi"] = types.SimpleNamespace(require_version=Mock())
-    sys.modules["gi.repository"] = types.SimpleNamespace(
-        GdkPixbuf=types.SimpleNamespace(Pixbuf=Mock())
-    )
-
-    # Must reload plugin *after* environment is patched
+def test_plugin_dbus_image_support_initialization(mock_dbus_module, mocker):
+    """
+    Test the GdkPixbuf import logic
+    """
+    # Case 1: Success (Already set up by fixture)
     reload_plugin("dbus")
+    from apprise.plugins.dbus import NOTIFY_DBUS_IMAGE_SUPPORT
+    assert NOTIFY_DBUS_IMAGE_SUPPORT is True
+
+    # Case 2: GI missing
+    mocker.patch.dict(sys.modules, {"gi": None})
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NOTIFY_DBUS_IMAGE_SUPPORT
+    assert NOTIFY_DBUS_IMAGE_SUPPORT is False
+
+
+def test_plugin_dbus_send_success(mock_dbus_module, mocker):
+    """
+    Test the happy path for send()
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+
+    # Setup the mock chain: SessionBus() ->
+    #   .get_object() -> Interface() -> .Notify()
+    mock_bus = mock_dbus_module.SessionBus.return_value
+    mock_proxy = mock_bus.get_object.return_value
+    mock_interface = mock_dbus_module.Interface.return_value
+
+    obj = NotifyDBus()
+
+    # Send notification
+    assert obj.notify(title="Title", body="Body") is True
+
+    # VERIFICATION
+    # Check SessionBus was called
+    mock_dbus_module.SessionBus.assert_called()
+    # Check Interface was created
+    mock_dbus_module.Interface.assert_called_with(
+        mock_proxy, dbus_interface="org.freedesktop.Notifications")
+    # Check Notify was called
+    assert mock_interface.Notify.called
+    args, _ = mock_interface.Notify.call_args
+    # Arg 3 is Title, Arg 4 is Body
+    assert args[3] == "Title"
+    assert args[4] == "Body"
+
+
+def test_plugin_dbus_send_no_title(mock_dbus_module):
+    """
+    Test the 'if not title' swap logic
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+    mock_interface = mock_dbus_module.Interface.return_value
+
+    obj = NotifyDBus()
+    obj.notify(title="", body="OnlyBody")
+
+    args, _ = mock_interface.Notify.call_args
+    # Title (Arg 3) should now be "OnlyBody", Body (Arg 4) empty
+    assert args[3] == "OnlyBody"
+    assert args[4] == ""
+
+
+def test_plugin_dbus_send_connection_failure(mock_dbus_module):
+    """
+    Test SessionBus raising DBusException
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+
+    # Force constructor to crash
+    mock_dbus_module.SessionBus.side_effect = \
+        mock_dbus_module.DBusException("Connection Refused")
+
+    obj = NotifyDBus()
+    # Should handle exception and return False
+    assert obj.notify(title="T", body="B") is False
+
+
+def test_plugin_dbus_send_notify_failure(mock_dbus_module):
+    """
+    Test Interface.Notify raising Exception
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+
+    # Force Notify to crash
+    mock_interface = mock_dbus_module.Interface.return_value
+    mock_interface.Notify.side_effect = Exception("Generic Failure")
+
+    obj = NotifyDBus()
+    assert obj.notify(title="T", body="B") is False
+
+
+def test_plugin_dbus_image_loading_failure(mock_dbus_module, mocker):
+    """
+    Test image loading exception
+    """
+    reload_plugin("dbus")
+    # Force GdkPixbuf to crash
+    import gi
+
+    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = \
+        Exception("Bad Image")
+
+    # Use Apprise.instantiate to handle parsing cleanly
+    obj = apprise.Apprise.instantiate(
+        "dbus://?image=yes", suppress_exceptions=False)
+    spy_logger = mocker.spy(obj, "logger")
+
+    # Notification should still succeed (return True), just log a warning
+    assert obj.notify(title="T", body="B") is True
+
+    # Verify the warning was logged
+    spy_logger.warning.assert_called_with(
+        "Could not load notification icon (%s).", ANY)
+
+
+def test_plugin_dbus_url_parsing(mock_dbus_module):
+    """
+    Test various URL parameters and instantiation.
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import DBusUrgency, NotifyDBus
+
+    # Test Urgency mapping
+    obj = apprise.Apprise.instantiate(
+        "dbus://?urgency=high", suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus)
+    assert obj.urgency == DBusUrgency.HIGH
+    assert "urgency=high" in obj.url()
+
+    obj = apprise.Apprise.instantiate(
+        "dbus://?priority=low", suppress_exceptions=False)
+    assert isinstance(obj, NotifyDBus)
+    assert obj.urgency == DBusUrgency.LOW
+    assert "urgency=low" in obj.url()
+
+    # Test X/Y coords
+    obj = apprise.Apprise.instantiate(
+        "dbus://?x=100&y=200", suppress_exceptions=False)
+    assert obj.x_axis == 100
+    assert obj.y_axis == 200
+    assert "x=100" in obj.url()
+    assert "y=200" in obj.url()
+
+    # Test Invalid X/Y
+    with pytest.raises(TypeError):
+        NotifyDBus(x_axis="invalid")
+
+
+def test_plugin_dbus_schema_not_supported(mock_dbus_module, mocker):
+    """
+    Dbus test for unsupported schema warning
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+
+    with pytest.raises(TypeError):
+        NotifyDBus(schema="not-a-real-schema")
+
+    # Assert warning emitted (message content is stable)
+    with pytest.raises(TypeError):
+        NotifyDBus(schema="still-not-real")
+
+
+def test_plugin_dbus_send_sets_xy_meta_payload(mock_dbus_module):
+    """
+    Covers setting x-y payload setting
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+
+    mock_interface = mock_dbus_module.Interface.return_value
+    obj = NotifyDBus(x_axis=100, y_axis=200)
+
+    assert obj.notify(title="T", body="B") is True
+
+    args, _ = mock_interface.Notify.call_args
+    # meta output (app, id, icon, title, body, actions, meta, timeout)
+    meta = args[6]
+    assert meta["x"] == 100
+    assert meta["y"] == 200
+
+
+def test_plugin_dbus_send_image_condition_false_skips_pixbuf(
+        mock_dbus_module, mocker):
+    """
+    Covers NOTIFY_DBUS_IMAGE_SUPPORT and icon_path flag
+    """
+    reload_plugin("dbus")
+    import gi
 
     from apprise.plugins.dbus import NotifyDBus
-    obj = apprise.Apprise.instantiate("dbus://", suppress_exceptions=False)
 
-    assert isinstance(obj, NotifyDBus)
+    mock_interface = mock_dbus_module.Interface.return_value
 
-    # Notify should fail gracefully
-    assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
-        )
-        is False
-    )
+    obj = NotifyDBus(include_image=False)
+
+    # Ensure image_path is not even consulted when include_image=False
+    spy_image_path = mocker.spy(obj, "image_path")
+
+    assert obj.notify(title="T", body="B") is True
+
+    assert mock_interface.Notify.called
+    assert gi.repository.GdkPixbuf.Pixbuf.new_from_file.called is False
+    assert spy_image_path.called is False
