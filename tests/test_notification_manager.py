@@ -441,3 +441,44 @@ def test_notification_manager_decorators(tmpdir):
     # Simple test to make sure we can handle duplicate entries loaded
     N_MGR.load_modules(path=str(notify_base), force=True)
     N_MGR.load_modules(path=str(notify_base), force=True)
+
+
+def test_notification_manager_add_force_returns_false_if_conflict_persists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """
+    N_MGR.add(force=True) must still fail safely if conflicts persist after the
+    attempted unmap.
+
+    This explicitly targets the defensive re-check branch in add().
+    """
+    # Ensure native modules are loaded and we have a known schema to collide on
+    N_MGR.unload_modules()
+    N_MGR.load_modules()
+    assert "discord" in N_MGR
+
+    class NotifyDiscordCustom:
+        protocol = "discord"
+        secure_protocol = None
+        service_name = "Discord (Custom)"
+
+        def __init__(self, *args, **kwargs) -> None:
+            pass
+
+        def send(self, *args, **kwargs) -> bool:
+            return True
+
+        def url(self, **kwargs) -> str:
+            return "discord://"
+
+    # Simulate an unmap failure by making remove() a no-op.
+    # This ensures the conflict remains on the re-check and triggers the
+    # warning + return False branch.
+    def _noop_remove(*args, **kwargs) -> None:
+        return None
+
+    monkeypatch.setattr(N_MGR, "remove", _noop_remove)
+
+    assert (
+        N_MGR.add(NotifyDiscordCustom, schemas="discord", force=True) is False
+    )
