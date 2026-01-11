@@ -443,3 +443,78 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     mock_post.return_value = robj
     # We would have failed to make Post
     assert a.notify(title="", body="test") is True
+
+
+def test_plugin_sns_detailed_failures(mocker):
+    """
+    Test specific failure modes (HTTP 400) for SMS, Topic Creation,
+    and Topic Publishing to ensure error counters are incremented.
+    """
+    from apprise.plugins.sns import NotifySNS
+
+    # Mock requests.post
+    mock_post = mocker.patch("requests.post")
+
+    # --- Scenario 1: SMS (Phone) Failure ---
+    obj_sms = NotifySNS(
+        access_key_id="key",
+        secret_access_key="secret",
+        region_name="us-east-1",
+        targets=["+15555555555"]
+    )
+
+    # Force a 400 Bad Request
+    mock_response_bad = mocker.Mock()
+    mock_response_bad.status_code = 400
+    mock_response_bad.text = (
+        "<ErrorResponse><Error><Message>Fail"
+        "</Message></Error></ErrorResponse>"
+    )
+
+    mock_response_bad.content = mock_response_bad.text.encode("utf-8")
+    mock_post.return_value = mock_response_bad
+
+    # Should return False because the SMS failed
+    assert obj_sms.notify(body="test") is False
+
+    # --- Scenario 2: Topic Creation Failure ---
+    obj_topic = NotifySNS(
+        access_key_id="key",
+        secret_access_key="secret",
+        region_name="us-east-1",
+        targets=["#MyTopic"]
+    )
+
+    # Force 400 on ANY request (which includes the first one: CreateTopic)
+    mock_post.return_value = mock_response_bad
+
+    # Should return False because CreateTopic failed
+    assert obj_topic.notify(body="test") is False
+
+    # --- Scenario 3: CreateTopic Success, but Publish Failure ---
+    # We need a side_effect to return 200 for the first call (CreateTopic)
+    # and 400 for the second (Publish)
+
+    mock_response_ok = mocker.Mock()
+    mock_response_ok.status_code = 200
+    mock_response_ok.text = """
+    <CreateTopicResponse>
+        <CreateTopicResult>
+            <TopicArn>arn:aws:sns:us-east-1:123456789012:MyTopic</TopicArn>
+        </CreateTopicResult>
+    </CreateTopicResponse>
+    """
+    mock_response_ok.content = mock_response_ok.text.encode("utf-8")
+
+    def side_effect(*args, **kwargs):
+        data = kwargs.get("data", "")
+        if "Action=CreateTopic" in data:
+            return mock_response_ok
+        if "Action=Publish" in data:
+            return mock_response_bad
+        return mock_response_ok
+
+    mock_post.side_effect = side_effect
+
+    # Should return False because Publish failed
+    assert obj_topic.notify(body="test") is False

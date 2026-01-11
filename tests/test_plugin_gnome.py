@@ -406,3 +406,33 @@ def test_plugin_gnome_notify_croaks(mocker, obj):
         call.warning("Failed to send Gnome notification."),
         call.debug("Gnome Exception: Something failed"),
     ]
+
+
+def test_plugin_gnome_show_exception(mocker, obj):
+    """
+    Test that an exception raised during notification.show() is caught
+    by the outer try/except block.
+    """
+    # 1. Import the mocked 'gi' library.
+    #    The 'obj' fixture (via 'glib_environment') has already set this up
+    #    in sys.modules, so this import works even if Gnome isn't installed.
+    import gi
+
+    # 2. Retrieve the mocked notification instance.
+    #    Your setup_glib_environment() sets
+    #    'gi.repository.Notify.Notification.new' to return a mock object.
+    notification_instance = gi.repository.Notify.Notification.new.return_value
+
+    # 3. Force the .show() method to raise an exception.
+    notification_instance.show.side_effect = \
+        Exception("Simulated Gnome Show Failure")
+
+    # 4. Spy on the logger to verify the output.
+    logger_spy = mocker.spy(obj, "logger")
+
+    # 5. Execute the notification.
+    #    It should crash at .show(), catch the exception, and return False.
+    assert obj.notify(title="Title", body="Body") is False
+
+    # 6. Verify the specific log message.
+    logger_spy.warning.assert_called_with("Failed to send Gnome notification.")
