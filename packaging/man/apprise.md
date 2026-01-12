@@ -335,7 +335,7 @@ If you find any bugs, please make them known at:
 If you found Apprise useful at all, [please consider sponsoring][sponsorship] or [donating][donating]!
 
 [sponsorship]: https://github.com/sponsors/caronc
-[donating]: https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=MHANV39UZNQ5E
+[donating]: https://www.paypal.com/donate/?hosted_button_id=CR6YF7KLQWQ5E
 
 ## COPYRIGHT
 
