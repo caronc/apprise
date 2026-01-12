@@ -719,5 +719,5 @@ If you're interested in reading more about this and other methods on how to cust
 * 🎉 [Showcase](https://appriseit.com/contributing/showcase/)
 
 Want to help make Apprise better?
-* 💡 [Contribute to the Apprise Code Base](https://appriseit.com/contributing/showcase/)
+* 💡 [Contribute to the Apprise Code Base](https://appriseit.com/contributing/)
 * ❤️ [Sponsorship and Donations](https://appriseit.com/contributing/sponsors/)
