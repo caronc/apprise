@@ -47,7 +47,7 @@ class CustomNotifyPlugin(NotifyBase):
 
     # Our Custom notification; identify the URL users can go to learn
     # more about the service this wrapper supports:
-    service_url = "https://appriseit.com/dev/decorator/"
+    service_url = "https://appriseit.com/library/extending/decorator/"
 
     # Over-ride our category since this inheritance of the NotifyBase class
     # should be treated differently.

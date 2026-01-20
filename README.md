@@ -49,6 +49,8 @@ System Administrators and DevOps who wish to send a notification now no longer n
 * [More Supported Links and Documentation](#want-to-learn-more)
 <!--te-->
 
+Visit the [Official Documentation](https://appriseit.com/getting-started/) site for more information on Apprise.
+
 # Supported Notifications
 
 The section identifies all of the services supported by this library. [Check out the wiki for more information on the supported modules here](https://appriseit.com/).
@@ -255,7 +257,8 @@ uptime | apprise -vv \
 
 ## CLI Configuration Files
 
-No one wants to put their credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific [YAML format](https://appriseit.com/config/yaml/) or a very simple [TEXT format](https://appriseit.com/config/text/). You can also pull these configuration files via an HTTP query too! You can read more about the expected structure of the configuration files [here](https://appriseit.com/config/).
+No one wants to put their credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific YAML format or a very simple TEXT format. You can also pull these configuration files via an HTTP query too! Read more about the expected structure of the configuration files [here](https://appriseit.com/config/).
+
 ```bash
 # By default if no url or configuration is specified apprise will attempt to load
 # configuration files (if present) from:
@@ -390,7 +393,7 @@ apprise -vv --title 'custom override' \
         foobar:\\
 ```
 
-You can read more about creating your own custom notifications and/or hooks [here](https://appriseit.com/dev/decorator/).
+You can read more about creating your own custom notifications and/or hooks [here](https://appriseit.com/library/extending/decorator/).
 
 ## CLI Environment Variables
 
@@ -429,7 +432,7 @@ apobj.notify(
 
 ## API Configuration Files
 
-Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://appriseit.com/config/).
+Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://appriseit.com/getting-started/configuration/).
 ```python
 import apprise
 
@@ -587,7 +590,7 @@ aobj.add('foobar://')
 aobj.notify("test")
 ```
 
-You can read more about creating your own custom notifications and/or hooks [here](https://appriseit.com/dev/decorator/).
+You can read more about creating your own custom notifications and/or hooks [here](https://appriseit.com/library/extending/decorator/).
 
 # Persistent Storage
 
@@ -660,7 +663,7 @@ apprise storage list f 0
 ```
 When using the CLI, Persistent storage is set to the operational mode of `auto` by default, you can change this by providing `--storage-mode=` (`-SM`) during your calls.  If you want to ensure it's always set to a value of your choice.
 
-For more information on persistent storage, [visit here](https://appriseit.com/getting-started/persistent-storage/).
+For more information on persistent storage, [visit here](https://appriseit.com/cli/persistent-storage/).
 
 ## API Persistent Storage Commands
 For developers, persistent storage is set in the operational mode of `memory` by default.
@@ -704,18 +707,18 @@ asset = AppriseAsset(
 aobj = Apprise(asset=asset)
 ```
 
-For more information on persistent storage, [visit here](https://appriseit.com/dev/persistent-storage/).
+For more information on persistent storage, [visit here](https://appriseit.com/library/persistent-storage/).
 
 # Want To Learn More?
 
 If you're interested in reading more about this and other methods on how to customize your own notifications, please check out the following links:
-* 📣 [Using the CLI](https://appriseit.com/guides/)
-* 🛠️ [Development API](https://appriseit.com/dev/)
-* 🔧 [Troubleshooting](https://appriseit.com/qa/)
-* ⚙️ [Configuration File Help](https://appriseit.com/config/)
-* ⚡ [Create Your Own Custom Notifications](https://appriseit.com/dev/decorator/)
+* 📣 [Using the CLI](https://appriseit.com/cli/)
+* 🛠️ [Development API](https://appriseit.com/library/)
+* ⚙️ [Configuration File Help](https://appriseit.com/getting-started/configuration/)
+* ⚡ [Create Your Own Custom Notifications](https://appriseit.com/library/extending/decorator/)
 * 🌎 [Apprise API/Web Interface](https://github.com/caronc/apprise-api/)
 * 📖 [Apprise Documentation Source](https://github.com/caronc/apprise-docs/)
+* 🔧 [Troubleshooting](https://appriseit.com/qa/)
 * 🎉 [Showcase](https://appriseit.com/contributing/showcase/)
 
 Want to help make Apprise better?

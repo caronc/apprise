@@ -399,10 +399,10 @@ def test_notification_manager_decorators(tmpdir):
         service_url = 'https://github.com/caronc/apprise/'
 
         # Define our protocol
-        secure_protocol = 'mytest'
+        secure_protocol = 'myservice'
 
         # A URL that takes you to the setup/help of the specific protocol
-        setup_url = 'https://appriseit.com/services/mytest/'
+        setup_url = 'https://appriseit.com/services/myservice/'
 
         # Define object templates
         templates = (
@@ -416,27 +416,27 @@ def test_notification_manager_decorators(tmpdir):
             return True
 
         def url(self):
-            return 'mytest://'
+            return 'myservice://'
     """))
-    assert "mytest" not in N_MGR
+    assert "myservice" not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
-    assert "mytest" in N_MGR
-    del N_MGR["mytest"]
-    assert "mytest" not in N_MGR
+    assert "myservice" in N_MGR
+    del N_MGR["myservice"]
+    assert "myservice" not in N_MGR
 
-    assert "mytest" not in N_MGR
+    assert "myservice" not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
 
     # It's still not loaded because the path has already been scanned
-    assert "mytest" not in N_MGR
+    assert "myservice" not in N_MGR
     N_MGR.load_modules(path=str(notify_base), force=True)
-    assert "mytest" in N_MGR
+    assert "myservice" in N_MGR
 
     # Double load will test section of code that prevents a notification
     # From reloading if previously already loaded
     N_MGR.load_modules(path=str(notify_base))
     # Our item is still loaded as expected
-    assert "mytest" in N_MGR
+    assert "myservice" in N_MGR
 
     # Simple test to make sure we can handle duplicate entries loaded
     N_MGR.load_modules(path=str(notify_base), force=True)
