@@ -212,7 +212,7 @@ accept them).</li>
 <pre><code>~/.local/share/apprise/cache
 </code></pre>
 
-<p>To utilize the <a href="https://appriseit.com/getting-started/persistent-storage/">persistent storage</a> element associated with Apprise, simply
+<p>To utilize the <a href="https://appriseit.com/cli/persistent-storage/">persistent storage</a> element associated with Apprise, simply
 specify the keyword <strong>storage</strong></p>
 
 <pre><code>$ apprise storage
@@ -362,9 +362,9 @@ def my_wrapper(body, title, notify_type, *args, **kwargs):
 
 <h2 id="CONFIGURATION">CONFIGURATION</h2>
 
-<p>A configuration file can be in the format of either <strong>TEXT</strong> or <strong>YAML</strong> where
-<a href="https://appriseit.com/config/text/">TEXT</a> is the easiest and most ideal solution for most users.  However
-<a href="https://appriseit.com/config/yaml/">YAML</a> configuration files grants the user a bit more leverage and access
+<p>An <a href="https://appriseit.com/getting-started/configuration/">Apprise configuration file</a> can be in the format of either <strong>TEXT</strong>
+or <strong>YAML</strong> where TEXT is the easiest and most ideal solution for most users.
+However YAML configuration files grants the user a bit more leverage and access
 to some of the internal features of Apprise. Regardless of which format you choose,
 both provide the users the ability to leverage <strong>tagging</strong> which adds a more rich and
 powerful notification environment.</p>
@@ -405,7 +405,7 @@ tool simplifies to:</p>
 <pre><code>$ apprise -vv -t "my title" -b "my notification body"
 </code></pre>
 
-<p>If you leveraged <a href="https://appriseit.com/guides/#leverage-tagging">tagging</a>, you can define all of Apprise Service URLs in your
+<p>If you leveraged <a href="https://appriseit.com/cli/usage/#tagging-and-filtering">tagging</a>, you can define all of Apprise Service URLs in your
 configuration that you want and only specifically notify a subset of them:</p>
 
 <pre><code>$ apprise -vv --title "Will Be Late Getting Home" \

@@ -256,9 +256,9 @@ it:
 
 ## CONFIGURATION
 
-A configuration file can be in the format of either **TEXT** or **YAML** where
-[TEXT][textconfig] is the easiest and most ideal solution for most users.  However
-[YAML][yamlconfig] configuration files grants the user a bit more leverage and access
+An [Apprise configuration file][config] can be in the format of either **TEXT**
+or **YAML** where TEXT is the easiest and most ideal solution for most users.
+However YAML configuration files grants the user a bit more leverage and access
 to some of the internal features of Apprise. Regardless of which format you choose,
 both provide the users the ability to leverage **tagging** which adds a more rich and
 powerful notification environment.
@@ -304,10 +304,9 @@ configuration that you want and only specifically notify a subset of them:
         --body "Please go ahead and make dinner without me." \
         --tag=family
 
-[yamlconfig]: https://appriseit.com/config/yaml/
-[textconfig]: https://appriseit.com/config/text/
-[tagging]: https://appriseit.com/guides/#leverage-tagging
-[pstorage]: https://appriseit.com/getting-started/persistent-storage/
+[config]: https://appriseit.com/getting-started/configuration/
+[tagging]: https://appriseit.com/cli/usage/#tagging-and-filtering
+[pstorage]: https://appriseit.com/cli/persistent-storage/
 
 ## ENVIRONMENT VARIABLES
   `APPRISE_URLS`:

@@ -88,7 +88,7 @@ Persistent storage by default writes to the following location unless the enviro
 .fi
 .IP "" 0
 .P
-To utilize the persistent storage \fIhttps://appriseit\.com/getting\-started/persistent\-storage/\fR element associated with Apprise, simply specify the keyword \fBstorage\fR
+To utilize the persistent storage \fIhttps://appriseit\.com/cli/persistent\-storage/\fR element associated with Apprise, simply specify the keyword \fBstorage\fR
 .IP "" 4
 .nf
 $ apprise storage
@@ -232,7 +232,7 @@ def my_wrapper(body, title, notify_type, *args, **kwargs):
 .fi
 .IP "" 0
 .SH "CONFIGURATION"
-A configuration file can be in the format of either \fBTEXT\fR or \fBYAML\fR where TEXT \fIhttps://appriseit\.com/config/text/\fR is the easiest and most ideal solution for most users\. However YAML \fIhttps://appriseit\.com/config/yaml/\fR configuration files grants the user a bit more leverage and access to some of the internal features of Apprise\. Regardless of which format you choose, both provide the users the ability to leverage \fBtagging\fR which adds a more rich and powerful notification environment\.
+An Apprise configuration file \fIhttps://appriseit\.com/getting\-started/configuration/\fR can be in the format of either \fBTEXT\fR or \fBYAML\fR where TEXT is the easiest and most ideal solution for most users\. However YAML configuration files grants the user a bit more leverage and access to some of the internal features of Apprise\. Regardless of which format you choose, both provide the users the ability to leverage \fBtagging\fR which adds a more rich and powerful notification environment\.
 .P
 Configuration files can be directly referenced via \fBapprise\fR when referencing the \fB\-\-config=\fR (\fB\-c\fR) CLI directive\. You can identify as many as you like on the command line and all of them will be loaded\. You can also point your configuration to a cloud location (by referencing \fBhttp://\fR or \fBhttps://\fR\. By default \fBapprise\fR looks in the following local locations for configuration files and loads them:
 .IP "" 4
@@ -265,7 +265,7 @@ $ apprise \-vv \-t "my title" \-b "my notification body"
 .fi
 .IP "" 0
 .P
-If you leveraged tagging \fIhttps://appriseit\.com/guides/#leverage\-tagging\fR, you can define all of Apprise Service URLs in your configuration that you want and only specifically notify a subset of them:
+If you leveraged tagging \fIhttps://appriseit\.com/cli/usage/#tagging\-and\-filtering\fR, you can define all of Apprise Service URLs in your configuration that you want and only specifically notify a subset of them:
 .IP "" 4
 .nf
 $ apprise \-vv \-\-title "Will Be Late Getting Home" \e
