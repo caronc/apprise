@@ -466,7 +466,8 @@ class AppriseURLTester:
                 )
                 if _resp != notify_response:
                     raise AssertionError(
-                        f"notify() call; notify_response={_resp} on {url}")
+                        f"notify() call; notify_response={_resp} "
+                        f"(expected {notify_response}) on {url}")
 
                 if notify_response:
                     # If we successfully got a response, there must have been
