@@ -77,8 +77,9 @@ notification services. It supports sending alerts to platforms such as: \
 `SMSEagle`, `SMS Manager`, `SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, \
 `Spug Push`, `Super Toasty`, `Streamlabs`, `Stride`, `Synology Chat`, \
 `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, `Twilio`, \
-`Twitter`, `Twist`, `Vapid`, `VictorOps`, `Voipms`, `Vonage`, `WebPush`, \
-`WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, `WxPusher`, and `XBMC`.}
+`Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, `Vonage`, \
+`WebPush`, `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, `WxPusher`,
+and `XBMC`.}
 
 Name:           python-%{pypi_name}
 Version:        1.9.7

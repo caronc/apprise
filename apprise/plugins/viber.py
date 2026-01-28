@@ -310,7 +310,7 @@ class NotifyViber(NotifyBase):
                 results["qsd"]["token"]
             )
 
-        elif results["targets"]:
+        else:
             results["token"] = results["targets"][0]
             results["targets"] = results["targets"][1:]
 

@@ -96,7 +96,7 @@ apprise_url_tests = (
         "requests_response_text": VIBER_GOOD_RESPONSE,
         "privacy_url": "viber://****/t10"}),
     (
-        "viber://token@targetZ",
+        "viber://token/targetZ",
         {
             "instance": NotifyViber,
             # throw a bizarre code forcing us to fail to look it up
@@ -106,7 +106,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "viber://token@targetZ",
+        "viber://token/targetZ",
         {
             "instance": NotifyViber,
             # force a failure
@@ -116,7 +116,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "viber://token@targetY",
+        "viber://token/targetY",
         {
             "instance": NotifyViber,
             # Throws a series of i/o exceptions with this flag
