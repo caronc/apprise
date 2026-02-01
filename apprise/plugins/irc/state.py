@@ -161,6 +161,12 @@ class IRCStateMachine:
                 return [IRCAction(
                     IRCActionKind.FAIL, reason=self.ctx.last_error)]
 
+            if n == 443 and len(msg.params) >= 2:
+                chan = msg.params[1]
+                self.ctx.joined.add(chan)
+                self.state = IRCState.READY
+                return actions
+
             if n == 366 and len(msg.params) >= 2:
                 chan = msg.params[1]
                 self.ctx.joined.add(chan)

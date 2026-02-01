@@ -50,6 +50,7 @@ from apprise.plugins.irc.protocol import (
 from apprise.plugins.irc.state import (
     IRCActionKind,
     IRCContext,
+    IRCState,
     IRCStateMachine,
 )
 from apprise.utils.socket import AppriseSocketError
@@ -116,12 +117,12 @@ def test_plugin_irc_modes() -> None:
         # Case Insensitive
         result = NotifyIRC(
             host="irc.example.com", targets=["#c"], mode="NICKServ")
-        assert "mode=nickserv" in result.url()
+        assert 'mode=nickserv' in result.url()
 
         # Case Insensitive
         result = NotifyIRC(
             host="irc.example.com", targets=["#c"], mode="server")
-        assert "mode=" not in result.url()
+        assert 'mode=' not in result.url()
 
 
 def test_plugin_irc_defaults_port_noop() -> None:
@@ -963,3 +964,234 @@ def test_plugin_irc_client_quit_queue_ignores_empty_send() -> None:
         c.quit(message="bye", timeout=0.1)
         m_queue.assert_not_called()
         m_flush.assert_called_once()
+
+
+def test_plugin_irc_send_znc_calls_check_connection() -> None:
+    """NotifyIRC ZNC mode triggers a connection check."""
+    n = NotifyIRC(
+        host="irc.example.com",
+        targets=["#chan"],
+        user="zncuser",
+        password="zncpass",
+        mode=IRCAuthMode.ZNC,
+        nick="mybot",
+    )
+
+    client = mock.Mock(spec=IRCClient)
+    client.nickname = "mybot"
+    client.check_connection.return_value = True
+
+    with mock.patch("apprise.plugins.irc.base.IRCClient", return_value=client):
+        assert n.send("body") is True
+
+    client.connect.assert_called_once()
+    client.register.assert_called_once()
+    client.check_connection.assert_called_once()
+    client.privmsg.assert_called_once()
+    client.quit.assert_called_once()
+    client.close.assert_called_once()
+
+
+def test_plugin_irc_send_znc_check_connection_failure() -> None:
+    """NotifyIRC ZNC mode fails fast if the bouncer liveness check fails."""
+    n = NotifyIRC(
+        host="irc.example.com",
+        targets=["#chan"],
+        user="zncuser",
+        password="zncpass",
+        mode=IRCAuthMode.ZNC,
+        nick="mybot",
+    )
+
+    client = mock.Mock(spec=IRCClient)
+    client.nickname = "mybot"
+    client.check_connection.return_value = False
+
+    with mock.patch("apprise.plugins.irc.base.IRCClient", return_value=client):
+        assert n.send("body") is False
+
+    client.connect.assert_called_once()
+    client.register.assert_called_once()
+    client.check_connection.assert_called_once()
+    client.privmsg.assert_not_called()
+    client.quit.assert_not_called()
+    client.close.assert_called_once()
+
+
+def test_plugin_irc_send_znc_pass_rewrite() -> None:
+    """NotifyIRC ZNC mode passes user:pass to IRCClient password."""
+    n = NotifyIRC(
+        host="irc.example.com",
+        targets=["#chan"],
+        user="zncuser",
+        password="zncpass",
+        mode=IRCAuthMode.ZNC,
+        nick="mybot",
+    )
+
+    client = mock.Mock(spec=IRCClient)
+    client.nickname = "mybot"
+    client.check_connection.return_value = True
+
+    with mock.patch(
+            "apprise.plugins.irc.base.IRCClient",
+            return_value=client) as m_ctor:
+        assert n.send("body") is True
+
+    # Pull the kwargs passed into IRCClient(...)
+    kwargs = m_ctor.call_args.kwargs
+    assert kwargs["password"] == "zncuser:zncpass"
+
+
+def test_plugin_irc_client_check_connection_success_on_any_pong() -> None:
+    """check_connection() returns True when a PONG is observed."""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    # 0.0 used to compute deadline, then remain within deadline once, then stop
+    times = [0.0, 0.0, 0.0]
+
+    def _mono() -> float:
+        return times.pop(0) if times else 10.0
+
+    with (
+        mock.patch("time.monotonic", side_effect=_mono),
+        mock.patch.object(c, "_write") as m_write,
+        mock.patch.object(c, "_read", side_effect=["PONG :server"]) as m_read,
+    ):
+        assert c.check_connection(timeout=5.0) is True
+        m_write.assert_called_once()
+        m_read.assert_called()
+
+
+def test_plugin_irc_client_andles_empty_reads() -> None:
+    """check_connection() handles empty reads and returns False at deadline."""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    # Start at 0.0, enter loop once, then exceed deadline after the empty read.
+    times = [0.0, 0.0, 6.0]
+
+    def _mono() -> float:
+        return times.pop(0)
+
+    with (
+        mock.patch("time.monotonic", side_effect=_mono),
+        mock.patch.object(c, "_write") as m_write,
+        mock.patch.object(c, "_read", return_value=None),
+    ):
+        assert c.check_connection(timeout=5.0) is False
+        m_write.assert_called_once()
+
+
+def test_plugin_irc_client_join_queues_join_line_and_completes() -> None:
+    """join() queues the JOIN command when request_join yields a SEND line."""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    def _handshake(deadline: float, prefix: str) -> None:
+        # Simulate join confirmation being observed
+        c.sm.ctx.joined.add("#c")
+
+    with (
+        mock.patch("time.monotonic", return_value=0.0),
+        mock.patch.object(c, "_queue") as m_queue,
+        mock.patch.object(c, "_flush"),
+        mock.patch.object(c, "_handshake", side_effect=_handshake),
+    ):
+        c.join(channel="#c", timeout=1.0, prefix="ap", key=None)
+
+    # Ensure the queue branch was taken
+    assert any(
+        call.args and isinstance(
+            call.args[0], str) and call.args[0].startswith("JOIN ")
+        for call in m_queue.call_args_list
+    )
+
+
+def test_plugin_irc_client_join_timeout_logs_debug() -> None:
+    """join() emits a debug line when confirmation is not observed."""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    # timeout=0.0 forces the while-loop to be skipped and triggers debug path
+    with (
+        mock.patch("time.monotonic", return_value=0.0),
+        mock.patch("apprise.plugins.irc.client.logger.debug") as m_dbg,
+        mock.patch.object(c, "_flush"),
+        mock.patch.object(c, "_handshake"),
+    ):
+        c.join(channel="#c", timeout=0.0, prefix="ap", key=None)
+        m_dbg.assert_called_once()
+
+
+def test_plugin_irc_state_machine_joining_numeric_443_adds_channel() -> None:
+    """State machine treats numeric 443 as joined confirmation."""
+    ctx = IRCContext(desired_nick="n", accepted_nick="n", fullname="f")
+    sm = IRCStateMachine(ctx)
+
+    # Enter JOINING state
+    sm.request_join("#c")
+
+    assert sm.state == IRCState.JOINING
+
+    # 443 usually indicates already on channel; this should mark as joined.
+    sm.on_message(parse_irc_line(":srv 443 n #c :is already on channel"))
+
+    assert "#c" in sm.ctx.joined
+    assert sm.state == IRCState.READY
+
+
+def test_plugin_irc_client_connection_check() -> None:
+    """check_connection() sees a non-PONG message."""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    # monotonic() is used to compute deadline, then loop condition.
+    # We provide values such that we enter the loop at least once, then
+    # exceed deadline.
+    times = [0.0, 0.0, 0.0, 6.0]
+
+    def _mono() -> float:
+        return times.pop(0)
+
+    with (
+        mock.patch("time.monotonic", side_effect=_mono),
+        mock.patch.object(c, "_write") as m_write,
+        # First read returns a non-empty line that is not a PONG, then nothing.
+        mock.patch.object(c, "_read", side_effect=["PING :abc", None]),
+    ):
+        assert c.check_connection(timeout=5.0) is False
+        m_write.assert_called_once()
+
+
+def test_plugin_irc_client_join_non_send_actions() -> None:
+    """join() ignores non-SEND actions"""
+    c = IRCClient(host="h", nickname="n", fullname="f")
+    c.transport = mock.Mock()
+
+    from apprise.plugins.irc.state import IRCAction, IRCActionKind
+
+    # Return a NOOP action so: act.kind == SEND is False
+    actions = [IRCAction(IRCActionKind.NOOP)]
+
+    # Skip the while loop by making monotonic() already past deadline
+    with (
+        mock.patch.object(c.sm, "request_join", return_value=actions),
+        mock.patch.object(c, "_queue") as m_queue,
+        mock.patch.object(c, "_flush") as m_flush,
+        mock.patch.object(c, "_handshake") as m_hs,
+        mock.patch("time.monotonic", side_effect=[0.0, 1.0]),
+        mock.patch("apprise.plugins.irc.client.logger.debug") as m_dbg,
+    ):
+        c.join(channel="#c", timeout=0.0, prefix="ap", key=None)
+
+        # Nothing queued because our action was not SEND
+        m_queue.assert_not_called()
+
+        # While loop is skipped, so these are not called
+        m_flush.assert_not_called()
+        m_hs.assert_not_called()
+
+        # Not joined, so debug path executes
+        m_dbg.assert_called_once()

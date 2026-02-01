@@ -36,17 +36,20 @@ from typing import Optional
 class IRCAuthMode:
     """IRC authentication mode."""
 
+    # No authentication
+    NONE = "none"
+
     # PASS <password> during registration
     SERVER = "server"
 
     # NickServ IDENTIFY after registration
     NICKSERV = "nickserv"
 
-    # No authentication
-    NONE = "none"
-
+    # ZNC bouncer mode - connects to bouncer only - presumes registration
+    ZNC = "znc"
 
 IRC_AUTH_MODES = (
+    IRCAuthMode.ZNC,
     IRCAuthMode.SERVER,
     IRCAuthMode.NICKSERV,
     IRCAuthMode.NONE,

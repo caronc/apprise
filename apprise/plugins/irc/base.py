@@ -304,7 +304,10 @@ class NotifyIRC(NotifyBase):
             secure=self.secure,
             verify=self.verify_certificate,
             timeout=self.socket_read_timeout,
-            password=self.password,
+            # In ZNC mode, authentication is performed against the bouncer itself.
+            # ZNC configurations expect the PASS line to include the username.
+            password=self.password if self.auth_mode != IRCAuthMode.ZNC
+            else f"{self.user}:{self.password}",
             auth_mode=self.auth_mode,
             nick_generator=IRCClient.nick_generation,
         )
@@ -315,6 +318,12 @@ class NotifyIRC(NotifyBase):
                 timeout=self.irc_register_timeout,
                 prefix=self.app_id,
             )
+
+            # ZNC operates as a bouncer, so perform a quick sanity check that
+            # the connection is alive before issuing commands.
+            if self.auth_mode == IRCAuthMode.ZNC and not client.check_connection(
+                    timeout=min(5.0, float(self.send_timeout or 5.0))):
+                raise AppriseSocketError("ZNC connection check failed")
 
             message = body if not title else f"{title} {body}".strip()
 
@@ -334,7 +343,7 @@ class NotifyIRC(NotifyBase):
                     timeout=self.send_timeout,
                 )
                 self.logger.info(
-                    "Sent IRC notification to #%s as %s",
+                    "Sent IRC notification to #%s as @%s",
                     c,
                     client.nickname,
                 )
@@ -347,7 +356,7 @@ class NotifyIRC(NotifyBase):
                     timeout=self.send_timeout,
                 )
                 self.logger.info(
-                    "Sent IRC notification to @%s as %s",
+                    "Sent IRC notification to @%s as @%s",
                     u,
                     client.nickname,
                 )
@@ -357,7 +366,7 @@ class NotifyIRC(NotifyBase):
 
         except (AppriseSocketError, OSError, TimeoutError) as e:
             self.logger.warning(
-                "Failed to send IRC notification to %s as %s.",
+                "Failed to send IRC notification to %s as @%s.",
                 self.host,
                 nickname,
             )

@@ -233,8 +233,8 @@ class IRCClient:
         tl_start = time.time()
         deadline = time.monotonic() + float(timeout)
 
-        # Only SERVER auth uses PASS during registration
-        if self.auth_mode != IRCAuthMode.SERVER:
+        # PASS during registration is only used for SERVER and ZNC.
+        if self.auth_mode not in (IRCAuthMode.SERVER, IRCAuthMode.ZNC):
             self.sm.ctx.password = None
 
         logger.trace("IRC registration started")
@@ -263,6 +263,27 @@ class IRCClient:
         if self.auth_mode == IRCAuthMode.NICKSERV:
             self.identify(timeout=timeout)
 
+    def check_connection(self, timeout: float) -> bool:
+        """Verify we can talk to the server by completing a PING/PONG."""
+        deadline = time.monotonic() + float(timeout)
+        token = "apprise"
+
+        # Send a ping and wait until we observe a PONG carrying our token.
+        self._write(f"PING :{token}", deadline=deadline)
+
+        while time.monotonic() < deadline:
+            line = self._read(deadline=deadline)
+            if not line:
+                continue
+
+            msg = parse_irc_line(line)
+            if msg.command.upper() == "PONG":
+                # Some IRC servers/bouncers do not echo our token back reliably.
+                # Observing any PONG after issuing our PING is sufficient.
+                return True
+
+        return False
+
     def join(
         self,
         channel: str,
@@ -272,6 +293,9 @@ class IRCClient:
     ) -> None:
 
         chan = normalise_channel(channel)
+        if chan in self.sm.ctx.joined:
+            # Nothing to do, we are already there.
+            return
         deadline = time.monotonic() + float(timeout)
 
         for act in self.sm.request_join(chan, key=key):
