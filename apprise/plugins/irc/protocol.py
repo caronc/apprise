@@ -66,10 +66,7 @@ class IRCMessage:
     @property
     def numeric(self) -> Optional[int]:
         if self.command.isdigit() and len(self.command) == 3:
-            try:
-                return int(self.command)
-            except ValueError:
-                return None
+            return int(self.command)
         return None
 
 

@@ -353,14 +353,25 @@ class SocketTransport:
 
     def _attempt_reconnect(
         self,
+        retries: int,
         action: str,
         exc: Exception,
     ) -> bool:
         """
-        Attempt to reconnect and allow the caller to retry once.
+        Attempt to reconnect and allow the caller to retry.
 
-        Returns True if a reconnect was performed and the caller should retry.
+        Args:
+            retries: Remaining reconnect attempts permitted (<= 0 disables).
+            action: A short label (e.g. "read" or "write") for logging.
+            exc: The exception that triggered the reconnect attempt.
+
+        Returns:
+            True if a reconnect was performed and the caller should retry.
         """
+        # Respect the caller's retry budget
+        if int(retries) <= 0:
+            return False
+
         # Only retry if we have previously completed useful I/O since the last
         # connect(). This prevents retrying the first failed read/write after
         # connect.
@@ -375,6 +386,7 @@ class SocketTransport:
         try:
             self.close()
             self.connect()
+
         except Exception as e:
             logger.debug("Socket reconnect exception: %s", e)
             return False
@@ -441,6 +453,7 @@ class SocketTransport:
                         ready = self.can_read(0.5)
                         if ready is None:
                             raise AppriseSocketError("Socket closed")
+
                         if ready:
                             break
                 else:
@@ -484,8 +497,32 @@ class SocketTransport:
                 err: Exception = e
 
                 # Reconnect only if we've had prior useful I/O
-                if attempts and self._attempt_reconnect(
-                        action="read", exc=err):
+                if self._attempt_reconnect(
+                        retries=attempts,
+                        action="read",
+                        exc=err,
+                ):
+                    # In blocking mode with no timeout (wait indefinitely),
+                    # perform an immediate read attempt after reconnect.
+                    # This avoids relying solely on can_read(), and it keeps
+                    # edge cases (like stale sockets) recoverable.
+                    if blocking and wait_timeout is None \
+                            and self._sock is not None:
+                        try:
+                            data = self._sock.recv(int(max_bytes))
+
+                            if data == b"":
+                                raise AppriseSocketError(
+                                    "Connection lost during read")
+
+                            self._had_io = True
+                            return data
+
+                        except (BlockingIOError, ssl.SSLWantReadError,
+                                ssl.SSLWantWriteError):
+                            # No data yet; fall back to retry loop
+                            pass
+
                     continue
 
                 if isinstance(err, AppriseSocketError):
@@ -520,8 +557,8 @@ class SocketTransport:
             raise AppriseInvalidData("write() expects bytes-like data")
 
         # Loop-based retry avoids recursion and keeps state obvious
-        attempts = max(
-            0, int(retries) if retries else self.retries) + 1
+        retry_count = self.retries if retries is None else int(retries)
+        attempts = max(0, retry_count) + 1
 
         while attempts:
             attempts -= 1

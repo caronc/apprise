@@ -862,3 +862,138 @@ def test_utils_socket_read_edge_cases():
         s.read(blocking=False, retries=0)
 
     assert "Socket read failed" in str(e.value)
+
+
+def test_utils_socket_attempt_reconnect_no_io() -> None:
+    """SocketTransport() _attempt_reconnect() returns False"""
+    s = SocketTransport("example.com", 1, timeout=None)
+
+    # Explicitly not eligible for reconnect
+    s._had_io = False
+
+    with (
+        mock.patch.object(s, "close") as m_close,
+        mock.patch.object(s, "connect") as m_connect,
+    ):
+        assert s._attempt_reconnect(
+            retries=1,
+            action="read",
+            exc=Exception("boom"),
+        ) is False
+
+        # Should not attempt any reconnect work
+        m_close.assert_not_called()
+        m_connect.assert_not_called()
+
+
+def test_utils_socket_attempt_reconnect_connect_exception() -> None:
+    """SocketTransport() _attempt_reconnect() handles exception."""
+    s = SocketTransport("example.com", 1, timeout=None)
+
+    # Eligible for reconnect
+    s._had_io = True
+
+    with (
+        mock.patch.object(s, "close") as m_close,
+        mock.patch.object(
+            s, "connect", side_effect=Exception("nope")) as m_connect,
+    ):
+        assert s._attempt_reconnect(
+            retries=1,
+            action="write",
+            exc=Exception("boom"),
+        ) is False
+
+        m_close.assert_called_once()
+        m_connect.assert_called_once()
+
+
+def test_utils_socket_ssl_read_blocking() -> None:
+    """SocketTransport() read() blocking """
+    s = SocketTransport("example.com", 1, timeout=None)
+    sock = _DummySocket()
+
+    # First recv indicates TLS wants more reads, second returns data
+    sock.recv = mock.Mock(side_effect=[ssl.SSLWantReadError(), b"data"])
+    s._sock = sock
+
+    # Indefinite blocking, so we must reach recv() and then loop on WANT_READ
+    with mock.patch.object(s, "can_read", return_value=True):
+        assert s.read(blocking=True, timeout=None) == b"data"
+
+    # Coverage for read blocking, WANT_WRITE
+    s = SocketTransport("example.com", 1, timeout=(1.0, 0.5))
+    sock = _DummySocket()
+
+    # Trigger the WANT_WRITE/BlockingIOError handling inside the recv loop
+    sock.recv = mock.Mock(side_effect=ssl.SSLWantWriteError())
+    s._sock = sock
+
+    # 1) initial readiness check returns True (enter recv loop)
+    # 2) inner loop calls can_read(min(...)) and gets False, returning b""
+    with mock.patch.object(s, "can_read", side_effect=[True, False]):
+        assert s.read(blocking=True, timeout=0.5) == b""
+
+    s = SocketTransport("example.com", 1, timeout=(1.0, 0.5))
+    sock = _DummySocket()
+
+    # WANT_WRITE first, then a successful read
+    sock.recv = mock.Mock(side_effect=[ssl.SSLWantWriteError(), b"data"])
+    s._sock = sock
+
+    # can_read used twice:
+    # - readiness check (True)
+    # - busy-loop avoidance check (True)
+    with mock.patch.object(s, "can_read", side_effect=[True, True]):
+        assert s.read(blocking=True, timeout=0.5) == b"data"
+
+    s = SocketTransport("example.com", 1, timeout=None)
+    bad_sock = _DummySocket()
+
+    # In blocking read, b"" triggers "Connection lost during read"
+    bad_sock.recv = mock.Mock(return_value=b"")
+
+    good_sock = _DummySocket()
+    # This targets the post-reconnect immediate recv path and forces b"" there
+    good_sock.recv = mock.Mock(return_value=b"")
+
+    s._sock = bad_sock
+    s._had_io = True
+
+    def _connect_side_effect() -> None:
+        s._sock = good_sock
+        s._refresh_wrappers()
+
+    # Ensure we enter the blocking path and do the initial recv that fails,
+    # then reconnect, then attempt immediate recv on the new socket.
+    with (
+        mock.patch.object(s, "can_read", return_value=True),
+        mock.patch.object(s, "connect", side_effect=_connect_side_effect),
+    ):
+        with pytest.raises(AppriseSocketError) as e:
+            s.read(blocking=True, retries=1)
+        assert "Connection lost during read" in str(e.value)
+
+    s = SocketTransport("example.com", 1, timeout=None)
+
+    bad_sock = _DummySocket()
+    bad_sock.recv = mock.Mock(return_value=b"")
+    s._sock = bad_sock
+    s._had_io = True
+
+    good_sock = _DummySocket()
+    # - First call is the post-reconnect immediate recv: it raises
+    #   BlockingIOError
+    # - Second call occurs in the next loop iteration after can_read says True
+    good_sock.recv = mock.Mock(side_effect=[BlockingIOError(), b"data"])
+
+    def _connect_side_effect() -> None:
+        s._sock = good_sock
+        s._refresh_wrappers()
+
+    # can_read must return True so we get to recv() on the next iteration
+    with (
+        mock.patch.object(s, "can_read", return_value=True),
+        mock.patch.object(s, "connect", side_effect=_connect_side_effect),
+    ):
+        assert s.read(blocking=True, retries=1) == b"data"
