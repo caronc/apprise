@@ -176,6 +176,7 @@ for po in apprise/i18n/*/LC_MESSAGES/apprise.po; do
     langdir="$(dirname "${po#apprise/i18n/}")"
     outdir="%{buildroot}%{python3_sitelib}/%{pypi_name}/i18n/${langdir}"
     install -d "$outdir"
+    msguniq --use-first -o "$po" "$po"
     msgfmt -o "${outdir}/apprise.mo" "$po"
 done
 %else
@@ -186,6 +187,7 @@ done
 pushd %{buildroot}%{python3_sitelib}/apprise/i18n
 for po in */LC_MESSAGES/apprise.po; do
     [ -f "$po" ] || continue
+    msguniq --use-first -o "$po" "$po"
     msgfmt -o "${po%.po}.mo" "$po"
 done
 %endif
