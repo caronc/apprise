@@ -278,8 +278,9 @@ class IRCClient:
 
             msg = parse_irc_line(line)
             if msg.command.upper() == "PONG":
-                # Some IRC servers/bouncers do not echo our token back reliably.
-                # Observing any PONG after issuing our PING is sufficient.
+                # Some IRC servers/bouncers do not echo our token back
+                # reliably. Observing any PONG after issuing our PING is
+                # sufficient.
                 return True
 
         return False

@@ -117,12 +117,12 @@ def test_plugin_irc_modes() -> None:
         # Case Insensitive
         result = NotifyIRC(
             host="irc.example.com", targets=["#c"], mode="NICKServ")
-        assert 'mode=nickserv' in result.url()
+        assert "mode=nickserv" in result.url()
 
         # Case Insensitive
         result = NotifyIRC(
             host="irc.example.com", targets=["#c"], mode="server")
-        assert 'mode=' not in result.url()
+        assert "mode=" not in result.url()
 
 
 def test_plugin_irc_defaults_port_noop() -> None:

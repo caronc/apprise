@@ -304,8 +304,9 @@ class NotifyIRC(NotifyBase):
             secure=self.secure,
             verify=self.verify_certificate,
             timeout=self.socket_read_timeout,
-            # In ZNC mode, authentication is performed against the bouncer itself.
-            # ZNC configurations expect the PASS line to include the username.
+            # In ZNC mode, authentication is performed against the bouncer
+            # itself. ZNC configurations expect the PASS line to include the
+            # username.
             password=self.password if self.auth_mode != IRCAuthMode.ZNC
             else f"{self.user}:{self.password}",
             auth_mode=self.auth_mode,
@@ -321,7 +322,8 @@ class NotifyIRC(NotifyBase):
 
             # ZNC operates as a bouncer, so perform a quick sanity check that
             # the connection is alive before issuing commands.
-            if self.auth_mode == IRCAuthMode.ZNC and not client.check_connection(
+            if self.auth_mode == IRCAuthMode.ZNC \
+                    and not client.check_connection(
                     timeout=min(5.0, float(self.send_timeout or 5.0))):
                 raise AppriseSocketError("ZNC connection check failed")
 
