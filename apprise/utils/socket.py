@@ -297,17 +297,35 @@ class SocketTransport:
 
     def _build_ssl_context(self) -> ssl.SSLContext:
         """Build SSL context using certifi bundle when verify=True."""
+        # Enforce TLS 1.2+ to avoid TLSv1/TLSv1.1 negotiation.
+        # We explicitly enforce TLS >= 1.2 for Python 3.9+ compatibility.
         if self.verify:
             import certifi
 
             ctx = ssl.create_default_context(cafile=certifi.where())
             ctx.check_hostname = True
             ctx.verify_mode = ssl.CERT_REQUIRED
-            return ctx
+        else:
+            # Still enforce modern TLS even when certificate verification is
+            # disabled, since protocol downgrade is independent of trust.
+            ctx = ssl.create_default_context()
+            ctx.check_hostname = False
+            ctx.verify_mode = ssl.CERT_NONE
 
-        ctx = ssl.create_default_context()
-        ctx.check_hostname = False
-        ctx.verify_mode = ssl.CERT_NONE
+        # Enforce TLS 1.2+ to avoid TLSv1/TLSv1.1 negotiation.
+        try:
+            ctx.minimum_version = ssl.TLSVersion.TLSv1_2
+        except Exception:
+            # Fallback for very old Python/OpenSSL combinations
+            with contextlib.suppress(Exception):
+                ctx.options |= ssl.OP_NO_TLSv1
+            with contextlib.suppress(Exception):
+                ctx.options |= ssl.OP_NO_TLSv1_1
+
+        # Disable TLS-level compression (mitigates CRIME-style attacks).
+        with contextlib.suppress(Exception):
+            ctx.options |= ssl.OP_NO_COMPRESSION
+
         return ctx
 
     def start_tls(self) -> None:
