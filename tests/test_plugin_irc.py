@@ -105,12 +105,23 @@ def test_plugin_irc_init_targets() -> None:
     assert "alice" in n.users
 
 
-def test_plugin_irc_init_mode_blank() -> None:
-    """NotifyIRC rejects blank mode."""
+def test_plugin_irc_modes() -> None:
+    """NotifyIRC auth mode tests."""
     with (
             mock.patch.object(NotifyIRC, "apply_irc_defaults"),
             pytest.raises(TypeError)):
-        NotifyIRC(host="irc.example.com", targets=["#c"], mode="   ")
+        NotifyIRC(host="irc.example.com", targets=["#c"], mode="invalid")
+
+    with mock.patch.object(NotifyIRC, "apply_irc_defaults"):
+        # Case Insensitive
+        result = NotifyIRC(
+            host="irc.example.com", targets=["#c"], mode="NICKServ")
+        assert "mode=nickserv" in result.url()
+
+        # Case Insensitive
+        result = NotifyIRC(
+            host="irc.example.com", targets=["#c"], mode="server")
+        assert "mode=" not in result.url()
 
 
 def test_plugin_irc_defaults_port_noop() -> None:
@@ -244,9 +255,42 @@ def test_plugin_irc_url_format() -> None:
     assert "pw" not in private
     assert "key" not in private
 
+    n = NotifyIRC(
+        host="irc.example.com",
+        targets=["#chan", "@bob"],
+        user="user2",
+        secure=True,
+        port=IRCClient.default_insecure_port,
+        join=False,
+        mode=IRCAuthMode.NICKSERV,
+    )
+
+    url = n.url(privacy=False)
+    assert url.startswith("ircs://user2@irc.example.com:6667/")
+    assert "#chan" in url
+    assert "@bob" in url
+
+    # Mode only appears when auth_mode is not SERVER.
+    if n.auth_mode != IRCAuthMode.SERVER:
+        assert "mode=nickserv" in url
+    else:
+        assert "mode=" not in url
+
+    private = n.url(privacy=True)
+    assert "pw" not in private
+    assert "key" not in private
+
 
 def test_plugin_irc_parse_url() -> None:
     """NotifyIRC parse_url() behaviour with host= query."""
+
+    with mock.patch(
+        "apprise.plugins.irc.base.NotifyBase.parse_url",
+        return_value=None,
+    ):
+        results = NotifyIRC.parse_url("irc://%@@")
+        assert results is None
+
     # host= indicates the URL host is a target, it does not override host.
     results = NotifyIRC.parse_url("irc://%23chan?host=irc.example.com")
     assert results is not None

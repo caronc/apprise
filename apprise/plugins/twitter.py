@@ -237,15 +237,11 @@ class NotifyTwitter(NotifyBase):
             raise TypeError(msg)
 
         # Store our webhook mode
-        self.mode = (
-            self.template_args["mode"]["default"]
-            if not isinstance(mode, str)
-            else mode.lower()
-        )
-
-        if mode and isinstance(mode, str):
+        if mode and isinstance(mode, str) and mode.strip():
+            self.mode = mode.strip().lower()
             self.mode = next(
-                (a for a in TWITTER_MESSAGE_MODES if a.startswith(mode)), None
+                (a for a in TWITTER_MESSAGE_MODES
+                 if a.startswith(self.mode)), None
             )
             if self.mode not in TWITTER_MESSAGE_MODES:
                 msg = (

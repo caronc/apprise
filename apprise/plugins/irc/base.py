@@ -193,20 +193,19 @@ class NotifyIRC(NotifyBase):
 
         self.nickname = (nick or "").strip() or (self.user or "").strip()
 
-        # Initialized value
-        self.auth_mode = IRCAuthMode.SERVER
+        # Initialized value (as it is used in apply_irc_defaults())
+        self.auth_mode = self.template_args["mode"]["default"]
 
         # Apply template defaults only where the user did not supply values
         self.apply_irc_defaults(**kwargs)
 
-        if isinstance(mode, str) and not mode.strip():
-            requested = mode.strip().lower()
-            matches = tuple(
-                m for m in IRC_AUTH_MODES if m.startswith(requested))
-            if len(matches) == 1:
-                self.auth_mode = matches[0]
-
-            else:
+        if isinstance(mode, str) and mode.strip():
+            self.auth_mode = mode.strip().lower()
+            self.auth_mode = next(
+                (a for a in IRC_AUTH_MODES
+                 if a.startswith(self.auth_mode)), None
+            )
+            if self.auth_mode not in IRC_AUTH_MODES:
                 msg = f"The IRC auth mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
                 raise TypeError(msg)
