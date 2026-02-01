@@ -438,7 +438,8 @@ def test_utils_socket_write_flush():
     s._wfile = _DummyFile()
 
     # Normal send, flush=True
-    assert s.write(b"test", flush=True) == 4
+    with mock.patch.object(s, "can_write", return_value=True):
+        assert s.write(b"test", flush=True) == 4
     assert s._wfile.flushed >= 1
 
     # send returning 0 triggers connection lost
@@ -637,7 +638,8 @@ def test_utils_socket_write_flush_edge_cases():
     s._wfile = _DummyFile()
 
     with mock.patch.object(s._wfile, "flush") as m:
-        assert s.write(b"test", flush=False, timeout=0.1) == 4
+        with mock.patch.object(s, "can_write", return_value=True):
+            assert s.write(b"test", flush=False, timeout=0.1) == 4
         m.assert_not_called()
 
     s = SocketTransport("example.com", 1, timeout=(1.0, 0.2))
@@ -645,7 +647,8 @@ def test_utils_socket_write_flush_edge_cases():
     s._wfile = None
 
     # Should succeed and simply skip flush
-    assert s.write(b"test", flush=True, timeout=0.1) == 4
+    with mock.patch.object(s, "can_write", return_value=True):
+        assert s.write(b"test", flush=True, timeout=0.1) == 4
 
 
 def test_utils_socket_recv_error():
