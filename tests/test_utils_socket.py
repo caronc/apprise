@@ -675,7 +675,8 @@ def test_utils_socket_write_timeout():
 
     # If deadline is None, can_write should never be called
     with mock.patch.object(s, "can_write") as m_can_write:
-        assert s.write(b"test", flush=True, timeout=None) == 4
+        result = s.write(b"test", flush=True, timeout=None)
+        assert result == 4
         m_can_write.assert_not_called()
 
 
