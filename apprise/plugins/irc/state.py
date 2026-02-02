@@ -33,10 +33,11 @@ handling, join completion, and keeping the connection alive (PING/PONG).
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import field
 from enum import Enum, auto
 from typing import Optional
 
+from ...compat import dataclass_compat as dataclass
 from .protocol import IRCMessage, extract_welcome_nick
 
 

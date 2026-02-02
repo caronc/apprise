@@ -232,25 +232,74 @@ def test_utils_socket_server_hostname_for_tls_ip_reverse():
 
 def test_utils_socket_build_ssl_context():
     """SocketTransport() Build SSL Context."""
+
+    class _DummySSLContext:
+        def __init__(self, *, raise_on_minimum: bool) -> None:
+            self.raise_on_minimum = raise_on_minimum
+            self.options = 0
+            self.check_hostname = None
+            self.verify_mode = None
+            self._minimum_version = None
+
+        @property
+        def minimum_version(self):
+            return self._minimum_version
+
+        @minimum_version.setter
+        def minimum_version(self, value):
+            if self.raise_on_minimum:
+                raise RuntimeError("minimum_version not supported")
+            self._minimum_version = value
+
+    # verify=True path with minimum_version support
     s = SocketTransport("example.com", 1, verify=True)
+    ctx = _DummySSLContext(raise_on_minimum=False)
+
     with mock.patch("certifi.where", return_value="/tmp/ca.pem"), mock.patch(
-        "ssl.create_default_context"
+        "ssl.create_default_context", return_value=ctx
     ) as m:
-        ctx = mock.Mock()
-        m.return_value = ctx
         result = s._build_ssl_context()
         assert result is ctx
+        m.assert_called_once()
         assert ctx.check_hostname is True
         assert ctx.verify_mode == ssl.CERT_REQUIRED
 
+        # TLS 1.2+ preferred path
+        assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+
+        # Compression disabled when supported
+        if hasattr(ssl, "OP_NO_COMPRESSION"):
+            assert (ctx.options & ssl.OP_NO_COMPRESSION) != 0
+
+    # verify=False path still enforces TLS 1.2+
     s = SocketTransport("example.com", 1, verify=False)
-    with mock.patch("ssl.create_default_context") as m:
-        ctx = mock.Mock()
-        m.return_value = ctx
+    ctx = _DummySSLContext(raise_on_minimum=False)
+
+    with mock.patch("ssl.create_default_context", return_value=ctx):
         result = s._build_ssl_context()
         assert result is ctx
         assert ctx.check_hostname is False
         assert ctx.verify_mode == ssl.CERT_NONE
+        assert ctx.minimum_version == ssl.TLSVersion.TLSv1_2
+
+    # Fallback path: minimum_version setter fails, options are used instead
+    s = SocketTransport("example.com", 1, verify=True)
+    ctx = _DummySSLContext(raise_on_minimum=True)
+
+    with mock.patch("certifi.where", return_value="/tmp/ca.pem"), mock.patch(
+        "ssl.create_default_context", return_value=ctx
+    ):
+        result = s._build_ssl_context()
+        assert result is ctx
+
+        # minimum_version was not set
+        assert ctx.minimum_version is None
+
+        # Fallback disables older protocols when options are present
+        if hasattr(ssl, "OP_NO_TLSv1"):
+            assert (ctx.options & ssl.OP_NO_TLSv1) != 0
+        if hasattr(ssl, "OP_NO_TLSv1_1"):
+            assert (ctx.options & ssl.OP_NO_TLSv1_1) != 0
 
 
 def test_utils_socket_start_tls_no_socket_raises():

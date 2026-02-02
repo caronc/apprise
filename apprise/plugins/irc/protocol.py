@@ -29,8 +29,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Optional
+
+from ...compat import dataclass_compat as dataclass
 
 
 class IRCAuthMode:
@@ -47,6 +48,7 @@ class IRCAuthMode:
 
     # ZNC bouncer mode - connects to bouncer only - presumes registration
     ZNC = "znc"
+
 
 IRC_AUTH_MODES = (
     IRCAuthMode.ZNC,
