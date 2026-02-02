@@ -1064,7 +1064,7 @@ def test_plugin_irc_client_check_connection_success_on_any_pong() -> None:
         m_read.assert_called()
 
 
-def test_plugin_irc_client_andles_empty_reads() -> None:
+def test_plugin_irc_client_handles_empty_reads() -> None:
     """check_connection() handles empty reads and returns False at deadline."""
     c = IRCClient(host="h", nickname="n", fullname="f")
     c.transport = mock.Mock()
