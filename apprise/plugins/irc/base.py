@@ -244,10 +244,9 @@ class NotifyIRC(NotifyBase):
         provided.
         """
         if self.port:
-            # IRC Port was explicitly specified, therefore it is assumed
-            # the caller knows what he's doing and is intentionally
-            # over-riding any smarts to be applied. We also can not apply
-            # any default if there was no user specified.
+            # IRC port was explicitly specified, therefore it is assumed
+            # the caller knows what they're doing and is intentionally
+            # overriding any smart defaults that might otherwise be applied.
             return
 
         for i in range(len(templates.IRC_TEMPLATES)):  # pragma: no branch
