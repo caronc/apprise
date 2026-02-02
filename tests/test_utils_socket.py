@@ -688,7 +688,8 @@ def test_utils_socket_write_flush_edge_cases():
 
     with mock.patch.object(s._wfile, "flush") as m:
         with mock.patch.object(s, "can_write", return_value=True):
-            assert s.write(b"test", flush=False, timeout=0.1) == 4
+            written = s.write(b"test", flush=False, timeout=0.1)
+            assert written == 4
         m.assert_not_called()
 
     s = SocketTransport("example.com", 1, timeout=(1.0, 0.2))
