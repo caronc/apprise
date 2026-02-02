@@ -235,7 +235,7 @@ class SocketTransport:
 
             if self.bind_addr is not None or self.bind_port is not None:
                 sock.bind(
-                    (self.bind_addr or "0.0.0.0", int(self.bind_port or 0)))
+                    (self.bind_addr or "127.0.0.1", int(self.bind_port or 0)))
 
             if self._connect_timeout is not None:
                 sock.settimeout(self._connect_timeout)
