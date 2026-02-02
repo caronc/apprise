@@ -89,10 +89,10 @@ class NotifyIRC(NotifyBase):
     # Keep a conservative payload budget to accommodate prefix overhead.
     body_maxlen = 380
 
-    # IRC is not fast... there is a lot of handshaking tht takes place
+    # IRC is not fast... there is a lot of handshaking that takes place
     # between us and the remote server. During development of this plugin
     # it took on average 18-22s to register with #EFnet; setting the value
-    # to 30.0s to be conservative with others as their milage may vary
+    # to 30.0s to be conservative with others as their mileage may vary
     irc_register_timeout = 30.0
 
     # Avoid flooding
