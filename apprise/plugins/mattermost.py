@@ -133,6 +133,10 @@ class NotifyMattermost(NotifyBase):
             "channel": {
                 "alias_of": "channels",
             },
+            "icon_url": {
+                "name": _("Icon URL"),
+                "type": "string",
+            },
             "image": {
                 "name": _("Include Image"),
                 "type": "bool",
@@ -151,6 +155,7 @@ class NotifyMattermost(NotifyBase):
         fullpath=None,
         channels=None,
         include_image=False,
+        icon_url=None,
         **kwargs,
     ):
         """Initialize Mattermost Object."""
@@ -183,6 +188,9 @@ class NotifyMattermost(NotifyBase):
         # Place a thumbnail image inline with the message body
         self.include_image = include_image
 
+        # Support a user-provided icon URL
+        self.icon_url = icon_url
+
         return
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
@@ -210,7 +218,13 @@ class NotifyMattermost(NotifyBase):
 
         # Acquire our image url if configured to do so
         image_url = (
-            None if not self.include_image else self.image_url(notify_type)
+            self.icon_url
+            if self.icon_url
+            else (
+                None
+                if not self.include_image
+                else self.image_url(notify_type)
+            )
         )
 
         if image_url:
@@ -329,6 +343,9 @@ class NotifyMattermost(NotifyBase):
             "image": "yes" if self.include_image else "no",
         }
 
+        if self.icon_url:
+            params["icon_url"] = self.icon_url
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -423,6 +440,11 @@ class NotifyMattermost(NotifyBase):
                 "image", NotifyMattermost.template_args["image"]["default"]
             )
         )
+
+        if "icon_url" in results["qsd"]:
+            results["icon_url"] = NotifyMattermost.unquote(
+                results["qsd"]["icon_url"]
+            )
 
         return results
 

@@ -73,6 +73,15 @@ apprise_url_tests = (
         },
     ),
     (
+        (
+            "mmost://localhost/3ccdd113474722377935511fc85d3dd4"
+            "?icon_url=http://localhost/test.png"
+        ),
+        {
+            "instance": NotifyMattermost,
+        },
+    ),
+    (
         "mmost://user@localhost/3ccdd113474722377935511fc85d3dd4?channel=test",
         {
             "instance": NotifyMattermost,
@@ -281,3 +290,27 @@ def test_mattermost_post_default_port(request_mock):
     posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
     assert "text" in posted_json
     assert posted_json["text"] == "title\r\nbody"
+
+
+def test_mattermost_icon_override(request_mock):
+    # Test token
+    token = "token"
+    icon_url = "http://localhost/test.png"
+
+    # Instantiate our URL with an icon override
+    obj = Apprise.instantiate(
+        "mmost://mattermost.example.com/{token}?icon_url={icon_url}".format(
+            token=token,
+            icon_url=icon_url,
+        )
+    )
+
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title") is True
+
+    assert request_mock.called is True
+    assert request_mock.call_count == 1
+
+    # Our Posted JSON Object
+    posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
+    assert posted_json["icon_url"] == icon_url
