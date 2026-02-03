@@ -27,25 +27,20 @@
 
 """A minimal, self-contained Slixmpp adapter.
 
-Design goals:
-- Do not touch the caller's event loop.
-- Connect, send, disconnect.
-- Clean up pending tasks so the loop can be closed safely.
-
-This module intentionally avoids exposing XEP/plugin toggles through the
-Apprise URL. Keep the surface area small, and expand only when needed.
+This module provides a wrapper to Slixmpp for Apprise
 """
 
 from __future__ import annotations
 
 import contextlib
-from dataclasses import dataclass
 import logging
 import ssl
 import threading
-from typing import Optional
+from typing import Callable, Optional
 
 import certifi
+
+from ...compat import dataclass_compat as dataclass
 
 # Default our global support flag
 SLIXMPP_SUPPORT_AVAILABLE = False
@@ -58,94 +53,131 @@ try:
     SLIXMPP_SUPPORT_AVAILABLE = True
 
 except ImportError:  # pragma: no cover
-    # slixmpp is optional; Apprise can still run without it.
     slixmpp = None  # type: ignore[assignment]
     asyncio = None  # type: ignore[assignment]
 
 
-@dataclass
+@dataclass(frozen=True, slots=True)
 class XMPPConfig:
-    """Configuration used by the adapter."""
+    """Connection configuration."""
 
-    jid: str
-    password: str
     host: str
     port: int
-    secure: bool
-    verify_certificate: bool
+    jid: str
+    password: str
+    secure: bool = False
+    verify_certificate: bool = True
 
 
-class SlixmppSendOnceAdapter:
-    """Connects, sends a message (to one or more JIDs), and disconnects."""
+# ---------------------------------------------------------------------------
+# Logging Bridge
+# ---------------------------------------------------------------------------
 
-    # This entry allows unit-testing in environments that do not have slixmpp.
+_LOG_BRIDGE_LOCK = threading.Lock()
+_LOG_BRIDGED = False
+
+
+def bridge_slixmpp_logging() -> None:
+    """Bridge Slixmpp logging into Apprise logging handlers.
+
+    This is intentionally idempotent to prevent handler duplication when many
+    notifications are sent within the same process.
+    """
+    global _LOG_BRIDGED
+
+    if _LOG_BRIDGED:
+        return
+
+    with _LOG_BRIDGE_LOCK:
+        if _LOG_BRIDGED:
+            return
+
+        apprise_logger = logging.getLogger("apprise")
+        slix_logger = logging.getLogger("slixmpp")
+
+        existing = {id(h) for h in slix_logger.handlers}
+        for handler in apprise_logger.handlers:
+            if id(handler) not in existing:
+                slix_logger.addHandler(handler)
+                existing.add(id(handler))
+
+        slix_logger.setLevel(apprise_logger.getEffectiveLevel())
+
+        # Prevent duplicates via propagation chains.
+        slix_logger.propagate = False
+
+        _LOG_BRIDGED = True
+
+
+# ---------------------------------------------------------------------------
+# Adapter
+# ---------------------------------------------------------------------------
+
+
+class SlixmppAdapter:
+    """Send a message to one or more targets, then disconnect."""
+
+    # Flag to control if we are enabled or not
+    # effectively.. .is the dependent slixmpp library available to us
+    # or not
     _enabled = SLIXMPP_SUPPORT_AVAILABLE
 
     def __init__(
         self,
         config: XMPPConfig,
         targets: list[str],
-        body: str,
         subject: str,
-        timeout: float,
-        before_message: Optional[callable] = None,
-        logger: Optional[logging.Logger] = None,
+        body: str,
+        timeout: float = 30.0,
+        before_message: Optional[Callable[[], None]] = None,
     ) -> None:
         self.config = config
         self.targets = targets
-        self.body = body
         self.subject = subject
-        self.timeout = float(timeout) if timeout else 30.0
+        self.body = body
+        self.timeout = max(5.0, float(timeout))
         self.before_message = before_message
-        self.logger = logger or logging.getLogger(__name__)
 
-        # Use the Apprise log handlers for configuring the slixmpp logger.
-        apprise_logger = logging.getLogger("apprise")
-        sli_logger = logging.getLogger("slixmpp")
-        for handler in apprise_logger.handlers:
-            sli_logger.addHandler(handler)
-        sli_logger.setLevel(apprise_logger.level)
+        self.logger = logging.getLogger("apprise.xmpp")
 
-        self._ok = False
+        bridge_slixmpp_logging()
 
     @staticmethod
-    def _ssl_context(verify: bool) -> ssl.SSLContext:
+    def _ssl_context(verify_certificate: bool) -> ssl.SSLContext:
         ctx = ssl.create_default_context(cafile=certifi.where())
-        if not verify:
+        if not verify_certificate:
             ctx.check_hostname = False
             ctx.verify_mode = ssl.CERT_NONE
         return ctx
 
     @staticmethod
     def _cancel_pending(loop: asyncio.AbstractEventLoop) -> None:
-        """Cancel and drain pending tasks on the loop."""
         pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
-        if not pending:
-            return
-
         for task in pending:
             task.cancel()
-
-        # Drain cancellations; ignore exceptions.
-        loop.run_until_complete(
-            asyncio.gather(*pending, return_exceptions=True)
-        )
+        if pending:
+            loop.run_until_complete(
+                asyncio.gather(*pending, return_exceptions=True)
+            )
 
     def process(self) -> bool:
-        """Run the send operation in an isolated thread and event loop."""
+        """Send the message, always returning within timeout."""
+        done = threading.Event()
+        result: list[Optional[bool]] = [None]
 
         if not self._enabled:
+            # We are not turned on
             return False
 
-        result: list[bool] = [False]
-        done = threading.Event()
+        shared: dict[str, object] = {"loop": None, "client": None}
 
         def runner() -> None:
-            loop = asyncio.new_event_loop()
             try:
+                loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
+                shared["loop"] = loop
 
-                class _Client(slixmpp.ClientXMPP):
+                class _Client(slixmpp.ClientXMPP):  # type: ignore[misc]
                     def __init__(
                         self,
                         jid: str,
@@ -153,28 +185,34 @@ class SlixmppSendOnceAdapter:
                         targets: list[str],
                         subject: str,
                         body: str,
-                        before_message: Optional[callable],
+                        before_message: Optional[Callable[[], None]],
+                        roster_timeout: float,
                     ) -> None:
-                        super().__init__(jid, password, loop=loop)
+                        super().__init__(jid, password)
                         self._targets = targets
                         self._subject = subject
                         self._body = body
                         self._before_message = before_message
+                        self._roster_timeout = roster_timeout
 
                         self.add_event_handler(
-                            "session_start", self._session_start
-                        )
+                            "session_start", self._session_start)
                         self.add_event_handler(
-                            "failed_auth", self._failed_auth
-                        )
+                            "failed_auth", self._failed_auth)
 
                         # Keep behaviour predictable and close quickly.
                         self.auto_reconnect = False
 
-                    async def _session_start(self, *args, **kwargs) -> None:
+                    async def _session_start(
+                            self, *args: object, **kwargs: object) -> None:
                         try:
                             self.send_presence()
-                            await self.get_roster()
+
+                            with contextlib.suppress(Exception):
+                                await asyncio.wait_for(
+                                    self.get_roster(),
+                                    timeout=self._roster_timeout,
+                                )
 
                             for target in self._targets:
                                 if self._before_message:
@@ -190,14 +228,13 @@ class SlixmppSendOnceAdapter:
                         finally:
                             self.disconnect()
 
-                    def _failed_auth(self, *args, **kwargs) -> None:
-                        # Authentication failures still trigger disconnect.
+                    def _failed_auth(
+                            self, *args: object, **kwargs: object) -> None:
                         self.disconnect()
 
-                targets = list(self.targets)
-                if not targets:
-                    # Default to notifying ourselves.
-                    targets = [self.config.jid]
+                targets = (
+                    list(self.targets) if self.targets else [self.config.jid])
+                roster_timeout = max(2.0, min(10.0, self.timeout / 3.0))
 
                 client = _Client(
                     self.config.jid,
@@ -206,7 +243,9 @@ class SlixmppSendOnceAdapter:
                     self.subject,
                     self.body,
                     self.before_message,
+                    roster_timeout,
                 )
+                shared["client"] = client
 
                 ssl_ctx = (
                     self._ssl_context(self.config.verify_certificate)
@@ -222,8 +261,7 @@ class SlixmppSendOnceAdapter:
                     ssl_context=ssl_ctx,
                 ):
                     self.logger.warning(
-                        "XMPP connection could not be established."
-                    )
+                        "XMPP connection could not be established.")
                     result[0] = False
                     return
 
@@ -240,22 +278,41 @@ class SlixmppSendOnceAdapter:
                 result[0] = False
 
             finally:
-                with contextlib.suppress(Exception):
-                    self._cancel_pending(loop)
-
-                with contextlib.suppress(Exception):
-                    loop.stop()
-
-                with contextlib.suppress(Exception):
-                    loop.close()
+                loop_obj = shared.get("loop")
+                if loop_obj is not None:
+                    loop = loop_obj  # type: ignore[assignment]
+                    with contextlib.suppress(Exception):
+                        self._cancel_pending(loop)
+                    with contextlib.suppress(Exception):
+                        loop.stop()
+                    with contextlib.suppress(Exception):
+                        loop.close()
 
                 done.set()
 
         t = threading.Thread(target=runner, name="apprise-xmpp", daemon=True)
         t.start()
 
-        # Bound the wait. If slixmpp hangs, we want a predictable timeout.
-        # Use Apprise's request_timeout as a rough ceiling (in seconds).
-        done.wait(timeout=max(5.0, self.timeout))
-        self._ok = bool(result[0])
-        return self._ok
+        if not done.wait(timeout=self.timeout):
+            self.logger.warning(
+                "XMPP send timed out after %.2fs.", self.timeout)
+            result[0] = False
+
+            loop_obj = shared.get("loop")
+            client_obj = shared.get("client")
+
+            if loop_obj is not None:
+                loop = loop_obj  # type: ignore[assignment]
+                try:
+                    if client_obj is not None:
+                        client = client_obj  # type: ignore[assignment]
+                        loop.call_soon_threadsafe(client.disconnect)
+                except Exception:
+                    pass
+
+                with contextlib.suppress(Exception):
+                    loop.call_soon_threadsafe(loop.stop)
+
+            t.join(timeout=0.25)
+
+        return bool(result[0])

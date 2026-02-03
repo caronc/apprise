@@ -47,19 +47,27 @@ from typing import Any, Optional
 from ...common import NotifyType
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_bool, parse_list
+from ...utils.parse import parse_list
 from ..base import NotifyBase
 from .adapter import (
     SLIXMPP_SUPPORT_AVAILABLE,
-    SlixmppSendOnceAdapter,
+    SlixmppAdapter,
     XMPPConfig,
 )
 
-# Basic, intentionally permissive JID check:
-# - no whitespace
-# - must contain at least one non-separator character
-IS_JID = re.compile(r"^[^\s]+$")
-
+# A pragmatic, "hardened" JID validator intended for Apprise URLs.
+#
+# - Supports: local@domain and local@domain/resource
+# - Rejects whitespace anywhere
+# - Rejects missing local or domain
+# - Rejects '@' in the domain component
+#
+# This does not try to fully implement RFC 7622. The goal is to catch bad
+# inputs early and reliably while still supporting common JID patterns.
+IS_JID = re.compile(
+    r"^\s*(?P<local>[^@\s/]+)((@|%40)"
+    r"(?P<domain>[^@\s/]+))?(?:(/|%2F)(?P<resource>[^%/\s]+)((/|%2F).*)?)?\s*$"
+)
 
 class NotifyXMPP(NotifyBase):
     """Send notifications via XMPP using Slixmpp."""
@@ -113,7 +121,7 @@ class NotifyXMPP(NotifyBase):
                 "max": 65535,
             },
             "user": {
-                "name": _("JID"),
+                "name": _("User"),
                 "type": "string",
                 "required": True,
             },
@@ -134,19 +142,12 @@ class NotifyXMPP(NotifyBase):
         NotifyBase.template_args,
         **{
             "to": {"alias_of": "targets"},
-            "verify": {
-                "name": _("Verify Certificate"),
-                "type": "bool",
-                "default": True,
-                "map_to": "verify_certificate",
-            },
         },
     )
 
     def __init__(
         self,
         targets: Optional[list[str]] = None,
-        verify_certificate: bool | None = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -154,34 +155,24 @@ class NotifyXMPP(NotifyBase):
         # The base class sets `self.secure` based on the schema.
         self.secure = bool(getattr(self, "secure", False))
 
-        # Verify certificate controls TLS validation in secure mode.
-        if verify_certificate is None:
-            verify_certificate = self.template_args["verify"]["default"]
-        self.verify_certificate = parse_bool(verify_certificate)
+        try:
+            self.jid = self.normalize_jid(self.user or "", self.host)
 
-        # Apprise gives us user/password/host/port already.
-        # For XMPP, user is the sender JID.
-        user = (self.user or "").strip()
-        # Apprise URLs split the JID across user@host. If the user part
-        # does not contain "@", then infer the domain from host.
-        self.jid = user if "@" in user else f"{user}@{self.host}"
-        if not self.jid or not IS_JID.match(self.jid):
+        except ValueError:
             msg = f"An invalid XMPP JID ({self.user}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise TypeError(msg) from None
 
         self.targets: list[str] = []
         for target in parse_list(targets):
-            jid = (target or "").strip()
-            if not jid or not IS_JID.match(jid):
+            try:
+                jid = self.normalize_jid(target or "", self.host)
+
+            except ValueError:
                 self.logger.warning(
                     "Dropped invalid XMPP target (%s).", target)
                 continue
             self.targets.append(jid)
-
-    def __len__(self) -> int:
-        """Return the number of outbound connections this config performs."""
-        return max(1, len(self.targets) if self.targets else 1)
 
     @property
     def url_identifier(self) -> tuple[str, str, str, str, int | None]:
@@ -193,10 +184,9 @@ class NotifyXMPP(NotifyBase):
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Return the URL representation of this notification."""
-        params: dict[str, Any] = {
-            "verify": self.verify_certificate,
-        }
-        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Initialize our parameters
+        params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         auth = "{user}:{password}@".format(
             user=self.quote(self.jid, safe=""),
@@ -218,20 +208,19 @@ class NotifyXMPP(NotifyBase):
         port_str = "" if port == default_port else f":{port}"
 
         schema = self.secure_protocol if self.secure else self.protocol
+
+        # Targets can contain '/' as a resource separator, so ensure it is
+        # always percent-encoded in the path (otherwise Apprise will split it).
         targets = "/".join(self.quote(t, safe="") for t in self.targets)
 
-        query = self.urlencode(params)
-        base = "{schema}://{auth}{host}{port}".format(
+        return "{schema}://{auth}{host}{port}/{targets}?{params}".format(
             schema=schema,
             auth=auth,
             host=self.host,
             port=port_str,
+            targets=targets,
+            params=self.urlencode(params),
         )
-
-        if targets:
-            base = f"{base}/{targets}"
-
-        return base if not query else f"{base}?{query}"
 
     def send(
         self,
@@ -250,7 +239,7 @@ class NotifyXMPP(NotifyBase):
 
         self.throttle()
 
-        cfg = XMPPConfig(
+        config = XMPPConfig(
             jid=self.jid,
             password=self.password or "",
             host=self.host,
@@ -259,17 +248,46 @@ class NotifyXMPP(NotifyBase):
             verify_certificate=self.verify_certificate,
         )
 
-        adapter = SlixmppSendOnceAdapter(
-            config=cfg,
-            targets=list(self.targets),
-            body=body,
+        adapter = SlixmppAdapter(
+            config=config,
+            targets=self.targets,
             subject=title,
+            body=body,
             timeout=self.socket_connect_timeout,
-            before_message=None,
-            logger=self.logger,
         )
 
         return adapter.process()
+
+    @staticmethod
+    def normalize_jid(value: str, default_host: str) -> str:
+        """Normalize and validate a JID.
+
+        Behaviour:
+        - If value is 'user' then it becomes 'user@default_host'.
+        - If value is 'user@host' then it becomes 'user@host'.
+        - If value is 'user@host/resource' then it becomes
+           'user@host/resource'.
+        - If value is 'user/resource' then it becomes
+           'user@default_host/resource'.
+        - If value already contains '@', it is used as-is, including an
+           optional '/resource' suffix.
+        """
+        raw = (value or "").strip()
+        if not raw:
+            raise ValueError("Empty JID")
+
+        results = IS_JID.match(value)
+        if not results:
+            raise ValueError("Invalid JID")
+
+        host = default_host \
+            if not results.group("domain") else results.group("domain")
+
+        jid = f"{results.group('local')}@{host}"
+        if results.group("resource"):
+            jid = f"{jid}/{results.group('resource')}"
+
+        return jid
 
     @staticmethod
     def parse_url(url: str) -> Optional[dict[str, Any]]:
@@ -279,7 +297,9 @@ class NotifyXMPP(NotifyBase):
             return None
 
         # Targets from path
-        results["targets"] = NotifyXMPP.split_path(results.get("fullpath"))
+        results["targets"] = [
+            NotifyXMPP.unquote(t)
+            for t in NotifyXMPP.split_path(results.get("fullpath"))]
 
         qd = results.get("qsd", {})
 
@@ -288,9 +308,5 @@ class NotifyXMPP(NotifyBase):
             results["targets"] += NotifyXMPP.parse_list(
                 NotifyXMPP.unquote(qd.get("to"))
             )
-
-        # verify=
-        if "verify" in qd:
-            results["verify_certificate"] = parse_bool(qd.get("verify"))
 
         return results
