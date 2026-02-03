@@ -25,7 +25,25 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""IRC protocol parsing helpers."""
+"""IRC protocol parsing helpers.
+
+This module contains *pure* helpers used by the IRC client/state machine.
+
+Design goals:
+- Be conservative: parse only what we need for reliability.
+- Avoid RFC rabbit holes: implement RFC 1459-ish behaviour for numerics,
+  PING/PONG, JOIN detection, and channel normalisation.
+- Keep parsing side-effect free: no state mutations happen here.
+
+Terminology refresher (IRC line shape, simplified):
+    [":" <prefix> <SPACE>] <command> <params> [":" <trailing>]
+
+Examples:
+    :server.example 001 nick :Welcome to the network
+    PING :123456
+    :nick!user@host JOIN :#channel
+    :server 366 nick #channel :End of /NAMES list.
+"""
 
 from __future__ import annotations
 
@@ -35,7 +53,22 @@ from ...compat import dataclass_compat as dataclass
 
 
 class IRCAuthMode:
-    """IRC authentication mode."""
+    """IRC authentication mode.
+
+    The IRC plugin uses a small set of authentication strategies, selected
+    by URL parsing logic. These values are treated as constants and are used
+    by the client (connection setup) rather than by the parsing/state code.
+
+    NONE
+        No authentication.
+    SERVER
+        Use PASS <password> during registration.
+    NICKSERV
+        Authenticate after registration via NickServ IDENTIFY.
+    ZNC
+        Connect to a ZNC bouncer and presume registration is already handled.
+        In this mode, the client generally avoids emitting registration flows.
+    """
 
     # No authentication
     NONE = "none"
@@ -60,7 +93,25 @@ IRC_AUTH_MODES = (
 
 @dataclass(frozen=True, slots=True)
 class IRCMessage:
-    """A parsed IRC line."""
+    """A parsed IRC line.
+
+    raw
+        The line as received (minus CRLF).
+    prefix
+        Optional prefix (nick/server). Examples:
+            server.example
+            nick!user@host
+    command
+        The IRC command, for example: PRIVMSG, JOIN, PING, or a numeric string.
+    params
+        A tuple of middle parameters (space separated).
+    trailing
+        The trailing parameter (after ' :'), which may contain spaces.
+
+    Notes on numerics:
+        Numeric replies are three digits as a string. This helper provides
+        a .numeric property that returns an int, or None when not numeric.
+    """
 
     raw: str
     prefix: Optional[str]
@@ -70,23 +121,41 @@ class IRCMessage:
 
     @property
     def numeric(self) -> Optional[int]:
+        """Return numeric reply code as int when command is a 3-digit
+        string."""
         if self.command.isdigit() and len(self.command) == 3:
             return int(self.command)
         return None
 
 
 def parse_irc_line(line: str) -> IRCMessage:
-    """Parse an IRC line per RFC 1459-ish rules (sufficient for numerics)."""
+    """Parse an IRC line into its components.
+
+    This is intentionally tolerant and small, but sufficient for:
+    - detecting PINGs (command == 'PING')
+    - reading common numeric replies (001, 376/422, 366, error codes)
+    - identifying JOIN completion
+    - extracting the welcome nick from 001
+
+    The parser follows the usual IRC split rules:
+    - prefix is optional and begins with ':' at the start of the line
+    - trailing is optional and begins with ' :' and consumes the remainder
+    - params are any remaining space-delimited tokens after command
+    """
     raw = line.rstrip("\r\n")
     prefix: Optional[str] = None
     trailing: Optional[str] = None
 
     s = raw
+
+    # Prefix is only present at the beginning of the message.
     if s.startswith(":"):
         parts = s[1:].split(" ", 1)
         prefix = parts[0] if parts else None
         s = parts[1] if len(parts) > 1 else ""
 
+    # Trailing is indicated by " :"; it may contain spaces and consumes the
+    # rest.
     if " :" in s:
         before, after = s.split(" :", 1)
         trailing = after
@@ -106,17 +175,19 @@ def parse_irc_line(line: str) -> IRCMessage:
 
 
 def is_ping(msg: IRCMessage) -> bool:
+    """True when message is a PING request."""
     return msg.command.upper() == "PING"
 
 
 def ping_payload(msg: IRCMessage) -> str:
+    """Extract the payload to use when responding to a PING."""
     if msg.trailing is not None:
         return msg.trailing
     return msg.params[0] if msg.params else ""
 
 
 def extract_welcome_nick(msg: IRCMessage) -> Optional[str]:
-    """Extract the nickname from 001 welcome message."""
+    """Extract the nickname from the numeric 001 (welcome) message."""
     if msg.numeric != 1:
         return None
     if msg.params:
@@ -125,6 +196,7 @@ def extract_welcome_nick(msg: IRCMessage) -> Optional[str]:
 
 
 def normalise_channel(name: str) -> str:
+    """Normalise a channel name to include '#'."""
     name = name.strip()
     if not name:
         return name

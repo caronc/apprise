@@ -27,8 +27,14 @@
 
 """IRC State Machine.
 
-This is intentionally small: it focuses on registration, nickname collision
-handling, join completion, and keeping the connection alive (PING/PONG).
+The client reads IRC lines, parses them into :class:`IRCMessage`, and feeds
+them into :meth:`IRCStateMachine.on_message`. The return value is a list of
+:class:`IRCAction` objects that describe what the client should do next.
+
+Responsibilities:
+- Client: I/O (socket), PING/PONG, retries/backoff, timeouts.
+- State machine: registration/join progress, mapping known numeric errors
+  to a terminal failure, tracking accepted nick, tracking joined channels.
 """
 
 from __future__ import annotations
@@ -42,6 +48,8 @@ from .protocol import IRCMessage, extract_welcome_nick
 
 
 class IRCState(Enum):
+    """High-level connection state."""
+
     DISCONNECTED = auto()
     REGISTERING = auto()
     READY = auto()
@@ -51,6 +59,8 @@ class IRCState(Enum):
 
 
 class IRCActionKind(Enum):
+    """Action returned by the state machine."""
+
     SEND = auto()
     FAIL = auto()
     NOOP = auto()
@@ -58,6 +68,8 @@ class IRCActionKind(Enum):
 
 @dataclass(frozen=True, slots=True)
 class IRCAction:
+    """Represents the next step for the client."""
+
     kind: IRCActionKind
     line: Optional[str] = None
     reason: Optional[str] = None
@@ -65,6 +77,8 @@ class IRCAction:
 
 @dataclass(slots=True)
 class IRCContext:
+    """Mutable context shared between client and state machine."""
+
     desired_nick: str
     accepted_nick: str
     fullname: str
@@ -76,6 +90,7 @@ class IRCContext:
 
 
 def _err(msg: IRCMessage) -> str:
+    """Build a human readable error message from an IRC message."""
     if msg.trailing:
         return msg.trailing
     return " ".join(msg.params) if msg.params else "IRC error"
@@ -107,6 +122,7 @@ class IRCStateMachine:
         self.state: IRCState = IRCState.DISCONNECTED
 
     def start_registration(self) -> list[IRCAction]:
+        """Begin registration by emitting PASS/NICK/USER as required."""
         self.state = IRCState.REGISTERING
         out: list[IRCAction] = []
         if self.ctx.password:
@@ -123,6 +139,7 @@ class IRCStateMachine:
         return out
 
     def on_message(self, msg: IRCMessage) -> list[IRCAction]:
+        """Process an inbound IRC message and emit next actions."""
         if self.state in (IRCState.ERROR, IRCState.QUITTING):
             return []
 
@@ -185,6 +202,7 @@ class IRCStateMachine:
 
     def request_join(
             self, channel: str, key: Optional[str] = None) -> list[IRCAction]:
+        """Request a channel join and enter JOINING state."""
         self.state = IRCState.JOINING
 
         if key:
@@ -193,5 +211,6 @@ class IRCStateMachine:
         return [IRCAction(IRCActionKind.SEND, line=f"JOIN {channel}")]
 
     def request_quit(self, message: str) -> list[IRCAction]:
+        """Request a quit and enter QUITTING state."""
         self.state = IRCState.QUITTING
         return [IRCAction(IRCActionKind.SEND, line=f"QUIT :{message}")]
