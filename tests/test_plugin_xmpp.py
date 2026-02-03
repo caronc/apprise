@@ -41,7 +41,8 @@ from typing import Any
 
 import pytest
 
-from apprise.plugins.xmpp import adapter as xmpp_adapter
+from apprise import Apprise, NotifyType
+from apprise.plugins.xmpp import adapter as xmpp_adapter, base as xmpp_base
 from apprise.plugins.xmpp.base import NotifyXMPP
 
 # ---------------------------------------------------------------------------
@@ -195,6 +196,114 @@ def test_xmpp_parse_url_to() -> None:
     )
     assert sorted(r["targets"]) == ["a@example.com", "b@example.net"]
 
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_invalid_targets_logged(
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture) -> None:
+    """Invalid XMPP targets are dropped with a warning."""
+
+    caplog.set_level(logging.WARNING)
+
+    # parse_list() tokenises on whitespace, so it is difficult to naturally
+    # feed a whitespace-containing value through.  Patch parse_list() to
+    # return a value that will fail IS_JID validation.
+    monkeypatch.setattr(
+        xmpp_base,
+        "parse_list",
+        lambda _v: ["bad jid", "ok@example.com"],
+        raising=True,
+    )
+
+    n = NotifyXMPP(
+        host="example.com",
+        user="me@example.com",
+        password="x",
+        targets=["ignored"],
+    )
+
+    assert n.targets == ["ok@example.com"]
+    assert "Dropped invalid XMPP target" in caplog.text
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_url_identifier_is_accessible() -> None:
+    """url_identifier property should be accessible and stable."""
+    n = NotifyXMPP(
+        host="example.com", user="me@example.com", password="secret")
+    schema, host, user, password, port = n.url_identifier
+    assert schema == "xmpp"
+    assert host == "example.com"
+    assert user == "me@example.com"
+    assert password == "secret"
+    assert port is None
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_url_no_targets_branch() -> None:
+    """url() must not append a path when there are no targets."""
+    apobj = Apprise()
+    apobj.add("xmpp://me:secret@example.com?verify=no")
+
+    assert len(apobj) == 1
+    plugin = apobj[0]
+
+    # Ensure we hit the url() branch where targets is empty.
+    u = plugin.url(privacy=False)
+    assert "example.com/" not in u
+    assert "example.com?" in u
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_parse_url_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
+    """parse_url() returns None when NotifyBase.parse_url() fails."""
+
+    monkeypatch.setattr(
+        xmpp_base.NotifyBase,
+        "parse_url",
+        lambda *_args, **_kwargs: None,
+        raising=True,
+    )
+    assert NotifyXMPP.parse_url("xmpp://bad") is None
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_apprise_notify_invokes_adapter(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """Exercise the Apprise.notify() workflow while mocking network I/O."""
+
+    captured: dict[str, Any] = {}
+
+    class _Adapter:
+        def __init__(
+            self,
+            config: xmpp_adapter.XMPPConfig,
+            targets: list[str],
+            body: str,
+            subject: str,
+            timeout: float,
+            before_message: Any,
+            logger: logging.Logger,
+        ) -> None:
+            captured["targets"] = targets
+            captured["body"] = body
+            captured["subject"] = subject
+
+        def process(self) -> bool:
+            return True
+
+    monkeypatch.setattr(
+        xmpp_base, "SlixmppSendOnceAdapter", _Adapter, raising=True)
+
+    apobj = Apprise()
+    apobj.add("xmpp://me:secret@example.com/a@example.com")
+
+    assert apobj.notify(
+        "hello", title="subject", notify_type=NotifyType.INFO) is True
+    assert captured["targets"] == ["a@example.com"]
+    assert captured["subject"] == "subject"
+    assert "hello" in captured["body"]
+
+
 
 # ---------------------------------------------------------------------------
 # Adapter tests
@@ -343,3 +452,71 @@ def test_xmpp_process_exception(
     a = xmpp_adapter.SlixmppSendOnceAdapter(
         cfg, ["a@example.com"], "b", "s", 1)
     assert a.process() is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_process_before_message(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Ensure before_message callback is invoked for each target."""
+    install_fake_slixmpp(monkeypatch)
+
+    called: list[int] = []
+
+    def before_message() -> None:
+        called.append(1)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5223,
+        secure=True,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppSendOnceAdapter(
+        cfg,
+        ["a@example.com", "b@example.com"],
+        "b",
+        "s",
+        1,
+        before_message=before_message,
+    )
+    assert a.process() is True
+    assert len(called) == 2
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_process_failed_auth_disconnect(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """Authentication failure path must still call disconnect()."""
+    install_fake_slixmpp(monkeypatch)
+
+    # Force the FakeClientXMPP.process() method to trigger the failed_auth
+    # handler.
+    def process_failed_auth(
+            self: FakeClientXMPP, forever: bool = False) -> None:
+        handler = self.handlers.get("failed_auth")
+        if handler:
+            handler()
+
+    monkeypatch.setattr(
+        FakeClientXMPP, "process", process_failed_auth, raising=True)
+
+    disconnected = {"called": False}
+
+    def disconnect(self: FakeClientXMPP) -> None:
+        disconnected["called"] = True
+
+    monkeypatch.setattr(FakeClientXMPP, "disconnect", disconnect, raising=True)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5223,
+        secure=True,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppSendOnceAdapter(
+        cfg, ["a@example.com"], "b", "s", 1)
+    assert a.process() is True
+    assert disconnected["called"] is True

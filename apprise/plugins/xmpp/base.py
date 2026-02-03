@@ -151,11 +151,6 @@ class NotifyXMPP(NotifyBase):
     ) -> None:
         super().__init__(**kwargs)
 
-        if not SLIXMPP_SUPPORT_AVAILABLE:
-            msg = "slixmpp is not installed"
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
         # The base class sets `self.secure` based on the schema.
         self.secure = bool(getattr(self, "secure", False))
 
@@ -164,17 +159,12 @@ class NotifyXMPP(NotifyBase):
             verify_certificate = self.template_args["verify"]["default"]
         self.verify_certificate = parse_bool(verify_certificate)
 
-        # Port handling
-        if not isinstance(self.port, int):
-            self.port = (
-                self.default_secure_port
-                if self.secure
-                else self.default_insecure_port
-            )
-
         # Apprise gives us user/password/host/port already.
         # For XMPP, user is the sender JID.
-        self.jid = (self.user or "").strip()
+        user = (self.user or "").strip()
+        # Apprise URLs split the JID across user@host. If the user part
+        # does not contain "@", then infer the domain from host.
+        self.jid = user if "@" in user else f"{user}@{self.host}"
         if not self.jid or not IS_JID.match(self.jid):
             msg = f"An invalid XMPP JID ({self.user}) was specified."
             self.logger.warning(msg)
@@ -194,7 +184,7 @@ class NotifyXMPP(NotifyBase):
         return max(1, len(self.targets) if self.targets else 1)
 
     @property
-    def url_identifier(self) -> tuple[str, str, str, str, bool]:
+    def url_identifier(self) -> tuple[str, str, str, str, int | None]:
         """Return the pieces that uniquely identify this configuration."""
         return (
             self.secure_protocol if self.secure else self.protocol,
@@ -252,20 +242,19 @@ class NotifyXMPP(NotifyBase):
     ) -> bool:
         """Send a notification to one or more XMPP targets."""
 
-        self.throttle()
-
-        subject = (title or "").strip()
-        message = self.msg_prepare(
-            body if not subject else f"{subject}\n{body}",
-            notify_type=notify_type,
-            allow_html=False,
+        default_port = (
+            self.default_secure_port
+            if self.secure
+            else self.default_insecure_port
         )
+
+        self.throttle()
 
         cfg = XMPPConfig(
             jid=self.jid,
             password=self.password or "",
             host=self.host,
-            port=int(self.port),
+            port=self.port if self.port else default_port,
             secure=self.secure,
             verify_certificate=self.verify_certificate,
         )
@@ -273,9 +262,9 @@ class NotifyXMPP(NotifyBase):
         adapter = SlixmppSendOnceAdapter(
             config=cfg,
             targets=list(self.targets),
-            body=message,
-            subject=subject,
-            timeout=float(self.request_timeout or 30.0),
+            body=body,
+            subject=title,
+            timeout=self.socket_connect_timeout,
             before_message=None,
             logger=self.logger,
         )
