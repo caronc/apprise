@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import ssl
 import threading
 import time
@@ -118,6 +119,10 @@ def bridge_slixmpp_logging() -> None:
 
 class SlixmppAdapter:
     """Send a message to one or more targets, then disconnect."""
+
+    # Define a Slixmpp reference version to prevent this tool from working
+    # under non-supported versions
+    _supported_version = (1, 10, 0)
 
     # Flag to control if we are enabled or not
     # effectively.. .is the dependent slixmpp library available to us
@@ -359,3 +364,34 @@ class SlixmppAdapter:
             t.join(timeout=0.25)
 
         return bool(result[0])
+
+    @staticmethod
+    def package_dependency():
+        """
+        Defines our static dependency for this adapter to work
+        """
+        version = ".".join([str(v) for v in SlixmppAdapter._supported_version])
+        return f"slixmpp >= {version}"
+
+    @staticmethod
+    def supported_version(version: Optional[str] = None) -> bool:
+        """
+        Returns true if we currently have a version of Slixmpp supported
+
+        Provided string describes a version in format of major.minor.patch
+
+        """
+        if SLIXMPP_SUPPORT_AVAILABLE:
+            m = re.match(
+                r"^(?P<major>\d+)(\.(?P<minor>\d+)(\.(?P<patch>\d+))?)?",
+                version or getattr(slixmpp, "__version__", "") or "")
+            if not m:
+                return False
+
+            return (
+                int(m.group("major")),
+                int(m.group("minor") or 0),
+                int(m.group("patch") or 0)
+            ) >= SlixmppAdapter._supported_version
+
+        return False

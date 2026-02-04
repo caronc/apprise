@@ -63,11 +63,11 @@ class NotifyXMPP(NotifyBase):
     """Send notifications via XMPP using Slixmpp."""
 
     # Set our global enabled flag
-    enabled = SLIXMPP_SUPPORT_AVAILABLE
+    enabled = SLIXMPP_SUPPORT_AVAILABLE and SlixmppAdapter._enabled
 
     requirements = {
         # Define our required packaging in order to work
-        "packages_required": "slixmpp >= 1.10.0"
+        "packages_required": SlixmppAdapter.package_dependency(),
     }
 
     # The default descriptive name associated with the Notification
