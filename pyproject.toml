@@ -229,7 +229,7 @@ all-plugins = [
     "smpplib",
 
     # For xmpp:// support
-    "slixmpp",
+    "slixmpp >= 1.10.0",
 ]
 windows = [
     "pywin32",

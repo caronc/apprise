@@ -25,19 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""XMPP Notifications.
-
-This is intentionally minimal:
-- One connection per notification send.
-- No exposed XEP/plugin flags.
-- Targets are JIDs provided in the path (and via to=).
-
-Notes about JIDs in paths:
-- XMPP resources use '/', which is also the Apprise path separator.
-- If you need to target a resource, percent-encode the slash as '%2F'.
-  Example: xmpp://user:pass@host/alice@example.com%2Fphone
-
-"""
+"""XMPP Notifications"""
 
 from __future__ import annotations
 
@@ -54,6 +42,7 @@ from .adapter import (
     SlixmppAdapter,
     XMPPConfig,
 )
+from .common import SECURE_MODES, SecureXMPPMode
 
 # A pragmatic, "hardened" JID validator intended for Apprise URLs.
 #
@@ -69,6 +58,7 @@ IS_JID = re.compile(
     r"(?P<domain>[^@\s/]+))?(?:(/|%2F)(?P<resource>[^%/\s]+)((/|%2F).*)?)?\s*$"
 )
 
+
 class NotifyXMPP(NotifyBase):
     """Send notifications via XMPP using Slixmpp."""
 
@@ -77,7 +67,7 @@ class NotifyXMPP(NotifyBase):
 
     requirements = {
         # Define our required packaging in order to work
-        "packages_required": "slixmpp"
+        "packages_required": "slixmpp >= 1.10.0"
     }
 
     # The default descriptive name associated with the Notification
@@ -142,12 +132,20 @@ class NotifyXMPP(NotifyBase):
         NotifyBase.template_args,
         **{
             "to": {"alias_of": "targets"},
+            "mode": {
+                "name": _("Secure Mode"),
+                "type": "choice:string",
+                "values": SECURE_MODES,
+                "default": SecureXMPPMode.STARTTLS,
+                "map_to": "secure_mode",
+            },
         },
     )
 
     def __init__(
         self,
         targets: Optional[list[str]] = None,
+        secure_mode: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -174,6 +172,26 @@ class NotifyXMPP(NotifyBase):
                 continue
             self.targets.append(jid)
 
+        if isinstance(secure_mode, str) and secure_mode.strip():
+            self.secure_mode = secure_mode.strip().lower()
+            self.secure_mode = next(
+                (k for k in SECURE_MODES
+                 if k.startswith(self.secure_mode)), None
+            )
+            if self.secure_mode not in SECURE_MODES:
+                msg = (
+                    "The XMPP secure mode specified "
+                    f"({secure_mode}) is invalid.")
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        else:
+            self.secure_mode = (
+                SecureXMPPMode.NONE
+                if not self.secure
+                else self.template_args["mode"]["default"]
+            )
+
     @property
     def url_identifier(self) -> tuple[str, str, str, str, int | None]:
         """Return the pieces that uniquely identify this configuration."""
@@ -186,7 +204,12 @@ class NotifyXMPP(NotifyBase):
         """Return the URL representation of this notification."""
 
         # Initialize our parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        params = {
+            "mode": self.secure_mode
+        }
+
+        # Extend our parameters
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         auth = "{user}:{password}@".format(
             user=self.quote(self.jid, safe=""),
@@ -244,8 +267,19 @@ class NotifyXMPP(NotifyBase):
             password=self.password or "",
             host=self.host,
             port=self.port if self.port else default_port,
-            secure=self.secure,
+            secure=self.secure_mode,
             verify_certificate=self.verify_certificate,
+        )
+
+        self.logger.debug(
+            "XMPP init: jid=%s host=%s port=%d mode=%s "
+            "verify_certificate=%s targets=%s",
+            self.jid,
+            config.host,
+            config.port,
+            config.secure,
+            config.verify_certificate,
+            self.targets,
         )
 
         adapter = SlixmppAdapter(
@@ -308,5 +342,9 @@ class NotifyXMPP(NotifyBase):
             results["targets"] += NotifyXMPP.parse_list(
                 NotifyXMPP.unquote(qd.get("to"))
             )
+
+        if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
+            # Extract the secure mode to over-ride the default
+            results["secure_mode"] = results["qsd"]["mode"].lower()
 
         return results

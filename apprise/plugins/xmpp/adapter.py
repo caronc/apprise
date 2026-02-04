@@ -36,11 +36,13 @@ import contextlib
 import logging
 import ssl
 import threading
+import time
 from typing import Callable, Optional
 
 import certifi
 
 from ...compat import dataclass_compat as dataclass
+from .common import SECURE_MODES, SecureXMPPMode
 
 # Default our global support flag
 SLIXMPP_SUPPORT_AVAILABLE = False
@@ -65,7 +67,7 @@ class XMPPConfig:
     port: int
     jid: str
     password: str
-    secure: bool = False
+    secure: str = SecureXMPPMode.STARTTLS
     verify_certificate: bool = True
 
 
@@ -144,6 +146,7 @@ class SlixmppAdapter:
 
     @staticmethod
     def _ssl_context(verify_certificate: bool) -> ssl.SSLContext:
+        """Build a certificate-verifying SSL context (or not)."""
         ctx = ssl.create_default_context(cafile=certifi.where())
         if not verify_certificate:
             ctx.check_hostname = False
@@ -172,6 +175,9 @@ class SlixmppAdapter:
         shared: dict[str, object] = {"loop": None, "client": None}
 
         def runner() -> None:
+            loop: asyncio.AbstractEventLoop | None = None
+            start = time.monotonic()
+
             try:
                 loop = asyncio.new_event_loop()
                 asyncio.set_event_loop(loop)
@@ -245,31 +251,68 @@ class SlixmppAdapter:
                     self.before_message,
                     roster_timeout,
                 )
+
                 shared["client"] = client
 
-                ssl_ctx = (
-                    self._ssl_context(self.config.verify_certificate)
-                    if self.config.secure
-                    else None
-                )
+                # Prevent Slixmpp from owning loop lifecycle
+                with contextlib.suppress(Exception):
+                    client.loop = loop
 
-                # connect() returns False if connection could not be started.
-                if not client.connect(
-                    address=(self.config.host, self.config.port),
-                    use_ssl=self.config.secure,
-                    use_tls=False,
-                    ssl_context=ssl_ctx,
-                ):
+                # Resolve connection behaviour from secure mode
+                mode = self.config.secure
+                mode_cfg = SECURE_MODES.get(mode)
+                if not mode_cfg:
+                    raise ValueError(f"Unsupported XMPP secure mode: {mode}")
+
+                client.enable_plaintext = bool(mode_cfg["enable_plaintext"])
+                client.enable_starttls = bool(mode_cfg["enable_starttls"])
+                client.enable_direct_tls = bool(mode_cfg["enable_direct_tls"])
+
+                # Only attach an SSL context when TLS may be used
+                if not client.enable_plaintext:
+                    client.ssl_context = \
+                        self._ssl_context(self.config.verify_certificate)
+
+                # Slixmpp >= 1.10.0 connect() returns a Future.
+                connect_timeout = max(3.0, min(15.0, self.timeout / 3.0))
+                connect_fut = client.connect(
+                    host=self.config.host, port=self.config.port)
+
+                try:
+                    loop.run_until_complete(
+                        asyncio.wait_for(connect_fut, timeout=connect_timeout)
+                    )
+                except asyncio.TimeoutError:
                     self.logger.warning(
-                        "XMPP connection could not be established.")
+                        "XMPP connect timed out after %.2fs", connect_timeout)
                     result[0] = False
                     return
 
-                # process() blocks until disconnected.
-                client.process(forever=False)
+                except Exception as e:
+                    self.logger.debug("XMPP connect failed: %s", e)
+                    result[0] = False
+                    return
 
-                # If we got this far, we consider it an OK send attempt.
-                # Slixmpp does not provide an explicit delivery receipt.
+                # Run until disconnected, but still respect our overall
+                # timeout.
+                elapsed = time.monotonic() - start
+                remaining = max(0.0, self.timeout - elapsed)
+                run_timeout = max(1.0, remaining)
+
+                try:
+                    loop.run_until_complete(
+                        asyncio.wait_for(
+                            client.disconnected, timeout=run_timeout))
+
+                except asyncio.TimeoutError:
+                    self.logger.warning(
+                        "XMPP session timed out after %.2fs", run_timeout)
+
+                    with contextlib.suppress(Exception):
+                        client.disconnect()
+                    result[0] = False
+                    return
+
                 result[0] = True
 
             except Exception as e:  # pragma: no cover

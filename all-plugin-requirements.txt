@@ -21,4 +21,4 @@ PGPy
 smpplib
 
 # For xmpp:// support
-slixmpp
+slixmpp >= 1.10.0
