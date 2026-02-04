@@ -124,9 +124,9 @@ def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
 # ---------------------------------------------------------------------------
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
-def test_xmpp_import_error() -> None:
-    with pytest.raises(TypeError):
-        NotifyXMPP(host="example.com", user="me@example.com", password="x")
+def test_slixmpp_unavailable() -> None:
+    obj=NotifyXMPP(host="example.com", user="me@example.com", password="x")
+    assert obj.send("will fail") is False
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
