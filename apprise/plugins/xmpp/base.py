@@ -85,10 +85,6 @@ class NotifyXMPP(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/xmpp/"
 
-    # Default Ports
-    default_insecure_port = 5222
-    default_secure_port = 5223
-
     templates = (
         "{schema}://{user}:{password}@{host}",
         "{schema}://{user}:{password}@{host}:{port}",
@@ -149,9 +145,6 @@ class NotifyXMPP(NotifyBase):
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
-
-        # The base class sets `self.secure` based on the schema.
-        self.secure = bool(getattr(self, "secure", False))
 
         try:
             self.jid = self.normalize_jid(self.user or "", self.host)
@@ -234,12 +227,7 @@ class NotifyXMPP(NotifyBase):
             ),
         )
 
-        default_port = (
-            self.default_secure_port
-            if self.secure
-            else self.default_insecure_port
-        )
-
+        default_port = SECURE_MODES[self.secure_mode]["default_port"]
         port = self.port if isinstance(self.port, int) else default_port
         port_str = "" if port == default_port else f":{port}"
 
@@ -267,11 +255,7 @@ class NotifyXMPP(NotifyBase):
     ) -> bool:
         """Send a notification to one or more XMPP targets."""
 
-        default_port = (
-            self.default_secure_port
-            if self.secure
-            else self.default_insecure_port
-        )
+        default_port = SECURE_MODES[self.secure_mode]["default_port"]
 
         self.throttle()
 
