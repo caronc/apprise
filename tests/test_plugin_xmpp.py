@@ -1230,6 +1230,7 @@ def test_xmpp_process_session_timeout(
     assert "XMPP session timed out" in caplog.text
 
 
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_slixmpp_versioning(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     Simple checks to verify versioning works correctly
