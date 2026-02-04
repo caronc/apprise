@@ -152,6 +152,7 @@ The table below identifies the services this tool supports and some example serv
 | [WhatsApp](https://appriseit.com/services/whatsapp/) | whatsapp://  | (TCP) 443   | whatsapp://AccessToken@FromPhoneID/ToPhoneNo<br/>whatsapp://Template:AccessToken@FromPhoneID/ToPhoneNo
 | [WxPusher](https://appriseit.com/services/wxpusher/) | wxpusher://  | (TCP) 443   | wxpusher://AppToken@UserID1/UserID2/UserIDN<br/>wxpusher://AppToken@Topic1/Topic2/Topic3<br/>wxpusher://AppToken@UserID1/Topic1/
 | [XBMC](https://appriseit.com/services/xbmc/) | xbmc:// or xbmcs://    | (TCP) 8080 or 443   | xbmc://hostname<br />xbmc://user@hostname<br />xbmc://user:password@hostname:port
+| [XMPP](https://appriseit.com/services/xmpp/) | xmpp:// or xmpps://    | (TCP) 5222 or 5223   | xmpp://user:pass@hostname<br />xmpps://user:pass@hostname/jid<br />xmpps://user:pass@hostname/jid1/jid2@example.ca
 | [Zulip Chat](https://appriseit.com/services/zulip/) | zulip://  | (TCP) 443   | zulip://botname@Organization/Token<br />zulip://botname@Organization/Token/Stream<br />zulip://botname@Organization/Token/Email
 
 ## SMS Notifications

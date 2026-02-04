@@ -79,7 +79,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, `Twilio`, \
 `Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, `Vonage`, \
 `WebPush`, `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, `WxPusher`,
-and `XBMC`.}
+`XBMC`, `XMPP`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
 Version:        1.9.7
@@ -145,6 +145,7 @@ Requires: python3dist(certifi)
 Requires: python3dist(pyyaml)
 
 Recommends: python3dist(paho-mqtt)
+Recommends: python3dist(slixmpp)
 
 %if 0%{?legacy_python_build} == 0
 # Logic for non-RHEL ≤ 9 systems
