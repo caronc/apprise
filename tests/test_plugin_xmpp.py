@@ -290,6 +290,28 @@ def test_xmpp_url_handling() -> None:
     apobj = Apprise()
     assert apobj.add("xmpps://me:secret@example.com?mode=invalid") is False
 
+    # Ambiguous secure=true (xmpps://) and mode = none
+    apobj = Apprise()
+    assert apobj.add("xmpps://me:secret@example.com?mode=none") is True
+
+    assert len(apobj) == 1
+    plugin = apobj[0]
+
+    u = plugin.url(privacy=False)
+    # starttls (upgraded from none - most secure path)
+    assert "mode=starttls" in u
+
+    # Ambiguous secure=False (xmpp://) and mode != none
+    apobj = Apprise()
+    assert apobj.add("xmpp://me:secret@example.com?mode=tls") is True
+
+    assert len(apobj) == 1
+    plugin = apobj[0]
+
+    u = plugin.url(privacy=False)
+    # most secure path prevails
+    assert "mode=tls" in u
+
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_parse_url_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:

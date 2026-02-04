@@ -192,6 +192,19 @@ class NotifyXMPP(NotifyBase):
                 else self.template_args["mode"]["default"]
             )
 
+        if self.secure and self.secure_mode == SecureXMPPMode.NONE:
+            self.secure_mode = self.template_args["mode"]["default"]
+            self.logger.warning(
+                "Ambiguous XMPP configuration: secure=True and mode=None; "
+                f"secure setting prevails; setting mode={self.secure_mode}")
+
+        elif not self.secure and self.secure_mode != SecureXMPPMode.NONE:
+            self.logger.warning(
+                "Ambiguous XMPP configuration: secure=False and "
+                f"mode={self.secure_mode}; "
+                "mode setting prevails; setting secure=True")
+            self.secure = True
+
     @property
     def url_identifier(self) -> tuple[str, str, str, str, int | None]:
         """Return the pieces that uniquely identify this configuration."""
