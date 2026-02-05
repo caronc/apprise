@@ -341,12 +341,15 @@ def test_xmpp_apprise_notify_invokes_adapter(
             subject: str,
             body: str,
             timeout: float = 0.0,
+            roster: bool = False,
             before_message: Any = None,
             logger: logging.Logger | None = None,
+            **kwargs: Any,
         ) -> None:
             captured["targets"] = targets
             captured["body"] = body
             captured["subject"] = subject
+            captured["roster"] = roster
 
         def process(self) -> bool:
             return True
@@ -362,7 +365,6 @@ def test_xmpp_apprise_notify_invokes_adapter(
     assert captured["targets"] == ["a@example.com"]
     assert captured["subject"] == "subject"
     assert "hello" in captured["body"]
-
 
 
 # ---------------------------------------------------------------------------
@@ -489,6 +491,17 @@ def test_xmpp_process_success(monkeypatch: pytest.MonkeyPatch) -> None:
         subject="s",
         body="b",
         timeout=1.0,
+    )
+    assert a.process() is True
+
+    # Test with roster=True
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=["a@example.com"],
+        subject="s",
+        body="b",
+        timeout=1.0,
+        roster=True
     )
     assert a.process() is True
 
@@ -640,7 +653,6 @@ def test_xmpp_normalize_jid() -> None:
     with pytest.raises(ValueError):
         # Bad entry
         NotifyXMPP.normalize_jid("", "example.ca")
-
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")

@@ -136,6 +136,7 @@ class SlixmppAdapter:
         subject: str,
         body: str,
         timeout: float = 30.0,
+        roster: bool = False,
         before_message: Optional[Callable[[], None]] = None,
     ) -> None:
         self.config = config
@@ -143,6 +144,7 @@ class SlixmppAdapter:
         self.subject = subject
         self.body = body
         self.timeout = max(5.0, float(timeout))
+        self.roster = roster
         self.before_message = before_message
 
         self.logger = logging.getLogger("apprise.xmpp")
@@ -197,7 +199,7 @@ class SlixmppAdapter:
                         subject: str,
                         body: str,
                         before_message: Optional[Callable[[], None]],
-                        roster_timeout: float,
+                        roster_timeout: Optional[float] = None,
                     ) -> None:
                         super().__init__(jid, password)
                         self._targets = targets
@@ -219,11 +221,12 @@ class SlixmppAdapter:
                         try:
                             self.send_presence()
 
-                            with contextlib.suppress(Exception):
-                                await asyncio.wait_for(
-                                    self.get_roster(),
-                                    timeout=self._roster_timeout,
-                                )
+                            if self._roster_timeout:
+                                with contextlib.suppress(Exception):
+                                    await asyncio.wait_for(
+                                        self.get_roster(),
+                                        timeout=self._roster_timeout,
+                                    )
 
                             for target in self._targets:
                                 if self._before_message:
@@ -245,16 +248,19 @@ class SlixmppAdapter:
 
                 targets = (
                     list(self.targets) if self.targets else [self.config.jid])
-                roster_timeout = max(2.0, min(10.0, self.timeout / 3.0))
+
+                roster_timeout = \
+                    max(2.0, min(10.0, self.timeout / 3.0)) \
+                    if self.roster else None
 
                 client = _Client(
-                    self.config.jid,
-                    self.config.password,
-                    targets,
-                    self.subject,
-                    self.body,
-                    self.before_message,
-                    roster_timeout,
+                    jid=self.config.jid,
+                    password=self.config.password,
+                    targets=targets,
+                    subject=self.subject,
+                    body=self.body,
+                    before_message=self.before_message,
+                    roster_timeout=roster_timeout,
                 )
 
                 shared["client"] = client

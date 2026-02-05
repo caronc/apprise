@@ -135,6 +135,11 @@ class NotifyXMPP(NotifyBase):
                 "default": SecureXMPPMode.STARTTLS,
                 "map_to": "secure_mode",
             },
+            "roster": {
+                "name": _("Get Roster"),
+                "type": "bool",
+                "default": False,
+            },
         },
     )
 
@@ -142,6 +147,7 @@ class NotifyXMPP(NotifyBase):
         self,
         targets: Optional[list[str]] = None,
         secure_mode: Optional[str] = None,
+        roster: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -185,6 +191,12 @@ class NotifyXMPP(NotifyBase):
                 else self.template_args["mode"]["default"]
             )
 
+        # Prepare our roster check
+        self.roster = (
+            self.template_args["roster"]["default"]
+            if roster is None else bool(roster)
+        )
+
         if self.secure and self.secure_mode == SecureXMPPMode.NONE:
             self.secure_mode = self.template_args["mode"]["default"]
             self.logger.warning(
@@ -211,7 +223,8 @@ class NotifyXMPP(NotifyBase):
 
         # Initialize our parameters
         params = {
-            "mode": self.secure_mode
+            "mode": self.secure_mode,
+            "roster": "yes" if self.roster else "no",
         }
 
         # Extend our parameters
@@ -270,12 +283,13 @@ class NotifyXMPP(NotifyBase):
 
         self.logger.debug(
             "XMPP init: jid=%s host=%s port=%d mode=%s "
-            "verify_certificate=%s targets=%s",
+            "verify_certificate=%s roster=%s targets=%s",
             self.jid,
             config.host,
             config.port,
             config.secure,
             config.verify_certificate,
+            "yes" if self.roster else "no",
             self.targets,
         )
 
@@ -285,6 +299,7 @@ class NotifyXMPP(NotifyBase):
             subject=title,
             body=body,
             timeout=self.socket_connect_timeout,
+            roster=self.roster,
         )
 
         return adapter.process()
