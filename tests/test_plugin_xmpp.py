@@ -146,7 +146,7 @@ def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
 def test_slixmpp_unavailable() -> None:
-    obj=NotifyXMPP(host="example.com", user="me@example.com", password="x")
+    obj = NotifyXMPP(host="example.com", user="me@example.com", password="x")
     assert obj.send("will fail") is False
 
 
@@ -220,6 +220,7 @@ def test_xmpp_parse_url_to() -> None:
         "xmpp://me:pass@example.com?to=a@example.com,b@example.net"
     )
     assert sorted(r["targets"]) == ["a@example.com", "b@example.net"]
+
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_invalid_targets_logged(
@@ -312,6 +313,19 @@ def test_xmpp_url_handling() -> None:
     # most secure path prevails
     assert "mode=tls" in u
 
+    apobj = Apprise()
+    assert apobj.add(
+        "xmpp://me:secret@example.com?subject=yes&roster=yes") is True
+
+    assert len(apobj) == 1
+    plugin = apobj[0]
+
+    u = plugin.url(privacy=False)
+    # most secure path prevails
+    assert "mode=none" in u
+    assert "roster=yes" in u
+    assert "subject=yes" in u
+
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_parse_url_returns_none(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -363,13 +377,22 @@ def test_xmpp_apprise_notify_invokes_adapter(
     assert apobj.notify(
         "hello", title="subject", notify_type=NotifyType.INFO) is True
     assert captured["targets"] == ["a@example.com"]
+    assert captured["subject"] == ""
+    assert "subject\r\nhello" in captured["body"]
+
+    apobj = Apprise()
+    apobj.add("xmpp://me:secret@example.com/a@example.com?subject=yes")
+
+    assert apobj.notify(
+        "hello", title="subject", notify_type=NotifyType.INFO) is True
+    assert captured["targets"] == ["a@example.com"]
     assert captured["subject"] == "subject"
     assert "hello" in captured["body"]
-
 
 # ---------------------------------------------------------------------------
 # Adapter tests
 # ---------------------------------------------------------------------------
+
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_ssl_context() -> None:
@@ -1275,4 +1298,3 @@ def test_xmpp_slixmpp_versioning(monkeypatch: pytest.MonkeyPatch) -> None:
         raising=False,
     )
     assert xmpp_adapter.SlixmppAdapter.supported_version("3.2") is False
-

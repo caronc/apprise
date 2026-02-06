@@ -35,7 +35,7 @@ from typing import Any, Optional
 from ...common import NotifyType
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_list
+from ...utils.parse import parse_bool, parse_list
 from ..base import NotifyBase
 from .adapter import (
     SLIXMPP_SUPPORT_AVAILABLE,
@@ -140,6 +140,11 @@ class NotifyXMPP(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
+            "subject": {
+                "name": _("Use Subject"),
+                "type": "bool",
+                "default": False,
+            },
         },
     )
 
@@ -148,6 +153,7 @@ class NotifyXMPP(NotifyBase):
         targets: Optional[list[str]] = None,
         secure_mode: Optional[str] = None,
         roster: Optional[bool] = None,
+        subject: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -197,6 +203,11 @@ class NotifyXMPP(NotifyBase):
             if roster is None else bool(roster)
         )
 
+        self.subject = (
+            self.template_args["subject"]["default"]
+            if subject is None else bool(subject)
+        )
+
         if self.secure and self.secure_mode == SecureXMPPMode.NONE:
             self.secure_mode = self.template_args["mode"]["default"]
             self.logger.warning(
@@ -225,6 +236,7 @@ class NotifyXMPP(NotifyBase):
         params = {
             "mode": self.secure_mode,
             "roster": "yes" if self.roster else "no",
+            "subject": "yes" if self.subject else "no",
         }
 
         # Extend our parameters
@@ -283,12 +295,13 @@ class NotifyXMPP(NotifyBase):
 
         self.logger.debug(
             "XMPP init: jid=%s host=%s port=%d mode=%s "
-            "verify_certificate=%s roster=%s targets=%s",
+            "verify_certificate=%s subject=%s, roster=%s targets=%s",
             self.jid,
             config.host,
             config.port,
             config.secure,
             config.verify_certificate,
+            "yes" if self.subject else "no",
             "yes" if self.roster else "no",
             self.targets,
         )
@@ -296,7 +309,9 @@ class NotifyXMPP(NotifyBase):
         adapter = SlixmppAdapter(
             config=config,
             targets=self.targets,
-            subject=title,
+            subject=title if self.subject else "",
+            # If subject is False, then the body actually already includes the
+            # title below (inline):
             body=body,
             timeout=self.socket_connect_timeout,
             roster=self.roster,
@@ -304,6 +319,16 @@ class NotifyXMPP(NotifyBase):
 
         return adapter.process()
 
+    @property
+    def title_maxlen(self) -> int | None:
+        """
+        Depending on if the subject field is set, we can control
+        how the message is constructed.
+        """
+
+        return 0 if not self.subject else super().title_maxlen
+
+        # We don't support titles for SMSEagle notifications
     @staticmethod
     def normalize_jid(value: str, default_host: str) -> str:
         """Normalize and validate a JID.
@@ -358,5 +383,11 @@ class NotifyXMPP(NotifyBase):
         if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
             # Extract the secure mode to over-ride the default
             results["secure_mode"] = results["qsd"]["mode"].lower()
+
+        if "roster" in results["qsd"] and len(results["qsd"]["roster"]):
+            results["roster"] = parse_bool(results["qsd"]["roster"])
+
+        if "subject" in results["qsd"] and len(results["qsd"]["subject"]):
+            results["subject"] = parse_bool(results["qsd"]["subject"])
 
         return results
