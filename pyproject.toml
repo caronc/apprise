@@ -189,6 +189,7 @@ keywords = [
     "WxPusher",
     "XBMC",
     "XML",
+    "XMPP",
     "Zulip",
 ]
 
@@ -226,6 +227,9 @@ all-plugins = [
 
     # Provides smpp:// support
     "smpplib",
+
+    # For xmpp:// support
+    "slixmpp >= 1.10.0",
 ]
 windows = [
     "pywin32",
@@ -396,4 +400,3 @@ exclude_lines = [
 [tool.coverage.xml]
 # Ensure GitHub Action can find a predictable file
 output = "coverage.xml"
-

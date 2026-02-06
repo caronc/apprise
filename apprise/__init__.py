@@ -64,7 +64,7 @@ from .config.base import ConfigBase
 from .locale import AppriseLocale
 
 # Inherit our logging with our additional entries added to it
-from .logger import LogCapture, logger, logging
+from .logger import LOGGER_NAME, LogCapture, logger, logging
 from .manager_attachment import AttachmentManager
 from .manager_config import ConfigurationManager
 from .manager_plugins import NotificationManager
@@ -79,6 +79,7 @@ __all__ = [
     "CONFIG_FORMATS",
     "CONTENT_INCLUDE_MODES",
     "CONTENT_LOCATIONS",
+    "LOGGER_NAME",
     "NOTIFY_FORMATS",
     "NOTIFY_IMAGE_SIZES",
     "NOTIFY_TYPES",
