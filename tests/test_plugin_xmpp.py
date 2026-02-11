@@ -26,7 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 """
-Unit tests for the XMPP plugin.
+Unit Tests for the XMPP plugin.
 
 """
 
@@ -34,6 +34,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import gc
 import logging
 import ssl
 import threading
@@ -82,6 +83,9 @@ class FakeClientXMPP:
         self.enable_direct_tls = False
         self.ssl_context = None
 
+        # Track plugins registered by the adapter (keepalive path)
+        self.registered_plugins: dict[str, Any] = {}
+
     def add_event_handler(self, name: str, handler: Any) -> None:
         self.handlers[name] = handler
 
@@ -92,6 +96,10 @@ class FakeClientXMPP:
         return None
 
     def send_message(self, **kwargs: Any) -> None:
+        return None
+
+    def register_plugin(self, name: str, config: Any | None = None) -> None:
+        self.registered_plugins[name] = config
         return None
 
     def disconnect(self) -> None:
@@ -141,7 +149,7 @@ def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 # ---------------------------------------------------------------------------
-# NotifyXMPP tests
+# NotifyXMPP Tests
 # ---------------------------------------------------------------------------
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
@@ -390,7 +398,7 @@ def test_xmpp_apprise_notify_invokes_adapter(
     assert "hello" in captured["body"]
 
 # ---------------------------------------------------------------------------
-# Adapter tests
+# Adapter Tests
 # ---------------------------------------------------------------------------
 
 
@@ -1298,3 +1306,1165 @@ def test_xmpp_slixmpp_versioning(monkeypatch: pytest.MonkeyPatch) -> None:
         raising=False,
     )
     assert xmpp_adapter.SlixmppAdapter.supported_version("3.2") is False
+
+
+# ---------------------------------------------------------------------------
+# Keepalive Tests
+# ---------------------------------------------------------------------------
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_keepalive_url_and_parse() -> None:
+    n = NotifyXMPP(
+        host="example.com",
+        user="me@example.com",
+        password="x",
+        targets=["a@example.com"],
+        keepalive=True,
+    )
+    u = n.url(privacy=False)
+    assert "keepalive=yes" in u
+
+    r = NotifyXMPP.parse_url(
+        "xmpp://me:pass@example.com/a@example.com?keepalive=yes"
+    )
+    assert r["keepalive"] is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_keepalive_reuses_adapter_instance(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    created = {"count": 0}
+    calls = {"send_message": 0, "process": 0}
+
+    class _Adapter:
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            created["count"] += 1
+            self.keepalive = kwargs.get("keepalive", False)
+
+        def process(self) -> bool:
+            calls["process"] += 1
+            return True
+
+        def send_message(self, **kwargs: Any) -> bool:
+            calls["send_message"] += 1
+            return True
+
+        def close(self) -> None:
+            return None
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _Adapter, raising=True)
+
+    # keepalive=yes should create adapter once, then reuse it
+    n = NotifyXMPP(
+        host="example.com",
+        user="me@example.com",
+        password="x",
+        targets=["a@example.com"],
+        keepalive=True,
+    )
+    assert n.send("body1", title="t1") is True
+    assert n.send("body2", title="t2") is True
+
+    assert created["count"] == 1
+    assert calls["send_message"] == 2
+    assert calls["process"] == 0
+
+    # keepalive=no should not reuse adapter, it uses process() one-shot
+    created["count"] = 0
+    calls["send_message"] = 0
+    calls["process"] = 0
+
+    n = NotifyXMPP(
+        host="example.com",
+        user="me@example.com",
+        password="x",
+        targets=["a@example.com"],
+        keepalive=False,
+    )
+    assert n.send("body", title="t") is True
+    assert created["count"] == 1
+    assert calls["process"] == 1
+    assert calls["send_message"] == 0
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_send_message_keepalive_false_calls_process(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.NONE,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=["a@example.com"],
+        subject="s",
+        body="b",
+        timeout=5.0,
+        keepalive=False,
+    )
+
+    called = {"process": 0}
+
+    def process() -> bool:
+        called["process"] += 1
+        return True
+
+    monkeypatch.setattr(a, "process", process, raising=True)
+
+    assert a.send_message(targets=["x"], subject="y", body="z") is True
+    assert called["process"] == 1
+    assert a.targets == ["x"]
+    assert a.subject == "y"
+    assert a.body == "z"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_ensure_keepalive_worker_edge_cases(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    # keepalive False => False
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=[],
+        subject="s",
+        body="b",
+        keepalive=False,
+    )
+    assert a._ensure_keepalive_worker() is False
+
+    # keepalive True but closing => False
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=[],
+        subject="s",
+        body="b",
+        keepalive=True,
+    )
+    a._closing = True
+    assert a._ensure_keepalive_worker() is False
+
+    # keepalive True but disabled => False
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=[],
+        subject="s",
+        body="b",
+        keepalive=True,
+    )
+    monkeypatch.setattr(a, "_enabled", False, raising=True)
+    assert a._ensure_keepalive_worker() is False
+
+    # thread already alive => True
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=[],
+        subject="s",
+        body="b",
+        keepalive=True,
+    )
+
+    class _AliveThread:
+        def is_alive(self) -> bool:
+            return True
+
+    a._thread = _AliveThread()
+    assert a._ensure_keepalive_worker() is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_ensure_keepalive_worker_wait_timeout(
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture) -> None:
+    install_fake_slixmpp(monkeypatch)
+    caplog.set_level(logging.WARNING, logger="apprise.xmpp")
+
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config,
+        targets=[],
+        subject="s",
+        body="b",
+        timeout=0.1,
+        keepalive=True,
+    )
+
+    # Prevent starting a real loop thread
+    monkeypatch.setattr(a, "_keepalive_runner", lambda: None, raising=True)
+
+    # Force wait() to fail
+    monkeypatch.setattr(
+        a._loop_ready, "wait", lambda timeout=None: False, raising=True)
+
+    assert a._ensure_keepalive_worker() is False
+    assert "keepalive worker failed to start" in caplog.text
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_connect_if_required_early_returns(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    assert asyncio.run(a._connect_if_required()) is False
+
+    a._loop = asyncio.new_event_loop()
+    try:
+        assert asyncio.run(a._connect_if_required()) is False
+        a._client = SimpleNamespace()
+        assert asyncio.run(a._connect_if_required()) is False
+        a._connect_lock = asyncio.Lock()
+        assert asyncio.run(a._connect_if_required()) is False
+        a._session_started = asyncio.Event()
+        assert asyncio.run(a._connect_if_required()) is False
+    finally:
+        a._loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_connect_if_required_already_connected(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+        a._session_started.set()
+
+        called = {"connect": 0}
+
+        class _Client:
+            def connect(self, **kwargs: Any) -> Any:
+                called["connect"] += 1
+                fut = loop.create_future()
+                fut.set_result(True)
+                return fut
+
+        a._client = _Client()
+        assert asyncio.run(a._connect_if_required()) is True
+        assert called["connect"] == 0
+    finally:
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_connect_if_required_connect_timeout(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", timeout=5.0,
+        keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+
+        fut = loop.create_future()
+
+        class _Client:
+            def connect(self, **kwargs: Any) -> Any:
+                return fut
+
+        a._client = _Client()
+
+        real_wait_for = xmpp_adapter.asyncio.wait_for
+
+        def wait_for_patched(aw: Any, timeout: float | None = None) -> Any:
+            if aw is fut:
+                raise asyncio.TimeoutError()
+            return real_wait_for(aw, timeout=timeout)
+
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True)
+
+        assert asyncio.run(a._connect_if_required()) is False
+    finally:
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_connect_if_required_connect_exception(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+
+        class _Client:
+            def connect(self, **kwargs: Any) -> Any:
+                raise RuntimeError("boom")
+
+        a._client = _Client()
+        assert asyncio.run(a._connect_if_required()) is False
+    finally:
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_connect_if_required_session_start_timeout(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", timeout=5.0,
+        keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+
+        fut = loop.create_future()
+        fut.set_result(True)
+
+        class _Client:
+            def connect(self, **kwargs: Any) -> Any:
+                return fut
+
+        a._client = _Client()
+
+        # First wait_for succeeds (connect), second one raises
+        # (session start wait)
+        real_wait_for = xmpp_adapter.asyncio.wait_for
+        calls = {"n": 0}
+
+        def wait_for_patched(aw: Any, timeout: float | None = None) -> Any:
+            calls["n"] += 1
+            if calls["n"] == 2:
+                raise asyncio.TimeoutError()
+            return real_wait_for(aw, timeout=timeout)
+
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True)
+
+        assert asyncio.run(a._connect_if_required()) is False
+    finally:
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_send_keepalive_async_default_target_and_send_error(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+        a._session_started.set()
+
+        sent: list[str] = []
+
+        class _Client:
+            def send_message(self, **kwargs: Any) -> None:
+                sent.append(kwargs.get("mto"))
+
+        a._client = _Client()
+
+        async def ok_connect() -> bool:
+            return True
+
+        monkeypatch.setattr(
+            a, "_connect_if_required", ok_connect, raising=True)
+
+        assert asyncio.run(a._send_keepalive_async(
+            targets=[], subject="s", body="b")) is True
+        assert sent == ["me@example.com"]
+
+        # Now force send_message to raise and ensure session_started clears
+        def boom_send_message(self: _Client, **kwargs: Any) -> None:
+            raise RuntimeError("boom-send")
+
+        monkeypatch.setattr(
+            _Client, "send_message", boom_send_message, raising=True)
+
+        assert a._session_started.is_set() is True
+        assert asyncio.run(
+            a._send_keepalive_async(
+                targets=[], subject="s", body="b")) is False
+        assert a._session_started.is_set() is False
+    finally:
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_send_message_keepalive_timeout_and_exception(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    install_fake_slixmpp(monkeypatch)
+    config = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=config, targets=[], subject="s", body="b", timeout=5.0,
+        keepalive=True
+    )
+
+    # Ensure worker exists without spinning a real thread
+    monkeypatch.setattr(
+        a, "_ensure_keepalive_worker", lambda: True, raising=True)
+
+    calls: list[str] = []
+
+    class _Loop:
+        def call_soon_threadsafe(self, cb: Any, *args: Any) -> None:
+            calls.append(getattr(cb, "__name__", "cb"))
+            cb(*args)
+
+    a._loop = _Loop()
+
+    cleared = {"n": 0}
+
+    class _Evt:
+        def clear(self) -> None:
+            cleared["n"] += 1
+
+    a._session_started = _Evt()
+
+    # Timeout path
+    class _FutureTimeout:
+        def result(self, timeout: float | None = None) -> Any:
+            raise xmpp_adapter.concurrent.futures.TimeoutError()
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio,
+        "run_coroutine_threadsafe",
+        lambda *a, **k: _FutureTimeout(),
+        raising=True,
+    )
+
+    assert a.send_message(targets=[], subject="s", body="b") is False
+    assert cleared["n"] == 1
+
+    # Exception path
+    class _FutureError:
+        def result(self, timeout: float | None = None) -> Any:
+            raise RuntimeError("boom")
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio,
+        "run_coroutine_threadsafe",
+        lambda *a, **k: _FutureError(),
+        raising=True,
+    )
+
+    assert a.send_message(targets=[], subject="s", body="b") is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_del_suppresses_close_exception(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover SlixmppAdapter.__del__() exception suppression
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    def boom_close() -> None:
+        raise RuntimeError("boom-close")
+
+    monkeypatch.setattr(a, "close", boom_close, raising=True)
+
+    # Ensure __del__ runs and does not raise
+    del a
+    gc.collect()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_close_shutdown_paths_and_state_reset(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover close(): _shutdown() branches and loop.call_soon_threadsafe exception
+    suppression, plus state reset
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    class _Client:
+        def disconnect(self) -> None:
+            raise RuntimeError("disconnect boom")
+
+    class _Loop:
+        def __init__(self) -> None:
+            self.called: list[str] = []
+
+        def stop(self) -> None:
+            self.called.append("stop")
+            raise RuntimeError("stop boom")
+
+        def call_soon_threadsafe(self, cb: Any, *args: Any) -> None:
+            self.called.append("call_soon_threadsafe")
+            # Execute immediately so _shutdown() runs in this test
+            cb(*args)
+
+    class _Thread:
+        def join(self, timeout: float | None = None) -> None:
+            return None
+
+    # Populate internals so close() takes the full path
+    loop = _Loop()
+    a._loop = loop
+    a._client = _Client()
+    a._thread = _Thread()
+
+    # Also set asyncio primitives to ensure they are nulled out
+    a._connect_lock = asyncio.Lock()
+    a._session_started = asyncio.Event()
+
+    a.close()
+
+    # State must be cleared
+    assert a._thread is None
+    assert a._loop is None
+    assert a._client is None
+    assert a._connect_lock is None
+    assert a._session_started is None
+
+    # Ensure call_soon_threadsafe ran (and stop attempted inside _shutdown)
+    assert "call_soon_threadsafe" in loop.called
+    assert "stop" in loop.called
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_close_call_soon_threadsafe_raises_still_resets(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover close(): loop.call_soon_threadsafe(_shutdown) raising and being
+    suppressed, while still joining and clearing state.
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    class _Loop:
+        def call_soon_threadsafe(self, cb: Any, *args: Any) -> None:
+            raise RuntimeError("csts boom")
+
+        def stop(self) -> None:
+            return None
+
+    class _Thread:
+        def join(self, timeout: float | None = None) -> None:
+            return None
+
+    a._loop = _Loop()
+    a._client = SimpleNamespace(disconnect=lambda: None)
+    a._thread = _Thread()
+    a._connect_lock = asyncio.Lock()
+    a._session_started = asyncio.Event()
+
+    a.close()
+
+    assert a._thread is None
+    assert a._loop is None
+    assert a._client is None
+    assert a._connect_lock is None
+    assert a._session_started is None
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_ensure_keepalive_worker_returns_true_at_end(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Hit _ensure_keepalive_worker() bottom return True
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", timeout=5.0,
+        keepalive=True
+    )
+
+    # Make the runner set loop_ready quickly and exit, using a real thread.
+    def runner() -> None:
+        a._loop_ready.set()
+        return None
+
+    monkeypatch.setattr(a, "_keepalive_runner", runner, raising=True)
+
+    assert a._ensure_keepalive_worker() is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_keepalive_runner_executes_and_register_plugin_suppressed(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Execute _keepalive_runner() including:
+    - secure mode config
+    - register_plugin() suppression
+    - loop.run_forever() exit
+    - finally: loop.stop/close
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    # Force register_plugin to raise so the suppress(Exception) is exercised
+    def boom_register_plugin(
+            self: FakeClientXMPP, name: str,
+            config: Any | None = None) -> None:
+        raise RuntimeError("boom-plugin")
+
+    monkeypatch.setattr(
+        FakeClientXMPP, "register_plugin", boom_register_plugin, raising=True)
+
+    # Wrap new_event_loop so we can make run_forever return immediately, and
+    # make stop/close callable.
+    real_new_event_loop = xmpp_adapter.asyncio.new_event_loop
+
+    def new_event_loop_wrapped() -> asyncio.AbstractEventLoop:
+        loop = real_new_event_loop()
+
+        # Exit immediately instead of blocking forever
+        monkeypatch.setattr(loop, "run_forever", lambda: None, raising=True)
+
+        # Ensure stop/close are callable (real loop has them already)
+        return loop
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio, "new_event_loop", new_event_loop_wrapped,
+        raising=True)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    # Run synchronously. Since run_forever() is patched to return, this
+    # should exit quickly.
+    a._keepalive_runner()
+
+    # Worker should have published these before entering run_forever()
+    assert a._loop is not None
+    assert a._client is not None
+    assert a._connect_lock is not None
+    assert a._session_started is not None
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_connect_if_required_hits_bottom_return_true(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover _connect_if_required() success path reaching the final return True,
+    not the early already-connected return.
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", timeout=5.0,
+        keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+
+        fut = loop.create_future()
+        fut.set_result(True)
+
+        class _Client:
+            def connect(self, **kwargs: Any) -> Any:
+                return fut
+
+        a._client = _Client()
+
+        # Patch wait_for so the second wait_for (session_started.wait()) sets
+        # the event just in time, forcing the bottom return True.
+        real_wait_for = xmpp_adapter.asyncio.wait_for
+        calls = {"n": 0}
+
+        async def wait_for_patched(
+                aw: Any, timeout: float | None = None) -> Any:
+            calls["n"] += 1
+            if calls["n"] == 2:
+                assert a._session_started is not None
+                a._session_started.set()
+            return await real_wait_for(aw, timeout=timeout)
+
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True)
+
+        assert asyncio.run(a._connect_if_required()) is True
+    finally:
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_send_keepalive_async_connect_fail_branch(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover _send_keepalive_async(): if not ok: return False
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    # Must not be None, or it returns False earlier
+    a._client = SimpleNamespace(send_message=lambda **kw: None)
+
+    async def fail_connect() -> bool:
+        return False
+
+    monkeypatch.setattr(a, "_connect_if_required", fail_connect, raising=True)
+
+    assert asyncio.run(
+        a._send_keepalive_async(
+            targets=["x"], subject="s", body="b")) is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_send_keepalive_async_exception_when_session_started_none(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover _send_keepalive_async() exception path where _session_started is None
+    so clear() is skipped
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    async def ok_connect() -> bool:
+        return True
+
+    monkeypatch.setattr(a, "_connect_if_required", ok_connect, raising=True)
+
+    class _Client:
+        def send_message(self, **kwargs: Any) -> None:
+            raise RuntimeError("boom-send")
+
+    a._client = _Client()
+
+    # Key detail: explicitly set to None to take the "skip clear()" branch
+    a._session_started = None
+
+    assert asyncio.run(
+        a._send_keepalive_async(
+            targets=["x"], subject="s", body="b")) is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_close_shutdown_client_none_branch(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """
+    Cover close(): _shutdown() path where client is None.
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    class _Loop:
+        def __init__(self) -> None:
+            self.stopped = False
+            self.called = False
+
+        def stop(self) -> None:
+            self.stopped = True
+
+        def call_soon_threadsafe(self, cb: Any, *args: Any) -> None:
+            self.called = True
+            cb(*args)
+
+    class _Thread:
+        def join(self, timeout: float | None = None) -> None:
+            return None
+
+    loop = _Loop()
+    a._loop = loop
+    a._thread = _Thread()
+
+    # Key: ensure client is None so if client is not None is False
+    a._client = None
+
+    a.close()
+
+    assert loop.called is True
+    assert loop.stopped is True
+    assert a._loop is None
+    assert a._thread is None
+    assert a._client is None
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_keepalive_runner_session_start_sets_event_even_on_exception(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Cover keepalive _Client._session_start():
+    - send_presence() raising still triggers finally: event.set()
+    - roster path executed and get_roster errors are suppressed
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    # Enable roster to take the _want_roster branch
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True,
+        roster=True
+    )
+
+    real_new_event_loop = xmpp_adapter.asyncio.new_event_loop
+
+    def new_event_loop_wrapped() -> asyncio.AbstractEventLoop:
+        loop = real_new_event_loop()
+
+        def run_forever_hook() -> None:
+            client = a._client
+            started = a._session_started
+            assert client is not None
+            assert started is not None
+
+            # 1) Force send_presence() to raise, event must still be set
+            called = {"n": 0}
+
+            def send_presence_boom() -> None:
+                called["n"] += 1
+                raise RuntimeError("boom-presence")
+
+            # 2) Next time: send_presence ok, but get_roster raises
+            async def get_roster_boom() -> None:
+                raise RuntimeError("boom-roster")
+
+            monkeypatch.setattr(
+                client, "send_presence", send_presence_boom, raising=True)
+            monkeypatch.setattr(
+                client, "get_roster", get_roster_boom, raising=True)
+
+            # First call: presence raises, finally should set event
+            started.clear()
+            loop.run_until_complete(client._session_start())
+            assert started.is_set() is True
+
+            # Second call: presence raises again by default, adjust to succeed
+            def send_presence_ok() -> None:
+                return None
+
+            monkeypatch.setattr(
+                client, "send_presence", send_presence_ok, raising=True)
+
+            started.clear()
+            loop.run_until_complete(client._session_start())
+            assert started.is_set() is True
+
+            # Exit runner
+            return None
+
+        monkeypatch.setattr(
+            loop, "run_forever", run_forever_hook, raising=True)
+        return loop
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio, "new_event_loop",
+        new_event_loop_wrapped, raising=True)
+
+    a._keepalive_runner()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_keepalive_runner_failed_handlers(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Cover keepalive _Client._failed_auth() and _disconnected().
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True,
+        roster=False
+    )
+
+    real_new_event_loop = xmpp_adapter.asyncio.new_event_loop
+
+    def new_event_loop_wrapped() -> asyncio.AbstractEventLoop:
+        loop = real_new_event_loop()
+
+        def run_forever_hook() -> None:
+            client = a._client
+            started = a._session_started
+            assert client is not None
+            assert started is not None
+
+            disconnected = {"called": 0}
+
+            def disconnect_spy() -> None:
+                disconnected["called"] += 1
+
+            monkeypatch.setattr(
+                client, "disconnect", disconnect_spy, raising=True)
+
+            # Mark started True, then failed_auth must clear + disconnect
+            started.set()
+            client._failed_auth()
+            assert started.is_set() is False
+            assert disconnected["called"] == 1
+
+            # Mark started True again, disconnected must clear, no disconnect
+            # call
+            started.set()
+            client._disconnected()
+            assert started.is_set() is False
+            assert disconnected["called"] == 1
+
+            return None
+
+        monkeypatch.setattr(
+            loop, "run_forever", run_forever_hook, raising=True)
+        return loop
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio, "new_event_loop", new_event_loop_wrapped,
+        raising=True)
+
+    a._keepalive_runner()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_keepalive_runner_unsupported_secure_mode_hits_valueerror(
+    monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """
+    Cover keepalive runner unsupported secure mode ValueError.
+    The exception is caught internally, but the raise line is executed.
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure="definitely-not-supported",
+        verify_certificate=False,
+    )
+
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    # Ensure clean initial state
+    a._loop_ready.clear()
+
+    # Patch run_forever to be safe if it ever reaches it (it should not)
+    real_new_event_loop = xmpp_adapter.asyncio.new_event_loop
+
+    def new_event_loop_wrapped() -> asyncio.AbstractEventLoop:
+        loop = real_new_event_loop()
+        monkeypatch.setattr(loop, "run_forever", lambda: None, raising=True)
+        return loop
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio, "new_event_loop",
+        new_event_loop_wrapped, raising=True)
+
+    a._keepalive_runner()
+
+    # Since secure mode invalid, it should not publish loop/client state
+    assert a._loop_ready.is_set() is False
+    assert a._loop is None
+    assert a._client is None
+    assert a._connect_lock is None
+    assert a._session_started is None
