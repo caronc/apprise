@@ -234,7 +234,7 @@ class NotifyXMPP(NotifyBase):
             self.secure = True
 
         # Keepalive adapter (created lazily)
-        self._adapter: SlixmppAdapter | None = None
+        self._adapter: Optional[SlixmppAdapter] = None
 
     def __del__(self) -> None:
         """Best-effort close for keepalive sessions."""
@@ -247,7 +247,7 @@ class NotifyXMPP(NotifyBase):
             pass
 
     @property
-    def url_identifier(self) -> tuple[str, str, str, str, int | None]:
+    def url_identifier(self) -> tuple[str, str, str, str, Optional[int]]:
         """Return the pieces that uniquely identify this configuration."""
         return (
             self.secure_protocol if self.secure else self.protocol,
@@ -372,7 +372,7 @@ class NotifyXMPP(NotifyBase):
         )
 
     @property
-    def title_maxlen(self) -> int | None:
+    def title_maxlen(self) -> Optional[int]:
         """
         Depending on if the subject field is set, we can control
         how the message is constructed.
