@@ -78,7 +78,7 @@ class XMPPConfig:
 # ---------------------------------------------------------------------------
 # Logging Bridge
 # ---------------------------------------------------------------------------
-
+LOGGING_ID = "apprise.xmpp"
 _LOG_BRIDGE_LOCK = threading.Lock()
 _LOG_BRIDGED = False
 
@@ -115,6 +115,16 @@ def bridge_slixmpp_logging() -> None:
         _LOG_BRIDGED = True
 
 
+def _close_awaitable(obj: Any) -> None:
+    """Best-effort close for coroutine-like objects.
+
+    Some test patches raise before awaiting, leaving coroutines to be
+    garbage collected and triggering runtime warnings.
+    """
+    close = getattr(obj, "close", None)
+    if callable(close):
+        with contextlib.suppress(Exception):
+            close()
 # ---------------------------------------------------------------------------
 # Internal Slixmpp Client Factory
 # ---------------------------------------------------------------------------
@@ -189,11 +199,14 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
                     self.send_presence()
 
                 if self._want_roster and self._roster_timeout > 0:
-                    with contextlib.suppress(Exception):
-                        await asyncio.wait_for(  # type: ignore[arg-type]
-                            self.get_roster(),
+                    roster_coro = self.get_roster()
+                    try:
+                        await asyncio.wait_for(
+                            roster_coro,
                             timeout=self._roster_timeout,
                         )
+                    except Exception:
+                        _close_awaitable(roster_coro)
 
                 # One-shot mode sends messages immediately on session_start and
                 # then disconnects. Keepalive mode just signals readiness.
@@ -230,24 +243,37 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             asyncio.create_task() because that can bind to the wrong
             loop, or no loop, and leak coroutines.
             """
+            coro = self._session_start(*args, **kwargs)
 
             # One-shot mode: let Slixmpp schedule the coroutine itself.
             if self._oneshot:
-                return self._session_start(*args, **kwargs)
+                return coro
 
             # Keepalive mode: schedule on the assigned loop.
             loop = getattr(self, "loop", None)
-            if loop is None:
+
+            # If the loop is missing or already closing, we MUST close the
+            # coroutine immediately to prevent "never awaited" warnings.
+            if loop is None or not loop.is_running():
+                with contextlib.suppress(Exception):
+                    coro.close()
                 return None
 
-            task = loop.create_task(self._session_start(*args, **kwargs))
+            try:
+                task = loop.create_task(coro)
+                task.add_done_callback(
+                    lambda t: (
+                        t.exception() if not t.cancelled() else None
+                    )
+                )
 
-            def _done(t: Any) -> None:
-                with contextlib.suppress(asyncio.CancelledError, Exception):
-                    t.exception()
+            except Exception:
+                # Fallback closure if loop.create_task fails
+                with contextlib.suppress(Exception):
+                    coro.close()
 
-            task.add_done_callback(_done)
             return None
+
         def _disconnected(self, *args: object, **kwargs: object) -> None:
             if self._session_started_evt is not None:
                 self._session_started_evt.clear()
@@ -257,13 +283,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
 
 
 def _build_client(*args: Any, **kwargs: Any) -> Any:
-    if not SLIXMPP_SUPPORT_AVAILABLE or slixmpp is None:
-        raise RuntimeError("slixmpp is not available")
-    base_cls = getattr(slixmpp, "ClientXMPP", None)
-    if base_cls is None:
-        raise RuntimeError("slixmpp.ClientXMPP is not available")
-    return _get_client_subclass(base_cls)(*args, **kwargs)
-
+    return _get_client_subclass(slixmpp.ClientXMPP)(*args, **kwargs)
 
 # ---------------------------------------------------------------------------
 # Adapter
@@ -307,7 +327,9 @@ class SlixmppAdapter:
         self.timeout = max(5.0, float(timeout))
         self.roster, self.before_message, self.keepalive = \
             roster, before_message, keepalive
-        self.logger = logging.getLogger("apprise.xmpp")
+
+        global LOGGING_ID
+        self.logger = logging.getLogger(LOGGING_ID)
 
         bridge_slixmpp_logging()
 
@@ -344,19 +366,54 @@ class SlixmppAdapter:
     def _cancel_pending(
         loop: asyncio.AbstractEventLoop,
     ) -> None:  # type: ignore[name-defined]
+        """Cleanup pending tasks."""
         pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
         for task in pending:
             task.cancel()
+
         if pending:
+            # We must run until the tasks actually complete (or acknowledge
+            # cancellation) to prevent "coroutine was never awaited" warnings.
             with contextlib.suppress(Exception):
                 loop.run_until_complete(
                     asyncio.gather(*pending, return_exceptions=True)
                 )
 
+    @staticmethod
+    def _loop_tick(loop: asyncio.AbstractEventLoop) -> None:
+        """Run one final loop tick, closing the coroutine on error."""
+        tick = asyncio.sleep(0)
+        try:
+            loop.run_until_complete(tick)
+
+        except Exception:
+            _close_awaitable(tick)
+
+    @staticmethod
+    def _finalize_loop(loop: asyncio.AbstractEventLoop) -> None:
+        """Best-effort loop shutdown to avoid resource warnings."""
+        with contextlib.suppress(Exception):
+            SlixmppAdapter._cancel_pending(loop)
+
+        # Give the loop one final tick to process cancellations
+        SlixmppAdapter._loop_tick(loop)
+
+        with contextlib.suppress(Exception):
+            loop.stop()
+
+        # Detach loop from thread policy
+        with contextlib.suppress(Exception):
+            asyncio.set_event_loop(None)
+
+        if not loop.is_closed():
+            with contextlib.suppress(Exception):
+                loop.close()
+
     def close(self) -> None:
         """Close any persistent connection and stop the keepalive worker."""
         with self._state_lock:
             self._closing = True
+
         loop, client, thread = self._loop, self._client, self._thread
         if loop is None or thread is None:
             return
@@ -372,10 +429,20 @@ class SlixmppAdapter:
         with contextlib.suppress(Exception):
             loop.call_soon_threadsafe(_shutdown)
 
-        # Give a moment to exit gracefully
+        # Give a moment to exit gracefully.
         thread.join(timeout=1.0)
 
+        # If the worker is still alive, do not clear state.
+        alive = getattr(thread, "is_alive", None)
+        if callable(alive) and alive():
+            return
+
         with self._state_lock:
+            # Detach from any thread-local loop to avoid creating a new
+            # loop implicitly (Python 3.12+ may warn about it).
+            with contextlib.suppress(Exception):
+                asyncio.set_event_loop(None)
+
             self._thread = None
             self._loop = None
             self._client = None
@@ -516,16 +583,7 @@ class SlixmppAdapter:
             finally:
                 loop = shared.get("loop")
                 if loop is not None:
-                    with contextlib.suppress(Exception):
-                        self._cancel_pending(loop)
-                    with contextlib.suppress(Exception):
-                        loop.stop()
-                    with contextlib.suppress(Exception):
-                        # detach loop from thread policy
-                        asyncio.set_event_loop(None)
-                    with contextlib.suppress(Exception):
-                        loop.close()
-
+                    self._finalize_loop(loop)
                 done.set()
 
         t = threading.Thread(target=runner, name="apprise-xmpp", daemon=True)
@@ -595,6 +653,7 @@ class SlixmppAdapter:
     def _keepalive_runner(self) -> None:
         loop: Optional[asyncio.AbstractEventLoop] = None
         # type: ignore[name-defined]
+        published = False
 
         try:
             loop = asyncio.new_event_loop()  # type: ignore[union-attr]
@@ -604,7 +663,8 @@ class SlixmppAdapter:
             connect_lock = asyncio.Lock()  # type: ignore[union-attr]
 
             roster_timeout = (
-                max(2.0, min(10.0, self.timeout / 3.0)) if self.roster else 3.0
+                max(2.0, min(10.0, self.timeout / 3.0))
+                if self.roster else 3.0
             )
 
             client = _build_client(
@@ -639,10 +699,14 @@ class SlixmppAdapter:
                 client.register_plugin("xep_0199", {"keepalive": True})
 
             with self._state_lock:
+                if self._closing:
+                    return
+
                 self._loop = loop
                 self._client = client
                 self._connect_lock = connect_lock
                 self._session_started = session_started
+                published = True
 
             self._loop_ready.set()
 
@@ -653,16 +717,20 @@ class SlixmppAdapter:
             self.logger.debug("XMPP keepalive exception: %s", e)
 
         finally:
+            if published:
+                with self._state_lock:
+                    if self._closing and self._loop is loop:
+                        # Clear internal references if we are exiting the
+                        # worker.
+                        self._loop = None
+                        self._client = None
+                        self._connect_lock = None
+                        self._session_started = None
+                        self._thread = None
+
             if loop is not None:
-                # Drain/cancel any pending tasks to avoid resource warnings
-                with contextlib.suppress(Exception):
-                    self._cancel_pending(loop)
-                with contextlib.suppress(Exception):
-                    loop.call_soon_threadsafe(loop.stop)
-                with contextlib.suppress(Exception):
-                    asyncio.set_event_loop(None)
-                with contextlib.suppress(Exception):
-                    loop.close()
+                self._finalize_loop(loop)
+
 
     async def _connect_if_required(self) -> bool:
         if self._loop is None or self._client is None:
@@ -707,15 +775,22 @@ class SlixmppAdapter:
                 return False
 
             try:
+                session_wait = self._session_started.wait()
                 await asyncio.wait_for(
-                    self._session_started.wait(),
+                    session_wait,
                     timeout=connect_timeout,
                 )
             except asyncio.TimeoutError:  # type: ignore[attr-defined]
+                _close_awaitable(session_wait)
                 self.logger.warning(
                     "XMPP session did not start within %.2fs",
                     connect_timeout,
                 )
+                return False
+
+            except Exception:
+                _close_awaitable(session_wait)
+
                 return False
 
             # If auth failed during startup, treat as failure.

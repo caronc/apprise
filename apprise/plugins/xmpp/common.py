@@ -38,7 +38,7 @@ class SecureXMPPMode:
 
 SECURE_MODES = {
     SecureXMPPMode.STARTTLS: {
-        "default_port": 5223,
+        "default_port": 5222,
          "enable_plaintext": False,
          "enable_starttls": True,
          "enable_direct_tls": False,

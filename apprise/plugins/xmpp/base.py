@@ -399,7 +399,7 @@ class NotifyXMPP(NotifyBase):
         if not raw:
             raise ValueError("Empty JID")
 
-        results = IS_JID.match(value)
+        results = IS_JID.match(raw)
         if not results:
             raise ValueError("Invalid JID")
 
