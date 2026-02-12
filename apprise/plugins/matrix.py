@@ -1082,11 +1082,17 @@ class NotifyMatrix(NotifyBase):
                 else self.home_server
             )
 
-            # It was a room ID; simple mapping:
-            room_id = "!{}:{}".format(
-                result.group("room"),
-                home_server,
-            )
+            if home_server == self.home_server:
+                # It's a local room ID, leave the homeserver off
+                room_id = "!{}".format(
+                    result.group("room"),
+                )
+            else:
+                # It was a room ID; simple mapping:
+                room_id = "!{}:{}".format(
+                    result.group("room"),
+                    home_server,
+                )
 
             # Check our cache for speed:
             try:
