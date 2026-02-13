@@ -280,6 +280,11 @@ class NotifyMatrix(NotifyBase):
                 "type": "bool",
                 "default": True,
             },
+            "hsreq": {
+                "name": _("Force Home Server on Room IDs"),
+                "type": "bool",
+                "default": False,
+            },
             "mode": {
                 "name": _("Webhook Mode"),
                 "type": "choice:string",
@@ -315,6 +320,7 @@ class NotifyMatrix(NotifyBase):
         version=None,
         include_image=None,
         discovery=None,
+        hsreq=None,
         **kwargs,
     ):
         """Initialize Matrix Object."""
@@ -347,6 +353,15 @@ class NotifyMatrix(NotifyBase):
             self.template_args["discovery"]["default"]
             if discovery is None
             else discovery
+        )
+
+        # When enabled, room IDs missing a ':homeserver' segment will
+        # be treated as legacy identifiers and automatically suffixed
+        # with the authenticated homeserver.
+        self.hsreq = (
+            self.template_args["hsreq"]["default"]
+            if hsreq is None
+            else hsreq
         )
 
         # Setup our mode
@@ -1075,44 +1090,57 @@ class NotifyMatrix(NotifyBase):
         # Check if it's a room id...
         result = IS_ROOM_ID.match(room)
         if result:
-            # We detected ourselves the home_server
+            room_token = result.group("room")
+            explicit_home_server = result.group("home_server")
+
+            # Determine the homeserver context (used for cache metadata)
             home_server = (
-                result.group("home_server")
-                if result.group("home_server")
-                else self.home_server
+                explicit_home_server
+                if explicit_home_server else self.home_server
             )
 
-            # It was a room ID; simple mapping:
-            room_id = "!{}:{}".format(
-                result.group("room"),
-                home_server,
-            )
+            # When hsreq is enabled (legacy behaviour), we always require a
+            # ':homeserver' segment on room IDs. Otherwise, we honour exactly
+            # what the caller provided and do not synthesise a homeserver when
+            # it was not specified.
+            cache_key = f"!{room_token}:{home_server}"
+            if explicit_home_server or self.hsreq:
+                room_id = cache_key
+            else:
+                room_id = f"!{room_token}"
 
             # Check our cache for speed:
             try:
-                # We're done as we've already joined the channel
-                return self.store[room_id]["id"]
+                return self.store[cache_key]["id"]
 
             except KeyError:
-                # No worries, we'll try to acquire the info
                 pass
 
             # Build our URL
             path = f"/join/{NotifyMatrix.quote(room_id)}"
 
-            # Make our query
-            postokay, _, _ = self._fetch(path, payload=payload)
-            if postokay:
-                # Cache our entry for fast access later
-                self.store.set(
-                    room_id,
-                    {
-                        "id": room_id,
-                        "home_server": home_server,
-                    },
-                )
+            # Attempt to join the channel
+            postokay, response, _status_code = \
+                self._fetch(path, payload=payload)
+            if not postokay:
+                return None
 
-            return room_id if postokay else None
+            # Prefer the server-provided room_id if one was returned,
+            # otherwise fall back to whatever we joined with.
+            joined_id = (
+                response.get("room_id") if isinstance(response, dict) else None
+            ) or room_id
+
+            # Cache mapping for faster future lookups.
+            self.store.set(
+                cache_key,
+                {
+                    "id": joined_id,
+                    "home_server": home_server,
+                },
+            )
+
+            return joined_id
 
         # Try to see if it's an alias then...
         result = IS_ROOM_ALIAS.match(room)
@@ -1553,6 +1581,7 @@ class NotifyMatrix(NotifyBase):
             "version": self.version,
             "msgtype": self.msgtype,
             "discovery": "yes" if self.discovery else "no",
+            "hsreq": "yes" if self.hsreq else "no",
         }
 
         # Extend our parameters
@@ -1628,6 +1657,13 @@ class NotifyMatrix(NotifyBase):
         results["discovery"] = parse_bool(
             results["qsd"].get(
                 "discovery", NotifyMatrix.template_args["discovery"]["default"]
+            )
+        )
+
+        # Boolean to enforce ':homeserver' on room IDs when missing
+        results["hsreq"] = parse_bool(
+            results["qsd"].get(
+                "hsreq", NotifyMatrix.template_args["hsreq"]["default"]
             )
         )
 

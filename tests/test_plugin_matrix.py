@@ -742,7 +742,26 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     # However this is how the cache entry gets stored
     assert obj.store.get("!abc123:localhost") is not None
     assert obj.store.get("!abc123:localhost")["id"] == response_obj["room_id"]
+
+    # When hsreq=yes, legacy behaviour is restored and a homeserver is
+    # automatically appended to room IDs that omit it.
+    obj.store.clear()
+    obj.hsreq = True
+    mock_post.reset_mock()
     assert obj._room_join("!abc123") == response_obj["room_id"]
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "http://host/_matrix/client/v3/join/%21abc123%3Alocalhost"
+    )
+
+    # Reset back to default for remaining tests
+    obj.hsreq = False
+
+    # Use cache to get same results (no additional HTTP call)
+    mock_post.reset_mock()
+    assert obj._room_join("!abc123") == response_obj["room_id"]
+    assert mock_post.call_count == 0
 
     obj.store.clear()
     assert obj._room_join("!abc123:localhost") == response_obj["room_id"]
@@ -904,6 +923,12 @@ def test_plugin_matrix_url_parsing():
     assert isinstance(result, dict) is True
     assert len(result["targets"]) == 1
     assert "#room" in result["targets"]
+
+    result = NotifyMatrix.parse_url(
+        "matrix://user:token@localhost?to=#room&hsreq=yes"
+    )
+    assert isinstance(result, dict) is True
+    assert result.get("hsreq") is True
 
     result = NotifyMatrix.parse_url(
         "matrix://user:token@localhost?to=#room1,#room2,#room3"
