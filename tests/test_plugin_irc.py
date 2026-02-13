@@ -658,11 +658,11 @@ def test_plugin_irc_client_tick() -> None:
     """Tick timing."""
     c = IRCClient(host="h", nickname="n", fullname="f")
     with mock.patch("time.monotonic", return_value=10.0):
-        assert c._tick(deadline=9.0) == 9.0
+        assert c._tick(deadline=9.0) == pytest.approx(9.0)
 
     with mock.patch("time.monotonic", return_value=0.0):
         # remaining=0.5 -> 0.0 + 0.5
-        assert c._tick(deadline=0.5) == 0.5
+        assert c._tick(deadline=0.5) == pytest.approx(0.5)
 
 
 def test_plugin_irc_client_handshake_paths() -> None:

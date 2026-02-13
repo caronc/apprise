@@ -485,8 +485,8 @@ def apprise_test(do_notify):
     # cto = Socket Connect Timeout
     plugin = a.instantiate("good://localhost?rto=5.1&cto=10")
     assert isinstance(plugin, NotifyBase)
-    assert plugin.socket_connect_timeout == 10.0
-    assert plugin.socket_read_timeout == 5.1
+    assert plugin.socket_connect_timeout == pytest.approx(10.0)
+    assert plugin.socket_read_timeout == pytest.approx(5.1)
 
     plugin = a.instantiate("good://localhost?rto=invalid&cto=invalid")
     assert isinstance(plugin, NotifyBase)

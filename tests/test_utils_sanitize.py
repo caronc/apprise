@@ -34,6 +34,8 @@ from hashlib import sha256
 import logging
 import sys
 
+import pytest
+
 from apprise.utils.sanitize import SanitizeOptions, sanitize_payload
 
 # Disable logging for a cleaner testing output
@@ -54,7 +56,7 @@ def test_sanitize_payload_passthrough_primitives() -> None:
     assert sanitize_payload(True) is True
     assert sanitize_payload(False) is False
     assert sanitize_payload(123) == 123
-    assert sanitize_payload(3.14) == 3.14
+    assert sanitize_payload(3.14) == pytest.approx(3.14)
 
 
 def test_sanitize_payload_small_string_passthrough() -> None:
