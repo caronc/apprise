@@ -193,7 +193,8 @@ def test_notify_dot_image_mode_with_attachment():
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
     assert payload["image"] == "YmFzZTY0"
-    assert payload["deviceId"] == "device"
+    # API v2: deviceId should NOT be in payload
+    assert "deviceId" not in payload
 
 
 def test_notify_dot_image_mode_with_existing_image_data():
@@ -243,7 +244,8 @@ def test_notify_dot_text_mode_with_existing_icon():
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
     assert "image" not in payload
-    assert payload["deviceId"] == "device"
+    # API v2: deviceId should NOT be in payload
+    assert "deviceId" not in payload
     assert payload["message"] == "world"
     # Should use existing icon, not attachment
     assert payload["icon"] == "aW5jb24="
@@ -269,7 +271,8 @@ def test_notify_dot_text_mode_uses_attachment_as_icon():
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    assert payload["deviceId"] == "device"
+    # API v2: deviceId should NOT be in payload
+    assert "deviceId" not in payload
     assert payload["message"] == "world"
     # Should use attachment as icon
     assert payload["icon"] == "attachment_icon_data"
