@@ -371,45 +371,45 @@ def requirements(plugin):
         return requirements
 
     # Get our required packages
-    _req_packages = plugin.requirements.get("packages_required")
-    if isinstance(_req_packages, str):
+    req_packages = plugin.requirements.get("packages_required")
+    if isinstance(req_packages, str):
         # Convert to list
-        _req_packages = [_req_packages]
+        req_packages = [req_packages]
 
-    elif not isinstance(_req_packages, (set, list, tuple)):
+    elif not isinstance(req_packages, (set, list, tuple)):
         # Allow one to set the required packages to None (as an example)
-        _req_packages = []
+        req_packages = []
 
-    requirements["packages_required"] = [str(p) for p in _req_packages]
+    requirements["packages_required"] = [str(p) for p in req_packages]
 
     # Get our recommended packages
-    _opt_packages = plugin.requirements.get("packages_recommended")
-    if isinstance(_opt_packages, str):
+    opt_packages = plugin.requirements.get("packages_recommended")
+    if isinstance(opt_packages, str):
         # Convert to list
-        _opt_packages = [_opt_packages]
+        opt_packages = [opt_packages]
 
-    elif not isinstance(_opt_packages, (set, list, tuple)):
+    elif not isinstance(opt_packages, (set, list, tuple)):
         # Allow one to set the recommended packages to None (as an example)
-        _opt_packages = []
+        opt_packages = []
 
-    requirements["packages_recommended"] = [str(p) for p in _opt_packages]
+    requirements["packages_recommended"] = [str(p) for p in opt_packages]
 
     # Get our package details
-    _req_details = plugin.requirements.get("details")
-    if not _req_details:
-        if not (_req_packages or _opt_packages):
-            _req_details = _("No dependencies.")
+    req_details = plugin.requirements.get("details")
+    if not req_details:
+        if not (req_packages or opt_packages):
+            req_details = _("No dependencies.")
 
-        elif _req_packages:
-            _req_details = _("Packages are required to function.")
+        elif req_packages:
+            req_details = _("Packages are required to function.")
 
         else:  # opt_packages
-            _req_details = _(
+            req_details = _(
                 "Packages are recommended to improve functionality."
             )
     else:
         # Store our details if defined
-        requirements["details"] = _req_details
+        requirements["details"] = req_details
 
     # Return our compiled package requirements
     return requirements
@@ -426,7 +426,7 @@ def url_to_dict(url, secure_logging=True):
     """
 
     # swap hash (#) tag values with their html version
-    _url = url.replace("/#", "/%23")
+    url_ = url.replace("/#", "/%23")
 
     # CWE-312 (Secure Logging) Handling
     loggable_url = url if not secure_logging else cwe312_url(url)
@@ -434,7 +434,7 @@ def url_to_dict(url, secure_logging=True):
     # Attempt to acquire the schema at the very least to allow our plugins to
     # determine if they can make a better interpretation of a URL geared for
     # them.
-    schema = GET_SCHEMA_RE.match(_url)
+    schema = GET_SCHEMA_RE.match(url_)
     if schema is None:
         # Not a valid URL; take an early exit
         logger.error(f"Unsupported URL: {loggable_url}")
@@ -449,7 +449,7 @@ def url_to_dict(url, secure_logging=True):
         # native_url() parse function
         results = None
         for plugin in N_MGR.plugins():
-            results = plugin.parse_native_url(_url)
+            results = plugin.parse_native_url(url_)
             if results:
                 break
 
@@ -468,7 +468,7 @@ def url_to_dict(url, secure_logging=True):
     else:
         # Parse our url details of the server object as dictionary
         # containing all of the information parsed from our URL
-        results = N_MGR[schema].parse_url(_url)
+        results = N_MGR[schema].parse_url(url_)
         if not results:
             logger.error(
                 f"Unparseable {N_MGR[schema].service_name} URL {loggable_url}"

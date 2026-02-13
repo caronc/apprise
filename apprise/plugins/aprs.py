@@ -340,24 +340,23 @@ class NotifyAprs(NotifyBase):
             )
 
         except ConnectionError as e:
-            self.logger.debug("Socket Exception socket_open: %s", str(e))
+            self.logger.debug("Socket Exception socket_open: %s", e)
             self.sock = None
             return False
 
         except socket.gaierror as e:
-            self.logger.debug("Socket Exception socket_open: %s", str(e))
+            self.logger.debug("Socket Exception socket_open: %s", e)
             self.sock = None
             return False
 
         except socket.timeout as e:
             self.logger.debug(
-                "Socket Timeout Exception socket_open: %s", str(e)
-            )
+                "Socket Timeout Exception socket_open: %s", e)
             self.sock = None
             return False
 
         except Exception as e:
-            self.logger.debug("General Exception socket_open: %s", str(e))
+            self.logger.debug("General Exception socket_open: %s", e)
             self.sock = None
             return False
 
@@ -607,7 +606,7 @@ class NotifyAprs(NotifyBase):
         # First remove all characters from the
         # payload that would break APRS
         # see https://www.aprs.org/doc/APRS101.PDF pg. 71
-        payload = re.sub("[{}|~]+", "", payload)
+        payload = re.sub(r"[{}|~]+", "", payload)
 
         payload = APRS_COMPILED_MAP.sub(  # pragma: no branch
             lambda x: APRS_BAD_CHARMAP[x.group()], payload

@@ -657,6 +657,8 @@ def test_utils_socket_write_deadline():
         written = s.write(b"test", timeout=0.1, flush=False)
         assert written == 4
         assert m_can_write.called
+
+
 def test_utils_socket_write_timeout():
     """SocketTransport() write() timeout."""
     s = SocketTransport("example.com", 1, timeout=(1.0, 0.2))

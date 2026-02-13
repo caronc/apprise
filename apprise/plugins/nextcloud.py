@@ -324,7 +324,7 @@ class NotifyNextcloud(NotifyBase):
 
         if payload:
             self.logger.debug(
-                "Nextcloud v%d Payload: %s", self.version, str(payload)
+                "Nextcloud v%d Payload: %s", self.version, payload
             )
 
         try:

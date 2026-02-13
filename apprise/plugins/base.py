@@ -557,10 +557,10 @@ class NotifyBase(URLBase):
         overflow = self.overflow_mode if overflow is None else overflow
         if attach and len(attach) > 1 and overflow == OverflowMode.TRUNCATE:
             # Save first attachment
-            _attach = AppriseAttachment(attach[0], asset=self.asset)
+            attach_ = AppriseAttachment(attach[0], asset=self.asset)
         else:
             # reference same attachment
-            _attach = attach
+            attach_ = attach
 
         # Apply our overflow (if defined)
         for chunk in self._apply_overflow(
@@ -572,7 +572,7 @@ class NotifyBase(URLBase):
                 "body": chunk["body"],
                 "title": chunk["title"],
                 "notify_type": notify_type,
-                "attach": _attach,
+                "attach": attach_,
                 "body_format": body_format,
             }
 

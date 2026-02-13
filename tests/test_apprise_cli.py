@@ -1094,10 +1094,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     assert result.exit_code == 0
 
     # our persist storage has not been created yet
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9]{8}\s+0\.00B\s+unused\s+-\s+test://\s*",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1191,10 +1191,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1212,10 +1212,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1254,10 +1254,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1277,10 +1277,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries successfully again..
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1302,10 +1302,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1342,15 +1342,15 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^[0-9]\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
     assert re.match(
         r".*\s*[0-9]\.\s+namespace\s+0\.00B\s+stale.*",
-        _stdout,
+        stdout,
         (re.MULTILINE | re.DOTALL),
     )
 
@@ -1371,16 +1371,16 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^[0-9]\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
     assert (
         re.match(
             r".*\s*[0-9]\.\s+namespace\s+0\.00B\s+stale.*",
-            _stdout,
+            stdout,
             (re.MULTILINE | re.DOTALL),
         )
         is None
@@ -1417,18 +1417,18 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     # back to unused state and 0 bytes
     assert re.match(
         r"^[0-9]\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
     # namespace is gone now
     assert (
         re.match(
             r".*\s*[0-9]\.\s+namespace\s+0\.00B\s+stale.*",
-            _stdout,
+            stdout,
             (re.MULTILINE | re.DOTALL),
         )
         is None
@@ -1452,11 +1452,11 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     # back to unused state and 0 bytes
     assert re.match(
         r"^[0-9]\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1496,10 +1496,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1532,10 +1532,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # list our entries
     assert result.exit_code == 0
 
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+81\.00B\s+active\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -1575,10 +1575,10 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # during testing only.
     # Until this can be resolved, this is the section of the test that
     # caused us to disable it in MS Windows
-    _stdout = result.stdout.strip()
+    stdout = result.stdout.strip()
     assert re.match(
         r"^1\.\s+[a-z0-9_-]{8}\s+0\.00B\s+unused\s+-\s+test://$",
-        _stdout,
+        stdout,
         re.MULTILINE,
     )
 
@@ -2285,7 +2285,6 @@ def test_apprise_cli_plugin_loading(mock_post, tmpdir):
     # Note that the failure of the decorator carries all the way back
     # to the CLI
     assert result.exit_code == 0
-
 
     result = runner.invoke(
         cli.main,

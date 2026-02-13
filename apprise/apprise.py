@@ -313,16 +313,16 @@ class Apprise:
             )
             return False
 
-        for _server in servers:
+        for server in servers:
 
-            if isinstance(_server, (ConfigBase, NotifyBase, AppriseConfig)):
+            if isinstance(server, (ConfigBase, NotifyBase, AppriseConfig)):
                 # Go ahead and just add our plugin into our list
-                self.servers.append(_server)
+                self.servers.append(server)
                 continue
 
-            elif not isinstance(_server, (str, dict)):
+            elif not isinstance(server, (str, dict)):
                 logger.error(
-                    f"An invalid notification (type={type(_server)}) was"
+                    f"An invalid notification (type={type(server)}) was"
                     " specified."
                 )
                 return_status = False
@@ -330,7 +330,7 @@ class Apprise:
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
-            instance = Apprise.instantiate(_server, asset=asset, tag=tag)
+            instance = Apprise.instantiate(server, asset=asset, tag=tag)
             if not isinstance(instance, NotifyBase):
                 # No logging is required as instantiate() handles failure
                 # and/or success reasons for us
@@ -856,8 +856,8 @@ class Apprise:
         urls = []
         for s in self.servers:
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                for _s in s.servers():
-                    urls.append(_s.url(privacy=privacy))
+                for s_ in s.servers():
+                    urls.append(s_.url(privacy=privacy))
             else:
                 urls.append(s.url(privacy=privacy))
         return urls
@@ -1005,11 +1005,9 @@ class Apprise:
         This funtion nnever actually counts the Config entry themselves (if
         they exist), only what they contain.
         """
-        return sum([
-            (
+        return sum((
                 1
                 if not isinstance(s, (ConfigBase, AppriseConfig))
                 else len(s.servers())
             )
-            for s in self.servers
-        ])
+            for s in self.servers)

@@ -400,16 +400,16 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
 
     # Test our data set for our key/value pair
     assert re.search(r"<Version>[1-9]+\.[0-9]+</Version>", details[1]["data"])
-    assert re.search("<Subject>title</Subject>", details[1]["data"])
+    assert "<Subject>title</Subject>" in details[1]["data"]
 
-    assert re.search("<Message>test</Message>", details[1]["data"]) is None
-    assert re.search("<Message>", details[1]["data"]) is None
+    assert "<Message>test</Message>" not in details[1]["data"]
+    assert "<Message>" not in details[1]["data"]
     # MessageType was removed from the payload
-    assert re.search("<MessageType>", details[1]["data"]) is None
+    assert "<MessageType>" not in details[1]["data"]
     # However we can find our mapped Message to the new value Body
-    assert re.search("<Body>body</Body>", details[1]["data"])
+    assert "<Body>body</Body>" in details[1]["data"]
     # Custom entry
-    assert re.search("<Key>value</Key>", details[1]["data"])
+    assert "<Key>value</Key>" in details[1]["data"]
 
     mock_post.reset_mock()
     mock_get.reset_mock()
@@ -469,9 +469,9 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     assert re.search(r"<Version>[1-9]+\.[0-9]+</Version>", details[1]["data"])
     assert re.search(r"<MessageType>{}</MessageType>".format(
         NotifyType.INFO.value), details[1]["data"])
-    assert re.search(r"<Subject>title</Subject>", details[1]["data"])
+    assert r"<Subject>title</Subject>" in details[1]["data"]
     # No over-ride
-    assert re.search(r"<Message>body</Message>", details[1]["data"])
+    assert r"<Message>body</Message>" in details[1]["data"]
 
     mock_post.reset_mock()
     mock_get.reset_mock()
@@ -525,9 +525,9 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
         NotifyType.INFO.value), details[1]["data"])
 
     # Subject is swapped for Title
-    assert re.search(r"<Subject>title</Subject>", details[1]["data"]) is None
-    assert re.search(r"<Title>title</Title>", details[1]["data"])
+    assert r"<Subject>title</Subject>" not in details[1]["data"]
+    assert r"<Title>title</Title>" in details[1]["data"]
 
     # Message is swapped for Body
-    assert re.search(r"<Message>body</Message>", details[1]["data"]) is None
-    assert re.search(r"<Body>body</Body>", details[1]["data"])
+    assert r"<Message>body</Message>" not in details[1]["data"]
+    assert r"<Body>body</Body>" in details[1]["data"]

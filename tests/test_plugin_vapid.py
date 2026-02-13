@@ -642,7 +642,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
     assert os.listdir(str(tmpdir0)) == ["subscriptions.json"]
     assert isinstance(smgr.json(), str)
 
-    _asset = asset.AppriseAsset(
+    asset_ = asset.AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir0),
         # Auto-gen our private/public key pair
@@ -656,7 +656,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
             "abc123",
         ],
         subfile=subfile,
-        asset=_asset,
+        asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)
     # Our subscription directory + our
@@ -670,7 +670,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
             "abc123",
         ],
         subfile=subfile,
-        asset=_asset,
+        asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)
     assert isinstance(obj.url(), str)
@@ -684,7 +684,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
             "abc123",
         ],
         subfile="/a/bad/path",
-        asset=_asset,
+        asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)
     assert isinstance(obj.url(), str)
@@ -709,7 +709,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
         ],
         keyfile=keyfile,
         subfile=subfile,
-        asset=_asset,
+        asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)
     assert isinstance(obj.url(), str)
@@ -725,7 +725,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
         ],
         keyfile=subfile,
         subfile=subfile,
-        asset=_asset,
+        asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)
     assert isinstance(obj.url(), str)
@@ -735,7 +735,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
 
     # AutoGen Temporary directory
     tmpdir1 = tmpdir.mkdir("tmp01")
-    _asset2 = asset.AppriseAsset(
+    asset2 = asset.AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir1),
         # Auto-gen our private/public key pair
@@ -749,7 +749,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
             "abc123",
         ],
         keyfile=keyfile,
-        asset=_asset2,
+        asset=asset2,
     )
     assert isinstance(obj, NotifyVapid)
     assert isinstance(obj.url(), str)
@@ -763,7 +763,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
 
     # AutoGen Temporary directory
     tmpdir2 = tmpdir.mkdir("tmp02")
-    _asset3 = asset.AppriseAsset(
+    asset3 = asset.AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir2),
         # Auto-gen our private/public key pair
@@ -779,7 +779,7 @@ def test_plugin_vapid_initializations(mock_post, tmpdir):
         ],
         keyfile="invalid-file",
         subfile=subfile,
-        asset=_asset3,
+        asset=asset3,
     )
     assert isinstance(obj, NotifyVapid)
     assert isinstance(obj.url(), str)
@@ -811,7 +811,7 @@ def test_plugin_vapid_initializations_without_c(tmpdir):
     }
     subfile = os.path.join(str(tmpdir0), "subscriptions.json")
     assert smgr.add(sub) is False
-    _asset = asset.AppriseAsset(
+    asset_ = asset.AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir0),
         # Auto-gen our private/public key pair
@@ -825,6 +825,6 @@ def test_plugin_vapid_initializations_without_c(tmpdir):
             "abc123",
         ],
         subfile=subfile,
-        asset=_asset,
+        asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)

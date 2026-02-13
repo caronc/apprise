@@ -193,6 +193,7 @@ def test_plugin_pagerduty_urls():
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
+
 @mock.patch("requests.post")
 def test_plugin_pagerduty_notify_type_is_string(mock_post):
     response = mock.Mock()

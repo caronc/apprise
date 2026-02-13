@@ -426,8 +426,8 @@ class ApprisePEMController:
         for name in names:
             fnames.insert(0, f"{name}-public_key.pem")
 
-            _entry = name.lower()
-            fnames.insert(0, f"{_entry}-public_key.pem")
+            entry = name.lower()
+            fnames.insert(0, f"{entry}-public_key.pem")
 
         return next(
             (
@@ -477,8 +477,8 @@ class ApprisePEMController:
         for name in names:
             fnames.insert(0, f"{name}-private_key.pem")
 
-            _entry = name.lower()
-            fnames.insert(0, f"{_entry}-private_key.pem")
+            entry = name.lower()
+            fnames.insert(0, f"{entry}-private_key.pem")
 
         return next(
             (

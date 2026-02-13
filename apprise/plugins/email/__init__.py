@@ -42,11 +42,8 @@ charset.add_charset("utf-8", charset.QP, charset.QP, "utf-8")
 
 __all__ = [
     "EMAIL_TEMPLATES",
-    "PGP_SUPPORT",
     "SECURE_MODES",
     "AppriseEmailException",
-    "ApprisePGPController",
-    "ApprisePGPException",
     "EmailMessage",
     "NotifyEmail",
     "SecureMailMode",

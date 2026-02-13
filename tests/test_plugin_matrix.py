@@ -1164,7 +1164,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
 
     response = mock.Mock()
     response.status_code = requests.codes.unavailable
-    _resp = loads(MATRIX_GOOD_RESPONSE)
+    resp = loads(MATRIX_GOOD_RESPONSE)
 
     mock_get.return_value = response
     mock_post.return_value = response
@@ -1189,8 +1189,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     )
 
     # bad data
-    _resp["m.homeserver"] = "!garbage!:303"
-    response.content = dumps(_resp).encode("utf-8")
+    resp["m.homeserver"] = "!garbage!:303"
+    response.content = dumps(resp).encode("utf-8")
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
     )
@@ -1206,8 +1206,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert obj.notify("hello world") is False
 
     # bad key
-    _resp["m.homeserver"] = {}
-    response.content = dumps(_resp).encode("utf-8")
+    resp["m.homeserver"] = {}
+    response.content = dumps(resp).encode("utf-8")
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
     )
@@ -1218,8 +1218,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert NotifyMatrix.discovery_base_key not in obj.store
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
-    _resp["m.homeserver"] = {"base_url": "https://nuxref.com/base"}
-    response.content = dumps(_resp).encode("utf-8")
+    resp["m.homeserver"] = {"base_url": "https://nuxref.com/base"}
+    response.content = dumps(resp).encode("utf-8")
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
     )
@@ -1234,8 +1234,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert obj.notify("hello world") is True
 
     # bad data
-    _resp["m.identity_server"] = "!garbage!:303"
-    response.content = dumps(_resp).encode("utf-8")
+    resp["m.identity_server"] = "!garbage!:303"
+    response.content = dumps(resp).encode("utf-8")
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
     )
@@ -1248,8 +1248,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
     # no key
-    _resp["m.identity_server"] = {}
-    response.content = dumps(_resp).encode("utf-8")
+    resp["m.identity_server"] = {}
+    response.content = dumps(resp).encode("utf-8")
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
     )
@@ -1262,8 +1262,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
     # remove
-    del _resp["m.identity_server"]
-    response.content = dumps(_resp).encode("utf-8")
+    del resp["m.identity_server"]
+    response.content = dumps(resp).encode("utf-8")
 
     obj.store.clear(
         NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
@@ -1272,8 +1272,8 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     assert obj.identity_url == "https://nuxref.com/base"
 
     # restore
-    _resp["m.identity_server"] = {"base_url": '"https://vector.im'}
-    response.content = dumps(_resp).encode("utf-8")
+    resp["m.identity_server"] = {"base_url": '"https://vector.im'}
+    response.content = dumps(resp).encode("utf-8")
 
     # Not found is an acceptable response (no exceptions thrown)
     response.status_code = requests.codes.not_found

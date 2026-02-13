@@ -27,6 +27,7 @@
 
 """XMPP General/Shared Configuration"""
 
+
 class SecureXMPPMode:
     """
     Defines our modes

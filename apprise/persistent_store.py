@@ -575,9 +575,9 @@ class PersistentStore:
             ntf.close()
 
             # Pointer to our open call
-            _open = open if not compress else gzip.open
+            open_ = open if not compress else gzip.open
 
-            with _open(ntf.name, mode="wb") as fd:
+            with open_(ntf.name, mode="wb") as fd:
                 # Write our content
                 fd.write(data)
 
@@ -1433,11 +1433,11 @@ class PersistentStore:
         namespaces = PersistentStore.disk_scan(path, namespace)
 
         # Track matches
-        _map = {}
+        map_ = {}
 
         for namespace in namespaces:
             # Prepare our map
-            _map[namespace] = []
+            map_[namespace] = []
 
             # Reference Directories
             base_dir = os.path.join(path, namespace)
@@ -1572,7 +1572,7 @@ class PersistentStore:
                         dir_sweep = False
 
                 # Store our record
-                _map[namespace].append(record)
+                map_[namespace].append(record)
 
             # Memory tidy
             del files
@@ -1594,7 +1594,7 @@ class PersistentStore:
                         except OSError:
                             # do nothing;
                             pass
-        return _map
+        return map_
 
     def size(
         self,
@@ -1614,10 +1614,8 @@ class PersistentStore:
 
         # Get a list of files (file paths) in the given directory
         try:
-            self.__cache_size = sum([
-                os.stat(path).st_size
-                for path in self.files(exclude=exclude, lazy=lazy)
-            ])
+            self.__cache_size = sum(os.stat(path).st_size
+                for path in self.files(exclude=exclude, lazy=lazy))
 
         except OSError:
             # We can't access the directory or it does not exist

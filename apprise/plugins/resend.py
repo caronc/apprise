@@ -370,7 +370,7 @@ class NotifyResend(NotifyBase):
         self.from_addr[0] \
             if self.from_addr[0] is not False else self.app_id
 
-        _payload = {
+        payload_ = {
             "from": formataddr(self.from_addr, charset="utf-8"),
             # A subject is a requirement, so if none is specified we must
             # set a default with at least 1 character or Resend will deny
@@ -421,7 +421,7 @@ class NotifyResend(NotifyBase):
                 )
 
             # Append our attachments to the payload
-            _payload.update({
+            payload_.update({
                 "attachments": attachments,
             })
 
@@ -430,7 +430,7 @@ class NotifyResend(NotifyBase):
             target = targets.pop(0)
 
             # Create a copy of our template
-            payload = _payload.copy()
+            payload = payload_.copy()
 
             # unique cc/bcc list management
             cc = self.cc - self.bcc - {target}

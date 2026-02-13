@@ -220,7 +220,7 @@ class NotifyThreema(NotifyBase):
         }
 
         # Prepare our payload
-        _payload = {
+        payload_ = {
             "secret": self.secret,
             "from": self.user,
             "text": body.encode("utf-8"),
@@ -234,7 +234,7 @@ class NotifyThreema(NotifyBase):
             key, target = targets.pop(0)
 
             # Prepare a payload object
-            payload = _payload.copy()
+            payload = payload_.copy()
 
             # Set Target
             payload[key] = target

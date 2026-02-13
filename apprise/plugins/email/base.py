@@ -1023,31 +1023,31 @@ class NotifyEmail(NotifyBase):
             to_name, to_addr = emails.pop(0)
 
             # Strip target out of cc list if in To or Bcc
-            _cc = cc - bcc - {to_addr}
+            cc_ = cc - bcc - {to_addr}
 
             # Strip target out of bcc list if in To
-            _bcc = bcc - {to_addr}
+            bcc_ = bcc - {to_addr}
 
             # Strip target out of reply_to list if in To
-            _reply_to = reply_to - {to_addr}
+            reply_to_ = reply_to - {to_addr}
 
             # Format our cc addresses to support the Name field
-            _cc = [
+            cc_ = [
                 formataddr((names.get(addr, False), addr), charset="utf-8")
-                for addr in _cc
+                for addr in cc_
             ]
 
             # Format our bcc addresses to support the Name field
-            _bcc = [
+            bcc_ = [
                 formataddr((names.get(addr, False), addr), charset="utf-8")
-                for addr in _bcc
+                for addr in bcc_
             ]
 
-            if _reply_to:
+            if reply_to_:
                 # Format our reply-to addresses to support the Name field
                 reply_to = [
                     formataddr((names.get(addr, False), addr), charset="utf-8")
-                    for addr in _reply_to
+                    for addr in reply_to_
                 ]
 
             logger.debug(
@@ -1055,12 +1055,12 @@ class NotifyEmail(NotifyBase):
             )
 
             logger.debug("Email To: {}".format(to_addr))
-            if _cc:
-                logger.debug("Email Cc: {}".format(", ".join(_cc)))
-            if _bcc:
-                logger.debug("Email Bcc: {}".format(", ".join(_bcc)))
-            if _reply_to:
-                logger.debug("Email Reply-To: {}".format(", ".join(_reply_to)))
+            if cc_:
+                logger.debug("Email Cc: {}".format(", ".join(cc_)))
+            if bcc_:
+                logger.debug("Email Bcc: {}".format(", ".join(bcc_)))
+            if reply_to_:
+                logger.debug("Email Reply-To: {}".format(", ".join(reply_to_)))
 
             # Prepare Email Message
             if notify_format == NotifyFormat.HTML:
@@ -1174,13 +1174,13 @@ class NotifyEmail(NotifyBase):
             base["Date"] = format_datetime(datetime.now(tz=tzinfo))
 
             if cc:
-                base["Cc"] = ",".join(_cc)
+                base["Cc"] = ",".join(cc_)
 
-            if _reply_to:
+            if reply_to_:
                 base["Reply-To"] = ",".join(reply_to)
 
             yield EmailMessage(
                 recipient=to_addr,
-                to_addrs=[to_addr, *list(_cc), *list(_bcc)],
+                to_addrs=[to_addr, *list(cc_), *list(bcc_)],
                 body=base.as_string(),
             )

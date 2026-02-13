@@ -282,7 +282,6 @@ def test_plugin_apprise_api_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-
 @mock.patch("requests.post")
 def test_notify_apprise_api_payload_check(mock_post):
     """NotifyAppriseAPI() payload checks"""

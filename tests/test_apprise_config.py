@@ -1529,4 +1529,3 @@ def test_config_base_expired_with_int_cache(monkeypatch):
     # Beyond cache window
     monkeypatch.setattr(time, "time", lambda: 1031.0)
     assert cb.expired() is True
-

@@ -248,26 +248,26 @@ class NotifyBlueSky(NotifyBase):
 
         if blobs:
             for no, blob in enumerate(blobs, start=1):
-                _payload = payload.copy()
+                payload_ = payload.copy()
                 if no > 1:
                     #
                     # multiple instances
                     #
                     # 1. update createdAt time
                     # 2. Change text to identify image no
-                    _payload["record"]["createdAt"] = datetime.now(
+                    payload_["record"]["createdAt"] = datetime.now(
                         tz=timezone.utc
                     ).strftime("%FT%XZ")
-                    _payload["record"]["text"] = f"{no:02d}/{len(blobs):02d}"
+                    payload_["record"]["text"] = f"{no:02d}/{len(blobs):02d}"
 
-                _payload["record"]["embed"] = {
+                payload_["record"]["embed"] = {
                     "images": [{
                         "image": blob[0],
                         "alt": blob[1],
                     }],
                     "$type": "app.bsky.embed.images",
                 }
-                payloads.append(_payload)
+                payloads.append(payload_)
         else:
             payloads.append(payload)
 

@@ -352,7 +352,6 @@ class NotifyDiscord(NotifyBase):
         elif self.ping:
             payload.update(self.ping_payload(" ".join(self.ping)))
 
-
         if body:
             # Track extra embed fields (if used)
             fields: list[dict[str, str]] = []

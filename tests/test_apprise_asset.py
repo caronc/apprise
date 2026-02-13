@@ -56,7 +56,6 @@ def test_timezone():
     asset = AppriseAsset(timezone=ZoneInfo("America/Toronto"))
     assert isinstance(asset.tzinfo, tzinfo)
 
-
     with pytest.raises(AttributeError):
         AppriseAsset(timezone=object)
 

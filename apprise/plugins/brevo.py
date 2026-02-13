@@ -336,7 +336,7 @@ class NotifyBrevo(NotifyBase):
         has_error = False
 
         # A Simple Email Payload Template
-        _payload = {
+        payload_ = {
             "sender": {
                 "email": self.from_email,
             },
@@ -349,14 +349,14 @@ class NotifyBrevo(NotifyBase):
 
         if use_html:
             # body already normalised; keep your existing logic
-            _payload["htmlContent"] = body
-            _payload["textContent"] = convert_between(
+            payload_["htmlContent"] = body
+            payload_["textContent"] = convert_between(
                 NotifyFormat.HTML, NotifyFormat.TEXT, body
             )
         else:
             # Plain text requested, but Brevo still wants HTML
-            _payload["textContent"] = body
-            _payload["htmlContent"] = convert_between(
+            payload_["textContent"] = body
+            payload_["htmlContent"] = convert_between(
                 NotifyFormat.TEXT, NotifyFormat.HTML, body
             )
 
@@ -414,19 +414,19 @@ class NotifyBrevo(NotifyBase):
                 )
 
             # Append our attachments to the payload
-            _payload.update({
+            payload_.update({
                 "attachment": attachments,
             })
 
         if self.reply_to:
-            _payload["replyTo"] = {"email": self.reply_to[1]}
+            payload_["replyTo"] = {"email": self.reply_to[1]}
 
         targets = list(self.targets)
         while len(targets) > 0:
             target = targets.pop(0)
 
             # Create a copy of our template
-            payload = _payload.copy()
+            payload = payload_.copy()
 
             # the cc, bcc, to field must be unique or SendMail will fail, the
             # below code prepares this by ensuring the target isn't in the cc

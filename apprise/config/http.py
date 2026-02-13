@@ -39,12 +39,12 @@ from .base import ConfigBase
 # text/x-yaml
 # application/yaml
 # application/x-yaml
-MIME_IS_YAML = re.compile("(text|application)/(x-)?yaml", re.I)
+MIME_IS_YAML = re.compile(r"(text|application)/(x-)?yaml", re.I)
 
 # Support TEXT formats
 # text/plain
 # text/html
-MIME_IS_TEXT = re.compile("text/(plain|html)", re.I)
+MIME_IS_TEXT = re.compile(r"text/(plain|html)", re.I)
 
 
 class ConfigHTTP(ConfigBase):

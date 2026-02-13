@@ -458,7 +458,7 @@ class NotifyVapid(NotifyBase):
                 self.logger.warning(
                     "A Connection error occurred sending Vapid notification."
                 )
-                self.logger.debug("Socket Exception: %s", str(e))
+                self.logger.debug("Socket Exception: %s", e)
 
                 has_error = True
 

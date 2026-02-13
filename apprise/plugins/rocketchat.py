@@ -473,7 +473,7 @@ class NotifyRocketChat(NotifyBase):
             return False
 
         # prepare JSON Object
-        _payload = self._payload(body, title, notify_type)
+        payload_ = self._payload(body, title, notify_type)
 
         # Initiaize our error tracking
         has_error = False
@@ -483,7 +483,7 @@ class NotifyRocketChat(NotifyBase):
         channels.extend([f"#{c}" for c in self.channels])
 
         # Create a copy of our channels to notify against
-        payload = _payload.copy()
+        payload = payload_.copy()
         while len(channels) > 0:
             # Get Channel
             channel = channels.pop(0)
@@ -496,7 +496,7 @@ class NotifyRocketChat(NotifyBase):
 
         # Create a copy of our room id's to notify against
         rooms = list(self.rooms)
-        payload = _payload.copy()
+        payload = payload_.copy()
         while len(rooms):
             # Get Room
             room = rooms.pop(0)

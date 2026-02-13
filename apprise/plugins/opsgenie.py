@@ -401,30 +401,30 @@ class NotifyOpsgenie(NotifyBase):
         # Store our mappings
         self.mapping = self.opsgenie_message_map.copy()
         if mapping and isinstance(mapping, dict):
-            for _k, _v in mapping.items():
+            for k_, v_ in mapping.items():
                 # Get our mapping
-                k = next((t for t in NOTIFY_TYPES if t.startswith(_k)), None)
+                k = next((t for t in NOTIFY_TYPES if t.startswith(k_)), None)
                 if not k:
                     msg = (
-                        f"The Opsgenie mapping key specified ({_k}) "
+                        f"The Opsgenie mapping key specified ({k_}) "
                         "is invalid."
                     )
                     self.logger.warning(msg)
                     raise TypeError(msg)
 
-                _v_lower = _v.lower()
+                v_lower = v_.lower()
                 v = next(
                     (
                         v
                         for v in OPSGENIE_ACTIONS[1:]
-                        if v.startswith(_v_lower)
+                        if v.startswith(v_lower)
                     ),
                     None,
                 )
                 if not v:
                     msg = (
                         f"The Opsgenie mapping value (assigned to {k}) "
-                        f"specified ({_v}) is invalid."
+                        f"specified ({v_}) is invalid."
                     )
                     self.logger.warning(msg)
                     raise TypeError(msg)
@@ -453,8 +453,8 @@ class NotifyOpsgenie(NotifyBase):
         self.targets = []
 
         # Sort our targets
-        for _target in parse_list(targets):
-            target = _target.strip()
+        for target_ in parse_list(targets):
+            target = target_.strip()
             if len(target) < 2:
                 self.logger.debug(f"Ignoring Opsgenie Entry: {target}")
                 continue
@@ -794,7 +794,7 @@ class NotifyOpsgenie(NotifyBase):
 
         # A map allows us to map our target types so they can be correctly
         # placed back into your URL below. Hence map the 'user' -> '@'
-        __map = {
+        map_ = {
             OpsgenieCategory.USER: NotifyOpsgenie.template_tokens[
                 "target_user"
             ]["prefix"],
@@ -816,7 +816,7 @@ class NotifyOpsgenie(NotifyBase):
             targets="/".join([
                 NotifyOpsgenie.quote(
                     "{}{}".format(
-                        __map[x["type"]],
+                        map_[x["type"]],
                         x.get("id", x.get("name", x.get("username"))),
                     )
                 )

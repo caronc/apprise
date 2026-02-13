@@ -457,13 +457,13 @@ class NotifyTwitter(NotifyBase):
                 batches.append(",".join(batch))
 
             for no, media_ids in enumerate(batches):
-                _payload = deepcopy(payload)
-                _payload["media_ids"] = media_ids
+                payload_ = deepcopy(payload)
+                payload_["media_ids"] = media_ids
 
                 if no or not body:
                     # strip text and replace it with the image representation
-                    _payload["status"] = f"{no + 1:02d}/{len(batches):02d}"
-                payloads.append(_payload)
+                    payload_["status"] = f"{no + 1:02d}/{len(batches):02d}"
+                payloads.append(payload_)
 
         for no, payload in enumerate(payloads, start=1):
             # Send Tweet
@@ -563,9 +563,9 @@ class NotifyTwitter(NotifyBase):
 
         else:
             for no, attachment in enumerate(attachments):
-                _payload = deepcopy(payload)
-                _data = _payload["event"]["message_create"]["message_data"]
-                _data["attachment"] = {
+                payload_ = deepcopy(payload)
+                data = payload_["event"]["message_create"]["message_data"]
+                data["attachment"] = {
                     "type": "media",
                     "media": {"id": attachment["media_id"]},
                     "additional_owners": ",".join(
@@ -574,8 +574,8 @@ class NotifyTwitter(NotifyBase):
                 }
                 if no or not body:
                     # strip text and replace it with the image representation
-                    _data["text"] = f"{no + 1:02d}/{len(attachments):02d}"
-                payloads.append(_payload)
+                    data["text"] = f"{no + 1:02d}/{len(attachments):02d}"
+                payloads.append(payload_)
 
         for no, payload in enumerate(payloads, start=1):
             for screen_name, user_id in targets.items():

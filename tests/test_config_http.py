@@ -340,8 +340,8 @@ def test_config_http(mock_post):
     assert ch.read() is None
 
     # Exception handling
-    for _exception in REQUEST_EXCEPTIONS:
-        mock_post.side_effect = _exception
+    for exception in REQUEST_EXCEPTIONS:
+        mock_post.side_effect = exception
         assert ch.read() is None
 
     # Restore buffer size count

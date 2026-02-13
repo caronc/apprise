@@ -27,7 +27,6 @@
 
 # Disable logging for a cleaner testing output
 import logging
-import re
 import sys
 from unittest import mock
 
@@ -89,8 +88,8 @@ def test_plugin_syslog_by_url(openlog, syslog):
 
     obj = apprise.Apprise.instantiate("syslog://")
     assert obj.url().startswith("syslog://user")
-    assert re.search(r"logpid=yes", obj.url()) is not None
-    assert re.search(r"logperror=no", obj.url()) is not None
+    assert r"logpid=yes" in obj.url()
+    assert r"logperror=no" in obj.url()
 
     # We do not support generation of a URL ID
     assert obj.url_id() is None
@@ -102,8 +101,8 @@ def test_plugin_syslog_by_url(openlog, syslog):
     obj = apprise.Apprise.instantiate("syslog://?logpid=no&logperror=yes")
     assert isinstance(obj, NotifySyslog)
     assert obj.url().startswith("syslog://user")
-    assert re.search(r"logpid=no", obj.url()) is not None
-    assert re.search(r"logperror=yes", obj.url()) is not None
+    assert r"logpid=no" in obj.url()
+    assert r"logperror=yes" in obj.url()
 
     # Test sending a notification
     assert obj.notify("body") is True
@@ -115,8 +114,8 @@ def test_plugin_syslog_by_url(openlog, syslog):
     obj = apprise.Apprise.instantiate("syslog://_/?facility=local5")
     assert isinstance(obj, NotifySyslog)
     assert obj.url().startswith("syslog://local5")
-    assert re.search(r"logpid=yes", obj.url()) is not None
-    assert re.search(r"logperror=no", obj.url()) is not None
+    assert r"logpid=yes" in obj.url()
+    assert r"logperror=no" in obj.url()
 
     # Invalid instantiation
     assert apprise.Apprise.instantiate("syslog://_/?facility=invalid") is None
@@ -125,15 +124,15 @@ def test_plugin_syslog_by_url(openlog, syslog):
     obj = apprise.Apprise.instantiate("syslog://_/?facility=d")
     assert isinstance(obj, NotifySyslog)
     assert obj.url().startswith("syslog://daemon")
-    assert re.search(r"logpid=yes", obj.url()) is not None
-    assert re.search(r"logperror=no", obj.url()) is not None
+    assert r"logpid=yes" in obj.url()
+    assert r"logperror=no" in obj.url()
 
     # Facility can also be specified on the url as a hostname
     obj = apprise.Apprise.instantiate("syslog://kern?logpid=no&logperror=y")
     assert isinstance(obj, NotifySyslog)
     assert obj.url().startswith("syslog://kern")
-    assert re.search(r"logpid=no", obj.url()) is not None
-    assert re.search(r"logperror=yes", obj.url()) is not None
+    assert r"logpid=no" in obj.url()
+    assert r"logperror=yes" in obj.url()
 
     # Facilities specified as an argument always over-ride host
     obj = apprise.Apprise.instantiate("syslog://kern?facility=d")
@@ -150,8 +149,8 @@ def test_plugin_syslog_edge_cases(openlog, syslog):
     obj = NotifySyslog(facility=None)
     assert isinstance(obj, NotifySyslog)
     assert obj.url().startswith("syslog://user")
-    assert re.search(r"logpid=yes", obj.url()) is not None
-    assert re.search(r"logperror=no", obj.url()) is not None
+    assert r"logpid=yes" in obj.url()
+    assert r"logperror=no" in obj.url()
 
     # Exception should be thrown about the fact no bot token was specified
     with pytest.raises(TypeError):

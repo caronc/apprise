@@ -522,12 +522,12 @@ def test_plugin_irc_client_join() -> None:
 
     # join() calls monotonic frequently; use a callable so we never exhaust
     # a finite side_effect list.
-    _calls = {"n": 0}
+    calls = {"n": 0}
 
     def _mono() -> float:
-        _calls["n"] += 1
+        calls["n"] += 1
         # Stay below deadline long enough to exercise the loop, then exceed it.
-        return 0.0 if _calls["n"] < 2000 else 1.0
+        return 0.0 if calls["n"] < 2000 else 1.0
 
     with (
         mock.patch.object(client, "_flush") as m_flush,
@@ -782,13 +782,13 @@ def test_plugin_irc_client_join_privmsg_identify_quit() -> None:
     )
     c.transport = mock.Mock()
 
-    _calls = {"n": 0}
+    calls = {"n": 0}
 
     def _mono() -> float:
-        _calls["n"] += 1
+        calls["n"] += 1
         # Return 0.0 long enough to enter the loop, then jump past deadline
         # to ensure join() exits.
-        return 0.0 if _calls["n"] < 5000 else 1.0
+        return 0.0 if calls["n"] < 5000 else 1.0
 
     with (
         mock.patch.object(c, "_flush") as m_flush,

@@ -749,7 +749,7 @@ def parse_url(
                 return None
 
     # Acquire our port (if defined)
-    _port = result.get("port")
+    port = result.get("port")
 
     if verify_host:
         # Verify and Validate our hostname
@@ -760,14 +760,14 @@ def parse_url(
             return None
 
         # Max port is 65535 and min is 1
-        if isinstance(_port, int) and not (
-            not strict_port or (strict_port and _port > 0 and _port <= 65535)
+        if isinstance(port, int) and not (
+            not strict_port or (strict_port and port > 0 and port <= 65535)
         ):
 
             # An invalid port was specified
             return None
 
-    elif pmatch and not isinstance(_port, int):
+    elif pmatch and not isinstance(port, int):
         if strict_port:
             # Store port
             result["port"] = pmatch.group("port").strip()
@@ -857,15 +857,15 @@ def parse_phone_no(*args, store_unparseable=True, prefix=False, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            _result = (
+            result_ = (
                 PHONE_NO_DETECTION_RE
                 if not prefix
                 else PHONE_NO_WPREFIX_DETECTION_RE
             ).findall(arg)
-            if _result:
-                result += _result
+            if result_:
+                result += result_
 
-            elif not _result and store_unparseable:
+            elif not result_ and store_unparseable:
                 # we had content passed into us that was lost because it was
                 # so poorly formatted that it didn't even come close to
                 # meeting the regular expression we defined. We intentially
@@ -891,11 +891,11 @@ def parse_call_sign(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            _result = CALL_SIGN_DETECTION_RE.findall(arg)
-            if _result:
-                result += _result
+            result_ = CALL_SIGN_DETECTION_RE.findall(arg)
+            if result_:
+                result += result_
 
-            elif not _result and store_unparseable:
+            elif not result_ and store_unparseable:
                 # we had content passed into us that was lost because it was
                 # so poorly formatted that it didn't even come close to
                 # meeting the regular expression we defined. We intentially
@@ -921,11 +921,11 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            _result = EMAIL_DETECTION_RE.findall(arg)
-            if _result:
-                result += _result
+            result_ = EMAIL_DETECTION_RE.findall(arg)
+            if result_:
+                result += result_
 
-            elif not _result and store_unparseable:
+            elif not result_ and store_unparseable:
                 # we had content passed into us that was lost because it was
                 # so poorly formatted that it didn't even come close to
                 # meeting the regular expression we defined. We intentially
@@ -950,20 +950,20 @@ def url_assembly(encode=False, **kwargs):
         # dummy function that does nothing to content
         return content
 
-    _quote = quote if encode else _no_encode
+    quote_ = quote if encode else _no_encode
 
     # Determine Authentication
     auth = ""
     if kwargs.get("user") is not None and kwargs.get("password") is not None:
 
         auth = "{user}:{password}@".format(
-            user=_quote(kwargs.get("user"), safe=""),
-            password=_quote(kwargs.get("password"), safe=""),
+            user=quote_(kwargs.get("user"), safe=""),
+            password=quote_(kwargs.get("password"), safe=""),
         )
 
     elif kwargs.get("user") is not None:
         auth = "{user}@".format(
-            user=_quote(kwargs.get("user"), safe=""),
+            user=quote_(kwargs.get("user"), safe=""),
         )
 
     return "{schema}://{auth}{hostname}{port}{fullpath}{params}".format(
@@ -974,7 +974,7 @@ def url_assembly(encode=False, **kwargs):
         port=(
             "" if not kwargs.get("port") else ":{}".format(kwargs.get("port"))
         ),
-        fullpath=_quote(kwargs.get("fullpath", ""), safe="/"),
+        fullpath=quote_(kwargs.get("fullpath", ""), safe="/"),
         params=(
             ""
             if not kwargs.get("qsd")
@@ -1012,9 +1012,9 @@ def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
         str: The escaped parameters returned as a string
     """
     # Tidy query by eliminating any records set to None
-    _query = {k: v for (k, v) in query.items() if v is not None}
+    query_ = {k: v for (k, v) in query.items() if v is not None}
     return _urlencode(
-        _query, doseq=doseq, safe=safe, encoding=encoding, errors=errors
+        query_, doseq=doseq, safe=safe, encoding=encoding, errors=errors
     )
 
 
@@ -1025,11 +1025,11 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            _result = URL_DETECTION_RE.findall(arg)
-            if _result:
-                result += _result
+            result_ = URL_DETECTION_RE.findall(arg)
+            if result_:
+                result += result_
 
-            elif not _result and store_unparseable:
+            elif not result_ and store_unparseable:
                 # we had content passed into us that was lost because it was
                 # so poorly formatted that it didn't even come close to
                 # meeting the regular expression we defined. We intentially
@@ -1128,7 +1128,7 @@ def validate_regex(value, regex=r"[^\s]+", flags=re.I, strip=True, fmt=None):
 
     if flags:
         # Regex String -> Flag Lookup Map
-        _map = {
+        map_ = {
             # Ignore Case
             "i": re.I,
             # Multi Line
@@ -1148,7 +1148,7 @@ def validate_regex(value, regex=r"[^\s]+", flags=re.I, strip=True, fmt=None):
             # respected integer (expected) Python values and perform
             # a bit-wise or on each match found:
             flags = reduce(
-                lambda x, y: x | y, [0] + [_map[f] for f in flags if f in _map]
+                lambda x, y: x | y, [0] + [map_[f] for f in flags if f in map_]
             )
 
     else:

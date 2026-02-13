@@ -73,7 +73,7 @@ NTFY_MODES = (
 
 # A Simple regular expression used to auto detect Auth mode if it isn't
 # otherwise specified:
-NTFY_AUTH_DETECT_RE = re.compile("tk_[^ \t]+", re.IGNORECASE)
+NTFY_AUTH_DETECT_RE = re.compile(r"tk_[^ \t]+", re.IGNORECASE)
 
 
 class NtfyAuth:
@@ -418,13 +418,13 @@ class NotifyNtfy(NotifyBase):
         # Build list of topics
         topics = parse_list(targets)
         self.topics = []
-        for _topic in topics:
+        for topic_ in topics:
             topic = validate_regex(
-                _topic, *self.template_tokens["topic"]["regex"]
+                topic_, *self.template_tokens["topic"]["regex"]
             )
             if not topic:
                 self.logger.warning(
-                    f"A specified ntfy topic ({_topic}) is invalid and will be"
+                    f"A specified ntfy topic ({topic_}) is invalid and will be"
                     " ignored"
                 )
                 continue
@@ -469,8 +469,8 @@ class NotifyNtfy(NotifyBase):
                 for no, attachment in enumerate(attach):
 
                     # First message only includes the text (if defined)
-                    _body = body if not no and body else None
-                    _title = title if not no and title else None
+                    body_ = body if not no and body else None
+                    title_ = title if not no and title else None
 
                     # Perform some simple error checking
                     if not attachment:
@@ -488,8 +488,8 @@ class NotifyNtfy(NotifyBase):
 
                     okay, _response = self._send(
                         topic,
-                        body=_body,
-                        title=_title,
+                        body=body_,
+                        title=title_,
                         image_url=image_url,
                         attach=attachment,
                     )
@@ -864,12 +864,12 @@ class NotifyNtfy(NotifyBase):
 
         if "attach" in results["qsd"] and len(results["qsd"]["attach"]):
             results["attach"] = NotifyNtfy.unquote(results["qsd"]["attach"])
-            _results = NotifyBase.parse_url(results["attach"])
-            if _results:
+            results_ = NotifyBase.parse_url(results["attach"])
+            if results_:
                 results["filename"] = (
                     None
-                    if _results["fullpath"]
-                    else basename(_results["fullpath"])
+                    if results_["fullpath"]
+                    else basename(results_["fullpath"])
                 )
 
             if "filename" in results["qsd"] and len(

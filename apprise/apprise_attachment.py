@@ -173,33 +173,33 @@ class AppriseAttachment:
             return False
 
         # Iterate over our attachments
-        for _attachment in attachments:
+        for attachment in attachments:
             if self.location == ContentLocation.INACCESSIBLE:
                 logger.warning(
-                    f"Attachments are disabled; ignoring {_attachment}"
+                    f"Attachments are disabled; ignoring {attachment}"
                 )
                 return_status = False
                 continue
 
-            if isinstance(_attachment, str):
-                logger.debug(f"Loading attachment: {_attachment}")
+            if isinstance(attachment, str):
+                logger.debug(f"Loading attachment: {attachment}")
                 # Instantiate ourselves an object, this function throws or
                 # returns None if it fails
                 instance = AppriseAttachment.instantiate(
-                    _attachment, asset=asset, cache=cache
+                    attachment, asset=asset, cache=cache
                 )
                 if not isinstance(instance, AttachBase):
                     return_status = False
                     continue
 
-            elif isinstance(_attachment, AppriseAttachment):
+            elif isinstance(attachment, AppriseAttachment):
                 # We were provided a list of Apprise Attachments
                 # append our content together
-                instance = _attachment.attachments
+                instance = attachment.attachments
 
-            elif not isinstance(_attachment, AttachBase):
+            elif not isinstance(attachment, AttachBase):
                 logger.warning(
-                    f"An invalid attachment (type={type(_attachment)}) was"
+                    f"An invalid attachment (type={type(attachment)}) was"
                     " specified."
                 )
                 return_status = False
@@ -208,7 +208,7 @@ class AppriseAttachment:
             else:
                 # our entry is of type AttachBase, so just go ahead and point
                 # our instance to it for some post processing below
-                instance = _attachment
+                instance = attachment
 
             # Apply some simple logic if our location flag is set
             if self.location and (
@@ -324,7 +324,7 @@ class AppriseAttachment:
 
     def size(self) -> int:
         """Returns the total size of accumulated attachments."""
-        return sum([len(a) for a in self.attachments if len(a) > 0])
+        return sum(len(a) for a in self.attachments if len(a) > 0)
 
     def pop(self, index: int = -1) -> AttachBase:
         """Removes an indexed Apprise Attachment from the stack and returns it.
