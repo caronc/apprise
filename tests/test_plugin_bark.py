@@ -268,6 +268,20 @@ apprise_url_tests = (
             "instance": NotifyBark,
         },
     ),
+    (
+        "bark://192.168.0.6:8081/device_key/?markdown=yes",
+        {
+            # enable markdown mode
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?markdown=no",
+        {
+            # explicitly disable markdown (default behavior)
+            "instance": NotifyBark,
+        },
+    ),
 )
 
 
