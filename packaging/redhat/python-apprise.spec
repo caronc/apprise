@@ -133,8 +133,6 @@ BuildRequires: python3dist(tox)
 %if %{with tests}
 BuildRequires: python3dist(pytest)
 BuildRequires: python3dist(pytest-mock)
-BuildRequires: python3dist(pytest-runner)
-BuildRequires: python3dist(pytest-cov)
 %endif
 
 Requires: python3dist(requests)
@@ -238,6 +236,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %changelog
 * Tue Jan 20 2026 Chris Caron <lead2gold@gmail.com> - 1.9.7-1
 - Updated to v1.9.7
+
+* Sun Jan 18 2026 Benjamin A. Beasley <code@musicinmybrain.net> - 1.9.6-2
+- Remove unnecessary pytest-runner, pytest-cov dependencies
 
 * Sat Jan 17 2026 Fedora Release Engineering <releng@fedoraproject.org> - 1.9.6-2
 - Rebuilt for https://fedoraproject.org/wiki/Fedora_44_Mass_Rebuild
