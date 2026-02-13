@@ -3185,7 +3185,21 @@ def test_adapter_send_keepalive_async_returns_false_when_client_none(
         with contextlib.suppress(Exception):
             asyncio.set_event_loop(None)
 
-        loop.close()
+        # Safe shutdown of asyncgens
+        if not loop.is_closed():
+            with contextlib.suppress(Exception):
+                ag_coro = loop.shutdown_asyncgens()
+                try:
+                    loop.run_until_complete(ag_coro)
+                except Exception:
+                    # Reuse the helper from the adapter module if available,
+                    # or do a manual close
+                    if hasattr(ag_coro, "close"):
+                        ag_coro.close()
+
+        # Ensure close() is called even if the block above had issues
+        with contextlib.suppress(Exception):
+            loop.close()
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")

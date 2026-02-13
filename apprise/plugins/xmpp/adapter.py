@@ -401,8 +401,16 @@ class SlixmppAdapter:
         with contextlib.suppress(Exception):
             loop.stop()
 
-        with contextlib.suppress(Exception):
-            loop.run_until_complete(loop.shutdown_asyncgens())
+        # Only attempt to shutdown generators if the loop is still open.
+        # Otherwise, creating the coroutine without running it triggers a
+        # RuntimeWarning.
+        if not loop.is_closed():
+            with contextlib.suppress(Exception):
+                ag_coro = loop.shutdown_asyncgens()
+                try:
+                    loop.run_until_complete(ag_coro)
+                except Exception:
+                    _close_awaitable(ag_coro)
 
         # Detach loop from thread policy
         with contextlib.suppress(Exception):
