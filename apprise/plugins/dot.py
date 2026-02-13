@@ -444,8 +444,7 @@ class NotifyDot(NotifyBase):
             status_str = NotifyDot.http_response_code_lookup(r.status_code)
 
             self.logger.warning(
-                "Failed to send Dot notification to {}: "
-                "{}{}error={}.".format(
+                "Failed to send Dot notification to {}: {}{}error={}.".format(
                     self.device_id,
                     status_str,
                     ", " if status_str else "",
@@ -454,7 +453,8 @@ class NotifyDot(NotifyBase):
             )
 
             self.logger.debug(
-                "Response Details:\r\n%r", (r.content or b"")[:2000])
+                "Response Details:\r\n%r", (r.content or b"")[:2000]
+            )
 
             return False
 
