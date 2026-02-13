@@ -336,40 +336,30 @@ class NotifyXMPP(NotifyBase):
 
         subject = title if self.subject else ""
 
-        if not self.keepalive:
-            adapter = SlixmppAdapter(
-                config=config,
+        if self.keepalive and self._adapter:
+            # Reuse existing adapter
+            return self._adapter.send_message(
                 targets=self.targets,
-                subject=title if self.subject else "",
-                # If subject is False, then the body actually already
-                # includes the title below (inline):
+                subject=subject,
                 body=body,
-                timeout=self.socket_connect_timeout,
-                roster=self.roster,
-                keepalive=False,
             )
-            return adapter.process()
+
+        adapter_kwargs = {
+            "config": config,
+            "targets": self.targets,
+            "subject": subject,
+            "body": body,
+            "timeout": self.socket_connect_timeout,
+            "roster": self.roster,
+            "keepalive": self.keepalive,
+        }
+        if not self.keepalive:
+            # One-shot mode: Create, process, and discard
+            return SlixmppAdapter(**adapter_kwargs).process()
 
         # Keepalive mode, reuse a single adapter instance
-        if self._adapter is None:
-            self._adapter = SlixmppAdapter(
-                config=config,
-                targets=self.targets,
-                subject=title if self.subject else "",
-                # If subject is False, then the body actually already
-                # includes the title below (inline):
-                body=body,
-                timeout=self.socket_connect_timeout,
-                roster=self.roster,
-                keepalive=True,
-            )
-
-        # Update per-message fields
-        return self._adapter.send_message(
-            targets=self.targets,
-            subject=subject,
-            body=body,
-        )
+        self._adapter = SlixmppAdapter(**adapter_kwargs)
+        return self._adapter.send_message()
 
     @property
     def title_maxlen(self) -> Optional[int]:
