@@ -117,18 +117,18 @@ def test_utils_socket_timeout_coerce():
 
     # float => both
     s = SocketTransport("example.com", 1, timeout=2.5)
-    assert s._connect_timeout == 2.5
-    assert s._read_timeout == 2.5
+    assert s._connect_timeout == pytest.approx(2.5)
+    assert s._read_timeout == pytest.approx(2.5)
 
     # tuple => (connect, read)
     s = SocketTransport("example.com", 1, timeout=(1.0, 3.0))
-    assert s._connect_timeout == 1.0
-    assert s._read_timeout == 3.0
+    assert s._connect_timeout == pytest.approx(1.0)
+    assert s._read_timeout == pytest.approx(3.0)
 
     # tuple with None is allowed
     s = SocketTransport("example.com", 1, timeout=(None, 3.0))
     assert s._connect_timeout is None
-    assert s._read_timeout == 3.0
+    assert s._read_timeout == pytest.approx(3.0)
 
     # invalid types
     with pytest.raises(AppriseInvalidData):
@@ -527,7 +527,7 @@ def test_utils_socket_read_timeouts():
 
     # Force the read_t is None branch
     s = SocketTransport("example.com", 1, timeout=(1.0, None))
-    assert s._connect_timeout == 1.0
+    assert s._connect_timeout == pytest.approx(1.0)
     assert s._read_timeout is None
 
 
@@ -657,6 +657,8 @@ def test_utils_socket_write_deadline():
         written = s.write(b"test", timeout=0.1, flush=False)
         assert written == 4
         assert m_can_write.called
+
+
 def test_utils_socket_write_timeout():
     """SocketTransport() write() timeout."""
     s = SocketTransport("example.com", 1, timeout=(1.0, 0.2))

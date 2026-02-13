@@ -482,7 +482,7 @@ class NotifySlack(NotifyBase):
         #
         if self.use_blocks:
             # Our slack format
-            _slack_format = (
+            slack_format = (
                 "mrkdwn"
                 if self.notify_format == NotifyFormat.MARKDOWN
                 else "plain_text"
@@ -493,7 +493,7 @@ class NotifySlack(NotifyBase):
                 "attachments": [{
                     "blocks": [{
                         "type": "section",
-                        "text": {"type": _slack_format, "text": body},
+                        "text": {"type": slack_format, "text": body},
                     }],
                     "color": self.color(notify_type),
                 }],
@@ -524,15 +524,15 @@ class NotifySlack(NotifyBase):
                 )
 
                 # Prepare our footer based on the block structure
-                _footer = {
+                footer = {
                     "type": "context",
-                    "elements": [{"type": _slack_format, "text": self.app_id}],
+                    "elements": [{"type": slack_format, "text": self.app_id}],
                 }
 
                 if image_url:
                     payload["icon_url"] = image_url
 
-                    _footer["elements"].insert(
+                    footer["elements"].insert(
                         0,
                         {
                             "type": "image",
@@ -541,7 +541,7 @@ class NotifySlack(NotifyBase):
                         },
                     )
 
-                payload["attachments"][0]["blocks"].append(_footer)
+                payload["attachments"][0]["blocks"].append(footer)
 
         else:
             #
@@ -760,7 +760,7 @@ class NotifySlack(NotifyBase):
 
                 # Get the URL to which to upload the file.
                 # https://api.slack.com/methods/files.getUploadURLExternal
-                _params = {
+                params = {
                     "filename": (
                         attachment.name
                         if attachment.name
@@ -768,9 +768,9 @@ class NotifySlack(NotifyBase):
                     ),
                     "length": len(attachment),
                 }
-                _url = self.api_url.format("files.getUploadURLExternal")
+                url_ = self.api_url.format("files.getUploadURLExternal")
                 response = self._send(
-                    _url, {}, http_method="get", params=_params
+                    url_, {}, http_method="get", params=params
                 )
                 if not (
                     response
@@ -790,15 +790,15 @@ class NotifySlack(NotifyBase):
                 # Send file to channels
                 # https://api.slack.com/methods/files.completeUploadExternal
                 for channel_id in attach_channel_list:
-                    _payload = {
+                    payload_ = {
                         "files": [{
                             "id": file_id,
                             "title": attachment.name,
                         }],
                         "channel_id": channel_id,
                     }
-                    _url = self.api_url.format("files.completeUploadExternal")
-                    response = self._send(_url, _payload)
+                    url_ = self.api_url.format("files.completeUploadExternal")
+                    response = self._send(url_, payload_)
                     # Expected response
                     # {
                     #     "ok": true,

@@ -186,7 +186,7 @@ class AttachHTTP(AttachBase):
 
                     d = r.headers.get("Content-Disposition", "")
                     result = re.search(
-                        "filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I
+                        r"filename=['\"]?(?P<name>[^'\"]+)['\"]?", d, re.I
                     )
                     if result:
                         self.detected_name = result.group("name").strip()

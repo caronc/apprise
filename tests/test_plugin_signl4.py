@@ -166,6 +166,7 @@ apprise_url_tests = (
     ),
 )
 
+
 def test_plugin_signl4_urls():
     """NotifySIGNL4() Apprise URLs."""
 

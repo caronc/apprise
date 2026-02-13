@@ -198,8 +198,6 @@ class HTMLConverter(HTMLParser):
         elif tag == "hr":
             if self._result and isinstance(self._result[-1], str):
                 self._result[-1] = self._result[-1].rstrip(" ")
-            else:
-                pass
 
             self._result.append("\n---\n")
 

@@ -341,7 +341,7 @@ class PluginManager(metaclass=Singleton):
             module = import_module(path, module_pyname)
             if not module:
                 # No problem, we can't use this object
-                logger.warning("Failed to load custom module: %s", _path)
+                logger.warning("Failed to load custom module: %s", path_)
                 return
 
             # Print our loaded modules if any
@@ -349,7 +349,7 @@ class PluginManager(metaclass=Singleton):
                 logger.debug(
                     "Custom module %s - %d schema(s) (name=%s) "
                     "loaded in %.6fs",
-                    _path,
+                    path_,
                     len(self._custom_module_map[module_pyname]["notify"]),
                     module_name,
                     (time.time() - t_start),
@@ -384,8 +384,8 @@ class PluginManager(metaclass=Singleton):
             # end of _import_module()
             return
 
-        for _path in paths:
-            path = path_decode(_path)
+        for path_ in paths:
+            path = path_decode(path_)
             if (
                 cache and path in self._paths_previously_scanned
             ) or not os.path.exists(path):

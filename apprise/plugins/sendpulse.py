@@ -189,12 +189,12 @@ class NotifySendPulse(NotifyBase):
         self.names = {}
 
         # Temporary from_addr to work with for parsing
-        _from_addr = [self.app_id, ""]
+        from_addr_ = [self.app_id, ""]
 
         if self.user:
             if self.host:
                 # Prepare the bases of our email
-                _from_addr = [_from_addr[0], "{}@{}".format(
+                from_addr_ = [from_addr_[0], "{}@{}".format(
                     re.split(r"[\s@]+", self.user)[0],
                     self.host,
                 )]
@@ -204,32 +204,32 @@ class NotifySendPulse(NotifyBase):
                 if result:
                     # Prepare the bases of our email and include domain
                     self.host = result["domain"]
-                    _from_addr = [
+                    from_addr_ = [
                         result["name"] if result["name"]
-                        else _from_addr[0], self.user]
+                        else from_addr_[0], self.user]
 
         if isinstance(from_addr, str):
             result = is_email(from_addr)
             if result:
-                _from_addr = (
-                    result["name"] if result["name"] else _from_addr[0],
+                from_addr_ = (
+                    result["name"] if result["name"] else from_addr_[0],
                     result["full_email"])
             else:
                 # Only update the string but use the already detected info
-                _from_addr[0] = from_addr
+                from_addr_[0] = from_addr
 
-        result = is_email(_from_addr[1])
+        result = is_email(from_addr_[1])
         if not result:
             # Parse Source domain based on from_addr
             msg = "Invalid ~From~ email specified: {}".format(
-                "{} <{}>".format(_from_addr[0], _from_addr[1])
-                if _from_addr[0] else "{}".format(_from_addr[1]))
+                "{} <{}>".format(from_addr_[0], from_addr_[1])
+                if from_addr_[0] else "{}".format(from_addr_[1]))
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Store our lookup
-        self.from_addr = _from_addr[1]
-        self.names[_from_addr[1]] = _from_addr[0]
+        self.from_addr = from_addr_[1]
+        self.names[from_addr_[1]] = from_addr_[0]
 
         # Client ID
         self.client_id = validate_regex(
@@ -458,7 +458,7 @@ class NotifySendPulse(NotifyBase):
         has_error = False
 
         # A Simple Email Payload Template
-        _payload = {
+        payload_ = {
             "email": {
                 "from": {
                     "name": self.names[self.from_addr],
@@ -476,14 +476,14 @@ class NotifySendPulse(NotifyBase):
         # Prepare Email Message
         if self.notify_format == NotifyFormat.HTML:
             # HTML
-            _payload["email"].update({
+            payload_["email"].update({
                 "text": convert_between(
                     NotifyFormat.HTML, NotifyFormat.TEXT, body),
                 "html": base64.b64encode(body.encode("utf-8")).decode("ascii"),
             })
 
         else:  # Text
-            _payload["email"]["text"] = body
+            payload_["email"]["text"] = body
 
         if attach and self.attachment_support:
             attachments = {}
@@ -515,12 +515,12 @@ class NotifySendPulse(NotifyBase):
                         attachment.url(privacy=True)))
 
             # Append our attachments to the payload
-            _payload["email"].update({
+            payload_["email"].update({
                 "attachments_binary": attachments,
             })
 
         if self.template:
-            _payload["email"].update({
+            payload_["email"].update({
                 "template": {
                     "id": self.template,
                     "variables": self.template_data,
@@ -531,7 +531,7 @@ class NotifySendPulse(NotifyBase):
             target = targets.pop(0)
 
             # Create a copy of our template
-            payload = _payload.copy()
+            payload = payload_.copy()
 
             # the cc, bcc, to field must be unique or SendMail will fail, the
             # below code prepares this by ensuring the target isn't in the cc

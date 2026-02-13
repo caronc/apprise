@@ -128,7 +128,7 @@ class AppriseURLTester:
         instance = meta.get("instance")
 
         # Our expected server objects
-        _self = meta.get("self")
+        self_ = meta.get("self")
 
         # Our expected privacy url
         # Don't set this if don't need to check it's value
@@ -306,10 +306,10 @@ class AppriseURLTester:
             del obj_cmp
             del instance
 
-        if _self:
+        if self_:
             # Iterate over our expected entries inside of our
             # object
-            for key, val in _self.items():
+            for key, val in self_.items():
                 # Test that our object has the desired key
                 assert hasattr(obj, key) is True
                 assert getattr(obj, key) == val
@@ -461,12 +461,12 @@ class AppriseURLTester:
                 targets = len(obj)
 
                 # check that we're as expected
-                _resp = obj.notify(
+                resp = obj.notify(
                     body=self.body, title=self.title, notify_type=notify_type
                 )
-                if _resp != notify_response:
+                if resp != notify_response:
                     raise AssertionError(
-                        f"notify() call; notify_response={_resp} "
+                        f"notify() call; notify_response={resp} "
                         f"(expected {notify_response}) on {url}")
 
                 if notify_response:
@@ -686,14 +686,14 @@ class AppriseURLTester:
                         )
             else:
 
-                for _exception in self.req_exceptions:
-                    mock_post.side_effect = _exception
-                    mock_head.side_effect = _exception
-                    mock_del.side_effect = _exception
-                    mock_put.side_effect = _exception
-                    mock_get.side_effect = _exception
-                    mock_patch.side_effect = _exception
-                    mock_request.side_effect = _exception
+                for exception in self.req_exceptions:
+                    mock_post.side_effect = exception
+                    mock_head.side_effect = exception
+                    mock_del.side_effect = exception
+                    mock_put.side_effect = exception
+                    mock_get.side_effect = exception
+                    mock_patch.side_effect = exception
+                    mock_request.side_effect = exception
 
                     try:
                         assert (
@@ -738,14 +738,14 @@ class AppriseURLTester:
                 )
 
             else:
-                for _exception in self.req_exceptions:
-                    mock_post.side_effect = _exception
-                    mock_del.side_effect = _exception
-                    mock_put.side_effect = _exception
-                    mock_head.side_effect = _exception
-                    mock_get.side_effect = _exception
-                    mock_patch.side_effect = _exception
-                    mock_request.side_effect = _exception
+                for exception in self.req_exceptions:
+                    mock_post.side_effect = exception
+                    mock_del.side_effect = exception
+                    mock_put.side_effect = exception
+                    mock_head.side_effect = exception
+                    mock_get.side_effect = exception
+                    mock_patch.side_effect = exception
+                    mock_request.side_effect = exception
 
                     try:
                         assert (

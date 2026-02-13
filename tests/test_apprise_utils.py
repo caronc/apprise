@@ -3131,9 +3131,9 @@ def test_dir_size(tmpdir):
     """Test dir size tool."""
 
     # Nothing to find/see
-    size, _errors = utils.disk.dir_size(str(tmpdir))
+    size, errors = utils.disk.dir_size(str(tmpdir))
     assert size == 0
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
     # Write a file in our root directory
     tmpdir.join("root.psdata").write("0" * 1024 * 1024)
@@ -3142,66 +3142,66 @@ def test_dir_size(tmpdir):
     namespace_1 = tmpdir.mkdir("abcdefg")
     namespace_2 = tmpdir.mkdir("defghij")
     namespace_2.join("cache.psdata").write("0" * 1024 * 1024)
-    size, _errors = utils.disk.dir_size(str(tmpdir))
+    size, errors = utils.disk.dir_size(str(tmpdir))
     assert size == 1024 * 1024 * 2
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
     # Write another file
     namespace_1.join("cache.psdata").write("0" * 1024 * 1024)
-    size, _errors = utils.disk.dir_size(str(tmpdir))
+    size, errors = utils.disk.dir_size(str(tmpdir))
     assert size == 1024 * 1024 * 3
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
-    size, _errors = utils.disk.dir_size(str(namespace_1))
+    size, errors = utils.disk.dir_size(str(namespace_1))
     assert size == 1024 * 1024
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
     # Create a directory insde one of our namespaces
     subspace_1 = namespace_1.mkdir("zyx")
-    size, _errors = utils.disk.dir_size(str(namespace_1))
+    size, errors = utils.disk.dir_size(str(namespace_1))
     assert size == 1024 * 1024
 
     subspace_1.join("cache.psdata").write("0" * 1024 * 1024)
-    size, _errors = utils.disk.dir_size(str(tmpdir))
+    size, errors = utils.disk.dir_size(str(tmpdir))
     assert size == 1024 * 1024 * 4
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
     # Recursion limit reduced... no change at 2 as we can go 2
     # diretories deep no problem
-    size, _errors = utils.disk.dir_size(str(tmpdir), max_depth=2)
+    size, errors = utils.disk.dir_size(str(tmpdir), max_depth=2)
     assert size == 1024 * 1024 * 4
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
-    size, _errors = utils.disk.dir_size(str(tmpdir), max_depth=1)
+    size, errors = utils.disk.dir_size(str(tmpdir), max_depth=1)
     assert size == 1024 * 1024 * 3
     # we can't get into our subspace_1
-    assert len(_errors) == 1
-    assert str(subspace_1) in _errors
+    assert len(errors) == 1
+    assert str(subspace_1) in errors
 
-    size, _errors = utils.disk.dir_size(str(tmpdir), max_depth=0)
+    size, errors = utils.disk.dir_size(str(tmpdir), max_depth=0)
     assert size == 1024 * 1024
     # we can't get into our namespace directories
-    assert len(_errors) == 2
-    assert str(namespace_1) in _errors
-    assert str(namespace_2) in _errors
+    assert len(errors) == 2
+    assert str(namespace_1) in errors
+    assert str(namespace_2) in errors
 
     # Let's cause problems now and test the output
-    size, _errors = utils.disk.dir_size("invalid-directory", missing_okay=True)
+    size, errors = utils.disk.dir_size("invalid-directory", missing_okay=True)
     assert size == 0
-    assert len(_errors) == 0
+    assert len(errors) == 0
 
-    size, _errors = utils.disk.dir_size(
+    size, errors = utils.disk.dir_size(
         "invalid-directory", missing_okay=False
     )
     assert size == 0
-    assert len(_errors) == 1
-    assert "invalid-directory" in _errors
+    assert len(errors) == 1
+    assert "invalid-directory" in errors
 
     with mock.patch("os.scandir", side_effect=OSError()):
-        size, _errors = utils.disk.dir_size(str(tmpdir), missing_okay=True)
+        size, errors = utils.disk.dir_size(str(tmpdir), missing_okay=True)
         assert size == 0
-        assert len(_errors) == 1
-        assert str(tmpdir) in _errors
+        assert len(errors) == 1
+        assert str(tmpdir) in errors
 
     with mock.patch("os.scandir") as mock_scandir:
         mock_entry = mock.MagicMock()
@@ -3210,10 +3210,10 @@ def test_dir_size(tmpdir):
         # Mock the scandir return value to yield the mock entry
         mock_scandir.return_value.__enter__.return_value = [mock_entry]
 
-        size, _errors = utils.disk.dir_size(str(tmpdir))
+        size, errors = utils.disk.dir_size(str(tmpdir))
         assert size == 0
-        assert len(_errors) == 1
-        assert mock_entry.path in _errors
+        assert len(errors) == 1
+        assert mock_entry.path in errors
 
     with mock.patch("os.scandir") as mock_scandir:
         mock_entry = mock.MagicMock()
@@ -3222,9 +3222,9 @@ def test_dir_size(tmpdir):
         mock_entry.path = "/test/path"
         # Mock the scandir return value to yield the mock entry
         mock_scandir.return_value.__enter__.return_value = [mock_entry]
-        size, _errors = utils.disk.dir_size(str(tmpdir))
-        assert len(_errors) == 1
-        assert mock_entry.path in _errors
+        size, errors = utils.disk.dir_size(str(tmpdir))
+        assert len(errors) == 1
+        assert mock_entry.path in errors
 
     with mock.patch("os.scandir") as mock_scandir:
         mock_entry = mock.MagicMock()
@@ -3232,9 +3232,9 @@ def test_dir_size(tmpdir):
         mock_entry.is_dir.return_value = False
         # Mock the scandir return value to yield the mock entry
         mock_scandir.return_value.__enter__.return_value = [mock_entry]
-        size, _errors = utils.disk.dir_size(str(tmpdir))
+        size, errors = utils.disk.dir_size(str(tmpdir))
         assert size == 0
-        assert len(_errors) == 0
+        assert len(errors) == 0
 
     with mock.patch("os.scandir") as mock_scandir:
         mock_entry = mock.MagicMock()
@@ -3243,11 +3243,11 @@ def test_dir_size(tmpdir):
         # Mock the scandir return value to yield the mock entry
         mock_scandir.return_value.__enter__.return_value = [mock_entry]
 
-        size, _errors = utils.disk.dir_size(str(tmpdir))
+        size, errors = utils.disk.dir_size(str(tmpdir))
         assert size == 0
         # No file isn't a problem, we're calculating disksize anyway,
         # one less thing to calculate
-        assert len(_errors) == 0
+        assert len(errors) == 0
 
 
 def test_bytes_to_str():

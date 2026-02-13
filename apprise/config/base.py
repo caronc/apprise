@@ -972,18 +972,18 @@ class ConfigBase(URLBase):
             #
             # Dictionary
             #
-            for _groups, tags in groups.items():
-                for group in parse_list(_groups, cast=str):
+            for groups_, tags in groups.items():
+                for group in parse_list(groups_, cast=str):
                     if isinstance(tags, (list, tuple)):
-                        _tags = set()
+                        tags_ = set()
                         for e in tags:
                             if isinstance(e, dict):
-                                _tags |= set(e.keys())
+                                tags_ |= set(e.keys())
                             else:
-                                _tags |= set(parse_list(e, cast=str))
+                                tags_ |= set(parse_list(e, cast=str))
 
                         # Final assignment
-                        tags = _tags
+                        tags = tags_
 
                     else:
                         tags = set(parse_list(tags, cast=str))
@@ -1007,18 +1007,18 @@ class ConfigBase(URLBase):
                     )
                     continue
 
-                for _groups, tags in entry.items():
-                    for group in parse_list(_groups, cast=str):
+                for groups_, tags in entry.items():
+                    for group in parse_list(groups_, cast=str):
                         if isinstance(tags, (list, tuple)):
-                            _tags = set()
+                            tags_ = set()
                             for e in tags:
                                 if isinstance(e, dict):
-                                    _tags |= set(e.keys())
+                                    tags_ |= set(e.keys())
                                 else:
-                                    _tags |= set(parse_list(e, cast=str))
+                                    tags_ |= set(parse_list(e, cast=str))
 
                             # Final assignment
-                            tags = _tags
+                            tags = tags_
 
                         else:
                             tags = set(parse_list(tags, cast=str))
@@ -1085,17 +1085,17 @@ class ConfigBase(URLBase):
 
                 # We found a valid schema worthy of tracking; store it's
                 # details:
-                _results = plugins.url_to_dict(
+                results_ = plugins.url_to_dict(
                     url, secure_logging=asset.secure_logging
                 )
-                if _results is None:
+                if results_ is None:
                     ConfigBase.logger.warning(
                         f"Unparseable URL {loggable_url}, entry #{no + 1}"
                     )
                     continue
 
                 # add our results to our global set
-                results.append(_results)
+                results.append(results_)
 
             elif isinstance(url, dict):
                 # We are a url string with additional unescaped options. In
@@ -1106,15 +1106,15 @@ class ConfigBase(URLBase):
                 it = iter(url.items())
 
                 # Track the URL to-load
-                _url = None
+                url_ = None
 
                 # Track last acquired schema
                 schema = None
 
-                for key, _tokens in it:
+                for key, tokens_ in it:
                     # Test our schema
-                    _schema = GET_SCHEMA_RE.match(key)
-                    if _schema is None:
+                    schema_ = GET_SCHEMA_RE.match(key)
+                    if schema_ is None:
                         # Log invalid entries so that maintainer of config
                         # config file at least has something to take action
                         # with.
@@ -1125,30 +1125,30 @@ class ConfigBase(URLBase):
                         continue
 
                     # Store our schema
-                    schema = _schema.group("schema").lower()
+                    schema = schema_.group("schema").lower()
 
                     # Store our URL and Schema Regex
-                    _url = key
+                    url_ = key
 
                     # Update our token assignment
-                    tokens = _tokens
+                    tokens = tokens_
 
                     # We're done
                     break
 
-                if _url is None:
+                if url_ is None:
                     # the loop above failed to match anything
                     ConfigBase.logger.warning(
                         f"Unsupported URL, entry #{no + 1}"
                     )
                     continue
 
-                _results = plugins.url_to_dict(
-                    _url, secure_logging=asset.secure_logging
+                results_ = plugins.url_to_dict(
+                    url_, secure_logging=asset.secure_logging
                 )
-                if _results is None:
+                if results_ is None:
                     # Setup dictionary
-                    _results = {
+                    results_ = {
                         # Minimum requirements
                         "schema": schema,
                     }
@@ -1159,11 +1159,11 @@ class ConfigBase(URLBase):
                     for entries in tokens:
                         # Copy ourselves a template of our parsed URL as a base
                         # to work with
-                        r = _results.copy()
+                        r = results_.copy()
 
                         # We are a url string with additional unescaped options
                         if isinstance(entries, dict):
-                            _url, tokens = next(iter(url.items()))
+                            url_, tokens = next(iter(url.items()))
 
                             # Tags you just can't over-ride
                             if "schema" in entries:
@@ -1190,7 +1190,7 @@ class ConfigBase(URLBase):
 
                     # Copy ourselves a template of our parsed URL as a base to
                     # work with
-                    r = _results.copy()
+                    r = results_.copy()
 
                     # add our result set
                     r.update(tokens)
@@ -1200,7 +1200,7 @@ class ConfigBase(URLBase):
 
                 else:
                     # add our results to our global set
-                    results.append(_results)
+                    results.append(results_)
 
             else:
                 # Unsupported
@@ -1220,46 +1220,46 @@ class ConfigBase(URLBase):
                 entry += 1
 
                 # Grab our first item
-                _results = results.popleft()
+                results_ = results.popleft()
 
-                if _results["schema"] not in N_MGR:
+                if results_["schema"] not in N_MGR:
                     # the arguments are invalid or can not be used.
                     ConfigBase.logger.warning(
                         "An invalid Apprise schema ({}) in YAML configuration "
                         "entry #{}, item #{}".format(
-                            _results["schema"], no + 1, entry
+                            results_["schema"], no + 1, entry
                         )
                     )
                     continue
 
                 # tag is a special keyword that is managed by Apprise object.
                 # The below ensures our tags are set correctly
-                if "tag" in _results:
+                if "tag" in results_:
                     # Tidy our list up
-                    _results["tag"] = (
-                        set(parse_list(_results["tag"], cast=str))
+                    results_["tag"] = (
+                        set(parse_list(results_["tag"], cast=str))
                         | global_tags
                     )
-                    if "tags" in _results:
+                    if "tags" in results_:
                         ConfigBase.logger.warning((
                             "URL #{}: {} contains both 'tag' and 'tags' "
                             "keyword").format(no + 1, url))
-                        del _results["tags"]
+                        del results_["tags"]
 
-                elif "tags" in _results:
+                elif "tags" in results_:
                     # Tidy our list up
-                    _results["tag"] = (
-                        set(parse_list(_results["tags"], cast=str))
+                    results_["tag"] = (
+                        set(parse_list(results_["tags"], cast=str))
                         | global_tags
                     )
                     # Should not carry forward
-                    del _results["tags"]
+                    del results_["tags"]
 
                 else:
                     # Just use the global settings
-                    _results["tag"] = global_tags
+                    results_["tag"] = global_tags
 
-                for key in list(_results.keys()):
+                for key in list(results_.keys()):
                     # Strip out any tokens we know that we can't accept and
                     # warn the user
                     match = VALID_TOKEN.match(key)
@@ -1268,7 +1268,7 @@ class ConfigBase(URLBase):
                             f"Ignoring invalid token ({key}) found in YAML "
                             f"configuration entry #{no + 1}, item #{entry}"
                         )
-                        del _results[key]
+                        del results_[key]
 
                 if ConfigBase.logger.isEnabledFor(logging.TRACE):
                     ConfigBase.logger.trace(
@@ -1277,18 +1277,18 @@ class ConfigBase(URLBase):
                         url,
                         os.linesep,
                         os.linesep.join(
-                            [f'{k}="{a}"' for k, a in _results.items()]),
+                            [f'{k}="{a}"' for k, a in results_.items()]),
                     )
 
                 # Prepare our Asset Object
-                _results["asset"] = asset
+                results_["asset"] = asset
 
                 # Handle post processing of result set
-                _results = URLBase.post_process_parse_url_results(_results)
+                results_ = URLBase.post_process_parse_url_results(results_)
 
                 # Store our preloaded entries
                 preloaded.append({
-                    "results": _results,
+                    "results": results_,
                     "entry": no + 1,
                     "item": entry,
                 })

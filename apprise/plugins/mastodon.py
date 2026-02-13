@@ -629,21 +629,21 @@ class NotifyMastodon(NotifyBase):
                 batches.append(batch)
 
             for no, media_ids in enumerate(batches):
-                _payload = deepcopy(payload)
-                _payload["media_ids"] = media_ids
+                payload_ = deepcopy(payload)
+                payload_["media_ids"] = media_ids
 
                 if no or not body:
                     # strip text and replace it with the image representation
-                    _payload["status"] = f"{no + 1:02d}/{len(batches):02d}"
+                    payload_["status"] = f"{no + 1:02d}/{len(batches):02d}"
                     # No longer sensitive information
-                    _payload["sensitive"] = False
+                    payload_["sensitive"] = False
                     if self.idempotency_key:
                         # Support multiposts while a Idempotency Key has been
                         # defined
-                        _payload["Idempotency-Key"] = (
+                        payload_["Idempotency-Key"] = (
                             f"{self.idempotency_key}-part{no:02d}"
                         )
-                payloads.append(_payload)
+                payloads.append(payload_)
 
         # Error Tracking
         has_error = False

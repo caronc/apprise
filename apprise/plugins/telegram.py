@@ -767,14 +767,14 @@ class NotifyTelegram(NotifyBase):
         if response.get("ok", False):
             for entry in response.get("result", []):
                 if "message" in entry and "from" in entry["message"]:
-                    _id = entry["message"]["from"].get("id", 0)
-                    _user = entry["message"]["from"].get("first_name")
+                    id_ = entry["message"]["from"].get("id", 0)
+                    user = entry["message"]["from"].get("first_name")
                     self.logger.info(
-                        "Detected Telegram user %s (userid=%d)", _user, _id
+                        "Detected Telegram user %s (userid=%d)", user, id_
                     )
                     # Return our detected userid
-                    self.store.set("bot_owner", _id)
-                    return _id
+                    self.store.set("bot_owner", id_)
+                    return id_
 
         self.logger.warning(
             "Failed to detect a Telegram user; "
@@ -794,10 +794,10 @@ class NotifyTelegram(NotifyBase):
         """Perform Telegram Notification."""
 
         if len(self.targets) == 0 and self.detect_owner:
-            _id = self.store.get("bot_owner") or self.detect_bot_owner()
-            if _id:
+            id_ = self.store.get("bot_owner") or self.detect_bot_owner()
+            if id_:
                 # Permanently store our id in our target list for next time
-                self.targets.append((str(_id), self.topic))
+                self.targets.append((str(id_), self.topic))
                 self.logger.info(
                     "Update your Telegram Apprise URL to read: "
                     f"{self.url(privacy=True)}"
@@ -817,7 +817,7 @@ class NotifyTelegram(NotifyBase):
 
         url = "{}{}/{}".format(self.notify_url, self.bot_token, "sendMessage")
 
-        _payload = {
+        payload_ = {
             # Notification Audible Control
             "disable_notification": self.silent,
             # Display Web Page Preview (if possible)
@@ -838,13 +838,13 @@ class NotifyTelegram(NotifyBase):
                 # Also: https://core.telegram.org/bots/api#markdownv2-style
                 body = re.sub(r"(?<!\\)([_*[\]()~`>#+=|{}.!-])", r"\\\1", body)
 
-            _payload["parse_mode"] = self.markdown_ver
-            _payload["text"] = body
+            payload_["parse_mode"] = self.markdown_ver
+            payload_["text"] = body
 
         else:  # HTML
 
             # Use Telegram's HTML mode
-            _payload["parse_mode"] = "HTML"
+            payload_["parse_mode"] = "HTML"
             for r, v, m in self.__telegram_escape_html_entries:
 
                 if "html" in m:
@@ -860,20 +860,20 @@ class NotifyTelegram(NotifyBase):
                 body = r.sub(v, body)
 
             # Prepare our payload based on HTML or TEXT
-            _payload["text"] = body
+            payload_["text"] = body
 
         # Prepare our caption payload
         caption_payload = (
             {
-                "caption": _payload["text"],
+                "caption": payload_["text"],
                 "show_caption_above_media": (
                     self.content == TelegramContentPlacement.BEFORE
                 ),
-                "parse_mode": _payload["parse_mode"],
+                "parse_mode": payload_["parse_mode"],
             }
             if attach
             and body
-            and len(_payload.get("text", "")) < self.telegram_caption_maxlen
+            and len(payload_.get("text", "")) < self.telegram_caption_maxlen
             else {}
         )
 
@@ -893,7 +893,7 @@ class NotifyTelegram(NotifyBase):
             # Printable chat_id details
             pchat_id = f"{chat_id}" if not topic else f"{chat_id}:{topic}"
 
-            payload = _payload.copy()
+            payload = payload_.copy()
             payload["chat_id"] = chat_id
             if topic:
                 payload["message_thread_id"] = topic
@@ -1066,8 +1066,8 @@ class NotifyTelegram(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         targets = []
-        for chat_id, _topic in self.targets:
-            topic = _topic if _topic else self.topic
+        for chat_id, topic_ in self.targets:
+            topic = topic_ if topic_ else self.topic
 
             targets.append(
                 "".join([

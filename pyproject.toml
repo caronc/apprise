@@ -308,6 +308,9 @@ extend-exclude = '''
 '''
 
 [tool.ruff.lint]
+# Allow Preview rules to run
+preview = true
+
 select = [
   "E",    # pycodestyle errors
   "F",    # pyflakes
@@ -339,6 +342,8 @@ ignore = [
 
   # The following needs to be supported at some point and is of great value
   "RUF012",  # typing.ClassVar implimentation
+  "RUF029",  # Use of async without await or async subcalls
+  "RUF067",  # Classes can only have docstrings and re-export only
   "UP032",   # This is a massive undertaking and requires a massive rewrite
              # of test cases; this will take a while to fix, so turning off
              # for now

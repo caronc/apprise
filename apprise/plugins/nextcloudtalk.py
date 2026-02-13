@@ -192,7 +192,7 @@ class NotifyNextcloudTalk(NotifyBase):
             # Nextcloud Talk URL
             notify_url = (
                 "{schema}://{host}/{url_prefix}"
-                "/ocs/v2.php/apps/spreed/api/v1/chat/{target}"
+                f"/ocs/v2.php/apps/spreed/api/v1/chat/{target}"
             )
 
             notify_url = notify_url.format(
@@ -211,7 +211,7 @@ class NotifyNextcloudTalk(NotifyBase):
                 notify_url,
                 self.verify_certificate,
             )
-            self.logger.debug("Nextcloud Talk Payload: %s", str(payload))
+            self.logger.debug("Nextcloud Talk Payload: %s", payload)
 
             # Always call throttle before any remote server i/o is made
             self.throttle()

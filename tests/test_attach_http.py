@@ -449,13 +449,13 @@ def test_attach_http(mock_get, mock_post):
 
     # Exception handling
     mock_get.return_value = None
-    for _exception in REQUEST_EXCEPTIONS:
+    for exception_ in REQUEST_EXCEPTIONS:
         aa = AppriseAttachment.instantiate(
             "http://localhost/exception.gif?cache=30"
         )
         assert isinstance(aa, AttachHTTP)
 
-        mock_get.side_effect = _exception
+        mock_get.side_effect = exception_
         assert not aa
 
     # Restore value

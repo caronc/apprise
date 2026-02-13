@@ -479,7 +479,7 @@ class NotifyFCM(NotifyBase):
                 notify_url,
                 self.verify_certificate,
             )
-            self.logger.debug("FCM %s Payload: %s", self.mode, str(payload))
+            self.logger.debug("FCM %s Payload: %s", self.mode, payload)
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -522,7 +522,7 @@ class NotifyFCM(NotifyBase):
                 self.logger.warning(
                     "A Connection error occurred sending FCM notification."
                 )
-                self.logger.debug("Socket Exception: %s", str(e))
+                self.logger.debug("Socket Exception: %s", e)
 
                 has_error = True
 

@@ -781,7 +781,7 @@ class NotifyMatrix(NotifyBase):
                 })
 
             elif self.notify_format == NotifyFormat.MARKDOWN:
-                _title = (
+                title_ = (
                     ""
                     if not title
                     else (
@@ -794,7 +794,7 @@ class NotifyMatrix(NotifyBase):
                 payload.update({
                     "format": "org.matrix.custom.html",
                     "formatted_body": "{title}{body}".format(
-                        title=_title,
+                        title=title_,
                         body=markdown(body),
                     ),
                 })
@@ -1486,7 +1486,7 @@ class NotifyMatrix(NotifyBase):
                     "A Connection error occurred while registering with Matrix"
                     " server."
                 )
-                self.logger.debug("Socket Exception: %s", str(e))
+                self.logger.debug("Socket Exception: %s", e)
                 # Return; we're done
                 return (False, response, status_code)
 
@@ -1496,7 +1496,7 @@ class NotifyMatrix(NotifyBase):
                         attachment.name if attachment else "unknown file"
                     )
                 )
-                self.logger.debug("I/O Exception: %s", str(e))
+                self.logger.debug("I/O Exception: %s", e)
                 return (False, {}, status_code)
 
             return (True, response, status_code)
@@ -1817,7 +1817,7 @@ class NotifyMatrix(NotifyBase):
             self.logger.warning(
                 "%s - m.homeserver payload is missing or invalid: %s",
                 msg,
-                str(response),
+                response,
             )
             raise MatrixDiscoveryException(msg)
 
@@ -1860,7 +1860,7 @@ class NotifyMatrix(NotifyBase):
                 self.logger.warning(
                     "%s - m.identity_server payload is missing or invalid: %s",
                     msg,
-                    str(response),
+                    response,
                 )
                 raise MatrixDiscoveryException(msg)
 

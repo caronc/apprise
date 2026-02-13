@@ -36,7 +36,7 @@ from apprise.plugins.viber import NotifyViber
 
 logging.disable(logging.CRITICAL)
 
-VIBER_GOOD_RESPONSE = dumps({"status":0,"status_message":"ok"})
+VIBER_GOOD_RESPONSE = dumps({"status": 0, "status_message": "ok"})
 VIBER_BAD_RESPONSE = dumps(
     {"status": 12, "status_message": "Too many requests"})
 
@@ -126,6 +126,7 @@ apprise_url_tests = (
         },
     )
 )
+
 
 def test_plugin_viber_urls():
     """Verify URL parsing, privacy, and basic validation."""

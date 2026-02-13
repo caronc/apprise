@@ -341,7 +341,7 @@ class NotifySendGrid(NotifyBase):
         has_error = False
 
         # A Simple Email Payload Template
-        _payload = {
+        payload_ = {
             "personalizations": [{
                 # Placeholder
                 "to": [{"email": None}],
@@ -403,15 +403,15 @@ class NotifySendGrid(NotifyBase):
                 )
 
             # Append our attachments to the payload
-            _payload.update({
+            payload_.update({
                 "attachments": attachments,
             })
 
         if self.template:
-            _payload["template_id"] = self.template
+            payload_["template_id"] = self.template
 
             if self.template_data:
-                _payload["personalizations"][0]["dynamic_template_data"] = (
+                payload_["personalizations"][0]["dynamic_template_data"] = (
                     dict(self.template_data.items())
                 )
 
@@ -420,7 +420,7 @@ class NotifySendGrid(NotifyBase):
             target = targets.pop(0)
 
             # Create a copy of our template
-            payload = _payload.copy()
+            payload = payload_.copy()
 
             # the cc, bcc, to field must be unique or SendMail will fail, the
             # below code prepares this by ensuring the target isn't in the cc

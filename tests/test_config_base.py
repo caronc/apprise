@@ -1786,6 +1786,7 @@ urls:
     # also stable tzname resolution
     assert isinstance(tzinfo.tzname(dt), str)
 
+
 def test_config_base_parse_yaml_file05_tags_alias_dict_form(tmpdir):
     """
     API: ConfigBase.parse_yaml_file (#5)
@@ -1898,4 +1899,3 @@ def test_config_base_parse_yaml_file07_tag_priority_over_tags(tmpdir):
     # Tag priority check
     assert sum(1 for _ in a.find("primary")) == 1
     assert sum(1 for _ in a.find("secondary")) == 0
-

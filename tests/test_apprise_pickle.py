@@ -71,11 +71,11 @@ def test_apprise_pickle_asset(tmpdir):
 
 def test_apprise_pickle_locale(tmpdir):
     """pickle: AppriseLocale"""
-    _locale = AppriseLocale()
-    serialized = pickle.dumps(_locale)
+    locale = AppriseLocale()
+    serialized = pickle.dumps(locale)
     new_locale = pickle.loads(serialized)
 
-    assert _locale.lang == new_locale.lang
+    assert locale.lang == new_locale.lang
 
     # Ensure internal functions still call in new object
     new_locale.detect_language()

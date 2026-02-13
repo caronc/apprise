@@ -478,17 +478,17 @@ class NotifySNS(NotifyBase):
                 return hmac.new(key, msg.encode("utf-8"), sha256).hexdigest()
             return hmac.new(key, msg.encode("utf-8"), sha256).digest()
 
-        _date = _sign(
+        date = _sign(
             (self.aws_auth_version + self.aws_secret_access_key).encode(
                 "utf-8"
             ),
             reference.strftime("%Y%m%d"),
         )
 
-        _region = _sign(_date, self.aws_region_name)
-        _service = _sign(_region, self.aws_service_name)
-        _signed = _sign(_service, self.aws_auth_request)
-        return _sign(_signed, to_sign, to_hex=True)
+        region = _sign(date, self.aws_region_name)
+        service = _sign(region, self.aws_service_name)
+        signed = _sign(service, self.aws_auth_request)
+        return _sign(signed, to_sign, to_hex=True)
 
     @staticmethod
     def aws_response_to_dict(aws_response):
@@ -540,7 +540,7 @@ class NotifySNS(NotifyBase):
             # reference to namespacing (if present) as it makes parsing
             # the tree so much easier.
             root = ElementTree.fromstring(
-                re.sub(' xmlns="[^"]+"', "", aws_response, count=1)
+                re.sub(r' xmlns="[^"]+"', "", aws_response, count=1)
             )
 
             # Store our response tag object name

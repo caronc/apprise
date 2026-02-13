@@ -965,4 +965,3 @@ def test_notify_dot_parse_url_without_host_field():
         assert result.get("device_id") is None
         assert result.get("apikey") == "apikey"
         assert result.get("refresh_now") is True  # refresh was in qsd
-

@@ -353,7 +353,7 @@ class IRCClient:
             # Default Assignment
             length = IRCClient.nickname_max_length
 
-        base = "{}".format(prefix)[:length-3].strip().lower()
+        base = "{}".format(prefix)[:length - 3].strip().lower()
         charset = string.ascii_lowercase + string.digits + "_"
         suffix = "".join(random.choice(charset) for _ in range(max(1, length)))
         nick = "{}{}".format(base, suffix)

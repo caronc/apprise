@@ -375,7 +375,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
 
     # Track our iteration; by tracing within an object, we can re-reference
     # it within a function scope.
-    _cache = {
+    cache = {
         "first_time": True,
     }
 
@@ -392,11 +392,11 @@ def test_plugin_twist_fetch(mock_post, mock_get):
             "default_workspace": 12345,
         })
 
-        if url.endswith("threads/add") and _cache["first_time"] is True:
+        if url.endswith("threads/add") and cache["first_time"] is True:
             # First time iteration; act as if we failed; our second iteration
             # will not enter this and be successful. This is done by simply
             # toggling the first_time flag:
-            _cache["first_time"] = False
+            cache["first_time"] = False
 
             # otherwise, we set our first-time failure settings
             request.status_code = 403
@@ -418,7 +418,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
     postokay, response = obj._fetch("threads/add")
 
     ##########################################################################
-    _cache = {
+    cache = {
         "first_time": True,
     }
 
@@ -435,11 +435,11 @@ def test_plugin_twist_fetch(mock_post, mock_get):
             "default_workspace": 12345,
         })
 
-        if url.endswith("threads/add") and _cache["first_time"] is True:
+        if url.endswith("threads/add") and cache["first_time"] is True:
             # First time iteration; act as if we failed; our second iteration
             # will not enter this and be successful. This is done by simply
             # toggling the first_time flag:
-            _cache["first_time"] = False
+            cache["first_time"] = False
 
             # otherwise, we set our first-time failure settings
             request.status_code = 403
@@ -448,7 +448,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
                 "error_string": "Invalid token",
             })
 
-        elif url.endswith("threads/add") and _cache["first_time"] is False:
+        elif url.endswith("threads/add") and cache["first_time"] is False:
             # unparseable response throws the exception
             request.status_code = 200
             request.content = "{"
@@ -466,7 +466,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
     postokay, response = obj._fetch("threads/add")
 
     ##########################################################################
-    _cache = {
+    cache = {
         "first_time": True,
     }
 
@@ -483,11 +483,11 @@ def test_plugin_twist_fetch(mock_post, mock_get):
             "default_workspace": 12345,
         })
 
-        if url.endswith("threads/add") and _cache["first_time"] is True:
+        if url.endswith("threads/add") and cache["first_time"] is True:
             # First time iteration; act as if we failed; our second iteration
             # will not enter this and be successful. This is done by simply
             # toggling the first_time flag:
-            _cache["first_time"] = False
+            cache["first_time"] = False
 
             # otherwise, we set our first-time failure settings
             request.status_code = 403
@@ -496,7 +496,7 @@ def test_plugin_twist_fetch(mock_post, mock_get):
                 "error_string": "Invalid token",
             })
 
-        elif url.endswith("/login") and _cache["first_time"] is False:
+        elif url.endswith("/login") and cache["first_time"] is False:
             # Fail to login
             request.status_code = 403
             request.content = "{}"

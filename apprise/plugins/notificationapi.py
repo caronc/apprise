@@ -277,21 +277,21 @@ class NotifyNotificationAPI(NotifyBase):
         self.names = {}
 
         # Prepare our From Address
-        _from_addr = [self.app_id, ""]
+        from_addr_ = [self.app_id, ""]
         self.from_addr = None
         if isinstance(from_addr, str):
             result = is_email(from_addr)
             if result:
-                _from_addr = (
-                    result["name"] if result["name"] else _from_addr[0],
+                from_addr_ = (
+                    result["name"] if result["name"] else from_addr_[0],
                     result["full_email"])
             else:
                 # Only update the string but use the already detected info
-                _from_addr[0] = from_addr
+                from_addr_[0] = from_addr
 
                 # Store our lookup
-            self.from_addr = _from_addr[1]
-        self.names[_from_addr[1]] = _from_addr[0]
+            self.from_addr = from_addr_[1]
+        self.names[from_addr_[1]] = from_addr_[0]
 
         # Prepare our Reply-To Address
         self.reply_to = {}
@@ -300,7 +300,7 @@ class NotifyNotificationAPI(NotifyBase):
             if result and "full_email" in result:
                 self.reply_to = {
                     "senderName": result["name"]
-                    if result["name"] else _from_addr[0],
+                    if result["name"] else from_addr_[0],
                     "senderEmail": result["full_email"],
                 }
 
@@ -367,8 +367,8 @@ class NotifyNotificationAPI(NotifyBase):
 
         # Initialize an empty set of channels
         self.channels = set()
-        for _channel in parse_list(channels):
-            channel = _channel.lower()
+        for channel_ in parse_list(channels):
+            channel = channel_.lower()
             if channel not in NOTIFICATIONAPI_CHANNELS:
                 # Invalid channel specified
                 msg = (
@@ -612,7 +612,7 @@ class NotifyNotificationAPI(NotifyBase):
         generates our NotificationAPI payload
         """
 
-        _payload = {
+        payload_ = {
             "type": self.message_type,
         }
         if self.mode == NotificationAPIMode.TEMPLATE:
@@ -630,7 +630,7 @@ class NotifyNotificationAPI(NotifyBase):
             parameters["appUrl"] = self.app_url
 
             # A Simple Email Payload Template
-            _payload.update({
+            payload_.update({
                 "parameters": {**parameters},
             })
 
@@ -645,7 +645,7 @@ class NotifyNotificationAPI(NotifyBase):
                 # be compatible with Python v3.9+, we must use if/else for the
                 # time being
                 if channel == NotificationAPIChannel.SMS:
-                    _payload.update({
+                    payload_.update({
                         NotificationAPIChannel.SMS: {
                             "message": (title + "\n" + text_body)
                             if title else text_body,
@@ -657,7 +657,7 @@ class NotifyNotificationAPI(NotifyBase):
                         NotifyFormat.TEXT, NotifyFormat.HTML, body) \
                         if self.notify_format != NotifyFormat.HTML else body
 
-                    _payload.update({
+                    payload_.update({
                         NotificationAPIChannel.EMAIL: {
                             "subject": title if title else self.app_id,
                             "html": html_body,
@@ -665,13 +665,13 @@ class NotifyNotificationAPI(NotifyBase):
                     })
 
                     if self.from_addr:
-                        _payload[NotificationAPIChannel.EMAIL].update({
+                        payload_[NotificationAPIChannel.EMAIL].update({
                             "senderEmail": self.from_addr,
                             "senderName": self.names[self.from_addr],
                         })
 
                 elif channel == NotificationAPIChannel.INAPP:
-                    _payload.update({
+                    payload_.update({
                         NotificationAPIChannel.INAPP: {
                             "title": title if title else self.app_id,
                             "image": self.image_url(notify_type),
@@ -679,7 +679,7 @@ class NotifyNotificationAPI(NotifyBase):
                     })
 
                 elif channel == NotificationAPIChannel.WEB_PUSH:
-                    _payload.update({
+                    payload_.update({
                         NotificationAPIChannel.WEB_PUSH: {
                             "title": title if title else self.app_id,
                             "message": text_body,
@@ -688,7 +688,7 @@ class NotifyNotificationAPI(NotifyBase):
                     })
 
                 elif channel == NotificationAPIChannel.MOBILE_PUSH:
-                    _payload.update({
+                    payload_.update({
                         NotificationAPIChannel.MOBILE_PUSH: {
                             "title": title if title else self.app_id,
                             "message": text_body,
@@ -696,7 +696,7 @@ class NotifyNotificationAPI(NotifyBase):
                     })
 
                 else:  # channel == NotificationAPIChannel.SLACK
-                    _payload.update({
+                    payload_.update({
                         NotificationAPIChannel.SLACK: {
                             "text": (title + "\n" + text_body)
                             if title else text_body,
@@ -706,7 +706,7 @@ class NotifyNotificationAPI(NotifyBase):
         # Copy our list to work with
         targets = list(self.targets)
         if self.from_addr:
-            _payload.update({
+            payload_.update({
                 "options": {
                     "email": {
                         "fromAddress": self.from_addr,
@@ -714,13 +714,13 @@ class NotifyNotificationAPI(NotifyBase):
 
         elif self.cc or self.bcc:
             # Set up shell
-            _payload.update({"options": {"email": {}}})
+            payload_.update({"options": {"email": {}}})
 
         while len(targets) > 0:
             target = targets.pop(0)
 
             # Create a copy of our template
-            payload = _payload.copy()
+            payload = payload_.copy()
 
             # the cc, bcc, to field must be unique or SendMail will fail,
             # the below code prepares this by ensuring the target isn't in
@@ -781,7 +781,7 @@ class NotifyNotificationAPI(NotifyBase):
                 "NotificationAPI POST URL: {} (cert_verify={!r})".format(
                     url, self.verify_certificate))
             self.logger.debug(
-                "NotificationAPI Payload: %s", str(payload["to"]["id"]))
+                "NotificationAPI Payload: %s", payload["to"]["id"])
 
             # Always call throttle before any remote server i/o is made
             self.throttle()

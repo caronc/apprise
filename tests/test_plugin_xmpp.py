@@ -77,12 +77,12 @@ class FakeClientXMPP:
         self.password = password
         # Loop is assigned by adapter via `client.loop = loop`, but we default
         # to the current event loop for safety in tests.
-        self.loop:Optional[asyncio.AbstractEventLoop] = None
+        self.loop: Optional[asyncio.AbstractEventLoop] = None
         self.handlers: dict[str, Any] = {}
         self.auto_reconnect = True
 
         # Slixmpp >= 1.10.0: adapter waits on this Future
-        self.disconnected:Optional[asyncio.Future[bool]] = None
+        self.disconnected: Optional[asyncio.Future[bool]] = None
 
         # Slixmpp toggles used by adapter
         self.enable_plaintext = True
@@ -105,7 +105,7 @@ class FakeClientXMPP:
     def send_message(self, **kwargs: Any) -> None:
         return None
 
-    def register_plugin(self, name: str, config:Optional[Any] = None) -> None:
+    def register_plugin(self, name: str, config: Optional[Any] = None) -> None:
         self.registered_plugins[name] = config
         return None
 
@@ -400,7 +400,7 @@ def test_xmpp_apprise_notify_invokes_adapter(
             timeout: float = 0.0,
             roster: bool = False,
             before_message: Any = None,
-            logger:Optional[logging.Logger] = None,
+            logger: Optional[logging.Logger] = None,
             **kwargs: Any,
         ) -> None:
             captured["targets"] = targets
@@ -886,7 +886,7 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
         def set(self) -> None:
             self._set = True
 
-        def wait(self, timeout:Optional[float] = None) -> bool:
+        def wait(self, timeout: Optional[float] = None) -> bool:
             self._wait_calls += 1
             if self._wait_calls == 1:
                 # Ensure the client exists before we force the timeout branch
@@ -995,7 +995,7 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
         def set(self) -> None:
             self._set = True
 
-        def wait(self, timeout:Optional[float] = None) -> bool:
+        def wait(self, timeout: Optional[float] = None) -> bool:
             self._wait_calls += 1
             if self._wait_calls == 1:
                 loop_created.wait(timeout=1.0)
@@ -1106,7 +1106,7 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
         def set(self) -> None:
             self._set = True
 
-        def wait(self, timeout:Optional[float] = None) -> bool:
+        def wait(self, timeout: Optional[float] = None) -> bool:
             self._wait_calls += 1
             # Force timeout branch immediately on the first wait
             if self._wait_calls == 1:
@@ -1229,7 +1229,8 @@ def test_xmpp_process_connect_timeout(
     # future.
     real_wait_for = xmpp_adapter.asyncio.wait_for
 
-    async def wait_for_patched(aw: Any, timeout:Optional[float] = None) -> Any:
+    async def wait_for_patched(
+            aw: Any, timeout: Optional[float] = None) -> Any:
         if aw is connect_future["fut"]:
             raise asyncio.TimeoutError()
         return await real_wait_for(aw, timeout=timeout)
@@ -1290,7 +1291,7 @@ def test_xmpp_process_session_timeout(
     real_wait_for = xmpp_adapter.asyncio.wait_for
     calls = {"n": 0}
 
-    def wait_for_patched(aw: Any, timeout:Optional[float] = None) -> Any:
+    def wait_for_patched(aw: Any, timeout: Optional[float] = None) -> Any:
         calls["n"] += 1
         if calls["n"] == 2:
             # If aw is a coroutine, close it to avoid warnings
@@ -1684,7 +1685,7 @@ def test_adapter_connect_if_required_connect_timeout(
 
         real_wait_for = xmpp_adapter.asyncio.wait_for
 
-        def wait_for_patched(aw: Any, timeout:Optional[float] = None) -> Any:
+        def wait_for_patched(aw: Any, timeout: Optional[float] = None) -> Any:
             if aw is fut:
                 raise asyncio.TimeoutError()
             return real_wait_for(aw, timeout=timeout)
@@ -1898,7 +1899,7 @@ def test_adapter_send_message_keepalive_timeout_and_exception(
 
     # Timeout path
     class _FutureTimeout:
-        def result(self, timeout:Optional[float] = None) -> Any:
+        def result(self, timeout: Optional[float] = None) -> Any:
             raise xmpp_adapter.FuturesTimeoutError()
 
     def run_coroutine_threadsafe_timeout(coro: Any, loop: Any) -> Any:
@@ -1919,7 +1920,7 @@ def test_adapter_send_message_keepalive_timeout_and_exception(
 
     # Exception path
     class _FutureError:
-        def result(self, timeout:Optional[float] = None) -> Any:
+        def result(self, timeout: Optional[float] = None) -> Any:
             raise RuntimeError("boom")
 
     monkeypatch.setattr(
@@ -2003,7 +2004,7 @@ def test_adapter_close_shutdown_paths_and_state_reset(
             cb(*args)
 
     class _Thread:
-        def join(self, timeout:Optional[float] = None) -> None:
+        def join(self, timeout: Optional[float] = None) -> None:
             return None
 
     # Populate internals so close() takes the full path
@@ -2060,7 +2061,7 @@ def test_adapter_close_call_soon_threadsafe_raises_still_resets(
             return None
 
     class _Thread:
-        def join(self, timeout:Optional[float] = None) -> None:
+        def join(self, timeout: Optional[float] = None) -> None:
             return None
 
     a._loop = _Loop()
@@ -2126,7 +2127,7 @@ def test_adapter_keepalive_runner_executes_and_register_plugin_suppressed(
     # Force register_plugin to raise so the suppress(Exception) is exercised
     def boom_register_plugin(
             self: FakeClientXMPP, name: str,
-            config:Optional[Any] = None) -> None:
+            config: Optional[Any] = None) -> None:
         raise RuntimeError("boom-plugin")
 
     monkeypatch.setattr(
@@ -2217,7 +2218,7 @@ def test_adapter_connect_if_required_hits_bottom_return_true(
         calls = {"n": 0}
 
         async def wait_for_patched(
-                aw: Any, timeout:Optional[float] = None) -> Any:
+                aw: Any, timeout: Optional[float] = None) -> Any:
             calls["n"] += 1
             if calls["n"] == 2:
                 assert a._session_started is not None
@@ -2342,7 +2343,7 @@ def test_adapter_close_shutdown_client_none_branch(
             cb(*args)
 
     class _Thread:
-        def join(self, timeout:Optional[float] = None) -> None:
+        def join(self, timeout: Optional[float] = None) -> None:
             return None
 
     loop = _Loop()
@@ -3363,7 +3364,7 @@ def test_adapter_send_message_keepalive_timeout_with_no_session_started_event(
     a._session_started = None  # key for branch coverage
 
     class _FutureTimeout:
-        def result(self, timeout:Optional[float] = None) -> Any:
+        def result(self, timeout: Optional[float] = None) -> Any:
             raise xmpp_adapter.FuturesTimeoutError()
 
     def run_coroutine_threadsafe_timeout(coro: Any, loop: Any) -> Any:
@@ -3968,6 +3969,7 @@ def test_client_on_session_start_done_callback_cancelled_returns(
             asyncio.set_event_loop(None)
         with contextlib.suppress(Exception):
             loop.close()
+
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_client_on_session_start_done_callback_logs_exception(

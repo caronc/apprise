@@ -239,10 +239,10 @@ class NotifyFlock(NotifyBase):
                 target = targets.pop(0)
 
                 # Copy and update our payload
-                _payload = payload.copy()
-                _payload["to"] = target
+                payload_ = payload.copy()
+                payload_["to"] = target
 
-                if not self._post(self.notify_api, headers, _payload):
+                if not self._post(self.notify_api, headers, payload_):
                     has_error = True
 
         else:

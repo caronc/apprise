@@ -110,7 +110,6 @@ class NotifyViber(NotifyBase):
         }
     })
 
-
     def __init__(
         self,
         token: str,
@@ -280,15 +279,15 @@ class NotifyViber(NotifyBase):
                     continue
 
             except requests.RequestException as e:
-               self.logger.warning(
-                   "A Connection error occured sending Viber notification "
-                   "to %s",
-                   dest,
-               )
-               self.logger.debug(f"Socket Exception: {e!s}")
-               # Mark our failure
-               has_error = True
-               continue
+                self.logger.warning(
+                    "A Connection error occured sending Viber notification "
+                    "to %s",
+                    dest,
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
+                # Mark our failure
+                has_error = True
+                continue
 
         return not has_error
 

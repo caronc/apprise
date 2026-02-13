@@ -268,7 +268,7 @@ class NotifyMSTeams(NotifyBase):
             NotifyBase.logger.deprecate(
                 "Apprise requires you to identify your Microsoft Team name as "
                 "part of the URL. e.g.: "
-                "msteams://TEAM-NAME/{token_a}/{token_b}/{token_c}"
+                f"msteams://TEAM-NAME/{token_a}/{token_b}/{token_c}"
             )
 
             # Fallback

@@ -135,9 +135,9 @@ def test_plugin_emby_general(
     obj.user_id = "123"
 
     # Test our exception handling
-    for _exception in AppriseURLTester.req_exceptions:
-        mock_post.side_effect = _exception
-        mock_get.side_effect = _exception
+    for exception in AppriseURLTester.req_exceptions:
+        mock_post.side_effect = exception
+        mock_get.side_effect = exception
         # We'll fail to log in each time
         assert obj.notify("title", "body", "info") is False
 
@@ -189,9 +189,9 @@ def test_plugin_emby_login(mock_post, mock_get):
     assert isinstance(obj, NotifyEmby)
 
     # Test our exception handling
-    for _exception in AppriseURLTester.req_exceptions:
-        mock_post.side_effect = _exception
-        mock_get.side_effect = _exception
+    for exception in AppriseURLTester.req_exceptions:
+        mock_post.side_effect = exception
+        mock_get.side_effect = exception
         # We'll fail to log in each time
         assert obj.login() is False
 
@@ -306,9 +306,9 @@ def test_plugin_emby_sessions(mock_post, mock_get, mock_logout, mock_login):
     obj.user_id = "123"
 
     # Test our exception handling
-    for _exception in AppriseURLTester.req_exceptions:
-        mock_post.side_effect = _exception
-        mock_get.side_effect = _exception
+    for exception in AppriseURLTester.req_exceptions:
+        mock_post.side_effect = exception
+        mock_get.side_effect = exception
         # We'll fail to log in each time
         sessions = obj.sessions()
         assert isinstance(sessions, dict) is True
@@ -397,9 +397,9 @@ def test_plugin_emby_logout(mock_post, mock_get, mock_login):
     obj.user_id = "123"
 
     # Test our exception handling
-    for _exception in AppriseURLTester.req_exceptions:
-        mock_post.side_effect = _exception
-        mock_get.side_effect = _exception
+    for exception in AppriseURLTester.req_exceptions:
+        mock_post.side_effect = exception
+        mock_get.side_effect = exception
         # We'll fail to log in each time
         obj.logout()
         obj.access_token = "abc"

@@ -93,10 +93,10 @@ def test_plugin_mqtt_default_success(mqtt_client_mock):
     assert isinstance(obj.url_id(), str)
 
     # Verify default settings.
-    assert re.search(r"qos=0", obj.url())
+    assert r"qos=0" in obj.url()
     assert re.search(r"version=v3.1.1", obj.url())
-    assert re.search(r"session=no", obj.url())
-    assert re.search(r"client_id=", obj.url()) is None
+    assert r"session=no" in obj.url()
+    assert r"client_id=" not in obj.url()
 
     # Verify notification succeeds.
     assert obj.notify(body="test=test") is True
@@ -132,8 +132,8 @@ def test_plugin_mqtt_multiple_topics_success(mqtt_client_mock):
 
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith("mqtt://localhost")
-    assert re.search(r"my/topic", obj.url())
-    assert re.search(r"my/other/topic", obj.url())
+    assert r"my/topic" in obj.url()
+    assert r"my/other/topic" in obj.url()
     assert obj.notify(body="test=test") is True
 
     # Verify the right calls have been made to the MQTT client object.
@@ -163,7 +163,7 @@ def test_plugin_mqtt_to_success(mqtt_client_mock):
     assert obj.url().startswith("mqtt://localhost/my/topic")
 
     # Verify default settings.
-    assert re.search(r"qos=0", obj.url())
+    assert r"qos=0" in obj.url()
     assert re.search(r"version=v3.1.1", obj.url())
 
     # Verify notification succeeds.
@@ -181,7 +181,7 @@ def test_plugin_mqtt_valid_settings_success(mqtt_client_mock):
 
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith("mqtt://localhost")
-    assert re.search(r"qos=1", obj.url())
+    assert r"qos=1" in obj.url()
     assert re.search(r"version=v3.1", obj.url())
 
 
@@ -303,10 +303,10 @@ def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):
 
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith("mqtt://user@localhost")
-    assert re.search(r"my/topic", obj.url())
-    assert re.search(r"client_id=apprise", obj.url())
-    assert re.search(r"session=yes", obj.url())
-    assert re.search(r"retain=no", obj.url())
+    assert r"my/topic" in obj.url()
+    assert r"client_id=apprise" in obj.url()
+    assert r"session=yes" in obj.url()
+    assert r"retain=no" in obj.url()
     assert obj.notify(body="test=test") is True
 
 
@@ -319,9 +319,9 @@ def test_plugin_mqtt_retain(mqtt_client_mock):
 
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith("mqtt://user@localhost")
-    assert re.search(r"my/topic", obj.url())
-    assert re.search(r"session=no", obj.url())
-    assert re.search(r"retain=yes", obj.url())
+    assert r"my/topic" in obj.url()
+    assert r"session=no" in obj.url()
+    assert r"retain=yes" in obj.url()
     assert obj.notify(body="test=test") is True
 
 

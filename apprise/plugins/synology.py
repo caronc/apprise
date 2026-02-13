@@ -301,7 +301,7 @@ class NotifySynology(NotifyBase):
                     "%serror=%s.",
                     status_str,
                     ", " if status_str else "",
-                    str(r.status_code),
+                    r.status_code,
                 )
 
                 self.logger.debug(

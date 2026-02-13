@@ -1246,14 +1246,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "user@hotmail.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "user2@yahoo.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "user@hotmail.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "user2@yahoo.com"
+    assert msg.split("\n")[-3] == "test"
 
     # Our URL port was over-ridden (on template) to use 444
     # We can verify that this was correctly saved
@@ -1296,14 +1296,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "user@hotmail.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "user2@yahoo.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "user@hotmail.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "user2@yahoo.com"
+    assert msg.split("\n")[-3] == "test"
 
     user, pw = response.login.call_args[0]
     # the SMTP Server was ovr
@@ -1724,14 +1724,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "bot@concordium-explorer.nl"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "hello@concordium-explorer.nl"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "bot@concordium-explorer.nl"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "hello@concordium-explorer.nl"
+    assert msg.split("\n")[-3] == "test"
 
     user, pw = response.login.call_args[0]
     assert pw == "abc123"
@@ -1780,14 +1780,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "username@customdomain.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "username@customdomain.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "username@customdomain.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "username@customdomain.com"
+    assert msg.split("\n")[-3] == "test"
 
     user, pw = response.login.call_args[0]
     assert pw == "password123"
@@ -1832,14 +1832,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "username@customdomain.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "username@customdomain.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "username@customdomain.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "username@customdomain.com"
+    assert msg.split("\n")[-3] == "test"
 
     user, pw = response.login.call_args[0]
     assert pw == "password123"
@@ -1888,14 +1888,14 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "admin@domain.subdomain.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "mail@mail-domain.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "admin@domain.subdomain.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "mail@mail-domain.com"
+    assert msg.split("\n")[-3] == "test"
 
     user, pw = response.login.call_args[0]
     assert user == "admin@mail-domain.com"
@@ -1945,14 +1945,14 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "user@gmail.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "test+notification@gmail.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "user@gmail.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "test+notification@gmail.com"
+    assert msg.split("\n")[-3] == "test"
 
     mock_smtp.reset_mock()
     mock_smtp_ssl.reset_mock()
@@ -1990,14 +1990,14 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "user@gmail.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "test+notification@gmail.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "user@gmail.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "test+notification@gmail.com"
+    assert msg.split("\n")[-3] == "test"
 
     mock_smtp.reset_mock()
     mock_smtp_ssl.reset_mock()
@@ -2034,14 +2034,14 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "user@gmail.com"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "test+notification@gmail.com"
-    assert _msg.split("\n")[-3] == "test"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "user@gmail.com"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "test+notification@gmail.com"
+    assert msg.split("\n")[-3] == "test"
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -2107,12 +2107,12 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
-    _email = result[0]
-    assert _email.from_addr == ["Apprise", "testuser@alt.lan"]
-    assert _email.user == "testuser@alt.lan"
-    assert _email.smtp_host == "smtp.alt.lan"
-    assert _email.targets == [(False, "alteriks@alt.lan")]
-    assert _email.password == "xxxxXXXxxx"
+    email_ = result[0]
+    assert email_.from_addr == ["Apprise", "testuser@alt.lan"]
+    assert email_.user == "testuser@alt.lan"
+    assert email_.smtp_host == "smtp.alt.lan"
+    assert email_.targets == [(False, "alteriks@alt.lan")]
+    assert email_.password == "xxxxXXXxxx"
 
     # Valid Configuration
     result, _ = ConfigBase.config_parse(
@@ -2133,12 +2133,12 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
-    _email = result[0]
-    assert _email.from_addr == ["Apprise", "joe@alt.lan"]
-    assert _email.user == "joe@alt.lan"
-    assert _email.smtp_host == "smtp.alt.lan"
-    assert _email.targets == [(False, "alteriks@alt.lan")]
-    assert _email.password == "abcd"
+    email_ = result[0]
+    assert email_.from_addr == ["Apprise", "joe@alt.lan"]
+    assert email_.user == "joe@alt.lan"
+    assert email_.smtp_host == "smtp.alt.lan"
+    assert email_.targets == [(False, "alteriks@alt.lan")]
+    assert email_.password == "abcd"
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -2193,14 +2193,14 @@ def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "user@custom-domain.casa"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "alerts@anothercustomdomain.net"
-    assert _msg.split("\n")[-3] == "body"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "user@custom-domain.casa"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "alerts@anothercustomdomain.net"
+    assert msg.split("\n")[-3] == "body"
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -2340,14 +2340,14 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "name@spectrum.net"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "name@spectrum.net"
-    assert _msg.split("\n")[-3] == "body"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "name@spectrum.net"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "name@spectrum.net"
+    assert msg.split("\n")[-3] == "body"
 
     #
     # Now let's do a shortened version of the same URL where the host isn't
@@ -2394,14 +2394,14 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "name@spectrum.net"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "name@spectrum.net"
-    assert _msg.split("\n")[-3] == "body"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "name@spectrum.net"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "name@spectrum.net"
+    assert msg.split("\n")[-3] == "body"
 
     #
     # Now let's do a shortened version of the same URL where the host isn't
@@ -2471,14 +2471,14 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     # Syntax is:
     #  sendmail(from_addr, to_addrs, msg, mail_options=(), rcpt_options=())
     #             [0]        [1]     [2]
-    _from = response.sendmail.call_args[0][0]
-    _to = response.sendmail.call_args[0][1]
-    _msg = response.sendmail.call_args[0][2]
-    assert _from == "name@spectrum.net"
-    assert isinstance(_to, list)
-    assert len(_to) == 1
-    assert _to[0] == "john@yahoo.ca"
-    assert _msg.split("\n")[-3] == "body"
+    from_ = response.sendmail.call_args[0][0]
+    to = response.sendmail.call_args[0][1]
+    msg = response.sendmail.call_args[0][2]
+    assert from_ == "name@spectrum.net"
+    assert isinstance(to, list)
+    assert len(to) == 1
+    assert to[0] == "john@yahoo.ca"
+    assert msg.split("\n")[-3] == "body"
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -2509,18 +2509,18 @@ def test_plugin_email_by_ipaddr_1113(mock_smtp, mock_smtp_ssl):
     assert results["targets"][0] == "alerts@example.com"
     assert results["port"] == 25
 
-    _email = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(_email, email.NotifyEmail) is True
+    email_ = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(email_, email.NotifyEmail) is True
 
-    assert len(_email.targets) == 1
-    assert (False, "alerts@example.com") in _email.targets
+    assert len(email_.targets) == 1
+    assert (False, "alerts@example.com") in email_.targets
 
-    assert _email.from_addr == (False, "sender@example.com")
-    assert _email.user is None
-    assert _email.password is None
-    assert _email.smtp_host == "10.0.0.195"
-    assert _email.port == 25
-    assert _email.targets == [(False, "alerts@example.com")]
+    assert email_.from_addr == (False, "sender@example.com")
+    assert email_.user is None
+    assert email_.password is None
+    assert email_.smtp_host == "10.0.0.195"
+    assert email_.port == 25
+    assert email_.targets == [(False, "alerts@example.com")]
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
@@ -2894,7 +2894,7 @@ def test_plugin_email_prepare():
             pass
 
     # Most basic call (a lot of defaults are used)
-    _iterator = email.NotifyEmail.prepare_emails(
+    iterator = email.NotifyEmail.prepare_emails(
         subject="Email Subject",
         body="Email Body",
         from_addr=(None, "test@test.com"),
@@ -2902,7 +2902,7 @@ def test_plugin_email_prepare():
             ("Apprise User", "apprise@test.com"),
         ],
     )
-    entries = list(_iterator)
+    entries = list(iterator)
     assert len(entries) == 1
 
 

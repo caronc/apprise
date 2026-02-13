@@ -193,8 +193,7 @@ class CustomNotifyPlugin(NotifyBase):
                         N_MGR[self.secure_protocol].service_name,
                     )
                     self.logger.debug(
-                        "%s Exception: %s", N_MGR[self.secure_protocol], str(e)
-                    )
+                        "%s Exception: %s", N_MGR[self.secure_protocol], e)
                     return False
 
                 if response:

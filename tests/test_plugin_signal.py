@@ -494,6 +494,7 @@ def test_notify_signal_plugin_attachments(request_mock):
     )
     assert request_mock.call_count == 1
 
+
 def test_plugin_signal_text_mode_markdown_from_url(request_mock):
     """NotifySignalAPI() sets text_mode=styled when ?format=markdown"""
     source = "+1 (555) 123-3456"

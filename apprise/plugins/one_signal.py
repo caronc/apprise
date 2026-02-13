@@ -289,8 +289,8 @@ class NotifyOneSignal(NotifyBase):
             raise TypeError(msg)
 
         # Sort our targets
-        for _target in parse_list(targets):
-            target = _target.strip()
+        for target_ in parse_list(targets):
+            target = target_.strip()
             if len(target) < 2:
                 self.logger.debug(f"Ignoring OneSignal Entry: {target}")
                 continue
@@ -501,7 +501,7 @@ class NotifyOneSignal(NotifyBase):
                         "A Connection error occurred sending OneSignal "
                         "notification."
                     )
-                    self.logger.debug("Socket Exception: %s", str(e))
+                    self.logger.debug("Socket Exception: %s", e)
 
                     has_error = True
 
@@ -623,7 +623,7 @@ class NotifyOneSignal(NotifyBase):
             return total_targets
 
         # Normal batch count; just count the targets
-        return sum([len(m) for _, m in self.targets.items()])
+        return sum(len(m) for _, m in self.targets.items())
 
     @staticmethod
     def parse_url(url):

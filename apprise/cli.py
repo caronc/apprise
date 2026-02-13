@@ -714,7 +714,7 @@ def main(
     #
     # Apply Environment Overrides if defined
     #
-    _config_paths = DEFAULT_CONFIG_PATHS
+    config_paths = DEFAULT_CONFIG_PATHS
     if "APPRISE_CONFIG" in os.environ:
         # Deprecate (this was from previous versions of Apprise <= 1.9.1)
         logger.deprecate(
@@ -724,25 +724,25 @@ def main(
         logger.debug(
             "Loading provided APPRISE_CONFIG (deprecated) environment variable"
         )
-        _config_paths = (os.environ.get("APPRISE_CONFIG", "").strip(),)
+        config_paths = (os.environ.get("APPRISE_CONFIG", "").strip(),)
 
     elif DEFAULT_ENV_APPRISE_CONFIG_PATH in os.environ:
         logger.debug(
             f"Loading provided {DEFAULT_ENV_APPRISE_CONFIG_PATH} "
             "environment variable"
         )
-        _config_paths = re.split(
+        config_paths = re.split(
             r"[\r\n;]+",
             os.environ.get(DEFAULT_ENV_APPRISE_CONFIG_PATH).strip(),
         )
 
-    _plugin_paths = DEFAULT_PLUGIN_PATHS
+    plugin_paths_ = DEFAULT_PLUGIN_PATHS
     if DEFAULT_ENV_APPRISE_PLUGIN_PATH in os.environ:
         logger.debug(
             f"Loading provided {DEFAULT_ENV_APPRISE_PLUGIN_PATH} environment "
             "variable"
         )
-        _plugin_paths = re.split(
+        plugin_paths_ = re.split(
             r"[\r\n;]+",
             os.environ.get(DEFAULT_ENV_APPRISE_PLUGIN_PATH).strip(),
         )
@@ -763,7 +763,7 @@ def main(
     plugin_paths = (
         plugin_path
         if plugin_path
-        else [path for path in _plugin_paths if exists(path_decode(path))]
+        else [path for path in plugin_paths_ if exists(path_decode(path))]
     )
 
     if storage_uid_length < 2:
@@ -955,7 +955,7 @@ def main(
         # Load default configuration
         a.add(
             AppriseConfig(
-                paths=[f for f in _config_paths if isfile(path_decode(f))],
+                paths=[f for f in config_paths if isfile(path_decode(f))],
                 asset=asset,
                 recursion=recursion_depth,
             )
@@ -1001,7 +1001,7 @@ def main(
 
         action = PERSISTENT_STORAGE_MODES[0]
         if filter_uids:
-            _action = next(  # pragma: no branch
+            action_ = next(  # pragma: no branch
                 (
                     a
                     for a in PERSISTENT_STORAGE_MODES
@@ -1010,25 +1010,25 @@ def main(
                 None,
             )
 
-            if _action:
+            if action_:
                 # pop 'action' off the head of our list
                 filter_uids = filter_uids[1:]
-                action = _action
+                action = action_
 
         # Get our detected URL IDs
         uids = {}
         for plugin in a if not tags else a.find(tag=tags):
-            _id = plugin.url_id()
-            if not _id:
+            id_ = plugin.url_id()
+            if not id_:
                 continue
 
             if filter_uids and next(
-                (False for n in filter_uids if _id.startswith(n)), True
+                (False for n in filter_uids if id_.startswith(n)), True
             ):
                 continue
 
-            if _id not in uids:
-                uids[_id] = {
+            if id_ not in uids:
+                uids[id_] = {
                     "plugins": [plugin],
                     "state": PersistentStoreState.UNUSED.value,
                     "size": 0,
@@ -1037,7 +1037,7 @@ def main(
             else:
                 # It's possible to have more than one URL point to the same
                 # location (thus match against the same url id more than once
-                uids[_id]["plugins"].append(plugin)
+                uids[id_]["plugins"].append(plugin)
 
         if action == PersistentStorageMode.LIST:
             detected_uid = PersistentStore.disk_scan(
@@ -1046,14 +1046,14 @@ def main(
                 # Provide filter if specified
                 namespace=filter_uids,
             )
-            for _id in detected_uid:
-                size, _ = dir_size(os.path.join(asset.storage_path, _id))
-                if _id in uids:
-                    uids[_id]["state"] = PersistentStoreState.ACTIVE.value
-                    uids[_id]["size"] = size
+            for id_ in detected_uid:
+                size, _ = dir_size(os.path.join(asset.storage_path, id_))
+                if id_ in uids:
+                    uids[id_]["state"] = PersistentStoreState.ACTIVE.value
+                    uids[id_]["size"] = size
 
                 elif not tags:
-                    uids[_id] = {
+                    uids[id_] = {
                         "plugins": [],
                         # No cross reference (wasted space?)
                         "state": PersistentStoreState.STALE.value,

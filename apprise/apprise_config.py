@@ -202,27 +202,27 @@ class AppriseConfig:
             return False
 
         # Iterate over our configuration
-        for _config in configs:
+        for config in configs:
 
-            if isinstance(_config, ConfigBase):
+            if isinstance(config, ConfigBase):
                 # Go ahead and just add our configuration into our list
-                self.configs.append(_config)
+                self.configs.append(config)
                 continue
 
-            elif not isinstance(_config, str):
+            elif not isinstance(config, str):
                 logger.warning(
-                    f"An invalid configuration (type={type(_config)}) was"
+                    f"An invalid configuration (type={type(config)}) was"
                     " specified."
                 )
                 return_status = False
                 continue
 
-            logger.debug(f"Loading configuration: {_config}")
+            logger.debug(f"Loading configuration: {config}")
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
             instance = AppriseConfig.instantiate(
-                _config,
+                config,
                 asset=asset,
                 tag=tag,
                 cache=cache,
@@ -296,7 +296,7 @@ class AppriseConfig:
             insecure_includes=insecure_includes,
         )
 
-        if not (instance.config_format and \
+        if not (instance.config_format and
                 instance.config_format.value in common.CONFIG_FORMATS):
             logger.warning(
                 "The format of the configuration could not be detected."

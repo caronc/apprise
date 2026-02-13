@@ -118,6 +118,7 @@ def markdown_adjust(
 
     return split_at
 
+
 def smart_split(
     text: str,
     limit: int,

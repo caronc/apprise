@@ -100,7 +100,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url": \
+            "privacy_url":
                 "resend://a...d:user@example.com/newuser2@example.com",
             "url_matches": r"name=Jessica",
         },
@@ -113,7 +113,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url": \
+            "privacy_url":
                 "resend://a...d:user2@example.ca/",
             "url_matches": r"name=Ralph",
             "force_debug": True,
@@ -127,7 +127,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url": \
+            "privacy_url":
                 "resend://a...d:user@example.com/newuser5@example.com",
             "url_matches": r"name=Joe",
         },
@@ -140,7 +140,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url": \
+            "privacy_url":
                 "resend://a...d:user@example.com",
             "url_matches": r"reply=John",
         },

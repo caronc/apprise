@@ -269,29 +269,29 @@ class NotifySplunk(NotifyBase):
         # Store our mappings
         self.mapping = self.splunk_message_map.copy()
         if mapping and isinstance(mapping, dict):
-            for _k, _v in mapping.items():
+            for k_, v_ in mapping.items():
                 # Get our mapping
-                k = next((t for t in NOTIFY_TYPES if t.startswith(_k)), None)
+                k = next((t for t in NOTIFY_TYPES if t.startswith(k_)), None)
                 if not k:
                     msg = (
-                        f"The Splunk mapping key specified ({_k}) is invalid."
+                        f"The Splunk mapping key specified ({k_}) is invalid."
                     )
                     self.logger.warning(msg)
                     raise TypeError(msg)
 
-                _v_upper = _v.upper()
+                v_upper = v_.upper()
                 v = next(
                     (
                         v
                         for v in SPLUNK_MESSAGE_TYPES
-                        if v.startswith(_v_upper)
+                        if v.startswith(v_upper)
                     ),
                     None,
                 )
                 if not v:
                     msg = (
                         f"The Splunk mapping value (assigned to {k}) "
-                        f"specified ({_v}) is invalid."
+                        f"specified ({v_}) is invalid."
                     )
                     self.logger.warning(msg)
                     raise TypeError(msg)
