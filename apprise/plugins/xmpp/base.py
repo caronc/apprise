@@ -37,11 +37,7 @@ from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_bool, parse_list
 from ..base import NotifyBase
-from .adapter import (
-    SLIXMPP_SUPPORT_AVAILABLE,
-    SlixmppAdapter,
-    XMPPConfig,
-)
+from .adapter import SLIXMPP_SUPPORT_AVAILABLE, SlixmppAdapter, XMPPConfig
 from .common import SECURE_MODES, SecureXMPPMode
 
 # A pragmatic, "hardened" JID validator intended for Apprise URLs.
@@ -55,7 +51,8 @@ from .common import SECURE_MODES, SecureXMPPMode
 # inputs early and reliably while still supporting common JID patterns.
 IS_JID = re.compile(
     r"^\s*(?P<local>[^@\s/]+)((@|%40)"
-    r"(?P<domain>[^@\s/]+))?(?:(/|%2F)(?P<resource>[^%/\s]+)((/|%2F).*)?)?\s*$"
+    r"(?P<domain>[^@\s/]+))?(?:(/|%2F)(?P<resource>[^%/\s]+)"
+    r"((/|%2F).*)?)?\s*$"
 )
 
 
@@ -145,6 +142,11 @@ class NotifyXMPP(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
+            "keepalive": {
+                "name": _("Keep Connection Alive"),
+                "type": "bool",
+                "default": False,
+            },
         },
     )
 
@@ -154,6 +156,7 @@ class NotifyXMPP(NotifyBase):
         secure_mode: Optional[str] = None,
         roster: Optional[bool] = None,
         subject: Optional[bool] = None,
+        keepalive: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -208,21 +211,43 @@ class NotifyXMPP(NotifyBase):
             if subject is None else bool(subject)
         )
 
+        self.keepalive = (
+            self.template_args["keepalive"]["default"]
+            if keepalive is None
+            else bool(keepalive)
+        )
+
         if self.secure and self.secure_mode == SecureXMPPMode.NONE:
             self.secure_mode = self.template_args["mode"]["default"]
             self.logger.warning(
                 "Ambiguous XMPP configuration: secure=True and mode=None; "
-                f"secure setting prevails; setting mode={self.secure_mode}")
+                "secure setting prevails; setting mode=%s",
+                self.secure_mode,
+            )
 
         elif not self.secure and self.secure_mode != SecureXMPPMode.NONE:
             self.logger.warning(
-                "Ambiguous XMPP configuration: secure=False and "
-                f"mode={self.secure_mode}; "
-                "mode setting prevails; setting secure=True")
+                "Ambiguous XMPP configuration: secure=False and mode=%s; "
+                "mode setting prevails; setting secure=True",
+                self.secure_mode,
+            )
             self.secure = True
 
+        # Keepalive adapter (created lazily)
+        self._adapter: Optional[SlixmppAdapter] = None
+
+    def __del__(self) -> None:
+        """Best-effort close for keepalive sessions."""
+        try:
+            if self._adapter is not None:
+                self._adapter.close()
+
+        except Exception:
+            # Never raise from __del__
+            pass
+
     @property
-    def url_identifier(self) -> tuple[str, str, str, str, int | None]:
+    def url_identifier(self) -> tuple[str, str, str, str, Optional[int]]:
         """Return the pieces that uniquely identify this configuration."""
         return (
             self.secure_protocol if self.secure else self.protocol,
@@ -237,6 +262,7 @@ class NotifyXMPP(NotifyBase):
             "mode": self.secure_mode,
             "roster": "yes" if self.roster else "no",
             "subject": "yes" if self.subject else "no",
+            "keepalive": "yes" if self.keepalive else "no",
         }
 
         # Extend our parameters
@@ -295,7 +321,8 @@ class NotifyXMPP(NotifyBase):
 
         self.logger.debug(
             "XMPP init: jid=%s host=%s port=%d mode=%s "
-            "verify_certificate=%s subject=%s, roster=%s targets=%s",
+            "verify_certificate=%s subject=%s roster=%s keepalive=%s "
+            "targets=%s",
             self.jid,
             config.host,
             config.port,
@@ -303,24 +330,39 @@ class NotifyXMPP(NotifyBase):
             config.verify_certificate,
             "yes" if self.subject else "no",
             "yes" if self.roster else "no",
+            "yes" if self.keepalive else "no",
             self.targets,
         )
 
-        adapter = SlixmppAdapter(
-            config=config,
-            targets=self.targets,
-            subject=title if self.subject else "",
-            # If subject is False, then the body actually already includes the
-            # title below (inline):
-            body=body,
-            timeout=self.socket_connect_timeout,
-            roster=self.roster,
-        )
+        subject = title if self.subject else ""
 
-        return adapter.process()
+        if self.keepalive and self._adapter:
+            # Reuse existing adapter
+            return self._adapter.send_message(
+                targets=self.targets,
+                subject=subject,
+                body=body,
+            )
+
+        adapter_kwargs = {
+            "config": config,
+            "targets": self.targets,
+            "subject": subject,
+            "body": body,
+            "timeout": self.socket_connect_timeout,
+            "roster": self.roster,
+            "keepalive": self.keepalive,
+        }
+        if not self.keepalive:
+            # One-shot mode: Create, process, and discard
+            return SlixmppAdapter(**adapter_kwargs).process()
+
+        # Keepalive mode, reuse a single adapter instance
+        self._adapter = SlixmppAdapter(**adapter_kwargs)
+        return self._adapter.send_message()
 
     @property
-    def title_maxlen(self) -> int | None:
+    def title_maxlen(self) -> Optional[int]:
         """
         Depending on if the subject field is set, we can control
         how the message is constructed.
@@ -347,7 +389,7 @@ class NotifyXMPP(NotifyBase):
         if not raw:
             raise ValueError("Empty JID")
 
-        results = IS_JID.match(value)
+        results = IS_JID.match(raw)
         if not results:
             raise ValueError("Invalid JID")
 
@@ -389,5 +431,8 @@ class NotifyXMPP(NotifyBase):
 
         if "subject" in results["qsd"] and len(results["qsd"]["subject"]):
             results["subject"] = parse_bool(results["qsd"]["subject"])
+
+        if "keepalive" in results["qsd"] and len(results["qsd"]["keepalive"]):
+            results["keepalive"] = parse_bool(results["qsd"]["keepalive"])
 
         return results
