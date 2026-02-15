@@ -150,6 +150,33 @@ TEST_URLS = (
             "instance": email.NotifyEmail,
         },
     ),
+    # GMX Support
+    (
+        "mailto://user:pass@gmx.net",
+        {
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailto://user:pass@gmx.com",
+        {
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailto://user:pass@gmx.de",
+        {
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        # STARTTLS flag checking (and privacy URL expectation)
+        "mailtos://user:pass@gmx.net?mode=starttls",
+        {
+            "instance": email.NotifyEmail,
+            "privacy_url": "mailtos://user:****@gmx.net",
+        },
+    ),
     # Yandex
     (
         "mailto://user:pass@yandex.com",
@@ -2967,3 +2994,34 @@ def test_pgp_public_keyfile_skips_self_email(tmpdir):
     result = pgp.public_keyfile("externaluser@email.com")
 
     assert result.endswith("externaluser-pub.asc")
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_gmx_template_lookup(mock_smtp):
+    """NotifyEmail() GMX template lookup tests."""
+
+    response = mock.Mock()
+    mock_smtp.return_value = response
+
+    results = email.NotifyEmail.parse_url("mailtos://user:pass123@gmx.net")
+    obj = Apprise.instantiate(results, suppress_exceptions=False)
+    assert isinstance(obj, email.NotifyEmail)
+
+    # Template-driven defaults
+    assert obj.smtp_host == "mail.gmx.com"
+    assert obj.secure_mode == "starttls"
+    assert obj.port == 587
+    assert obj.secure is True
+
+    # Send once to trigger SMTP/login behaviour
+    assert obj.notify("body", "title") is True
+
+    # STARTTLS used
+    assert response.starttls.call_count == 1
+    assert response.login.call_count == 1
+
+    login_user, login_pass = response.login.call_args[0]
+    assert login_pass == "pass123"
+
+    # GMX should authenticate with full email, not just the local part
+    assert login_user == "user@gmx.net"
