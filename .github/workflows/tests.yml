@@ -33,6 +33,14 @@ jobs:
             tox_env: qa
             continue-on-error: true
 
+          - python-version: "3.14-dev"
+            tox_env: qa
+            continue-on-error: true
+
+          - python-version: "3.15-dev"
+            tox_env: qa
+            continue-on-error: true
+
           # Platform validation only (one version)
           - os: windows-latest
             python-version: "3.12"
