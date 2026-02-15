@@ -155,18 +155,21 @@ TEST_URLS = (
         "mailto://user:pass@gmx.net",
         {
             "instance": email.NotifyEmail,
+            "privacy_url": "mailto://user:****@gmx.net",
         },
     ),
     (
         "mailto://user:pass@gmx.com",
         {
             "instance": email.NotifyEmail,
+            "privacy_url": "mailto://user:****@gmx.com",
         },
     ),
     (
         "mailto://user:pass@gmx.de",
         {
             "instance": email.NotifyEmail,
+            "privacy_url": "mailto://user:****@gmx.de",
         },
     ),
     (
@@ -3003,25 +3006,31 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
     response = mock.Mock()
     mock_smtp.return_value = response
 
-    results = email.NotifyEmail.parse_url("mailtos://user:pass123@gmx.net")
-    obj = Apprise.instantiate(results, suppress_exceptions=False)
-    assert isinstance(obj, email.NotifyEmail)
+    for domain in ("gmx.net", "gmx.com", "gmx.de", "gmx.at", "gmx.ch",
+                   "gmx.fr"):
 
-    # Template-driven defaults
-    assert obj.smtp_host == "mail.gmx.com"
-    assert obj.secure_mode == "starttls"
-    assert obj.port == 587
-    assert obj.secure is True
+        results = email.NotifyEmail.parse_url(
+            f"mailtos://user:pass123@{domain}")
+        obj = Apprise.instantiate(results, suppress_exceptions=False)
+        assert isinstance(obj, email.NotifyEmail)
 
-    # Send once to trigger SMTP/login behaviour
-    assert obj.notify("body", "title") is True
+        # Template-driven defaults
+        assert obj.smtp_host == "mail.gmx.com"
+        assert obj.secure_mode == "starttls"
+        assert obj.port == 587
+        assert obj.secure is True
 
-    # STARTTLS used
-    assert response.starttls.call_count == 1
-    assert response.login.call_count == 1
+        # Send once to trigger SMTP/login behaviour
+        assert obj.notify("body", "title") is True
 
-    login_user, login_pass = response.login.call_args[0]
-    assert login_pass == "pass123"
+        # STARTTLS used
+        assert response.starttls.call_count == 1
+        assert response.login.call_count == 1
 
-    # GMX should authenticate with full email, not just the local part
-    assert login_user == "user@gmx.net"
+        login_user, login_pass = response.login.call_args[0]
+        mock_smtp.reset_mock()
+
+        assert login_pass == "pass123"
+
+        # GMX should authenticate with full email, not just the local part
+        assert login_user == f"user@{domain}"
