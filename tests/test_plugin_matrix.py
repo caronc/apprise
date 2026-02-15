@@ -713,9 +713,9 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
         "user_id": "@apprise:localhost",
         "home_server": "localhost",
         # For joined_room response
-        "joined_rooms": ["!abc123:localhost", "!def456:localhost"],
+        "joined_rooms": ["!abc123", "!def456:localhost"],
         # For room joining
-        "room_id": "!abc123:localhost",
+        "room_id": "!abc123",
     }
 
     # Default configuration
