@@ -87,7 +87,7 @@ apprise_url_tests = (
 )
 
 
-def test_plugin_template_urls():
+def test_plugin_jellyfin_urls():
     """NotifyJellyfin() Apprise URLs."""
 
     # Run our general tests

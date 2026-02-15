@@ -63,7 +63,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `FCM`, `Feishu`, `Flock`, \
 `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, `Guilded`, \
-`Home Assistant`, `httpSMS`, `IFTTT`, `IRC`, `Jellyfin`, `Join`, `Kavenegar`,
+`Home Assistant`, `httpSMS`, `IFTTT`, `IRC`, `Jellyfin`, `Join`, `Kavenegar`, \
 `KODI`, `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, \
 `Mastodon`, `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
 `Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, \
