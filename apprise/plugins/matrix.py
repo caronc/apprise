@@ -283,7 +283,7 @@ class NotifyMatrix(NotifyBase):
             "hsreq": {
                 "name": _("Force Home Server on Room IDs"),
                 "type": "bool",
-                "default": False,
+                "default": True,
             },
             "mode": {
                 "name": _("Webhook Mode"),
