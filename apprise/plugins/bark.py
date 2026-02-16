@@ -32,7 +32,7 @@ import json
 
 import requests
 
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -218,11 +218,6 @@ class NotifyBark(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
-            "markdown": {
-                "name": _("Markdown"),
-                "type": "bool",
-                "default": False,
-            },
         },
     )
 
@@ -239,7 +234,6 @@ class NotifyBark(NotifyBase):
         volume=None,
         icon=None,
         call=None,
-        markdown=None,
         **kwargs,
     ):
         """Initialize Notify Bark Object."""
@@ -321,9 +315,6 @@ class NotifyBark(NotifyBase):
         # Call
         self.call = parse_bool(call)
 
-        # Markdown mode
-        self.markdown = parse_bool(markdown)
-
         # Icon URL
         self.icon = icon if isinstance(icon, str) else None
 
@@ -377,7 +368,7 @@ class NotifyBark(NotifyBase):
             "title": title if title else self.app_desc,
         }
 
-        if self.markdown:
+        if self.notify_format == NotifyFormat.MARKDOWN:
             payload["markdown"] = body
         else:
             payload["body"] = body
@@ -535,9 +526,6 @@ class NotifyBark(NotifyBase):
         if self.call:
             params["call"] = "yes"
 
-        if self.markdown:
-            params["markdown"] = "yes"
-
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -647,11 +635,6 @@ class NotifyBark(NotifyBase):
         # Call
         results["call"] = parse_bool(
             results["qsd"].get("call", False)
-        )
-
-        # Markdown
-        results["markdown"] = parse_bool(
-            results["qsd"].get("markdown", False)
         )
 
         return results
