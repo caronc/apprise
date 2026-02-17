@@ -24,6 +24,27 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
+"""
+Mattermost Notifications.
+
+This plugin supports 2 modes of operation:
+
+1. Webhook mode (default):
+   - Uses Mattermost Incoming Webhooks: /hooks/<webhook_token>
+   - Targets are channel names (for example: '#support' or 'support')
+   - If no targets are specified, Mattermost uses the webhook default
+
+2. Bot mode (mode=bot):
+   - Uses Mattermost REST API: /api/v4/posts
+   - Requires a Bot (or User) Access Token (Bearer token)
+   - Targets are channel_id values by default
+   - Channel name resolution is supported when a team is known
+
+"""
+
+from __future__ import annotations
+
+from itertools import chain
 
 # Create an incoming webhook; the website will provide you with something like:
 #  http://localhost:8065/hooks/yobjmukpaw3r3urc5h6i369yima
@@ -34,13 +55,13 @@
 # mmost://localhost:8065/yobjmukpaw3r3urc5h6i369yima
 #  - swap http with mmost
 #  - drop /hooks/ reference
-
-from json import dumps
+from json import dumps, loads
 import re
+from typing import Any
 
 import requests
 
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyImageSize, NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -48,6 +69,26 @@ from .base import NotifyBase
 # Some Reference Locations:
 # - https://docs.mattermost.com/developer/webhooks-incoming.html
 # - https://docs.mattermost.com/administration/config-settings.html
+
+IS_CHANNEL = re.compile(r"^(#|%23)(?P<name>[A-Za-z0-9_-]+)$")
+IS_CHANNEL_ID = re.compile(r"^(\+|%2B)?(?P<name>[A-Za-z0-9_-]+)$")
+
+
+class MattermostMode:
+    """Supported Mattermost integration modes."""
+
+    # Incoming webhook mode
+    WEBHOOK = "webhook"
+
+    # Bot API mode
+    BOT = "bot"
+
+
+# Define our Mattermost Modes
+MATTERMOST_MODES = (
+    MattermostMode.WEBHOOK,
+    MattermostMode.BOT,
+)
 
 
 class NotifyMattermost(NotifyBase):
@@ -77,7 +118,16 @@ class NotifyMattermost(NotifyBase):
     # Mattermost does not have a title
     title_maxlen = 0
 
-    # Define object templates
+    # Allow persistent caching of bot channel lookups
+    storage_mode = PersistentStoreMode.AUTO
+
+    # Keep our cache for 20 days
+    default_cache_expiry_sec = 60 * 60 * 24 * 20
+
+    # Lower rate req since service is self hosted in most
+    # circumstances
+    request_rate_per_sec = 0.02
+
     templates = (
         "{schema}://{host}/{token}",
         "{schema}://{host}:{port}/{token}",
@@ -87,6 +137,10 @@ class NotifyMattermost(NotifyBase):
         "{schema}://{botname}@{host}:{port}/{token}",
         "{schema}://{botname}@{host}/{fullpath}/{token}",
         "{schema}://{botname}@{host}:{port}/{fullpath}/{token}",
+        "{schema}://{team}@{host}/{token}",
+        "{schema}://{team}@{host}:{port}/{token}",
+        "{schema}://{team}@{host}/{fullpath}/{token}",
+        "{schema}://{team}@{host}:{port}/{fullpath}/{token}",
     )
 
     # Define our template tokens
@@ -99,7 +153,8 @@ class NotifyMattermost(NotifyBase):
                 "required": True,
             },
             "token": {
-                "name": _("Webhook Token"),
+                # Webhook Token (webhook mode) OR Access Token (bot mode)
+                "name": _("Token"),
                 "type": "string",
                 "private": True,
                 "required": True,
@@ -108,8 +163,16 @@ class NotifyMattermost(NotifyBase):
                 "name": _("Path"),
                 "type": "string",
             },
-            "botname": {
-                "name": _("Bot Name"),
+            "source": {
+                "name": _("Source"),
+                "type": "string",
+                "map_to": "user",
+            },
+            "team": {
+                # Bot mode team name
+                # This is only required to look up channels for those that are
+                # not known
+                "name": _("Team"),
                 "type": "string",
                 "map_to": "user",
             },
@@ -119,6 +182,22 @@ class NotifyMattermost(NotifyBase):
                 "min": 1,
                 "max": 65535,
             },
+            "target_channel": {
+                "name": _("Target Channel"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
+            "target_channel_id": {
+                "name": _("Target Channel ID"),
+                "type": "string",
+                "prefix": "",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
     )
 
@@ -126,12 +205,16 @@ class NotifyMattermost(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "channels": {
-                "name": _("Channels"),
-                "type": "list:string",
+            "to": {
+                "alias_of": "targets",
             },
             "channel": {
-                "alias_of": "channels",
+                # Backwards compatible
+                "alias_of": "targets",
+            },
+            "channels": {
+                # Backwards compatible
+                "alias_of": "targets",
             },
             "icon_url": {
                 "name": _("Icon URL"),
@@ -143,111 +226,241 @@ class NotifyMattermost(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
-            "to": {
-                "alias_of": "channels",
+            "team": {
+                "name": _("Team"),
+                "alias_of": "source",
+            },
+            "botname": {
+                "name": _("Botname"),
+                "alias_of": "source",
+            },
+            "mode": {
+                "name": _("Mode"),
+                "type": "choice:string",
+                "values": MATTERMOST_MODES,
+                "default": MATTERMOST_MODES[0],
             },
         },
     )
 
     def __init__(
         self,
-        token,
-        fullpath=None,
-        channels=None,
-        include_image=False,
-        icon_url=None,
-        **kwargs,
-    ):
-        """Initialize Mattermost Object."""
+        token: str,
+        fullpath: str | None = None,
+        targets: list[str] | str | None = None,
+        include_image: bool = False,
+        icon_url: str | None = None,
+        mode: str | None = None,
+        team: str | None = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize Mattermost object."""
         super().__init__(**kwargs)
 
-        if self.secure:
-            self.schema = "https"
-
-        else:
-            self.schema = "http"
-
-        # our full path
+        self.schema = "https" if self.secure else "http"
         self.fullpath = (
             "" if not isinstance(fullpath, str) else fullpath.strip()
         )
 
-        # Authorization Token (associated with project)
+        # Mode
+        if isinstance(mode, str) and mode.strip():
+            mode_ = mode.strip().lower()
+            self.mode = next(
+                (m for m in MATTERMOST_MODES if m.startswith(mode_)), None
+            )
+            if self.mode not in MATTERMOST_MODES:
+                msg = f"The Mattermost mode specified ({mode}) is invalid."
+                self.logger.warning(msg)
+                raise TypeError(msg)
+        else:
+            self.mode = self.template_args["mode"]["default"]
+
+        # Token (webhook token in webhook mode, bearer token in bot mode)
         self.token = validate_regex(token)
         if not self.token:
-            msg = (
-                "An invalid Mattermost Authorization Token "
-                f"({token}) was specified."
-            )
+            msg = f"An invalid Mattermost Token ({token}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Optional Channels (strip off any channel prefix entries if present)
-        self.channels = [x.lstrip("#") for x in parse_list(channels)]
+        # Used for URL generation afterwards only
+        self._invalid_targets = []
 
-        # Place a thumbnail image inline with the message body
+        # Channels:
+        self.targets = []
+        for target in parse_list(targets):
+            result = IS_CHANNEL.match(target)
+            if result:
+                if self.mode == MattermostMode.BOT and not self.user:
+                    # No team was defined and we're in BOT mode
+                    self.logger.warning(
+                        "Mattermost bot mode requires a team to resolve "
+                        "%s, dropping it.",
+                        target,
+                    )
+                    self._invalid_targets.append(target)
+                    continue
+
+                # store valid channel
+                self.targets.append(("#", result.group("name")))
+                continue
+
+            result = IS_CHANNEL_ID.match(target)
+            if result:
+                if self.mode == MattermostMode.WEBHOOK:
+                    # store valid channel
+                    self.targets.append(("#", result.group("name")))
+
+                else:  # MattermostMode.BOT
+                    # store valid channel_id
+                    self.targets.append(("+", result.group("name")))
+                continue
+
+            self.logger.warning(
+                "Dropping invalid Mattermost target %s",
+                target,
+            )
+            self._invalid_targets.append(target)
+
+        # Webhook mode features (ignored in bot mode)
         self.include_image = include_image
 
         # Support a user-provided icon URL
         self.icon_url = icon_url
 
-        return
+    def __len__(self) -> int:
+        """Returns the number of outbound HTTP requests expected."""
+        return max(1, len(self.targets))
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
-        """Perform Mattermost Notification."""
+    def _channel_lookup(self, channel: str) -> str | None:
+        """
+        Resolve a channel name to a channel_id.
 
-        # Create a copy of our channels, otherwise place a dummy entry
-        channels = (
-            list(self.channels)
-            if self.channels
-            else [
-                None,
-            ]
+        Resolution occurs only during send(); results are persistently cached.
+        """
+        # Attempt to pull from Persistent Storage if available
+        key = f"c:{channel}"
+        cached = self.store.get(key)
+        if cached:
+            return cached
+
+        port = "" if self.port is None else f":{self.port}"
+        team = NotifyMattermost.quote(self.user, safe="")
+        name = NotifyMattermost.quote(channel, safe="")
+
+        headers: dict[str, str] = {
+            "User-Agent": self.app_id,
+            "Accept": "application/json",
+            "Authorization": f"Bearer {self.token}",
+        }
+
+        url = "{}://{}{}{}/api/v4/teams/name/{}/channels/name/{}".format(
+            self.schema,
+            self.host,
+            port,
+            self.fullpath.rstrip("/"),
+            team,
+            name,
         )
 
-        headers = {
+        self.logger.debug(
+            "Mattermost channel lookup URL: %s (cert_verify=%r)",
+            url,
+            self.verify_certificate,
+        )
+
+        self.throttle()
+
+        try:
+            r = requests.get(
+                url,
+                headers=headers,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
+
+            if r.status_code != requests.codes.ok:
+                status = self.http_response_code_lookup(r.status_code)
+                self.logger.warning(
+                    "Mattermost channel lookup failed for %s: %s, error=%d.",
+                    channel,
+                    status,
+                    r.status_code,
+                )
+                self.logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
+                return None
+
+            try:
+                data = loads(r.content.decode("utf-8"))
+
+            except (AttributeError, TypeError, ValueError):
+                # ValueError = r.content is Unparsable
+                # TypeError = r.content is None
+                # AttributeError = r is None
+                self.logger.debug(
+                    "Mattermost channel lookup response was not JSON:\r\n%r",
+                    (r.content or b"")[:2000],
+                )
+                return None
+
+            channel_id = data.get("id")
+            if not isinstance(channel_id, str) or not channel_id.strip():
+                return None
+
+            self.store.set(
+                key,
+                channel_id,
+                expires=self.default_cache_expiry_sec,
+            )
+            return channel_id
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A Connection error occurred performing Mattermost channel "
+                "lookup for %s.",
+                channel,
+            )
+            self.logger.debug("Socket Exception: %s", e)
+            return None
+
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
+        """Perform Mattermost Notification."""
+
+        if self.mode == MattermostMode.BOT and not self.targets:
+            self.logger.warning(
+                "Mattermost BOT mode has no valid channels to notify, "
+                "aborting."
+            )
+            return False
+
+        # Initialize our error tracking
+        has_error = False
+
+        # Prepare our port reference in advance
+        port = "" if self.port is None else f":{self.port}"
+
+        headers: dict[str, str] = {
             "User-Agent": self.app_id,
             "Content-Type": "application/json",
         }
 
-        # prepare JSON Object
-        payload = {
-            "text": body,
-            "icon_url": None,
-        }
-
-        # Acquire our image url if configured to do so
-        image_url = (
-            self.icon_url
-            if self.icon_url
-            else (
-                None
-                if not self.include_image
-                else self.image_url(notify_type)
+        if self.mode == MattermostMode.BOT:
+            url = "{}://{}{}{}/api/v4/posts".format(
+                self.schema, self.host, port, self.fullpath.rstrip("/")
             )
-        )
 
-        if image_url:
-            # Set our image configuration if told to do so
-            payload["icon_url"] = image_url
+            # Append headers
+            headers["Authorization"] = f"Bearer {self.token}"
+            expected = (requests.codes.created, requests.codes.ok)
 
-        # Set our user
-        payload["username"] = self.user if self.user else self.app_id
-
-        port = ""
-        if self.port is not None:
-            port = f":{self.port}"
-
-        # For error tracking
-        has_error = False
-
-        while len(channels):
-            # Pop a channel off of the list
-            channel = channels.pop(0)
-
-            if channel:
-                payload["channel"] = channel
-
+        else:  # self.mode == MattermostMode.WEBHOOK
             url = "{}://{}{}{}/hooks/{}".format(
                 self.schema,
                 self.host,
@@ -255,14 +468,56 @@ class NotifyMattermost(NotifyBase):
                 self.fullpath.rstrip("/"),
                 self.token,
             )
+            expected = (requests.codes.ok,)
+
+        # Iterate over our targets
+        targets = self.targets.copy()
+        if self.mode == MattermostMode.WEBHOOK and not targets:
+            targets = [(None, None)]
+
+        for kind, value in targets:
+            target = value
+            if kind == "#" and self.mode == MattermostMode.BOT:
+                target = self._channel_lookup(value)
+                if not target:
+                    has_error = True
+                    continue
+
+            if self.mode == MattermostMode.BOT:
+                payload: dict[str, Any] = {
+                    "channel_id": target,
+                    "message": body,
+                }
+
+            else:
+                payload: dict[str, Any] = {
+                    "text": body,
+                }
+
+                image_url = self.icon_url
+                if not image_url and self.include_image:
+                    image_url = self.image_url(notify_type)
+
+                if image_url:
+                    payload["icon_url"] = image_url
+
+                payload["username"] = (
+                    self.user if self.user else self.app_id
+                )
+
+                if target:
+                    payload["channel"] = target
 
             self.logger.debug(
-                "Mattermost POST URL:"
-                f" {url} (cert_verify={self.verify_certificate!r})"
+                "Mattermost %s POST URL: %s (cert_verify=%r)",
+                self.mode,
+                url,
+                self.verify_certificate,
             )
-            self.logger.debug(f"Mattermost Payload: {payload!s}")
+            self.logger.debug(
+                "Mattermost %s Payload: %s", self.mode, payload
+            )
 
-            # Always call throttle before any remote server i/o is made
             self.throttle()
 
             try:
@@ -274,46 +529,37 @@ class NotifyMattermost(NotifyBase):
                     timeout=self.request_timeout,
                 )
 
-                if r.status_code != requests.codes.ok:
-                    # We had a problem
-                    status_str = NotifyMattermost.http_response_code_lookup(
-                        r.status_code
-                    )
-
+                if r.status_code not in expected:
+                    status = self.http_response_code_lookup(r.status_code)
                     self.logger.warning(
-                        "Failed to send Mattermost notification{}: "
-                        "{}{}error={}.".format(
-                            "" if not channel else f" to channel {channel}",
-                            status_str,
-                            ", " if status_str else "",
-                            r.status_code,
-                        )
+                        "Failed to send Mattermost notification to "
+                        "%s: %s, error=%d.",
+                        f"channel_id {target}"
+                        if self.mode == MattermostMode.BOT
+                        else f"channel {target}",
+                        status,
+                        r.status_code,
                     )
-
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
-
-                    # Flag our error
+                        "Response Details:\r\n%r",
+                        (r.content or b"")[:2000],
+                    )
                     has_error = True
                     continue
 
-                else:
-                    self.logger.info(
-                        "Sent Mattermost notification{}.".format(
-                            "" if not channel else f" to channel {channel}"
-                        )
-                    )
+                self.logger.info(
+                    "Sent Mattermost %s notification to %s.",
+                    self.mode,
+                    target,
+                )
 
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending Mattermost "
-                    "notification{}.".format(
-                        "" if not channel else f" to channel {channel}"
-                    )
+                    "%s notification to %s.",
+                    self.mode, target,
                 )
-                self.logger.debug(f"Socket Exception: {e!s}")
-
-                # Flag our error
+                self.logger.debug("Socket Exception: %s", e)
                 has_error = True
                 continue
 
@@ -321,57 +567,69 @@ class NotifyMattermost(NotifyBase):
         return not has_error
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
-        another simliar one.
+        another similar one.
 
         Targets or end points should never be identified here.
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
+            self.mode,
             self.token,
             self.host,
             self.port,
             self.fullpath,
+            self.user if self.mode == MattermostMode.BOT else None,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
-        # Define any URL parameters
-        params = {
+        params: dict[str, Any] = {
             "image": "yes" if self.include_image else "no",
         }
 
-        if self.icon_url:
+        if self.mode != self.template_args["mode"]["default"]:
+            params["mode"] = self.mode
+
+        if self.mode == MattermostMode.WEBHOOK and self.icon_url:
             params["icon_url"] = self.icon_url
 
-        # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        if self.channels:
+        if self.targets:
             # historically the value only accepted one channel and is
             # therefore identified as 'channel'. Channels have always been
             # optional, so that is why this setting is nested in an if block
-            params["channel"] = ",".join(
-                [NotifyMattermost.quote(x, safe="") for x in self.channels]
-            )
+            entries = []
+            for kind, value in self.targets:
+                if kind == "#":
+                    entries.append(f"#{value}")
+                else:
+                    entries.append(f"+{value}")
+
+            params["to"] = ",".join(chain(
+                [NotifyMattermost.quote(v, safe="#+") for v in entries],
+                [NotifyMattermost.quote(x, safe="")
+                 for x in self._invalid_targets],
+            ))
 
         default_port = 443 if self.secure else 80
         default_schema = self.secure_protocol if self.secure else self.protocol
 
-        # Determine if there is a botname present
-        botname = ""
+        # Determine if there is a source present
+        source = ""
         if self.user:
-            botname = "{botname}@".format(
-                botname=NotifyMattermost.quote(self.user, safe=""),
+            source = "{source}@".format(
+                source=NotifyMattermost.quote(self.user, safe=""),
             )
 
         return (
-            "{schema}://{botname}{hostname}{port}{fullpath}{token}"
+            "{schema}://{source}{hostname}{port}{fullpath}{token}"
             "/?{params}".format(
                 schema=default_schema,
-                botname=botname,
+                source=source,
                 # never encode hostname since we're expecting it to be a valid
                 # one
                 hostname=self.host,
@@ -393,9 +651,9 @@ class NotifyMattermost(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
-        """Parses the URL and returns enough arguments that can allow us to re-
-        instantiate this object."""
+    def parse_url(url: str):
+        """Parses the URL and returns enough arguments that can allow us to
+        re-instantiate this object."""
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
@@ -406,31 +664,28 @@ class NotifyMattermost(NotifyBase):
         tokens = NotifyMattermost.split_path(results["fullpath"])
 
         results["token"] = None if not tokens else tokens.pop()
-
-        # Store our path
         results["fullpath"] = (
             "" if not tokens else "/{}".format("/".join(tokens))
         )
 
         # Define our optional list of channels to notify
-        results["channels"] = []
+        results["targets"] = []
 
-        # Support both 'to' (for yaml configuration) and channel=
+        # Support both 'to' (for yaml configuration) and channel(s)=
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             # Allow the user to specify the channel to post to
-            results["channels"].extend(
+            results["targets"].extend(
                 NotifyMattermost.parse_list(results["qsd"]["to"])
             )
 
         if "channel" in results["qsd"] and len(results["qsd"]["channel"]):
-            # Allow the user to specify the channel to post to
-            results["channels"].extend(
+            results["targets"].extend(
                 NotifyMattermost.parse_list(results["qsd"]["channel"])
             )
 
         if "channels" in results["qsd"] and len(results["qsd"]["channels"]):
             # Allow the user to specify the channel to post to
-            results["channels"].extend(
+            results["targets"].extend(
                 NotifyMattermost.parse_list(results["qsd"]["channels"])
             )
 
@@ -441,6 +696,20 @@ class NotifyMattermost(NotifyBase):
             )
         )
 
+        # Our Mode
+        if "mode" in results["qsd"] and results["qsd"]["mode"]:
+            results["mode"] = NotifyMattermost.unquote(
+                results["qsd"]["mode"]
+            )
+
+        # Team support (bot mode lookup). This maps to `user`.
+        if "team" in results["qsd"] and results["qsd"]["team"]:
+            results["user"] = NotifyMattermost.unquote(
+                results["qsd"]["team"]
+            )
+            if "mode" not in results:
+                results["mode"] = MattermostMode.BOT
+
         if "icon_url" in results["qsd"]:
             results["icon_url"] = NotifyMattermost.unquote(
                 results["qsd"]["icon_url"]
@@ -449,7 +718,7 @@ class NotifyMattermost(NotifyBase):
         return results
 
     @staticmethod
-    def parse_native_url(url):
+    def parse_native_url(url: str) -> dict[str, Any] | None:
         """
         Support parsing the webhook straight from URL
             https://HOST:443/workflows/WORKFLOWID/triggers/manual/paths/invoke
