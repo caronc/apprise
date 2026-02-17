@@ -155,21 +155,21 @@ TEST_URLS = (
         "mailto://user:pass@gmx.net",
         {
             "instance": email.NotifyEmail,
-            "privacy_url": "mailto://user:****@gmx.net",
+            "privacy_url": "mailtos://user:****@gmx.net",
         },
     ),
     (
         "mailto://user:pass@gmx.com",
         {
             "instance": email.NotifyEmail,
-            "privacy_url": "mailto://user:****@gmx.com",
+            "privacy_url": "mailtos://user:****@gmx.com",
         },
     ),
     (
         "mailto://user:pass@gmx.de",
         {
             "instance": email.NotifyEmail,
-            "privacy_url": "mailto://user:****@gmx.de",
+            "privacy_url": "mailtos://user:****@gmx.de",
         },
     ),
     (
@@ -562,9 +562,15 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 assert instance.parse_url(object) is None
                 assert instance.parse_url(42) is None
 
-                if privacy_url:
+                if privacy_url and not obj.url(privacy=True).startswith(
                     # Assess that our privacy url is as expected
-                    assert obj.url(privacy=True).startswith(privacy_url)
+                    privacy_url
+                ):
+                    raise AssertionError(
+                        f"URL: {url} Privacy URL:"
+                        f" '{obj.url(privacy=True)[:len(privacy_url)]}' !="
+                        f" expected '{privacy_url}'"
+                    )
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
