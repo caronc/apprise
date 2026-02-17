@@ -150,6 +150,36 @@ TEST_URLS = (
             "instance": email.NotifyEmail,
         },
     ),
+    # GMX Support
+    (
+        "mailto://user:pass@gmx.net",
+        {
+            "instance": email.NotifyEmail,
+            "privacy_url": "mailtos://user:****@gmx.net",
+        },
+    ),
+    (
+        "mailto://user:pass@gmx.com",
+        {
+            "instance": email.NotifyEmail,
+            "privacy_url": "mailtos://user:****@gmx.com",
+        },
+    ),
+    (
+        "mailto://user:pass@gmx.de",
+        {
+            "instance": email.NotifyEmail,
+            "privacy_url": "mailtos://user:****@gmx.de",
+        },
+    ),
+    (
+        # STARTTLS flag checking (and privacy URL expectation)
+        "mailtos://user:pass@gmx.net?mode=starttls",
+        {
+            "instance": email.NotifyEmail,
+            "privacy_url": "mailtos://user:****@gmx.net",
+        },
+    ),
     # Yandex
     (
         "mailto://user:pass@yandex.com",
@@ -532,9 +562,15 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 assert instance.parse_url(object) is None
                 assert instance.parse_url(42) is None
 
-                if privacy_url:
+                if privacy_url and not obj.url(privacy=True).startswith(
                     # Assess that our privacy url is as expected
-                    assert obj.url(privacy=True).startswith(privacy_url)
+                    privacy_url
+                ):
+                    raise AssertionError(
+                        f"URL: {url} Privacy URL:"
+                        f" '{obj.url(privacy=True)[:len(privacy_url)]}' !="
+                        f" expected '{privacy_url}'"
+                    )
 
                 # Instantiate the exact same object again using the URL from
                 # the one that was already created properly
@@ -2967,3 +3003,40 @@ def test_pgp_public_keyfile_skips_self_email(tmpdir):
     result = pgp.public_keyfile("externaluser@email.com")
 
     assert result.endswith("externaluser-pub.asc")
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_gmx_template_lookup(mock_smtp):
+    """NotifyEmail() GMX template lookup tests."""
+
+    response = mock.Mock()
+    mock_smtp.return_value = response
+
+    for domain in ("gmx.net", "gmx.com", "gmx.de", "gmx.at", "gmx.ch",
+                   "gmx.fr"):
+
+        results = email.NotifyEmail.parse_url(
+            f"mailtos://user:pass123@{domain}")
+        obj = Apprise.instantiate(results, suppress_exceptions=False)
+        assert isinstance(obj, email.NotifyEmail)
+
+        # Template-driven defaults
+        assert obj.smtp_host == "mail.gmx.com"
+        assert obj.secure_mode == "starttls"
+        assert obj.port == 587
+        assert obj.secure is True
+
+        # Send once to trigger SMTP/login behaviour
+        assert obj.notify("body", "title") is True
+
+        # STARTTLS used
+        assert response.starttls.call_count == 1
+        assert response.login.call_count == 1
+
+        login_user, login_pass = response.login.call_args[0]
+        mock_smtp.reset_mock()
+
+        assert login_pass == "pass123"
+
+        # GMX should authenticate with full email, not just the local part
+        assert login_user == f"user@{domain}"

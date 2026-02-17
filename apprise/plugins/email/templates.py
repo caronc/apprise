@@ -126,6 +126,22 @@ EMAIL_TEMPLATES = (
             "login_type": (WebBaseLogin.EMAIL,),
         },
     ),
+    # GMX Mail
+    (
+        "GMX Mail",
+        re.compile(
+            r"^((?P<label>[^+]+)\+)?(?P<id>[^@]+)@"
+            r"(?P<domain>gmx\.(com|net|de|at|ch|fr))$",
+            re.I,
+        ),
+        {
+            "port": 587,
+            "smtp_host": "mail.gmx.com",
+            "secure": True,
+            "secure_mode": SecureMailMode.STARTTLS,
+            "login_type": (WebBaseLogin.EMAIL,),
+        },
+    ),
     # Fast Mail (Series 1)
     (
         "Fast Mail",
