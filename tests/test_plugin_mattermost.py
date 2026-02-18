@@ -322,7 +322,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     # Invalid response
-    request_get_mock.return_value.content = b'}'
+    request_get_mock.return_value.content = b"}"
     assert obj.notify("test") is False
 
     obj = Apprise.instantiate(
@@ -330,7 +330,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     # empty response
-    request_get_mock.return_value.content = b'{}'
+    request_get_mock.return_value.content = b"{}"
     assert obj.notify("test") is False
 
     obj = Apprise.instantiate(
