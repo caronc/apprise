@@ -133,20 +133,20 @@ class NotifyMattermost(NotifyBase):
         "{schema}://{host}:{port}/{token}",
         "{schema}://{host}/{fullpath}/{token}",
         "{schema}://{host}:{port}/{fullpath}/{token}",
-        "{schema}://{botname}@{host}/{token}",
-        "{schema}://{botname}@{host}:{port}/{token}",
-        "{schema}://{botname}@{host}/{fullpath}/{token}",
-        "{schema}://{botname}@{host}:{port}/{fullpath}/{token}",
-        "{schema}://{team}@{host}/{token}",
-        "{schema}://{team}@{host}:{port}/{token}",
-        "{schema}://{team}@{host}/{fullpath}/{token}",
-        "{schema}://{team}@{host}:{port}/{fullpath}/{token}",
+        "{schema}://{user}@{host}/{token}",
+        "{schema}://{user}@{host}:{port}/{token}",
+        "{schema}://{user}@{host}/{fullpath}/{token}",
+        "{schema}://{user}@{host}:{port}/{fullpath}/{token}",
     )
 
     # Define our template tokens
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
+            "user": {
+                "name": _("User"),
+                "type": "string",
+            },
             "host": {
                 "name": _("Hostname"),
                 "type": "string",
@@ -162,19 +162,6 @@ class NotifyMattermost(NotifyBase):
             "fullpath": {
                 "name": _("Path"),
                 "type": "string",
-            },
-            "source": {
-                "name": _("Source"),
-                "type": "string",
-                "map_to": "user",
-            },
-            "team": {
-                # Bot mode team name
-                # This is only required to look up channels for those that are
-                # not known
-                "name": _("Team"),
-                "type": "string",
-                "map_to": "user",
             },
             "port": {
                 "name": _("Port"),
@@ -227,12 +214,10 @@ class NotifyMattermost(NotifyBase):
                 "map_to": "include_image",
             },
             "team": {
-                "name": _("Team"),
-                "alias_of": "source",
+                "alias_of": "user",
             },
             "botname": {
-                "name": _("Botname"),
-                "alias_of": "source",
+                "alias_of": "user",
             },
             "mode": {
                 "name": _("Mode"),
@@ -251,7 +236,6 @@ class NotifyMattermost(NotifyBase):
         include_image: bool = False,
         icon_url: str | None = None,
         mode: str | None = None,
-        team: str | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize Mattermost object."""
@@ -709,6 +693,11 @@ class NotifyMattermost(NotifyBase):
             )
             if "mode" not in results:
                 results["mode"] = MattermostMode.BOT
+
+        elif "botname" in results["qsd"] and results["qsd"]["botname"]:
+            results["user"] = NotifyMattermost.unquote(
+                results["qsd"]["botname"]
+            )
 
         if "icon_url" in results["qsd"]:
             results["icon_url"] = NotifyMattermost.unquote(

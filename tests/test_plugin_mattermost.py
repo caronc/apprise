@@ -106,6 +106,14 @@ apprise_url_tests = (
     ),
     (
         (
+            # sets botname on webhook
+            "mmost://localhost/3ccdd113474722377935511fc85d3dd4"
+            "?to=general&botname=foobar"
+        ),
+        {"instance": NotifyMattermost},
+    ),
+    (
+        (
             "mmost://team@localhost/3ccdd113474722377935511fc85d3dd4"
             "?channel=$!garbag3^&mode=bot"
         ),
