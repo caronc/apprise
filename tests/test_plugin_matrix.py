@@ -713,9 +713,9 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
         "user_id": "@apprise:localhost",
         "home_server": "localhost",
         # For joined_room response
-        "joined_rooms": ["!abc123:localhost", "!def456:localhost"],
+        "joined_rooms": ["!abc123", "!def456:localhost"],
         # For room joining
-        "room_id": "!abc123:localhost",
+        "room_id": "!abc123",
     }
 
     # Default configuration
@@ -742,7 +742,72 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     # However this is how the cache entry gets stored
     assert obj.store.get("!abc123:localhost") is not None
     assert obj.store.get("!abc123:localhost")["id"] == response_obj["room_id"]
+
+    # When hsreq=yes, legacy behaviour is restored and a homeserver is
+    # automatically appended to room IDs that omit it.
+    obj.store.clear()
+    obj.hsreq = True
+    mock_post.reset_mock()
     assert obj._room_join("!abc123") == response_obj["room_id"]
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "http://host/_matrix/client/v3/join/%21abc123%3Alocalhost"
+    )
+
+    # When hsreq=no, we honour the raw !room identifier exactly as provided
+    # and do not suffix it with :homeserver.
+    obj.store.clear()
+    obj.hsreq = False
+
+    def _join_side_effect(url, *args, **kwargs):
+        r = mock.Mock()
+
+        # With hsreq disabled, only the raw form should be attempted:
+        if url.endswith("/_matrix/client/v3/join/%21abc123"):
+            r.status_code = requests.codes.ok
+            r.content = dumps(response_obj).encode("utf-8")
+            return r
+
+        # Default ok for any other unexpected call
+        r.status_code = requests.codes.ok
+        r.content = dumps(response_obj).encode("utf-8")
+        return r
+
+    mock_post.reset_mock()
+    mock_post.side_effect = _join_side_effect
+    assert obj._room_join("!abc123") == response_obj["room_id"]
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "http://host/_matrix/client/v3/join/%21abc123"
+    )
+
+    mock_post.reset_mock()
+    assert obj._room_join("!abc123") == response_obj["room_id"]
+    # Cache is used
+    assert mock_post.call_count == 0
+
+    # Still using cache
+    assert obj._room_join("!abc123:localhost") == response_obj["room_id"]
+    assert mock_post.call_count == 0
+
+    # Toggle our settings back
+    obj.hsreq = True
+    mock_post.reset_mock()
+    mock_post.side_effect = _join_side_effect
+    assert obj._room_join("!abc123") == response_obj["room_id"]
+    # We still no longer need to fetch as we know the info already
+    assert mock_post.call_count == 0
+
+    # Restore defaults for remaining tests
+    mock_post.side_effect = None
+    obj.hsreq = True
+
+    # Use cache to get same results (no additional HTTP call)
+    mock_post.reset_mock()
+    assert obj._room_join("!abc123") == response_obj["room_id"]
+    assert mock_post.call_count == 0
 
     obj.store.clear()
     assert obj._room_join("!abc123:localhost") == response_obj["room_id"]
@@ -904,6 +969,12 @@ def test_plugin_matrix_url_parsing():
     assert isinstance(result, dict) is True
     assert len(result["targets"]) == 1
     assert "#room" in result["targets"]
+
+    result = NotifyMatrix.parse_url(
+        "matrix://user:token@localhost?to=#room&hsreq=yes"
+    )
+    assert isinstance(result, dict) is True
+    assert result.get("hsreq") is True
 
     result = NotifyMatrix.parse_url(
         "matrix://user:token@localhost?to=#room1,#room2,#room3"
