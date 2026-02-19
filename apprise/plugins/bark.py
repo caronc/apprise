@@ -32,7 +32,7 @@ import json
 
 import requests
 
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -351,6 +351,7 @@ class NotifyBark(NotifyBase):
         # Prepare our payload (sample below)
         # {
         #     "body": "Test Bark Server",
+        #     "markdown": "# Markdown Content",
         #     "device_key": "nysrshcqielvoxsa",
         #     "title": "bleem",
         #     "category": "category",
@@ -358,12 +359,19 @@ class NotifyBark(NotifyBase):
         #     "badge": 1,
         #     "icon": "https://day.app/assets/images/avatar.jpg",
         #     "group": "test",
+        #     "level": "active",
+        #     "volume": 5,
+        #     "call": 1,
         #     "url": "https://mritd.com"
         # }
         payload = {
             "title": title if title else self.app_desc,
-            "body": body,
         }
+
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            payload["markdown"] = body
+        else:
+            payload["body"] = body
 
         # Acquire our image url if configured to do so
         image_url = (

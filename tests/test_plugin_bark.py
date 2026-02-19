@@ -268,6 +268,20 @@ apprise_url_tests = (
             "instance": NotifyBark,
         },
     ),
+    (
+        "bark://192.168.0.6:8081/device_key/?format=markdown",
+        {
+            # enable markdown mode via global format parameter
+            "instance": NotifyBark,
+        },
+    ),
+    (
+        "bark://192.168.0.6:8081/device_key/?format=text",
+        {
+            # explicitly set text format (default behavior)
+            "instance": NotifyBark,
+        },
+    ),
 )
 
 
