@@ -1187,7 +1187,7 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
         # teardown on some platforms.
         t = created_thread.get("thread")
         if t is not None:
-            t.join(timeout=1.0)
+            t.join(timeout=a.timeout + 1.0)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
