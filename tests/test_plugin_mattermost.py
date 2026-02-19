@@ -588,7 +588,7 @@ def test_plugin_mattermost_bot_channel_lookup_success(
 
 def test_plugin_mattermost_bot_channel_lookup_partial_success(
         request_post_mock, request_get_mock):
-    """One lookup fails, one succeeds, overall result is True."""
+    """One lookup fails, one succeeds, overall result is False."""
     bearer = "bearerToken"
     team = "myteam"
 
