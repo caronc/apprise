@@ -604,8 +604,6 @@ class NotifyNtfy(NotifyBase):
 
         if self.__tags:
             headers["X-Tags"] = ",".join(self.__tags)
-            # 2026-02-18: X-Tags is not honored; use JSON payload
-            virt_payload["tags"] = self.__tags
 
         if self.__actions:
             headers["X-Actions"] = self.__actions
