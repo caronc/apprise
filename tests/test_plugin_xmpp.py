@@ -1098,6 +1098,13 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     # by Thread internals.
     import threading as _real_threading
 
+    created_thread: dict[str, Any] = {"thread": None}
+
+    class _CapturingThread(_real_threading.Thread):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            created_thread["thread"] = self
+
     class _FakeDoneEvent:
         def __init__(self) -> None:
             self._set = False
@@ -1115,7 +1122,7 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
 
     class _ThreadingProxy:
         Event = _FakeDoneEvent
-        Thread = _real_threading.Thread
+        Thread = _CapturingThread
 
         def __getattr__(self, name: str) -> Any:
             return getattr(_real_threading, name)
@@ -1174,6 +1181,13 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     finally:
         # Let the runner proceed and exit
         gate.set()
+
+        # Ensure the background runner thread has exited before the test
+        # returns. This prevents intermittent races with pytest log capture
+        # teardown on some platforms.
+        t = created_thread.get("thread")
+        if t is not None:
+            t.join(timeout=1.0)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
