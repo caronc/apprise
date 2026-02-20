@@ -221,6 +221,7 @@ def _make_fake_done_event_cls(
             self._set = False
             self._signal_evt = signal_evt
             self._pre_wait = pre_wait
+            self._wait_calls = 0
 
         def is_set(self) -> bool:
             return self._set
@@ -232,15 +233,19 @@ def _make_fake_done_event_cls(
             self._set = False
 
         def wait(self, timeout: Optional[float] = None) -> bool:
-            if self._signal_evt is not None:
-                # The specific timeout value isn't important; we just don't
-                # want this to hang a test if the checkpoint is never reached.
-                self._signal_evt.wait(timeout=1.0)
+            self._wait_calls += 1
+            if self._wait_calls == 1:
+                if self._signal_evt is not None:
+                    # The specific timeout value isn't important; we just
+                    # don't want this to hang a test if the checkpoint is
+                    # never reached.
+                    self._signal_evt.wait(timeout=1.0)
 
-            # Give the worker thread a brief chance to run before we force
-            # the timeout condition in the code under test.
-            time.sleep(self._pre_wait)
-            return False
+                # Give the worker thread a brief chance to run before we
+                # force the timeout condition in the code under test.
+                time.sleep(self._pre_wait)
+                return False
+            return self._set
 
     return _FakeDoneEvent
 
