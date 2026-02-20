@@ -178,19 +178,13 @@ def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _patch_threading(
         monkeypatch: pytest.MonkeyPatch, *,
-        done_event_cls: type,
-        created_thread: dict[str, Any]) -> None:
-    """Patch adapter threading to capture the created Thread instance."""
+        done_event_cls: type) -> None:
+    """Patch adapter threading to use a custom done-event class."""
     import threading as _real_threading
-
-    class _CapturingThread(_real_threading.Thread):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            created_thread["thread"] = self
 
     class _ThreadingProxy:
         Event = done_event_cls
-        Thread = _CapturingThread
+        Thread = _real_threading.Thread
 
         def __getattr__(self, name: str) -> Any:
             return getattr(_real_threading, name)
@@ -955,13 +949,11 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
     # Make done.wait deterministic without touching real threading.Event used
     # by Thread internals
 
-    created_thread: dict[str, Any] = {"thread": None}
     monkeypatch.setattr(_FakeDoneEvent, "signal_evt", client_created)
 
     _patch_threading(
         monkeypatch,
         done_event_cls=_FakeDoneEvent,
-        created_thread=created_thread,
     )
 
     # Capture and control loop.call_soon_threadsafe behaviour
@@ -1046,13 +1038,11 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
 
     # Deterministic done.wait: wait until loop exists, then force timeout
 
-    created_thread: dict[str, Any] = {"thread": None}
     monkeypatch.setattr(_FakeDoneEvent, "signal_evt", loop_created)
 
     _patch_threading(
         monkeypatch,
         done_event_cls=_FakeDoneEvent,
-        created_thread=created_thread,
     )
 
     # Wrap new_event_loop so we can (a) signal loop exists and (b) make stop
@@ -1140,13 +1130,11 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     # Make done.wait deterministic without touching real threading.Event used
     # by Thread internals.
 
-    created_thread: dict[str, Any] = {"thread": None}
     monkeypatch.setattr(_FakeDoneEvent, "signal_evt", None)
 
     _patch_threading(
         monkeypatch,
         done_event_cls=_FakeDoneEvent,
-        created_thread=created_thread,
     )
 
     # Track whether any loop clean-up scheduling occurs.
