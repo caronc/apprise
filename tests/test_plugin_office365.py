@@ -537,6 +537,46 @@ def test_plugin_office365_queries(mock_post, mock_get, mock_put):
     # Assign our GET a bad response so we fail to look up the user
     mock_get.return_value = bad_response
 
+    #
+    # Early exit: source is an Object ID (GUID) and lookup fails
+    #
+    guid_source = "e2a9db46-5714-44c2-87bf-c33bf236f42a"
+
+    not_found_payload = {
+        "error": {
+            "code": "Request_ResourceNotFound",
+            "message": "Resource not found.",
+        }
+    }
+    not_found_response = mock.Mock()
+    not_found_response.content = dumps(not_found_payload)
+    not_found_response.status_code = requests.codes.not_found
+
+    # Force the sender lookup to fail for a GUID based source
+    mock_get.return_value = not_found_response
+
+    obj = Apprise.instantiate(
+        f"azure://{guid_source}/{tenant}/{client_id}{secret}/{targets}"
+    )
+    assert isinstance(obj, NotifyOffice365)
+
+    # Notify must exit early since the source Object ID could not be resolved
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+
+    # 1) Authenticate (POST token)
+    assert mock_post.call_count == 1
+    # 2) Attempt user lookup (GET)
+    assert mock_get.call_count == 1
+
+    mock_post.reset_mock()
+    mock_get.reset_mock()
+
+    # Restore GET failure behaviour used by remaining tests
+    mock_get.return_value = bad_response
+
     # Instantiate our object
     obj = Apprise.instantiate(
         f"azure://{source}/{tenant}/{client_id}{secret}/{targets}"

@@ -312,6 +312,18 @@ class NotifyOffice365(NotifyBase):
         else:
             self.from_name = self.store.get("name")
 
+        # Track whether our source looks like an Entra Object ID (GUID).
+        # This is used to provide clearer error handling when sender lookups
+        # fail.
+        self.source_is_object_id = bool(
+            not result
+            and validate_regex(
+                self.source,
+                r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$",
+                "i",
+            )
+        )
+
         return
 
     def send(
@@ -341,6 +353,13 @@ class NotifyOffice365(NotifyBase):
             url = f"https://graph.microsoft.com/v1.0/users/{self.source}"
             postokay, response = self._fetch(url=url, method="GET")
             if not postokay:
+                if getattr(self, "source_is_object_id", False):
+                    self.logger.warning(
+                        "The specifieg Object ID could not be resolved in "
+                        "this tenant. Verify the Object ID exists in the "
+                        "selected directory, or use a email address instead."
+                    )
+                    return False
                 self.logger.warning(
                     "Could not acquire From email address; ensure "
                     '"User.Read.All" Application scope is set!'
