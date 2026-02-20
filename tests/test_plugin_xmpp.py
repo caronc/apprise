@@ -233,6 +233,9 @@ def _make_fake_done_event_cls(
             self._set = False
 
         def wait(self, timeout: Optional[float] = None) -> bool:
+            # Only the first call forces the timeout path; subsequent calls
+            # reflect the real `_set` state so the worker thread can be
+            # waited on normally after the timeout has been handled.
             self._wait_calls += 1
             if self._wait_calls == 1:
                 if self._signal_evt is not None:
