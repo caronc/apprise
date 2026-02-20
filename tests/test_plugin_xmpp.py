@@ -40,7 +40,7 @@ import ssl
 import threading
 import time
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any, Optional, Type
 
 import pytest
 
@@ -200,7 +200,7 @@ def _patch_threading(
 def _make_fake_done_event_cls(
         signal_evt: Optional[threading.Event] = None,
         pre_wait: float = 0.02,
-) -> type:
+) -> Type[Any]:
     """Return a fresh threading.Event-compatible class for timeout-path tests.
 
     The adapter under test uses `threading.Event()` for `done`, then calls
