@@ -170,9 +170,76 @@ def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
     )
 
 
+def _patch_threading(
+        monkeypatch: pytest.MonkeyPatch, *,
+        done_event_cls: type,
+        created_thread: dict[str, Any]) -> None:
+    """Patch adapter threading to capture the created Thread instance."""
+    import threading as _real_threading
+
+    class _CapturingThread(_real_threading.Thread):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            created_thread["thread"] = self
+
+    class _ThreadingProxy:
+        Event = done_event_cls
+        Thread = _CapturingThread
+
+        def __getattr__(self, name: str) -> Any:
+            return getattr(_real_threading, name)
+
+    monkeypatch.setattr(
+        xmpp_adapter, "threading", _ThreadingProxy(), raising=True)
+
+
 # ---------------------------------------------------------------------------
 # NotifyXMPP Tests
 # ---------------------------------------------------------------------------
+
+class _FakeDoneEvent:
+    """A deterministic threading.Event replacement for timeout-path tests.
+
+    The adapter under test uses `threading.Event()` for `done`, then calls
+    `done.wait(timeout=...)` and later `done.set()` from the worker thread.
+
+    In these specific tests we want `wait()` to return `False` deterministically
+    (forcing the timeout branch), while still giving the worker thread a chance
+    to progress to a known checkpoint (for example: loop created, client
+    created, etc.).
+    """
+
+    # Optional gate the test can set to make `wait()` pause until a checkpoint
+    # is reached. This must be class-level because `threading.Event()` is
+    # constructed with no arguments in the code under test.
+    signal_evt: Optional[threading.Event] = None
+
+    # Small delay to allow the runner thread to reach any blocking point.
+    pre_wait: float = 0.02
+
+    def __init__(self) -> None:
+        self._set = False
+
+    def is_set(self) -> bool:
+        return self._set
+
+    def set(self) -> None:
+        self._set = True
+
+    def clear(self) -> None:
+        self._set = False
+
+    def wait(self, timeout: Optional[float] = None) -> bool:
+        signal_evt = type(self).signal_evt
+        if signal_evt is not None:
+            # The specific timeout value isn't important, we just don't want
+            # this to hang a test if the checkpoint is never reached.
+            signal_evt.wait(timeout=1.0)
+
+        # Give the worker thread a brief chance to run before we force the
+        # timeout condition in the code under test.
+        time.sleep(type(self).pre_wait)
+        return False
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
 def test_slixmpp_unavailable() -> None:
@@ -876,40 +943,15 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
 
     # Make done.wait deterministic without touching real threading.Event used
     # by Thread internals
-    import threading as _real_threading
-
-    class _FakeDoneEvent:
-        def __init__(self) -> None:
-            self._set = False
-            self._wait_calls = 0
-
-        def set(self) -> None:
-            self._set = True
-
-        def wait(self, timeout: Optional[float] = None) -> bool:
-            self._wait_calls += 1
-            if self._wait_calls == 1:
-                # Ensure the client exists before we force the timeout branch
-                client_created.wait(timeout=1.0)
-                return False
-            return self._set
 
     created_thread: dict[str, Any] = {"thread": None}
+    _FakeDoneEvent.signal_evt = client_created
 
-    class _CapturingThread(_real_threading.Thread):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            created_thread["thread"] = self
-
-    class _ThreadingProxy:
-        Event = _FakeDoneEvent
-        Thread = _CapturingThread
-
-        def __getattr__(self, name: str) -> Any:
-            return getattr(_real_threading, name)
-
-    monkeypatch.setattr(
-        xmpp_adapter, "threading", _ThreadingProxy(), raising=True)
+    _patch_threading(
+        monkeypatch,
+        done_event_cls=_FakeDoneEvent,
+        created_thread=created_thread,
+    )
 
     # Capture and control loop.call_soon_threadsafe behaviour
     import asyncio as _real_asyncio
@@ -956,17 +998,11 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
         timeout=5.0,
     )
 
-    try:
-        assert a.process() is False
+    assert a.process() is False
 
-        # We should have attempted both disconnect and loop.stop scheduling
-        assert "disconnect" in calls
-        assert "stop" in calls
-
-    finally:
-        t = created_thread.get("thread")
-        if t is not None:
-            t.join(timeout=a.timeout + 1.0)
+    # We should have attempted both disconnect and loop.stop scheduling
+    assert "disconnect" in calls
+    assert "stop" in calls
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -998,39 +1034,15 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
     monkeypatch.setattr(FakeClientXMPP, "__init__", init_block, raising=True)
 
     # Deterministic done.wait: wait until loop exists, then force timeout
-    import threading as _real_threading
-
-    class _FakeDoneEvent:
-        def __init__(self) -> None:
-            self._set = False
-            self._wait_calls = 0
-
-        def set(self) -> None:
-            self._set = True
-
-        def wait(self, timeout: Optional[float] = None) -> bool:
-            self._wait_calls += 1
-            if self._wait_calls == 1:
-                loop_created.wait(timeout=1.0)
-                return False
-            return self._set
 
     created_thread: dict[str, Any] = {"thread": None}
+    _FakeDoneEvent.signal_evt = loop_created
 
-    class _CapturingThread(_real_threading.Thread):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            created_thread["thread"] = self
-
-    class _ThreadingProxy:
-        Event = _FakeDoneEvent
-        Thread = _CapturingThread
-
-        def __getattr__(self, name: str) -> Any:
-            return getattr(_real_threading, name)
-
-    monkeypatch.setattr(
-        xmpp_adapter, "threading", _ThreadingProxy(), raising=True)
+    _patch_threading(
+        monkeypatch,
+        done_event_cls=_FakeDoneEvent,
+        created_thread=created_thread,
+    )
 
     # Wrap new_event_loop so we can (a) signal loop exists and (b) make stop
     # raise
@@ -1084,10 +1096,6 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
         # Unblock the runner thread so it does not linger
         allow_client_create.set()
 
-        t = created_thread.get("thread")
-        if t is not None:
-            t.join(timeout=a.timeout + 1.0)
-
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
@@ -1120,39 +1128,15 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
 
     # Make done.wait deterministic without touching real threading.Event used
     # by Thread internals.
-    import threading as _real_threading
 
     created_thread: dict[str, Any] = {"thread": None}
+    _FakeDoneEvent.signal_evt = None
 
-    class _CapturingThread(_real_threading.Thread):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            created_thread["thread"] = self
-
-    class _FakeDoneEvent:
-        def __init__(self) -> None:
-            self._set = False
-            self._wait_calls = 0
-
-        def set(self) -> None:
-            self._set = True
-
-        def wait(self, timeout: Optional[float] = None) -> bool:
-            self._wait_calls += 1
-            # Force timeout branch immediately on the first wait
-            if self._wait_calls == 1:
-                return False
-            return self._set
-
-    class _ThreadingProxy:
-        Event = _FakeDoneEvent
-        Thread = _CapturingThread
-
-        def __getattr__(self, name: str) -> Any:
-            return getattr(_real_threading, name)
-
-    monkeypatch.setattr(
-        xmpp_adapter, "threading", _ThreadingProxy(), raising=True)
+    _patch_threading(
+        monkeypatch,
+        done_event_cls=_FakeDoneEvent,
+        created_thread=created_thread,
+    )
 
     # Track whether any loop clean-up scheduling occurs.
     # It must NOT when loop_obj is None.
@@ -1205,13 +1189,6 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     finally:
         # Let the runner proceed and exit
         gate.set()
-
-        # Ensure the background runner thread has exited before the test
-        # returns. This prevents intermittent races with pytest log capture
-        # teardown on some platforms.
-        t = created_thread.get("thread")
-        if t is not None:
-            t.join(timeout=a.timeout + 1.0)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
