@@ -203,10 +203,10 @@ class _FakeDoneEvent:
     The adapter under test uses `threading.Event()` for `done`, then calls
     `done.wait(timeout=...)` and later `done.set()` from the worker thread.
 
-    In these specific tests we want `wait()` to return `False` deterministically
-    (forcing the timeout branch), while still giving the worker thread a chance
-    to progress to a known checkpoint (for example: loop created, client
-    created, etc.).
+    In these specific tests we want `wait()` to return `False`
+    deterministically (forcing the timeout branch), while still giving the
+    worker thread a chance to progress to a known checkpoint (for example:
+    loop created, client created, etc.).
     """
 
     # Optional gate the test can set to make `wait()` pause until a checkpoint
@@ -240,6 +240,7 @@ class _FakeDoneEvent:
         # timeout condition in the code under test.
         time.sleep(type(self).pre_wait)
         return False
+
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
 def test_slixmpp_unavailable() -> None:
