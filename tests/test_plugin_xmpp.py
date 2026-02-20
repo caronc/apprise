@@ -219,6 +219,7 @@ class _FakeDoneEvent:
 
     def __init__(self) -> None:
         self._set = False
+        self._wait_calls = 0
 
     def is_set(self) -> bool:
         return self._set
@@ -230,16 +231,19 @@ class _FakeDoneEvent:
         self._set = False
 
     def wait(self, timeout: Optional[float] = None) -> bool:
-        signal_evt = type(self).signal_evt
-        if signal_evt is not None:
-            # The specific timeout value isn't important, we just don't want
-            # this to hang a test if the checkpoint is never reached.
-            signal_evt.wait(timeout=1.0)
+        self._wait_calls += 1
+        if self._wait_calls == 1:
+            signal_evt = type(self).signal_evt
+            if signal_evt is not None:
+                # The specific timeout value isn't important, we just don't
+                # want this to hang a test if the checkpoint is never reached.
+                signal_evt.wait(timeout=1.0)
 
-        # Give the worker thread a brief chance to run before we force the
-        # timeout condition in the code under test.
-        time.sleep(type(self).pre_wait)
-        return False
+            # Give the worker thread a brief chance to run before we force the
+            # timeout condition in the code under test.
+            time.sleep(type(self).pre_wait)
+            return False
+        return self._set
 
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
