@@ -66,6 +66,12 @@ try:
 except Exception:
     SLIXMPP_AVAILABLE = False
 
+# Seconds to sleep before forcing the timeout branch in _FakeDoneEvent.wait().
+# This gives the worker thread enough time to progress to a known checkpoint
+# (e.g. event loop created, client instantiated) without relying on a longer
+# wall-clock timeout that would slow tests down.
+WORKER_THREAD_STARTUP_DELAY: float = 0.02
+
 
 # ---------------------------------------------------------------------------
 # Fake Slixmpp Client
@@ -172,19 +178,13 @@ def install_fake_slixmpp(monkeypatch: pytest.MonkeyPatch) -> None:
 
 def _patch_threading(
         monkeypatch: pytest.MonkeyPatch, *,
-        done_event_cls: type,
-        created_thread: dict[str, Any]) -> None:
-    """Patch adapter threading to capture the created Thread instance."""
+        done_event_cls: type) -> None:
+    """Patch adapter threading to use a custom done-event class."""
     import threading as _real_threading
-
-    class _CapturingThread(_real_threading.Thread):
-        def __init__(self, *args: Any, **kwargs: Any) -> None:
-            super().__init__(*args, **kwargs)
-            created_thread["thread"] = self
 
     class _ThreadingProxy:
         Event = done_event_cls
-        Thread = _CapturingThread
+        Thread = _real_threading.Thread
 
         def __getattr__(self, name: str) -> Any:
             return getattr(_real_threading, name)
@@ -209,12 +209,12 @@ def _make_fake_done_event_cls(
     Each call returns a *new* class whose instances store ``signal_evt`` and
     ``pre_wait`` as instance attributes, so concurrent tests never share state.
 
-    Args:
-        signal_evt: Optional gate event; ``wait()`` blocks until it is set
-            before forcing the timeout return value.
-        pre_wait: Small delay (seconds) to let the worker thread reach a
-            known checkpoint before ``wait()`` returns ``False``.
-    """
+    # Small delay to allow the runner thread to reach any blocking point.
+    pre_wait: float = WORKER_THREAD_STARTUP_DELAY
+
+    def __init__(self) -> None:
+        self._set = False
+        self._wait_calls = 0
 
     class _FakeDoneEvent:
         def __init__(self) -> None:
