@@ -894,9 +894,16 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
                 return False
             return self._set
 
+    created_thread: dict[str, Any] = {"thread": None}
+
+    class _CapturingThread(_real_threading.Thread):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            created_thread["thread"] = self
+
     class _ThreadingProxy:
         Event = _FakeDoneEvent
-        Thread = _real_threading.Thread
+        Thread = _CapturingThread
 
         def __getattr__(self, name: str) -> Any:
             return getattr(_real_threading, name)
@@ -949,11 +956,17 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
         timeout=5.0,
     )
 
-    assert a.process() is False
+    try:
+        assert a.process() is False
 
-    # We should have attempted both disconnect and loop.stop scheduling
-    assert "disconnect" in calls
-    assert "stop" in calls
+        # We should have attempted both disconnect and loop.stop scheduling
+        assert "disconnect" in calls
+        assert "stop" in calls
+
+    finally:
+        t = created_thread.get("thread")
+        if t is not None:
+            t.join(timeout=a.timeout + 1.0)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -1002,9 +1015,16 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
                 return False
             return self._set
 
+    created_thread: dict[str, Any] = {"thread": None}
+
+    class _CapturingThread(_real_threading.Thread):
+        def __init__(self, *args: Any, **kwargs: Any) -> None:
+            super().__init__(*args, **kwargs)
+            created_thread["thread"] = self
+
     class _ThreadingProxy:
         Event = _FakeDoneEvent
-        Thread = _real_threading.Thread
+        Thread = _CapturingThread
 
         def __getattr__(self, name: str) -> Any:
             return getattr(_real_threading, name)
@@ -1063,6 +1083,10 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
     finally:
         # Unblock the runner thread so it does not linger
         allow_client_create.set()
+
+        t = created_thread.get("thread")
+        if t is not None:
+            t.join(timeout=a.timeout + 1.0)
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
