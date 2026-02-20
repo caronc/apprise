@@ -946,7 +946,7 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
     # by Thread internals
 
     created_thread: dict[str, Any] = {"thread": None}
-    _FakeDoneEvent.signal_evt = client_created
+    monkeypatch.setattr(_FakeDoneEvent, "signal_evt", client_created)
 
     _patch_threading(
         monkeypatch,
@@ -1037,7 +1037,7 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
     # Deterministic done.wait: wait until loop exists, then force timeout
 
     created_thread: dict[str, Any] = {"thread": None}
-    _FakeDoneEvent.signal_evt = loop_created
+    monkeypatch.setattr(_FakeDoneEvent, "signal_evt", loop_created)
 
     _patch_threading(
         monkeypatch,
@@ -1131,7 +1131,7 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     # by Thread internals.
 
     created_thread: dict[str, Any] = {"thread": None}
-    _FakeDoneEvent.signal_evt = None
+    monkeypatch.setattr(_FakeDoneEvent, "signal_evt", None)
 
     _patch_threading(
         monkeypatch,
