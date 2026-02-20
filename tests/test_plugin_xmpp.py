@@ -197,49 +197,52 @@ def _patch_threading(
 # NotifyXMPP Tests
 # ---------------------------------------------------------------------------
 
-class _FakeDoneEvent:
-    """A deterministic threading.Event replacement for timeout-path tests.
+def _make_fake_done_event_cls(
+        signal_evt: Optional[threading.Event] = None,
+        pre_wait: float = 0.02,
+) -> type:
+    """Return a fresh threading.Event-compatible class for timeout-path tests.
 
     The adapter under test uses `threading.Event()` for `done`, then calls
     `done.wait(timeout=...)` and later `done.set()` from the worker thread.
 
-    In these specific tests we want `wait()` to return `False`
-    deterministically (forcing the timeout branch), while still giving the
-    worker thread a chance to progress to a known checkpoint (for example:
-    loop created, client created, etc.).
+    Each call returns a *new* class whose instances store ``signal_evt`` and
+    ``pre_wait`` as instance attributes, so concurrent tests never share state.
+
+    Args:
+        signal_evt: Optional gate event; ``wait()`` blocks until it is set
+            before forcing the timeout return value.
+        pre_wait: Small delay (seconds) to let the worker thread reach a
+            known checkpoint before ``wait()`` returns ``False``.
     """
 
-    # Optional gate the test can set to make `wait()` pause until a checkpoint
-    # is reached. This must be class-level because `threading.Event()` is
-    # constructed with no arguments in the code under test.
-    signal_evt: Optional[threading.Event] = None
+    class _FakeDoneEvent:
+        def __init__(self) -> None:
+            self._set = False
+            self._signal_evt = signal_evt
+            self._pre_wait = pre_wait
 
-    # Small delay to allow the runner thread to reach any blocking point.
-    pre_wait: float = 0.02
+        def is_set(self) -> bool:
+            return self._set
 
-    def __init__(self) -> None:
-        self._set = False
+        def set(self) -> None:
+            self._set = True
 
-    def is_set(self) -> bool:
-        return self._set
+        def clear(self) -> None:
+            self._set = False
 
-    def set(self) -> None:
-        self._set = True
+        def wait(self, timeout: Optional[float] = None) -> bool:
+            if self._signal_evt is not None:
+                # The specific timeout value isn't important; we just don't
+                # want this to hang a test if the checkpoint is never reached.
+                self._signal_evt.wait(timeout=1.0)
 
-    def clear(self) -> None:
-        self._set = False
+            # Give the worker thread a brief chance to run before we force
+            # the timeout condition in the code under test.
+            time.sleep(self._pre_wait)
+            return False
 
-    def wait(self, timeout: Optional[float] = None) -> bool:
-        signal_evt = type(self).signal_evt
-        if signal_evt is not None:
-            # The specific timeout value isn't important, we just don't want
-            # this to hang a test if the checkpoint is never reached.
-            signal_evt.wait(timeout=1.0)
-
-        # Give the worker thread a brief chance to run before we force the
-        # timeout condition in the code under test.
-        time.sleep(type(self).pre_wait)
-        return False
+    return _FakeDoneEvent
 
 
 @pytest.mark.skipif(SLIXMPP_AVAILABLE, reason="Requires slixmpp NOT installed")
@@ -946,11 +949,10 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
     # by Thread internals
 
     created_thread: dict[str, Any] = {"thread": None}
-    _FakeDoneEvent.signal_evt = client_created
 
     _patch_threading(
         monkeypatch,
-        done_event_cls=_FakeDoneEvent,
+        done_event_cls=_make_fake_done_event_cls(signal_evt=client_created),
         created_thread=created_thread,
     )
 
@@ -1037,11 +1039,10 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
     # Deterministic done.wait: wait until loop exists, then force timeout
 
     created_thread: dict[str, Any] = {"thread": None}
-    _FakeDoneEvent.signal_evt = loop_created
 
     _patch_threading(
         monkeypatch,
-        done_event_cls=_FakeDoneEvent,
+        done_event_cls=_make_fake_done_event_cls(signal_evt=loop_created),
         created_thread=created_thread,
     )
 
@@ -1131,11 +1132,10 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     # by Thread internals.
 
     created_thread: dict[str, Any] = {"thread": None}
-    _FakeDoneEvent.signal_evt = None
 
     _patch_threading(
         monkeypatch,
-        done_event_cls=_FakeDoneEvent,
+        done_event_cls=_make_fake_done_event_cls(),
         created_thread=created_thread,
     )
 
