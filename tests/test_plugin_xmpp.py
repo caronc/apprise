@@ -66,6 +66,12 @@ try:
 except Exception:
     SLIXMPP_AVAILABLE = False
 
+# Seconds to sleep before forcing the timeout branch in _FakeDoneEvent.wait().
+# This gives the worker thread enough time to progress to a known checkpoint
+# (e.g. event loop created, client instantiated) without relying on a longer
+# wall-clock timeout that would slow tests down.
+WORKER_THREAD_STARTUP_DELAY: float = 0.02
+
 
 # ---------------------------------------------------------------------------
 # Fake Slixmpp Client
@@ -215,7 +221,7 @@ class _FakeDoneEvent:
     signal_evt: Optional[threading.Event] = None
 
     # Small delay to allow the runner thread to reach any blocking point.
-    pre_wait: float = 0.02
+    pre_wait: float = WORKER_THREAD_STARTUP_DELAY
 
     def __init__(self) -> None:
         self._set = False
