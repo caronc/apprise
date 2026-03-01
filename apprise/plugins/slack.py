@@ -195,7 +195,7 @@ class NotifySlack(NotifyBase):
                 "type": "string",
                 "private": True,
                 "required": True,
-                "regex": (r"^xox[abp]-[A-Z0-9-]+$", "i"),
+                "regex": (r"^(?:xoxe\.)?xox[abp]-[A-Z0-9-]+$", "i"),
             },
             # Token required as part of the Webhook request
             #  /AAAAAAAAA/........./........................
