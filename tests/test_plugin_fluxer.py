@@ -26,7 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 from __future__ import annotations
 
-from datetime import timedelta, datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 # Disable logging for a cleaner testing output
 import logging
