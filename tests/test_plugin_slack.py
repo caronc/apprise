@@ -109,6 +109,47 @@ apprise_url_tests = (
         },
     ),
     (
+        (
+            "slack://username@xoxe.xoxb-1234-1234-abc124/#nuxref?footer=no"
+            "&timestamp=yes"
+        ),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": {
+                "ok": True,
+                "message": "",
+            },
+        },
+    ),
+    (
+        (
+            "slack://username@xoxe.xoxp-1234-1234-abc124/#nuxref?footer=yes"
+            "&timestamp=no"
+        ),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": {
+                "ok": True,
+                "message": "",
+            },
+        },
+    ),
+    # Test using a rotating bot-token as argument
+    (
+        (
+            "slack://?token=xoxe.xoxb-1234-1234-abc124&to=#nuxref&footer=no"
+            "&user=test"
+        ),
+        {
+            "instance": NotifySlack,
+            "requests_response_text": {
+                "ok": True,
+                "message": "",
+            },
+            "privacy_url": "slack://test@x...4/nuxref/",
+        },
+    ),
+    (
         "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/+id/@id/",
         {
             # + encoded id,
@@ -491,6 +532,9 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # Generate a (valid) bot token
     token = "xoxb-1234-1234-abc124"
 
+    # Generate a (valid) rotating bot token
+    rotating_token = "xoxe.xoxb-1234-1234-abc124"
+
     # Prepare Mock
     mock_request.return_value = request
     # Variation Initializations
@@ -500,6 +544,16 @@ def test_plugin_slack_oauth_access_token(mock_request):
 
     # apprise room was found
     assert obj.send(body="test") is True
+
+    # Validate rotating token is accepted too
+    obj = NotifySlack(access_token=rotating_token, targets="#apprise")
+    assert isinstance(obj, NotifySlack) is True
+    assert isinstance(obj.url(), str) is True
+    assert obj.send(body="test") is True
+
+    # A poorly formatted xoxe prefix should still be rejected
+    with pytest.raises(TypeError):
+        NotifySlack(access_token="xoxe.xo-invalid", targets="#apprise")
 
     # Test Valid Attachment
     mock_request.reset_mock()
