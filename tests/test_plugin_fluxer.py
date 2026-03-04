@@ -27,6 +27,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from json import loads
 
 # Disable logging for a cleaner testing output
 import logging
@@ -361,7 +362,7 @@ def test_plugin_fluxer_notifications(mock_post: mock.MagicMock) -> None:
         == f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}"
     )
 
-    payload = details[1]["json"]
+    payload = loads(details[1]["data"])
     assert isinstance(payload, dict)
 
     assert "allow_mentions" in payload
@@ -381,7 +382,7 @@ def test_plugin_fluxer_notifications(mock_post: mock.MagicMock) -> None:
     assert isinstance(instance, NotifyFluxer)
 
     assert instance.send(body=body) is True
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
 
     # text mode does not parse mentions from body
     assert "allow_mentions" not in payload
@@ -398,7 +399,7 @@ def test_plugin_fluxer_notifications(mock_post: mock.MagicMock) -> None:
     assert isinstance(instance, NotifyFluxer)
 
     assert instance.send(body=body) is True
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert "allow_mentions" in payload
     assert set(payload["allow_mentions"]["users"]) == {"321"}
@@ -427,7 +428,7 @@ def test_plugin_fluxer_notifications(mock_post: mock.MagicMock) -> None:
     assert isinstance(instance, NotifyFluxer)
 
     assert instance.send(body=body) is True
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
 
     # Payload only includes elements on ping= line with text mode
     assert "allow_mentions" in payload
@@ -564,6 +565,30 @@ def test_plugin_fluxer_429(
     response.headers = {}
     mock_post.return_value = response
     mock_post.side_effect = None
+
+    # Force the 'now <= ratelimit_reset' path to compute a wait.
+    obj = NotifyFluxer(webhook_id=webhook_id, webhook_token=webhook_token)
+
+    # Force the rate-limit gate to run
+    obj.ratelimit_remaining = 0.0
+
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    obj.ratelimit_reset = now - timedelta(seconds=2)
+
+    with mock.patch.object(obj, "throttle") as m_throttle:
+        assert obj.send(body="test") is True
+
+    # We expect throttle(wait=~2.0) to be called.
+    assert m_throttle.call_count >= 1
+    wait = m_throttle.call_args_list[-1][1].get("wait")
+
+    assert wait is None
+
+    # Call count
+    assert mock_post.call_count == 1
+
+    # Reset our object
+    mock_post.reset_mock()
 
     # Force the 'now < ratelimit_reset' path to compute a wait.
     obj = NotifyFluxer(webhook_id=webhook_id, webhook_token=webhook_token)
@@ -972,11 +997,11 @@ def test_plugin_fluxer_markdown_attachments(
     assert mock_post.call_count == 2
     assert (
         mock_post.call_args_list[0][0][0]
-        == f"https://fluxer.com/api/webhooks/{webhook_id}/{webhook_token}"
+        == f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}"
     )
     assert (
         mock_post.call_args_list[1][0][0]
-        == f"https://fluxer.com/api/webhooks/{webhook_id}/{webhook_token}"
+        == f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}"
     )
 
     # Reset our object
@@ -996,11 +1021,11 @@ def test_plugin_fluxer_markdown_attachments(
     assert mock_post.call_count == 2
     assert (
         mock_post.call_args_list[0][0][0]
-        == f"https://fluxer.com/api/webhooks/{webhook_id}/{webhook_token}"
+        == f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}"
     )
     assert (
         mock_post.call_args_list[1][0][0]
-        == f"https://fluxer.com/api/webhooks/{webhook_id}/{webhook_token}"
+        == f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}"
     )
 
     # Reset our object
@@ -1096,7 +1121,7 @@ def test_plugin_fluxer_markdown_ping_is_additive(
     assert obj.send(body=body) is True
     assert mock_post.call_count == 1
 
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert "allow_mentions" in payload
     # union
@@ -1124,7 +1149,7 @@ def test_plugin_fluxer_html_ping_is_exclusive(
     obj = NotifyFluxer(**results)
 
     assert obj.send(body=body) is True
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert set(payload["allow_mentions"]["users"]) == {"333"}
     assert set(payload["allow_mentions"]["roles"]) == {"444"}
@@ -1148,7 +1173,7 @@ def test_plugin_fluxer_markdown_no_mentions_has_no_allow_mentions(
     obj = NotifyFluxer(**results)
 
     assert obj.send(body="Hello world") is True
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert "allow_mentions" not in payload
     assert "content" not in payload
@@ -1202,8 +1227,99 @@ def test_plugin_fluxer_threading(mock_post: mock.MagicMock) -> None:
     assert "params" in kwargs
     assert kwargs["params"].get("thread_id") == "12345"
 
-    payload = mock_post.call_args_list[0][1]["json"]
+    payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload.get("thread_name") == "abc"
 
     assert "thread_name=abc" in a[0].url()
     assert "thread=12345" in a[0].url()
+
+
+@mock.patch("requests.post")
+@mock.patch("time.sleep")
+@mock.patch("builtins.open")
+def test_plugin_fluxer_429_attachment_closes_edge_cases(
+    mock_open: mock.MagicMock,
+    mock_sleep: mock.MagicMock,
+    mock_post: mock.MagicMock,
+) -> None:
+    """
+    Cover 429 error during attachment upload triggers the pre-recursion close
+    loop, and close() exceptions are suppressed.
+    """
+
+    mock_sleep.return_value = True
+
+    webhook_id, webhook_token = _tokens()
+    obj = NotifyFluxer(webhook_id=webhook_id, webhook_token=webhook_token)
+
+    attach_path = os.path.join(TEST_VAR_DIR, "apprise-test.png")
+    attach = AppriseAttachment(attach_path)
+
+    class _BadCloseIO:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+            raise OSError("boom")
+
+    bad = _BadCloseIO()
+    mock_open.return_value = bad
+
+    def _resp(code: int, headers: dict[str, str] | None = None) -> mock.Mock:
+        r = mock.Mock()
+        r.status_code = code
+        r.content = b""
+        r.headers = headers or {}
+        return r
+
+    # 3 posts:
+    #  (1) initial message post succeeds
+    #  (2) attachment post 429 triggers file close-before-recursion
+    #  (3) recursive retry succeeds (note: retry is non-attachment in baseline)
+    mock_post.side_effect = [
+        _resp(requests.codes.no_content, {}),
+        _resp(requests.codes.too_many_requests, {"Retry-After": "1"}),
+        _resp(requests.codes.no_content, {}),
+    ]
+
+    assert obj.send(body="test", attach=attach) is True
+    assert bad.closed is True
+
+    mock_post.reset_mock()
+    mock_open.reset_mock()
+
+    mock_sleep.reset_mock()
+    mock_sleep.return_value = True
+
+    webhook_id, webhook_token = _tokens()
+    obj = NotifyFluxer(webhook_id=webhook_id, webhook_token=webhook_token)
+
+    attach_path = os.path.join(TEST_VAR_DIR, "apprise-test.png")
+    attach = AppriseAttachment(attach_path)
+
+    class _GoodCloseIO:
+        def __init__(self) -> None:
+            self.closed = False
+
+        def close(self) -> None:
+            self.closed = True
+
+    good = _GoodCloseIO()
+    mock_open.return_value = good
+
+    def _resp(code: int, headers: dict[str, str] | None = None) -> mock.Mock:
+        r = mock.Mock()
+        r.status_code = code
+        r.content = b""
+        r.headers = headers or {}
+        return r
+
+    mock_post.side_effect = [
+        _resp(requests.codes.no_content, {}),
+        _resp(requests.codes.too_many_requests, {"Retry-After": "1"}),
+        _resp(requests.codes.no_content, {}),
+    ]
+
+    assert obj.send(body="test", attach=attach) is True
+    assert good.closed is True

@@ -46,12 +46,13 @@ from __future__ import annotations
 import contextlib
 from datetime import datetime, timedelta, timezone
 from itertools import chain
-import json
+from json import dumps
 import re
 from typing import Any
 
 import requests
 
+from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
@@ -137,7 +138,7 @@ class NotifyFluxer(NotifyBase):
     __auto_cloud_host = re.compile(r"fluxer\.app", re.IGNORECASE)
 
     # Default upstream/cloud host if none is defined
-    cloud_notify_host = "api.fluxer.app"
+    cloud_notify_host = "https://api.fluxer.app"
 
     # Webhook URLs used by the Fluxer API.
     notify_url = "{prefix}/webhooks/{webhook_id}/{webhook_token}"
@@ -391,6 +392,7 @@ class NotifyFluxer(NotifyBase):
         body: str,
         title: str = "",
         notify_type: NotifyType = NotifyType.INFO,
+        attach=None,
         **kwargs: Any,
     ) -> bool:
 
@@ -420,17 +422,6 @@ class NotifyFluxer(NotifyBase):
             payload["thread_name"] = self.thread_name
 
         params = {"thread_id": self.thread_id} if self.thread_id else None
-
-        # Prepare attachments (if provided)
-        attach = kwargs.get("attach")
-        attachments: list[Any] = []
-        if attach and self.attachment_support:
-            if isinstance(attach, (list, tuple, set)):
-                attachments = list(attach)
-            else:
-                attachments = [attach]
-            # Filter out empty entries while preserving order
-            attachments = [a for a in attachments if a]
 
         if self.notify_format == NotifyFormat.MARKDOWN:
             if self.ping:
@@ -479,9 +470,14 @@ class NotifyFluxer(NotifyBase):
                     }
 
                 if self.fields:
+                    # Break titles out so that we can sort them in embeds
                     description, fields = self.extract_markdown_sections(body)
+
+                    # Swap first entry for description
                     payload["embeds"][0]["description"] = description
                     if fields:
+                        # Apply our additional parsing for a better
+                        # presentation
                         payload["embeds"][0]["fields"] = fields[
                             : self.fluxer_max_fields
                         ]
@@ -497,26 +493,11 @@ class NotifyFluxer(NotifyBase):
                     body if not title else f"{title}\r\n{body}"
                 ) + payload.get("content", "")
 
-            batches: list[list[Any] | None] = [None]
-
-            if attachments:
-                batches = [
-                    attachments[i : i + self.fluxer_max_files]
-                    for i in range(0, len(attachments), self.fluxer_max_files)
-                ]
-
-            sent = False
-            for batch in batches:
-                if self._send(payload, params=params, attach=batch):
-                    sent = True
-                    continue
-
-                if not attachments:
-                    return False
-
-            if not sent:
+            if not self._send(payload, params=params):
+                # We failed to post our message
                 return False
 
+            # Send remaining fields (if any)
             if fields:
                 payload["embeds"][0]["description"] = ""
                 for i in range(0, len(fields), self.fluxer_max_fields):
@@ -526,6 +507,35 @@ class NotifyFluxer(NotifyBase):
                     if not self._send(payload, params=params):
                         return False
 
+        if attach and self.attachment_support:
+
+            # Update our payload; the idea is to preserve it's other detected
+            # and assigned values for re-use here too
+            payload.update({
+                # Text-To-Speech
+                "tts": False,
+                # Wait until the upload has posted itself before continuing
+                "wait": False,
+            })
+
+            #
+            # Remove our text/title based content for attachment use
+            #
+            payload.pop("embeds", None)
+            payload.pop("allow_mentions", None)
+
+            #
+            # Send our attachments
+            #
+            for attachment in attach:
+                self.logger.info(
+                    f"Posting Fluxer Attachment {attachment.name}"
+                )
+
+                if not self._send(payload, params=params, attach=attachment):
+                    # We failed to post our message
+                    return False
+
         return True
 
     def _send(
@@ -533,12 +543,19 @@ class NotifyFluxer(NotifyBase):
         payload: dict[str, Any],
         params: dict[str, str] | None = None,
         rate_limit: int = 1,
+        attach: AttachBase | None = None,
         **kwargs: Any,
     ) -> bool:
         """Wrapper to the requests (post) object."""
 
+        # Our headers
+        headers = {
+            "User-Agent": self.app_id,
+        }
+
         if self.mode == FluxerMode.CLOUD:
-            prefix = f"https://{self.cloud_notify_host}"
+            prefix = self.cloud_notify_host
+
         else:
             # Prepare our Fluxer Template URL
             schema = "https" if self.secure else "http"
@@ -583,78 +600,60 @@ class NotifyFluxer(NotifyBase):
 
         self.throttle(wait=wait)
 
-        # Track list of open file descriptors
-        opened: list[Any] = []
+        # Perform some simple error checking
+        if isinstance(attach, AttachBase):
+            if not attach:
+                # We could not access the attachment
+                self.logger.error(
+                    f"Could not access attachment {attach.url(privacy=True)}."
+                )
+                return False
 
+            self.logger.debug(
+                f"Posting Fluxer attachment {attach.url(privacy=True)}"
+            )
+
+        # Our attachment path (if specified)
+        files = None
+        data: dict[str, Any] | str
         try:
-            attach = kwargs.get("attach")
-            files = None
-            data = None
-            json_payload: dict[str, Any] | None = payload
 
+            # Open our attachment path if required:
             if attach:
-                # Multipart upload: Fluxer expects payload_json plus one
-                # or more
-                # file parts. We also supply attachments metadata.
-                json_payload = dict(payload)
-                json_payload["attachments"] = []
-
-                files = []
-                for idx, attachment in enumerate(attach):
-                    if not attachment:
-                        self.logger.error(
-                            "Could not access Fluxer attachment."
-                        )
-                        return False
-
-                    aurl = (
-                        attachment.url(privacy=True)
-                        if hasattr(attachment, "url")
-                        else "<unknown>"
+                #
+                # Fluxer requires content to be provided
+                #
+                payload.update({
+                    "content": attach.name,
+                    "attachments": [{
+                        "id": 0,
+                        "filename": attach.name,
+                    }],
+                })
+                files = {
+                    "files[0]": (
+                        attach.name,
+                        # file handle is safely closed in `finally`; inline
+                        # open is intentional
+                        open(attach.path, "rb"),  # noqa: SIM115
+                        # Explicitly declare the file type so the server
+                        # doesn't hang
+                        attach.mimetype,
                     )
-
-                    fname = (
-                        attachment.name
-                        if getattr(attachment, "name", None)
-                        else f"file{idx:03}.dat"
-                    )
-
-                    # Track attachment metadata for payload_json
-                    json_payload["attachments"].append({
-                        "id": idx,
-                        "filename": fname,
-                    })
-
-                    try:
-                        f = attachment.open()
-                        opened.append(f)
-
-                    except Exception:
-                        self.logger.error(
-                            "Could not open Fluxer attachment"
-                            f" {aurl}."
-                        )
-                        return False
-
-                    mimetype = getattr(
-                        attachment, "mimetype", "application/octet-stream"
-                    )
-
-                    files.append((
-                        f"files[{idx}]",
-                        (fname, f, mimetype),
-                    ))
-
-                data = {"payload_json": json.dumps(json_payload)}
-                json_payload = None
+                }
+                data = {
+                    "payload_json": dumps(payload),
+                }
+            else:
+                headers["Content-Type"] = "application/json; charset=utf-8"
+                data = dumps(payload)
 
             r = requests.post(
                 notify_url,
                 params=params,
-                json=json_payload,
                 data=data,
                 files=files,
-                headers={"User-Agent": self.app_id},
+                headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
             )
@@ -685,6 +684,13 @@ class NotifyFluxer(NotifyBase):
                 )
 
                 if rate_limit > 0:
+                    # Prevent file handle leak before recursion
+                    if files:
+                        for file_info in files.values():
+                            with contextlib.suppress(Exception):
+                                file_info[1].close()
+                        files = None
+
                     # Recursive retry; next _send() invocation will hit the
                     # ratelimit_remaining<=0 gate and sleep via throttle()
                     return self._send(
@@ -723,21 +729,29 @@ class NotifyFluxer(NotifyBase):
             self.ratelimit_reset = \
                 datetime.now(timezone.utc).replace(tzinfo=None)
             self.ratelimit_remaining = self.default_delay_sec
-            return True
 
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending Fluxer notification."
             )
             self.logger.debug("Socket Exception: %s", e)
+            return False
+
+        except OSError as e:
+            self.logger.warning(
+                "An I/O error occurred while reading attachment(s)")
+            self.logger.debug(f"I/O Exception: {e!s}")
+            return False
 
         finally:
-            # Close any open file descriptors
-            for fp in opened:
-                with contextlib.suppress(Exception):
-                    fp.close()
+            # Close our file (if it's open) stored in the second element
+            # of our files tuple (index 1)
+            if files:
+                for file_info in files.values():
+                    with contextlib.suppress(Exception):
+                        file_info[1].close()
 
-        return False
+        return True
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
