@@ -283,7 +283,7 @@ class PluginManager(metaclass=Singleton):
             self._loaded.add(module_path)
 
             logger.debug(
-                f"{self.name} {len(self._module_map) - module_count}(s) and"
+                f"{len(self._module_map) - module_count} {self.name}(s) and"
                 f" {len(self._schema_map) - schema_count} Schema(s) loaded in"
                 f" {time.time() - t_start:.4f}s"
             )
