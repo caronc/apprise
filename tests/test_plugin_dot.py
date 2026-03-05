@@ -193,7 +193,8 @@ def test_notify_dot_image_mode_with_attachment():
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
     assert payload["image"] == "YmFzZTY0"
-    assert payload["deviceId"] == "device"
+    # API v2: deviceId should NOT be in payload
+    assert "deviceId" not in payload
 
 
 def test_notify_dot_image_mode_with_existing_image_data():
@@ -243,7 +244,8 @@ def test_notify_dot_text_mode_with_existing_icon():
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
     assert "image" not in payload
-    assert payload["deviceId"] == "device"
+    # API v2: deviceId should NOT be in payload
+    assert "deviceId" not in payload
     assert payload["message"] == "world"
     # Should use existing icon, not attachment
     assert payload["icon"] == "aW5jb24="
@@ -269,7 +271,8 @@ def test_notify_dot_text_mode_uses_attachment_as_icon():
 
     _args, kwargs = mock_post.call_args
     payload = json.loads(kwargs["data"])
-    assert payload["deviceId"] == "device"
+    # API v2: deviceId should NOT be in payload
+    assert "deviceId" not in payload
     assert payload["message"] == "world"
     # Should use attachment as icon
     assert payload["icon"] == "attachment_icon_data"
@@ -433,9 +436,10 @@ def test_notify_dot_image_mode_with_failed_attachment():
 
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
     # Should fail when no valid image data is available
-    assert dot.notify(
-        title="test", body="test", attach=[FailedAttachment()]
-    ) is False
+    assert (
+        dot.notify(title="test", body="test", attach=[FailedAttachment()])
+        is False
+    )
 
 
 def test_notify_dot_url_generation_defaults():
@@ -650,11 +654,14 @@ def test_notify_dot_image_mode_attachment_exception():
 
     # First attachment throws exception, should log warning and fail
     with mock.patch.object(dot.logger, "warning") as mock_warning:
-        assert dot.send(
-            body="test",
-            title="test",
-            attach=[ExceptionAttachment()],
-        ) is False
+        assert (
+            dot.send(
+                body="test",
+                title="test",
+                attach=[ExceptionAttachment()],
+            )
+            is False
+        )
         # Should log warning about failed attachment processing
         assert mock_warning.called
         # Check that the warning message contains expected text
@@ -670,11 +677,14 @@ def test_notify_dot_image_mode_attachment_none():
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
 
     # Attachment is None, should skip base64() call and fail
-    assert dot.send(
-        body="test",
-        title="test",
-        attach=[None],
-    ) is False
+    assert (
+        dot.send(
+            body="test",
+            title="test",
+            attach=[None],
+        )
+        is False
+    )
 
 
 def test_notify_dot_image_mode_attachment_falsy():
@@ -689,11 +699,14 @@ def test_notify_dot_image_mode_attachment_falsy():
         def base64(self):
             return "should_not_be_called"
 
-    assert dot.send(
-        body="test",
-        title="test",
-        attach=[FalsyAttachment()],
-    ) is False
+    assert (
+        dot.send(
+            body="test",
+            title="test",
+            attach=[FalsyAttachment()],
+        )
+        is False
+    )
 
 
 def test_notify_dot_text_mode_attachment_exception():
@@ -915,11 +928,14 @@ def test_notify_dot_image_mode_first_attachment_fails():
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
 
     # First attachment returns None, should fail immediately
-    assert dot.notify(
-        title="",
-        body="",
-        attach=[FailingAttachment()],
-    ) is False
+    assert (
+        dot.notify(
+            title="",
+            body="",
+            attach=[FailingAttachment()],
+        )
+        is False
+    )
 
 
 def test_notify_dot_image_mode_with_empty_attach_list():
@@ -929,11 +945,14 @@ def test_notify_dot_image_mode_with_empty_attach_list():
     # Try with empty attachments list
     # Condition: not image_data and attach -> not None and [] -> False
     # Should skip the for loop and go directly to line 313
-    assert dot.notify(
-        title="",
-        body="",
-        attach=[],  # Empty list (truthy in Python but loop won't execute)
-    ) is False
+    assert (
+        dot.notify(
+            title="",
+            body="",
+            attach=[],  # Empty list (truthy in Python but loop won't execute)
+        )
+        is False
+    )
 
 
 def test_notify_dot_parse_url_without_host_field():
@@ -965,3 +984,349 @@ def test_notify_dot_parse_url_without_host_field():
         assert result.get("device_id") is None
         assert result.get("apikey") == "apikey"
         assert result.get("refresh_now") is True  # refresh was in qsd
+
+
+def test_notify_dot_api_v2_endpoint_construction():
+    """Test API v2 endpoints with device_id in URL."""
+    # Test text mode endpoint
+    dot_text = NotifyDot(apikey="test_key", device_id="DEVICE123", mode="text")
+    expected_text_url = (
+        "https://dot.mindreset.tech/api/authV2/open/device/DEVICE123/text"
+    )
+    assert dot_text.text_api_url == expected_text_url
+
+    # Test image mode endpoint
+    dot_image = NotifyDot(
+        apikey="test_key", device_id="DEVICE456", mode="image"
+    )
+    expected_image_url = (
+        "https://dot.mindreset.tech/api/authV2/open/device/DEVICE456/image"
+    )
+    assert dot_image.image_api_url == expected_image_url
+
+
+def test_notify_dot_deviceid_not_in_text_payload():
+    """Test deviceId NOT in text payload (API v2)."""
+    dot = NotifyDot(apikey="test_key", device_id="12345", mode="text")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test body", "test title")
+
+        # Verify payload does NOT contain deviceId
+        call_args = mock_post.call_args
+        payload = json.loads(call_args[1]["data"])
+        assert "deviceId" not in payload
+
+        # Verify URL contains device_id in path
+        called_url = call_args[0][0]
+        assert "/device/12345/text" in called_url
+
+
+def test_notify_dot_deviceid_not_in_image_payload():
+    """Test deviceId NOT in image payload (API v2)."""
+    dot = NotifyDot(
+        apikey="test_key",
+        device_id="67890",
+        mode="image",
+        image_data="base64data",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("", "")
+
+        # Verify payload does NOT contain deviceId
+        call_args = mock_post.call_args
+        payload = json.loads(call_args[1]["data"])
+        assert "deviceId" not in payload
+
+        # Verify URL contains device_id in path
+        called_url = call_args[0][0]
+        assert "/device/67890/image" in called_url
+
+
+def test_notify_dot_task_key_in_text_mode():
+    """Test taskKey parameter in text mode payload."""
+    dot = NotifyDot(
+        apikey="test_key",
+        device_id="12345",
+        mode="text",
+        task_key="my_task_123",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test body", "test title")
+
+        # Verify payload contains taskKey
+        call_args = mock_post.call_args
+        payload = json.loads(call_args[1]["data"])
+        assert "taskKey" in payload
+        assert payload["taskKey"] == "my_task_123"
+
+
+def test_notify_dot_task_key_in_image_mode():
+    """Test taskKey parameter in image mode payload."""
+    dot = NotifyDot(
+        apikey="test_key",
+        device_id="12345",
+        mode="image",
+        task_key="image_task_456",
+        image_data="base64encodedimage",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("", "")
+
+        # Verify payload contains taskKey
+        call_args = mock_post.call_args
+        payload = json.loads(call_args[1]["data"])
+        assert "taskKey" in payload
+        assert payload["taskKey"] == "image_task_456"
+
+
+def test_notify_dot_task_key_none_not_in_payload():
+    """Test that taskKey is NOT in payload when None."""
+    dot = NotifyDot(
+        apikey="test_key",
+        device_id="12345",
+        task_key=None,
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test", "title")
+
+        call_args = mock_post.call_args
+        payload = json.loads(call_args[1]["data"])
+        assert "taskKey" not in payload
+
+
+def test_notify_dot_task_key_url_parsing():
+    """Test parsing taskKey from URL."""
+    url = "dot://apikey@device_id/text/?task_key=parsed_task"
+    result = NotifyDot.parse_url(url)
+
+    assert result is not None
+    assert result["task_key"] == "parsed_task"
+
+
+def test_notify_dot_task_key_in_url_method():
+    """Test that url() method includes task_key parameter."""
+    dot = NotifyDot(
+        apikey="test_key",
+        device_id="12345",
+        task_key="url_task",
+    )
+    url = dot.url()
+
+    assert "task_key=url_task" in url
+
+
+def test_notify_dot_refresh_now_none_not_in_payload():
+    """Test that refreshNow is NOT in payload when None."""
+    dot = NotifyDot(apikey="key", device_id="id", refresh_now=None)
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test", "title")
+
+        payload = json.loads(mock_post.call_args[1]["data"])
+        # None value should not be included in payload
+        assert "refreshNow" not in payload
+
+
+def test_notify_dot_refresh_now_true_in_payload():
+    """Test that refreshNow is in payload when True."""
+    dot = NotifyDot(apikey="key", device_id="id", refresh_now=True)
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test", "title")
+
+        payload = json.loads(mock_post.call_args[1]["data"])
+        assert payload.get("refreshNow") is True
+
+
+def test_notify_dot_refresh_now_false_in_payload():
+    """Test that refreshNow is in payload when False."""
+    dot = NotifyDot(apikey="key", device_id="id", refresh_now=False)
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test", "title")
+
+        payload = json.loads(mock_post.call_args[1]["data"])
+        assert payload.get("refreshNow") is False
+
+
+def test_notify_dot_refresh_now_none_not_in_url():
+    """Test that refresh parameter is NOT in URL when refresh_now is None."""
+    dot = NotifyDot(apikey="key", device_id="id", refresh_now=None)
+    url = dot.url()
+
+    # None value should not include refresh parameter
+    assert "refresh=" not in url
+
+
+def test_notify_dot_device_id_with_special_characters():
+    """Test that device_id with special characters is properly URL-encoded."""
+    # Test various special characters
+    test_cases = [
+        ("device/id", "device%2Fid"),  # forward slash
+        ("device?id", "device%3Fid"),  # question mark
+        ("device#id", "device%23id"),  # hash
+        ("device%id", "device%25id"),  # percent
+        ("device id", "device%20id"),  # space
+        ("device@id", "device%40id"),  # at sign
+    ]
+
+    for device_id, expected_encoded in test_cases:
+        dot = NotifyDot(apikey="test_key", device_id=device_id)
+        # Verify URL method properly encodes
+        url = dot.url()
+        assert expected_encoded in url, (
+            f"device_id '{device_id}' should be encoded"
+            f" as '{expected_encoded}'"
+        )
+
+
+def test_notify_dot_url_roundtrip_with_task_key():
+    """Test URL parsing and reconstruction maintains taskKey."""
+    original_url = "dot://apikey@device123/text/?task_key=test&signature=sig"
+
+    # Parse URL
+    result = NotifyDot.parse_url(original_url)
+
+    # Create object
+    dot = NotifyDot(**result)
+
+    # Reconstruct URL
+    reconstructed = dot.url(privacy=False)
+
+    # Verify key parameters are maintained
+    assert "device123" in reconstructed
+    assert "text" in reconstructed
+    assert "task_key=test" in reconstructed
+    assert "signature=sig" in reconstructed
+
+
+def test_notify_dot_authorization_header_bearer_format():
+    """Test that Authorization header uses Bearer format."""
+    dot = NotifyDot(apikey="MY_SECRET_KEY", device_id="12345")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test", "title")
+
+        call_args = mock_post.call_args
+        headers = call_args[1]["headers"]
+
+        assert "Authorization" in headers
+        assert headers["Authorization"] == "Bearer MY_SECRET_KEY"
+
+
+def test_notify_dot_device_id_in_endpoint_url():
+    """Test that device_id is properly embedded in endpoint URL."""
+    dot = NotifyDot(apikey="key", device_id="ABC123", mode="text")
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("test", "title")
+
+        # Check the actual URL that was called
+        called_url = mock_post.call_args[0][0]
+        assert "ABC123" in called_url
+        assert "/api/authV2/open/device/ABC123/text" in called_url
+
+
+def test_notify_dot_multiple_parameters_combined():
+    """Test combining multiple new API v2 parameters."""
+    dot = NotifyDot(
+        apikey="key",
+        device_id="device",
+        mode="text",
+        task_key="combined_task",
+        refresh_now=False,
+        signature="test_sig",
+        link="https://example.com",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("body", "title")
+
+        # Verify all parameters in payload
+        payload = json.loads(mock_post.call_args[1]["data"])
+        assert "deviceId" not in payload  # Should NOT be in payload
+        assert payload.get("taskKey") == "combined_task"
+        assert payload.get("refreshNow") is False
+        assert payload.get("signature") == "test_sig"
+        assert payload.get("link") == "https://example.com"
+        assert payload.get("title") == "title"
+        assert payload.get("message") == "body"
+
+        # Verify URL structure
+        called_url = mock_post.call_args[0][0]
+        assert "/device/device/text" in called_url
+
+
+def test_notify_dot_image_mode_combined_parameters():
+    """Test image mode with all API v2 parameters."""
+    dot = NotifyDot(
+        apikey="key",
+        device_id="img_device",
+        mode="image",
+        image_data="base64image",
+        task_key="img_task",
+        refresh_now=True,
+        link="https://example.com",
+        border=1,
+        dither_type="ORDERED",
+        dither_kernel="ATKINSON",
+    )
+
+    response = mock.Mock()
+    response.status_code = 200
+
+    with mock.patch("requests.post", return_value=response) as mock_post:
+        assert dot.send("", "")
+
+        # Verify all parameters in payload
+        payload = json.loads(mock_post.call_args[1]["data"])
+        assert "deviceId" not in payload  # Should NOT be in payload
+        assert payload.get("image") == "base64image"
+        assert payload.get("taskKey") == "img_task"
+        assert payload.get("refreshNow") is True
+        assert payload.get("link") == "https://example.com"
+        assert payload.get("border") == 1
+        assert payload.get("ditherType") == "ORDERED"
+        assert payload.get("ditherKernel") == "ATKINSON"
+
+        # Verify URL structure
+        called_url = mock_post.call_args[0][0]
+        assert "/device/img_device/image" in called_url
