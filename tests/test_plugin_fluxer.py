@@ -453,9 +453,6 @@ def test_plugin_fluxer_429(
     # Prevent throttling side effects
     mock_sleep.return_value = True
 
-    # Turn off clock skew for local testing
-    NotifyFluxer.clock_skew = timedelta(seconds=0)
-
     webhook_id, webhook_token = _tokens()
 
     # Basic construction checks (keep these, they match plugin validation)
@@ -737,18 +734,22 @@ def test_plugin_fluxer_general(
         is True
     )
 
-    # This call includes an image with it's payload:
-    NotifyFluxer.fluxer_max_fields = 1
-
-    assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+    # This call includes an image with its payload:
+    orig_fluxer_max_fields = NotifyFluxer.fluxer_max_fields
+    try:
+        NotifyFluxer.fluxer_max_fields = 1
+        assert (
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
+            is True
         )
-        is True
-    )
+    finally:
+        # Restore the original value to avoid impacting other tests
+        NotifyFluxer.fluxer_max_fields = orig_fluxer_max_fields
 
     # Throw an exception on the forth call to requests.post()
     # This allows to test our batch field processing
@@ -770,13 +771,20 @@ def test_plugin_fluxer_general(
     )
     assert isinstance(obj, NotifyFluxer)
 
-    assert (
-        obj.notify(
-            body=test_markdown, title="title", notify_type=NotifyType.INFO
+    # Force batching so we actually hit the 4th post() call
+    orig_fluxer_max_fields = NotifyFluxer.fluxer_max_fields
+    try:
+        NotifyFluxer.fluxer_max_fields = 1
+
+        assert (
+            obj.notify(
+                body=test_markdown, title="title", notify_type=NotifyType.INFO
+            )
+            is False
         )
-        is False
-    )
-    mock_post.side_effect = None
+    finally:
+        NotifyFluxer.fluxer_max_fields = orig_fluxer_max_fields
+        mock_post.side_effect = None
 
     # Empty String
     desc, results = obj.extract_markdown_sections("")

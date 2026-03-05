@@ -355,7 +355,7 @@ class NotifyFluxer(NotifyBase):
         # Include Image
         self.include_image = include_image if isinstance(include_image, bool) \
             else parse_bool(
-                include_image, self.template_args["include_image"]["default"])
+                include_image, self.template_args["image"]["default"])
 
         # Fields
         self.fields = fields if isinstance(fields, bool) \
@@ -512,9 +512,9 @@ class NotifyFluxer(NotifyBase):
             # Update our payload; the idea is to preserve it's other detected
             # and assigned values for re-use here too
             payload.update({
-                # Text-To-Speech
+                # Text-To-Speech can be off so we don't read the filename
                 "tts": False,
-                # Wait until the upload has posted itself before continuing
+                # no tts; no need to wait
                 "wait": False,
             })
 
@@ -697,6 +697,7 @@ class NotifyFluxer(NotifyBase):
                         payload=payload,
                         params=params,
                         rate_limit=rate_limit - 1,
+                        attach=attach,
                         **kwargs,
                     )
 
