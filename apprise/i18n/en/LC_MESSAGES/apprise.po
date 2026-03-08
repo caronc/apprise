@@ -1,11 +1,11 @@
 # English translations for apprise.
-# Copyright (C) 2019 Chris Caron
+# Copyright (C) 2026 Chris Caron
 # This file is distributed under the same license as the apprise project.
-# Chris Caron <lead2gold@gmail.com>, 2019.
+# Chris Caron <lead2gold@gmail.com>, 2026.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: apprise 1.4.5\n"
+"Project-Id-Version: apprise 1.9.7\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
 "POT-Creation-Date: 2026-02-01 19:16-0500\n"
 "PO-Revision-Date: 2019-05-24 20:00-0400\n"

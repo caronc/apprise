@@ -338,4 +338,4 @@ If you found Apprise useful at all, [please consider sponsoring][sponsorship] or
 
 ## COPYRIGHT
 
-Apprise is Copyright (C) 2025 Chris Caron <lead2gold@gmail.com>
+Apprise is Copyright (C) 2026 Chris Caron <lead2gold@gmail.com>
