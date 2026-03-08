@@ -82,7 +82,7 @@ notification services. It supports sending alerts to platforms such as: \
 `XBMC`, `XMPP`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
-Version:        1.9.7
+Version:        1.9.8
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -234,10 +234,13 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Sun Mar  8 2026 Chris Caron <lead2gold@gmail.com> - 1.9.8-1
+- Updated to v1.9.8
+
 * Tue Jan 20 2026 Chris Caron <lead2gold@gmail.com> - 1.9.7-1
 - Updated to v1.9.7
 
-* Sun Jan 18 2026 Benjamin A. Beasley <code@musicinmybrain.net> - 1.9.6-2
+* Sun Jan 18 2026 Benjamin A. Beasley <code@musicinmybrain.net> - 1.9.6-3
 - Remove unnecessary pytest-runner, pytest-cov dependencies
 
 * Sat Jan 17 2026 Fedora Release Engineering <releng@fedoraproject.org> - 1.9.6-2
