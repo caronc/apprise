@@ -543,7 +543,7 @@ class SlixmppAdapter:
                             timeout=connect_timeout,
                         )
                     )
-                    if not ok:
+                    if ok is False:
                         self.logger.warning("XMPP connect failed.")
                         with contextlib.suppress(Exception):
                             client.disconnect()
@@ -816,7 +816,7 @@ class SlixmppAdapter:
             return False
 
         ok = await self._connect_if_required()
-        if not ok:
+        if ok is False:
             return False
 
         # Auth failed after connect, do not send.
