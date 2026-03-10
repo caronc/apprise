@@ -1604,8 +1604,10 @@ def test_adapter_connect_if_required_early_returns(
     assert asyncio.run(a._connect_if_required()) is False
 
     loop = asyncio.new_event_loop()
-    a._loop = loop
     try:
+        asyncio.set_event_loop(loop)
+        a._loop = loop
+
         assert run_on_loop(loop, a._connect_if_required()) is False
         a._client = SimpleNamespace()
         assert run_on_loop(loop, a._connect_if_required()) is False
@@ -1618,7 +1620,7 @@ def test_adapter_connect_if_required_early_returns(
         with contextlib.suppress(Exception):
             asyncio.set_event_loop(None)
 
-        a._loop.close()
+        loop.close()
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
@@ -1639,6 +1641,7 @@ def test_adapter_connect_if_required_already_connected(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -1683,6 +1686,7 @@ def test_adapter_connect_if_required_connect_timeout(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -1732,6 +1736,7 @@ def test_adapter_connect_if_required_connect_exception(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -1769,6 +1774,7 @@ def test_adapter_connect_if_required_session_start_timeout(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -1804,7 +1810,7 @@ def test_adapter_connect_if_required_session_start_timeout(
             xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
         )
 
-        assert asyncio.run(a._connect_if_required()) is False
+        assert run_on_loop(loop, a._connect_if_required()) is False
 
     finally:
         with contextlib.suppress(Exception):
@@ -1830,6 +1836,7 @@ def test_adapter_send_keepalive_async_default_target_and_send_error(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -1849,7 +1856,7 @@ def test_adapter_send_keepalive_async_default_target_and_send_error(
         monkeypatch.setattr(
             a, "_connect_if_required", ok_connect, raising=True)
 
-        assert asyncio.run(a._send_keepalive_async(
+        assert run_on_loop(loop, a._send_keepalive_async(
             targets=[], subject="s", body="b")) is True
         assert sent == ["me@example.com"]
 
@@ -1861,10 +1868,11 @@ def test_adapter_send_keepalive_async_default_target_and_send_error(
             _Client, "send_message", boom_send_message, raising=True)
 
         assert a._session_started.is_set() is True
-        assert asyncio.run(
-            a._send_keepalive_async(
+
+        assert run_on_loop(loop, a._send_keepalive_async(
                 targets=[], subject="s", body="b")) is False
         assert a._session_started.is_set() is False
+
     finally:
         with contextlib.suppress(Exception):
             asyncio.set_event_loop(None)
@@ -2211,6 +2219,7 @@ def test_adapter_connect_if_required_hits_bottom_return_true(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -2240,7 +2249,7 @@ def test_adapter_connect_if_required_hits_bottom_return_true(
         monkeypatch.setattr(
             xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True)
 
-        assert asyncio.run(a._connect_if_required()) is True
+        assert run_on_loop(loop, a._connect_if_required()) is True
     finally:
         with contextlib.suppress(Exception):
             asyncio.set_event_loop(None)
@@ -3679,6 +3688,7 @@ def test_adapter_connect_if_required_auth_failed_returns_false(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -3688,7 +3698,7 @@ def test_adapter_connect_if_required_auth_failed_returns_false(
 
         a._client = _Client()
 
-        assert asyncio.run(a._connect_if_required()) is False
+        assert run_on_loop(loop, a._connect_if_required()) is False
 
     finally:
         with contextlib.suppress(Exception):
@@ -3719,6 +3729,7 @@ def test_adapter_connect_if_required_connect_ok_false_disconnects(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -3736,7 +3747,7 @@ def test_adapter_connect_if_required_connect_ok_false_disconnects(
 
         a._client = _Client()
 
-        assert asyncio.run(a._connect_if_required()) is False
+        assert run_on_loop(loop, a._connect_if_required()) is False
         assert disconnected["n"] == 1
         assert "XMPP connect failed" in caplog.text
 
@@ -3767,6 +3778,7 @@ def test_adapter_connect_if_required_session_wait_exception_closes(
 
     loop = asyncio.new_event_loop()
     try:
+        asyncio.set_event_loop(loop)
         a._loop = loop
         a._connect_lock = asyncio.Lock()
         a._session_started = asyncio.Event()
@@ -3806,7 +3818,7 @@ def test_adapter_connect_if_required_session_wait_exception_closes(
             xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
         )
 
-        assert asyncio.run(a._connect_if_required()) is False
+        assert run_on_loop(loop, a._connect_if_required()) is False
         assert len(called) == 1
 
     finally:
