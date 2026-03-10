@@ -248,11 +248,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             """
             coro = self._session_start(*args, **kwargs)
 
-            # One-shot mode: let Slixmpp schedule the coroutine itself.
-            if self._oneshot:
-                return coro
-
-            # Keepalive mode: schedule on the assigned loop.
+            # Schedule on the event loop for both one-shot and keepalive.
             loop = getattr(self, "loop", None)
 
             # If the loop is missing or already closing, we MUST close the
