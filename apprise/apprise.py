@@ -31,6 +31,7 @@ import asyncio
 from collections.abc import Iterator
 import concurrent.futures as cf
 from itertools import chain
+import json
 import os
 from typing import Any, Optional, Union
 
@@ -47,6 +48,7 @@ from .logger import logger
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase
 from .utils.cwe312 import cwe312_url
+from .utils.json import AppriseJSONEncoder
 from .utils.logic import is_exclusive_match
 from .utils.parse import parse_list, parse_urls
 
@@ -768,6 +770,54 @@ class Apprise:
             return False
 
         return all(results)
+
+    def json(
+        self,
+        lang: Optional[str] = None,
+        show_requirements: bool = False,
+        show_disabled: bool = False,
+        indent: int = 0,
+        path: Optional[str] = None,
+    ) -> Union[str, bool]:
+        """Returns a json response associated with the Apprise object."""
+        details = self.details(
+            lang=lang,
+            show_requirements=show_requirements,
+            show_disabled=show_disabled,
+        )
+
+        if not path:
+            return json.dumps(
+                details,
+                separators=(",", ":"),
+                indent=indent,
+                cls=AppriseJSONEncoder,
+            )
+
+        with open(path, "w") as fp:
+            try:
+                json.dump(
+                    details,
+                    fp,
+                    separators=(",", ":"),
+                    indent=indent,
+                    cls=AppriseJSONEncoder,
+                )
+
+            except (OSError, EOFError) as e:
+                logger.error(
+                    "Apprise details dumpfile inaccessible: %s", path
+                )
+                logger.debug("Apprise details dump Exception: %s", e)
+
+                # Early Exit
+                return False
+
+            finally:
+                # Reduce memory
+                del details
+
+        return True
 
     def details(
         self,
