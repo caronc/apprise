@@ -248,11 +248,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             """
             coro = self._session_start(*args, **kwargs)
 
-            # One-shot mode: let Slixmpp schedule the coroutine itself.
-            if self._oneshot:
-                return coro
-
-            # Keepalive mode: schedule on the assigned loop.
+            # Schedule on the event loop for both one-shot and keepalive.
             loop = getattr(self, "loop", None)
 
             # If the loop is missing or already closing, we MUST close the
@@ -543,7 +539,7 @@ class SlixmppAdapter:
                             timeout=connect_timeout,
                         )
                     )
-                    if not ok:
+                    if ok is False:
                         self.logger.warning("XMPP connect failed.")
                         with contextlib.suppress(Exception):
                             client.disconnect()
@@ -816,7 +812,7 @@ class SlixmppAdapter:
             return False
 
         ok = await self._connect_if_required()
-        if not ok:
+        if ok is False:
             return False
 
         # Auth failed after connect, do not send.
