@@ -776,7 +776,7 @@ class Apprise:
         lang: Optional[str] = None,
         show_requirements: bool = False,
         show_disabled: bool = False,
-        indent: int = 0,
+        indent: Optional[int] = None,
         path: Optional[str] = None,
     ) -> Union[str, bool]:
         """Returns a json response associated with the Apprise object."""
