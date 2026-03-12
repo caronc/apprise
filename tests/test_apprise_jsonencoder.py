@@ -28,12 +28,11 @@
 import base64
 from datetime import datetime, timezone
 import json
-from unittest import mock
 
 # Disable logging for a cleaner testing output
 import logging
-import os
 import sys
+from unittest import mock
 
 import pytest
 
@@ -245,7 +244,8 @@ def test_apprise_json_method_write_failure(tmpdir):
     apobj = Apprise()
     output = tmpdir.join("fail.json")
 
-    with mock.patch("apprise.apprise.json.dump", side_effect=OSError("disk full")):
+    with mock.patch(
+            "apprise.apprise.json.dump", side_effect=OSError("disk full")):
         assert apobj.json(path=str(output)) is False
 
 
