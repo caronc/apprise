@@ -28,13 +28,16 @@
 import base64
 from datetime import datetime, timezone
 import json
+from unittest import mock
 
 # Disable logging for a cleaner testing output
 import logging
+import os
 import sys
 
 import pytest
 
+from apprise import Apprise
 from apprise.common import AWARE_DATE_ISO_FORMAT, NAIVE_DATE_ISO_FORMAT
 from apprise.locale import LazyTranslation
 from apprise.utils.json import AppriseJSONEncoder
@@ -170,3 +173,87 @@ def test_apprise_json_encoder_nested():
     assert sorted(result["tags"]) == ["alpha", "beta"]
     assert result["label"] == "nested"
     assert result["coords"] == [1.0, 2.0]
+
+
+def test_apprise_json_method_no_path():
+    "Apprise.json(): returns compact JSON string when no path is given"
+
+    apobj = Apprise()
+
+    # Default call — compact output (indent=None), no newlines
+    result = apobj.json()
+    assert isinstance(result, str)
+    parsed = json.loads(result)
+    assert isinstance(parsed, dict)
+    # Compact: no newlines in the output
+    assert "\n" not in result
+
+    # show_requirements and show_disabled flags are forwarded to details()
+    result_req = apobj.json(show_requirements=True)
+    assert isinstance(result_req, str)
+    assert json.loads(result_req)
+
+    result_dis = apobj.json(show_disabled=True)
+    assert isinstance(result_dis, str)
+    assert json.loads(result_dis)
+
+
+def test_apprise_json_method_indent():
+    "Apprise.json(): indent > 0 produces pretty-printed output with newlines"
+
+    apobj = Apprise()
+
+    result = apobj.json(indent=4)
+    assert isinstance(result, str)
+    # Pretty-printed output contains newlines
+    assert "\n" in result
+    assert json.loads(result)
+
+
+def test_apprise_json_method_with_path(tmpdir):
+    "Apprise.json(): writes JSON to file and returns True"
+
+    apobj = Apprise()
+    output = tmpdir.join("details.json")
+
+    assert apobj.json(path=str(output)) is True
+    assert output.check(file=True)
+
+    content = output.read()
+    parsed = json.loads(content)
+    assert isinstance(parsed, dict)
+
+    # Compact by default — no newlines
+    assert "\n" not in content
+
+
+def test_apprise_json_method_with_path_and_indent(tmpdir):
+    "Apprise.json(): writes pretty-printed JSON to file when indent is set"
+
+    apobj = Apprise()
+    output = tmpdir.join("details_pretty.json")
+
+    assert apobj.json(path=str(output), indent=2) is True
+    content = output.read()
+    assert "\n" in content
+    assert json.loads(content)
+
+
+def test_apprise_json_method_write_failure(tmpdir):
+    "Apprise.json(): returns False when json.dump raises OSError"
+
+    apobj = Apprise()
+    output = tmpdir.join("fail.json")
+
+    with mock.patch("apprise.apprise.json.dump", side_effect=OSError("disk full")):
+        assert apobj.json(path=str(output)) is False
+
+
+def test_apprise_json_method_write_eoferror(tmpdir):
+    "Apprise.json(): returns False when json.dump raises EOFError"
+
+    apobj = Apprise()
+    output = tmpdir.join("eof.json")
+
+    with mock.patch("apprise.apprise.json.dump", side_effect=EOFError):
+        assert apobj.json(path=str(output)) is False
