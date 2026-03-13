@@ -321,7 +321,7 @@ def test_apprise_trans_windows_users_nux(mock_getlocale):
         # We fall back to posix locale
         assert locale.AppriseLocale.detect_language() == "fr"
 
-    delattr(ctypes, "windll")
+    del ctypes.windll
 
     # Restore default value
     locale.AppriseLocale._default_language = default_language
