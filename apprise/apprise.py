@@ -802,6 +802,7 @@ class Apprise:
                     separators=(",", ":"),
                     indent=indent,
                     cls=AppriseJSONEncoder,
+                    ensure_ascii=False,
                 )
 
             except (OSError, EOFError) as e:
