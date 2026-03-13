@@ -27,6 +27,10 @@
 
 from enum import Enum
 
+# isoformat is spelled out for compatibility with Python v3.6
+AWARE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
+NAIVE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
+
 
 class NotifyType(str, Enum):
     """A simple mapping of notification types most commonly used with all types

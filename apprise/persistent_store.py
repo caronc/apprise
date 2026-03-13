@@ -43,16 +43,16 @@ from typing import Any, Optional, Union
 import zlib
 
 from . import exception
-from .common import PersistentStoreMode
+from .common import (
+    AWARE_DATE_ISO_FORMAT,
+    NAIVE_DATE_ISO_FORMAT,
+    PersistentStoreMode,
+)
 from .logger import logger
 from .utils.disk import path_decode
 
 # Used for writing/reading time stored in cache file
 EPOCH = datetime(1970, 1, 1, tzinfo=timezone.utc)
-
-# isoformat is spelled out for compatibility with Python v3.6
-AWARE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
-NAIVE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
 def _ntf_tidy(ntf):
