@@ -1079,7 +1079,7 @@ class NotifyEmail(NotifyBase):
                 base = MIMEText(body, "plain", "utf-8")
 
             if attach:
-                mixed = MIMEMultipart("mixed")
+                mixed = MIMEMultipart("related")
                 mixed.attach(base)
                 # Now store our attachments
                 for no, attachment in enumerate(attach, start=1):
@@ -1118,6 +1118,10 @@ class NotifyEmail(NotifyBase):
                             ),
                         )
                         mixed.attach(app)
+                        app.add_header(
+                            'Content-ID',
+                             '<{}>'.format(Header(filename, 'utf-8')),
+                        )
                 base = mixed
 
             if pgp:
