@@ -57,7 +57,7 @@ The section identifies all of the services supported by this library. [Check out
 
 ## Productivity Based Notifications
 
-The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them.
+The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them. If you're having trouble constructing your own URL; try our [Apprise URL Builder](https://appriseit.com/tools/url-builder/) out.
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |

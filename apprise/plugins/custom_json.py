@@ -49,7 +49,8 @@ class JSONPayloadField:
 
 
 # Defines the method to send the notification
-METHODS = ("POST", "GET", "DELETE", "PUT", "HEAD", "PATCH")
+METHODS = (
+    "POST", "GET", "DELETE", "PUT", "HEAD", "PATCH", "UPDATE", "OPTIONS")
 
 
 class NotifyJSON(NotifyBase):
@@ -301,26 +302,9 @@ class NotifyJSON(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        if self.method == "GET":
-            method = requests.get
-
-        elif self.method == "PUT":
-            method = requests.put
-
-        elif self.method == "PATCH":
-            method = requests.patch
-
-        elif self.method == "DELETE":
-            method = requests.delete
-
-        elif self.method == "HEAD":
-            method = requests.head
-
-        else:  # POST
-            method = requests.post
-
         try:
-            r = method(
+            r = requests.request(
+                self.method,
                 url,
                 data=dumps(payload),
                 params=self.params,

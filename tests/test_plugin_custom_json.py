@@ -127,6 +127,18 @@ apprise_url_tests = (
             "instance": NotifyJSON,
         },
     ),
+    (
+        "json://user@localhost?method=update",
+        {
+            "instance": NotifyJSON,
+        },
+    ),
+    (
+        "json://user@localhost?method=options",
+        {
+            "instance": NotifyJSON,
+        },
+    ),
     # Continue testing other cases
     (
         "json://localhost:8080",
@@ -219,9 +231,8 @@ def test_plugin_custom_json_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch("requests.post")
-@mock.patch("requests.get")
-def test_plugin_custom_json_edge_cases(mock_get, mock_post):
+@mock.patch("requests.request")
+def test_plugin_custom_json_edge_cases(mock_request):
     """NotifyJSON() Edge Cases."""
 
     # Prepare our response
@@ -229,8 +240,7 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     response.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = response
-    mock_get.return_value = response
+    mock_request.return_value = response
 
     # This string also tests that type is set to nothing
     results = NotifyJSON.parse_url(
@@ -259,11 +269,11 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 0
-    assert mock_get.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_get.call_args_list[0]
-    assert details[0][0] == "http://localhost:8080/command"
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "GET"
+    assert details[0][1] == "http://localhost:8080/command"
     assert "title" in details[1]["data"]
     dataset = json.loads(details[1]["data"])
     assert dataset["title"] == "title"
@@ -300,23 +310,22 @@ def test_plugin_custom_json_edge_cases(mock_get, mock_post):
     ):
         assert new_results[k] == results[k]
 
-    mock_get.reset_mock()
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     results = NotifyJSON.parse_url(
         "json://localhost:8080/command?:message=msg&method=GET"
     )
     instance = NotifyJSON(**results)
     assert instance.send(title="title", body="body") is True
-    details = mock_get.call_args_list[0]
+    details = mock_request.call_args_list[0]
     dataset = json.loads(details[1]["data"])
 
     assert dataset["type"] == NotifyType.INFO.value
     assert "NotifyType." not in details[1]["data"]
 
 
-@mock.patch("requests.post")
-def test_notify_json_plugin_attachments(mock_post):
+@mock.patch("requests.request")
+def test_notify_json_plugin_attachments(mock_request):
     """NotifyJSON() Attachments."""
 
     okay_response = requests.Request()
@@ -324,7 +333,7 @@ def test_notify_json_plugin_attachments(mock_post):
     okay_response.content = ""
 
     # Assign our mock object our return value
-    mock_post.return_value = okay_response
+    mock_request.return_value = okay_response
 
     obj = Apprise.instantiate("json://localhost.localdomain/")
     assert isinstance(obj, NotifyJSON)
@@ -363,8 +372,8 @@ def test_notify_json_plugin_attachments(mock_post):
     attach = AppriseAttachment(path)
 
     # Return our good configuration
-    mock_post.side_effect = None
-    mock_post.return_value = okay_response
+    mock_request.side_effect = None
+    mock_request.return_value = okay_response
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
@@ -382,7 +391,7 @@ def test_notify_json_plugin_attachments(mock_post):
     assert isinstance(obj, NotifyJSON)
 
     # Now send an attachment normally without issues
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     assert (
         obj.notify(
             body="body",
@@ -392,13 +401,13 @@ def test_notify_json_plugin_attachments(mock_post):
         )
         is True
     )
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
 
 # Based on incomming webhook details defined here:
 # https://kb.synology.com/en-au/DSM/help/Chat/chat_integration
-@mock.patch("requests.post")
-def test_plugin_custom_form_for_synology(mock_post):
+@mock.patch("requests.request")
+def test_plugin_custom_form_for_synology(mock_request):
     """NotifyJSON() Synology Chat Test Case."""
 
     # Prepare our response
@@ -406,7 +415,7 @@ def test_plugin_custom_form_for_synology(mock_post):
     response.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = response
+    mock_request.return_value = response
 
     # This is rather confusing, it may be easier to leverage the
     # synology:// and synologys:// plugins instead, but this is just to prove
@@ -441,10 +450,11 @@ def test_plugin_custom_form_for_synology(mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
-    assert details[0][0] == "https://localhost:8081/webapi/entry.cgi"
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
+    assert details[0][1] == "https://localhost:8081/webapi/entry.cgi"
 
     params = details[1]["params"]
     assert params.get("api") == "SYNO.Chat.External"
