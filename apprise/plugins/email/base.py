@@ -93,13 +93,16 @@ class NotifyEmail(NotifyBase):
 
     # Define object templates
     templates = (
+        "{schema}://{host}",
+        "{schema}://{host}/{targets}",
         "{schema}://{user}@{host}",
+        "{schema}://{user}@{host}/{targets}",
         "{schema}://{user}@{host}:{port}",
         "{schema}://{user}@{host}/{targets}",
         "{schema}://{user}@{host}:{port}/{targets}",
         "{schema}://{user}:{password}@{host}",
-        "{schema}://{user}:{password}@{host}:{port}",
         "{schema}://{user}:{password}@{host}/{targets}",
+        "{schema}://{user}:{password}@{host}:{port}",
         "{schema}://{user}:{password}@{host}:{port}/{targets}",
     )
 
