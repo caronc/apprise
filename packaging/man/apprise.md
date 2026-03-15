@@ -158,8 +158,11 @@ The **storage** action has the following sub actions:
 
 There are too many service URL and combinations to list here. It's best to
 visit the [Apprise GitHub page][serviceurls] and see what's available.
+Also try out the [Apprise URL Builder][buildurls] to easily construct the URLS
+this tool supports and works with.
 
 [serviceurls]: https://appriseit.com/services/
+[buildurls]: https://appriseit.com/tools/url-builder/
 
 The **environment variable** of `APPRISE_URLS` (comma/space delimited) can be specified to
 provide the default set of URLs you wish to notify if none are otherwise specified.

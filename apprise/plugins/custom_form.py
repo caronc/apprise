@@ -45,7 +45,8 @@ class FORMPayloadField:
 
 
 # Defines the method to send the notification
-METHODS = ("POST", "GET", "DELETE", "PUT", "HEAD", "PATCH")
+METHODS = (
+    "POST", "GET", "DELETE", "PUT", "HEAD", "PATCH", "UPDATE", "OPTIONS")
 
 
 class NotifyForm(NotifyBase):
@@ -380,27 +381,14 @@ class NotifyForm(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
+        # For GET the payload becomes URL query parameters; for all other
+        # methods it is sent as the request body.
         if self.method == "GET":
-            method = requests.get
             payload.update(self.params)
 
-        elif self.method == "PUT":
-            method = requests.put
-
-        elif self.method == "PATCH":
-            method = requests.patch
-
-        elif self.method == "DELETE":
-            method = requests.delete
-
-        elif self.method == "HEAD":
-            method = requests.head
-
-        else:  # POST
-            method = requests.post
-
         try:
-            r = method(
+            r = requests.request(
+                self.method,
                 url,
                 files=files if files else None,
                 data=payload if self.method != "GET" else None,
