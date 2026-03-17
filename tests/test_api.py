@@ -663,9 +663,8 @@ def test_apprise_pretty_print():
     assert URLBase.pprint(" ", privacy=False, quote=False, safe="") == " "
 
 
-@mock.patch("requests.get")
-@mock.patch("requests.post")
-def test_apprise_tagging(mock_post, mock_get):
+@mock.patch("requests.request")
+def test_apprise_tagging(mock_request):
     """
     API: Apprise() object tagging functionality
 
@@ -674,12 +673,11 @@ def test_apprise_tagging(mock_post, mock_get):
     def do_notify(server, *args, **kwargs):
         return server.notify(*args, **kwargs)
 
-    apprise_tagging_test(mock_post, mock_get, do_notify)
+    apprise_tagging_test(mock_request, do_notify)
 
 
-@mock.patch("requests.get")
-@mock.patch("requests.post")
-def test_apprise_tagging_async(mock_post, mock_get):
+@mock.patch("requests.request")
+def test_apprise_tagging_async(mock_request):
     """
     API: Apprise() object tagging functionality asynchronous methods
 
@@ -691,10 +689,10 @@ def test_apprise_tagging_async(mock_post, mock_get):
                 server.async_notify(*args, **kwargs)
             )
 
-        apprise_tagging_test(mock_post, mock_get, do_notify)
+        apprise_tagging_test(mock_request, do_notify)
 
 
-def apprise_tagging_test(mock_post, mock_get, do_notify):
+def apprise_tagging_test(mock_request, do_notify):
     # A request
     robj = mock.Mock()
     robj.raw = mock.Mock()
@@ -702,12 +700,10 @@ def apprise_tagging_test(mock_post, mock_get, do_notify):
     robj.raw.read.return_value = ""
     robj.text = ""
     robj.content = ""
-    mock_get.return_value = robj
-    mock_post.return_value = robj
+    mock_request.return_value = robj
 
     # Simulate a successful notification
-    mock_get.return_value.status_code = requests.codes.ok
-    mock_post.return_value.status_code = requests.codes.ok
+    mock_request.return_value.status_code = requests.codes.ok
 
     # Create our object
     a = Apprise()
@@ -2132,18 +2128,18 @@ def test_apprise_details_plugin_verification():
                 assert arg in defined_tokens
 
 
-@mock.patch("requests.post")
+@mock.patch("requests.request")
 @mock.patch("asyncio.gather", wraps=asyncio.gather)
 @mock.patch(
     "concurrent.futures.ThreadPoolExecutor",
     wraps=concurrent.futures.ThreadPoolExecutor,
 )
-def test_apprise_async_mode(mock_threadpool, mock_gather, mock_post):
+def test_apprise_async_mode(mock_threadpool, mock_gather, mock_request):
     """
     API: Apprise() async_mode tests
 
     """
-    mock_post.return_value.status_code = requests.codes.ok
+    mock_request.return_value.status_code = requests.codes.ok
 
     # Define some servers
     servers = [

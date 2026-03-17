@@ -3828,8 +3828,8 @@ def test_notify_markdown_general():
     assert chunks[0].get("title") == ""
 
 
-@mock.patch("requests.post")
-def test_notify_emoji_general(mock_post):
+@mock.patch("requests.request")
+def test_notify_emoji_general(mock_request):
     """
     API: Emoji General Testing
 
@@ -3840,7 +3840,7 @@ def test_notify_emoji_general(mock_post):
     response.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = response
+    mock_request.return_value = response
 
     # Set up our emojis
     title = ":smile:"
@@ -3859,16 +3859,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # No changes
     assert dataset["title"] == title
     assert dataset["message"] == body
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Test URL over-ride while default value set in asset
@@ -3880,16 +3881,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # No changes
     assert dataset["title"] == title
     assert dataset["message"] == body
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Test URL over-ride while default value set in asset pt 2
@@ -3901,16 +3903,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # Emoji's are displayed
     assert dataset["title"] == "😄"
     assert dataset["message"] == "😃"
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Test URL over-ride while default value set in asset pt 2
@@ -3922,16 +3925,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # No changes
     assert dataset["title"] == title
     assert dataset["message"] == body
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Test Default Emoji settings
@@ -3948,16 +3952,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # emoji's are displayed
     assert dataset["title"] == "😄"
     assert dataset["message"] == "😃"
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # With Emoji's turned on by default, the user can optionally turn them
@@ -3971,16 +3976,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # No changes
     assert dataset["title"] == title
     assert dataset["message"] == body
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # With Emoji's turned on by default, there is no change when emojis
@@ -3994,16 +4000,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # emoji's are displayed
     assert dataset["title"] == "😄"
     assert dataset["message"] == "😃"
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Enforce the disabling of emojis
@@ -4020,16 +4027,17 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # Disabled - no emojis
     assert dataset["title"] == title
     assert dataset["message"] == body
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Enforce the disabling of emojis
@@ -4046,13 +4054,14 @@ def test_notify_emoji_general(mock_post):
     assert len(ap_obj) == 1
 
     assert ap_obj.notify(title=title, body=body) is True
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
     dataset = json.loads(details[1]["data"])
 
     # Disabled - no emojis
     assert dataset["title"] == title
     assert dataset["message"] == body
 
-    mock_post.reset_mock()
+    mock_request.reset_mock()

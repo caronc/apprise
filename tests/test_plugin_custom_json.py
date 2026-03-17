@@ -318,10 +318,33 @@ def test_plugin_custom_json_edge_cases(mock_request):
     instance = NotifyJSON(**results)
     assert instance.send(title="title", body="body") is True
     details = mock_request.call_args_list[0]
+    assert details[0][0] == "GET"
     dataset = json.loads(details[1]["data"])
 
     assert dataset["type"] == NotifyType.INFO.value
     assert "NotifyType." not in details[1]["data"]
+
+    mock_request.reset_mock()
+
+    # Verify UPDATE method is forwarded correctly
+    results = NotifyJSON.parse_url("json://localhost?method=UPDATE")
+    instance = NotifyJSON(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "UPDATE"
+    assert details[0][1] == "http://localhost"
+
+    mock_request.reset_mock()
+
+    # Verify OPTIONS method is forwarded correctly
+    results = NotifyJSON.parse_url("json://localhost?method=OPTIONS")
+    instance = NotifyJSON(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "OPTIONS"
+    assert details[0][1] == "http://localhost"
 
 
 @mock.patch("requests.request")

@@ -638,3 +638,25 @@ def test_plugin_custom_form_edge_cases(mock_request):
         "method",
     ):
         assert new_results[k] == results[k]
+
+    mock_request.reset_mock()
+
+    # Verify UPDATE method is forwarded correctly
+    results = NotifyForm.parse_url("form://localhost?method=UPDATE")
+    instance = NotifyForm(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "UPDATE"
+    assert details[0][1] == "http://localhost"
+
+    mock_request.reset_mock()
+
+    # Verify OPTIONS method is forwarded correctly
+    results = NotifyForm.parse_url("form://localhost?method=OPTIONS")
+    instance = NotifyForm(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "OPTIONS"
+    assert details[0][1] == "http://localhost"

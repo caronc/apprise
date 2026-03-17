@@ -539,3 +539,25 @@ def test_plugin_custom_xml_edge_cases(mock_request):
     # Message is swapped for Body
     assert r"<Message>body</Message>" not in details[1]["data"]
     assert r"<Body>body</Body>" in details[1]["data"]
+
+    mock_request.reset_mock()
+
+    # Verify UPDATE method is forwarded correctly
+    results = NotifyXML.parse_url("xml://localhost?method=UPDATE")
+    instance = NotifyXML(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "UPDATE"
+    assert details[0][1] == "http://localhost"
+
+    mock_request.reset_mock()
+
+    # Verify OPTIONS method is forwarded correctly
+    results = NotifyXML.parse_url("xml://localhost?method=OPTIONS")
+    instance = NotifyXML(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "OPTIONS"
+    assert details[0][1] == "http://localhost"
