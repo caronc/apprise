@@ -90,7 +90,6 @@ def test_plugin_title_maxlen(request_mock):
     assert mock_request.call_count == 1
     assert mock_post.call_count == 1
 
-    # JSON plugin: requests.request("POST", url, data=...) → method is [0][0], url is [0][1]
     details = mock_request.call_args_list[0]
     assert details[0][0] == "POST"
     assert details[0][1] == "http://example.ca"
@@ -141,7 +140,6 @@ def test_plugin_title_maxlen(request_mock):
     assert mock_request.call_count == 1
     assert mock_post.call_count == 1
 
-    # Telegram plugin: requests.post(url, data=...) → url is [0][0]
     details = mock_post.call_args_list[0]
     assert (
         details[0][0]
@@ -152,7 +150,6 @@ def test_plugin_title_maxlen(request_mock):
     # HTML in Title is escaped
     assert payload["text"] == "<b>Hello World</b>\r\nFoo Bar"
 
-    # JSON plugin: requests.request("POST", url, data=...) → method is [0][0], url is [0][1]
     details = mock_request.call_args_list[0]
     assert details[0][0] == "POST"
     assert details[0][1] == "http://example.ca"
