@@ -121,9 +121,6 @@ class NotifyPlivo(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "source",
             },
@@ -132,6 +129,9 @@ class NotifyPlivo(NotifyBase):
             },
             "id": {
                 "alias_of": "auth_id",
+            },
+            "to": {
+                "alias_of": "targets",
             },
             "batch": {
                 "name": _("Batch Mode"),

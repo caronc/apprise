@@ -115,9 +115,6 @@ class NotifyVonage(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "from_phone",
             },
@@ -138,6 +135,9 @@ class NotifyVonage(NotifyBase):
                 "default": 900000,
                 "min": 20000,
                 "max": 604800000,
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

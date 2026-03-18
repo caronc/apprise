@@ -303,11 +303,11 @@ class NotifyMatrix(NotifyBase):
                 "values": MATRIX_MESSAGE_TYPES,
                 "default": MatrixMessageType.TEXT,
             },
-            "to": {
-                "alias_of": "targets",
-            },
             "token": {
                 "alias_of": "token",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

@@ -145,11 +145,6 @@ class NotifyEmail(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "name": _("To Email"),
-                "type": "string",
-                "map_to": "targets",
-            },
             "from": {
                 "name": _("From Email"),
                 "type": "string",
@@ -159,14 +154,6 @@ class NotifyEmail(NotifyBase):
                 "name": _("From Name"),
                 "type": "string",
                 "map_to": "from_addr",
-            },
-            "cc": {
-                "name": _("Carbon Copy"),
-                "type": "list:string",
-            },
-            "bcc": {
-                "name": _("Blind Carbon Copy"),
-                "type": "list:string",
             },
             "smtp": {
                 "name": _("SMTP Server"),
@@ -198,6 +185,19 @@ class NotifyEmail(NotifyBase):
                 # By default persistent storage is referenced
                 "default": "",
                 "map_to": "pgp_key",
+            },
+            "to": {
+                "name": _("To Email"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "cc": {
+                "name": _("Carbon Copy"),
+                "type": "list:string",
+            },
+            "bcc": {
+                "name": _("Blind Carbon Copy"),
+                "type": "list:string",
             },
         },
     )

@@ -157,9 +157,6 @@ class NotifyAfricasTalking(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "apikey": {
                 "alias_of": "apikey",
             },
@@ -170,16 +167,19 @@ class NotifyAfricasTalking(NotifyBase):
                 "default": "AFRICASTKNG",
                 "map_to": "sender",
             },
-            "batch": {
-                "name": _("Batch Mode"),
-                "type": "bool",
-                "default": False,
-            },
             "mode": {
                 "name": _("SMS Mode"),
                 "type": "choice:string",
                 "values": AFRICAS_TALKING_SMS_MODES,
                 "default": AFRICAS_TALKING_SMS_MODES[0],
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
             },
         },
     )

@@ -181,9 +181,6 @@ class NotifyTwilio(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "from_phone",
             },
@@ -204,6 +201,9 @@ class NotifyTwilio(NotifyBase):
                 "type": "choice:string",
                 "values": TWILIO_NOTIFICATION_METHODS,
                 "default": TWILIO_NOTIFICATION_METHODS[0],
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

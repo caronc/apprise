@@ -192,9 +192,6 @@ class NotifyMattermost(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "channel": {
                 # Backwards compatible
                 "alias_of": "targets",
@@ -224,6 +221,9 @@ class NotifyMattermost(NotifyBase):
                 "type": "choice:string",
                 "values": MATTERMOST_MODES,
                 "default": MATTERMOST_MODES[0],
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

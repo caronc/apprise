@@ -145,19 +145,19 @@ class NotifySignalAPI(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "from_phone",
             },
-            "batch": {
-                "name": _("Batch Mode"),
+            "status": {
+                "name": _("Show Status"),
                 "type": "bool",
                 "default": False,
             },
-            "status": {
-                "name": _("Show Status"),
+            "to": {
+                "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
                 "type": "bool",
                 "default": False,
             },

@@ -275,9 +275,6 @@ class NotifySlack(NotifyBase):
                 "default": False,
                 "map_to": "use_blocks",
             },
-            "to": {
-                "alias_of": "targets",
-            },
             "timestamp": {
                 "name": _("Include Timestamp"),
                 "type": "bool",
@@ -293,6 +290,9 @@ class NotifySlack(NotifyBase):
             "token": {
                 "name": _("Token"),
                 "alias_of": ("access_token", "token_a", "token_b", "token_c"),
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

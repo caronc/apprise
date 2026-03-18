@@ -130,9 +130,6 @@ class NotifySMSManager(NotifyBase):
             "key": {
                 "alias_of": "apikey",
             },
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "name": _("From Phone No"),
                 "type": "string",
@@ -147,6 +144,9 @@ class NotifySMSManager(NotifyBase):
                 "type": "choice:string",
                 "values": SMS_MANAGER_GATEWAYS,
                 "default": SMS_MANAGER_GATEWAYS[0],
+            },
+            "to": {
+                "alias_of": "targets",
             },
             "batch": {
                 "name": _("Batch Mode"),

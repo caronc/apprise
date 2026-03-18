@@ -118,20 +118,6 @@ class NotifyD7Networks(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "unicode": {
-                # Unicode characters (default is 'auto')
-                "name": _("Unicode Characters"),
-                "type": "bool",
-                "default": False,
-            },
-            "batch": {
-                "name": _("Batch Mode"),
-                "type": "bool",
-                "default": False,
-            },
-            "to": {
-                "alias_of": "targets",
-            },
             "source": {
                 # Originating address,In cases where the rewriting of the
                 # sender's address is supported or permitted by the SMS-C.
@@ -144,6 +130,20 @@ class NotifyD7Networks(NotifyBase):
             },
             "from": {
                 "alias_of": "source",
+            },
+            "unicode": {
+                # Unicode characters (default is 'auto')
+                "name": _("Unicode Characters"),
+                "type": "bool",
+                "default": False,
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
             },
         },
     )

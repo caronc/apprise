@@ -140,21 +140,10 @@ class NotifySendPulse(NotifyBase):
 
     # Define our template arguments
     template_args = dict(NotifyBase.template_args, **{
-        "to": {
-            "alias_of": "targets",
-        },
         "from": {
             "name": _("From Email"),
             "type": "string",
             "map_to": "from_addr",
-        },
-        "cc": {
-            "name": _("Carbon Copy"),
-            "type": "list:string",
-        },
-        "bcc": {
-            "name": _("Blind Carbon Copy"),
-            "type": "list:string",
         },
         "template": {
             # The template ID is an integer
@@ -166,7 +155,18 @@ class NotifySendPulse(NotifyBase):
         },
         "secret": {
             "alias_of": "client_secret",
-        }
+        },
+        "to": {
+            "alias_of": "targets",
+        },
+        "cc": {
+            "name": _("Carbon Copy"),
+            "type": "list:string",
+        },
+        "bcc": {
+            "name": _("Blind Carbon Copy"),
+            "type": "list:string",
+        },
     })
 
     # Support Template Dynamic Variables (Substitutions)

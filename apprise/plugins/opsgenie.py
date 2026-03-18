@@ -284,11 +284,6 @@ class NotifyOpsgenie(NotifyBase):
                 "default": OpsgenieRegion.US,
                 "map_to": "region_name",
             },
-            "batch": {
-                "name": _("Batch Mode"),
-                "type": "bool",
-                "default": False,
-            },
             "priority": {
                 "name": _("Priority"),
                 "type": "choice:int",
@@ -307,14 +302,19 @@ class NotifyOpsgenie(NotifyBase):
                 "name": _("Tags"),
                 "type": "string",
             },
-            "to": {
-                "alias_of": "targets",
-            },
             "action": {
                 "name": _("Action"),
                 "type": "choice:string",
                 "values": OPSGENIE_ACTIONS,
                 "default": OPSGENIE_ACTIONS[0],
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
             },
         },
     )

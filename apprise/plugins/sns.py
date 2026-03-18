@@ -146,9 +146,6 @@ class NotifySNS(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "access": {
                 "alias_of": "access_key_id",
             },
@@ -157,6 +154,9 @@ class NotifySNS(NotifyBase):
             },
             "region": {
                 "alias_of": "region",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

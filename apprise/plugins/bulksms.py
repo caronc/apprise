@@ -145,9 +145,6 @@ class NotifyBulkSMS(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "name": _("From Phone No"),
                 "type": "string",
@@ -165,6 +162,9 @@ class NotifyBulkSMS(NotifyBase):
                 "name": _("Unicode Characters"),
                 "type": "bool",
                 "default": True,
+            },
+            "to": {
+                "alias_of": "targets",
             },
             "batch": {
                 "name": _("Batch Mode"),

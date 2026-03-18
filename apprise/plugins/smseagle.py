@@ -180,16 +180,14 @@ class NotifySMSEagle(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "token": {
                 "alias_of": "token",
             },
-            "batch": {
-                "name": _("Batch Mode"),
-                "type": "bool",
-                "default": False,
+            "priority": {
+                "name": _("Priority"),
+                "type": "choice:int",
+                "values": SMSEAGLE_PRIORITIES,
+                "default": SMSEaglePriority.NORMAL,
             },
             "status": {
                 "name": _("Show Status"),
@@ -206,11 +204,13 @@ class NotifySMSEagle(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
-            "priority": {
-                "name": _("Priority"),
-                "type": "choice:int",
-                "values": SMSEAGLE_PRIORITIES,
-                "default": SMSEaglePriority.NORMAL,
+            "to": {
+                "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
             },
         },
     )

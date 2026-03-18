@@ -140,6 +140,12 @@ class NotifySendGrid(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "template": {
+                # Template ID
+                # The template ID is 64 characters with one dash (d-uuid)
+                "name": _("Template"),
+                "type": "string",
+            },
             "to": {
                 "alias_of": "targets",
             },
@@ -150,12 +156,6 @@ class NotifySendGrid(NotifyBase):
             "bcc": {
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
-            },
-            "template": {
-                # Template ID
-                # The template ID is 64 characters with one dash (d-uuid)
-                "name": _("Template"),
-                "type": "string",
             },
         },
     )

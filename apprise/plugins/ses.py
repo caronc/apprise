@@ -186,9 +186,6 @@ class NotifySES(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "from_email",
             },
@@ -202,14 +199,6 @@ class NotifySES(NotifyBase):
                 "type": "string",
                 "map_to": "from_name",
             },
-            "cc": {
-                "name": _("Carbon Copy"),
-                "type": "list:string",
-            },
-            "bcc": {
-                "name": _("Blind Carbon Copy"),
-                "type": "list:string",
-            },
             "access": {
                 "alias_of": "access_key_id",
             },
@@ -218,6 +207,17 @@ class NotifySES(NotifyBase):
             },
             "region": {
                 "alias_of": "region",
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "cc": {
+                "name": _("Carbon Copy"),
+                "type": "list:string",
+            },
+            "bcc": {
+                "name": _("Blind Carbon Copy"),
+                "type": "list:string",
             },
         },
     )

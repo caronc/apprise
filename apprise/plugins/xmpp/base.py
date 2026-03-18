@@ -124,7 +124,6 @@ class NotifyXMPP(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {"alias_of": "targets"},
             "mode": {
                 "name": _("Secure Mode"),
                 "type": "choice:string",
@@ -147,6 +146,7 @@ class NotifyXMPP(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
+            "to": {"alias_of": "targets"},
         },
     )
 

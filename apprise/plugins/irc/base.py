@@ -155,7 +155,6 @@ class NotifyIRC(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {"alias_of": "targets"},
             "name": {"name": _("Real Name"), "type": "string"},
             "nick": {"name": _("Nickname"), "type": "string"},
             "join": {
@@ -169,6 +168,7 @@ class NotifyIRC(NotifyBase):
                 "values": IRC_AUTH_MODES,
                 "default": IRCAuthMode.SERVER,
             },
+            "to": {"alias_of": "targets"},
         },
     )
 
