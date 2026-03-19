@@ -86,6 +86,7 @@ class NotifyViber(NotifyBase):
         "targets": {
             "name": _("Receiver IDs"),
             "type": "list:string",
+            "required": True,
         },
     })
 

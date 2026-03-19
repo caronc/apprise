@@ -107,6 +107,7 @@ class NotifySendPulse(NotifyBase):
         "user": {
             "name": _("User Name"),
             "type": "string",
+            "required": True,
         },
         "host": {
             "name": _("Domain"),

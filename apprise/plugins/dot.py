@@ -134,6 +134,7 @@ class NotifyDot(NotifyBase):
                 "type": "choice:string",
                 "values": SUPPORTED_MODES,
                 "default": DEFAULT_MODE,
+                "required": True,
                 "map_to": "mode",
             },
         },

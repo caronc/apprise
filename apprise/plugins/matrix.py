@@ -219,6 +219,7 @@ class NotifyMatrix(NotifyBase):
             "host": {
                 "name": _("Hostname"),
                 "type": "string",
+                "required": True,
             },
             "port": {
                 "name": _("Port"),

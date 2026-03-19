@@ -168,6 +168,7 @@ class NotifyMQTT(NotifyBase):
             "topic": {
                 "name": _("Target Queue"),
                 "type": "string",
+                "required": True,
                 "map_to": "targets",
             },
             "targets": {

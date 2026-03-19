@@ -186,6 +186,7 @@ class NotifyNotificationAPI(NotifyBase):
         "targets": {
             "name": _("Targets"),
             "type": "list:string",
+            "required": True,
         },
     })
 

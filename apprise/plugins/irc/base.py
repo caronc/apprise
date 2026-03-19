@@ -148,6 +148,7 @@ class NotifyIRC(NotifyBase):
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
+                "required": True,
             },
         },
     )
