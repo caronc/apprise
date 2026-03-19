@@ -170,7 +170,7 @@ class NotifySlack(NotifyBase):
     templates = (
         # Webhook
         "{schema}://{token_a}/{token_b}/{token_c}",
-        "{schema}://{botname}@{token_a}/{token_b}{token_c}",
+        "{schema}://{botname}@{token_a}/{token_b}/{token_c}",
         "{schema}://{token_a}/{token_b}/{token_c}/{targets}",
         "{schema}://{botname}@{token_a}/{token_b}/{token_c}/{targets}",
         # Bot
