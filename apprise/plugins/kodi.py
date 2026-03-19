@@ -52,10 +52,10 @@ class NotifyXBMC(NotifyBase):
     kodi_secure_protocol = "kodis"
 
     # The default protocols
-    protocol = (xbmc_protocol, kodi_protocol)
+    protocol = (kodi_protocol, xbmc_protocol)
 
     # The default secure protocols
-    secure_protocol = (xbmc_secure_protocol, kodi_secure_protocol)
+    secure_protocol = (kodi_secure_protocol, xbmc_secure_protocol)
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/kodi/"

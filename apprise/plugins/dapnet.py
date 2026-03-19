@@ -146,11 +146,6 @@ class NotifyDapnet(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "name": _("Target Callsign"),
-                "type": "string",
-                "map_to": "targets",
-            },
             "priority": {
                 "name": _("Priority"),
                 "type": "choice:int",
@@ -162,6 +157,11 @@ class NotifyDapnet(NotifyBase):
                 "type": "string",
                 "default": "dl-all",
                 "private": True,
+            },
+            "to": {
+                "name": _("Target Callsign"),
+                "type": "string",
+                "map_to": "targets",
             },
             "batch": {
                 "name": _("Batch Mode"),

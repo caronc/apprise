@@ -206,21 +206,6 @@ class NotifyMastodon(NotifyBase):
                 "values": MASTODON_MESSAGE_VISIBILITIES,
                 "default": MastodonMessageVisibility.DEFAULT,
             },
-            "cache": {
-                "name": _("Cache Results"),
-                "type": "bool",
-                "default": True,
-            },
-            "batch": {
-                "name": _("Batch Mode"),
-                "type": "bool",
-                "default": True,
-            },
-            "sensitive": {
-                "name": _("Sensitive Attachments"),
-                "type": "bool",
-                "default": False,
-            },
             "spoiler": {
                 "name": _("Spoiler Text"),
                 "type": "string",
@@ -233,8 +218,23 @@ class NotifyMastodon(NotifyBase):
                 "name": _("Language Code"),
                 "type": "string",
             },
+            "cache": {
+                "name": _("Cache Results"),
+                "type": "bool",
+                "default": True,
+            },
+            "sensitive": {
+                "name": _("Sensitive Attachments"),
+                "type": "bool",
+                "default": False,
+            },
             "to": {
                 "alias_of": "targets",
+            },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": True,
             },
         },
     )

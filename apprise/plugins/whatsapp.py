@@ -115,6 +115,12 @@ class NotifyWhatsApp(NotifyBase):
                 "required": True,
                 "regex": (r"^[0-9]+$", "i"),
             },
+            "language": {
+                "name": _("Language"),
+                "type": "string",
+                "default": "en_US",
+                "regex": (r"^[^0-9\s]+$", "i"),
+            },
             "target_phone": {
                 "name": _("Target Phone No"),
                 "type": "string",
@@ -125,12 +131,7 @@ class NotifyWhatsApp(NotifyBase):
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
-            },
-            "language": {
-                "name": _("Language"),
-                "type": "string",
-                "default": "en_US",
-                "regex": (r"^[^0-9\s]+$", "i"),
+                "required": True,
             },
         },
     )
@@ -139,9 +140,6 @@ class NotifyWhatsApp(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "from_phone_id",
             },
@@ -153,6 +151,9 @@ class NotifyWhatsApp(NotifyBase):
             },
             "lang": {
                 "alias_of": "language",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

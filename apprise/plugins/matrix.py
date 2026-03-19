@@ -219,6 +219,7 @@ class NotifyMatrix(NotifyBase):
             "host": {
                 "name": _("Hostname"),
                 "type": "string",
+                "required": True,
             },
             "port": {
                 "name": _("Port"),
@@ -303,11 +304,11 @@ class NotifyMatrix(NotifyBase):
                 "values": MATRIX_MESSAGE_TYPES,
                 "default": MatrixMessageType.TEXT,
             },
-            "to": {
-                "alias_of": "targets",
-            },
             "token": {
                 "alias_of": "token",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

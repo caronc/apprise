@@ -93,6 +93,7 @@ class NotifyVoipms(NotifyBase):
             "from_phone": {
                 "name": _("From Phone No"),
                 "type": "string",
+                "required": True,
                 "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
                 "map_to": "source",
             },

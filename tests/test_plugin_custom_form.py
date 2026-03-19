@@ -124,6 +124,18 @@ apprise_url_tests = (
             "instance": NotifyForm,
         },
     ),
+    (
+        "form://user@localhost?method=update",
+        {
+            "instance": NotifyForm,
+        },
+    ),
+    (
+        "form://user@localhost?method=options",
+        {
+            "instance": NotifyForm,
+        },
+    ),
     # Custom payload options
     (
         "form://localhost:8080?:key=value&:key2=value2",
@@ -223,8 +235,8 @@ def test_plugin_custom_form_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch("requests.post")
-def test_plugin_custom_form_attachments(mock_post):
+@mock.patch("requests.request")
+def test_plugin_custom_form_attachments(mock_request):
     """NotifyForm() Attachments."""
 
     okay_response = requests.Request()
@@ -232,7 +244,7 @@ def test_plugin_custom_form_attachments(mock_post):
     okay_response.content = ""
 
     # Assign our mock object our return value
-    mock_post.return_value = okay_response
+    mock_request.return_value = okay_response
 
     obj = Apprise.instantiate("form://user@localhost.localdomain/?method=post")
     assert isinstance(obj, NotifyForm)
@@ -262,8 +274,8 @@ def test_plugin_custom_form_attachments(mock_post):
         is False
     )
 
-    mock_post.return_value = None
-    mock_post.side_effect = OSError()
+    mock_request.return_value = None
+    mock_request.side_effect = OSError()
     # We can't send the message if we can't read the attachment
     assert (
         obj.notify(
@@ -284,8 +296,8 @@ def test_plugin_custom_form_attachments(mock_post):
     attach = AppriseAttachment(path)
 
     # Return our good configuration
-    mock_post.side_effect = None
-    mock_post.return_value = okay_response
+    mock_request.side_effect = None
+    mock_request.return_value = okay_response
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
@@ -312,8 +324,8 @@ def test_plugin_custom_form_attachments(mock_post):
         )
 
     # Test file exception handling when performing post
-    mock_post.return_value = None
-    mock_post.side_effect = OSError()
+    mock_request.return_value = None
+    mock_request.side_effect = OSError()
     assert (
         obj.notify(
             body="body",
@@ -329,8 +341,8 @@ def test_plugin_custom_form_attachments(mock_post):
     #
 
     # Assign our mock object our return value
-    mock_post.return_value = okay_response
-    mock_post.side_effect = None
+    mock_request.return_value = okay_response
+    mock_request.side_effect = None
 
     obj = Apprise.instantiate(
         "form://user@localhost.localdomain/?attach-as=file"
@@ -430,9 +442,8 @@ def test_plugin_custom_form_attachments(mock_post):
     assert obj is None
 
 
-@mock.patch("requests.post")
-@mock.patch("requests.get")
-def test_plugin_custom_form_edge_cases(mock_get, mock_post):
+@mock.patch("requests.request")
+def test_plugin_custom_form_edge_cases(mock_request):
     """NotifyForm() Edge Cases."""
 
     # Prepare our response
@@ -440,8 +451,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
     response.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = response
-    mock_get.return_value = response
+    mock_request.return_value = response
 
     results = NotifyForm.parse_url(
         "form://localhost:8080/command?:message=msg&:abcd=test&method=POST"
@@ -466,11 +476,11 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 1
-    assert mock_get.call_count == 0
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
-    assert details[0][0] == "http://localhost:8080/command"
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
+    assert details[0][1] == "http://localhost:8080/command"
     assert "abcd" in details[1]["data"]
     assert details[1]["data"]["abcd"] == "test"
     assert "title" in details[1]["data"]
@@ -505,8 +515,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
         assert new_results[k] == results[k]
 
     # Reset our mock configuration
-    mock_post.reset_mock()
-    mock_get.reset_mock()
+    mock_request.reset_mock()
 
     results = NotifyForm.parse_url(
         "form://localhost:8080/command?:type=&:message=msg&method=POST"
@@ -530,11 +539,11 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 1
-    assert mock_get.call_count == 0
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
-    assert details[0][0] == "http://localhost:8080/command"
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
+    assert details[0][1] == "http://localhost:8080/command"
     assert "title" in details[1]["data"]
     assert details[1]["data"]["title"] == "title"
 
@@ -572,8 +581,7 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
         assert new_results[k] == results[k]
 
     # Reset our mock configuration
-    mock_post.reset_mock()
-    mock_get.reset_mock()
+    mock_request.reset_mock()
 
     results = NotifyForm.parse_url(
         "form://localhost:8080/command?:message=test&method=GET"
@@ -597,11 +605,11 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 0
-    assert mock_get.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_get.call_args_list[0]
-    assert details[0][0] == "http://localhost:8080/command"
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "GET"
+    assert details[0][1] == "http://localhost:8080/command"
 
     assert "title" in details[1]["params"]
     assert details[1]["params"]["title"] == "title"
@@ -630,3 +638,25 @@ def test_plugin_custom_form_edge_cases(mock_get, mock_post):
         "method",
     ):
         assert new_results[k] == results[k]
+
+    mock_request.reset_mock()
+
+    # Verify UPDATE method is forwarded correctly
+    results = NotifyForm.parse_url("form://localhost?method=UPDATE")
+    instance = NotifyForm(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "UPDATE"
+    assert details[0][1] == "http://localhost"
+
+    mock_request.reset_mock()
+
+    # Verify OPTIONS method is forwarded correctly
+    results = NotifyForm.parse_url("form://localhost?method=OPTIONS")
+    instance = NotifyForm(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "OPTIONS"
+    assert details[0][1] == "http://localhost"

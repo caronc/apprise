@@ -124,10 +124,10 @@ def test_apprise_cli_nux_env(tmpdir):
     )
     assert result.exit_code == 0
 
-    with mock.patch("requests.post") as mock_post:
+    with mock.patch("requests.request") as mock_request:
         # Prepare Mock
-        mock_post.return_value = requests.Request()
-        mock_post.return_value.status_code = requests.codes.ok
+        mock_request.return_value = requests.Request()
+        mock_request.return_value.status_code = requests.codes.ok
 
         result = runner.invoke(
             cli.main,
@@ -145,18 +145,18 @@ def test_apprise_cli_nux_env(tmpdir):
         assert result.exit_code == 0
 
         # Test our call count
-        assert mock_post.call_count == 1
+        assert mock_request.call_count == 1
+        details = mock_request.call_args_list[0]
+        assert details[0][0] == "POST"
 
         # Our string is now escaped correctly
         assert (
-            json.loads(mock_post.call_args_list[0][1]["data"]).get(
-                "message", ""
-            )
+            json.loads(details[1]["data"]).get("message", "")
             == "test body\nsNewLine"
         )
 
         # Reset
-        mock_post.reset_mock()
+        mock_request.reset_mock()
 
         result = runner.invoke(
             cli.main,
@@ -173,13 +173,13 @@ def test_apprise_cli_nux_env(tmpdir):
         assert result.exit_code == 0
 
         # Test our call count
-        assert mock_post.call_count == 1
+        assert mock_request.call_count == 1
+        details = mock_request.call_args_list[0]
+        assert details[0][0] == "POST"
 
         # Our string is now escaped correctly
         assert (
-            json.loads(mock_post.call_args_list[0][1]["data"]).get(
-                "message", ""
-            )
+            json.loads(details[1]["data"]).get("message", "")
             == "test body\\nsNewLine"
         )
 
@@ -1872,15 +1872,15 @@ def test_apprise_cli_print_help():
     assert result.exit_code == 0
 
 
-@mock.patch("requests.post")
-def test_apprise_cli_plugin_loading(mock_post, tmpdir):
+@mock.patch("requests.request")
+def test_apprise_cli_plugin_loading(mock_request, tmpdir):
     """
     CLI: --plugin-path (-P)
 
     """
     # Prepare Mock
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
 
     runner = CliRunner()
 

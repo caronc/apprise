@@ -123,9 +123,6 @@ class NotifyThreema(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "gateway_id",
             },
@@ -134,6 +131,9 @@ class NotifyThreema(NotifyBase):
             },
             "secret": {
                 "alias_of": "secret",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

@@ -127,6 +127,18 @@ apprise_url_tests = (
             "instance": NotifyXML,
         },
     ),
+    (
+        "xml://user@localhost?method=update",
+        {
+            "instance": NotifyXML,
+        },
+    ),
+    (
+        "xml://user@localhost?method=options",
+        {
+            "instance": NotifyXML,
+        },
+    ),
     # Continue testing other cases
     (
         "xml://localhost:8080",
@@ -251,8 +263,8 @@ def test_plugin_custom_xml_urls():
     AppriseURLTester(tests=apprise_url_tests).run_all()
 
 
-@mock.patch("requests.post")
-def test_notify_xml_plugin_attachments(mock_post):
+@mock.patch("requests.request")
+def test_notify_xml_plugin_attachments(mock_request):
     """NotifyXML() Attachments."""
 
     okay_response = requests.Request()
@@ -260,7 +272,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     okay_response.content = ""
 
     # Assign our mock object our return value
-    mock_post.return_value = okay_response
+    mock_request.return_value = okay_response
 
     obj = Apprise.instantiate("xml://localhost.localdomain/")
     assert isinstance(obj, NotifyXML)
@@ -299,8 +311,8 @@ def test_notify_xml_plugin_attachments(mock_post):
     attach = AppriseAttachment(path)
 
     # Return our good configuration
-    mock_post.side_effect = None
-    mock_post.return_value = okay_response
+    mock_request.side_effect = None
+    mock_request.return_value = okay_response
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
@@ -318,7 +330,7 @@ def test_notify_xml_plugin_attachments(mock_post):
     assert isinstance(obj, NotifyXML)
 
     # Now send an attachment normally without issues
-    mock_post.reset_mock()
+    mock_request.reset_mock()
     assert (
         obj.notify(
             body="body",
@@ -328,12 +340,11 @@ def test_notify_xml_plugin_attachments(mock_post):
         )
         is True
     )
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
 
-@mock.patch("requests.post")
-@mock.patch("requests.get")
-def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
+@mock.patch("requests.request")
+def test_plugin_custom_xml_edge_cases(mock_request):
     """NotifyXML() Edge Cases."""
 
     # Prepare our response
@@ -341,8 +352,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     response.status_code = requests.codes.ok
 
     # Prepare Mock
-    mock_post.return_value = response
-    mock_get.return_value = response
+    mock_request.return_value = response
 
     results = NotifyXML.parse_url(
         "xml://localhost:8080/command?:Message=Body&method=GET"
@@ -372,12 +382,12 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 0
-    assert mock_get.call_count == 1
+    assert mock_request.call_count == 1
 
-    details = mock_get.call_args_list[0]
+    details = mock_request.call_args_list[0]
     assert "NotifyType." not in details[1]["data"]
-    assert details[0][0] == "http://localhost:8080/command"
+    assert details[0][0] == "GET"
+    assert details[0][1] == "http://localhost:8080/command"
     assert instance.url(privacy=False).startswith(
         "xml://localhost:8080/command?"
     )
@@ -411,8 +421,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     # Custom entry
     assert "<Key>value</Key>" in details[1]["data"]
 
-    mock_post.reset_mock()
-    mock_get.reset_mock()
+    mock_request.reset_mock()
 
     results = NotifyXML.parse_url(
         "xml://localhost:8081/command?method=POST&:New=Value"
@@ -439,12 +448,12 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 1
-    assert mock_get.call_count == 0
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
     assert "NotifyType." not in details[1]["data"]
-    assert details[0][0] == "http://localhost:8081/command"
+    assert details[0][0] == "POST"
+    assert details[0][1] == "http://localhost:8081/command"
     assert instance.url(privacy=False).startswith(
         "xml://localhost:8081/command?"
     )
@@ -473,8 +482,7 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     # No over-ride
     assert r"<Message>body</Message>" in details[1]["data"]
 
-    mock_post.reset_mock()
-    mock_get.reset_mock()
+    mock_request.reset_mock()
 
     results = NotifyXML.parse_url(
         "xmls://localhost?method=POST&:Message=Body&:Subject=Title&:Version"
@@ -503,12 +511,12 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
 
     response = instance.send(title="title", body="body")
     assert response is True
-    assert mock_post.call_count == 1
-    assert mock_get.call_count == 0
+    assert mock_request.call_count == 1
 
-    details = mock_post.call_args_list[0]
+    details = mock_request.call_args_list[0]
     assert "NotifyType." not in details[1]["data"]
-    assert details[0][0] == "https://localhost"
+    assert details[0][0] == "POST"
+    assert details[0][1] == "https://localhost"
     assert instance.url(privacy=False).startswith("xmls://localhost")
 
     # Generate a new URL based on our last and verify key values are the same
@@ -531,3 +539,25 @@ def test_plugin_custom_xml_edge_cases(mock_get, mock_post):
     # Message is swapped for Body
     assert r"<Message>body</Message>" not in details[1]["data"]
     assert r"<Body>body</Body>" in details[1]["data"]
+
+    mock_request.reset_mock()
+
+    # Verify UPDATE method is forwarded correctly
+    results = NotifyXML.parse_url("xml://localhost?method=UPDATE")
+    instance = NotifyXML(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "UPDATE"
+    assert details[0][1] == "http://localhost"
+
+    mock_request.reset_mock()
+
+    # Verify OPTIONS method is forwarded correctly
+    results = NotifyXML.parse_url("xml://localhost?method=OPTIONS")
+    instance = NotifyXML(**results)
+    assert instance.send(title="title", body="body") is True
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "OPTIONS"
+    assert details[0][1] == "http://localhost"

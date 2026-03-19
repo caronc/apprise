@@ -118,14 +118,14 @@ class NotifyBulkVS(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "name": _("From Phone No"),
                 "type": "string",
                 "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
                 "map_to": "source",
+            },
+            "to": {
+                "alias_of": "targets",
             },
             "batch": {
                 "name": _("Batch Mode"),

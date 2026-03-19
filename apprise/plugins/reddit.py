@@ -178,9 +178,6 @@ class NotifyReddit(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "kind": {
                 "name": _("Kind"),
                 "type": "choice:string",
@@ -226,6 +223,9 @@ class NotifyReddit(NotifyBase):
                 "type": "bool",
                 "default": False,
                 "map_to": "resubmit",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

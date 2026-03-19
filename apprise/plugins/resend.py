@@ -131,6 +131,21 @@ class NotifyResend(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "from": {
+                "map_to": "from_addr",
+            },
+            "name": {
+                "name": _("From Name"),
+                "map_to": "from_addr",
+            },
+            "apikey": {
+                "map_to": "apikey",
+            },
+            "reply": {
+                "name": _("Reply To"),
+                "type": "list:string",
+                "map_to": "reply_to",
+            },
             "to": {
                 "alias_of": "targets",
             },
@@ -141,21 +156,6 @@ class NotifyResend(NotifyBase):
             "bcc": {
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
-            },
-            "reply": {
-                "name": _("Reply To"),
-                "type": "list:string",
-                "map_to": "reply_to",
-            },
-            "from": {
-                "map_to": "from_addr",
-            },
-            "name": {
-                "name": _("From Name"),
-                "map_to": "from_addr",
-            },
-            "apikey": {
-                "map_to": "apikey",
             },
         },
     )

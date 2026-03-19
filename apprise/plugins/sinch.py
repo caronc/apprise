@@ -147,9 +147,6 @@ class NotifySinch(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "from_phone",
             },
@@ -164,6 +161,9 @@ class NotifySinch(NotifyBase):
             },
             "token": {
                 "alias_of": "api_token",
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

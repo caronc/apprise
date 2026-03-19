@@ -201,7 +201,7 @@ def test_apprise_log_memory_captures():
     # Test capture where our notification throws an unhandled exception
     obj = Apprise.instantiate("json://user:password@example.com")
     with (
-        mock.patch("requests.post", side_effect=NotImplementedError()),
+        mock.patch("requests.request", side_effect=NotImplementedError()),
         pytest.raises(NotImplementedError),
         # Our exception gets caught in side our with() block
         # and although raised, all graceful handling of the log
@@ -355,8 +355,8 @@ def test_apprise_log_file_captures(tmpdir):
     logging.disable(logging.CRITICAL)
 
 
-@mock.patch("requests.post")
-def test_apprise_secure_logging(mock_post):
+@mock.patch("requests.request")
+def test_apprise_secure_logging(mock_request):
     """
     API: Apprise() secure logging tests
     """
@@ -367,8 +367,8 @@ def test_apprise_secure_logging(mock_post):
     logger.setLevel(logging.CRITICAL)
 
     # Prepare Mock
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
 
     # Default Secure Logging is set to enabled
     asset = AppriseAsset()
@@ -397,10 +397,10 @@ def test_apprise_secure_logging(mock_post):
     assert a.notify("test") is True
 
     # Test our call count
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
 
     # Reset
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     # Now we test the reverse configuration and turn off
     # secure logging.

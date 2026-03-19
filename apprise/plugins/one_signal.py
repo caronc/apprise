@@ -148,19 +148,23 @@ class NotifyOneSignal(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
+            "template": {
+                "alias_of": "template",
+            },
+            "subtitle": {
+                "name": _("Subtitle"),
+                "type": "string",
+            },
+            "language": {
+                "name": _("Language"),
+                "type": "string",
+                "default": "en",
             },
             "image": {
                 "name": _("Include Image"),
                 "type": "bool",
                 "default": True,
                 "map_to": "include_image",
-            },
-            "batch": {
-                "name": _("Batch Mode"),
-                "type": "bool",
-                "default": False,
             },
             "contents": {
                 "name": _("Enable Contents"),
@@ -174,17 +178,13 @@ class NotifyOneSignal(NotifyBase):
                 "default": False,
                 "map_to": "decode_tpl_args",
             },
-            "template": {
-                "alias_of": "template",
+            "to": {
+                "alias_of": "targets",
             },
-            "subtitle": {
-                "name": _("Subtitle"),
-                "type": "string",
-            },
-            "language": {
-                "name": _("Language"),
-                "type": "string",
-                "default": "en",
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
             },
         },
     )

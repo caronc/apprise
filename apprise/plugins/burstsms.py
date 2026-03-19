@@ -139,9 +139,6 @@ class NotifyBurstSMS(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "from": {
                 "alias_of": "sender_id",
             },
@@ -162,6 +159,9 @@ class NotifyBurstSMS(NotifyBase):
             # If set to Zero (0); this is the default and sets the max validity
             # period
             "validity": {"name": _("validity"), "type": "int", "default": 0},
+            "to": {
+                "alias_of": "targets",
+            },
             "batch": {
                 "name": _("Batch Mode"),
                 "type": "bool",

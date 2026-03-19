@@ -32,7 +32,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import NotifyType
-from apprise.plugins.xbmc import NotifyXBMC
+from apprise.plugins.kodi import NotifyXBMC
 
 logging.disable(logging.CRITICAL)
 

@@ -186,6 +186,7 @@ class NotifyNotificationAPI(NotifyBase):
         "targets": {
             "name": _("Targets"),
             "type": "list:string",
+            "required": True,
         },
     })
 
@@ -210,18 +211,6 @@ class NotifyNotificationAPI(NotifyBase):
             "type": "choice:string",
             "values": NOTIFICATIONAPI_MODES,
         },
-        "to": {
-            "alias_of": "targets",
-        },
-        # Email Values
-        "cc": {
-            "name": _("Carbon Copy"),
-            "type": "list:string",
-        },
-        "bcc": {
-            "name": _("Blind Carbon Copy"),
-            "type": "list:string",
-        },
         "reply": {
             "name": _("Reply To"),
             "type": "string",
@@ -237,7 +226,19 @@ class NotifyNotificationAPI(NotifyBase):
         },
         "secret": {
             "alias_of": "client_secret",
-        }
+        },
+        "to": {
+            "alias_of": "targets",
+        },
+        # Email Values
+        "cc": {
+            "name": _("Carbon Copy"),
+            "type": "list:string",
+        },
+        "bcc": {
+            "name": _("Blind Carbon Copy"),
+            "type": "list:string",
+        },
     })
 
     # Define our token control

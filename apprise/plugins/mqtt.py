@@ -168,6 +168,7 @@ class NotifyMQTT(NotifyBase):
             "topic": {
                 "name": _("Target Queue"),
                 "type": "string",
+                "required": True,
                 "map_to": "targets",
             },
             "targets": {
@@ -181,9 +182,6 @@ class NotifyMQTT(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
-            "to": {
-                "alias_of": "targets",
-            },
             "qos": {
                 "name": _("QOS"),
                 "type": "int",
@@ -210,6 +208,9 @@ class NotifyMQTT(NotifyBase):
                 "name": _("Retain Messages"),
                 "type": "bool",
                 "default": False,
+            },
+            "to": {
+                "alias_of": "targets",
             },
         },
     )

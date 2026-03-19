@@ -33,15 +33,15 @@ import requests
 import apprise
 
 
-@mock.patch("requests.post")
-def test_apprise_interpret_escapes(mock_post):
+@mock.patch("requests.request")
+def test_apprise_interpret_escapes(mock_request):
     """
     API: Apprise() interpret-escape tests
     """
 
     # Prepare Mock
-    mock_post.return_value = requests.Request()
-    mock_post.return_value.status_code = requests.codes.ok
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
 
     # Default Escapes interpretation Mode is set to disable
     asset = apprise.AppriseAsset()
@@ -60,31 +60,29 @@ def test_apprise_interpret_escapes(mock_post):
     assert a.notify("ab\\ncd") is True
 
     # Test our call count
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
 
     # content is not escaped
-    assert (
-        loads(mock_post.call_args_list[0][1]["data"]).get("message", "")
-        == "ab\\ncd"
-    )
+    assert loads(details[1]["data"]).get("message", "") == "ab\\ncd"
 
     # Reset
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     # Send notification and provide override:
     assert a.notify("ab\\ncd", interpret_escapes=True) is True
 
     # Test our call count
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
 
     # content IS escaped
-    assert (
-        loads(mock_post.call_args_list[0][1]["data"]).get("message", "")
-        == "ab\ncd"
-    )
+    assert loads(details[1]["data"]).get("message", "") == "ab\ncd"
 
     # Reset
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     #  Now we test the reverse setup where we set the AppriseAsset
@@ -108,32 +106,30 @@ def test_apprise_interpret_escapes(mock_post):
     assert a.notify("ab\\ncd") is True
 
     # Test our call count
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
 
     # content IS escaped
-    assert (
-        loads(mock_post.call_args_list[0][1]["data"]).get("message", "")
-        == "ab\ncd"
-    )
+    assert loads(details[1]["data"]).get("message", "") == "ab\ncd"
 
     # Reset
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     # Send notification and provide override:
     assert a.notify("ab\\ncd", interpret_escapes=False) is True
 
     # Test our call count
-    assert mock_post.call_count == 1
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
 
     # content is NOT escaped
-    assert (
-        loads(mock_post.call_args_list[0][1]["data"]).get("message", "")
-        == "ab\\ncd"
-    )
+    assert loads(details[1]["data"]).get("message", "") == "ab\\ncd"
 
 
-@mock.patch("requests.post")
-def test_apprise_escaping(mock_post):
+@mock.patch("requests.request")
+def test_apprise_escaping(mock_request):
     """
     API: Apprise() escaping tests
 
@@ -143,7 +139,7 @@ def test_apprise_escaping(mock_post):
     response = mock.Mock()
     response.content = ""
     response.status_code = requests.codes.ok
-    mock_post.return_value = response
+    mock_request.return_value = response
 
     # Create ourselves a test object to work with
     a.add("json://localhost")
@@ -156,13 +152,15 @@ def test_apprise_escaping(mock_post):
     )
 
     # Verify our content was escaped correctly
-    assert mock_post.call_count == 1
-    result = loads(mock_post.call_args_list[0][1]["data"])
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
+    result = loads(details[1]["data"])
     assert result["title"] == "title"
     assert result["message"] == "\r\nbody"
 
     # Reset our mock object
-    mock_post.reset_mock()
+    mock_request.reset_mock()
 
     #
     # Support Specially encoded content:
@@ -179,8 +177,10 @@ def test_apprise_escaping(mock_post):
     )
 
     # Verify our content was escaped correctly
-    assert mock_post.call_count == 1
-    result = loads(mock_post.call_args_list[0][1]["data"])
+    assert mock_request.call_count == 1
+    details = mock_request.call_args_list[0]
+    assert details[0][0] == "POST"
+    result = loads(details[1]["data"])
     assert result["title"] == "دعونا نجعل العالم مكانا أفضل."
     assert result["message"] == "Egy sor kódot egyszerre."
 

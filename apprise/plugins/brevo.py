@@ -136,6 +136,11 @@ class NotifyBrevo(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "reply": {
+                "name": _("Reply To Email"),
+                "type": "string",
+                "map_to": "reply_to",
+            },
             "to": {
                 "alias_of": "targets",
             },
@@ -146,11 +151,6 @@ class NotifyBrevo(NotifyBase):
             "bcc": {
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
-            },
-            "reply": {
-                "name": _("Reply To Email"),
-                "type": "string",
-                "map_to": "reply_to",
             },
         },
     )

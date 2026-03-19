@@ -155,6 +155,12 @@ class NotifyOffice365(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "oauth_id": {
+                "alias_of": "client_id",
+            },
+            "oauth_secret": {
+                "alias_of": "secret",
+            },
             "to": {
                 "alias_of": "targets",
             },
@@ -165,12 +171,6 @@ class NotifyOffice365(NotifyBase):
             "bcc": {
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
-            },
-            "oauth_id": {
-                "alias_of": "client_id",
-            },
-            "oauth_secret": {
-                "alias_of": "secret",
             },
         },
     )
