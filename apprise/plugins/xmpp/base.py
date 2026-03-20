@@ -50,7 +50,7 @@ from .common import SECURE_MODES, SecureXMPPMode
 # This does not try to fully implement RFC 7622. The goal is to catch bad
 # inputs early and reliably while still supporting common JID patterns.
 IS_JID = re.compile(
-    r"^\s*(?P<local>[^@\s/]+)((@|%40)"
+    r"^\s*(?P<is_room>#|%23)?(?P<local>[^@\s/]+)((@|%40)"
     r"(?P<domain>[^@\s/]+))?(?:(/|%2F)(?P<resource>[^%/\s]+)"
     r"((/|%2F).*)?)?\s*$"
 )
@@ -114,6 +114,17 @@ class NotifyXMPP(NotifyBase):
                 "private": True,
                 "required": True,
             },
+            "target_user": {
+                "name": _("Target User"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "target_channels": {
+                "name": _("Target Channel"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
@@ -152,7 +163,7 @@ class NotifyXMPP(NotifyBase):
 
     def __init__(
         self,
-        targets: Optional[list[str]] = None,
+        targets: Optional[list[(str, str)]] = None,
         secure_mode: Optional[str] = None,
         roster: Optional[bool] = None,
         subject: Optional[bool] = None,
@@ -162,23 +173,29 @@ class NotifyXMPP(NotifyBase):
         super().__init__(**kwargs)
 
         try:
-            self.jid = self.normalize_jid(self.user or "", self.host)
+            self.jid, _ = self.normalize_jid(self.user or "", self.host)
 
         except ValueError:
             msg = f"An invalid XMPP JID ({self.user}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg) from None
 
-        self.targets: list[str] = []
+        self.targets: list[(str, str)] = []
+        # Flag for tracking if we want Multi-User Chat function enabled
+        self.want_muc = False
+
         for target in parse_list(targets):
             try:
-                jid = self.normalize_jid(target or "", self.host)
+                jid, is_muc = self.normalize_jid(target or "", self.host)
+                mtype = "groupchat" if is_muc else "chat"
+                if is_muc:
+                    self.want_muc = True
 
             except ValueError:
                 self.logger.warning(
                     "Dropped invalid XMPP target (%s).", target)
                 continue
-            self.targets.append(jid)
+            self.targets.append((mtype, jid))
 
         if isinstance(secure_mode, str) and secure_mode.strip():
             self.secure_mode = secure_mode.strip().lower()
@@ -286,7 +303,10 @@ class NotifyXMPP(NotifyBase):
 
         # Targets can contain '/' as a resource separator, so ensure it is
         # always percent-encoded in the path (otherwise Apprise will split it).
-        targets = "/".join(self.quote(t, safe="") for t in self.targets)
+        # Use %23 for the MUC '#' prefix so it is not misread as a fragment.
+        targets = "/".join(
+            ("%23" if mode == "groupchat" else "") + self.quote(jid, safe="")
+            for (mode, jid) in self.targets)
 
         return "{schema}://{auth}{host}{port}/{targets}?{params}".format(
             schema=schema,
@@ -352,6 +372,7 @@ class NotifyXMPP(NotifyBase):
             "timeout": self.socket_connect_timeout,
             "roster": self.roster,
             "keepalive": self.keepalive,
+            "want_muc": self.want_muc,
         }
         if not self.keepalive:
             # One-shot mode: Create, process, and discard
@@ -370,9 +391,8 @@ class NotifyXMPP(NotifyBase):
 
         return 0 if not self.subject else super().title_maxlen
 
-        # We don't support titles for SMSEagle notifications
     @staticmethod
-    def normalize_jid(value: str, default_host: str) -> str:
+    def normalize_jid(value: str, default_host: str) -> tuple[str, bool]:
         """Normalize and validate a JID.
 
         Behaviour:
@@ -386,21 +406,18 @@ class NotifyXMPP(NotifyBase):
            optional '/resource' suffix.
         """
         raw = (value or "").strip()
-        if not raw:
-            raise ValueError("Empty JID")
-
         results = IS_JID.match(raw)
         if not results:
             raise ValueError("Invalid JID")
 
-        host = default_host \
-            if not results.group("domain") else results.group("domain")
+        is_muc = bool(results.group("is_room"))
+        host = results.group("domain") or default_host
 
         jid = f"{results.group('local')}@{host}"
         if results.group("resource"):
             jid = f"{jid}/{results.group('resource')}"
 
-        return jid
+        return jid, is_muc
 
     @staticmethod
     def parse_url(url: str) -> Optional[dict[str, Any]]:

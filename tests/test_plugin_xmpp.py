@@ -278,10 +278,10 @@ def test_xmpp_targets_filtered() -> None:
     # Empty values are dropped before they reach the validation loop, so no
     # warning is guaranteed for the empty string.
     assert sorted(n.targets) == [
-        "also@example.net",
-        "ok@example.com",
-        "user1@example.com",
-        "user2@example.com",
+        ("chat", "also@example.net"),
+        ("chat", "ok@example.com"),
+        ("chat", "user1@example.com"),
+        ("chat", "user2@example.com"),
     ]
 
 
@@ -357,7 +357,7 @@ def test_xmpp_invalid_targets_logged(
         targets=["ignored"],
     )
 
-    assert n.targets == ["ok@example.com"]
+    assert n.targets == [("chat", "ok@example.com")]
     assert "Dropped invalid XMPP target" in caplog.text
 
 
@@ -498,7 +498,7 @@ def test_xmpp_apprise_notify_invokes_adapter(
 
     assert apobj.notify(
         "hello", title="subject", notify_type=NotifyType.INFO) is True
-    assert captured["targets"] == ["a@example.com"]
+    assert captured["targets"] == [("chat", "a@example.com")]
     assert captured["subject"] == ""
     assert "subject\r\nhello" in captured["body"]
 
@@ -507,7 +507,7 @@ def test_xmpp_apprise_notify_invokes_adapter(
 
     assert apobj.notify(
         "hello", title="subject", notify_type=NotifyType.INFO) is True
-    assert captured["targets"] == ["a@example.com"]
+    assert captured["targets"] == [("chat", "a@example.com")]
     assert captured["subject"] == "subject"
     assert "hello" in captured["body"]
 
@@ -615,7 +615,7 @@ def test_xmpp_process_fail(
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=1,
@@ -637,7 +637,7 @@ def test_xmpp_process_success(monkeypatch: pytest.MonkeyPatch) -> None:
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=1.0,
@@ -647,7 +647,7 @@ def test_xmpp_process_success(monkeypatch: pytest.MonkeyPatch) -> None:
     # Test with roster=True
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=1.0,
@@ -700,7 +700,7 @@ def test_xmpp_process_exception(
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=1,
@@ -728,7 +728,7 @@ def test_xmpp_process_before_message(monkeypatch: pytest.MonkeyPatch) -> None:
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com", "b@example.com"],
+        targets=[("chat", "a@example.com"), ("chat", "b@example.com")],
         subject="s",
         body="b",
         timeout=1,
@@ -784,7 +784,7 @@ def test_xmpp_process_failed_auth_disconnect(
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=1,
@@ -796,13 +796,18 @@ def test_xmpp_process_failed_auth_disconnect(
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_normalize_jid() -> None:
     """Tests normalize_jid()"""
-    assert NotifyXMPP.normalize_jid("user", "example.ca") == "user@example.ca"
     assert NotifyXMPP.normalize_jid(
-        "user/resource", "example.ca") == "user@example.ca/resource"
+        "user", "example.ca") == ("user@example.ca", False)
     assert NotifyXMPP.normalize_jid(
-        "user/resource/extra/crap", "example.ca") == "user@example.ca/resource"
+        "user/resource", "example.ca") == ("user@example.ca/resource", False)
     assert NotifyXMPP.normalize_jid(
-        "user@example.com/r1", "example.ca") == "user@example.com/r1"
+        "user/resource/extra/crap", "example.ca") == (
+            "user@example.ca/resource", False)
+    assert NotifyXMPP.normalize_jid(
+        "user@example.com/r1", "example.ca") == ("user@example.com/r1", False)
+    assert NotifyXMPP.normalize_jid(
+        "#room@conference.example.ca", "example.ca") == (
+            "room@conference.example.ca", True)
 
     with pytest.raises(ValueError):
         # Bad entry
@@ -906,7 +911,7 @@ def test_xmpp_process_failure_cleanup(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -999,7 +1004,7 @@ def test_xmpp_timeout_cleanup_disconnect_exception_suppressed(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -1082,7 +1087,7 @@ def test_xmpp_timeout_cleanup_no_client_stop_exception_suppressed(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -1168,7 +1173,7 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -1207,7 +1212,7 @@ def test_xmpp_process_unsupported_secure_mode(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -1262,7 +1267,7 @@ def test_xmpp_process_connect_timeout(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -1328,7 +1333,7 @@ def test_xmpp_process_session_timeout(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -1466,7 +1471,7 @@ def test_adapter_send_message_keepalive_false_calls_process(
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -2761,7 +2766,7 @@ def test_client_session_start_oneshot_sends_and_disconnects(
             jid="user@example.com",
             password="pass",
             oneshot=True,
-            targets=["a", "b"],
+            targets=[("chat", "a@example.com"), ("chat", "b@example.com")],
             subject="sub",
             body="body",
             before_message=_before,
@@ -3294,7 +3299,7 @@ def test_adapter_send_message_keepalive_false_none_params_does_not_override(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["orig@example.com"],
+        targets=[("chat", "orig@example.com")],
         subject="orig-subj",
         body="orig-body",
         keepalive=False,
@@ -3310,7 +3315,7 @@ def test_adapter_send_message_keepalive_false_none_params_does_not_override(
 
     assert a.send_message() is True
     assert called["process"] == 1
-    assert a.targets == ["orig@example.com"]
+    assert a.targets == [("chat", "orig@example.com")]
     assert a.subject == "orig-subj"
     assert a.body == "orig-body"
 
@@ -3332,7 +3337,7 @@ def test_adapter_send_message_keepalive_worker_failure_returns_false(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         keepalive=True,
@@ -3364,7 +3369,7 @@ def test_adapter_send_message_keepalive_timeout_with_no_session_started_event(
 
     a = xmpp_adapter.SlixmppAdapter(
         config=config,
-        targets=["a@example.com"],
+        targets=[("chat", "a@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -3565,7 +3570,7 @@ def test_adapter_send_message_keepalive_loop_none_returns_false(
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=cfg,
-        targets=["t@example.com"],
+        targets=[("chat", "t@example.com")],
         subject="s",
         body="b",
         keepalive=True,
@@ -3595,7 +3600,7 @@ def test_adapter_send_message_keepalive_exception_returns_false(
     )
     a = xmpp_adapter.SlixmppAdapter(
         config=cfg,
-        targets=["t@example.com"],
+        targets=[("chat", "t@example.com")],
         subject="s",
         body="b",
         timeout=5.0,
@@ -4068,3 +4073,344 @@ def test_client_on_session_start_done_callback_logs_exception(
             asyncio.set_event_loop(None)
         with contextlib.suppress(Exception):
             loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_muc_url_parsing_and_reconstruction() -> None:
+    """MUC targets parse from '#room@conf.host' and round-trip via url()."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="me",
+        password="secret",
+        targets=["#room@conference.example.com", "user@example.com"],
+    )
+    # MUC target becomes groupchat, regular becomes chat
+    assert ("groupchat", "room@conference.example.com") in n.targets
+    assert ("chat", "user@example.com") in n.targets
+    assert n.want_muc is True
+
+    # url() encodes MUC '#' as %23 to avoid URL fragment misparse
+    u = n.url()
+    assert "%23room%40conference.example.com" in u
+    # Verify round-trip: parse_url -> NotifyXMPP reconstructs same targets
+    results = NotifyXMPP.parse_url(u)
+    assert results is not None
+    n2 = NotifyXMPP(**results)
+    assert ("groupchat", "room@conference.example.com") in n2.targets
+    assert ("chat", "user@example.com") in n2.targets
+    assert n2.want_muc is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_muc_only_no_regular_targets() -> None:
+    """NotifyXMPP with only MUC targets sets want_muc=True."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="me",
+        password="secret",
+        targets=["#general@conference.example.com"],
+    )
+    assert n.want_muc is True
+    assert len(n.targets) == 1
+    assert n.targets[0] == ("groupchat", "general@conference.example.com")
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_client_session_start_oneshot_muc_join(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover join_muc() in _session_start() for oneshot groupchat target."""
+    install_fake_slixmpp(monkeypatch)
+
+    client_cls = xmpp_adapter._get_client_subclass(FakeClientXMPP)
+
+    sent: list[dict[str, Any]] = []
+    join_calls: list[tuple[str, str]] = []
+
+    async def fake_join_muc(room: str, nick: str) -> None:
+        join_calls.append((room, nick))
+
+    class FakeMucPlugin:
+        def join_muc(self, room: str, nick: str) -> Any:
+            return fake_join_muc(room, nick)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        client = client_cls(
+            jid="me@example.com",
+            password="pass",
+            oneshot=True,
+            targets=[("groupchat", "room@conference.example.com")],
+            subject="s",
+            body="b",
+            want_muc=True,
+            want_roster=False,
+            roster_timeout=0.0,
+            session_started_evt=None,
+        )
+
+        # Inject fake xep_0045 plugin and boundjid (not on FakeClientXMPP)
+        class _BoundJID:
+            user = "me"
+
+        monkeypatch.setattr(client, "boundjid", _BoundJID(), raising=False)
+        monkeypatch.setattr(
+            client, "plugin", {"xep_0045": FakeMucPlugin()}, raising=False
+        )
+        monkeypatch.setattr(
+            client, "send_message", lambda **kw: sent.append(kw), raising=True
+        )
+        monkeypatch.setattr(
+            client, "disconnect", lambda: None, raising=True
+        )
+
+        loop.run_until_complete(client._session_start())
+
+        assert len(join_calls) == 1
+        assert join_calls[0][0] == "room@conference.example.com"
+        assert join_calls[0][1] == "me"
+        assert len(sent) == 1
+        assert sent[0]["mtype"] == "groupchat"
+
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_client_session_start_oneshot_muc_join_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover join_muc() error path: exception is caught, send still happens."""
+    install_fake_slixmpp(monkeypatch)
+
+    client_cls = xmpp_adapter._get_client_subclass(FakeClientXMPP)
+
+    sent: list[dict[str, Any]] = []
+
+    async def join_muc_fail(room: str, nick: str) -> None:
+        raise asyncio.TimeoutError()  # simulate timeout
+
+    class FakeMucPlugin:
+        def join_muc(self, room: str, nick: str) -> Any:
+            return join_muc_fail(room, nick)
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    try:
+        client = client_cls(
+            jid="me@example.com",
+            password="pass",
+            oneshot=True,
+            targets=[("groupchat", "room@conference.example.com")],
+            subject="s",
+            body="b",
+            want_muc=True,
+            want_roster=False,
+            roster_timeout=0.0,
+            session_started_evt=None,
+        )
+
+        class _BoundJID:
+            user = "me"
+
+        monkeypatch.setattr(client, "boundjid", _BoundJID(), raising=False)
+        monkeypatch.setattr(
+            client, "plugin", {"xep_0045": FakeMucPlugin()}, raising=False
+        )
+        monkeypatch.setattr(
+            client, "send_message", lambda **kw: sent.append(kw), raising=True
+        )
+        monkeypatch.setattr(client, "disconnect", lambda: None, raising=True)
+
+        loop.run_until_complete(client._session_start())
+
+        # Message is still sent even when MUC join errors
+        assert len(sent) == 1
+        assert sent[0]["mtype"] == "groupchat"
+
+    finally:
+        asyncio.set_event_loop(None)
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_send_keepalive_async_muc_join(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover join_muc() in _send_keepalive_async() for groupchat target."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("groupchat", "room@conference.example.com")],
+        subject="s",
+        body="b",
+        keepalive=True,
+        want_muc=True,
+    )
+
+    join_calls: list[tuple[str, str]] = []
+    sent: list[dict[str, Any]] = []
+
+    async def fake_join_muc(room: str, nick: str) -> None:
+        join_calls.append((room, nick))
+
+    class FakeBoundJID:
+        user = "me"
+
+    class FakeMucPlugin:
+        def join_muc(self, room: str, nick: str) -> Any:
+            return fake_join_muc(room, nick)
+
+    class _Client:
+        _auth_failed = False
+        boundjid = FakeBoundJID()
+        plugin = {"xep_0045": FakeMucPlugin()}
+
+        def send_message(self, **kwargs: Any) -> None:
+            sent.append(kwargs)
+
+    a._client = _Client()
+
+    async def ok_connect() -> bool:
+        return True
+
+    monkeypatch.setattr(a, "_connect_if_required", ok_connect, raising=True)
+
+    result = asyncio.run(
+        a._send_keepalive_async(
+            targets=[("groupchat", "room@conference.example.com")],
+            subject="s",
+            body="b",
+        )
+    )
+
+    assert result is True
+    assert len(join_calls) == 1
+    assert join_calls[0][0] == "room@conference.example.com"
+    assert len(sent) == 1
+    assert sent[0]["mtype"] == "groupchat"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_adapter_keepalive_runner_registers_xep_0045_when_want_muc(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover _keepalive_runner(): register_plugin('xep_0045') for want_muc."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("groupchat", "room@conference.example.com")],
+        subject="s",
+        body="b",
+        keepalive=True,
+        want_muc=True,
+    )
+
+    registered: list[str] = []
+    real_new_event_loop = xmpp_adapter.asyncio.new_event_loop
+
+    def new_event_loop_wrapped() -> asyncio.AbstractEventLoop:
+        loop = real_new_event_loop()
+
+        def run_forever_hook() -> None:
+            client = a._client
+            assert client is not None
+            # Capture what was registered and then stop
+            registered.extend(client.registered_plugins.keys())
+
+        monkeypatch.setattr(
+            loop, "run_forever", run_forever_hook, raising=True)
+        return loop
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio, "new_event_loop", new_event_loop_wrapped,
+        raising=True)
+
+    a._keepalive_runner()
+
+    assert "xep_0045" in registered
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_send_keepalive_async_muc_join_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Cover join_muc() exception path in _send_keepalive_async()."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("groupchat", "room@conference.example.com")],
+        subject="s",
+        body="b",
+        keepalive=True,
+        want_muc=True,
+    )
+
+    sent: list[dict[str, Any]] = []
+
+    async def join_muc_fail(room: str, nick: str) -> None:
+        raise asyncio.TimeoutError()  # simulate timeout → exception path
+
+    class FakeBoundJID:
+        user = "me"
+
+    class FakeMucPlugin:
+        def join_muc(self, room: str, nick: str) -> Any:
+            return join_muc_fail(room, nick)
+
+    class _Client:
+        _auth_failed = False
+        boundjid = FakeBoundJID()
+        plugin = {"xep_0045": FakeMucPlugin()}
+
+        def send_message(self, **kwargs: Any) -> None:
+            sent.append(kwargs)
+
+    a._client = _Client()
+
+    async def ok_connect() -> bool:
+        return True
+
+    monkeypatch.setattr(a, "_connect_if_required", ok_connect, raising=True)
+
+    result = asyncio.run(
+        a._send_keepalive_async(
+            targets=[("groupchat", "room@conference.example.com")],
+            subject="s",
+            body="b",
+        )
+    )
+
+    # Exception from join_muc is caught; message is still sent
+    assert result is True
+    assert len(sent) == 1
+    assert sent[0]["mtype"] == "groupchat"

@@ -157,10 +157,12 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             password: str,
             *,
             oneshot: bool,
-            targets: Optional[list[str]] = None,
+            targets: Optional[list[(str, str)]] = None,
             subject: str = "",
             body: str = "",
             before_message: Optional[Callable[[], None]] = None,
+            # Multi-User Chat
+            want_muc: bool = False,
             want_roster: bool = False,
             roster_timeout: float = 0.0,
             session_started_evt: Optional[asyncio.Event] = None,
@@ -180,6 +182,12 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             # Roster behaviour (both modes)
             self._want_roster = bool(want_roster)
             self._roster_timeout = float(roster_timeout)
+
+            # Multi-User Chat
+            self._want_muc = bool(want_muc)
+            if self._want_muc:
+                with contextlib.suppress(Exception):
+                    self.register_plugin("xep_0045")
 
             # Keepalive coordination (keepalive mode only)
             self._session_started_evt = session_started_evt
@@ -214,15 +222,25 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
                 # One-shot mode sends messages immediately on session_start and
                 # then disconnects. Keepalive mode just signals readiness.
                 if self._oneshot:
-                    for target in self._targets:
+                    for (mtype, target) in self._targets:
                         if self._before_message:
                             self._before_message()
+
+                        if mtype == "groupchat":
+                            nick = self.boundjid.user
+                            muc_coro = self.plugin["xep_0045"].join_muc(
+                                target, nick)
+                            try:
+                                await asyncio.wait_for(
+                                    muc_coro, timeout=5.0)
+                            except Exception:
+                                _close_awaitable(muc_coro)
 
                         self.send_message(
                             mto=target,
                             msubject=self._subject,
                             mbody=self._body,
-                            mtype="chat",
+                            mtype=mtype,
                         )
 
             finally:
@@ -317,13 +335,14 @@ class SlixmppAdapter:
     def __init__(
         self,
         config: XMPPConfig,
-        targets: list[str],
+        targets: list[(str, str)],
         subject: str,
         body: str,
         timeout: float = 30.0,
         roster: bool = False,
         before_message: Optional[Callable[[], None]] = None,
         keepalive: bool = False,
+        want_muc: bool = False,
     ) -> None:
         self.config, self.targets, self.subject, self.body = \
             config, targets, subject, body
@@ -331,6 +350,7 @@ class SlixmppAdapter:
         self.timeout = max(5.0, float(timeout))
         self.roster, self.before_message, self.keepalive = \
             roster, before_message, keepalive
+        self._want_muc = want_muc
 
         global LOGGING_ID
         self.logger = logging.getLogger(LOGGING_ID)
@@ -482,7 +502,8 @@ class SlixmppAdapter:
                 shared["loop"] = loop
 
                 targets = (
-                    list(self.targets) if self.targets else [self.config.jid])
+                    list(self.targets) if self.targets
+                    else [("chat", self.config.jid)])
 
                 roster_timeout = (
                     max(2.0, min(10.0, self.timeout / 3.0))
@@ -497,6 +518,7 @@ class SlixmppAdapter:
                     subject=self.subject,
                     body=self.body,
                     before_message=self.before_message,
+                    want_muc=self._want_muc,
                     want_roster=self.roster,
                     roster_timeout=roster_timeout,
                     session_started_evt=None,
@@ -678,6 +700,7 @@ class SlixmppAdapter:
                 jid=self.config.jid,
                 password=self.config.password,
                 oneshot=False,
+                want_muc=self._want_muc,
                 want_roster=self.roster,
                 roster_timeout=roster_timeout,
                 session_started_evt=session_started,
@@ -704,6 +727,11 @@ class SlixmppAdapter:
             # keepalive=yes implies enabling XEP-0199 keepalive pings
             with contextlib.suppress(Exception):
                 client.register_plugin("xep_0199", {"keepalive": True})
+
+            if self._want_muc:
+                # Multi-User Chat
+                with contextlib.suppress(Exception):
+                    client.register_plugin("xep_0045")
 
             with self._state_lock:
                 if self._closing:
@@ -804,7 +832,7 @@ class SlixmppAdapter:
 
     async def _send_keepalive_async(
         self,
-        targets: list[str],
+        targets: list[(str, str)],
         subject: str,
         body: str,
     ) -> bool:
@@ -819,15 +847,25 @@ class SlixmppAdapter:
         if bool(getattr(self._client, "_auth_failed", False)):
             return False
 
-        send_targets = targets if targets else [self.config.jid]
+        send_targets = targets if targets else [("chat", self.config.jid)]
 
         try:
-            for target in send_targets:
+            for (mtype, target) in send_targets:
+                if mtype == "groupchat":
+                    nick = self._client.boundjid.user
+                    muc_coro = self._client.plugin["xep_0045"].join_muc(
+                        target, nick)
+                    try:
+                        await asyncio.wait_for(
+                            muc_coro, timeout=5.0)
+                    except Exception:
+                        _close_awaitable(muc_coro)
+
                 self._client.send_message(
                     mto=target,
                     msubject=subject,
                     mbody=body,
-                    mtype="chat",
+                    mtype=mtype,
                 )
             return True
 
@@ -839,7 +877,7 @@ class SlixmppAdapter:
 
     def send_message(
         self,
-        targets: Optional[list[str]] = None,
+        targets: Optional[list[(str, str)]] = None,
         subject: Optional[str] = None,
         body: Optional[str] = None,
     ) -> bool:
