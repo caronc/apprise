@@ -1208,9 +1208,10 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     del obj
 
 
+@mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_matrix_discovery_service(mock_post, mock_get):
+def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     """NotifyMatrix() Discovery Service."""
 
     # Prepare a good response
@@ -1226,6 +1227,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     # Prepare Mock return object
     mock_post.return_value = response
     mock_get.return_value = response
+    mock_put.return_value = response
 
     # Instantiate our object
     obj = Apprise.instantiate(
@@ -1410,9 +1412,10 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     del obj
 
 
+@mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
+def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     """NotifyMatrix() Attachment Checks (v2)"""
 
     # Prepare a good response
@@ -1427,6 +1430,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Prepare Mock return object
     mock_post.return_value = response
     mock_get.return_value = response
+    mock_put.return_value = response
 
     # Instantiate our object
     obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=2")
@@ -1461,6 +1465,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Reset our object
     mock_post.reset_mock()
     mock_get.reset_mock()
+    mock_put.reset_mock()
 
     assert (
         obj.notify(
@@ -1472,8 +1477,8 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         is True
     )
 
-    # Test our call count
-    assert mock_post.call_count == 5
+    # Test our call count — login, upload, join use POST; sends use PUT
+    assert mock_post.call_count == 3
     assert (
         mock_post.call_args_list[0][0][0]
         == "https://matrix.example.com/_matrix/client/r0/login"
@@ -1487,15 +1492,16 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         == "https://matrix.example.com/_matrix/client/r0/"
         "join/%23general%3Alocalhost"
     )
+    assert mock_put.call_count == 2
     assert (
-        mock_post.call_args_list[3][0][0]
+        mock_put.call_args_list[0][0][0]
         == "https://matrix.example.com/_matrix/client/r0"
-        "/rooms/%21abc123%3Alocalhost/send/m.room.message"
+        "/rooms/%21abc123%3Alocalhost/send/m.room.message/0"
     )
     assert (
-        mock_post.call_args_list[4][0][0]
+        mock_put.call_args_list[1][0][0]
         == "https://matrix.example.com/_matrix/client/r0/"
-        "rooms/%21abc123%3Alocalhost/send/m.room.message"
+        "rooms/%21abc123%3Alocalhost/send/m.room.message/1"
     )
 
     # Attach an unsupported file type; these are skipped
@@ -1542,35 +1548,23 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 
         assert obj.send(body="test", attach=attach) is False
 
-    # Throw an exception on the second call to requests.post()
+    # Throw an exception on the attachment send (now uses PUT)
     for side_effect in (requests.RequestException(), OSError(), bad_response):
         # Reset our value
         mock_post.reset_mock()
         mock_get.reset_mock()
+        mock_put.reset_mock()
 
-        mock_post.side_effect = [response, side_effect, side_effect, response]
-        mock_get.side_effect = [side_effect, side_effect, response]
+        mock_post.side_effect = [response]  # upload ok
+        mock_put.side_effect = [side_effect, side_effect]  # sends fail
 
         # We'll fail now because of our error handling
         assert obj.send(body="test", attach=attach) is False
 
-    # handle a bad response
-    mock_post.side_effect = [
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
-    mock_get.side_effect = [
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
+    # handle a bad response on the attachment send (now PUT)
+    mock_post.side_effect = [response]  # upload ok
+    mock_put.side_effect = [bad_response, response]  # attachment fails
+    mock_get.side_effect = None
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False
@@ -1586,27 +1580,12 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Reset our object
     mock_post.reset_mock()
     mock_get.reset_mock()
+    mock_put.reset_mock()
 
-    mock_post.return_value = None
-    mock_get.return_value = None
-    mock_post.side_effect = [
-        response,
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
-    mock_get.side_effect = [
-        response,
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
+    # login + join succeed; image inline send (now PUT) fails
+    mock_post.side_effect = [response, response]
+    mock_get.side_effect = None
+    mock_put.side_effect = [bad_response]
 
     # image attachment didn't succeed
     assert (
@@ -1614,11 +1593,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         is False
     )
 
-    # Error during image post
+    # All calls now succeed
     mock_post.return_value = response
     mock_get.return_value = response
+    mock_put.return_value = response
     mock_post.side_effect = None
     mock_get.side_effect = None
+    mock_put.side_effect = None
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is True

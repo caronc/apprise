@@ -707,9 +707,6 @@ class NotifyMatrix(NotifyBase):
             # Get our room
             room = rooms.pop(0)
 
-            # Set method according to MatrixVersion
-            method = "PUT" if self.version == MatrixVersion.V3 else "POST"
-
             # Get our room_id from our response
             room_id = self._room_join(room)
             if not room_id:
@@ -725,15 +722,9 @@ class NotifyMatrix(NotifyBase):
                 None if not self.include_image else self.image_url(notify_type)
             )
 
-            # Build our path
-            if self.version == MatrixVersion.V3:
-                path = f"/rooms/{NotifyMatrix.quote(room_id)}" \
-                    f"/send/m.room.message/{self.transaction_id}"
-
-            else:
-                path = (
-                    f"/rooms/{NotifyMatrix.quote(room_id)}/send/m.room.message"
-                )
+            # Always use PUT with a transaction ID (spec-compliant since 2015)
+            path = "/rooms/{}/send/m.room.message/{}".format(
+                NotifyMatrix.quote(room_id), self.transaction_id)
 
             if image_url and self.version == MatrixVersion.V2:
                 # Define our payload
@@ -745,11 +736,21 @@ class NotifyMatrix(NotifyBase):
 
                 # Post our content
                 postokay, _, _ = self._fetch(
-                    path, payload=image_payload)
+                    path, payload=image_payload, method="PUT")
                 if not postokay:
                     # Mark our failure
                     has_error = True
                     continue
+
+                # Increment transaction ID so subsequent sends
+                # don't reuse the same path
+                if self.access_token != self.password:
+                    self.transaction_id += 1
+                    self.store.set(
+                        "transaction_id", self.transaction_id,
+                        expires=self.default_cache_expiry_sec)
+                    path = "/rooms/{}/send/m.room.message/{}".format(
+                        NotifyMatrix.quote(room_id), self.transaction_id)
 
             if attachments:
                 for attachment in attachments:
@@ -757,12 +758,11 @@ class NotifyMatrix(NotifyBase):
                     attachment["type"] = "m.room.message"
 
                     postokay, _, _ = self._fetch(
-                        path, payload=attachment, method=method)
+                        path, payload=attachment, method="PUT")
 
                     # Increment the transaction ID to avoid future messages
                     # being recognized as retransmissions and ignored
-                    if self.version == MatrixVersion.V3 \
-                       and self.access_token != self.password:
+                    if self.access_token != self.password:
                         self.transaction_id += 1
                         self.store.set(
                             "transaction_id", self.transaction_id,
@@ -817,15 +817,12 @@ class NotifyMatrix(NotifyBase):
 
             # Post our content
             postokay, _, _ = self._fetch(
-                path, payload=payload, method=method
+                path, payload=payload, method="PUT"
             )
 
             # Increment the transaction ID to avoid future messages being
             # recognized as retransmissions and ignored
-            if (
-                self.version == MatrixVersion.V3
-                and self.access_token != self.password
-            ):
+            if self.access_token != self.password:
                 self.transaction_id += 1
                 self.store.set(
                     "transaction_id",
