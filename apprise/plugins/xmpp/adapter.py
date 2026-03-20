@@ -163,6 +163,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             before_message: Optional[Callable[[], None]] = None,
             # Multi-User Chat
             want_muc: bool = False,
+            nick: str = "",
             want_roster: bool = False,
             roster_timeout: float = 0.0,
             session_started_evt: Optional[asyncio.Event] = None,
@@ -185,6 +186,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
 
             # Multi-User Chat
             self._want_muc = bool(want_muc)
+            self._nick = nick
             if self._want_muc:
                 with contextlib.suppress(Exception):
                     self.register_plugin("xep_0045")
@@ -227,9 +229,11 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
                             self._before_message()
 
                         if mtype == "groupchat":
-                            nick = self.boundjid.user
+                            nick = self._nick \
+                                or getattr(self.boundjid, "user", "") \
+                                or "apprise"
                             muc_coro = self.plugin["xep_0045"].join_muc(
-                                target, nick)
+                                target, nick, wait=True)
                             try:
                                 await asyncio.wait_for(
                                     muc_coro, timeout=5.0)
@@ -343,6 +347,7 @@ class SlixmppAdapter:
         before_message: Optional[Callable[[], None]] = None,
         keepalive: bool = False,
         want_muc: bool = False,
+        default_nickname: Optional[str] = None,
     ) -> None:
         self.config, self.targets, self.subject, self.body = \
             config, targets, subject, body
@@ -354,6 +359,8 @@ class SlixmppAdapter:
 
         global LOGGING_ID
         self.logger = logging.getLogger(LOGGING_ID)
+
+        self.nickname = default_nickname or "apprise"
 
         bridge_slixmpp_logging()
 
@@ -519,6 +526,7 @@ class SlixmppAdapter:
                     body=self.body,
                     before_message=self.before_message,
                     want_muc=self._want_muc,
+                    nick=self.nickname,
                     want_roster=self.roster,
                     roster_timeout=roster_timeout,
                     session_started_evt=None,
@@ -852,9 +860,13 @@ class SlixmppAdapter:
         try:
             for (mtype, target) in send_targets:
                 if mtype == "groupchat":
-                    nick = self._client.boundjid.user
+                    nick = (
+                        getattr(
+                            self._client.boundjid, "user", "")
+                        or self.nickname
+                    )
                     muc_coro = self._client.plugin["xep_0045"].join_muc(
-                        target, nick)
+                        target, nick, wait=True)
                     try:
                         await asyncio.wait_for(
                             muc_coro, timeout=5.0)

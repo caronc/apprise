@@ -35,7 +35,7 @@ from typing import Any, Optional
 from ...common import NotifyType
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_bool, parse_list
+from ...utils.parse import parse_bool, parse_list, validate_regex
 from ..base import NotifyBase
 from .adapter import SLIXMPP_SUPPORT_AVAILABLE, SlixmppAdapter, XMPPConfig
 from .common import SECURE_MODES, SecureXMPPMode
@@ -158,6 +158,10 @@ class NotifyXMPP(NotifyBase):
                 "default": False,
             },
             "to": {"alias_of": "targets"},
+            "name": {
+                "name": _("MUC Nickname"),
+                "type": "string",
+            },
         },
     )
 
@@ -168,6 +172,7 @@ class NotifyXMPP(NotifyBase):
         roster: Optional[bool] = None,
         subject: Optional[bool] = None,
         keepalive: Optional[bool] = None,
+        name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -250,6 +255,12 @@ class NotifyXMPP(NotifyBase):
             )
             self.secure = True
 
+        # MUC nickname: alphanumeric + underscore; falls back to app_id
+        self.name = validate_regex(
+            name, r"^[a-zA-Z0-9_]+$") if name else None
+        if self.name is None:
+            self.name = self.app_id
+
         # Keepalive adapter (created lazily)
         self._adapter: Optional[SlixmppAdapter] = None
 
@@ -281,6 +292,10 @@ class NotifyXMPP(NotifyBase):
             "subject": "yes" if self.subject else "no",
             "keepalive": "yes" if self.keepalive else "no",
         }
+
+        # Only include name when it differs from the default (app_id)
+        if self.name != self.app_id:
+            params["name"] = self.name
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -373,6 +388,7 @@ class NotifyXMPP(NotifyBase):
             "roster": self.roster,
             "keepalive": self.keepalive,
             "want_muc": self.want_muc,
+            "default_nickname": self.name,
         }
         if not self.keepalive:
             # One-shot mode: Create, process, and discard
@@ -451,5 +467,9 @@ class NotifyXMPP(NotifyBase):
 
         if "keepalive" in results["qsd"] and len(results["qsd"]["keepalive"]):
             results["keepalive"] = parse_bool(results["qsd"]["keepalive"])
+
+        if "name" in results["qsd"] and len(results["qsd"]["name"]):
+            results["name"] = \
+                NotifyXMPP.unquote(results["qsd"]["name"])
 
         return results

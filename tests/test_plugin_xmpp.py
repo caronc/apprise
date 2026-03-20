@@ -4102,6 +4102,46 @@ def test_xmpp_muc_url_parsing_and_reconstruction() -> None:
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_name_parameter() -> None:
+    """name= is stored, emitted in url(), and round-trips via parse_url()."""
+    # Valid name: stored as-is and emitted in the URL
+    n = NotifyXMPP(
+        host="example.com",
+        user="me",
+        password="secret",
+        name="my_bot",
+    )
+    assert n.name == "my_bot"
+    u = n.url()
+    assert "name=my_bot" in u
+
+    # Round-trip through parse_url
+    results = NotifyXMPP.parse_url(u)
+    assert results is not None
+    assert results.get("name") == "my_bot"
+    n2 = NotifyXMPP(**results)
+    assert n2.name == "my_bot"
+
+    # Invalid name falls back to app_id (no TypeError raised)
+    n3 = NotifyXMPP(
+        host="example.com",
+        user="me",
+        password="secret",
+        name="bad name!",
+    )
+    assert n3.name == n3.app_id
+
+    # No name provided → defaults to app_id; not emitted in URL
+    n4 = NotifyXMPP(
+        host="example.com",
+        user="me",
+        password="secret",
+    )
+    assert n4.name == n4.app_id
+    assert "name=" not in n4.url()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_muc_only_no_regular_targets() -> None:
     """NotifyXMPP with only MUC targets sets want_muc=True."""
     n = NotifyXMPP(
@@ -4131,7 +4171,7 @@ def test_client_session_start_oneshot_muc_join(
         join_calls.append((room, nick))
 
     class FakeMucPlugin:
-        def join_muc(self, room: str, nick: str) -> Any:
+        def join_muc(self, room: str, nick: str, **kw: Any) -> Any:
             return fake_join_muc(room, nick)
 
     loop = asyncio.new_event_loop()
@@ -4193,7 +4233,7 @@ def test_client_session_start_oneshot_muc_join_error(
         raise asyncio.TimeoutError()  # simulate timeout
 
     class FakeMucPlugin:
-        def join_muc(self, room: str, nick: str) -> Any:
+        def join_muc(self, room: str, nick: str, **kw: Any) -> Any:
             return join_muc_fail(room, nick)
 
     loop = asyncio.new_event_loop()
@@ -4269,7 +4309,7 @@ def test_send_keepalive_async_muc_join(
         user = "me"
 
     class FakeMucPlugin:
-        def join_muc(self, room: str, nick: str) -> Any:
+        def join_muc(self, room: str, nick: str, **kw: Any) -> Any:
             return fake_join_muc(room, nick)
 
     class _Client:
@@ -4384,7 +4424,7 @@ def test_send_keepalive_async_muc_join_error(
         user = "me"
 
     class FakeMucPlugin:
-        def join_muc(self, room: str, nick: str) -> Any:
+        def join_muc(self, room: str, nick: str, **kw: Any) -> Any:
             return join_muc_fail(room, nick)
 
     class _Client:
