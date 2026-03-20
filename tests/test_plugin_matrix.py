@@ -1609,6 +1609,31 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 
 
 @mock.patch("requests.put")
+@mock.patch("requests.post")
+def test_plugin_matrix_v2_compliance(mock_post, mock_put):
+    """NotifyMatrix() Verify V2 uses PUT and Transaction ID for standard messages."""
+    # Setup compliant response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+    mock_put.return_value = response
+
+    # Instantiate as V2
+    obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=2")
+
+    # Send a standard notification
+    assert obj.notify(body="test message") is True
+
+    # Confirm the fix:
+    # 1. Path contains the transaction ID '0'
+    # 2. Method is PUT
+    assert mock_put.call_count == 1
+    assert "/_matrix/client/r0/rooms/" in mock_put.call_args_list[0][0][0]
+    assert "/send/m.room.message/0" in mock_put.call_args_list[0][0][0]
+
+
+@mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_matrix_transaction_ids_api_v3_no_cache(
