@@ -1636,6 +1636,44 @@ def test_plugin_matrix_v2_compliance(mock_post, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+def test_plugin_matrix_v2_token_mode_no_txn_increment(
+    mock_post, mock_get, mock_put
+):
+    """Token mode (access_token == password) skips transaction ID increment."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_put.return_value = response
+
+    # Token mode: user omitted, password treated as access token
+    # (parse_url swaps user→password when no password supplied)
+    obj = Apprise.instantiate(
+        "matrixs://my_access_token@localhost/#general?v=2&image=y"
+    )
+    assert obj is not None
+
+    # Send with image inline enabled (exercises line 747→755 branch)
+    assert obj.notify(body="token mode image test") is True
+
+    # Send with an attachment (exercises line 765→775 branch)
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.send(body="token mode attach test", attach=attach) is True
+
+
+def test_plugin_matrix_parse_native_url_no_match():
+    """parse_native_url returns None for non-t2bot URLs."""
+    assert NotifyMatrix.parse_native_url(
+        "https://not-a-t2bot-url.com/some/path"
+    ) is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_matrix_transaction_ids_api_v3_no_cache(
     mock_post, mock_get, mock_put
 ):
