@@ -1611,7 +1611,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.post")
 def test_plugin_matrix_v2_compliance(mock_post, mock_put):
-    """NotifyMatrix() Verify V2 uses PUT and Transaction ID for standard messages."""
+    """NotifyMatrix() Verify V2 uses PUT and TID for standard messages."""
     # Setup compliant response
     response = mock.Mock()
     response.status_code = requests.codes.ok
