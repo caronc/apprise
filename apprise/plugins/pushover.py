@@ -510,8 +510,9 @@ class NotifyPushover(NotifyBase):
                     "attachment": (
                         attach.name,
                         # file handle is safely closed in `finally`; inline
-                        # open is intentional
-                        open(attach.path, "rb"),  # noqa: SIM115
+                        # open is intentional; attach.open() dispatches to
+                        # BytesIO for memory attachments
+                        attach.open(),
                     )}
 
             r = requests.post(

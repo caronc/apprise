@@ -634,8 +634,9 @@ class NotifyFluxer(NotifyBase):
                     "files[0]": (
                         attach.name,
                         # file handle is safely closed in `finally`; inline
-                        # open is intentional
-                        open(attach.path, "rb"),  # noqa: SIM115
+                        # open is intentional; attach.open() dispatches to
+                        # BytesIO for memory attachments
+                        attach.open(),
                         # Explicitly declare the file type so the server
                         # doesn't hang
                         attach.mimetype,

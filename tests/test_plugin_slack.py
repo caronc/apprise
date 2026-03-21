@@ -1243,3 +1243,48 @@ def test_plugin_slack_file_upload_fails_missing_files(mock_request):
     )
 
     assert result is False
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_attach_memory(mock_request):
+    """Regression: AttachMemory must be sendable without OSError."""
+    from apprise.attachment.memory import AttachMemory
+
+    token = "xoxb-1234-1234-abc124"
+
+    mock_request.side_effect = [
+        mock.Mock(**{
+            "content": dumps({"ok": True, "channel": "C123456"}),
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "upload_url": "https://files.slack.com/upload/v1/ABC123",
+                "file_id": "F123ABC456",
+            }),
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": b"OK - 100",
+            "status_code": requests.codes.ok,
+        }),
+        mock.Mock(**{
+            "content": dumps({
+                "ok": True,
+                "files": [{"id": "F123ABC456", "title": "report"}],
+            }),
+            "status_code": requests.codes.ok,
+        }),
+    ]
+
+    obj = NotifySlack(access_token=token, targets=["#general"])
+
+    mem = AttachMemory(
+        content=b"<html><body><h1>Test</h1></body></html>",
+        name="report.html",
+        mimetype="text/html",
+    )
+
+    assert obj.notify(body="Test", attach=mem) is True
+    assert mock_request.call_count >= 1
