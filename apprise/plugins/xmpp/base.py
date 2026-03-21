@@ -255,11 +255,12 @@ class NotifyXMPP(NotifyBase):
             )
             self.secure = True
 
-        # MUC nickname: alphanumeric + underscore; falls back to app_id
+        # MUC nickname: alphanumeric + underscore; falls back to the JID
+        # username, then the app_id as a last resort
         self.name = validate_regex(
             name, r"^[a-zA-Z0-9_]+$") if name else None
         if self.name is None:
-            self.name = self.app_id
+            self.name = self.user or self.app_id
 
         # Keepalive adapter (created lazily)
         self._adapter: Optional[SlixmppAdapter] = None
@@ -293,8 +294,9 @@ class NotifyXMPP(NotifyBase):
             "keepalive": "yes" if self.keepalive else "no",
         }
 
-        # Only include name when it differs from the default (app_id)
-        if self.name != self.app_id:
+        # Only include name when it differs from the default
+        # (JID user / app_id)
+        if self.name != (self.user or self.app_id):
             params["name"] = self.name
 
         # Extend our parameters

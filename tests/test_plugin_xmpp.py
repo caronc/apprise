@@ -4454,3 +4454,60 @@ def test_send_keepalive_async_muc_join_error(
     assert result is True
     assert len(sent) == 1
     assert sent[0]["mtype"] == "groupchat"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_client_logger_presence_regression(monkeypatch):
+    """
+    Regression test: Verify that the internal _Client class automatically
+    receives a 'logger' attribute so _log_task does not AttributeError.
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com", password="x", host="ex.com", port=5222)
+
+    # Test standard adapter initialization
+    adapter = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b")
+
+    # Use the same factory the adapter uses to create a client
+    client = xmpp_adapter._build_client(
+        jid="me@example.com",
+        password="x",
+        oneshot=True,
+        logger=adapter.logger)
+
+    # This was the point of failure: self.logger must exist
+    assert hasattr(client, "logger")
+    assert client.logger == adapter.logger
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_log_task_crash_regression(monkeypatch):
+    """
+    Regression test: Verify that _log_task can handle an exception
+    without crashing on a missing logger attribute.
+    """
+    install_fake_slixmpp(monkeypatch)
+
+    # Create a client using the production factory
+    client_cls = xmpp_adapter._get_client_subclass(FakeClientXMPP)
+    client = client_cls(
+        jid="user@example.com",
+        password="pass",
+        oneshot=False,
+        # Provide Logger
+        logger=logging.getLogger("apprise")
+    )
+
+    # Simulate a task failure
+    class MockTask:
+        def cancelled(self): return False
+        def exception(self): return RuntimeError("Simulated XMPP Failure")
+
+    # Manually trigger the callback logic
+    client.handlers.get("session_start")
+
+    # Triggers _log_task
+    client._on_session_start()

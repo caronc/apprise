@@ -157,6 +157,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             password: str,
             *,
             oneshot: bool,
+            logger: Optional[logging.Logger] = None,
             targets: Optional[list[(str, str)]] = None,
             subject: str = "",
             body: str = "",
@@ -170,6 +171,10 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
             # type: ignore[name-defined]
         ) -> None:
             super().__init__(jid, password)
+
+            # Store the logger so _log_task can find it
+            global LOGGING_ID
+            self.logger = logger or logging.getLogger(LOGGING_ID)
 
             # Behaviour
             self._oneshot = bool(oneshot)
@@ -233,7 +238,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
                                 or getattr(self.boundjid, "user", "") \
                                 or "apprise"
                             muc_coro = self.plugin["xep_0045"].join_muc(
-                                target, nick, wait=True)
+                                target, nick)
                             try:
                                 await asyncio.wait_for(
                                     muc_coro, timeout=5.0)
@@ -521,6 +526,7 @@ class SlixmppAdapter:
                     jid=self.config.jid,
                     password=self.config.password,
                     oneshot=True,
+                    logger=self.logger,
                     targets=targets,
                     subject=self.subject,
                     body=self.body,
@@ -708,6 +714,7 @@ class SlixmppAdapter:
                 jid=self.config.jid,
                 password=self.config.password,
                 oneshot=False,
+                logger=self.logger,
                 want_muc=self._want_muc,
                 want_roster=self.roster,
                 roster_timeout=roster_timeout,
@@ -866,7 +873,7 @@ class SlixmppAdapter:
                         or self.nickname
                     )
                     muc_coro = self._client.plugin["xep_0045"].join_muc(
-                        target, nick, wait=True)
+                        target, nick)
                     try:
                         await asyncio.wait_for(
                             muc_coro, timeout=5.0)
