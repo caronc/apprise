@@ -35,7 +35,7 @@ from typing import Any, Optional
 from ...common import NotifyType
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_bool, parse_list
+from ...utils.parse import parse_bool, parse_list, validate_regex
 from ..base import NotifyBase
 from .adapter import SLIXMPP_SUPPORT_AVAILABLE, SlixmppAdapter, XMPPConfig
 from .common import SECURE_MODES, SecureXMPPMode
@@ -50,7 +50,7 @@ from .common import SECURE_MODES, SecureXMPPMode
 # This does not try to fully implement RFC 7622. The goal is to catch bad
 # inputs early and reliably while still supporting common JID patterns.
 IS_JID = re.compile(
-    r"^\s*(?P<local>[^@\s/]+)((@|%40)"
+    r"^\s*(?P<is_room>#|%23)?(?P<local>[^@\s/]+)((@|%40)"
     r"(?P<domain>[^@\s/]+))?(?:(/|%2F)(?P<resource>[^%/\s]+)"
     r"((/|%2F).*)?)?\s*$"
 )
@@ -114,6 +114,17 @@ class NotifyXMPP(NotifyBase):
                 "private": True,
                 "required": True,
             },
+            "target_user": {
+                "name": _("Target User"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "target_channels": {
+                "name": _("Target Channel"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
@@ -147,38 +158,49 @@ class NotifyXMPP(NotifyBase):
                 "default": False,
             },
             "to": {"alias_of": "targets"},
+            "name": {
+                "name": _("MUC Nickname"),
+                "type": "string",
+            },
         },
     )
 
     def __init__(
         self,
-        targets: Optional[list[str]] = None,
+        targets: Optional[list[(str, str)]] = None,
         secure_mode: Optional[str] = None,
         roster: Optional[bool] = None,
         subject: Optional[bool] = None,
         keepalive: Optional[bool] = None,
+        name: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
 
         try:
-            self.jid = self.normalize_jid(self.user or "", self.host)
+            self.jid, _ = self.normalize_jid(self.user or "", self.host)
 
         except ValueError:
             msg = f"An invalid XMPP JID ({self.user}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg) from None
 
-        self.targets: list[str] = []
+        self.targets: list[(str, str)] = []
+        # Flag for tracking if we want Multi-User Chat function enabled
+        self.want_muc = False
+
         for target in parse_list(targets):
             try:
-                jid = self.normalize_jid(target or "", self.host)
+                jid, is_muc = self.normalize_jid(target or "", self.host)
+                mtype = "groupchat" if is_muc else "chat"
+                if is_muc:
+                    self.want_muc = True
 
             except ValueError:
                 self.logger.warning(
                     "Dropped invalid XMPP target (%s).", target)
                 continue
-            self.targets.append(jid)
+            self.targets.append((mtype, jid))
 
         if isinstance(secure_mode, str) and secure_mode.strip():
             self.secure_mode = secure_mode.strip().lower()
@@ -233,6 +255,13 @@ class NotifyXMPP(NotifyBase):
             )
             self.secure = True
 
+        # MUC nickname: alphanumeric + underscore; falls back to the JID
+        # username, then the app_id as a last resort
+        self.name = validate_regex(
+            name, r"^[a-zA-Z0-9_]+$") if name else None
+        if self.name is None:
+            self.name = self.user or self.app_id
+
         # Keepalive adapter (created lazily)
         self._adapter: Optional[SlixmppAdapter] = None
 
@@ -265,6 +294,11 @@ class NotifyXMPP(NotifyBase):
             "keepalive": "yes" if self.keepalive else "no",
         }
 
+        # Only include name when it differs from the default
+        # (JID user / app_id)
+        if self.name != (self.user or self.app_id):
+            params["name"] = self.name
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -286,7 +320,10 @@ class NotifyXMPP(NotifyBase):
 
         # Targets can contain '/' as a resource separator, so ensure it is
         # always percent-encoded in the path (otherwise Apprise will split it).
-        targets = "/".join(self.quote(t, safe="") for t in self.targets)
+        # Use %23 for the MUC '#' prefix so it is not misread as a fragment.
+        targets = "/".join(
+            ("%23" if mode == "groupchat" else "") + self.quote(jid, safe="")
+            for (mode, jid) in self.targets)
 
         return "{schema}://{auth}{host}{port}/{targets}?{params}".format(
             schema=schema,
@@ -352,6 +389,8 @@ class NotifyXMPP(NotifyBase):
             "timeout": self.socket_connect_timeout,
             "roster": self.roster,
             "keepalive": self.keepalive,
+            "want_muc": self.want_muc,
+            "default_nickname": self.name,
         }
         if not self.keepalive:
             # One-shot mode: Create, process, and discard
@@ -370,9 +409,8 @@ class NotifyXMPP(NotifyBase):
 
         return 0 if not self.subject else super().title_maxlen
 
-        # We don't support titles for SMSEagle notifications
     @staticmethod
-    def normalize_jid(value: str, default_host: str) -> str:
+    def normalize_jid(value: str, default_host: str) -> tuple[str, bool]:
         """Normalize and validate a JID.
 
         Behaviour:
@@ -386,21 +424,18 @@ class NotifyXMPP(NotifyBase):
            optional '/resource' suffix.
         """
         raw = (value or "").strip()
-        if not raw:
-            raise ValueError("Empty JID")
-
         results = IS_JID.match(raw)
         if not results:
             raise ValueError("Invalid JID")
 
-        host = default_host \
-            if not results.group("domain") else results.group("domain")
+        is_muc = bool(results.group("is_room"))
+        host = results.group("domain") or default_host
 
         jid = f"{results.group('local')}@{host}"
         if results.group("resource"):
             jid = f"{jid}/{results.group('resource')}"
 
-        return jid
+        return jid, is_muc
 
     @staticmethod
     def parse_url(url: str) -> Optional[dict[str, Any]]:
@@ -434,5 +469,9 @@ class NotifyXMPP(NotifyBase):
 
         if "keepalive" in results["qsd"] and len(results["qsd"]["keepalive"]):
             results["keepalive"] = parse_bool(results["qsd"]["keepalive"])
+
+        if "name" in results["qsd"] and len(results["qsd"]["name"]):
+            results["name"] = \
+                NotifyXMPP.unquote(results["qsd"]["name"])
 
         return results
