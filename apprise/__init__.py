@@ -28,7 +28,7 @@
 __title__ = "Apprise"
 __description__: str = \
     "Push Notifications that work with just about every platform!"
-__version__ = "1.9.8"
+__version__ = "1.9.9"
 __author__ = "Chris Caron"
 __email__ = "lead2gold@gmail.com"
 __license__ = "BSD 2-Clause"
