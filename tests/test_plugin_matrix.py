@@ -1208,9 +1208,10 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     del obj
 
 
+@mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_matrix_discovery_service(mock_post, mock_get):
+def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     """NotifyMatrix() Discovery Service."""
 
     # Prepare a good response
@@ -1226,6 +1227,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     # Prepare Mock return object
     mock_post.return_value = response
     mock_get.return_value = response
+    mock_put.return_value = response
 
     # Instantiate our object
     obj = Apprise.instantiate(
@@ -1410,9 +1412,10 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get):
     del obj
 
 
+@mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
+def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     """NotifyMatrix() Attachment Checks (v2)"""
 
     # Prepare a good response
@@ -1427,6 +1430,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Prepare Mock return object
     mock_post.return_value = response
     mock_get.return_value = response
+    mock_put.return_value = response
 
     # Instantiate our object
     obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=2")
@@ -1461,6 +1465,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Reset our object
     mock_post.reset_mock()
     mock_get.reset_mock()
+    mock_put.reset_mock()
 
     assert (
         obj.notify(
@@ -1472,8 +1477,8 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         is True
     )
 
-    # Test our call count
-    assert mock_post.call_count == 5
+    # Test our call count — login, upload, join use POST; sends use PUT
+    assert mock_post.call_count == 3
     assert (
         mock_post.call_args_list[0][0][0]
         == "https://matrix.example.com/_matrix/client/r0/login"
@@ -1487,15 +1492,16 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         == "https://matrix.example.com/_matrix/client/r0/"
         "join/%23general%3Alocalhost"
     )
+    assert mock_put.call_count == 2
     assert (
-        mock_post.call_args_list[3][0][0]
+        mock_put.call_args_list[0][0][0]
         == "https://matrix.example.com/_matrix/client/r0"
-        "/rooms/%21abc123%3Alocalhost/send/m.room.message"
+        "/rooms/%21abc123%3Alocalhost/send/m.room.message/0"
     )
     assert (
-        mock_post.call_args_list[4][0][0]
+        mock_put.call_args_list[1][0][0]
         == "https://matrix.example.com/_matrix/client/r0/"
-        "rooms/%21abc123%3Alocalhost/send/m.room.message"
+        "rooms/%21abc123%3Alocalhost/send/m.room.message/1"
     )
 
     # Attach an unsupported file type; these are skipped
@@ -1542,35 +1548,23 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
 
         assert obj.send(body="test", attach=attach) is False
 
-    # Throw an exception on the second call to requests.post()
+    # Throw an exception on the attachment send (now uses PUT)
     for side_effect in (requests.RequestException(), OSError(), bad_response):
         # Reset our value
         mock_post.reset_mock()
         mock_get.reset_mock()
+        mock_put.reset_mock()
 
-        mock_post.side_effect = [response, side_effect, side_effect, response]
-        mock_get.side_effect = [side_effect, side_effect, response]
+        mock_post.side_effect = [response]  # upload ok
+        mock_put.side_effect = [side_effect, side_effect]  # sends fail
 
         # We'll fail now because of our error handling
         assert obj.send(body="test", attach=attach) is False
 
-    # handle a bad response
-    mock_post.side_effect = [
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
-    mock_get.side_effect = [
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
+    # handle a bad response on the attachment send (now PUT)
+    mock_post.side_effect = [response]  # upload ok
+    mock_put.side_effect = [bad_response, response]  # attachment fails
+    mock_get.side_effect = None
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is False
@@ -1586,27 +1580,12 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
     # Reset our object
     mock_post.reset_mock()
     mock_get.reset_mock()
+    mock_put.reset_mock()
 
-    mock_post.return_value = None
-    mock_get.return_value = None
-    mock_post.side_effect = [
-        response,
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
-    mock_get.side_effect = [
-        response,
-        response,
-        bad_response,
-        response,
-        response,
-        response,
-        response,
-    ]
+    # login + join succeed; image inline send (now PUT) fails
+    mock_post.side_effect = [response, response]
+    mock_get.side_effect = None
+    mock_put.side_effect = [bad_response]
 
     # image attachment didn't succeed
     assert (
@@ -1614,17 +1593,82 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get):
         is False
     )
 
-    # Error during image post
+    # All calls now succeed
     mock_post.return_value = response
     mock_get.return_value = response
+    mock_put.return_value = response
     mock_post.side_effect = None
     mock_get.side_effect = None
+    mock_put.side_effect = None
 
     # We'll fail now because of an internal exception
     assert obj.send(body="test", attach=attach) is True
 
     # Force __del__() call
     del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.post")
+def test_plugin_matrix_v2_compliance(mock_post, mock_put):
+    """NotifyMatrix() Verify V2 uses PUT and TID for standard messages."""
+    # Setup compliant response
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+    mock_put.return_value = response
+
+    # Instantiate as V2
+    obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=2")
+
+    # Send a standard notification
+    assert obj.notify(body="test message") is True
+
+    # Confirm the fix:
+    # 1. Path contains the transaction ID '0'
+    # 2. Method is PUT
+    assert mock_put.call_count == 1
+    assert "/_matrix/client/r0/rooms/" in mock_put.call_args_list[0][0][0]
+    assert "/send/m.room.message/0" in mock_put.call_args_list[0][0][0]
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_v2_token_mode_no_txn_increment(
+    mock_post, mock_get, mock_put
+):
+    """Token mode (access_token == password) skips transaction ID increment."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_put.return_value = response
+
+    # Token mode: user omitted, password treated as access token
+    # (parse_url swaps user→password when no password supplied)
+    obj = Apprise.instantiate(
+        "matrixs://my_access_token@localhost/#general?v=2&image=y"
+    )
+    assert obj is not None
+
+    # Send with image inline enabled (exercises line 747→755 branch)
+    assert obj.notify(body="token mode image test") is True
+
+    # Send with an attachment (exercises line 765→775 branch)
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.send(body="token mode attach test", attach=attach) is True
+
+
+def test_plugin_matrix_parse_native_url_no_match():
+    """parse_native_url returns None for non-t2bot URLs."""
+    assert NotifyMatrix.parse_native_url(
+        "https://not-a-t2bot-url.com/some/path"
+    ) is None
 
 
 @mock.patch("requests.put")
