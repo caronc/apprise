@@ -4122,22 +4122,23 @@ def test_xmpp_name_parameter() -> None:
     n2 = NotifyXMPP(**results)
     assert n2.name == "my_bot"
 
-    # Invalid name falls back to app_id (no TypeError raised)
+    # Invalid name falls back to user (then app_id if no user)
     n3 = NotifyXMPP(
         host="example.com",
         user="me",
         password="secret",
         name="bad name!",
     )
-    assert n3.name == n3.app_id
+    assert n3.name == n3.user
 
-    # No name provided → defaults to app_id; not emitted in URL
+    # No name provided → defaults to user (then app_id if no user);
+    # not emitted in URL
     n4 = NotifyXMPP(
         host="example.com",
         user="me",
         password="secret",
     )
-    assert n4.name == n4.app_id
+    assert n4.name == n4.user
     assert "name=" not in n4.url()
 
 
@@ -4338,6 +4339,78 @@ def test_send_keepalive_async_muc_join(
     assert result is True
     assert len(join_calls) == 1
     assert join_calls[0][0] == "room@conference.example.com"
+    # boundjid.user == "me" → nick must be taken from boundjid, not nickname
+    assert join_calls[0][1] == "me"
+    assert len(sent) == 1
+    assert sent[0]["mtype"] == "groupchat"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_send_keepalive_async_muc_join_nick_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When boundjid.user is empty, nick falls back to adapter nickname."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("groupchat", "room@conference.example.com")],
+        subject="s",
+        body="b",
+        keepalive=True,
+        want_muc=True,
+        default_nickname="mybot",
+    )
+
+    join_calls: list[tuple[str, str]] = []
+    sent: list[dict[str, Any]] = []
+
+    async def fake_join_muc(room: str, nick: str) -> None:
+        join_calls.append((room, nick))
+
+    class FakeBoundJID:
+        user = ""   # empty → should fall back to nickname
+
+    class FakeMucPlugin:
+        def join_muc(self, room: str, nick: str, **kw: Any) -> Any:
+            return fake_join_muc(room, nick)
+
+    class _Client:
+        _auth_failed = False
+        boundjid = FakeBoundJID()
+        plugin = {"xep_0045": FakeMucPlugin()}
+
+        def send_message(self, **kwargs: Any) -> None:
+            sent.append(kwargs)
+
+    a._client = _Client()
+
+    async def ok_connect() -> bool:
+        return True
+
+    monkeypatch.setattr(a, "_connect_if_required", ok_connect, raising=True)
+
+    result = asyncio.run(
+        a._send_keepalive_async(
+            targets=[("groupchat", "room@conference.example.com")],
+            subject="s",
+            body="b",
+        )
+    )
+
+    assert result is True
+    assert len(join_calls) == 1
+    assert join_calls[0][0] == "room@conference.example.com"
+    # boundjid.user is empty → nick must fall back to adapter's nickname
+    assert join_calls[0][1] == "mybot"
     assert len(sent) == 1
     assert sent[0]["mtype"] == "groupchat"
 
