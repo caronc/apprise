@@ -141,7 +141,15 @@ apprise_url_tests = (
             "requests_response_text": GOOD_RESPONSE_TEXT,
         },
     ),
-    # Tags
+    # X-Tags via canonical xtags= parameter
+    (
+        "ntfy://localhost/topic1/?xtags=tag1,tag2,tag3",
+        {
+            "instance": NotifyNtfy,
+            "requests_response_text": GOOD_RESPONSE_TEXT,
+        },
+    ),
+    # X-Tags via legacy tags= parameter (backward compat)
     (
         "ntfy://localhost/topic1/?tags=tag1,tag2,tag3",
         {
@@ -561,12 +569,19 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert isinstance(results["qsd:"], dict) is True
     assert results["qsd"]["priority"] == "max"
     assert results["qsd"]["tags"] == "smile,de"
+    # Legacy tags= is translated to xtags internally; must not leak as
+    # results["tags"] or the config/base YAML parser would treat it as
+    # an Apprise routing tag and silently drop the notification.
+    assert "tags" not in results
+    assert results["xtags"] == ["de", "smile"]
 
     instance = NotifyNtfy(**results)
     assert isinstance(instance, NotifyNtfy)
     assert len(instance.topics) == 2
     assert "abc---" in instance.topics
     assert "topic2" in instance.topics
+    # X-Tags header must be set correctly
+    assert instance._NotifyNtfy__tags == ["de", "smile"]
 
     results = NotifyNtfy.parse_url(
         "ntfy://localhost/topic1/"
@@ -784,3 +799,57 @@ def test_plugin_ntfy_message_to_attach(mock_post):
 
         # Reset our mock object
         mock_post.reset_mock()
+
+
+def test_plugin_ntfy_xtags_no_apprise_tag_collision():
+    """Regression: ntfy xtags= / tags= must never become an Apprise routing
+    tag.
+
+    Prior to the xtags= rename (commit that introduced this test), ntfy stored
+    its X-Tags value in results["tags"].  The config/base YAML parser
+    intercepts results["tags"] and converts it to an Apprise routing tag,
+    which caused the plugin to be silently skipped when a notify request
+    arrived without a matching tag filter.
+    """
+
+    # --- parse_url: canonical xtags= form ---
+    r = NotifyNtfy.parse_url("ntfy://myhost/mytopic?xtags=warning,critical")
+    assert r is not None
+    assert "tags" not in r, "xtags= must not appear as results['tags']"
+    assert r["xtags"] == ["critical", "warning"]
+
+    n = NotifyNtfy(**r)
+    assert n._NotifyNtfy__tags == ["critical", "warning"]
+    # apprise routing tag must remain empty
+    assert not n.tags
+    # canonical URL must use xtags= and must not contain a bare tags= param
+    assert "xtags=" in n.url()
+    assert "&tags=" not in n.url() and "?tags=" not in n.url()
+
+    # --- parse_url: legacy tags= form (backward compat) ---
+    r2 = NotifyNtfy.parse_url("ntfy://myhost/mytopic?tags=info,storage")
+    assert r2 is not None
+    assert "tags" not in r2, "legacy tags= must be re-keyed as xtags, not tags"
+    assert r2["xtags"] == ["info", "storage"]
+
+    n2 = NotifyNtfy(**r2)
+    assert n2._NotifyNtfy__tags == ["info", "storage"]
+    assert not n2.tags
+
+    # --- YAML config: tags= in URL must not become an Apprise routing tag ---
+    cfg = apprise.AppriseConfig()
+    cfg.add_config(
+        "urls:\n  - ntfy://myhost/mytopic?tags=warning\n",
+        format="yaml",
+    )
+    a = apprise.Apprise()
+    a.add(cfg)
+    servers = list(cfg.servers())
+    assert len(servers) == 1
+    s = servers[0]
+    # X-Tags must be preserved
+    assert s._NotifyNtfy__tags == ["warning"]
+    # No Apprise routing tag should have been created
+    assert not s.tags, (
+        "tags= in a YAML ntfy URL must not create an Apprise routing tag"
+    )
