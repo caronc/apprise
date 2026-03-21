@@ -1617,3 +1617,27 @@ def test_plugin_telegram_markdown_v2(mock_post):
         )
 
         mock_post.reset_mock()
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_attach_memory(mock_post):
+    """Regression: AttachMemory must be sendable without OSError."""
+    from apprise.attachment.memory import AttachMemory
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True, "result": True})
+    mock_post.return_value = response
+
+    obj = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop", targets="12345"
+    )
+
+    mem = AttachMemory(
+        content=b"<html><body><h1>Test</h1></body></html>",
+        name="test.html",
+        mimetype="text/html",
+    )
+
+    assert obj.notify(body="Test", attach=mem) is True
+    assert mock_post.call_count >= 1

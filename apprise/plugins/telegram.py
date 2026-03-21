@@ -603,7 +603,8 @@ class NotifyTelegram(NotifyBase):
             payload["message_thread_id"] = topic
 
         try:
-            with open(path, "rb") as f:
+            with (attach if isinstance(attach, AttachBase)
+                  else open(path, "rb")) as f:
                 # Configure file payload (for upload)
                 files = {key: (file_name, f)}
 

@@ -538,3 +538,31 @@ def test_plugin_pushover_config_files(mock_post):
 
     # Notify everything loaded
     assert aobj.notify(title="title", body="body") is True
+
+
+@mock.patch("requests.post")
+def test_plugin_pushover_attach_memory(mock_post):
+    """Regression: AttachMemory must be sendable without OSError."""
+    from apprise.attachment.memory import AttachMemory
+
+    user_key = "u" * 30
+    api_token = "a" * 30
+
+    response = mock.Mock()
+    response.content = dumps(
+        {"status": 1, "request": "647d2300-702c-4b38-8b2f-d56326ae460b"}
+    )
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = apprise.Apprise.instantiate(f"pover://{user_key}@{api_token}/")
+    assert isinstance(obj, NotifyPushover)
+
+    mem = AttachMemory(
+        content=b"<html><body><h1>Test</h1></body></html>",
+        name="report.html",
+        mimetype="text/html",
+    )
+
+    assert obj.notify(body="Test", attach=mem) is True
+    assert mock_post.call_count == 1

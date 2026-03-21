@@ -1331,3 +1331,29 @@ def test_plugin_fluxer_429_attachment_closes_edge_cases(
 
     assert obj.send(body="test", attach=attach) is True
     assert good.closed is True
+
+
+@mock.patch("requests.post")
+def test_plugin_fluxer_attach_memory(mock_post: mock.MagicMock) -> None:
+    """Regression: AttachMemory must be sendable without OSError."""
+    from apprise.attachment.memory import AttachMemory
+
+    webhook_id, webhook_token = _tokens()
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        f"fluxer://{webhook_id}/{webhook_token}/"
+    )
+
+    mem = AttachMemory(
+        content=b"<html><body><h1>Test</h1></body></html>",
+        name="report.html",
+        mimetype="text/html",
+    )
+
+    assert obj.notify(body="Test", attach=mem) is True
+    assert mock_post.call_count >= 1

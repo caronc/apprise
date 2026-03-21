@@ -162,7 +162,8 @@ class AttachMemory(AttachBase):
 
     def invalidate(self):
         """Removes data."""
-        self._data.truncate(0)
+        if not self._data.closed:
+            self._data.truncate(0)
         return
 
     def exists(self):
