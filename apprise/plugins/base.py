@@ -69,6 +69,56 @@ class NotifyBase(URLBase):
     # enabled.
     enabled = True
 
+    @staticmethod
+    def runtime_deps():
+        """Return a tuple of top-level Python package names that this plugin
+        imported as optional runtime dependencies.
+
+        The plugin manager uses this to maintain a reference counter per
+        library.  When every plugin that declared a given library is disabled,
+        its counter reaches zero and the manager evicts the library from
+        `sys.modules`, releasing the associated Python objects from memory.
+
+        Names must be the importable top-level namespace - the same string you
+        would pass to `import` - not the pip install name:
+
+            ('paho',)        # paho-mqtt installs as 'paho'
+            ('slixmpp',)
+            ('cryptography',)
+
+        Submodules are handled automatically; declaring the top-level name is
+        sufficient.
+
+        Override this in any plugin that conditionally imports a heavy optional
+        library.  Return an empty tuple (the default) when the plugin has no
+        optional dependencies that are worth evicting.
+        """
+        return ()
+
+    @classmethod
+    def enable(self):
+        """Mark this plugin as enabled.
+
+        This is the counterpart to :meth:`disable`.  Calling this restores the
+        plugin to an active state so it will be used for notifications again.
+        Note that if the plugin's runtime dependencies were evicted from memory
+        by the plugin manager, re-enabling will restore the flag but the
+        plugin may not function until the process is restarted.
+        """
+        self.enabled = True
+
+    @classmethod
+    def disable(self):
+        """Mark this plugin as disabled.
+
+        The plugin will not be used for notifications.  The plugin manager
+        calls this when honouring `APPRISE_DENY_SERVICES` /
+        `APPRISE_ALLOW_SERVICES` and uses the result of
+        :method:`runtime_deps` to decrement its per-library reference counters,
+        potentially evicting unused libraries from `sys.modules`.
+        """
+        self.enabled = False
+
     # The category allows for parent inheritance of this object to alter
     # this when it's function/use is intended to behave differently. The
     # following category types exist:
@@ -337,14 +387,16 @@ class NotifyBase(URLBase):
             value = kwargs["format"]
             try:
                 self.notify_format = (
-                    value if isinstance(value, NotifyFormat)
+                    value
+                    if isinstance(value, NotifyFormat)
                     else NotifyFormat(value.lower())
                 )
 
             except (AttributeError, ValueError):
                 err = (
-                    f"An invalid notification format ({value}) was "
-                    "specified.")
+                    "An invalid notification format "
+                    f"({value}) was specified."
+                )
                 self.logger.warning(err)
                 raise TypeError(err) from None
 
@@ -353,8 +405,9 @@ class NotifyBase(URLBase):
             self.__tzinfo = zoneinfo(value)
             if not self.__tzinfo:
                 err = (
-                    f"An invalid notification timezone ({value}) was "
-                    "specified.")
+                    "An invalid notification timezone "
+                    f"({value}) was specified."
+                )
                 self.logger.warning(err)
                 raise TypeError(err) from None
 
@@ -362,7 +415,8 @@ class NotifyBase(URLBase):
             value = kwargs["overflow"]
             try:
                 self.overflow_mode = (
-                    value if isinstance(value, OverflowMode)
+                    value
+                    if isinstance(value, OverflowMode)
                     else OverflowMode(value.lower())
                 )
 
@@ -540,8 +594,8 @@ class NotifyBase(URLBase):
             # attachments, there is nothing further to do here, just move
             # along.
             msg = (
-                f"{self.service_name} does not support attachments; "
-                " service skipped"
+                f"{self.service_name} does not support "
+                "attachments; service skipped"
             )
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -566,7 +620,6 @@ class NotifyBase(URLBase):
         for chunk in self._apply_overflow(
             body=body, title=title, overflow=overflow, body_format=body_format
         ):
-
             # Send notification
             yield {
                 "body": chunk["body"],
@@ -702,10 +755,12 @@ class NotifyBase(URLBase):
 
         # TRUNCATE mode: hard truncation (no smart-splitting)
         if overflow == OverflowMode.TRUNCATE:
-            response.append({
-                "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
-                "title": title,
-            })
+            response.append(
+                {
+                    "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
+                    "title": title,
+                }
+            )
             return response
 
         #
@@ -725,8 +780,7 @@ class NotifyBase(URLBase):
         # SPLIT mode with repeated title (with/without counter)
         if not overflow_display_title_once and not (
             # edge case: amalgamated title but no body space
-            self.overflow_amalgamate_title
-            and body_maxlen <= 0
+            self.overflow_amalgamate_title and body_maxlen <= 0
         ):
             # Decide whether to show a counter (legacy condition)
             show_counter = (
@@ -735,20 +789,20 @@ class NotifyBase(URLBase):
                 and (
                     (
                         self.overflow_amalgamate_title
-                        and body_maxlen >=
-                        self.overflow_display_count_threshold
+                        and body_maxlen
+                        >= self.overflow_display_count_threshold
                     )
                     or (
                         not self.overflow_amalgamate_title
-                        and title_maxlen >
-                        self.overflow_display_count_threshold
+                        and title_maxlen
+                        > self.overflow_display_count_threshold
                     )
                 )
                 and (
-                    title_maxlen >
-                    (self.overflow_max_display_count_width + overflow_buffer)
-                    and self.title_maxlen >=
-                    self.overflow_display_count_threshold
+                    title_maxlen
+                    > (self.overflow_max_display_count_width + overflow_buffer)
+                    and self.title_maxlen
+                    >= self.overflow_display_count_threshold
                 )
             )
 
@@ -775,13 +829,9 @@ class NotifyBase(URLBase):
                     <= self.overflow_max_display_count_width
                 ):
                     # Truncate title further if needed to make room for counter
-                    if (
-                        len(title)
-                        > title_maxlen - overflow_display_count_width
-                    ):
-                        title = title[
-                            : title_maxlen - overflow_display_count_width
-                        ]
+                    t_max = title_maxlen - overflow_display_count_width
+                    if len(title) > t_max:
+                        title = title[:t_max]
                     template = f" [{{:0{digits}d}}/{{:0{digits}d}}]"
                 else:
                     # Too many messages; fall back to repeated title without
@@ -791,10 +841,12 @@ class NotifyBase(URLBase):
             response = []
             for idx, chunk_body in enumerate(chunks, start=1):
                 suffix = template.format(idx, count) if show_counter else ""
-                response.append({
-                    "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
-                    "title": f"{title}{suffix}",
-                })
+                response.append(
+                    {
+                        "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
+                        "title": f"{title}{suffix}",
+                    }
+                )
 
         else:
             #
@@ -818,18 +870,22 @@ class NotifyBase(URLBase):
                 consumed = len(first_body)
                 remainder = body[consumed:]
 
-                response.append({
-                    "body": first_body.lstrip("\r\n\x0b\x0c").rstrip(),
-                    "title": title,
-                })
+                response.append(
+                    {
+                        "body": first_body.lstrip("\r\n\x0b\x0c").rstrip(),
+                        "title": title,
+                    }
+                )
 
             else:
                 # body_maxlen <= 0 or no body; send title only, still honouring
                 # body
-                response.append({
-                    "body": "",
-                    "title": title,
-                })
+                response.append(
+                    {
+                        "body": "",
+                        "title": title,
+                    }
+                )
                 # remainder stays as full body; will be split below
 
             # Remaining chunks: no title, use the full body_maxlen of the
@@ -841,10 +897,12 @@ class NotifyBase(URLBase):
                     body_format,
                 )
                 for chunk_body in more_chunks:
-                    response.append({
-                        "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
-                        "title": "",
-                    })
+                    response.append(
+                        {
+                            "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
+                            "title": "",
+                        }
+                    )
 
         return response
 
@@ -857,7 +915,7 @@ class NotifyBase(URLBase):
     ) -> bool:
         """Should preform the actual notification itself."""
         raise NotImplementedError(
-            "send() is not implimented by the child class."
+            "send() is not implemented by the child class."
         )
 
     def url_parameters(
@@ -925,8 +983,8 @@ class NotifyBase(URLBase):
             results["format"] = results["qsd"].get("format", "").lower()
             if results["format"] not in NOTIFY_FORMATS:
                 URLBase.logger.warning(
-                    "Unsupported format specified "
-                    f"{results['qsd']['format']!r}"
+                    "Unsupported format specified %r",
+                    results["qsd"]["format"],
                 )
                 del results["format"]
 

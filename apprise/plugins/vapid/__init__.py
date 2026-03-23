@@ -614,3 +614,7 @@ class NotifyVapid(NotifyBase):
     def public_key(self):
         """Returns our public key representation."""
         return self.pem.x962_str
+
+    @staticmethod
+    def runtime_deps():
+        return ("cryptography",)

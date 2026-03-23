@@ -472,3 +472,7 @@ class NotifyGrowl(NotifyBase):
             results["version"] = version
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        return ("gntp",)

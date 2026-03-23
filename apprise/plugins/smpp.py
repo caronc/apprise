@@ -344,3 +344,7 @@ class NotifySMPP(NotifyBase):
             results["source"] = results["targets"].pop(0)
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        return ("smpplib",)

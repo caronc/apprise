@@ -482,3 +482,253 @@ def test_notification_manager_add_force_returns_false_if_conflict_persists(
     assert (
         N_MGR.add(NotifyDiscordCustom, schemas="discord", force=True) is False
     )
+
+
+# ---------------------------------------------------------------------------
+# Helpers shared by the runtime_deps / eviction tests
+# ---------------------------------------------------------------------------
+
+def _make_dep_plugin(schema, *deps):
+    """Return a minimal NotifyBase subclass that declares *deps* in
+    runtime_deps() and is always enabled."""
+
+    class _Plugin(NotifyBase):
+        protocol = schema
+        enabled = True
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return f"{schema}://"
+
+        @staticmethod
+        def runtime_deps():
+            return deps
+
+    _Plugin.__name__ = f"Notify_{schema}"
+    return _Plugin
+
+
+# ---------------------------------------------------------------------------
+
+
+def test_manager_dep_counter_built_on_load():
+    """_dep_counter is populated after native modules are loaded."""
+    N_MGR.unload_modules()
+    # Trigger native load
+    assert len(N_MGR.schemas()) > 0
+
+    # The counter must exist and be a dict
+    assert isinstance(N_MGR._dep_counter, dict)
+
+    # Every library declared by an enabled plugin must appear in the counter
+    for plugin in N_MGR.plugins(include_disabled=False):
+        for lib in plugin.runtime_deps():
+            assert lib in N_MGR._dep_counter
+            assert N_MGR._dep_counter[lib] >= 1
+
+
+def test_manager_dep_counter_custom_plugins():
+    """_dep_counter reflects only enabled plugins with runtime_deps."""
+    N_MGR.unload_modules()
+
+    PlugA = _make_dep_plugin("plugA", "fakelib1")
+    PlugB = _make_dep_plugin("plugB", "fakelib1", "fakelib2")
+    PlugC = _make_dep_plugin("plugC")  # no deps
+
+    N_MGR["plugA"] = PlugA
+    N_MGR["plugB"] = PlugB
+    N_MGR["plugC"] = PlugC
+
+    # Rebuild counter to include newly registered plugins
+    N_MGR._build_dep_counter()
+
+    assert N_MGR._dep_counter.get("fakelib1", 0) >= 2
+    assert N_MGR._dep_counter.get("fakelib2", 0) >= 1
+    # PlugC has no deps so it contributes nothing
+    assert "fakelib_none" not in N_MGR._dep_counter
+
+
+def test_manager_disable_decrements_counter():
+    """disable() decrements the dep counter for the disabled plugin's libs."""
+    N_MGR.unload_modules()
+
+    PlugA = _make_dep_plugin("solodep", "uniquelib99")
+    N_MGR["solodep"] = PlugA
+    N_MGR._build_dep_counter()
+
+    assert N_MGR._dep_counter.get("uniquelib99", 0) >= 1
+    before = N_MGR._dep_counter["uniquelib99"]
+
+    N_MGR.disable("solodep")
+    assert N_MGR._dep_counter.get("uniquelib99", 0) == before - 1
+
+
+def test_manager_shared_dep_not_evicted_until_all_disabled():
+    """A shared library is not evicted until every plugin using it is off."""
+    import sys
+
+    N_MGR.unload_modules()
+    N_MGR.evict_on_disable = True
+
+    # Two plugins share the same fake library
+    PlugX = _make_dep_plugin("sharedX", "sharedfakelib")
+    PlugY = _make_dep_plugin("sharedY", "sharedfakelib")
+
+    # Inject a fake module so eviction has something to remove
+    fake_mod = types.ModuleType("sharedfakelib")
+    sys.modules["sharedfakelib"] = fake_mod
+
+    N_MGR["sharedX"] = PlugX
+    N_MGR["sharedY"] = PlugY
+    N_MGR._build_dep_counter()
+
+    assert N_MGR._dep_counter.get("sharedfakelib", 0) >= 2
+
+    # Disable one — library should still be present (counter > 0)
+    N_MGR.disable("sharedX")
+    assert "sharedfakelib" in sys.modules
+
+    # Disable the other — counter should hit 0 and library gets evicted
+    N_MGR.disable("sharedY")
+    assert "sharedfakelib" not in sys.modules
+
+    N_MGR.evict_on_disable = False
+
+
+def test_manager_evict_on_disable_false_by_default():
+    """evict_on_disable defaults to False; no eviction even at counter 0."""
+    import sys
+
+    N_MGR.unload_modules()
+    assert N_MGR.evict_on_disable is False
+
+    PlugZ = _make_dep_plugin("nodiscard", "nodiscardlib")
+    fake_mod = types.ModuleType("nodiscardlib")
+    sys.modules["nodiscardlib"] = fake_mod
+
+    N_MGR["nodiscard"] = PlugZ
+    N_MGR._build_dep_counter()
+
+    N_MGR.disable("nodiscard")
+
+    # Library is still present because evict_on_disable is False
+    assert "nodiscardlib" in sys.modules
+
+    # Cleanup
+    del sys.modules["nodiscardlib"]
+
+
+def test_manager_evict_library_graceful_keyerror():
+    """_evict_library handles a missing sys.modules key gracefully."""
+    import sys
+
+    N_MGR.unload_modules()
+
+    # Put a module in, then remove it manually before eviction to simulate
+    # a race or double-eviction scenario
+    fake_mod = types.ModuleType("ghostlib")
+    sys.modules["ghostlib"] = fake_mod
+    del sys.modules["ghostlib"]
+
+    # Should not raise even though the key is gone
+    N_MGR._evict_library("ghostlib")
+
+
+def test_manager_evict_library_removes_submodules():
+    """_evict_library removes the top-level package and all its submodules."""
+    import sys
+
+    N_MGR.unload_modules()
+
+    root = types.ModuleType("mypkg")
+    sub = types.ModuleType("mypkg.sub")
+    deep = types.ModuleType("mypkg.sub.deep")
+
+    sys.modules["mypkg"] = root
+    sys.modules["mypkg.sub"] = sub
+    sys.modules["mypkg.sub.deep"] = deep
+
+    N_MGR._evict_library("mypkg")
+
+    assert "mypkg" not in sys.modules
+    assert "mypkg.sub" not in sys.modules
+    assert "mypkg.sub.deep" not in sys.modules
+
+
+def test_manager_enable_only_updates_dep_counter():
+    """enable_only() decrements counters for disabled plugins.
+
+    We isolate this test to fake libraries only to avoid evicting real native
+    extensions (e.g. cryptography/PyO3) that cannot be safely re-imported in
+    the same interpreter session.
+    """
+    import sys
+
+    N_MGR.unload_modules()
+    N_MGR.evict_on_disable = True
+
+    PlugKeep = _make_dep_plugin("keepme2", "keeplib2")
+    PlugDrop = _make_dep_plugin("dropme2", "droplib2")
+
+    fake_keep = types.ModuleType("keeplib2")
+    fake_drop = types.ModuleType("droplib2")
+    sys.modules["keeplib2"] = fake_keep
+    sys.modules["droplib2"] = fake_drop
+
+    N_MGR["keepme2"] = PlugKeep
+    N_MGR["dropme2"] = PlugDrop
+
+    # Seed the dep counter for only our two fake plugins so that disabling
+    # dropme2 drives the droplib2 counter to zero — without touching real
+    # native-library plugins loaded alongside them.
+    N_MGR._dep_counter["keeplib2"] = 1
+    N_MGR._dep_counter["droplib2"] = 1
+
+    # Disable dropme2 directly; keepme2 stays enabled.
+    N_MGR.disable("dropme2")
+
+    assert N_MGR["keepme2"].enabled is True
+    assert N_MGR["dropme2"].enabled is False
+    assert "keeplib2" in sys.modules       # counter still 1 — not evicted
+    assert "droplib2" not in sys.modules   # counter hit 0 — evicted
+
+    # Cleanup
+    del sys.modules["keeplib2"]
+    N_MGR.evict_on_disable = False
+
+
+def test_manager_unload_resets_dep_counter():
+    """unload_modules() resets _dep_counter to an empty dict."""
+    N_MGR.unload_modules()
+    # Trigger load so counter is built
+    assert len(N_MGR.schemas()) > 0
+    assert len(N_MGR._dep_counter) > 0
+
+    N_MGR.unload_modules()
+    assert N_MGR._dep_counter == {}
+
+
+def test_manager_known_plugin_runtime_deps():
+    """Plugins known to carry optional deps must declare runtime_deps()."""
+    N_MGR.unload_modules()
+
+    from apprise.plugins.fcm import NotifyFCM
+    from apprise.plugins.growl import NotifyGrowl
+    from apprise.plugins.mqtt import NotifyMQTT
+    from apprise.plugins.simplepush import NotifySimplePush
+    from apprise.plugins.smpp import NotifySMPP
+    from apprise.plugins.vapid import NotifyVapid
+    from apprise.plugins.xmpp.base import NotifyXMPP
+
+    assert "paho" in NotifyMQTT.runtime_deps()
+    assert "gntp" in NotifyGrowl.runtime_deps()
+    assert "smpplib" in NotifySMPP.runtime_deps()
+    assert "slixmpp" in NotifyXMPP.runtime_deps()
+    assert "cryptography" in NotifySimplePush.runtime_deps()
+    assert "cryptography" in NotifyFCM.runtime_deps()
+    assert "cryptography" in NotifyVapid.runtime_deps()
+
+    # Base class has no deps
+    assert NotifyBase.runtime_deps() == ()

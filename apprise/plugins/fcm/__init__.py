@@ -648,3 +648,7 @@ class NotifyFCM(NotifyBase):
         results["data_kwargs"] = results["qsd+"]
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        return ("cryptography",)

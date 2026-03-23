@@ -7,6 +7,9 @@
   "python.linting.ruffPath": "ruff",
   "python.formatting.provider": "none",
   "editor.formatOnSave": true,
+  "[python]": {
+    "editor.formatOnSave": false
+  },
   "python.testing.cwd": "${workspaceFolder}",
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,

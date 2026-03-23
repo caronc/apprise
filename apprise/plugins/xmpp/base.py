@@ -475,3 +475,7 @@ class NotifyXMPP(NotifyBase):
                 NotifyXMPP.unquote(results["qsd"]["name"])
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        return ("slixmpp",)

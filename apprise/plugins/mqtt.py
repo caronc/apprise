@@ -651,3 +651,7 @@ class NotifyMQTT(NotifyBase):
             pass
 
         return candidates
+
+    @staticmethod
+    def runtime_deps():
+        return ("paho",)

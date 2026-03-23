@@ -369,3 +369,7 @@ class NotifySimplePush(NotifyBase):
             )
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        return ("cryptography",)
