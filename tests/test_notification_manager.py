@@ -30,6 +30,7 @@ from inspect import cleandoc
 # Disable logging for a cleaner testing output
 import logging
 import re
+import sys
 import threading
 import types
 
@@ -489,7 +490,7 @@ def test_notification_manager_add_force_returns_false_if_conflict_persists(
 # ---------------------------------------------------------------------------
 
 def _make_dep_plugin(schema, *deps):
-    """Return a minimal NotifyBase subclass that declares *deps* in
+    """Return a minimal NotifyBase subclass that declares *deps in
     runtime_deps() and is always enabled."""
 
     class _Plugin(NotifyBase):
@@ -700,11 +701,19 @@ def test_manager_enable_only_updates_dep_counter():
 
 
 def test_manager_unload_resets_dep_counter():
-    """unload_modules() resets _dep_counter to an empty dict."""
+    """unload_modules() resets _dep_counter to an empty dict.
+
+    Seeds the counter via a fake plugin rather than relying on native
+    plugins whose optional libraries may not be installed (the minimal
+    tox env disables all such plugins, leaving _dep_counter empty after
+    a native load).
+    """
     N_MGR.unload_modules()
-    # Trigger load so counter is built
-    assert len(N_MGR.schemas()) > 0
-    assert len(N_MGR._dep_counter) > 0
+    # Seed counter directly so the post-unload assertion is meaningful
+    PlugR = _make_dep_plugin("resettest_xyz", "resetlib_xyz")
+    N_MGR["resettest_xyz"] = PlugR
+    N_MGR._build_dep_counter()
+    assert N_MGR._dep_counter.get("resetlib_xyz", 0) >= 1
 
     N_MGR.unload_modules()
     assert N_MGR._dep_counter == {}
@@ -732,3 +741,276 @@ def test_manager_known_plugin_runtime_deps():
 
     # Base class has no deps
     assert NotifyBase.runtime_deps() == ()
+
+
+# ===========================================================================
+# Coverage: additional tests for previously uncovered branches
+# ===========================================================================
+
+
+def test_manager_len_already_loaded():
+    """Verify __len__ works correctly when modules are already loaded."""
+    N_MGR.unload_modules()
+    # First call: triggers lazy load
+    _ = len(N_MGR)
+    # Second call: modules already loaded, returns length directly
+    assert len(N_MGR) > 0
+
+
+def test_manager_unload_orphan_custom_module():
+    """Verify unload_modules() skips custom module map entries whose
+    name is not present in the native module map."""
+    N_MGR.unload_modules()
+    N_MGR.load_modules()
+    # Inject a synthetic entry whose 'name' value is not a key in
+    # _module_map so the early-continue branch is exercised.
+    N_MGR._custom_module_map["orphan_key_xyz"] = {
+        "name": "orphan_module_xyz_not_native",
+        "path": "/fake/path.py",
+        "notify": {},
+    }
+    N_MGR.unload_modules()
+    assert "orphan_key_xyz" not in N_MGR._custom_module_map
+
+
+def test_module_detection_invalid_paths():
+    """Verify module_detection returns early for invalid path inputs."""
+    N_MGR.unload_modules()
+    N_MGR.module_detection(None)
+    N_MGR.module_detection([])
+    N_MGR.module_detection(123)
+
+
+def test_module_detection_nonexistent_path():
+    """Verify a path that does not exist is silently skipped."""
+    N_MGR.unload_modules()
+    N_MGR.module_detection(["/tmp/__no_such_path_xyz_abc_123__"])
+
+
+def test_module_detection_directory_scan(tmpdir):
+    """Scans a plain directory (no __init__.py at root) containing several
+    fixture files that each exercise a different branch."""
+    N_MGR.unload_modules()
+
+    # File whose name starts with '.' -> module_re fails -> ignored
+    tmpdir.join(".hidden_xyz").write("")
+
+    # File without .py extension -> valid_python_file_re fails inside
+    # _import_module -> skipped
+    tmpdir.join("noext_xyz").write("")
+
+    # Valid .py but raises ImportError at module level ->
+    # import_module returns None -> skipped
+    tmpdir.join("badimport_xyz.py").write(
+        "import this_library_does_not_exist_xyz_abc\n"
+    )
+
+    # Valid .py with no @notify -> module_pyname absent from
+    # _custom_module_map after import -> skipped
+    tmpdir.join("nohooks_xyz.py").write("x = 1\n")
+
+    # Subdir without __init__.py -> no __init__.py -> skipped
+    tmpdir.mkdir("subpkg_no_init_xyz")
+
+    # Subdir WITH __init__.py, pre-populated in cache so the cache-hit
+    # branch is exercised (file exists -> don't skip, but cache -> skip
+    # _import_module call)
+    cached_sub = tmpdir.mkdir("subpkg_cached_xyz")
+    cached_init = cached_sub.join("__init__.py")
+    cached_init.write("# cached\n")
+    N_MGR._paths_previously_scanned.add(str(cached_init))
+
+    N_MGR.module_detection(str(tmpdir))
+    N_MGR.unload_modules()
+
+
+def test_module_detection_package_dir(tmpdir):
+    """Directory with __init__.py: already-scanned path is skipped;
+    fresh path is imported but yields no hooks."""
+    N_MGR.unload_modules()
+
+    # A package dir (has __init__.py) with no @notify hooks
+    pkgdir = tmpdir.mkdir("mypkg_xyz")
+    pkg_path = str(pkgdir)
+    init_path = str(pkgdir.join("__init__.py"))
+    pkgdir.join("__init__.py").write("# no hooks\n")
+
+    # Pre-populate the cache with the __init__.py path so the
+    # already-scanned-inner-path branch is exercised on first call
+    N_MGR._paths_previously_scanned.add(init_path)
+    N_MGR.module_detection(pkg_path)
+
+    # Discard both paths
+    # so the add-to-cache branch is exercised on the second call
+    N_MGR._paths_previously_scanned.discard(init_path)
+    N_MGR._paths_previously_scanned.discard(pkg_path)
+    N_MGR.module_detection(pkg_path)
+    N_MGR.unload_modules()
+
+
+def test_module_detection_non_matching_file(tmpdir):
+    """File path whose basename fails module_re is silently ignored."""
+    N_MGR.unload_modules()
+
+    # A filename starting with '.' does not match module_re -> ignored
+    hidden = tmpdir.join(".hidden_direct_xyz")
+    hidden.write("")
+
+    N_MGR.module_detection(str(hidden))
+    N_MGR.unload_modules()
+
+
+def test_module_detection_reload_existing(tmpdir):
+    """_import_module clears and re-registers a custom module that was
+    previously loaded into _custom_module_map."""
+    N_MGR.unload_modules()
+
+    hook = tmpdir.mkdir("reloadpkg_xyz").join("__init__.py")
+    hook.write(cleandoc("""
+        from apprise.decorators import notify
+
+        @notify(on="reloadhookxyz")
+        def handler(body, title, notify_type, *args, **kwargs):
+            pass
+    """))
+
+    # First load — populates _custom_module_map
+    N_MGR.module_detection(str(hook))
+    assert "reloadhookxyz" in N_MGR
+
+    # Remove path from cache so the same file is processed a second time
+    N_MGR._paths_previously_scanned.discard(str(hook))
+
+    # Second load -> _import_module finds module_pyname already in
+    # _custom_module_map -> clear + re-register
+    N_MGR.module_detection(str(hook))
+    assert "reloadhookxyz" in N_MGR
+    N_MGR.unload_modules()
+
+
+def test_build_dep_counter_empty_map():
+    """_build_dep_counter returns early when _module_map is empty."""
+    # disable_native=True sets _module_map = {} (falsy) -> returns early
+    N_MGR.unload_modules(disable_native=True)
+    N_MGR._build_dep_counter()
+    assert N_MGR._dep_counter == {}
+
+
+def test_build_dep_counter_no_runtime_deps_attr():
+    """Plugin without a callable runtime_deps is skipped by
+    _build_dep_counter."""
+    N_MGR.unload_modules()
+    N_MGR.load_modules()
+
+    class MinimalPlugin:
+        """Minimal plugin: enabled but has no runtime_deps attribute."""
+        enabled = True
+
+    N_MGR._module_map["minimal_test_xyz_657"] = {
+        "plugin": {MinimalPlugin},
+        "module": None,
+        "path": "apprise.adhoc.minimal_test_xyz_657",
+        "native": False,
+    }
+    # getattr returns None -> not callable(None) -> continue
+    N_MGR._build_dep_counter()
+    N_MGR.unload_modules()
+
+
+def test_update_dep_counter_no_runtime_deps():
+    """_update_dep_counter returns early when the plugin has no callable
+    runtime_deps."""
+    N_MGR.unload_modules()
+
+    class NoDepPlugin:
+        """Plugin with no runtime_deps attribute at all."""
+
+    # getattr returns None -> not callable(None) -> return early
+    N_MGR._update_dep_counter(NoDepPlugin, -1)
+
+
+def test_evict_library_keyerror_race(monkeypatch):
+    """KeyError during sys.modules eviction is handled gracefully.
+
+    sys.modules is replaced with a subclass whose __delitem__ always
+    raises KeyError.  The key is found but the delete fails, exercising
+    the except-KeyError branch.  With evicted == 0 and to_remove
+    non-empty the elif warning branch is also reached.
+    """
+    N_MGR.unload_modules()
+
+    class BrokenModulesDict(dict):
+        def __delitem__(self, key):
+            raise KeyError(key)
+
+    broken = BrokenModulesDict(sys.modules)
+    broken["evict_race_lib_xyz"] = types.ModuleType(
+        "evict_race_lib_xyz"
+    )
+    monkeypatch.setattr(sys, "modules", broken)
+
+    # to_remove = ["evict_race_lib_xyz"]; del raises -> KeyError caught
+    # evicted stays 0, to_remove non-empty -> warning branch reached
+    N_MGR._evict_library("evict_race_lib_xyz")
+
+
+def test_load_modules_import_fallback_fails(tmpdir):
+    """__import__ raises ImportError and the path-based fallback also
+    returns None because the file itself fails to import."""
+    N_MGR.unload_modules()
+
+    # A .py file whose top-level import always fails
+    tmpdir.join("alwaysfail_xyz.py").write(
+        "import this_library_does_not_exist_xyz_abc\n"
+    )
+    # load_modules uses the default prefix ("apprise.plugins") so
+    # __import__("apprise.plugins.alwaysfail_xyz") raises ImportError,
+    # then import_module(path, ...) also returns None -> skipped
+    N_MGR.load_modules(path=str(tmpdir))
+    N_MGR.unload_modules()
+
+
+def test_load_modules_no_valid_class(tmpdir):
+    """Module loads successfully but contains no qualifying class, so
+    module_class stays None and the module is skipped."""
+    N_MGR.unload_modules()
+
+    # A module with only a docstring: dir() yields nothing that matches
+    # module_filter_re (all dunders start with '_') -> empty list ->
+    # module_class stays None -> skipped
+    tmpdir.join("notifyempty_xyz.py").write('"""Empty module."""\n')
+
+    N_MGR.load_modules(path=str(tmpdir))
+    N_MGR.unload_modules()
+
+
+def test_load_modules_schema_conflict(tmpdir):
+    """A schema already registered is logged as a conflict and
+    skipped."""
+    N_MGR.unload_modules()
+    N_MGR.load_modules()  # native load -> "json" in _schema_map
+
+    tmpdir.join("notifyconflict_xyz.py").write(cleandoc("""
+        from apprise.plugins.base import NotifyBase
+
+        class NotifyConflict(NotifyBase):
+            service_name = "Conflict"
+            protocol = "json"
+            secure_protocol = None
+            service_url = "https://example.com"
+            setup_url = "https://example.com"
+            notify_url = ""
+            templates = ('{schema}://',)
+
+            def send(self, body, title="", **kwargs):
+                return True
+
+            def url(self, **kwargs):
+                return "json://"
+    """))
+
+    # __import__("apprise.plugins.notifyconflict_xyz") -> ImportError;
+    # fallback loads the file; NotifyConflict.schemas() = {"json"};
+    # "json" already in _schema_map -> conflict logged, skipped
+    N_MGR.load_modules(path=str(tmpdir))
+    N_MGR.unload_modules()

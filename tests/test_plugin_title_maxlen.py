@@ -97,7 +97,7 @@ def test_plugin_title_maxlen(request_mock):
     assert payload["message"] == body
     assert payload["title"] == "Hello World"
 
-    # Telegram plugin: requests.post(url, data=...) → url is [0][0]
+    # Telegram plugin: requests.post(url, data=...) -> url is [0][0]
     details = mock_post.call_args_list[0]
     assert (
         details[0][0]

@@ -467,7 +467,7 @@ def test_notify_base_runtime_deps_override():
         def runtime_deps():
             return ("fakelibA", "fakelibB")
 
-    # No override → inherits the empty tuple from NotifyBase
+    # No override -> inherits the empty tuple from NotifyBase
     assert DepFreePlugin.runtime_deps() == ()
 
     # Single-dep override

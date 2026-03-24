@@ -827,11 +827,8 @@ def test_xmpp_bridge_logging_safe_lock(
     done = {"ok": False}
 
     def worker() -> None:
-        try:
-            xmpp_adapter.bridge_slixmpp_logging()
-            done["ok"] = True
-        finally:
-            pass
+        xmpp_adapter.bridge_slixmpp_logging()
+        done["ok"] = True
 
     t = threading.Thread(target=worker, daemon=True)
     t.start()
@@ -4131,7 +4128,7 @@ def test_xmpp_name_parameter() -> None:
     )
     assert n3.name == n3.user
 
-    # No name provided → defaults to user (then app_id if no user);
+    # No name provided -> defaults to user (then app_id if no user);
     # not emitted in URL
     n4 = NotifyXMPP(
         host="example.com",
@@ -4339,7 +4336,7 @@ def test_send_keepalive_async_muc_join(
     assert result is True
     assert len(join_calls) == 1
     assert join_calls[0][0] == "room@conference.example.com"
-    # boundjid.user == "me" → nick must be taken from boundjid, not nickname
+    # boundjid.user == "me" -> nick must be taken from boundjid, not nickname
     assert join_calls[0][1] == "me"
     assert len(sent) == 1
     assert sent[0]["mtype"] == "groupchat"
@@ -4377,7 +4374,7 @@ def test_send_keepalive_async_muc_join_nick_fallback(
         join_calls.append((room, nick))
 
     class FakeBoundJID:
-        user = ""   # empty → should fall back to nickname
+        user = ""   # empty -> should fall back to nickname
 
     class FakeMucPlugin:
         def join_muc(self, room: str, nick: str, **kw: Any) -> Any:
@@ -4409,7 +4406,7 @@ def test_send_keepalive_async_muc_join_nick_fallback(
     assert result is True
     assert len(join_calls) == 1
     assert join_calls[0][0] == "room@conference.example.com"
-    # boundjid.user is empty → nick must fall back to adapter's nickname
+    # boundjid.user is empty -> nick must fall back to adapter's nickname
     assert join_calls[0][1] == "mybot"
     assert len(sent) == 1
     assert sent[0]["mtype"] == "groupchat"
@@ -4491,7 +4488,7 @@ def test_send_keepalive_async_muc_join_error(
     sent: list[dict[str, Any]] = []
 
     async def join_muc_fail(room: str, nick: str) -> None:
-        raise asyncio.TimeoutError()  # simulate timeout → exception path
+        raise asyncio.TimeoutError()  # simulate timeout -> exception path
 
     class FakeBoundJID:
         user = "me"
