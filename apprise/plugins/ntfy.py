@@ -284,7 +284,7 @@ class NotifyNtfy(NotifyBase):
                 "values": NTFY_PRIORITIES,
                 "default": NtfyPriority.NORMAL,
             },
-            "tags": {
+            "xtags": {
                 "name": _("Tags"),
                 "type": "string",
             },
@@ -322,7 +322,7 @@ class NotifyNtfy(NotifyBase):
         delay=None,
         email=None,
         priority=None,
-        tags=None,
+        xtags=None,
         actions=None,
         mode=None,
         include_image=True,
@@ -405,7 +405,7 @@ class NotifyNtfy(NotifyBase):
         )
 
         # Any optional tags to attach to the notification
-        self.__tags = parse_list(tags)
+        self.__tags = parse_list(xtags)
 
         # Action buttons
         self.__actions = actions
@@ -788,7 +788,7 @@ class NotifyNtfy(NotifyBase):
             params["email"] = self.email
 
         if self.__tags:
-            params["tags"] = ",".join(self.__tags)
+            params["xtags"] = ",".join(self.__tags)
 
         if self.__actions:
             params["actions"] = self.__actions
@@ -888,9 +888,15 @@ class NotifyNtfy(NotifyBase):
         if "email" in results["qsd"] and len(results["qsd"]["email"]):
             results["email"] = NotifyNtfy.unquote(results["qsd"]["email"])
 
-        if "tags" in results["qsd"] and len(results["qsd"]["tags"]):
-            results["tags"] = parse_list(
-                NotifyNtfy.unquote(results["qsd"]["tags"])
+        # Support both 'xtags' (canonical) and legacy 'tags'.
+        # Storing as 'xtags' prevents the config/base parser from
+        # misinterpreting this as an apprise-level tag filter.
+        raw_xtags = (
+            results["qsd"].get("xtags") or results["qsd"].get("tags") or ""
+        )
+        if raw_xtags:
+            results["xtags"] = parse_list(
+                NotifyNtfy.unquote(raw_xtags)
             )
 
         if "actions" in results["qsd"] and len(results["qsd"]["actions"]):
