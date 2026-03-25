@@ -26,27 +26,35 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 #
-# API: https://dot.mindreset.tech/docs/service/studio/api/text_api
-#      https://dot.mindreset.tech/docs/service/studio/api/image_api
+# API: https://dot.mindreset.tech/docs/service/open/text_api
+#      https://dot.mindreset.tech/docs/service/open/image_api
+#
+# New API endpoints (v2):
+#   - Text API: /api/authV2/open/device/:deviceId/text
+#   - Image API: /api/authV2/open/device/:deviceId/image
+#
+# Note: Old endpoints (/api/open/text and /api/open/image) are deprecated
+# and will be removed in the future. Requests are automatically forwarded
+# to the new endpoints.
 #
 # Text API Fields:
 #   - refreshNow (bool, optional, default true): controls display timing.
-#   - deviceId (string, required): unique device serial.
 #   - title (string, optional): title text shown on screen.
 #   - message (string, optional): body text shown on screen.
 #   - signature (string, optional): footer/signature text.
 #   - icon (string, optional): base64 PNG icon (40px x 40px).
 #   - link (string, optional): tap-to-interact target URL.
+#   - taskKey (string, optional): specify which text API content to update.
 #
 # Image API Fields:
 #   - refreshNow (bool, optional, default true): controls display timing.
-#   - deviceId (string, required): unique device serial.
 #   - image (string, required): base64 PNG image (296px x 152px).
 #   - link (string, optional): tap-to-interact target URL.
 #   - border (number, optional, default 0): 0=white, 1=black frame.
 #   - ditherType (string, optional, default DIFFUSION): dithering mode.
 #   - ditherKernel (string, optional, default FLOYD_STEINBERG):
 #     dithering kernel.
+#   - taskKey (string, optional): specify which image API content to update.
 
 from contextlib import suppress
 import json
@@ -186,6 +194,10 @@ class NotifyDot(NotifyBase):
                 "values": DOT_DITHER_KERNELS,
                 "default": "FLOYD_STEINBERG",
             },
+            "task_key": {
+                "name": _("Task Key"),
+                "type": "string",
+            },
         },
     )
     # Note:
@@ -201,7 +213,7 @@ class NotifyDot(NotifyBase):
         apikey=None,
         device_id=None,
         mode=DEFAULT_MODE,
-        refresh_now=True,
+        refresh_now=None,
         signature=None,
         icon=None,
         link=None,
@@ -209,6 +221,7 @@ class NotifyDot(NotifyBase):
         dither_type=None,
         dither_kernel=None,
         image_data=None,
+        task_key=None,
         **kwargs,
     ):
         """Initialize Notify Dot Object."""
@@ -221,7 +234,14 @@ class NotifyDot(NotifyBase):
         self.device_id = device_id
 
         # Refresh Now flag: True shows content immediately (default).
-        self.refresh_now = parse_bool(refresh_now, default=True)
+        self.refresh_now = (
+            parse_bool(
+                refresh_now,
+                self.template_args["refresh"]["default"],
+            )
+            if refresh_now is not None
+            else self.template_args["refresh"]["default"]
+        )
 
         # API mode ("text" or "image")
         self.mode = (
@@ -267,11 +287,20 @@ class NotifyDot(NotifyBase):
         # Dither kernel for the Image API
         self.dither_kernel = dither_kernel
 
-        # Text API endpoint
-        self.text_api_url = "https://dot.mindreset.tech/api/open/text"
+        # Task Key for specifying which content to update
+        self.task_key = task_key if isinstance(task_key, str) else None
 
-        # Image API endpoint
-        self.image_api_url = "https://dot.mindreset.tech/api/open/image"
+        # Text API endpoint (v2)
+        self.text_api_url = (
+            f"https://dot.mindreset.tech/api/authV2/open/device/"
+            f"{self.device_id}/text"
+        )
+
+        # Image API endpoint (v2)
+        self.image_api_url = (
+            f"https://dot.mindreset.tech/api/authV2/open/device/"
+            f"{self.device_id}/image"
+        )
 
         return
 
@@ -335,17 +364,16 @@ class NotifyDot(NotifyBase):
 
             # Use Image API
             # Image API payload:
-            #   refreshNow: display timing control.
-            #   deviceId: Dot device serial (required).
+            #   refreshNow: display timing control (optional).
             #   image: base64 PNG 296x152 (required).
             #   link: optional tap target.
             #   border: optional frame color.
             #   ditherType: optional dithering mode.
             #   ditherKernel: optional dithering kernel.
+            #   taskKey: optional task identifier.
             payload = {
-                "refreshNow": self.refresh_now,
-                "deviceId": self.device_id,
                 "image": image_data,  # Image payload shown on screen
+                "refreshNow": self.refresh_now,
             }
 
             if self.link:
@@ -360,21 +388,23 @@ class NotifyDot(NotifyBase):
             if self.dither_kernel is not None:
                 payload["ditherKernel"] = self.dither_kernel
 
+            if self.task_key is not None:
+                payload["taskKey"] = self.task_key
+
             api_url = self.image_api_url
 
         else:
             # Use Text API
             # Text API payload:
-            #   refreshNow: display timing control.
-            #   deviceId: Dot device serial (required).
+            #   refreshNow: display timing control (optional).
             #   title: optional title on screen.
             #   message: optional body on screen.
             #   signature: optional footer text.
             #   icon: optional base64 PNG icon (40x40).
             #   link: optional tap target.
+            #   taskKey: optional task identifier.
             payload = {
                 "refreshNow": self.refresh_now,
-                "deviceId": self.device_id,
             }
 
             if title:
@@ -412,6 +442,9 @@ class NotifyDot(NotifyBase):
             if self.link:
                 payload["link"] = self.link
 
+            if self.task_key is not None:
+                payload["taskKey"] = self.task_key
+
             api_url = self.text_api_url
 
         # Some Debug Logging
@@ -445,8 +478,7 @@ class NotifyDot(NotifyBase):
             status_str = NotifyDot.http_response_code_lookup(r.status_code)
 
             self.logger.warning(
-                "Failed to send Dot notification to {}: "
-                "{}{}error={}.".format(
+                "Failed to send Dot notification to {}: {}{}error={}.".format(
                     self.device_id,
                     status_str,
                     ", " if status_str else "",
@@ -455,7 +487,8 @@ class NotifyDot(NotifyBase):
             )
 
             self.logger.debug(
-                "Response Details:\r\n%r", (r.content or b"")[:2000])
+                "Response Details:\r\n%r", (r.content or b"")[:2000]
+            )
 
             return False
 
@@ -484,9 +517,10 @@ class NotifyDot(NotifyBase):
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
-        params = {
-            "refresh": "yes" if self.refresh_now else "no",
-        }
+        params = {}
+
+        # Add refresh parameter
+        params["refresh"] = "yes" if self.refresh_now else "no"
 
         if self.mode == "text":
             if self.signature:
@@ -513,6 +547,10 @@ class NotifyDot(NotifyBase):
 
             if self.dither_kernel and self.dither_kernel != "FLOYD_STEINBERG":
                 params["dither_kernel"] = self.dither_kernel
+
+        # Add task_key if provided
+        if self.task_key:
+            params["task_key"] = self.task_key
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -615,5 +653,10 @@ class NotifyDot(NotifyBase):
         image_value = results["qsd"].get("image")
         if image_value:
             results["image_data"] = NotifyDot.unquote(image_value.strip())
+
+        # Task Key
+        task_key_value = results["qsd"].get("task_key")
+        if task_key_value:
+            results["task_key"] = NotifyDot.unquote(task_key_value.strip())
 
         return results
