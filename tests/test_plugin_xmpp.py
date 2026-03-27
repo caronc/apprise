@@ -450,7 +450,7 @@ def test_xmpp_server_override_url_identifier() -> None:
         password="pass",
         xmpp_host="xmpp.example.com",
     )
-    schema, host, xmpp_host, user, password, port = n.url_identifier
+    _schema, host, xmpp_host, _user, _password, _port = n.url_identifier
     assert host == "example.com"
     assert xmpp_host == "xmpp.example.com"
 
