@@ -135,6 +135,11 @@ class NotifyXMPP(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "xmpp": {
+                "name": _("XMPP Server"),
+                "type": "string",
+                "map_to": "xmpp_host",
+            },
             "mode": {
                 "name": _("Secure Mode"),
                 "type": "choice:string",
@@ -173,9 +178,18 @@ class NotifyXMPP(NotifyBase):
         subject: Optional[bool] = None,
         keepalive: Optional[bool] = None,
         name: Optional[str] = None,
+        xmpp_host: Optional[str] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
+
+        # xmpp_host allows the connection host to differ from the JID domain.
+        # Mirrors the smtp= / smtp_host pattern in the email plugin.
+        self.xmpp_host = (
+            xmpp_host.strip()
+            if isinstance(xmpp_host, str) and xmpp_host.strip()
+            else ""
+        )
 
         try:
             self.jid, _ = self.normalize_jid(self.user or "", self.host)
@@ -280,7 +294,7 @@ class NotifyXMPP(NotifyBase):
         """Return the pieces that uniquely identify this configuration."""
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.host, self.user, self.password, self.port,
+            self.host, self.xmpp_host, self.user, self.password, self.port,
         )
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
@@ -298,6 +312,9 @@ class NotifyXMPP(NotifyBase):
         # (JID user / app_id)
         if self.name != (self.user or self.app_id):
             params["name"] = self.name
+
+        if self.xmpp_host and self.xmpp_host != self.host:
+            params["xmpp"] = self.xmpp_host
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -350,7 +367,7 @@ class NotifyXMPP(NotifyBase):
         config = XMPPConfig(
             jid=self.jid,
             password=self.password or "",
-            host=self.host,
+            host=self.xmpp_host or self.host,
             port=self.port if self.port else default_port,
             secure=self.secure_mode,
             verify_certificate=self.verify_certificate,
@@ -473,6 +490,10 @@ class NotifyXMPP(NotifyBase):
         if "name" in results["qsd"] and len(results["qsd"]["name"]):
             results["name"] = \
                 NotifyXMPP.unquote(results["qsd"]["name"])
+
+        if "xmpp" in results["qsd"] and len(results["qsd"]["xmpp"]):
+            results["xmpp_host"] = \
+                NotifyXMPP.unquote(results["qsd"]["xmpp"])
 
         return results
 
