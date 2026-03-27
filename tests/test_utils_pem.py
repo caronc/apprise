@@ -421,8 +421,8 @@ def test_utils_pem_general(tmpdir):
         assert mock_keyfile.call_count == 2
         mock_keygen.assert_called_once()
 
-    # - First call: None → triggers keygen
-    # - Second call (recursive): None → causes fallback
+    # - First call: None -> triggers keygen
+    # - Second call (recursive): None -> causes fallback
     public_keyfile_side_effect = [None, None]
 
     with (
@@ -468,8 +468,8 @@ def test_utils_pem_general(tmpdir):
         assert mock_keyfile.call_count == 2
         mock_keygen.assert_called_once()
 
-    # - First call: None → triggers keygen
-    # - Second call (recursive): None → causes fallback
+    # - First call: None -> triggers keygen
+    # - Second call (recursive): None -> causes fallback
     private_keyfile_side_effect = [None, None]
 
     with (

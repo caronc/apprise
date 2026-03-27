@@ -369,3 +369,10 @@ class NotifySimplePush(NotifyBase):
             )
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        """Return a tuple of top-level Python package names that this plugin
+        imported as optional runtime dependencies.
+        """
+        return ("cryptography",)

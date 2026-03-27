@@ -1183,3 +1183,10 @@ class NotifyEmail(NotifyBase):
                 to_addrs=[to_addr, *list(cc_), *list(bcc_)],
                 body=base.as_string(),
             )
+
+    @staticmethod
+    def runtime_deps():
+        """Return a tuple of top-level Python package names that this plugin
+        imported as optional runtime dependencies.
+        """
+        return ("pgpy",)

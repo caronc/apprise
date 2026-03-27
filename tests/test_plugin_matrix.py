@@ -1648,16 +1648,16 @@ def test_plugin_matrix_v2_token_mode_no_txn_increment(
     mock_put.return_value = response
 
     # Token mode: user omitted, password treated as access token
-    # (parse_url swaps user→password when no password supplied)
+    # (parse_url swaps user->password when no password supplied)
     obj = Apprise.instantiate(
         "matrixs://my_access_token@localhost/#general?v=2&image=y"
     )
     assert obj is not None
 
-    # Send with image inline enabled (exercises line 747→755 branch)
+    # Send with image inline enabled
     assert obj.notify(body="token mode image test") is True
 
-    # Send with an attachment (exercises line 765→775 branch)
+    # Send with an attachment
     attach = AppriseAttachment(
         os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     )

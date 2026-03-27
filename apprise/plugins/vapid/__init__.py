@@ -614,3 +614,10 @@ class NotifyVapid(NotifyBase):
     def public_key(self):
         """Returns our public key representation."""
         return self.pem.x962_str
+
+    @staticmethod
+    def runtime_deps():
+        """Return a tuple of top-level Python package names that this plugin
+        imported as optional runtime dependencies.
+        """
+        return ("cryptography",)

@@ -472,3 +472,10 @@ class NotifyGrowl(NotifyBase):
             results["version"] = version
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        """Return a tuple of top-level Python package names that this plugin
+        imported as optional runtime dependencies.
+        """
+        return ("gntp",)

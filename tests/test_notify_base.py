@@ -379,3 +379,102 @@ def test_notify_base_urls():
     assert NotifyBase.parse_url("http:///") is None
     assert NotifyBase.parse_url("http://:test/") is None
     assert NotifyBase.parse_url("http://pass:test/") is None
+
+
+def test_notify_base_runtime_deps():
+    """NotifyBase.runtime_deps() returns an empty tuple by default."""
+
+    assert NotifyBase.runtime_deps() == ()
+    assert isinstance(NotifyBase.runtime_deps(), tuple)
+
+
+def test_notify_base_enable_disable():
+    """NotifyBase.enable() and disable() toggle the enabled flag."""
+
+    class ToggleNotification(NotifyBase):
+        protocol = "toggle"
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "toggle://"
+
+    # Starts enabled
+    assert ToggleNotification.enabled is True
+
+    # disable() sets it False
+    ToggleNotification.disable()
+    assert ToggleNotification.enabled is False
+
+    # enable() restores it
+    ToggleNotification.enable()
+    assert ToggleNotification.enabled is True
+
+    # Calling disable() twice is idempotent
+    ToggleNotification.disable()
+    ToggleNotification.disable()
+    assert ToggleNotification.enabled is False
+
+    # Calling enable() twice is idempotent
+    ToggleNotification.enable()
+    ToggleNotification.enable()
+    assert ToggleNotification.enabled is True
+
+    # Changes are on the class, not on instances
+    instance = ToggleNotification(host="localhost")
+    ToggleNotification.disable()
+    assert instance.enabled is False
+    ToggleNotification.enable()
+    assert instance.enabled is True
+
+
+def test_notify_base_runtime_deps_override():
+    """Subclasses can override runtime_deps() to declare their dependencies."""
+
+    class DepFreePlugin(NotifyBase):
+        protocol = "depfree"
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "depfree://"
+
+    class SingleDepPlugin(NotifyBase):
+        protocol = "singledep"
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "singledep://"
+
+        @staticmethod
+        def runtime_deps():
+            return ("fakelibA",)
+
+    class MultiDepPlugin(NotifyBase):
+        protocol = "multidep"
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "multidep://"
+
+        @staticmethod
+        def runtime_deps():
+            return ("fakelibA", "fakelibB")
+
+    # No override -> inherits the empty tuple from NotifyBase
+    assert DepFreePlugin.runtime_deps() == ()
+
+    # Single-dep override
+    assert SingleDepPlugin.runtime_deps() == ("fakelibA",)
+
+    # Multi-dep override preserves order
+    deps = MultiDepPlugin.runtime_deps()
+    assert deps == ("fakelibA", "fakelibB")
+    assert deps[0] == "fakelibA"
+    assert deps[1] == "fakelibB"

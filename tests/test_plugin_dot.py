@@ -797,7 +797,7 @@ def test_notify_dot_text_mode_attachment_falsy():
 
 
 def test_notify_dot_parse_url_no_host():
-    """Test parse_url when host is empty (line 578)."""
+    """Test parse_url when host is empty."""
     # Test URL with empty host - device_id should not be added
     # Using a valid URL structure but testing when host is explicitly empty
     result = NotifyDot.parse_url("dot://apikey@device/text/")
@@ -807,7 +807,7 @@ def test_notify_dot_parse_url_no_host():
 
 
 def test_notify_dot_url_with_border_not_none():
-    """Test URL generation when border is not None (line 515)."""
+    """Test URL generation when border is not None."""
     dot = NotifyDot(
         apikey="token",
         device_id="device",
@@ -885,7 +885,7 @@ def test_notify_dot_parse_url_without_host():
 
 
 def test_notify_dot_image_mode_without_title_and_body():
-    """Test image mode without title and body (line 294->300)."""
+    """Test image mode without title and body."""
     dot = NotifyDot(
         apikey="token",
         device_id="device",
@@ -910,7 +910,7 @@ def test_notify_dot_image_mode_without_title_and_body():
 
 
 def test_notify_dot_parse_url_with_empty_refresh():
-    """Test parse_url when refresh query parameter is empty (line 535->539)."""
+    """Test parse_url when refresh query parameter is empty."""
     # Test with no refresh parameter (should default to True)
     result = NotifyDot.parse_url("dot://apikey@device/text/")
     assert result is not None
@@ -939,12 +939,12 @@ def test_notify_dot_image_mode_first_attachment_fails():
 
 
 def test_notify_dot_image_mode_with_empty_attach_list():
-    """Test image mode with empty attachments list (line 305->313)."""
+    """Test image mode with empty attachments list."""
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
 
     # Try with empty attachments list
     # Condition: not image_data and attach -> not None and [] -> False
-    # Should skip the for loop and go directly to line 313
+    # Should skip the for loop and go directly
     assert (
         dot.notify(
             title="",
@@ -956,11 +956,11 @@ def test_notify_dot_image_mode_with_empty_attach_list():
 
 
 def test_notify_dot_parse_url_without_host_field():
-    """Test parse_url when host field is None (line 535->539)."""
+    """Test parse_url when host field is None."""
     from apprise import NotifyBase
 
     # Mock NotifyBase.parse_url to return results with host=None
-    # This triggers the else branch of "if host:" at line 535
+    # This triggers the else branch of "if host:"
     with mock.patch.object(NotifyBase, "parse_url") as mock_parse:
         mock_parse.return_value = {
             "user": "apikey",
