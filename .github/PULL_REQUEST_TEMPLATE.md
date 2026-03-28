@@ -54,11 +54,11 @@ END OF NEW PLUGIN SECTION -->
 
 <!-- The following must be completed or your PR cannot be merged -->
 ## Checklist
-* [ ] Documentation ticket created (if applicable):** [apprise-docs/##](https://github.com/caronc/apprise-docs/issue/<!--apprise-docs issue number goes here-->)
+* [ ] Documentation ticket created (if applicable): [apprise-docs/##](https://github.com/caronc/apprise-docs/pull/<!--apprise-docs pull request ## goes here-->)
 * [ ] The change is tested and works locally.
 * [ ] No commented-out code in this PR.
 * [ ] No lint errors (use `tox -e lint` and optionally `tox -e format`).
-* [ ] Test coverage added or updated (use `tox -e minimal`).
+* [ ] Test coverage added or updated (use `tox -e qa`).
 
 ## Testing
 <!-- If your change is testable by others, define how to validate it here -->
