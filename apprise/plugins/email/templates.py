@@ -122,7 +122,7 @@ EMAIL_TEMPLATES = (
             "port": 465,
             "smtp_host": "smtp.mail.yahoo.com",
             "secure": True,
-            "secure_mode": SecureMailMode.STARTTLS,
+            "secure_mode": SecureMailMode.SSL,
             "login_type": (WebBaseLogin.EMAIL,),
         },
     ),
