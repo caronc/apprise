@@ -366,12 +366,137 @@ def test_xmpp_url_identifier_is_accessible() -> None:
     """url_identifier property should be accessible and stable."""
     n = NotifyXMPP(
         host="example.com", user="me@example.com", password="secret")
-    schema, host, user, password, port = n.url_identifier
+    schema, host, xmpp_host, user, password, port = n.url_identifier
     assert schema == "xmpp"
     assert host == "example.com"
+    assert xmpp_host == ""
     assert user == "me@example.com"
     assert password == "secret"
     assert port is None
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_server_override_parse_url() -> None:
+    """?xmpp= is extracted into xmpp_host by parse_url()."""
+    r = NotifyXMPP.parse_url(
+        "xmpps://user@example.com/joe?xmpp=xmpp.example.com")
+    assert r is not None
+    assert r["xmpp_host"] == "xmpp.example.com"
+    # host stays as the JID domain
+    assert r["host"] == "example.com"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_server_override_constructor_and_url() -> None:
+    """xmpp_host is stored and round-trips through url()."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="user",
+        password="pass",
+        xmpp_host="xmpp.example.com",
+    )
+
+    # Stored correctly
+    assert n.xmpp_host == "xmpp.example.com"
+
+    # JIDs are built from host, not xmpp_host
+    assert n.jid == "user@example.com"
+
+    # url() emits xmpp= when it differs from host
+    u = n.url(privacy=False)
+    assert "xmpp=xmpp.example.com" in u
+    assert "example.com" in u
+
+    # url() omits xmpp= when xmpp_host matches host (redundant)
+    n2 = NotifyXMPP(
+        host="example.com",
+        user="user",
+        password="pass",
+        xmpp_host="example.com",
+    )
+    u2 = n2.url(privacy=False)
+    assert "xmpp=" not in u2
+
+    # url() omits xmpp= when xmpp_host is empty
+    n3 = NotifyXMPP(
+        host="example.com",
+        user="user",
+        password="pass",
+    )
+    u3 = n3.url(privacy=False)
+    assert "xmpp=" not in u3
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_server_override_target_jids_use_host() -> None:
+    """Target JIDs are built from host, not xmpp_host."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="user",
+        password="pass",
+        targets=["joe"],
+        xmpp_host="xmpp.example.com",
+    )
+    # Target 'joe' gets host domain appended, not xmpp_host
+    assert n.targets == [("chat", "joe@example.com")]
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_server_override_url_identifier() -> None:
+    """url_identifier carries xmpp_host so deduplication is xmpp_host-aware."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="user",
+        password="pass",
+        xmpp_host="xmpp.example.com",
+    )
+    _schema, host, xmpp_host, _user, _password, _port = n.url_identifier
+    assert host == "example.com"
+    assert xmpp_host == "xmpp.example.com"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_server_override_config_host(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """send() passes xmpp_host (not host) to XMPPConfig when set."""
+    captured: dict = {}
+
+    class _Adapter:
+        def __init__(self, config: Any, **kwargs: Any) -> None:
+            captured["config_host"] = config.host
+
+        def process(self) -> bool:
+            return True
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _Adapter, raising=True)
+
+    apobj = Apprise()
+    apobj.add("xmpps://user@example.com/joe?xmpp=xmpp.example.com")
+    apobj.notify("hello")
+
+    assert captured["config_host"] == "xmpp.example.com"
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_server_override_config_host_defaults_to_host(
+        monkeypatch: pytest.MonkeyPatch) -> None:
+    """send() passes host to XMPPConfig when xmpp_host is not set."""
+    captured: dict = {}
+
+    class _Adapter:
+        def __init__(self, config: Any, **kwargs: Any) -> None:
+            captured["config_host"] = config.host
+
+        def process(self) -> bool:
+            return True
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _Adapter, raising=True)
+
+    apobj = Apprise()
+    apobj.add("xmpps://user@example.com/joe")
+    apobj.notify("hello")
+
+    assert captured["config_host"] == "example.com"
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
