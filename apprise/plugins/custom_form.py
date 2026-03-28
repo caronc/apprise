@@ -46,7 +46,15 @@ class FORMPayloadField:
 
 # Defines the method to send the notification
 METHODS = (
-    "POST", "GET", "DELETE", "PUT", "HEAD", "PATCH", "UPDATE", "OPTIONS")
+    "POST",
+    "GET",
+    "DELETE",
+    "PUT",
+    "HEAD",
+    "PATCH",
+    "UPDATE",
+    "OPTIONS",
+)
 
 
 class NotifyForm(NotifyBase):
@@ -307,24 +315,26 @@ class NotifyForm(NotifyBase):
                     return False
 
                 try:
-                    files.append((
-                        (
-                            self.attach_as.format(no)
-                            if self.attach_multi_support
-                            else self.attach_as
-                        ),
+                    files.append(
                         (
                             (
-                                attachment.name
-                                if attachment.name
-                                else f"file{no:03}.dat"
+                                self.attach_as.format(no)
+                                if self.attach_multi_support
+                                else self.attach_as
                             ),
-                            # file handle is safely closed in `finally`; inline
-                            # open is intentional
-                            open(attachment.path, "rb"),  # noqa: SIM115
-                            attachment.mimetype,
-                        ),
-                    ))
+                            (
+                                (
+                                    attachment.name
+                                    if attachment.name
+                                    else f"file{no:03}.dat"
+                                ),
+                                # file handle is safely closed in `finally`; inline
+                                # open is intentional
+                                open(attachment.path, "rb"),  # noqa: SIM115
+                                attachment.mimetype,
+                            ),
+                        )
+                    )
 
                 except OSError as e:
                     self.logger.warning(
@@ -350,7 +360,6 @@ class NotifyForm(NotifyBase):
             (FORMPayloadField.MESSAGE, body),
             (FORMPayloadField.MESSAGETYPE, notify_type.value),
         ):
-
             if not self.payload_map[key]:
                 # Do not store element in payload response
                 continue
@@ -413,7 +422,8 @@ class NotifyForm(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

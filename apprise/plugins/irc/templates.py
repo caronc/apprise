@@ -57,7 +57,6 @@ IRC_TEMPLATES = (
             "mode": IRCAuthMode.NICKSERV,
         },
     ),
-
     # Libera.Chat: TLS default 6697, NickServ common (SASL also common but
     # not implemented here)
     (
@@ -69,7 +68,6 @@ IRC_TEMPLATES = (
             "mode": IRCAuthMode.NICKSERV,
         },
     ),
-
     # EFnet: traditionally plain 6667, auth varies widely
     (
         "EFnet",

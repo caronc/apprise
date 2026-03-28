@@ -229,19 +229,21 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
                 # One-shot mode sends messages immediately on session_start and
                 # then disconnects. Keepalive mode just signals readiness.
                 if self._oneshot:
-                    for (mtype, target) in self._targets:
+                    for mtype, target in self._targets:
                         if self._before_message:
                             self._before_message()
 
                         if mtype == "groupchat":
-                            nick = self._nick \
-                                or getattr(self.boundjid, "user", "") \
+                            nick = (
+                                self._nick
+                                or getattr(self.boundjid, "user", "")
                                 or "apprise"
+                            )
                             muc_coro = self.plugin["xep_0045"].join_muc(
-                                target, nick)
+                                target, nick
+                            )
                             try:
-                                await asyncio.wait_for(
-                                    muc_coro, timeout=5.0)
+                                await asyncio.wait_for(muc_coro, timeout=5.0)
                             except Exception:
                                 _close_awaitable(muc_coro)
 
@@ -316,6 +318,7 @@ def _get_client_subclass(base_cls: type[Any]) -> type[Any]:
 def _build_client(*args: Any, **kwargs: Any) -> Any:
     return _get_client_subclass(slixmpp.ClientXMPP)(*args, **kwargs)
 
+
 # ---------------------------------------------------------------------------
 # Adapter
 # ---------------------------------------------------------------------------
@@ -354,12 +357,19 @@ class SlixmppAdapter:
         want_muc: bool = False,
         default_nickname: Optional[str] = None,
     ) -> None:
-        self.config, self.targets, self.subject, self.body = \
-            config, targets, subject, body
+        self.config, self.targets, self.subject, self.body = (
+            config,
+            targets,
+            subject,
+            body,
+        )
 
         self.timeout = max(5.0, float(timeout))
-        self.roster, self.before_message, self.keepalive = \
-            roster, before_message, keepalive
+        self.roster, self.before_message, self.keepalive = (
+            roster,
+            before_message,
+            keepalive,
+        )
         self._want_muc = want_muc
 
         global LOGGING_ID
@@ -514,12 +524,15 @@ class SlixmppAdapter:
                 shared["loop"] = loop
 
                 targets = (
-                    list(self.targets) if self.targets
-                    else [("chat", self.config.jid)])
+                    list(self.targets)
+                    if self.targets
+                    else [("chat", self.config.jid)]
+                )
 
                 roster_timeout = (
                     max(2.0, min(10.0, self.timeout / 3.0))
-                    if self.roster else 0.0
+                    if self.roster
+                    else 0.0
                 )
 
                 client = _build_client(
@@ -634,7 +647,8 @@ class SlixmppAdapter:
 
         if not done.wait(timeout=self.timeout):
             self.logger.warning(
-                "XMPP send timed out after %.2fs.", self.timeout)
+                "XMPP send timed out after %.2fs.", self.timeout
+            )
             result[0] = False
 
             loop_obj = shared.get("loop")
@@ -706,8 +720,7 @@ class SlixmppAdapter:
             connect_lock = asyncio.Lock()  # type: ignore[union-attr]
 
             roster_timeout = (
-                max(2.0, min(10.0, self.timeout / 3.0))
-                if self.roster else 0.0
+                max(2.0, min(10.0, self.timeout / 3.0)) if self.roster else 0.0
             )
 
             client = _build_client(
@@ -865,18 +878,17 @@ class SlixmppAdapter:
         send_targets = targets if targets else [("chat", self.config.jid)]
 
         try:
-            for (mtype, target) in send_targets:
+            for mtype, target in send_targets:
                 if mtype == "groupchat":
                     nick = (
-                        getattr(
-                            self._client.boundjid, "user", "")
+                        getattr(self._client.boundjid, "user", "")
                         or self.nickname
                     )
                     muc_coro = self._client.plugin["xep_0045"].join_muc(
-                        target, nick)
+                        target, nick
+                    )
                     try:
-                        await asyncio.wait_for(
-                            muc_coro, timeout=5.0)
+                        await asyncio.wait_for(muc_coro, timeout=5.0)
                     except Exception:
                         _close_awaitable(muc_coro)
 

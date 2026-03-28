@@ -232,10 +232,12 @@ def test_plugin_voipms_edge_cases(mock_get):
 
     # a error response is returned
     response.status_code = 400
-    response.content = dumps({
-        "code": 21211,
-        "message": "Unable to process your request.",
-    })
+    response.content = dumps(
+        {
+            "code": 21211,
+            "message": "Unable to process your request.",
+        }
+    )
     mock_get.return_value = response
 
     # Initialize our object
@@ -262,10 +264,12 @@ def test_plugin_voipms_non_success_status(mock_get):
 
     # A 200 response is returned but non-success message
     response.status_code = 200
-    response.content = dumps({
-        "status": "invalid_credentials",
-        "message": "Username or Password is incorrect",
-    })
+    response.content = dumps(
+        {
+            "status": "invalid_credentials",
+            "message": "Username or Password is incorrect",
+        }
+    )
 
     obj = Apprise.instantiate(
         "voipms://{password}:{email}/{source}/{targets}".format(

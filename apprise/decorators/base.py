@@ -120,7 +120,6 @@ class CustomNotifyPlugin(NotifyBase):
         # `Apprise.details()` to correctly differentiate one custom plugin
         # that was loaded from another
         class CustomNotifyPluginWrapper(CustomNotifyPlugin):
-
             # Our Service Name
             service_name = (
                 name
@@ -193,7 +192,8 @@ class CustomNotifyPlugin(NotifyBase):
                         N_MGR[self.secure_protocol].service_name,
                     )
                     self.logger.debug(
-                        "%s Exception: %s", N_MGR[self.secure_protocol], e)
+                        "%s Exception: %s", N_MGR[self.secure_protocol], e
+                    )
                     return False
 
                 if response:

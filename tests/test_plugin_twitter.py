@@ -289,10 +289,12 @@ def twitter_url():
 @pytest.fixture
 def good_message_response():
     """Prepare a good tweet response."""
-    response = good_response({
-        "screen_name": TWITTER_SCREEN_NAME,
-        "id": 9876,
-    })
+    response = good_response(
+        {
+            "screen_name": TWITTER_SCREEN_NAME,
+            "id": 9876,
+        }
+    )
     return response
 
 
@@ -301,10 +303,12 @@ def bad_message_response():
     """Prepare a bad message response."""
     response = bad_response(
         {
-            "errors": [{
-                "code": 999,
-                "message": "Something failed",
-            }]
+            "errors": [
+                {
+                    "code": 999,
+                    "message": "Something failed",
+                }
+            ]
         }
     )
     return response
@@ -314,14 +318,16 @@ def bad_message_response():
 def good_media_response():
     """Prepare a good media response."""
     response = Mock()
-    response.content = json.dumps({
-        "media_id": 710511363345354753,
-        "media_id_string": "710511363345354753",
-        "media_key": "3_710511363345354753",
-        "size": 11065,
-        "expires_after_secs": 86400,
-        "image": {"image_type": "image/jpeg", "w": 800, "h": 320},
-    })
+    response.content = json.dumps(
+        {
+            "media_id": 710511363345354753,
+            "media_id_string": "710511363345354753",
+            "media_key": "3_710511363345354753",
+            "size": 11065,
+            "expires_after_secs": 86400,
+            "image": {"image_type": "image/jpeg", "w": 800, "h": 320},
+        }
+    )
     response.status_code = requests.codes.ok
     return response
 
@@ -329,15 +335,19 @@ def good_media_response():
 @pytest.fixture
 def bad_media_response():
     """Prepare a bad media response."""
-    response = bad_response({
-        "errors": [{
-            "code": 93,
-            "message": (
-                "This application is not allowed to access or "
-                "delete your direct messages."
-            ),
-        }]
-    })
+    response = bad_response(
+        {
+            "errors": [
+                {
+                    "code": 93,
+                    "message": (
+                        "This application is not allowed to access or "
+                        "delete your direct messages."
+                    ),
+                }
+            ]
+        }
+    )
     return response
 
 
@@ -369,10 +379,12 @@ def test_plugin_twitter_general(mocker):
     akey = "akey"
     asecret = "asecret"
 
-    response_obj = [{
-        "screen_name": TWITTER_SCREEN_NAME,
-        "id": 9876,
-    }]
+    response_obj = [
+        {
+            "screen_name": TWITTER_SCREEN_NAME,
+            "id": 9876,
+        }
+    ]
 
     # Epoch time:
     epoch = datetime.fromtimestamp(0, timezone.utc)
@@ -463,10 +475,12 @@ def test_plugin_twitter_general(mocker):
     # Alter pending targets
     obj.targets.append("usera")
     request.content = json.dumps(response_obj)
-    response_obj = [{
-        "screen_name": "usera",
-        "id": 1234,
-    }]
+    response_obj = [
+        {
+            "screen_name": "usera",
+            "id": 1234,
+        }
+    ]
 
     assert obj.send(body="test") is True
 
@@ -950,15 +964,17 @@ def test_plugin_twitter_tweet_attachments_more_logging(
     TODO: The "more logging" aspect is not verified yet?
     """
 
-    good_tweet_response = good_response({
-        "screen_name": TWITTER_SCREEN_NAME,
-        "id": 9876,
-        # needed for additional logging
-        "id_str": "12345",
-        "user": {
+    good_tweet_response = good_response(
+        {
             "screen_name": TWITTER_SCREEN_NAME,
-        },
-    })
+            "id": 9876,
+            # needed for additional logging
+            "id_str": "12345",
+            "user": {
+                "screen_name": TWITTER_SCREEN_NAME,
+            },
+        }
+    )
 
     mock_post.side_effect = [good_media_response, good_tweet_response]
 

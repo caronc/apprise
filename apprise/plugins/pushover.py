@@ -337,7 +337,6 @@ class NotifyPushover(NotifyBase):
 
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
-
             # How often to resend notification, in seconds
             self.retry = self.template_args["retry"]["default"]
             with contextlib.suppress(ValueError, TypeError):
@@ -469,7 +468,6 @@ class NotifyPushover(NotifyBase):
                 if not (
                     file_size > 0 and file_size <= self.attach_max_size_bytes
                 ):
-
                     # File size is no good
                     self.logger.warning(
                         f"Pushover attachment size ({file_size}B) exceeds"
@@ -513,7 +511,8 @@ class NotifyPushover(NotifyBase):
                         # open is intentional; attach.open() dispatches to
                         # BytesIO for memory attachments
                         attach.open(),
-                    )}
+                    )
+                }
 
             r = requests.post(
                 self.notify_url,
@@ -542,7 +541,8 @@ class NotifyPushover(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return False
 
@@ -611,10 +611,12 @@ class NotifyPushover(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Escape our devices
-        devices = "/".join([
-            NotifyPushover.quote(x, safe="")
-            for x in chain(self.targets, self.invalid_targets)
-        ])
+        devices = "/".join(
+            [
+                NotifyPushover.quote(x, safe="")
+                for x in chain(self.targets, self.invalid_targets)
+            ]
+        )
 
         if devices == PUSHOVER_SEND_TO_ALL:
             # keyword is reserved for internal usage only; it's safe to remove

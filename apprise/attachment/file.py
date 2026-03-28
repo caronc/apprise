@@ -107,7 +107,6 @@ class AttachFile(AttachBase):
             self.max_file_size > 0
             and os.path.getsize(self.dirty_path) > self.max_file_size
         ):
-
             # The content to attach is to large
             self.logger.error(
                 "Content exceeds allowable maximum file length"

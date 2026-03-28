@@ -289,7 +289,6 @@ class NotifyFCM(NotifyBase):
             self.keyfile[0].max_file_size = self.max_fcm_keyfile_size
 
         else:  # Legacy Mode
-
             # The apikey associated with the account
             self.apikey = validate_regex(apikey)
             if not self.apikey:
@@ -511,7 +510,8 @@ class NotifyFCM(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     has_error = True
 

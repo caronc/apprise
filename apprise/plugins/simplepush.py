@@ -168,10 +168,12 @@ class NotifySimplePush(NotifyBase):
             self._iv = urandom(algorithms.AES.block_size // 8)
 
             # convert vector into hex string (used in payload)
-            self._iv_hex = "".join([
-                f"{ord(self._iv[idx:idx + 1]):02x}"
-                for idx in range(len(self._iv))
-            ]).upper()
+            self._iv_hex = "".join(
+                [
+                    f"{ord(self._iv[idx : idx + 1]):02x}"
+                    for idx in range(len(self._iv))
+                ]
+            ).upper()
 
             # encrypted key and cache it
             self._key = bytes(
@@ -227,16 +229,20 @@ class NotifySimplePush(NotifyBase):
         if self.password and self.user:
             body = self._encrypt(body)
             title = self._encrypt(title)
-            payload.update({
-                "encrypted": "true",
-                "iv": self._iv_hex,
-            })
+            payload.update(
+                {
+                    "encrypted": "true",
+                    "iv": self._iv_hex,
+                }
+            )
 
         # prepare SimplePush Object
-        payload.update({
-            "msg": body,
-            "title": title,
-        })
+        payload.update(
+            {
+                "msg": body,
+                "title": title,
+            }
+        )
 
         if self.event:
             # Store Event
@@ -293,7 +299,8 @@ class NotifySimplePush(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

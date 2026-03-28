@@ -226,7 +226,8 @@ class NotifyEmby(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False
@@ -464,7 +465,6 @@ class NotifyEmby(NotifyBase):
                 requests.codes.ok,
                 requests.codes.no_content,
             ):
-
                 # We had a problem
                 status_str = NotifyEmby.http_response_code_lookup(
                     r.status_code

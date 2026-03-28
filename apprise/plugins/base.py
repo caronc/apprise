@@ -394,8 +394,7 @@ class NotifyBase(URLBase):
 
             except (AttributeError, ValueError):
                 err = (
-                    "An invalid notification format "
-                    f"({value}) was specified."
+                    f"An invalid notification format ({value}) was specified."
                 )
                 self.logger.warning(err)
                 raise TypeError(err) from None

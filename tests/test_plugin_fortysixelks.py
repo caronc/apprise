@@ -42,57 +42,75 @@ apprise_url_tests = (
     ("46elks://", False),
     ("46elks://user@/", False),
     ("46elks://:pass@/", False),
-
-    ("46elks://user:pass@/", {
-        "instance": Notify46Elks,
-        # no target was specified
-        "notify_response": False,
-    }),
-
-    ("46elks://user:pass@+15551234556", {
-        "instance": Notify46Elks,
-    }),
-
-    ("46elks://user:pass@+15551234567/+46701234534?from=Acme", {
-        "instance": Notify46Elks,
-    }),
-
+    (
+        "46elks://user:pass@/",
+        {
+            "instance": Notify46Elks,
+            # no target was specified
+            "notify_response": False,
+        },
+    ),
+    (
+        "46elks://user:pass@+15551234556",
+        {
+            "instance": Notify46Elks,
+        },
+    ),
+    (
+        "46elks://user:pass@+15551234567/+46701234534?from=Acme",
+        {
+            "instance": Notify46Elks,
+        },
+    ),
     # Support elks:// too!
-    ("elks://user:pass@+15551234123/", {
-        "instance": Notify46Elks,
-    }),
-
+    (
+        "elks://user:pass@+15551234123/",
+        {
+            "instance": Notify46Elks,
+        },
+    ),
     # Privacy mode redacts password
-    ("46elks://user:pass@+15551234512", {
-        "privacy_url": "46elks://user:****@+15551234512",
-        "instance": Notify46Elks,
-    }),
-
+    (
+        "46elks://user:pass@+15551234512",
+        {
+            "privacy_url": "46elks://user:****@+15551234512",
+            "instance": Notify46Elks,
+        },
+    ),
     # invalid phone no
-    ("46elks://user:pass@Acme/234512", {
-        "instance": Notify46Elks,
-        "notify_response": False,
-    }),
+    (
+        "46elks://user:pass@Acme/234512",
+        {
+            "instance": Notify46Elks,
+            "notify_response": False,
+        },
+    ),
     # Native URL reversal
-    (("https://user1:pass@"
-      "api.46elks.com/a1/sms?to=+15551234511&from=Acme"), {
-        "instance": Notify46Elks,
-        "privacy_url": "46elks://user1:****@Acme/+15551234511",
-    }),
-    ("46elks://user:pass@+15551234567",
+    (
+        ("https://user1:pass@api.46elks.com/a1/sms?to=+15551234511&from=Acme"),
+        {
+            "instance": Notify46Elks,
+            "privacy_url": "46elks://user1:****@Acme/+15551234511",
+        },
+    ),
+    (
+        "46elks://user:pass@+15551234567",
         {
             "instance": Notify46Elks,
             # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
-        }),
-    ("46elks://user:pass@+15551234578",
+        },
+    ),
+    (
+        "46elks://user:pass@+15551234578",
         {
             "instance": Notify46Elks,
             # Throws a series of i/o exceptions with this flag
             # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
-        }),
+        },
+    ),
 )
 
 

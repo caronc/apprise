@@ -83,9 +83,14 @@ class IRCClient:
     ) -> None:
 
         # Detect port if not set
-        port = port if port is not None else (
-            self.default_secure_port
-            if secure else self.default_insecure_port
+        port = (
+            port
+            if port is not None
+            else (
+                self.default_secure_port
+                if secure
+                else self.default_insecure_port
+            )
         )
 
         self.transport = SocketTransport(
@@ -98,8 +103,7 @@ class IRCClient:
 
         self._nick_generator = nick_generator
         self._nick_length = (
-            int(nick_length)
-            if nick_length else int(self.nickname_max_length)
+            int(nick_length) if nick_length else int(self.nickname_max_length)
         )
         self._nick_collision = 0
 
@@ -139,13 +143,19 @@ class IRCClient:
         if remaining <= 0.0:
             raise TimeoutError("timeout while writing IRC commands")
 
-        payload = (line + "\r\n").encode("utf-8", errors="replace") \
-            if isinstance(line, str) else line
+        payload = (
+            (line + "\r\n").encode("utf-8", errors="replace")
+            if isinstance(line, str)
+            else line
+        )
         self.transport.write(payload, flush=True, timeout=remaining)
         if logger.isEnabledFor(logging.TRACE):
             logger.trace(
-                "IRC write: %s", payload.rstrip(b"\r")
-                .decode("utf-8", errors="replace").rstrip())
+                "IRC write: %s",
+                payload.rstrip(b"\r")
+                .decode("utf-8", errors="replace")
+                .rstrip(),
+            )
 
     def _flush(self, deadline: float) -> None:
         """Flush all queued information to the IRC server."""
@@ -167,8 +177,7 @@ class IRCClient:
 
             remaining = max(0.0, deadline - time.monotonic())
             if remaining <= 0.0:
-                logger.trace(
-                    "IRC read timeout - deadline=%.2fs", deadline)
+                logger.trace("IRC read timeout - deadline=%.2fs", deadline)
                 return None
 
             chunk = self.transport.read(4096, blocking=True, timeout=remaining)
@@ -327,9 +336,7 @@ class IRCClient:
 
         deadline = time.monotonic() + float(timeout)
         self._queue(
-            "PRIVMSG NickServ :IDENTIFY {}".format(
-                self.sm.ctx.password
-            )
+            "PRIVMSG NickServ :IDENTIFY {}".format(self.sm.ctx.password)
         )
         self._flush(deadline)
         self._handshake(
@@ -346,14 +353,14 @@ class IRCClient:
 
     @staticmethod
     def nick_generation(
-            prefix: str, length: Optional[int] = None,
-            collision: int = 0) -> str:
+        prefix: str, length: Optional[int] = None, collision: int = 0
+    ) -> str:
         """Generate a nickname suitable for retry after collision."""
         if length is None:
             # Default Assignment
             length = IRCClient.nickname_max_length
 
-        base = "{}".format(prefix)[:length - 3].strip().lower()
+        base = "{}".format(prefix)[: length - 3].strip().lower()
         charset = string.ascii_lowercase + string.digits + "_"
         suffix = "".join(random.choice(charset) for _ in range(max(1, length)))
         nick = "{}{}".format(base, suffix)

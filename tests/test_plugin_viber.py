@@ -38,63 +38,112 @@ logging.disable(logging.CRITICAL)
 
 VIBER_GOOD_RESPONSE = dumps({"status": 0, "status_message": "ok"})
 VIBER_BAD_RESPONSE = dumps(
-    {"status": 12, "status_message": "Too many requests"})
+    {"status": 12, "status_message": "Too many requests"}
+)
 
 # Our Testing URLs
 apprise_url_tests = (
     ("viber://", False),
     ("viber:///", False),
-    ("viber://tokena", {
-        "instance": NotifyViber,
-        "notify_response": False}),
-    ("viber://?token=tokenb", {
-        "instance": NotifyViber,
-        "notify_response": False}),
-    ("viber://token/targetx", {
-        "instance": NotifyViber,
-        # Our response expected server response
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://token/t1/t2?from=Viber%20Bot", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://t1/t2?token=token", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://?token=token&to=t5", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://token/t3?avatar=value", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://token/?to=abc,def", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://token/m12/?from={}".format(
-        "a" * (NotifyViber.viber_sender_name_limit + 1)), {
+    ("viber://tokena", {"instance": NotifyViber, "notify_response": False}),
+    (
+        "viber://?token=tokenb",
+        {"instance": NotifyViber, "notify_response": False},
+    ),
+    (
+        "viber://token/targetx",
+        {
             "instance": NotifyViber,
-            "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://token/m12/?from={}".format(
-        "b" * (NotifyViber.viber_sender_name_limit)), {
+            # Our response expected server response
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://token/t1/t2?from=Viber%20Bot",
+        {
             "instance": NotifyViber,
-            "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://?token=token&to=hij,klm", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE}),
-    ("viber://?token=token&to=nop,qrs", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_BAD_RESPONSE,
-        "notify_response": False}),
-    ("viber://?token=token&to=tuv,wxy", {
-        "instance": NotifyViber,
-        # Bad JSON
-        "requests_response_text": "{",
-        "notify_response": False}),
-
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://t1/t2?token=token",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://?token=token&to=t5",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://token/t3?avatar=value",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://token/?to=abc,def",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://token/m12/?from={}".format(
+            "a" * (NotifyViber.viber_sender_name_limit + 1)
+        ),
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://token/m12/?from={}".format(
+            "b" * (NotifyViber.viber_sender_name_limit)
+        ),
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://?token=token&to=hij,klm",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "viber://?token=token&to=nop,qrs",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_BAD_RESPONSE,
+            "notify_response": False,
+        },
+    ),
+    (
+        "viber://?token=token&to=tuv,wxy",
+        {
+            "instance": NotifyViber,
+            # Bad JSON
+            "requests_response_text": "{",
+            "notify_response": False,
+        },
+    ),
     # Privacy redaction of token
-    ("viber://token/t10", {
-        "instance": NotifyViber,
-        "requests_response_text": VIBER_GOOD_RESPONSE,
-        "privacy_url": "viber://****/t10"}),
+    (
+        "viber://token/t10",
+        {
+            "instance": NotifyViber,
+            "requests_response_text": VIBER_GOOD_RESPONSE,
+            "privacy_url": "viber://****/t10",
+        },
+    ),
     (
         "viber://token/targetZ",
         {
@@ -124,7 +173,7 @@ apprise_url_tests = (
             "requests_response_text": VIBER_GOOD_RESPONSE,
             "test_requests_exceptions": True,
         },
-    )
+    ),
 )
 
 

@@ -137,8 +137,9 @@ apprise_url_tests = (
     ),
     # Test an invalid country
     (
-        "burstsms://_?key={}&secret={}&source={}&to={}&validity=invalid"
-        .format("a" * 8, "b" * 16, "5" * 11, "6" * 11),
+        "burstsms://_?key={}&secret={}&source={}&to={}&validity=invalid".format(
+            "a" * 8, "b" * 16, "5" * 11, "6" * 11
+        ),
         {
             "instance": TypeError,
         },
@@ -212,15 +213,17 @@ def test_plugin_burstsms_edge_cases(mock_post):
 
     # a error response
     response.status_code = 400
-    response.content = dumps({
-        "error": {
-            "code": "FIELD_INVALID",
-            "description": (
-                "Sender ID must be one of the numbers that are currently"
-                " leased."
-            ),
-        },
-    })
+    response.content = dumps(
+        {
+            "error": {
+                "code": "FIELD_INVALID",
+                "description": (
+                    "Sender ID must be one of the numbers that are currently"
+                    " leased."
+                ),
+            },
+        }
+    )
     mock_post.return_value = response
 
     # Initialize our object

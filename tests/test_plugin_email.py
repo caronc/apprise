@@ -478,7 +478,6 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
 
     # iterate over our dictionary and test it out
     for url, meta in TEST_URLS:
-
         # Our expected instance
         instance = meta.get("instance", None)
 
@@ -568,7 +567,7 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 ):
                     raise AssertionError(
                         f"URL: {url} Privacy URL:"
-                        f" '{obj.url(privacy=True)[:len(privacy_url)]}' !="
+                        f" '{obj.url(privacy=True)[: len(privacy_url)]}' !="
                         f" expected '{privacy_url}'"
                     )
 
@@ -885,8 +884,7 @@ def test_plugin_email_timezone(mock_smtp):
 
     # Loads America/Toronto
     results = email.NotifyEmail.parse_url(
-        "mailtos://user:pass123@hotmail.com:123"
-        "?tz=Toronto"
+        "mailtos://user:pass123@hotmail.com:123?tz=Toronto"
     )
     assert isinstance(results, dict)
     # timezone is detected
@@ -932,8 +930,7 @@ def test_plugin_email_timezone(mock_smtp):
 
     # Loads America/Montreal
     results = email.NotifyEmail.parse_url(
-        "mailtos://user:pass123@hotmail.com:321"
-        "?tz=Montreal"
+        "mailtos://user:pass123@hotmail.com:321?tz=Montreal"
     )
     assert isinstance(results, dict)
     # timezone is detected
@@ -953,10 +950,12 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
     """NotifyEmail() Internationalization Handling."""
 
     # i18n test
-    email_url = "".join([
-        "mailto://user:pass@gmail.com?",
-        "name=Например%20так",  # noqa: RUF001
-    ])
+    email_url = "".join(
+        [
+            "mailto://user:pass@gmail.com?",
+            "name=Например%20так",  # noqa: RUF001
+        ]
+    )
 
     obj = Apprise.instantiate(
         email_url,
@@ -1213,7 +1212,6 @@ def test_plugin_email_url_variations():
         "/john.smith%2Bmytag@domain.com",
         "?to=john.smith%2Bmytag@domain.com",
     ):
-
         obj = Apprise.instantiate(f"mailto://user:pass@domain.com{toaddr}")
         assert isinstance(obj, email.NotifyEmail)
         assert obj.password == "pass"
@@ -3012,11 +3010,17 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
     response = mock.Mock()
     mock_smtp.return_value = response
 
-    for domain in ("gmx.net", "gmx.com", "gmx.de", "gmx.at", "gmx.ch",
-                   "gmx.fr"):
-
+    for domain in (
+        "gmx.net",
+        "gmx.com",
+        "gmx.de",
+        "gmx.at",
+        "gmx.ch",
+        "gmx.fr",
+    ):
         results = email.NotifyEmail.parse_url(
-            f"mailtos://user:pass123@{domain}")
+            f"mailtos://user:pass123@{domain}"
+        )
         obj = Apprise.instantiate(results, suppress_exceptions=False)
         assert isinstance(obj, email.NotifyEmail)
 

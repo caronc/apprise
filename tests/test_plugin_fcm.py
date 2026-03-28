@@ -286,11 +286,13 @@ def mock_post(mocker):
     mock_thing = mocker.patch("requests.post")
 
     response = mock.Mock()
-    response.content = json.dumps({
-        "access_token": "ya29.c.abcd",
-        "expires_in": 3599,
-        "token_type": "Bearer",
-    })
+    response.content = json.dumps(
+        {
+            "access_token": "ya29.c.abcd",
+            "expires_in": 3599,
+            "token_type": "Bearer",
+        }
+    )
     response.status_code = requests.codes.ok
     mock_thing.return_value = response
 
@@ -744,10 +746,12 @@ def test_plugin_fcm_keyfile_parse_default(mock_post):
 def test_plugin_fcm_keyfile_parse_no_expiry(mock_post):
     """Test case without `expires_in` entry."""
 
-    mock_post.return_value.content = json.dumps({
-        "access_token": "ya29.c.abcd",
-        "token_type": "Bearer",
-    })
+    mock_post.return_value.content = json.dumps(
+        {
+            "access_token": "ya29.c.abcd",
+            "token_type": "Bearer",
+        }
+    )
 
     oauth = GoogleOAuth()
     assert oauth.load(FCM_KEYFILE) is True
@@ -851,10 +855,12 @@ def test_plugin_fcm_keyfile_parse_token_failures(mock_post):
 
     # No access token
     bad_response_1 = mock.Mock()
-    bad_response_1.content = json.dumps({
-        "expires_in": 3599,
-        "token_type": "Bearer",
-    })
+    bad_response_1.content = json.dumps(
+        {
+            "expires_in": 3599,
+            "token_type": "Bearer",
+        }
+    )
 
     # Invalid JSON
     bad_response_2 = mock.Mock()
@@ -909,7 +915,6 @@ def test_plugin_fcm_keyfile_missing_entries_parse(tmpdir):
         "type",
         "project_id",
     ):
-
         # Ensure the key actually exists in our file
         assert entry in content
 

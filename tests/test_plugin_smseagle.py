@@ -643,12 +643,14 @@ def test_notify_smseagle_plugin_result_list(mock_post):
     assert obj.notify("test") is True
 
     # However if one of the elements in the list is bad
-    okay_response.content = dumps({
-        "result": [
-            {"message_id": "748", "status": "ok"},
-            {"message_id": "749", "status": "error"},
-        ]
-    })
+    okay_response.content = dumps(
+        {
+            "result": [
+                {"message_id": "748", "status": "ok"},
+                {"message_id": "749", "status": "error"},
+            ]
+        }
+    )
 
     # Assign our mock object our return value
     mock_post.return_value = okay_response

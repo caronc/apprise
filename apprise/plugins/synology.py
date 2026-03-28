@@ -305,7 +305,8 @@ class NotifySynology(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False
@@ -354,7 +355,7 @@ class NotifySynology(NotifyBase):
 
                 # Update our fullpath to not include our token
                 results["fullpath"] = results["fullpath"][
-                    len(results["token"]) + 1:
+                    len(results["token"]) + 1 :
                 ]
 
         # Set upload/file_url if not otherwise set

@@ -917,13 +917,15 @@ def test_apprise_cli_modules(tmpdir):
     #
     notify_cmod_base = tmpdir.mkdir("cli_modules")
     notify_cmod = notify_cmod_base.join("hook.py")
-    notify_cmod.write(cleandoc("""
+    notify_cmod.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     @notify(on="climod")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
-    """))
+    """)
+    )
 
     result = runner.invoke(
         cli.main,
@@ -958,13 +960,15 @@ def test_apprise_cli_modules(tmpdir):
 
     # Test double hooks
     notify_cmod2 = notify_cmod_base.join("hook2.py")
-    notify_cmod2.write(cleandoc("""
+    notify_cmod2.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     @notify(on="climod2")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
-    """))
+    """)
+    )
 
     result = runner.invoke(
         cli.main,
@@ -1940,9 +1944,11 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
     # Prepare ourselves a file to work with
     notify_hook_a_base = tmpdir.mkdir("random")
     notify_hook_a = notify_hook_a_base.join("myhook01.py")
-    notify_hook_a.write(cleandoc("""
+    notify_hook_a.write(
+        cleandoc("""
     raise ImportError
-    """))
+    """)
+    )
 
     result = runner.invoke(
         cli.main,
@@ -1968,9 +1974,11 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
 
     # Prepare ourselves a file to work with
     notify_hook_aa = notify_hook_a_base.join("myhook02.py")
-    notify_hook_aa.write(cleandoc("""
+    notify_hook_aa.write(
+        cleandoc("""
     garbage entry
-    """))
+    """)
+    )
 
     N_MGR.plugins()
     result = runner.invoke(
@@ -2005,7 +2013,8 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
 
     # Prepare ourselves a file to work with
     notify_hook_b = tmpdir.mkdir("goodmodule").join("__init__.py")
-    notify_hook_b.write(cleandoc("""
+    notify_hook_b.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     # We want to trigger on anyone who configures a call to clihook://
@@ -2023,7 +2032,8 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
         print("!! {}: {} - {}".format(notify_type, title, body))
 
         # No return (so a return of None) get's translated to True
-    """))
+    """)
+    )
 
     result = runner.invoke(
         cli.main,
@@ -2169,7 +2179,8 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
 
     # Prepare ourselves a file to work with
     notify_hook_b = tmpdir.mkdir("complex").join("complex.py")
-    notify_hook_b.write(cleandoc("""
+    notify_hook_b.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     # We can't over-ride an element that already exists
@@ -2211,7 +2222,8 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
     @notify(on="", name="an invalid schema was specified")
     def mywrapper_06(body, title, notify_type, *args, **kwargs):
         return True
-    """))
+    """)
+    )
 
     result = runner.invoke(
         cli.main,
@@ -2295,7 +2307,8 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
         [
             "--plugin-path",
             join(str(tmpdir), "complex"),
-            "--notification-type", "invalid",
+            "--notification-type",
+            "invalid",
             "-b",
             "test body",
             # our clihook that returns true
@@ -2311,8 +2324,8 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
             "--plugin-path",
             join(str(tmpdir), "complex"),
             "-b",
-            "-i", "warning"
-            "test body",
+            "-i",
+            "warningtest body",
             # our clihook that returns true
             "clihook1://",
         ],

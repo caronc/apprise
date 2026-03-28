@@ -306,12 +306,14 @@ def test_plugin_whatsapp_edge_cases(mock_post):
 
     # a error response
     response.status_code = 400
-    response.content = dumps({
-        "error": {
-            "code": 21211,
-            "message": "The 'To' number +1234567 is not a valid phone number.",
-        },
-    })
+    response.content = dumps(
+        {
+            "error": {
+                "code": 21211,
+                "message": "The 'To' number +1234567 is not a valid phone number.",
+            },
+        }
+    )
     mock_post.return_value = response
 
     # Initialize our object
@@ -336,13 +338,13 @@ def test_plugin_whatsapp_template_notify_type_value(mock_post):
 
     # Map notify_type -> {{2}}, body -> {{3}}
     obj = Apprise.instantiate(
-        f"whatsapp://template:{token}@{from_phone_id}/"
-        f"{target}?:type=2&:body=3"
+        f"whatsapp://template:{token}@{from_phone_id}/{target}?:type=2&:body=3"
     )
     assert isinstance(obj, NotifyWhatsApp)
 
-    assert obj.send(
-        body="test", title="t", notify_type=NotifyType.INFO) is True
+    assert (
+        obj.send(body="test", title="t", notify_type=NotifyType.INFO) is True
+    )
 
     call = mock_post.call_args_list[0]
     assert "NotifyType." not in call[1]["data"]

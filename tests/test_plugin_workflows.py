@@ -239,7 +239,8 @@ def request_mock(mocker):
 @pytest.fixture
 def simple_template(tmpdir):
     template = tmpdir.join("simple.json")
-    template.write(cleandoc("""
+    template.write(
+        cleandoc("""
     {
         "type": "message",
         "attachments": [{
@@ -260,12 +261,14 @@ def simple_template(tmpdir):
             }
         ]
     }
-    """))
+    """)
+    )
     return template
 
 
 def test_plugin_workflows_simple_test(
-    request_mock, workflows_url,
+    request_mock,
+    workflows_url,
 ):
     """
     NotifyWorkflows() simple testing
@@ -291,8 +294,7 @@ def test_plugin_workflows_simple_test(
                 "contentType": "application/vnd.microsoft.card.adaptive",
                 "contentUrl": None,
                 "content": {
-                    "$schema":
-                    "http://adaptivecards.io/schemas/adaptive-card.json",
+                    "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
                     "type": "AdaptiveCard",
                     "version": "1.4",
                     "body": [
@@ -303,7 +305,8 @@ def test_plugin_workflows_simple_test(
                             "apprise-info-32x32.png",
                             "height": "32px",
                             "altText": NotifyType.INFO.value,
-                        }, {
+                        },
+                        {
                             "type": "TextBlock",
                             # Verify our Title is set
                             "text": "title",
@@ -311,7 +314,8 @@ def test_plugin_workflows_simple_test(
                             "weight": "Bolder",
                             "size": "Large",
                             "id": "title",
-                        }, {
+                        },
+                        {
                             "type": "TextBlock",
                             # Verify our Body is set
                             "text": "body",
@@ -320,9 +324,7 @@ def test_plugin_workflows_simple_test(
                             "id": "body",
                         },
                     ],
-                    "msteams": {
-                        "width": "full"
-                    },
+                    "msteams": {"width": "full"},
                 },
             },
         ],
@@ -365,7 +367,8 @@ def test_plugin_workflows_simple_test(
                             "apprise-info-32x32.png",
                             "height": "32px",
                             "altText": "info",
-                        }, {
+                        },
+                        {
                             "type": "TextBlock",
                             # Verify our Title is set
                             "text": "title",
@@ -373,7 +376,8 @@ def test_plugin_workflows_simple_test(
                             "weight": "Bolder",
                             "size": "Large",
                             "id": "title",
-                        }, {
+                        },
+                        {
                             "type": "TextBlock",
                             # Verify our Body is set
                             "text": "body",
@@ -400,7 +404,8 @@ def test_plugin_workflows_templating_basic_success(
     """
 
     template = tmpdir.join("simple.json")
-    template.write(cleandoc("""
+    template.write(
+        cleandoc("""
     {
       "@type": "MessageCard",
       "@context": "https://schema.org/extensions",
@@ -414,7 +419,8 @@ def test_plugin_workflows_templating_basic_success(
         }
       ]
     }
-    """))
+    """)
+    )
 
     # Instantiate our URL
     obj = Apprise.instantiate(
@@ -504,7 +510,8 @@ def test_plugin_workflows_templating_target_success(
     """
 
     template = tmpdir.join("more_complicated_example.json")
-    template.write(cleandoc("""
+    template.write(
+        cleandoc("""
     {
       "@type": "MessageCard",
       "@context": "https://schema.org/extensions",
@@ -533,7 +540,8 @@ def test_plugin_workflows_templating_target_success(
         }]
      }]
     }
-    """))
+    """)
+    )
 
     # Instantiate our URL
     obj = Apprise.instantiate(
@@ -579,7 +587,8 @@ def test_workflows_yaml_config_missing_template_filename(
     """
 
     config = tmpdir.join("workflow01.yml")
-    config.write(cleandoc(f"""
+    config.write(
+        cleandoc(f"""
     urls:
       - {workflows_url}:
         - tag: 'workflow'
@@ -587,7 +596,8 @@ def test_workflows_yaml_config_missing_template_filename(
           :name: 'Template.Missing'
           :body: 'test body'
           :title: 'test title'
-    """))
+    """)
+    )
 
     # Config still loads okay
     cfg = AppriseConfig()

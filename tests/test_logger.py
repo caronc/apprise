@@ -302,7 +302,6 @@ def test_apprise_log_file_captures(tmpdir):
     with LogCapture(
         path=str(log_file), delete=False, level=logging.WARNING
     ) as fp:
-
         # Verify exists
         assert os.path.isfile(str(log_file))
 
@@ -347,7 +346,6 @@ def test_apprise_log_file_captures(tmpdir):
         pytest.raises(OSError),
         LogCapture(path=str(log_file)) as fp,
     ):
-
         # we'll never get here because we'll fail to open the file
         pass
 

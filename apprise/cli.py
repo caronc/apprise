@@ -294,31 +294,33 @@ class CustomHelpCommand(click.Command):
         formatter.write_text("")
         formatter.write_text("Actions:")
 
-        actions = [(
-            "storage",
-            "Access the persistent storage disk administration",
-            [
-                (
-                    "list",
+        actions = [
+            (
+                "storage",
+                "Access the persistent storage disk administration",
+                [
                     (
-                        "List all URL IDs associated with detected URL(s)."
-                        " This is also the default action run if nothing is"
-                        " provided"
+                        "list",
+                        (
+                            "List all URL IDs associated with detected URL(s)."
+                            " This is also the default action run if nothing is"
+                            " provided"
+                        ),
                     ),
-                ),
-                (
-                    "prune",
                     (
-                        "Eliminates stale entries found based on "
-                        "--storage-prune-days (-SPD)"
+                        "prune",
+                        (
+                            "Eliminates stale entries found based on "
+                            "--storage-prune-days (-SPD)"
+                        ),
                     ),
-                ),
-                (
-                    "clean",
-                    "Removes any persistent data created by Apprise",
-                ),
-            ],
-        )]
+                    (
+                        "clean",
+                        "Removes any persistent data created by Apprise",
+                    ),
+                ],
+            )
+        ]
 
         #
         # Some variables
@@ -458,7 +460,7 @@ class CustomHelpCommand(click.Command):
     metavar="MODE",
     help=(
         "Specify the persistent storage operational mode "
-        f'(default={DEFAULT_STORAGE_MODE.value}). '
+        f"(default={DEFAULT_STORAGE_MODE.value}). "
         'Possible values are: "{}".'.format(
             '", "'.join(mode.value for mode in PERSISTENT_STORE_MODE_CHOICES)
         )
@@ -1094,7 +1096,7 @@ def main(
                             (
                                 url
                                 if len(url) <= (columns - 8)
-                                else f"{url[:columns - 11]}..."
+                                else f"{url[: columns - 11]}..."
                             ),
                         )
                     )
@@ -1158,7 +1160,7 @@ def main(
                     (
                         url
                         if len(url) <= (columns - 8)
-                        else f"{url[:columns - 9]}..."
+                        else f"{url[: columns - 9]}..."
                     ),
                 )
             )

@@ -246,8 +246,11 @@ class NotifyRSyslog(NotifyBase):
         )
 
         priority = SYSLOG_PUBLISH_MAP[notify_type] + self.facility * 8
-        payload = f"<{priority}>- {os.getpid()} {body}" \
-            if self.log_pid else f"<{priority}>- {body}"
+        payload = (
+            f"<{priority}>- {os.getpid()} {body}"
+            if self.log_pid
+            else f"<{priority}>- {body}"
+        )
 
         # send UDP packet to upstream server
         self.logger.debug(

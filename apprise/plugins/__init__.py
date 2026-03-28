@@ -68,7 +68,6 @@ def _sanitize_token(tokens, default_delimiter):
 
     # Iterate over our tokens
     for key in tokens:
-
         for element in tokens[key]:
             # Perform translations (if detected to do so)
             if isinstance(tokens[key][element], LazyTranslation):
@@ -114,7 +113,6 @@ def _sanitize_token(tokens, default_delimiter):
             and "values" in tokens[key]
             and len(tokens[key]["values"]) == 1
         ):
-
             # If there is only one choice; then make it the default
             #  - support dictionaries too
             tokens[key]["default"] = (
@@ -291,7 +289,6 @@ def details(plugin):
 
     # Argument/Option Handling
     for key in list(template_args.keys()):
-
         if "alias_of" in template_args[key]:
             # Check if the mapped reference is a list; if it is, then
             # we need to store a different delimiter

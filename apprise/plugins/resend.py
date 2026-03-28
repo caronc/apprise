@@ -161,8 +161,15 @@ class NotifyResend(NotifyBase):
     )
 
     def __init__(
-        self, apikey, from_addr, targets=None, cc=None, bcc=None,
-        reply_to=None, **kwargs):
+        self,
+        apikey,
+        from_addr,
+        targets=None,
+        cc=None,
+        bcc=None,
+        reply_to=None,
+        **kwargs,
+    ):
         """Initialize Notify Resend Object."""
         super().__init__(**kwargs)
 
@@ -213,7 +220,6 @@ class NotifyResend(NotifyBase):
         if targets:
             # Validate recipients (to:) and drop bad ones:
             for recipient in targets:
-
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
@@ -228,7 +234,6 @@ class NotifyResend(NotifyBase):
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
-
             result = is_email(recipient)
             if result:
                 self.cc.add(result["full_email"])
@@ -245,7 +250,6 @@ class NotifyResend(NotifyBase):
 
         # Validate recipients (bcc:) and drop bad ones:
         for recipient in parse_emails(bcc):
-
             result = is_email(recipient)
             if result:
                 self.bcc.add(result["full_email"])
@@ -293,15 +297,17 @@ class NotifyResend(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for it's escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8",
-                ).replace(",", "%2C")
-                for e in self.cc
-            ])
+            params["cc"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for it's escaped url code (if detected) since
+                        # we're using that as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.cc
+                ]
+            )
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
@@ -309,20 +315,23 @@ class NotifyResend(NotifyBase):
 
         if self.reply_to:
             # Handle our Reply-To Addresses
-            params["reply"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for its escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8",
-                ).replace(",", "%2C")
-                for e in self.reply_to
-            ])
+            params["reply"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for its escaped url code (if detected) since
+                        # we're using that as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.reply_to
+                ]
+            )
 
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = not (
-            len(self.targets) == 1 and self.targets[0] == self.from_addr[1])
+            len(self.targets) == 1 and self.targets[0] == self.from_addr[1]
+        )
 
         if self.from_addr[0] and self.from_addr[0] != self.app_id:
             # A custom name was provided
@@ -367,8 +376,7 @@ class NotifyResend(NotifyBase):
         has_error = False
 
         # Prepare our from_name
-        self.from_addr[0] \
-            if self.from_addr[0] is not False else self.app_id
+        self.from_addr[0] if self.from_addr[0] is not False else self.app_id
 
         payload_ = {
             "from": formataddr(self.from_addr, charset="utf-8"),
@@ -396,16 +404,18 @@ class NotifyResend(NotifyBase):
                     return False
 
                 try:
-                    attachments.append({
-                        "content": attachment.base64(),
-                        "filename": (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
-                        "type": "application/octet-stream",
-                        "disposition": "attachment",
-                    })
+                    attachments.append(
+                        {
+                            "content": attachment.base64(),
+                            "filename": (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            "type": "application/octet-stream",
+                            "disposition": "attachment",
+                        }
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -421,9 +431,11 @@ class NotifyResend(NotifyBase):
                 )
 
             # Append our attachments to the payload
-            payload_.update({
-                "attachments": attachments,
-            })
+            payload_.update(
+                {
+                    "attachments": attachments,
+                }
+            )
 
         targets = list(self.targets)
         while len(targets) > 0:
@@ -441,15 +453,17 @@ class NotifyResend(NotifyBase):
 
             # Format our cc addresses to support the Name field
             cc = [
-                formataddr((self.names.get(addr, False), addr),
-                           charset="utf-8")
+                formataddr(
+                    (self.names.get(addr, False), addr), charset="utf-8"
+                )
                 for addr in cc
             ]
 
             # Format our reply-to addresses to support the Name field
             reply_to = [
-                formataddr((self.names.get(addr, False), addr),
-                           charset="utf-8")
+                formataddr(
+                    (self.names.get(addr, False), addr), charset="utf-8"
+                )
                 for addr in reply_to
             ]
 
@@ -477,7 +491,8 @@ class NotifyResend(NotifyBase):
                     f"(cert_verify={self.verify_certificate!r})"
                 )
                 self.logger.debug(
-                    "Resend Payload: %s", sanitize_payload(payload))
+                    "Resend Payload: %s", sanitize_payload(payload)
+                )
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -509,7 +524,8 @@ class NotifyResend(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
@@ -552,8 +568,7 @@ class NotifyResend(NotifyBase):
 
         # Prepare our API Key
         if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
-            results["apikey"] = \
-                NotifyResend.unquote(results["qsd"]["apikey"])
+            results["apikey"] = NotifyResend.unquote(results["qsd"]["apikey"])
 
         else:
             results["apikey"] = NotifyResend.unquote(results["user"])
@@ -567,21 +582,28 @@ class NotifyResend(NotifyBase):
 
             if results.get("host"):
                 results["targets"].append(
-                    NotifyResend.unquote(results["host"]))
+                    NotifyResend.unquote(results["host"])
+                )
 
         else:
             # Prepare our From Email Address
             results["from_addr"] = "{}@{}".format(
                 NotifyResend.unquote(
                     results["password"]
-                    if results["password"] else results["user"]),
+                    if results["password"]
+                    else results["user"]
+                ),
                 NotifyResend.unquote(results["host"]),
             )
 
         if "name" in results["qsd"] and len(results["qsd"]["name"]):
-            results["from_addr"] = formataddr((
-                NotifyResend.unquote(results["qsd"]["name"]),
-                results["from_addr"]), charset="utf-8")
+            results["from_addr"] = formataddr(
+                (
+                    NotifyResend.unquote(results["qsd"]["name"]),
+                    results["from_addr"],
+                ),
+                charset="utf-8",
+            )
 
         # Acquire our targets
         results["targets"].extend(NotifyResend.split_path(results["fullpath"]))

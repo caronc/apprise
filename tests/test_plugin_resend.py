@@ -100,8 +100,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url":
-                "resend://a...d:user@example.com/newuser2@example.com",
+            "privacy_url": "resend://a...d:user@example.com/newuser2@example.com",
             "url_matches": r"name=Jessica",
         },
     ),
@@ -113,8 +112,7 @@ apprise_url_tests = (
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url":
-                "resend://a...d:user2@example.ca/",
+            "privacy_url": "resend://a...d:user2@example.ca/",
             "url_matches": r"name=Ralph",
             "force_debug": True,
         },
@@ -123,12 +121,11 @@ apprise_url_tests = (
         (
             "resend://?apikey=abcd&from=Joe<user@example.com>"
             "&to=newuser5@example.com"
-         ),
+        ),
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url":
-                "resend://a...d:user@example.com/newuser5@example.com",
+            "privacy_url": "resend://a...d:user@example.com/newuser5@example.com",
             "url_matches": r"name=Joe",
         },
     ),
@@ -136,20 +133,16 @@ apprise_url_tests = (
         (
             "resend://?apikey=abcd&from=Joe<user@example.com>"
             "&reply=John<newuser6@example.com>"
-         ),
+        ),
         {
             # A good email
             "instance": NotifyResend,
-            "privacy_url":
-                "resend://a...d:user@example.com",
+            "privacy_url": "resend://a...d:user@example.com",
             "url_matches": r"reply=John",
         },
     ),
     (
-        (
-            "resend://?apikey=abcd&from=Joe<user@example.com>"
-            "&reply=garbage%"
-         ),
+        ("resend://?apikey=abcd&from=Joe<user@example.com>&reply=garbage%"),
         {
             # A good email but has a garbage reply-to value
             "instance": NotifyResend,
@@ -182,7 +175,6 @@ apprise_url_tests = (
             "instance": NotifyResend,
         },
     ),
-
     (
         "resend://abcd:user@example.com/newuser9@example.com?to=l2g@nuxref.com",
         {

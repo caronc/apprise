@@ -444,7 +444,6 @@ class NotifyMastodon(NotifyBase):
             not self.targets
             and self.visibility == MastodonMessageVisibility.DIRECT
         ):
-
             result = self._whoami()
             if not result:
                 # Could not access our status
@@ -553,13 +552,15 @@ class NotifyMastodon(NotifyBase):
                 #  'description': None,
                 #  'blurhash': 'UmIsdJnT^mX4V@XQofnQ~Ebq%4o3ofnQjZbt'
                 # }
-                response.update({
-                    # Update our response to additionally include the
-                    # attachment details
-                    "file_name": attachment.name,
-                    "file_mime": attachment.mimetype,
-                    "file_path": attachment.path,
-                })
+                response.update(
+                    {
+                        # Update our response to additionally include the
+                        # attachment details
+                        "file_name": attachment.name,
+                        "file_mime": attachment.mimetype,
+                        "file_path": attachment.path,
+                    }
+                )
 
                 # Save our pre-prepared payload for attachment posting
                 attachments.append(response)
@@ -934,7 +935,6 @@ class NotifyMastodon(NotifyBase):
                 requests.codes.created,
                 requests.codes.accepted,
             ):
-
                 # We had a problem
                 status_str = NotifyMastodon.http_response_code_lookup(
                     r.status_code
@@ -947,7 +947,8 @@ class NotifyMastodon(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Mark our failure
                 return (False, content)

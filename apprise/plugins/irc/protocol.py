@@ -164,14 +164,19 @@ def parse_irc_line(line: str) -> IRCMessage:
     s = s.strip()
     if not s:
         return IRCMessage(
-            raw=raw, prefix=prefix, command="", params=(), trailing=trailing)
+            raw=raw, prefix=prefix, command="", params=(), trailing=trailing
+        )
 
     bits = s.split()
     command = bits[0]
     params = tuple(bits[1:]) if len(bits) > 1 else ()
     return IRCMessage(
-        raw=raw, prefix=prefix, command=command, params=params,
-        trailing=trailing)
+        raw=raw,
+        prefix=prefix,
+        command=command,
+        params=params,
+        trailing=trailing,
+    )
 
 
 def is_ping(msg: IRCMessage) -> bool:

@@ -203,10 +203,12 @@ class NotifySMPP(NotifyBase):
             password=self.password,
             host=f"{self.host}:{self.port}" if self.port else self.host,
             source=self.source,
-            targets="/".join([
-                NotifySMPP.quote(t, safe="")
-                for t in chain(self.targets, self._invalid_targets)
-            ]),
+            targets="/".join(
+                [
+                    NotifySMPP.quote(t, safe="")
+                    for t in chain(self.targets, self._invalid_targets)
+                ]
+            ),
             params=self.urlencode(params),
         )
 

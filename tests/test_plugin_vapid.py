@@ -146,7 +146,6 @@ def patch_persistent_store_namespace(tmpdir):
         ),
         mock.patch.object(asset.AppriseAsset, "storage_path", str(tmpdir)),
     ):
-
         tmp_dir = tmpdir.mkdir(PLUGIN_ID)
         # Return the directory name
         yield str(tmp_dir)
@@ -373,43 +372,53 @@ def test_plugin_vapid_subscriptions(tmpdir):
         WebPushSubscription({})
 
     with pytest.raises(exception.AppriseInvalidData):
-        WebPushSubscription({
-            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-            "keys": {
-                "p256dh": "BNcW4oA7zq5H9TKIrA3XfKclN2fX9P_7NR=",
-                "auth": 42,
-            },
-        })
+        WebPushSubscription(
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+                "keys": {
+                    "p256dh": "BNcW4oA7zq5H9TKIrA3XfKclN2fX9P_7NR=",
+                    "auth": 42,
+                },
+            }
+        )
 
     with pytest.raises(exception.AppriseInvalidData):
-        WebPushSubscription({
-            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-            "keys": {
-                "p256dh": 42,
-                "auth": "k9Xzm43nBGo=",
-            },
-        })
+        WebPushSubscription(
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+                "keys": {
+                    "p256dh": 42,
+                    "auth": "k9Xzm43nBGo=",
+                },
+            }
+        )
 
     with pytest.raises(exception.AppriseInvalidData):
-        WebPushSubscription({
-            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-        })
+        WebPushSubscription(
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+            }
+        )
 
     with pytest.raises(exception.AppriseInvalidData):
-        WebPushSubscription({
-            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-            "keys": {},
-        })
+        WebPushSubscription(
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+                "keys": {},
+            }
+        )
 
     with pytest.raises(exception.AppriseInvalidData):
         # Invalid p256dh public key provided
-        wps = WebPushSubscription({
-            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-            "keys": {
-                "p256dh": "BNcW4oA7zq5H9TKIrA3XfKclN2fX9P_7NR=",
-                "auth": "k9Xzm43nBGo=",
-            },
-        })
+        wps = WebPushSubscription(
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+                "keys": {
+                    "p256dh": "BNcW4oA7zq5H9TKIrA3XfKclN2fX9P_7NR=",
+                    "auth": "k9Xzm43nBGo=",
+                },
+            }
+        )
 
     # An empty object
     wps = WebPushSubscription()
@@ -425,16 +434,18 @@ def test_plugin_vapid_subscriptions(tmpdir):
     assert wps.write(os.path.join(str(tmpdir0), "subscriptions.json")) is False
 
     # A valid key
-    wps = WebPushSubscription({
-        "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-        "keys": {
-            "p256dh": (
-                "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
-                "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
-            ),
-            "auth": "k9Xzm43nBGo=",
-        },
-    })
+    wps = WebPushSubscription(
+        {
+            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+            "keys": {
+                "p256dh": (
+                    "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
+                    "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
+                ),
+                "auth": "k9Xzm43nBGo=",
+            },
+        }
+    )
 
     assert bool(wps) is True
     assert isinstance(wps.json(), str)
@@ -443,8 +454,7 @@ def test_plugin_vapid_subscriptions(tmpdir):
     assert wps.auth == "k9Xzm43nBGo="
     assert wps.endpoint == "https://fcm.googleapis.com/fcm/send/abc123"
     assert (
-        wps.p256dh
-        == "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
+        wps.p256dh == "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
         "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
     )
     assert wps.public_key is not None
@@ -470,16 +480,18 @@ def test_plugin_vapid_subscriptions_without_c():
     """NotifyVapid() Subscriptions (no Cryptography)"""
     with pytest.raises(exception.AppriseInvalidData):
         # A valid key that can't be loaded because crytography is missing
-        WebPushSubscription({
-            "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
-            "keys": {
-                "p256dh": (
-                    "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
-                    "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
-                ),
-                "auth": "k9Xzm43nBGo=",
-            },
-        })
+        WebPushSubscription(
+            {
+                "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+                "keys": {
+                    "p256dh": (
+                        "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
+                        "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
+                    ),
+                    "auth": "k9Xzm43nBGo=",
+                },
+            }
+        )
 
 
 @pytest.mark.skipif(

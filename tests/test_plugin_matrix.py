@@ -48,16 +48,18 @@ from apprise.plugins.matrix import MatrixDiscoveryException, NotifyMatrix
 
 logging.disable(logging.CRITICAL)
 
-MATRIX_GOOD_RESPONSE = dumps({
-    "room_id": "!abc123:localhost",
-    "room_alias": "#abc123:localhost",
-    "joined_rooms": ["!abc123:localhost", "!def456:localhost"],
-    "access_token": "abcd1234",
-    "home_server": "localhost",
-    # Simulate .well-known
-    "m.homeserver": {"base_url": "https://matrix.example.com"},
-    "m.identity_server": {"base_url": "https://vector.im"},
-})
+MATRIX_GOOD_RESPONSE = dumps(
+    {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost", "!def456:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+        # Simulate .well-known
+        "m.homeserver": {"base_url": "https://matrix.example.com"},
+        "m.identity_server": {"base_url": "https://vector.im"},
+    }
+)
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
@@ -209,8 +211,10 @@ apprise_url_tests = (
         },
     ),
     (
-        ("matrixs://user:token@localhost?mode=slack"
-         "&format=markdown&image=False"),
+        (
+            "matrixs://user:token@localhost?mode=slack"
+            "&format=markdown&image=False"
+        ),
         {
             # user and token specified; image set to True
             "instance": NotifyMatrix,
@@ -525,10 +529,12 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
         if url.find("/rooms/") > -1:
             # over-ride on room query
             request.status_code = 403
-            request.content = dumps({
-                "errcode": "M_UNKNOWN",
-                "error": "Internal server error",
-            })
+            request.content = dumps(
+                {
+                    "errcode": "M_UNKNOWN",
+                    "error": "Internal server error",
+                }
+            )
 
         return request
 
@@ -583,9 +589,11 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
 
     # Cause retries
     request.status_code = 429
-    request.content = dumps({
-        "retry_after_ms": 1,
-    })
+    request.content = dumps(
+        {
+            "retry_after_ms": 1,
+        }
+    )
 
     postokay, _response, _ = obj._fetch("/retry/apprise/unit/test")
     assert postokay is False
@@ -690,10 +698,12 @@ def test_plugin_matrix_auth(mock_post, mock_get, mock_put):
     assert obj._register() is True
     assert obj.access_token is not None
     request.status_code = 403
-    request.content = dumps({
-        "errcode": "M_UNKNOWN_TOKEN",
-        "error": "Access Token unknown or expired",
-    })
+    request.content = dumps(
+        {
+            "errcode": "M_UNKNOWN_TOKEN",
+            "error": "Access Token unknown or expired",
+        }
+    )
     # Test logoff when getting a 403 error; but if we have the right error
     # code in the response, then we return a True
     assert obj._logout() is True
@@ -892,10 +902,12 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     assert obj._room_create("#abc123:localhost") is None
 
     request.status_code = 403
-    request.content = dumps({
-        "errcode": "M_ROOM_IN_USE",
-        "error": "Room alias already taken",
-    })
+    request.content = dumps(
+        {
+            "errcode": "M_ROOM_IN_USE",
+            "error": "Room alias already taken",
+        }
+    )
     obj.store.clear()
     # This causes us to look up a channel ID if we get a ROOM_IN_USE response
     assert obj._room_create("#abc123:localhost") is None
@@ -995,8 +1007,9 @@ def test_plugin_matrix_url_parsing():
 
     # Mixed-case room id with underscore should be accepted by _room_join
     from apprise.plugins.matrix import IS_ROOM_ID  # local alias
+
     nm = NotifyMatrix(host="localhost")
-    nm.access_token = "abc"   # simulate logged-in
+    nm.access_token = "abc"  # simulate logged-in
     nm.home_server = "localhost"
     # this should NOT be rejected by the regex
     assert IS_ROOM_ID.match("!Jm_LvU1nas_8KJPBmN9n:nginx.eu")
@@ -1129,18 +1142,28 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     # Test our call count
     assert mock_put.call_count == 2
     assert mock_post.call_count == 3
-    assert mock_post.call_args_list[0][0][0] == \
-        "http://localhost/_matrix/client/v3/login"
-    assert mock_post.call_args_list[1][0][0] == \
-        "http://localhost/_matrix/media/v3/upload"
-    assert mock_post.call_args_list[2][0][0] == \
-        "http://localhost/_matrix/client/v3/join/%23general%3Alocalhost"
-    assert mock_put.call_args_list[0][0][0] == \
-        "http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/" \
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "http://localhost/_matrix/client/v3/login"
+    )
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == "http://localhost/_matrix/media/v3/upload"
+    )
+    assert (
+        mock_post.call_args_list[2][0][0]
+        == "http://localhost/_matrix/client/v3/join/%23general%3Alocalhost"
+    )
+    assert (
+        mock_put.call_args_list[0][0][0]
+        == "http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/"
         "send/m.room.message/0"
-    assert mock_put.call_args_list[1][0][0] == \
-        "http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/" \
+    )
+    assert (
+        mock_put.call_args_list[1][0][0]
+        == "http://localhost/_matrix/client/v3/rooms/%21abc123%3Alocalhost/"
         "send/m.room.message/1"
+    )
 
     # Attach a zip file type
     attach = AppriseAttachment(
@@ -1658,17 +1681,16 @@ def test_plugin_matrix_v2_token_mode_no_txn_increment(
     assert obj.notify(body="token mode image test") is True
 
     # Send with an attachment
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
     assert obj.send(body="token mode attach test", attach=attach) is True
 
 
 def test_plugin_matrix_parse_native_url_no_match():
     """parse_native_url returns None for non-t2bot URLs."""
-    assert NotifyMatrix.parse_native_url(
-        "https://not-a-t2bot-url.com/some/path"
-    ) is None
+    assert (
+        NotifyMatrix.parse_native_url("https://not-a-t2bot-url.com/some/path")
+        is None
+    )
 
 
 @mock.patch("requests.put")

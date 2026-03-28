@@ -763,7 +763,6 @@ def parse_url(
         if isinstance(port, int) and not (
             not strict_port or (strict_port and port > 0 and port <= 65535)
         ):
-
             # An invalid port was specified
             return None
 
@@ -955,7 +954,6 @@ def url_assembly(encode=False, **kwargs):
     # Determine Authentication
     auth = ""
     if kwargs.get("user") is not None and kwargs.get("password") is not None:
-
         auth = "{user}:{password}@".format(
             user=quote_(kwargs.get("user"), safe=""),
             password=quote_(kwargs.get("password"), safe=""),
@@ -1082,7 +1080,8 @@ def parse_list(*args, cast=None, allow_whitespace=True, sort=True):
 
         elif isinstance(arg, (set, list, tuple)):
             result += parse_list(
-                *arg, allow_whitespace=allow_whitespace, sort=sort)
+                *arg, allow_whitespace=allow_whitespace, sort=sort
+            )
 
     #
     # filter() eliminates any empty entries
@@ -1095,8 +1094,11 @@ def parse_list(*args, cast=None, allow_whitespace=True, sort=True):
             sorted(filter(bool, list(set(result))))
             if allow_whitespace
             else sorted(
-                [x.strip() for x in filter(
-                    bool, list(set(result))) if x.strip()]
+                [
+                    x.strip()
+                    for x in filter(bool, list(set(result)))
+                    if x.strip()
+                ]
             )
         )
     return (

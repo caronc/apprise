@@ -278,7 +278,6 @@ class NotifyStreamlabs(NotifyBase):
             "User-Agent": self.app_id,
         }
         if self.call == StrmlabsCall.ALERT:
-
             data = {
                 "access_token": self.access_token,
                 "type": self.alert_type.lower(),
@@ -314,7 +313,8 @@ class NotifyStreamlabs(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
                     return False
 
                 else:

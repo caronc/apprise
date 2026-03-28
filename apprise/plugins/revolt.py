@@ -193,13 +193,17 @@ class NotifyRevolt(NotifyBase):
         )
 
         if self.notify_format == NotifyFormat.MARKDOWN:
-            payload["embeds"] = [{
-                "title": None if not title else title[0 : self.title_maxlen],
-                "description": body,
-                # Our color associated with our notification
-                "colour": self.color(notify_type),
-                "replies": None,
-            }]
+            payload["embeds"] = [
+                {
+                    "title": None
+                    if not title
+                    else title[0 : self.title_maxlen],
+                    "description": body,
+                    # Our color associated with our notification
+                    "colour": self.color(notify_type),
+                    "replies": None,
+                }
+            ]
 
             if image_url:
                 payload["embeds"][0]["icon_url"] = image_url
@@ -250,9 +254,7 @@ class NotifyRevolt(NotifyBase):
             # the same allowing this to role smoothly and set our throttle
             # accordingly
             wait = abs(
-                (
-                    self.ratelimit_reset - now + self.clock_skew
-                ).total_seconds()
+                (self.ratelimit_reset - now + self.clock_skew).total_seconds()
             )
 
         # Default content response object
@@ -300,11 +302,11 @@ class NotifyRevolt(NotifyBase):
                 requests.codes.ok,
                 requests.codes.no_content,
             ):
-
                 # Some details to debug by
                 self.logger.debug(
                     "Response Details:\r\n%r",
-                    content if content else (r.content or b"")[:2000])
+                    content if content else (r.content or b"")[:2000],
+                )
 
                 # We had a problem
                 status_str = NotifyBase.http_response_code_lookup(
@@ -325,7 +327,6 @@ class NotifyRevolt(NotifyBase):
                     r.status_code == requests.codes.too_many_requests
                     and retries > 0
                 ):
-
                     # Try again
                     return self._send(
                         payload=payload,

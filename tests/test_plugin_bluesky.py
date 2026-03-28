@@ -105,10 +105,12 @@ apprise_url_tests = (
                 "refreshJwt": "abcd",
                 "did": "did:plc:1234",
                 # Support plc response
-                "service": [{
-                    "type": "AtprotoPersonalDataServer",
-                    "serviceEndpoint": "https://example.pds.io",
-                }],
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ],
             },
         },
     ),
@@ -125,10 +127,12 @@ apprise_url_tests = (
                 # For handling attachments
                 "blob": "content",
                 # Support plc response
-                "service": [{
-                    "type": "AtprotoPersonalDataServer",
-                    "serviceEndpoint": "https://example.pds.io",
-                }],
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ],
             },
         },
     ),
@@ -145,10 +149,12 @@ apprise_url_tests = (
                 # For handling attachments
                 "blob": "content",
                 # Support plc response
-                "service": [{
-                    "type": "AtprotoPersonalDataServer",
-                    "serviceEndpoint": "https://example.pds.io",
-                }],
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ],
             },
         },
     ),
@@ -166,10 +172,12 @@ apprise_url_tests = (
                 # For handling attachments
                 "blob": "content",
                 # Support plc response
-                "service": [{
-                    "type": "AtprotoPersonalDataServer",
-                    "serviceEndpoint": "https://example.pds.io",
-                }],
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ],
             },
         },
     ),
@@ -185,10 +193,12 @@ apprise_url_tests = (
                 "refreshJwt": "abcd",
                 "did": "did:plc:1234",
                 # Support plc response
-                "service": [{
-                    "type": "AtprotoPersonalDataServer",
-                    "serviceEndpoint": "https://example.pds.io",
-                }],
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ],
             },
         },
     ),
@@ -204,10 +214,12 @@ apprise_url_tests = (
                 "refreshJwt": "abcd",
                 "did": "did:plc:1234",
                 # Support plc response
-                "service": [{
-                    "type": "AtprotoPersonalDataServer",
-                    "serviceEndpoint": "https://example.pds.io",
-                }],
+                "service": [
+                    {
+                        "type": "AtprotoPersonalDataServer",
+                        "serviceEndpoint": "https://example.pds.io",
+                    }
+                ],
             },
         },
     ),
@@ -223,10 +235,12 @@ def good_response(data=None):
             "refreshJwt": "abcd",
             "did": "did:plc:1234",
             # Support plc response
-            "service": [{
-                "type": "AtprotoPersonalDataServer",
-                "serviceEndpoint": "https://example.pds.io",
-            }],
+            "service": [
+                {
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://example.pds.io",
+                }
+            ],
             "ratelimit-reset": str(
                 int(datetime.now(timezone.utc).timestamp()) + 3600
             ),
@@ -292,14 +306,16 @@ def bad_message_response():
 def good_media_response():
     """Prepare a good media response."""
     response = Mock()
-    response.content = json.dumps({
-        "blob": {
-            "$type": "blob",
-            "mimeType": "image/jpeg",
-            "ref": {"$link": "baf124idksduabcjkaa3iey4bfyq"},
-            "size": 73667,
+    response.content = json.dumps(
+        {
+            "blob": {
+                "$type": "blob",
+                "mimeType": "image/jpeg",
+                "ref": {"$link": "baf124idksduabcjkaa3iey4bfyq"},
+                "size": 73667,
+            }
         }
-    })
+    )
     response.headers = {}
     response.status_code = requests.codes.ok
     return response
@@ -431,10 +447,12 @@ def test_plugin_bluesky_general(mocker):
         "refreshJwt": "abcd",
         "did": "did:plc:1234",
         # Support plc response
-        "service": [{
-            "type": "AtprotoPersonalDataServer",
-            "serviceEndpoint": "https://example.pds.io",
-        }],
+        "service": [
+            {
+                "type": "AtprotoPersonalDataServer",
+                "serviceEndpoint": "https://example.pds.io",
+            }
+        ],
     }
     request.content = json.dumps(response_obj)
 
@@ -885,12 +903,16 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
     identity_response = good_response({"did": "did:plc:abcdefg1234567"})
 
     # Step 2: PLC Directory lookup
-    plc_response = good_response({
-        "service": [{
-            "type": "AtprotoPersonalDataServer",
-            "serviceEndpoint": "https://example.pds.io",
-        }]
-    })
+    plc_response = good_response(
+        {
+            "service": [
+                {
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://example.pds.io",
+                }
+            ]
+        }
+    )
 
     # Step 3: Auth session
     session_response = good_response()
@@ -907,12 +929,16 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
     # Reset for did:web test
     identity_response = good_response({"did": "did:web:example.com"})
 
-    web_did_response = good_response({
-        "service": [{
-            "type": "AtprotoPersonalDataServer",
-            "serviceEndpoint": "https://example.com",
-        }]
-    })
+    web_did_response = good_response(
+        {
+            "service": [
+                {
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://example.com",
+                }
+            ]
+        }
+    )
 
     mock_get.side_effect = [identity_response, web_did_response]
     mock_post.side_effect = [session_response, post_response]
@@ -959,12 +985,16 @@ def test_plugin_bluesky_missing_pds_endpoint(mock_get):
     identity_response = good_response({"did": "did:plc:abcdefg1234567"})
 
     # Return DID document with a service list, but no matching PDS type
-    incomplete_pds_response = good_response({
-        "service": [{
-            "type": "SomeOtherService",
-            "serviceEndpoint": "https://unrelated.example.com",
-        }]
-    })
+    incomplete_pds_response = good_response(
+        {
+            "service": [
+                {
+                    "type": "SomeOtherService",
+                    "serviceEndpoint": "https://unrelated.example.com",
+                }
+            ]
+        }
+    )
 
     mock_get.side_effect = [identity_response, incomplete_pds_response]
     obj = NotifyBlueSky(user="handle", password="app-pw")

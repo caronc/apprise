@@ -291,9 +291,11 @@ class NotifyBulkSMS(NotifyBase):
         }
 
         if self.source:
-            payload.update({
-                "from": self.source,
-            })
+            payload.update(
+                {
+                    "from": self.source,
+                }
+            )
 
         # Authentication
         auth = (self.user, self.password)
@@ -388,7 +390,8 @@ class NotifyBulkSMS(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

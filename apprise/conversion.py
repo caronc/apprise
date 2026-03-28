@@ -176,7 +176,6 @@ class HTMLConverter(HTMLParser):
 
         # initialize our previous flag
         if self._do_store:
-
             # Tidy our whitespace
             content = self.WS_TRIM.sub(" ", data)
             self._result.append(content)

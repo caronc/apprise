@@ -51,7 +51,6 @@ logging.disable(logging.CRITICAL)
 
 
 class AppriseURLTester:
-
     # Some exception handling we'll use
     req_exceptions = (
         requests.ConnectionError(0, "requests.ConnectionError() not handled"),
@@ -86,10 +85,12 @@ class AppriseURLTester:
         self.body = "".join(
             choice(str_alpha + str_num + " ") for _ in range(self.body_len)
         )
-        self.body = "\r\n".join([
-            self.body[i : i + self.row]
-            for i in range(0, len(self.body), self.row)
-        ])
+        self.body = "\r\n".join(
+            [
+                self.body[i : i + self.row]
+                for i in range(0, len(self.body), self.row)
+            ]
+        )
 
         # Create our title using random data
         self.title = "".join(
@@ -101,10 +102,12 @@ class AppriseURLTester:
 
     def add(self, url, meta):
         """Adds a test suite to our object."""
-        self.__tests.append({
-            "url": url,
-            "meta": meta,
-        })
+        self.__tests.append(
+            {
+                "url": url,
+                "meta": meta,
+            }
+        )
 
     def run_all(self, tmpdir=None):
         """Run all of our tests."""
@@ -257,7 +260,7 @@ class AppriseURLTester:
             ):
                 raise AssertionError(
                     f"URL: {url} Privacy URL:"
-                    f" '{obj.url(privacy=True)[:len(privacy_url)]}' !="
+                    f" '{obj.url(privacy=True)[: len(privacy_url)]}' !="
                     f" expected '{privacy_url}'"
                 )
 
@@ -456,7 +459,6 @@ class AppriseURLTester:
 
         try:
             if test_requests_exceptions is False:
-
                 # Verify we can acquire a target count as an integer
                 targets = len(obj)
 
@@ -467,7 +469,8 @@ class AppriseURLTester:
                 if resp != notify_response:
                     raise AssertionError(
                         f"notify() call; notify_response={resp} "
-                        f"(expected {notify_response}) on {url}")
+                        f"(expected {notify_response}) on {url}"
+                    )
 
                 if notify_response:
                     # If we successfully got a response, there must have been
@@ -602,11 +605,19 @@ class AppriseURLTester:
                     )
 
                     # Same results should apply to a list of attachments
-                    attach = AppriseAttachment((
-                        os.path.join(self.__test_var_dir, "apprise-test.gif"),
-                        os.path.join(self.__test_var_dir, "apprise-test.png"),
-                        os.path.join(self.__test_var_dir, "apprise-test.jpeg"),
-                    ))
+                    attach = AppriseAttachment(
+                        (
+                            os.path.join(
+                                self.__test_var_dir, "apprise-test.gif"
+                            ),
+                            os.path.join(
+                                self.__test_var_dir, "apprise-test.png"
+                            ),
+                            os.path.join(
+                                self.__test_var_dir, "apprise-test.jpeg"
+                            ),
+                        )
+                    )
 
                     assert (
                         obj.notify(
@@ -685,7 +696,6 @@ class AppriseURLTester:
                             is False
                         )
             else:
-
                 for exception in self.req_exceptions:
                     mock_post.side_effect = exception
                     mock_head.side_effect = exception

@@ -678,9 +678,11 @@ class NotifyLametric(NotifyBase):
         """Return URL and payload for cloud directed requests."""
 
         # Update header entries
-        headers.update({
-            "X-Access-Token": self.lametric_apikey,
-        })
+        headers.update(
+            {
+                "X-Access-Token": self.lametric_apikey,
+            }
+        )
 
         if self.sound:
             self.logger.warning(
@@ -714,11 +716,13 @@ class NotifyLametric(NotifyBase):
         # Cloud Notifications don't have as much functionality
         # You can not set priority and/or sound
         payload = {
-            "frames": [{
-                "icon": icon,
-                "text": body,
-                "index": 0,
-            }]
+            "frames": [
+                {
+                    "icon": icon,
+                    "text": body,
+                    "index": 0,
+                }
+            ]
         }
 
         # Prepare our Cloud Notify URL
@@ -756,10 +760,12 @@ class NotifyLametric(NotifyBase):
                 # cycles is set to 0, notification will stay on the screen
                 # until user dismisses it manually. By default it is set to 1.
                 "cycles": self.cycles,
-                "frames": [{
-                    "icon": icon,
-                    "text": body,
-                }],
+                "frames": [
+                    {
+                        "icon": icon,
+                        "text": body,
+                    }
+                ],
             },
         }
 
@@ -857,7 +863,8 @@ class NotifyLametric(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False
@@ -1032,13 +1039,11 @@ class NotifyLametric(NotifyBase):
 
         # App ID
         if "app" in results["qsd"] and results["qsd"]["app"]:
-
             # Extract the App ID from an argument
             results["app_id"] = NotifyLametric.unquote(results["qsd"]["app"])
 
         # App Version
         if "app_ver" in results["qsd"] and results["qsd"]["app_ver"]:
-
             # Extract the App ID from an argument
             results["app_ver"] = NotifyLametric.unquote(
                 results["qsd"]["app_ver"]

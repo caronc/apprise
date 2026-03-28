@@ -197,7 +197,8 @@ class NotifyWebexTeams(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return False
 
@@ -246,8 +247,9 @@ class NotifyWebexTeams(NotifyBase):
 
         # Set our token if found as an argument
         if "token" in results["qsd"] and len(results["qsd"]["token"]):
-            results["token"] = \
-                NotifyWebexTeams.unquote(results["qsd"]["token"])
+            results["token"] = NotifyWebexTeams.unquote(
+                results["qsd"]["token"]
+            )
 
         else:
             # The first token is stored in the hostname

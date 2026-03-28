@@ -299,10 +299,12 @@ def test_plugin_pushsafer_general(mock_post):
     # Prepare Mock
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
-    mock_post.return_value.content = dumps({
-        "status": 1,
-        "success": "okay",
-    })
+    mock_post.return_value.content = dumps(
+        {
+            "status": 1,
+            "success": "okay",
+        }
+    )
 
     # Exception should be thrown about the fact no private key was specified
     with pytest.raises(TypeError):

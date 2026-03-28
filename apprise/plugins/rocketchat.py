@@ -265,10 +265,12 @@ class NotifyRocketChat(NotifyBase):
 
         if self.mode == RocketChatAuthMode.TOKEN:
             # Set our headers for further communication
-            self.headers.update({
-                "X-User-Id": self.user,
-                "X-Auth-Token": self.password,
-            })
+            self.headers.update(
+                {
+                    "X-User-Id": self.user,
+                    "X-Auth-Token": self.password,
+                }
+            )
 
         # Validate recipients and drop bad ones:
         for recipient in parse_list(targets):
@@ -385,17 +387,19 @@ class NotifyRocketChat(NotifyBase):
                 if self.port is None or self.port == default_port
                 else f":{self.port}"
             ),
-            targets="/".join([
-                NotifyRocketChat.quote(x, safe="@#")
-                for x in chain(
-                    # Channels are prefixed with a pound/hashtag symbol
-                    [f"#{x}" for x in self.channels],
-                    # Rooms are as is
-                    self.rooms,
-                    # Users
-                    [f"@{x}" for x in self.users],
-                )
-            ]),
+            targets="/".join(
+                [
+                    NotifyRocketChat.quote(x, safe="@#")
+                    for x in chain(
+                        # Channels are prefixed with a pound/hashtag symbol
+                        [f"#{x}" for x in self.channels],
+                        # Rooms are as is
+                        self.rooms,
+                        # Users
+                        [f"@{x}" for x in self.users],
+                    )
+                ]
+            ),
             params=NotifyRocketChat.urlencode(params),
         )
 
@@ -456,7 +460,6 @@ class NotifyRocketChat(NotifyBase):
             if not self._send(
                 payload, notify_type=notify_type, path=path, **kwargs
             ):
-
                 # toggle flag
                 has_error = True
 
@@ -490,7 +493,6 @@ class NotifyRocketChat(NotifyBase):
             payload["channel"] = channel
 
             if not self._send(payload, notify_type=notify_type, **kwargs):
-
                 # toggle flag
                 has_error = True
 
@@ -503,7 +505,6 @@ class NotifyRocketChat(NotifyBase):
             payload["roomId"] = room
 
             if not self._send(payload, notify_type=notify_type, **kwargs):
-
                 # toggle flag
                 has_error = True
 
@@ -544,10 +545,12 @@ class NotifyRocketChat(NotifyBase):
         headers = self.headers.copy()
 
         # Apply minimum headers
-        headers.update({
-            "User-Agent": self.app_id,
-            "Content-Type": "application/json",
-        })
+        headers.update(
+            {
+                "User-Agent": self.app_id,
+                "Content-Type": "application/json",
+            }
+        )
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -577,7 +580,8 @@ class NotifyRocketChat(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

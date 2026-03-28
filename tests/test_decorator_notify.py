@@ -74,14 +74,16 @@ def test_notify_simple_decoration():
             assert isinstance(attach, AppriseAttachment)
 
         # Populate our object we can use to validate
-        verify_obj.update({
-            "body": body,
-            "title": title,
-            "notify_type": notify_type,
-            "attach": attach,
-            "args": args,
-            "kwargs": kwargs,
-        })
+        verify_obj.update(
+            {
+                "body": body,
+                "title": title,
+                "notify_type": notify_type,
+                "attach": attach,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
 
     # Now after our hook being inline... it's been loaded
     assert "utiltest" in N_MGR
@@ -313,14 +315,16 @@ def test_notify_complex_decoration():
     ):
 
         # Populate our object we can use to validate
-        verify_obj.update({
-            "body": body,
-            "title": title,
-            "notify_type": notify_type,
-            "attach": attach,
-            "args": args,
-            "kwargs": kwargs,
-        })
+        verify_obj.update(
+            {
+                "body": body,
+                "title": title,
+                "notify_type": notify_type,
+                "attach": attach,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
 
     # Now after our hook being inline... it's been loaded
     assert "utiltest" in N_MGR
@@ -464,15 +468,17 @@ def test_notify_decorator_urls_with_space():
     ):
 
         # Track what is added
-        verify_obj.append({
-            "body": body,
-            "title": title,
-            "notify_type": notify_type,
-            "attach": attach,
-            "meta": meta,
-            "args": args,
-            "kwargs": kwargs,
-        })
+        verify_obj.append(
+            {
+                "body": body,
+                "title": title,
+                "notify_type": notify_type,
+                "attach": attach,
+                "meta": meta,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
 
     assert "posts" in N_MGR
 
@@ -542,15 +548,17 @@ def test_notify_multi_instance_decoration(tmpdir):
         assert isinstance(body, str)
 
         # Track what is added
-        verify_obj.append({
-            "body": body,
-            "title": title,
-            "notify_type": notify_type,
-            "attach": attach,
-            "meta": meta,
-            "args": args,
-            "kwargs": kwargs,
-        })
+        verify_obj.append(
+            {
+                "body": body,
+                "title": title,
+                "notify_type": notify_type,
+                "attach": attach,
+                "meta": meta,
+                "args": args,
+                "kwargs": kwargs,
+            }
+        )
 
     # Now after our hook being inline... it's been loaded
     assert "multi" in N_MGR

@@ -204,8 +204,10 @@ def test_plugin_pagerduty_notify_type_is_string(mock_post):
     obj = Apprise.instantiate("pagerduty://myroutekey@myapikey")
     assert isinstance(obj, NotifyPagerDuty)
 
-    assert obj.notify(
-        body="body", title="title", notify_type=NotifyType.INFO) is True
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
     assert mock_post.call_count == 1
 
     call = mock_post.call_args_list[0]

@@ -220,7 +220,6 @@ class NotifySendGrid(NotifyBase):
         # Validate recipients (to:) and drop bad ones:
         if targets:
             for recipient in parse_list(targets):
-
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
@@ -235,7 +234,6 @@ class NotifySendGrid(NotifyBase):
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_list(cc):
-
             result = is_email(recipient)
             if result:
                 self.cc.add(result["full_email"])
@@ -247,7 +245,6 @@ class NotifySendGrid(NotifyBase):
 
         # Validate recipients (bcc:) and drop bad ones:
         for recipient in parse_list(bcc):
-
             result = is_email(recipient)
             if result:
                 self.bcc.add(result["full_email"])
@@ -328,7 +325,8 @@ class NotifySendGrid(NotifyBase):
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
-                "There are no SendGrid email recipients to notify")
+                "There are no SendGrid email recipients to notify"
+            )
             return False
 
         headers = {
@@ -342,10 +340,12 @@ class NotifySendGrid(NotifyBase):
 
         # A Simple Email Payload Template
         payload_ = {
-            "personalizations": [{
-                # Placeholder
-                "to": [{"email": None}],
-            }],
+            "personalizations": [
+                {
+                    # Placeholder
+                    "to": [{"email": None}],
+                }
+            ],
             "from": {
                 "email": self.from_email,
             },
@@ -353,14 +353,16 @@ class NotifySendGrid(NotifyBase):
             # set a default with at least 1 character or SendGrid will deny
             # our request
             "subject": title if title else self.default_empty_subject,
-            "content": [{
-                "type": (
-                    "text/plain"
-                    if self.notify_format == NotifyFormat.TEXT
-                    else "text/html"
-                ),
-                "value": body,
-            }],
+            "content": [
+                {
+                    "type": (
+                        "text/plain"
+                        if self.notify_format == NotifyFormat.TEXT
+                        else "text/html"
+                    ),
+                    "value": body,
+                }
+            ],
         }
 
         if attach and self.attachment_support:
@@ -378,16 +380,18 @@ class NotifySendGrid(NotifyBase):
                     return False
 
                 try:
-                    attachments.append({
-                        "content": attachment.base64(),
-                        "filename": (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
-                        "type": "application/octet-stream",
-                        "disposition": "attachment",
-                    })
+                    attachments.append(
+                        {
+                            "content": attachment.base64(),
+                            "filename": (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            "type": "application/octet-stream",
+                            "disposition": "attachment",
+                        }
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -403,9 +407,11 @@ class NotifySendGrid(NotifyBase):
                 )
 
             # Append our attachments to the payload
-            payload_.update({
-                "attachments": attachments,
-            })
+            payload_.update(
+                {
+                    "attachments": attachments,
+                }
+            )
 
         if self.template:
             payload_["template_id"] = self.template
@@ -454,7 +460,8 @@ class NotifySendGrid(NotifyBase):
                     f"(cert_verify={self.verify_certificate!r})"
                 )
                 self.logger.debug(
-                    "SendGrid Payload: %s", sanitize_payload(payload))
+                    "SendGrid Payload: %s", sanitize_payload(payload)
+                )
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -486,7 +493,8 @@ class NotifySendGrid(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

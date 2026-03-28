@@ -317,7 +317,8 @@ class NotifySMSManager(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
@@ -369,9 +370,12 @@ class NotifySMSManager(NotifyBase):
         return "{schema}://{apikey}@{targets}?{params}".format(
             schema=self.secure_protocol[0],
             apikey=self.pprint(self.apikey, privacy, safe=""),
-            targets="/".join([
-                NotifySMSManager.quote(f"{x}", safe="+") for x in self.targets
-            ]),
+            targets="/".join(
+                [
+                    NotifySMSManager.quote(f"{x}", safe="+")
+                    for x in self.targets
+                ]
+            ),
             params=NotifySMSManager.urlencode(params),
         )
 

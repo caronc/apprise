@@ -101,7 +101,6 @@ class ConfigFile(ConfigBase):
                 self.max_buffer_size > 0
                 and os.path.getsize(self.path) > self.max_buffer_size
             ):
-
                 # Content exceeds maximum buffer size
                 self.logger.error(
                     "File size exceeds maximum allowable buffer length"
@@ -149,7 +148,6 @@ class ConfigFile(ConfigBase):
             self.config_format is None
             and re.match(r"^.*\.ya?ml\s*$", self.path, re.I) is not None
         ):
-
             # YAML Filename Detected
             self.default_config_format = ConfigFormat.YAML
 

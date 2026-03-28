@@ -32,6 +32,7 @@ class SecureXMPPMode:
     """
     Defines our modes
     """
+
     NONE = "none"
     TLS = "tls"
     STARTTLS = "starttls"
@@ -40,20 +41,20 @@ class SecureXMPPMode:
 SECURE_MODES = {
     SecureXMPPMode.STARTTLS: {
         "default_port": 5222,
-         "enable_plaintext": False,
-         "enable_starttls": True,
-         "enable_direct_tls": False,
+        "enable_plaintext": False,
+        "enable_starttls": True,
+        "enable_direct_tls": False,
     },
     SecureXMPPMode.TLS: {
         "default_port": 5223,
-         "enable_plaintext": False,
-         "enable_starttls": False,
-         "enable_direct_tls": True,
+        "enable_plaintext": False,
+        "enable_starttls": False,
+        "enable_direct_tls": True,
     },
     SecureXMPPMode.NONE: {
         "default_port": 5222,
-         "enable_plaintext": True,
-         "enable_starttls": False,
-         "enable_direct_tls": False,
+        "enable_plaintext": True,
+        "enable_starttls": False,
+        "enable_direct_tls": False,
     },
 }

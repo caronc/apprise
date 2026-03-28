@@ -302,18 +302,20 @@ def test_plugin_reddit_general(mock_post):
     epoch = datetime.fromtimestamp(0, timezone.utc)
 
     good_response = mock.Mock()
-    good_response.content = dumps({
-        "access_token": "abc123",
-        "token_type": "bearer",
-        "expires_in": 100000,
-        "scope": "*",
-        "refresh_token": "def456",
-        # The below is used in the response:
-        "json": {
-            # No errors during post
-            "errors": [],
-        },
-    })
+    good_response.content = dumps(
+        {
+            "access_token": "abc123",
+            "token_type": "bearer",
+            "expires_in": 100000,
+            "scope": "*",
+            "refresh_token": "def456",
+            # The below is used in the response:
+            "json": {
+                # No errors during post
+                "errors": [],
+            },
+        }
+    )
     good_response.status_code = requests.codes.ok
     good_response.headers = {
         "X-RateLimit-Reset": (
@@ -426,13 +428,15 @@ def test_plugin_reddit_general(mock_post):
     assert obj.send(body="test") is False
 
     # No access token provided
-    response.content = dumps({
-        "access_token": "",
-        "json": {
-            # No errors during post
-            "errors": [],
-        },
-    })
+    response.content = dumps(
+        {
+            "access_token": "",
+            "json": {
+                # No errors during post
+                "errors": [],
+            },
+        }
+    )
     obj = NotifyReddit(**kwargs)
     assert obj.send(body="test") is False
 
@@ -442,18 +446,20 @@ def test_plugin_reddit_general(mock_post):
     assert obj.send(body="test") is False
 
     # Reset to what we consider a good response
-    good_response.content = dumps({
-        "access_token": "abc123",
-        "token_type": "bearer",
-        "expires_in": 100000,
-        "scope": "*",
-        "refresh_token": "def456",
-        # The below is used in the response:
-        "json": {
-            # No errors during post
-            "errors": [],
-        },
-    })
+    good_response.content = dumps(
+        {
+            "access_token": "abc123",
+            "token_type": "bearer",
+            "expires_in": 100000,
+            "scope": "*",
+            "refresh_token": "def456",
+            # The below is used in the response:
+            "json": {
+                # No errors during post
+                "errors": [],
+            },
+        }
+    )
     good_response.status_code = requests.codes.ok
     good_response.headers = {
         "X-RateLimit-Reset": (

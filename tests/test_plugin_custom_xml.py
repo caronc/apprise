@@ -476,8 +476,10 @@ def test_plugin_custom_xml_edge_cases(mock_request):
 
     # Test our data set for our key/value pair
     assert re.search(r"<Version>[1-9]+\.[0-9]+</Version>", details[1]["data"])
-    assert re.search(r"<MessageType>{}</MessageType>".format(
-        NotifyType.INFO.value), details[1]["data"])
+    assert re.search(
+        r"<MessageType>{}</MessageType>".format(NotifyType.INFO.value),
+        details[1]["data"],
+    )
     assert r"<Subject>title</Subject>" in details[1]["data"]
     # No over-ride
     assert r"<Message>body</Message>" in details[1]["data"]
@@ -529,8 +531,10 @@ def test_plugin_custom_xml_edge_cases(mock_request):
     )
 
     # Test our data set for our key/value pair
-    assert re.search(r"<MessageType>{}</MessageType>".format(
-        NotifyType.INFO.value), details[1]["data"])
+    assert re.search(
+        r"<MessageType>{}</MessageType>".format(NotifyType.INFO.value),
+        details[1]["data"],
+    )
 
     # Subject is swapped for Title
     assert r"<Subject>title</Subject>" not in details[1]["data"]

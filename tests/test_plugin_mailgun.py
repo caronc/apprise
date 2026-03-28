@@ -184,8 +184,9 @@ apprise_url_tests = (
     ),
     # One To Email address
     (
-        "mailgun://user@localhost.localdomain/{}-{}-{}/test@example.com"
-        .format("a" * 32, "b" * 8, "c" * 8),
+        "mailgun://user@localhost.localdomain/{}-{}-{}/test@example.com".format(
+            "a" * 32, "b" * 8, "c" * 8
+        ),
         {
             "instance": NotifyMailgun,
         },
@@ -353,7 +354,6 @@ def test_plugin_mailgun_attachments(mock_post):
     with mock.patch(
         "builtins.open", side_effect=(mock.Mock(), mock.Mock(), OSError())
     ):
-
         assert (
             obj.notify(
                 body="body",

@@ -144,8 +144,7 @@ def test_notify_base():
     assert nb.image_raw(notify_type=NotifyType.INFO) is None
 
     # Color handling
-    assert nb.color(notify_type="invalid") == \
-        AppriseAsset.default_html_color
+    assert nb.color(notify_type="invalid") == AppriseAsset.default_html_color
     assert isinstance(
         nb.color(notify_type=NotifyType.INFO, color_type=None), str
     )
@@ -157,8 +156,7 @@ def test_notify_base():
     )
 
     # Ascii Handling
-    assert nb.ascii(notify_type="invalid") == \
-        AppriseAsset.default_ascii_chars
+    assert nb.ascii(notify_type="invalid") == AppriseAsset.default_ascii_chars
     assert nb.ascii(NotifyType.INFO) == "[i]"
     assert nb.ascii(NotifyType.SUCCESS) == "[+]"
     assert nb.ascii(NotifyType.WARNING) == "[~]"

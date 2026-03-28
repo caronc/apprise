@@ -203,7 +203,9 @@ class NotifyNextcloud(NotifyBase):
             if results:
                 group_id = (
                     self.all_group_id
-                    if results.group("all") else results.group("group"))
+                    if results.group("all")
+                    else results.group("group")
+                )
 
                 self.groups.add(group_id)
                 self.logger.debug("Added Nextcloud group '%s'", group_id)
@@ -214,11 +216,13 @@ class NotifyNextcloud(NotifyBase):
                 # Store our target
                 self.targets.append(results.group("user"))
                 self.logger.debug(
-                    "Added Nextcloud user '%s'", self.targets[-1])
+                    "Added Nextcloud user '%s'", self.targets[-1]
+                )
                 continue
 
             self.logger.warning(
-                "Ignored invalid Nextcloud user/group '%s'", target)
+                "Ignored invalid Nextcloud user/group '%s'", target
+            )
 
         self.version = self.template_args["version"]["default"]
         if version is not None:
@@ -236,8 +240,9 @@ class NotifyNextcloud(NotifyBase):
                 raise TypeError(msg) from None
 
         # Support URL Prefix
-        self.url_prefix = "" if not url_prefix else (
-            "/" + url_prefix.strip("/"))
+        self.url_prefix = (
+            "" if not url_prefix else ("/" + url_prefix.strip("/"))
+        )
 
         self.headers = {}
         if headers:
@@ -364,13 +369,15 @@ class NotifyNextcloud(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 if target:
                     return (False, content)
 
                 raise NextcloudGroupDiscoveryException(
-                    f"{query} non-200 response")
+                    f"{query} non-200 response"
+                )
 
         except requests.RequestException as e:
             self.logger.warning(
@@ -382,7 +389,8 @@ class NotifyNextcloud(NotifyBase):
             if target:
                 return (False, None)
             raise NextcloudGroupDiscoveryException(
-                f"{query} socket exception") from None
+                f"{query} socket exception"
+            ) from None
 
         self.logger.info("Sent Nextcloud %s", query)
         return (True, content)
@@ -443,8 +451,8 @@ class NotifyNextcloud(NotifyBase):
         if targets is not None:
             # Returned cached value
             self.logger.trace(
-                f"Using Nextcloud cached response for group '{group}' "
-                "query")
+                f"Using Nextcloud cached response for group '{group}' query"
+            )
             return set(targets)
 
         # _fetch throws an exception if it fails, so we can
@@ -457,9 +465,7 @@ class NotifyNextcloud(NotifyBase):
         # If we get here, our fetch was successful; look up our users
         users = response.get("ocs", {}).get("data", {}).get("users")
         if isinstance(users, list):
-            targets = {
-                s for u in users if (s := str(u).strip())
-            }
+            targets = {s for u in users if (s := str(u).strip())}
 
         if not targets:
             self.logger.warning(
@@ -467,8 +473,8 @@ class NotifyNextcloud(NotifyBase):
             )
 
         self.store.set(
-            group, list(targets),
-            expires=self.group_discovery_cache_length_sec)
+            group, list(targets), expires=self.group_discovery_cache_length_sec
+        )
         return targets
 
     def all_users(self):
@@ -479,7 +485,8 @@ class NotifyNextcloud(NotifyBase):
         targets = self.store.get(self.all_group_id)
         if targets is not None:
             self.logger.trace(
-                "Using Nextcloud cached response for all-user query")
+                "Using Nextcloud cached response for all-user query"
+            )
             return set(targets)
 
         # _fetch throws an exception if it fails, so we can
@@ -492,9 +499,7 @@ class NotifyNextcloud(NotifyBase):
         # If we get here, our fetch was successful; look up our users
         users = response.get("ocs", {}).get("data", {}).get("users")
         if isinstance(users, list):
-            targets = {
-                s for u in users if (s := str(u).strip())
-            }
+            targets = {s for u in users if (s := str(u).strip())}
 
         if not targets:
             self.logger.warning(
@@ -505,7 +510,9 @@ class NotifyNextcloud(NotifyBase):
 
         self.store.set(
             self.all_group_id,
-            list(targets), expires=self.group_discovery_cache_length_sec)
+            list(targets),
+            expires=self.group_discovery_cache_length_sec,
+        )
         return targets
 
     @property
@@ -568,16 +575,17 @@ class NotifyNextcloud(NotifyBase):
                 if self.port is None or self.port == default_port
                 else f":{self.port}"
             ),
-            targets="/".join([
-                NotifyNextcloud.quote(x, safe=(group_prefix + user_prefix))
-                for x in chain(
-                    # Groups are prefixed with a pound/hashtag symbol
-                    [f"{group_prefix}{x}" for x in self.groups],
-                    # Users
-                    [f"{user_prefix}{x}" for x in self.targets],
-                )
-            ]),
-
+            targets="/".join(
+                [
+                    NotifyNextcloud.quote(x, safe=(group_prefix + user_prefix))
+                    for x in chain(
+                        # Groups are prefixed with a pound/hashtag symbol
+                        [f"{group_prefix}{x}" for x in self.groups],
+                        # Users
+                        [f"{user_prefix}{x}" for x in self.targets],
+                    )
+                ]
+            ),
             params=NotifyNextcloud.urlencode(params),
         )
 

@@ -176,7 +176,7 @@ class NotifyPlivo(NotifyBase):
             raise TypeError(msg)
 
         # Store our source; enforce E.164 format
-        self.source = f'+{result["full"]}'
+        self.source = f"+{result['full']}"
 
         # Parse our targets
         self.targets = []
@@ -187,7 +187,7 @@ class NotifyPlivo(NotifyBase):
                 result = is_phone_no(target)
                 if result:
                     # store valid phone number; enforce E.164 format
-                    self.targets.append(f'+{result["full"]}')
+                    self.targets.append(f"+{result['full']}")
                     continue
 
                 self.logger.warning(
@@ -284,7 +284,8 @@ class NotifyPlivo(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

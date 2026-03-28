@@ -41,6 +41,7 @@ except ImportError:
     # Shim so that test cases can run in environments that
     # do not have syslog
     import types
+
     syslog = types.SimpleNamespace(
         LOG_PID=0x01,
         LOG_PERROR=0x02,

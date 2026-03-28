@@ -134,8 +134,9 @@ apprise_url_tests = (
     ),
     # One To Email address
     (
-        "smtp2go://user@localhost.localdomain/{}-{}-{}/test@example.com"
-        .format("a" * 32, "b" * 8, "c" * 8),
+        "smtp2go://user@localhost.localdomain/{}-{}-{}/test@example.com".format(
+            "a" * 32, "b" * 8, "c" * 8
+        ),
         {
             "instance": NotifySMTP2Go,
         },

@@ -298,7 +298,6 @@ class NotifyOneSignal(NotifyBase):
             if target.startswith(
                 NotifyOneSignal.template_tokens["target_user"]["prefix"]
             ):
-
                 self.targets[OneSignalCategory.USER].append(target)
                 self.logger.debug(
                     "Detected OneSignal UserID:"
@@ -309,7 +308,6 @@ class NotifyOneSignal(NotifyBase):
             if target.startswith(
                 NotifyOneSignal.template_tokens["target_segment"]["prefix"]
             ):
-
                 self.targets[OneSignalCategory.SEGMENT].append(target)
                 self.logger.debug(
                     "Detected OneSignal Include Segment:"
@@ -400,15 +398,19 @@ class NotifyOneSignal(NotifyBase):
 
         # Set our data if defined
         if self.custom_data:
-            payload.update({
-                "custom_data": self.custom_data,
-            })
+            payload.update(
+                {
+                    "custom_data": self.custom_data,
+                }
+            )
 
         # Set our postback data if defined
         if self.postback_data:
-            payload.update({
-                "data": self.postback_data,
-            })
+            payload.update(
+                {
+                    "data": self.postback_data,
+                }
+            )
 
         if title:
             # Display our title if defined
@@ -421,11 +423,13 @@ class NotifyOneSignal(NotifyBase):
             )
 
         if self.subtitle:
-            payload.update({
-                "subtitle": {
-                    self.language: self.subtitle,
-                },
-            })
+            payload.update(
+                {
+                    "subtitle": {
+                        self.language: self.subtitle,
+                    },
+                }
+            )
 
         # Acquire our large_icon image URL (if set)
         image_url = (
@@ -489,7 +493,8 @@ class NotifyOneSignal(NotifyBase):
 
                         self.logger.debug(
                             "Response Details:\r\n%r",
-                            (r.content or b"")[:2000])
+                            (r.content or b"")[:2000],
+                        )
 
                         has_error = True
 

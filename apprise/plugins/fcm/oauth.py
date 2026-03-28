@@ -255,10 +255,12 @@ class GoogleOAuth:
         segments.append(base64.urlsafe_b64encode(signature).rstrip(b"="))
         assertion = b".".join(segments)
 
-        http_payload = _urlencode({
-            "assertion": assertion,
-            "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
-        })
+        http_payload = _urlencode(
+            {
+                "assertion": assertion,
+                "grant_type": "urn:ietf:params:oauth:grant-type:jwt-bearer",
+            }
+        )
 
         http_headers = {
             "Content-Type": "application/x-www-form-urlencoded",
@@ -282,7 +284,8 @@ class GoogleOAuth:
                 )
 
                 logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
                 return None
 
         except requests.RequestException as e:

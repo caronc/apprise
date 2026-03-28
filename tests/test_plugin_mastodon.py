@@ -398,10 +398,12 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
 
     # Prepare a good media response
     good_media_response = mock.Mock()
-    good_media_response.content = dumps({
-        "id": "710511363345354753",
-        "file_mime": "image/jpeg",
-    })
+    good_media_response.content = dumps(
+        {
+            "id": "710511363345354753",
+            "file_mime": "image/jpeg",
+        }
+    )
     good_media_response.status_code = requests.codes.ok
 
     #
@@ -530,24 +532,30 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
 
     # Prepare a good media response
     mr1 = mock.Mock()
-    mr1.content = dumps({
-        "id": "1",
-        "file_mime": "image/gif",
-    })
+    mr1.content = dumps(
+        {
+            "id": "1",
+            "file_mime": "image/gif",
+        }
+    )
     mr1.status_code = requests.codes.ok
 
     mr2 = mock.Mock()
-    mr2.content = dumps({
-        "id": "2",
-        "file_mime": "image/png",
-    })
+    mr2.content = dumps(
+        {
+            "id": "2",
+            "file_mime": "image/png",
+        }
+    )
     mr2.status_code = requests.codes.ok
 
     mr3 = mock.Mock()
-    mr3.content = dumps({
-        "id": "3",
-        "file_mime": "image/jpeg",
-    })
+    mr3.content = dumps(
+        {
+            "id": "3",
+            "file_mime": "image/jpeg",
+        }
+    )
     mr3.status_code = requests.codes.ok
 
     # Return 3 good uploads and a good status response

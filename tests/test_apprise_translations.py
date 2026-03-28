@@ -242,7 +242,6 @@ def test_apprise_trans_windows_users_win(mock_getlocale):
     with mock.patch(
         "ctypes.windll.kernel32.GetUserDefaultUILanguage"
     ) as ui_lang:
-
         # 4105 = en_CA
         ui_lang.return_value = 4105
 

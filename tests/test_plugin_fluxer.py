@@ -135,9 +135,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "fluxer://jack@{}/{}?mode=private&host=example.ca".format(
-            *_tokens()
-        ),
+        "fluxer://jack@{}/{}?mode=private&host=example.ca".format(*_tokens()),
         {
             "instance": NotifyFluxer,
             "requests_response_code": requests.codes.no_content,
@@ -153,9 +151,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "fluxer://example.ca:123/{}/{}".format(
-            *_tokens()
-        ),
+        "fluxer://example.ca:123/{}/{}".format(*_tokens()),
         {
             "instance": NotifyFluxer,
             "requests_response_code": requests.codes.no_content,
@@ -163,9 +159,7 @@ apprise_url_tests = (
     ),
     (
         # Invalid Mode
-        "fluxer://jack@{}/{}?mode=invalid".format(
-            *_tokens()
-        ),
+        "fluxer://jack@{}/{}?mode=invalid".format(*_tokens()),
         {
             "instance": TypeError,
         },
@@ -179,7 +173,9 @@ apprise_url_tests = (
         },
     ),
     (
-        "https://api.fluxer.app/v1/webhooks/{}/{}?footer=yes".format(*_tokens()),
+        "https://api.fluxer.app/v1/webhooks/{}/{}?footer=yes".format(
+            *_tokens()
+        ),
         {
             # Native URL Support with arguments
             "instance": NotifyFluxer,
@@ -253,7 +249,9 @@ apprise_url_tests = (
     ),
     # Test with href (title link)
     (
-        "fluxer://{}/{}?hmarkdown=true&ref=http://localhost".format(*_tokens()),
+        "fluxer://{}/{}?hmarkdown=true&ref=http://localhost".format(
+            *_tokens()
+        ),
         {
             "instance": NotifyFluxer,
             "requests_response_code": requests.codes.no_content,
@@ -269,7 +267,9 @@ apprise_url_tests = (
     ),
     # Test with avatar URL
     (
-        "fluxer://{}/{}?avatar_url=http://localhost/test.jpg".format(*_tokens()),
+        "fluxer://{}/{}?avatar_url=http://localhost/test.jpg".format(
+            *_tokens()
+        ),
         {
             "instance": NotifyFluxer,
             "requests_response_code": requests.codes.no_content,
@@ -495,8 +495,9 @@ def test_plugin_fluxer_429(
     assert obj.send(body="test") is True
     assert mock_post.call_count == 2
     assert mock_sleep.call_count == 1
-    assert mock_sleep.call_args_list[-1][0][0] == \
-        pytest.approx(1.0, rel=0, abs=0.05)
+    assert mock_sleep.call_args_list[-1][0][0] == pytest.approx(
+        1.0, rel=0, abs=0.05
+    )
 
     # Retry-After invalid -> falls back to 1.0
     mock_post.reset_mock()
@@ -509,8 +510,9 @@ def test_plugin_fluxer_429(
     assert obj.send(body="test") is True
     assert mock_post.call_count == 2
     assert mock_sleep.call_count >= 1
-    assert mock_sleep.call_args_list[-1][0][0] == \
-        pytest.approx(1.0, rel=0, abs=0.05)
+    assert mock_sleep.call_args_list[-1][0][0] == pytest.approx(
+        1.0, rel=0, abs=0.05
+    )
 
     # Retry-After < 1.0 -> max(1.0, value) enforces 1.0
     mock_post.reset_mock()
@@ -523,8 +525,9 @@ def test_plugin_fluxer_429(
     assert obj.send(body="test") is True
     assert mock_post.call_count == 2
     assert mock_sleep.call_count >= 1
-    assert mock_sleep.call_args_list[-1][0][0] == \
-        pytest.approx(1.0, rel=0, abs=0.05)
+    assert mock_sleep.call_args_list[-1][0][0] == pytest.approx(
+        1.0, rel=0, abs=0.05
+    )
 
     # Retry-After valid integer -> sleeps that many seconds
     mock_post.reset_mock()
@@ -537,8 +540,9 @@ def test_plugin_fluxer_429(
     assert obj.send(body="test") is True
     assert mock_post.call_count == 2
     assert mock_sleep.call_count >= 1
-    assert mock_sleep.call_args_list[-1][0][0] == \
-        pytest.approx(2.0, rel=0, abs=0.05)
+    assert mock_sleep.call_args_list[-1][0][0] == pytest.approx(
+        2.0, rel=0, abs=0.05
+    )
 
     # Retry exhaustion: default send() retries once.
     # If we get 429 twice, second one is not retried and send fails.
@@ -614,8 +618,7 @@ def test_plugin_fluxer_429(
 def test_plugin_fluxer_general(
     mock_post: mock.MagicMock,
 ) -> None:
-    """NotifyFluxer() General Checks.
-    """
+    """NotifyFluxer() General Checks."""
 
     webhook_id, webhook_token = _tokens()
 
@@ -897,9 +900,7 @@ def test_plugin_fluxer_overflow(mock_post):
 
     # Create a large body and title with random data
     body = "".join(choice(str_alpha + str_num + " ") for _ in range(body_len))
-    body = "\r\n".join(
-        [body[i:i + row] for i in range(0, len(body), row)]
-    )
+    body = "\r\n".join([body[i : i + row] for i in range(0, len(body), row)])
 
     # Create our title using random data
     title = "".join(choice(str_alpha + str_num) for _ in range(title_len))
@@ -1225,8 +1226,11 @@ def test_plugin_fluxer_threading(mock_post: mock.MagicMock) -> None:
 
     a = Apprise()
     assert (
-        a.add(f"fluxer://{webhook_id}/{webhook_token}/"
-              "?thread=12345&thread_name=abc") is True
+        a.add(
+            f"fluxer://{webhook_id}/{webhook_token}/"
+            "?thread=12345&thread_name=abc"
+        )
+        is True
     )
 
     assert a.notify(body="test", title="title") is True
@@ -1345,9 +1349,7 @@ def test_plugin_fluxer_attach_memory(mock_post: mock.MagicMock) -> None:
     response.content = b""
     mock_post.return_value = response
 
-    obj = Apprise.instantiate(
-        f"fluxer://{webhook_id}/{webhook_token}/"
-    )
+    obj = Apprise.instantiate(f"fluxer://{webhook_id}/{webhook_token}/")
 
     mem = AttachMemory(
         content=b"<html><body><h1>Test</h1></body></html>",

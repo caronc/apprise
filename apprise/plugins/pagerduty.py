@@ -362,9 +362,11 @@ class NotifyPagerDuty(NotifyBase):
             payload["payload"]["class"] = self.class_id
 
         if self.click:
-            payload["links"] = [{
-                "href": self.click,
-            }]
+            payload["links"] = [
+                {
+                    "href": self.click,
+                }
+            ]
 
         # Acquire our image url if configured to do so
         image_url = (
@@ -372,10 +374,12 @@ class NotifyPagerDuty(NotifyBase):
         )
 
         if image_url:
-            payload["images"] = [{
-                "src": image_url,
-                "alt": notify_type.value,
-            }]
+            payload["images"] = [
+                {
+                    "src": image_url,
+                    "alt": notify_type.value,
+                }
+            ]
 
         if self.details:
             payload["payload"]["custom_details"] = {}
@@ -421,7 +425,8 @@ class NotifyPagerDuty(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

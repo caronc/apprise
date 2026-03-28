@@ -79,7 +79,6 @@ def _ntf_tidy(ntf):
 
 
 class CacheObject:
-
     hash_engine = hashlib.sha256
     hash_length = 6
 
@@ -124,8 +123,9 @@ class CacheObject:
         if persistent is not None:
             self.__persistent = bool(persistent)
 
-    def set_expiry(self, expires:
-                   Union[datetime, bool, float, int, None] = None) -> None:
+    def set_expiry(
+        self, expires: Union[datetime, bool, float, int, None] = None
+    ) -> None:
         """Sets a new expiry."""
 
         if isinstance(expires, datetime):
@@ -430,7 +430,8 @@ class PersistentStore:
         try:
             # Store our mode
             self.__mode = (
-                mode if isinstance(mode, PersistentStoreMode)
+                mode
+                if isinstance(mode, PersistentStoreMode)
                 else PersistentStoreMode(mode.lower())
             )
 
@@ -826,7 +827,6 @@ class PersistentStore:
             and self.__mode != PersistentStoreMode.MEMORY
             and not self.__dirty
         ):
-
             # ensure we renew our content
             self.__renew.add(self.cache_file)
 
@@ -881,7 +881,6 @@ class PersistentStore:
 
         if args:
             for arg in args:
-
                 try:
                     del self._cache[arg]
 
@@ -966,7 +965,6 @@ class PersistentStore:
             AttributeError,
             EOFError,
         ):
-
             # Let users known there was a problem
             logger.warning(
                 "Corrupted access persistent cache content: %s", cache_file
@@ -1618,8 +1616,10 @@ class PersistentStore:
 
         # Get a list of files (file paths) in the given directory
         try:
-            self.__cache_size = sum(os.stat(path).st_size
-                for path in self.files(exclude=exclude, lazy=lazy))
+            self.__cache_size = sum(
+                os.stat(path).st_size
+                for path in self.files(exclude=exclude, lazy=lazy)
+            )
 
         except OSError:
             # We can't access the directory or it does not exist
@@ -1751,7 +1751,6 @@ class PersistentStore:
             self.__dirty = False
 
         for path in self.files(exclude=False):
-
             # Some information we use to validate the actions of our clean()
             # call. This is so we don't remove anything we shouldn't
             base = os.path.dirname(path)

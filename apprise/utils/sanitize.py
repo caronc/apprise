@@ -103,7 +103,8 @@ class SanitizeOptions:
 
 
 def sanitize_payload(
-        value: Any, *, options: Optional[SanitizeOptions] = None) -> Any:
+    value: Any, *, options: Optional[SanitizeOptions] = None
+) -> Any:
     """
     This function is intended for DEBUG and TRACE logging only.
 
@@ -201,8 +202,8 @@ def sanitize_payload(
                 tail = obj[-opts.preview :] if length >= opts.preview else obj
                 items_seen += 1
                 return (
-                    f"<string len={length} blob "
-                    f"head={head!r} tail={tail!r}>")
+                    f"<string len={length} blob head={head!r} tail={tail!r}>"
+                )
             return _summarize_str(obj)
 
         # Bytes: always summarize.

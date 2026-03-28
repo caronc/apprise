@@ -467,7 +467,6 @@ class NotifyNtfy(NotifyBase):
                 # We need to upload our payload first so that we can source it
                 # in remaining messages
                 for no, attachment in enumerate(attach):
-
                     # First message only includes the text (if defined)
                     body_ = body if not no and body else None
                     title_ = title if not no and title else None
@@ -698,7 +697,8 @@ class NotifyNtfy(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return False, response
 
@@ -750,10 +750,12 @@ class NotifyNtfy(NotifyBase):
 
         if self.mode == NtfyMode.PRIVATE:
             if self.auth == NtfyAuth.BASIC:
-                kwargs.extend([
-                    self.user if self.user else None,
-                    self.password if self.password else None,
-                ])
+                kwargs.extend(
+                    [
+                        self.user if self.user else None,
+                        self.password if self.password else None,
+                    ]
+                )
 
             elif self.token:  # NtfyAuth.TOKEN also
                 kwargs.append(self.token)
@@ -895,9 +897,7 @@ class NotifyNtfy(NotifyBase):
             results["qsd"].get("xtags") or results["qsd"].get("tags") or ""
         )
         if raw_xtags:
-            results["xtags"] = parse_list(
-                NotifyNtfy.unquote(raw_xtags)
-            )
+            results["xtags"] = parse_list(NotifyNtfy.unquote(raw_xtags))
 
         if "actions" in results["qsd"] and len(results["qsd"]["actions"]):
             results["actions"] = NotifyNtfy.unquote(results["qsd"]["actions"])

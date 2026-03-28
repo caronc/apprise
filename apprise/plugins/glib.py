@@ -42,6 +42,7 @@ NOTIFY_GLIB_IMAGE_SUPPORT = False
 try:
     # glib essentials
     import gi
+
     gi.require_version("Gio", "2.0")
     gi.require_version("GLib", "2.0")
     from gi.repository import Gio, GLib
@@ -60,6 +61,7 @@ try:
         # The following is required for Image/Icon loading only
         gi.require_version("GdkPixbuf", "2.0")
         from gi.repository import GdkPixbuf
+
         NOTIFY_GLIB_IMAGE_SUPPORT = True
 
     except (ImportError, ValueError, AttributeError):
@@ -101,7 +103,6 @@ GLIB_URGENCY_MAP = {
     "h": GLibUrgency.HIGH,
     # Maps against string 'emergency'
     "e": GLibUrgency.HIGH,
-
     # Entries to additionally support (so more like DBus's API)
     "0": GLibUrgency.LOW,
     "1": GLibUrgency.NORMAL,
@@ -126,8 +127,9 @@ class NotifyGLib(NotifyBase):
     service_name = _("GLib Notification")
 
     # The services URL
-    service_url = \
+    service_url = (
         "https://lazka.github.io/pgi-docs/Gio-2.0/classes/DBusProxy.html"
+    )
 
     # The default protocols
     protocol = ("glib", "gio")
@@ -153,46 +155,53 @@ class NotifyGLib(NotifyBase):
     glib_setting_location = "/org/freedesktop/Notifications"
 
     # Define object templates
-    templates = (
-        "{schema}://",
-    )
+    templates = ("{schema}://",)
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        "urgency": {
-            "name": _("Urgency"),
-            "type": "choice:int",
-            "values": GLIB_URGENCIES,
-            "default": GLibUrgency.NORMAL,
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "urgency": {
+                "name": _("Urgency"),
+                "type": "choice:int",
+                "values": GLIB_URGENCIES,
+                "default": GLibUrgency.NORMAL,
+            },
+            "priority": {
+                # Apprise uses 'priority' everywhere; it's just a nice consistent
+                # feel to be able to use it here as well. Just map the
+                # value back to 'priority'
+                "alias_of": "urgency",
+            },
+            "x": {
+                "name": _("X-Axis"),
+                "type": "int",
+                "min": 0,
+                "map_to": "x_axis",
+            },
+            "y": {
+                "name": _("Y-Axis"),
+                "type": "int",
+                "min": 0,
+                "map_to": "y_axis",
+            },
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": True,
+                "map_to": "include_image",
+            },
         },
-        "priority": {
-            # Apprise uses 'priority' everywhere; it's just a nice consistent
-            # feel to be able to use it here as well. Just map the
-            # value back to 'priority'
-            "alias_of": "urgency",
-        },
-        "x": {
-            "name": _("X-Axis"),
-            "type": "int",
-            "min": 0,
-            "map_to": "x_axis",
-        },
-        "y": {
-            "name": _("Y-Axis"),
-            "type": "int",
-            "min": 0,
-            "map_to": "y_axis",
-        },
-        "image": {
-            "name": _("Include Image"),
-            "type": "bool",
-            "default": True,
-            "map_to": "include_image",
-        },
-    })
+    )
 
-    def __init__(self, urgency=None, x_axis=None, y_axis=None,
-                 include_image=True, **kwargs):
+    def __init__(
+        self,
+        urgency=None,
+        x_axis=None,
+        y_axis=None,
+        include_image=True,
+        **kwargs,
+    ):
         """
         Initialize DBus Object
         """
@@ -205,11 +214,16 @@ class NotifyGLib(NotifyBase):
         # The urgency of the message
         self.urgency = int(
             NotifyGLib.template_args["urgency"]["default"]
-            if urgency is None else
-            next((
-                v for k, v in GLIB_URGENCY_MAP.items()
-                if str(urgency).lower().startswith(k)),
-                NotifyGLib.template_args["urgency"]["default"]))
+            if urgency is None
+            else next(
+                (
+                    v
+                    for k, v in GLIB_URGENCY_MAP.items()
+                    if str(urgency).lower().startswith(k)
+                ),
+                NotifyGLib.template_args["urgency"]["default"],
+            )
+        )
 
         # Our x/y axis settings
         if x_axis or y_axis:
@@ -219,8 +233,9 @@ class NotifyGLib(NotifyBase):
 
             except (TypeError, ValueError):
                 # Invalid x/y values specified
-                msg = "The x,y coordinates specified ({},{}) are invalid."\
-                    .format(x_axis, y_axis)
+                msg = "The x,y coordinates specified ({},{}) are invalid.".format(
+                    x_axis, y_axis
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg) from None
         else:
@@ -259,8 +274,11 @@ class NotifyGLib(NotifyBase):
             body = ""
 
         # image path
-        icon_path = None if not self.include_image \
+        icon_path = (
+            None
+            if not self.include_image
             else self.image_path(notify_type, extension=".ico")
+        )
 
         # Our meta payload
         meta_payload = {
@@ -293,7 +311,8 @@ class NotifyGLib(NotifyBase):
 
             except Exception as e:
                 self.logger.warning(
-                    "Could not load notification icon (%s).", icon_path)
+                    "Could not load notification icon (%s).", icon_path
+                )
                 self.logger.debug(f"GLib/Gio Exception: {e}")
 
         try:
@@ -337,10 +356,9 @@ class NotifyGLib(NotifyBase):
         # Define any URL parameters
         params = {
             "image": "yes" if self.include_image else "no",
-            "urgency":
-                GLIB_URGENCIES[self.template_args["urgency"]["default"]]
-                if self.urgency not in GLIB_URGENCIES
-                else GLIB_URGENCIES[self.urgency],
+            "urgency": GLIB_URGENCIES[self.template_args["urgency"]["default"]]
+            if self.urgency not in GLIB_URGENCIES
+            else GLIB_URGENCIES[self.urgency],
         }
 
         # Extend our parameters
@@ -369,19 +387,18 @@ class NotifyGLib(NotifyBase):
         results = NotifyBase.parse_url(url, verify_host=False)
 
         # Include images with our message
-        results["include_image"] = \
-            parse_bool(results["qsd"].get("image", True))
+        results["include_image"] = parse_bool(
+            results["qsd"].get("image", True)
+        )
 
         # GLib/Gio supports urgency, but we we also support the keyword
         # priority so that it is consistent with some of the other plugins
         if "priority" in results["qsd"] and len(results["qsd"]["priority"]):
             # We intentionally store the priority in the urgency section
-            results["urgency"] = \
-                NotifyGLib.unquote(results["qsd"]["priority"])
+            results["urgency"] = NotifyGLib.unquote(results["qsd"]["priority"])
 
         if "urgency" in results["qsd"] and len(results["qsd"]["urgency"]):
-            results["urgency"] = \
-                NotifyGLib.unquote(results["qsd"]["urgency"])
+            results["urgency"] = NotifyGLib.unquote(results["qsd"]["urgency"])
 
         # handle x,y coordinates
         if "x" in results["qsd"] and len(results["qsd"]["x"]):

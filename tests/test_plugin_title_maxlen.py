@@ -64,14 +64,16 @@ def test_plugin_title_maxlen(request_mock):
     mock_request, mock_post = request_mock
 
     # Load our configuration
-    result, _ = ConfigBase.config_parse_yaml(cleandoc("""
+    result, _ = ConfigBase.config_parse_yaml(
+        cleandoc("""
     urls:
 
       # Our JSON plugin allows for a title definition; we enforce a html format
       - json://user:pass@example.ca?format=html
       # Telegram has a title_maxlen of 0
       - tgram://123456789:AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/987654321
-    """))
+    """)
+    )
 
     # Verify we loaded correctly
     assert isinstance(result, list)
@@ -100,8 +102,7 @@ def test_plugin_title_maxlen(request_mock):
     # Telegram plugin: requests.post(url, data=...) -> url is [0][0]
     details = mock_post.call_args_list[0]
     assert (
-        details[0][0]
-        == "https://api.telegram.org/bot123456789:"
+        details[0][0] == "https://api.telegram.org/bot123456789:"
         "AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage"
     )
     payload = loads(details[1]["data"])
@@ -114,14 +115,16 @@ def test_plugin_title_maxlen(request_mock):
     #
     # Reverse the configuration file and expect the same results
     #
-    result, _config = ConfigBase.config_parse_yaml(cleandoc("""
+    result, _config = ConfigBase.config_parse_yaml(
+        cleandoc("""
     urls:
 
       # Telegram has a title_maxlen of 0
       - tgram://123456789:AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/987654321
       # Our JSON plugin allows for a title definition; we enforce a html format
       - json://user:pass@example.ca?format=html
-    """))
+    """)
+    )
 
     # Verify we loaded correctly
     assert isinstance(result, list)
@@ -142,8 +145,7 @@ def test_plugin_title_maxlen(request_mock):
 
     details = mock_post.call_args_list[0]
     assert (
-        details[0][0]
-        == "https://api.telegram.org/bot123456789:"
+        details[0][0] == "https://api.telegram.org/bot123456789:"
         "AABCeFGhIJKLmnOPqrStUvWxYZ12345678U/sendMessage"
     )
     payload = loads(details[1]["data"])
