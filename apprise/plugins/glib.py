@@ -123,7 +123,7 @@ class NotifyGLib(NotifyBase):
     }
 
     # The default descriptive name associated with the Notification
-    service_name = _("DBus Notification")
+    service_name = _("GLib Notification")
 
     # The services URL
     service_url = \
