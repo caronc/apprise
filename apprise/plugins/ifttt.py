@@ -221,7 +221,6 @@ class NotifyIFTTT(NotifyBase):
         events = list(self.events)
 
         while len(events):
-
             # Retrive an entry off of our event list
             event = events.pop(0)
 
@@ -270,7 +269,8 @@ class NotifyIFTTT(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

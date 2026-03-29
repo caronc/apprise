@@ -38,9 +38,7 @@ from typing import Optional, Union
 from ..exception import AppriseException, AppriseInvalidData
 from ..logger import logger
 
-TimeoutType = Optional[
-    Union[float, tuple[Optional[float], Optional[float]]]
-]
+TimeoutType = Optional[Union[float, tuple[Optional[float], Optional[float]]]]
 
 
 class AppriseSocketError(AppriseException):
@@ -85,8 +83,9 @@ class SocketTransport:
         self.verify = bool(verify)
         self.retries = retries
 
-        self._connect_timeout, self._read_timeout = \
-            self._coerce_timeout(timeout)
+        self._connect_timeout, self._read_timeout = self._coerce_timeout(
+            timeout
+        )
 
         self._sock: Optional[socket.socket] = None
         self._rfile = None
@@ -102,7 +101,8 @@ class SocketTransport:
 
     @staticmethod
     def _coerce_timeout(
-            timeout: TimeoutType) -> tuple[Optional[float], Optional[float]]:
+        timeout: TimeoutType,
+    ) -> tuple[Optional[float], Optional[float]]:
         """
         Coerce requests-style timeout into (connect_timeout, read_timeout).
         """
@@ -188,7 +188,8 @@ class SocketTransport:
             return None
         try:
             r, _, x = select.select(
-                [self._sock], [], [self._sock], float(timeout))
+                [self._sock], [], [self._sock], float(timeout)
+            )
 
         except OSError:
             self.close()
@@ -205,8 +206,9 @@ class SocketTransport:
         if self._sock is None:
             return None
         try:
-            _, w, x = \
-                select.select([], [self._sock], [self._sock], float(timeout))
+            _, w, x = select.select(
+                [], [self._sock], [self._sock], float(timeout)
+            )
         except OSError:
             self.close()
             return None
@@ -235,7 +237,8 @@ class SocketTransport:
 
             if self.bind_addr is not None or self.bind_port is not None:
                 sock.bind(
-                    (self.bind_addr or "127.0.0.1", int(self.bind_port or 0)))
+                    (self.bind_addr or "127.0.0.1", int(self.bind_port or 0))
+                )
 
             if self._connect_timeout is not None:
                 sock.settimeout(self._connect_timeout)
@@ -396,9 +399,7 @@ class SocketTransport:
         if not self._had_io:
             return False
 
-        logger.warning(
-            "Socket %s failed, reconnecting and retrying", action
-        )
+        logger.warning("Socket %s failed, reconnecting and retrying", action)
         logger.debug("Socket %s exception: %s", action, exc)
 
         try:
@@ -442,8 +443,9 @@ class SocketTransport:
         attempts = max(0, retry_count) + 1
 
         # Derive wait timeout (None means wait indefinitely)
-        wait_timeout = \
+        wait_timeout = (
             self._read_timeout if timeout is None else float(timeout)
+        )
 
         # We manage readiness via select, socket stays non-blocking
         self._sock.setblocking(False)
@@ -457,11 +459,15 @@ class SocketTransport:
                         data = self._sock.recv(int(max_bytes))
                         if data == b"":
                             raise AppriseSocketError(
-                                "Connection lost during read")
+                                "Connection lost during read"
+                            )
                         self._had_io = True
                         return data
-                    except (BlockingIOError, ssl.SSLWantReadError,
-                            ssl.SSLWantWriteError):
+                    except (
+                        BlockingIOError,
+                        ssl.SSLWantReadError,
+                        ssl.SSLWantWriteError,
+                    ):
                         return b""
 
                 # blocking=True path: wait for readability, then recv
@@ -487,13 +493,16 @@ class SocketTransport:
                         data = self._sock.recv(int(max_bytes))
                         if data == b"":
                             raise AppriseSocketError(
-                                "Connection lost during read")
+                                "Connection lost during read"
+                            )
                         self._had_io = True
                         return data
 
-                    except (ssl.SSLWantReadError, ssl.SSLWantWriteError,
-                            BlockingIOError):
-
+                    except (
+                        ssl.SSLWantReadError,
+                        ssl.SSLWantWriteError,
+                        BlockingIOError,
+                    ):
                         if wait_timeout is None:
                             continue
 
@@ -507,37 +516,46 @@ class SocketTransport:
                 logger.debug("Socket read exception: %s", e)
 
                 # Only close on hard errors; WANT_READ/WRITE handled above
-                if isinstance(e, OSError) \
-                        and not isinstance(e, ssl.SSLWantReadError) \
-                        and not isinstance(e, ssl.SSLWantWriteError):
+                if (
+                    isinstance(e, OSError)
+                    and not isinstance(e, ssl.SSLWantReadError)
+                    and not isinstance(e, ssl.SSLWantWriteError)
+                ):
                     self.close()
 
                 err: Exception = e
 
                 # Reconnect only if we've had prior useful I/O
                 if self._attempt_reconnect(
-                        retries=attempts,
-                        action="read",
-                        exc=err,
+                    retries=attempts,
+                    action="read",
+                    exc=err,
                 ):
                     # In blocking mode with no timeout (wait indefinitely),
                     # perform an immediate read attempt after reconnect.
                     # This avoids relying solely on can_read(), and it keeps
                     # edge cases (like stale sockets) recoverable.
-                    if blocking and wait_timeout is None \
-                            and self._sock is not None:
+                    if (
+                        blocking
+                        and wait_timeout is None
+                        and self._sock is not None
+                    ):
                         try:
                             data = self._sock.recv(int(max_bytes))
 
                             if data == b"":
                                 raise AppriseSocketError(
-                                    "Connection lost during read")
+                                    "Connection lost during read"
+                                )
 
                             self._had_io = True
                             return data
 
-                        except (BlockingIOError, ssl.SSLWantReadError,
-                                ssl.SSLWantWriteError):
+                        except (
+                            BlockingIOError,
+                            ssl.SSLWantReadError,
+                            ssl.SSLWantWriteError,
+                        ):
                             # No data yet; fall back to retry loop
                             pass
 
@@ -588,9 +606,7 @@ class SocketTransport:
                 self._read_timeout if timeout is None else float(timeout)
             )
             deadline = (
-                None
-                if op_timeout is None
-                else (time.monotonic() + op_timeout)
+                None if op_timeout is None else (time.monotonic() + op_timeout)
             )
 
             try:
@@ -600,9 +616,7 @@ class SocketTransport:
                     if deadline is not None:
                         remaining = deadline - time.monotonic()
                         if remaining <= 0:
-                            raise AppriseSocketError(
-                                "Timed out during write"
-                            )
+                            raise AppriseSocketError("Timed out during write")
                         writable = self.can_write(remaining)
                         if not writable:
                             raise AppriseSocketError(

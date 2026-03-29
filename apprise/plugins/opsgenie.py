@@ -414,11 +414,7 @@ class NotifyOpsgenie(NotifyBase):
 
                 v_lower = v_.lower()
                 v = next(
-                    (
-                        v
-                        for v in OPSGENIE_ACTIONS[1:]
-                        if v.startswith(v_lower)
-                    ),
+                    (v for v in OPSGENIE_ACTIONS[1:] if v.startswith(v_lower)),
                     None,
                 )
                 if not v:
@@ -462,7 +458,6 @@ class NotifyOpsgenie(NotifyBase):
             if target.startswith(
                 NotifyOpsgenie.template_tokens["target_team"]["prefix"]
             ):
-
                 self.targets.append(
                     {"type": OpsgenieCategory.TEAM, "id": target[1:]}
                     if is_uuid(target[1:])
@@ -472,7 +467,6 @@ class NotifyOpsgenie(NotifyBase):
             elif target.startswith(
                 NotifyOpsgenie.template_tokens["target_schedule"]["prefix"]
             ):
-
                 self.targets.append(
                     {"type": OpsgenieCategory.SCHEDULE, "id": target[1:]}
                     if is_uuid(target[1:])
@@ -485,7 +479,6 @@ class NotifyOpsgenie(NotifyBase):
             elif target.startswith(
                 NotifyOpsgenie.template_tokens["target_escalation"]["prefix"]
             ):
-
                 self.targets.append(
                     {"type": OpsgenieCategory.ESCALATION, "id": target[1:]}
                     if is_uuid(target[1:])
@@ -498,7 +491,6 @@ class NotifyOpsgenie(NotifyBase):
             elif target.startswith(
                 NotifyOpsgenie.template_tokens["target_user"]["prefix"]
             ):
-
                 self.targets.append(
                     {"type": OpsgenieCategory.USER, "id": target[1:]}
                     if is_uuid(target[1:])
@@ -582,7 +574,8 @@ class NotifyOpsgenie(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return (False, content.get("requestId"))
 
@@ -658,7 +651,7 @@ class NotifyOpsgenie(NotifyBase):
             # limitation
             if len(payload["message"]) > self.opsgenie_body_minlen:
                 payload["message"] = (
-                    f"{title_body[:self.opsgenie_body_minlen - 3]}..."
+                    f"{title_body[: self.opsgenie_body_minlen - 3]}..."
                 )
 
             if self.__tags:
@@ -813,15 +806,17 @@ class NotifyOpsgenie(NotifyBase):
             schema=self.secure_protocol,
             user=f"{self.user}@" if self.user else "",
             apikey=self.pprint(self.apikey, privacy, safe=""),
-            targets="/".join([
-                NotifyOpsgenie.quote(
-                    "{}{}".format(
-                        map_[x["type"]],
-                        x.get("id", x.get("name", x.get("username"))),
+            targets="/".join(
+                [
+                    NotifyOpsgenie.quote(
+                        "{}{}".format(
+                            map_[x["type"]],
+                            x.get("id", x.get("name", x.get("username"))),
+                        )
                     )
-                )
-                for x in self.targets
-            ]),
+                    for x in self.targets
+                ]
+            ),
             params=NotifyOpsgenie.urlencode(params),
         )
 

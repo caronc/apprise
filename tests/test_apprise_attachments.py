@@ -405,22 +405,27 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
     base.join("__init__.py").write("")
 
     # Test no app_id
-    base.join("AttachBadFile1.py").write(cleandoc("""
+    base.join("AttachBadFile1.py").write(
+        cleandoc("""
         class AttachBadFile1:
             pass
-        """))
+        """)
+    )
 
     # No class of the same name
-    base.join("AttachBadFile2.py").write(cleandoc("""
+    base.join("AttachBadFile2.py").write(
+        cleandoc("""
         class BadClassName:
             pass
-        """))
+        """)
+    )
 
     # Exception thrown
     base.join("AttachBadFile3.py").write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join("AttachGoober.py").write(cleandoc("""
+    base.join("AttachGoober.py").write(
+        cleandoc("""
         from apprise import AttachBase
         class AttachGoober(AttachBase):
             # This class tests the fact we have a new class name, but we're
@@ -431,10 +436,12 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
 
             # The default secure protocol
             secure_protocol = 'https'
-        """))
+        """)
+    )
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join("AttachBugger.py").write(cleandoc("""
+    base.join("AttachBugger.py").write(
+        cleandoc("""
         from apprise import AttachBase
         class AttachBugger(AttachBase):
             # This class tests the fact we have a new class name, but we're
@@ -445,6 +452,7 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
 
             # The default secure protocol
             secure_protocol = ('https', 'bugger-tests')
-        """))
+        """)
+    )
 
     A_MGR.load_modules(path=str(base), name=module_name)

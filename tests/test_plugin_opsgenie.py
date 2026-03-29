@@ -46,11 +46,13 @@ logging.disable(logging.CRITICAL)
 # a test UUID we can use
 UUID4 = "8b799edf-6f98-4d3a-9be7-2862fb4e5752"
 
-OPSGENIE_GOOD_RESPONSE = dumps({
-    "result": "Request will be processed",
-    "took": 0.204,
-    "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120",
-})
+OPSGENIE_GOOD_RESPONSE = dumps(
+    {
+        "result": "Request will be processed",
+        "took": 0.204,
+        "requestId": "43a29c5c-3dbf-4fa4-9c26-f4f71023e120",
+    }
+)
 
 # Our Testing URLs
 apprise_url_tests = (

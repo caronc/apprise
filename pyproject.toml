@@ -205,7 +205,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-mock",
-    "ruff",
+    "ruff==0.15.8",
     "babel",
     "validate-pyproject",
 ]
@@ -290,29 +290,8 @@ exclude = [
   "venv",
 ]
 
-[tool.black]
-# Added for backwards support and alternative cleanup
-# when needed
-line-length = 79  # Respecting BSD-style 79-char limit
-target-version = ['py39']
-extend-exclude = '''
-/(
-  tests/data \
-  bin \
-  build \
-  dist \
-  .eggs \
-  .tox \
-  .local \
-  .venv \
-  venv
-)
-'''
 
 [tool.ruff.lint]
-# Allow Preview rules to run
-preview = true
-
 select = [
   "E",    # pycodestyle errors
   "F",    # pyflakes
@@ -327,12 +306,6 @@ select = [
   "RUF",  # Ruff-native rules
 ]
 
-extend-select = [
-   "E501",   # Spacing
-   "Q000",   # Quoting
-   "I"  # Automatically sort imports with isort logic
-]
-
 ignore = [
   "D100",    # missing docstring in public module
   "D104",    # missing docstring in public package
@@ -345,7 +318,6 @@ ignore = [
   # The following needs to be supported at some point and is of great value
   "RUF012",  # typing.ClassVar implimentation
   "RUF029",  # Use of async without await or async subcalls
-  "RUF067",  # Classes can only have docstrings and re-export only
   "UP032",   # This is a massive undertaking and requires a massive rewrite
              # of test cases; this will take a while to fix, so turning off
              # for now

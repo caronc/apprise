@@ -99,7 +99,6 @@ def test_notification_manager_general():
 
     # Define our good:// url
     class GoodNotification(NotifyBase):
-
         secure_protocol = ("good", "goods")
 
         def __init__(self, *args, **kwargs):
@@ -276,8 +275,9 @@ def test_notification_manager_add_force_overrides_schema_without_unload():
     assert N_MGR.add(NotifyDiscordCustom, schemas="discord") is False
 
     # A forced add should succeed and must not unload the native module
-    assert N_MGR.add(
-        NotifyDiscordCustom, schemas="discord", force=True) is True
+    assert (
+        N_MGR.add(NotifyDiscordCustom, schemas="discord", force=True) is True
+    )
     assert N_MGR["discord"] is NotifyDiscordCustom
     assert native_module in sys.modules
 
@@ -344,7 +344,8 @@ def test_notification_manager_decorators(tmpdir):
 
     # Prepare ourselves a file to work with
     notify_hook = tmpdir.mkdir("goodmodule").join("__init__.py")
-    notify_hook.write(cleandoc("""
+    notify_hook.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     # We want to trigger on anyone who configures a call to clihook://
@@ -362,7 +363,8 @@ def test_notification_manager_decorators(tmpdir):
         print("B {}: {} - {}".format(notify_type, title, body))
 
         # No return (so a return of None) get's translated to True
-    """))
+    """)
+    )
 
     N_MGR.module_detection(str(notify_hook))
 
@@ -385,7 +387,8 @@ def test_notification_manager_decorators(tmpdir):
     # Prepare ourselves a file to work with
     notify_base = tmpdir.mkdir("plugins")
     notify_test = notify_base.join("NotifyTest.py")
-    notify_test.write(cleandoc("""
+    notify_test.write(
+        cleandoc("""
     #
     # Bare Minimum Valid Object
     #
@@ -418,7 +421,8 @@ def test_notification_manager_decorators(tmpdir):
 
         def url(self):
             return 'myservice://'
-    """))
+    """)
+    )
     assert "myservice" not in N_MGR
     N_MGR.load_modules(path=str(notify_base))
     assert "myservice" in N_MGR
@@ -488,6 +492,7 @@ def test_notification_manager_add_force_returns_false_if_conflict_persists(
 # ---------------------------------------------------------------------------
 # Helpers shared by the runtime_deps / eviction tests
 # ---------------------------------------------------------------------------
+
 
 def _make_dep_plugin(schema, *deps):
     """Return a minimal NotifyBase subclass that declares *deps in
@@ -692,8 +697,8 @@ def test_manager_enable_only_updates_dep_counter():
 
     assert N_MGR["keepme2"].enabled is True
     assert N_MGR["dropme2"].enabled is False
-    assert "keeplib2" in sys.modules       # counter still 1 — not evicted
-    assert "droplib2" not in sys.modules   # counter hit 0 — evicted
+    assert "keeplib2" in sys.modules  # counter still 1 — not evicted
+    assert "droplib2" not in sys.modules  # counter hit 0 — evicted
 
     # Cleanup
     del sys.modules["keeplib2"]
@@ -866,13 +871,15 @@ def test_module_detection_reload_existing(tmpdir):
     N_MGR.unload_modules()
 
     hook = tmpdir.mkdir("reloadpkg_xyz").join("__init__.py")
-    hook.write(cleandoc("""
+    hook.write(
+        cleandoc("""
         from apprise.decorators import notify
 
         @notify(on="reloadhookxyz")
         def handler(body, title, notify_type, *args, **kwargs):
             pass
-    """))
+    """)
+    )
 
     # First load — populates _custom_module_map
     N_MGR.module_detection(str(hook))
@@ -904,6 +911,7 @@ def test_build_dep_counter_no_runtime_deps_attr():
 
     class MinimalPlugin:
         """Minimal plugin: enabled but has no runtime_deps attribute."""
+
         enabled = True
 
     N_MGR._module_map["minimal_test_xyz_657"] = {
@@ -944,9 +952,7 @@ def test_evict_library_keyerror_race(monkeypatch):
             raise KeyError(key)
 
     broken = BrokenModulesDict(sys.modules)
-    broken["evict_race_lib_xyz"] = types.ModuleType(
-        "evict_race_lib_xyz"
-    )
+    broken["evict_race_lib_xyz"] = types.ModuleType("evict_race_lib_xyz")
     monkeypatch.setattr(sys, "modules", broken)
 
     # to_remove = ["evict_race_lib_xyz"]; del raises -> KeyError caught
@@ -990,7 +996,8 @@ def test_load_modules_schema_conflict(tmpdir):
     N_MGR.unload_modules()
     N_MGR.load_modules()  # native load -> "json" in _schema_map
 
-    tmpdir.join("notifyconflict_xyz.py").write(cleandoc("""
+    tmpdir.join("notifyconflict_xyz.py").write(
+        cleandoc("""
         from apprise.plugins.base import NotifyBase
 
         class NotifyConflict(NotifyBase):
@@ -1007,7 +1014,8 @@ def test_load_modules_schema_conflict(tmpdir):
 
             def url(self, **kwargs):
                 return "json://"
-    """))
+    """)
+    )
 
     # __import__("apprise.plugins.notifyconflict_xyz") -> ImportError;
     # fallback loads the file; NotifyConflict.schemas() = {"json"};

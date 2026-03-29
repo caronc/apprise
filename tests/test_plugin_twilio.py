@@ -302,23 +302,20 @@ def test_plugin_twilio_auth(mock_post):
     assert (
         first_call[0][0]
         == second_call[0][0]
-        == ("https://api.twilio.com/2010-04-01/Accounts"
-            f"/{account_sid}/Messages.json")
+        == (
+            "https://api.twilio.com/2010-04-01/Accounts"
+            f"/{account_sid}/Messages.json"
+        )
     )
     assert (
         first_call[1]["data"]["Body"]
         == second_call[1]["data"]["Body"]
         == message_contents
     )
-    assert (
-        third_call[0][0]
-        == ("https://api.twilio.com/2010-04-01/Accounts"
-        f"/{account_sid}/Calls.json")
+    assert third_call[0][0] == (
+        f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Calls.json"
     )
-    assert (
-        third_call[1]["data"]["Twiml"]
-        == message_contents
-    )
+    assert third_call[1]["data"]["Twiml"] == message_contents
     assert (
         first_call[1]["data"]["From"]
         == second_call[1]["data"]["From"]
@@ -370,16 +367,20 @@ def test_plugin_twilio_edge_cases(mock_post):
     # Incompatibility between mode and method
     with pytest.raises(TypeError):
         NotifyTwilio(
-            account_sid=account_sid, auth_token=auth_token,
-            source=whatsapp_source, method=TwilioNotificationMethod.CALL
+            account_sid=account_sid,
+            auth_token=auth_token,
+            source=whatsapp_source,
+            method=TwilioNotificationMethod.CALL,
         )
 
     # a error response
     response.status_code = 400
-    response.content = dumps({
-        "code": 21211,
-        "message": "The 'To' number +1234567 is not a valid phone number.",
-    })
+    response.content = dumps(
+        {
+            "code": 21211,
+            "message": "The 'To' number +1234567 is not a valid phone number.",
+        }
+    )
     mock_post.return_value = response
 
     # Initialize our object

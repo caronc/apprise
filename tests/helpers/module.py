@@ -98,7 +98,6 @@ def reload_plugin(name):
     for class_name in [
         obj for obj in dir(new_notify_mod) if module_filter_re.match(obj)
     ]:
-
         # Store our entry
         class_matches[class_name] = getattr(new_notify_mod, class_name)
 
@@ -204,7 +203,6 @@ def reload_plugin(name):
                         for obj in dir(new_attach_mod)
                         if module_filter_re.match(obj)
                     ]:
-
                         # Store our entry
                         class_matches[class_name] = getattr(
                             new_attach_mod, class_name
@@ -266,7 +264,6 @@ def reload_plugin(name):
                         for obj in dir(new_config_mod)
                         if module_filter_re.match(obj)
                     ]:
-
                         # Store our entry
                         class_matches[class_name] = getattr(
                             new_config_mod, class_name

@@ -10,19 +10,18 @@ merge your contributions smoothly.
 
 ## ✅ Quick Checklist Before You Submit
 
-- ✔️ Your code passes all lint checks:
+- ✔️ Your code passes all lint and style checks:
   ```bash
   tox -e lint
+  ```
+  If it reports issues, auto-fix them with:
+  ```bash
+  tox -e format
   ```
 
 - ✔️ Your changes are covered by tests:
   ```bash
   tox -e qa
-  ```
-
-- ✔️ Your code is clean and consistently formatted:
-  ```bash
-  tox -e format
   ```
 
 
@@ -74,12 +73,22 @@ pytest --cov=apprise --cov-report=term
 
 ---
 
-## 🧹 Linting & Formatting with ruff
+## 🧹 Linting & Formatting
+
+Use `tox` to run through the same toolchain as CI:
 
 ```bash
-ruff check apprise tests           # Check linting
-ruff check apprise tests --fix     # Auto-fix
-ruff format apprise tests          # Format files
+tox -e lint    # Check for lint violations and style issues (read-only)
+tox -e format  # Auto-fix lint violations and apply consistent code style
+```
+
+If you prefer to call ruff directly:
+
+```bash
+ruff check .              # Check lint violations
+ruff check . --fix        # Auto-fix lint violations
+ruff format --check .     # Check code style
+ruff format .             # Apply code style
 ```
 
 ---
@@ -87,9 +96,9 @@ ruff format apprise tests          # Format files
 ## 🧰 Optional: Using VS Code
 
 1. Open the repo: `code .`
-2. Press `Ctrl+Shift+P → Python: Select Interpreter`
+2. Press `Ctrl+Shift+P -> Python: Select Interpreter`
 3. Choose the same interpreter you used for `pip install .[dev]`
-4. Press `Ctrl+Shift+P → Python: Discover Tests`
+4. Press `Ctrl+Shift+P -> Python: Discover Tests`
 
 `.vscode/settings.json` is pre-configured with:
 

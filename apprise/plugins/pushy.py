@@ -273,7 +273,6 @@ class NotifyPushy(NotifyBase):
                 if r.status_code != requests.codes.ok or not content.get(
                     "success"
                 ):
-
                     # We had a problem
                     status_str = NotifyPushy.http_response_code_lookup(
                         r.status_code, PUSHY_HTTP_ERROR_MAP
@@ -290,7 +289,8 @@ class NotifyPushy(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     has_error = True
                     continue
@@ -337,15 +337,17 @@ class NotifyPushy(NotifyBase):
         return "{schema}://{apikey}/{targets}/?{params}".format(
             schema=self.secure_protocol,
             apikey=self.pprint(self.apikey, privacy, safe=""),
-            targets="/".join([
-                NotifyPushy.quote(x, safe="@#")
-                for x in chain(
-                    # Topics are prefixed with a pound/hashtag symbol
-                    [f"#{x}" for x in self.topics],
-                    # Devices
-                    [f"@{x}" for x in self.devices],
-                )
-            ]),
+            targets="/".join(
+                [
+                    NotifyPushy.quote(x, safe="@#")
+                    for x in chain(
+                        # Topics are prefixed with a pound/hashtag symbol
+                        [f"#{x}" for x in self.topics],
+                        # Devices
+                        [f"@{x}" for x in self.devices],
+                    )
+                ]
+            ),
             params=NotifyPushy.urlencode(params),
         )
 

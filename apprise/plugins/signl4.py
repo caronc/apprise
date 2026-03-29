@@ -65,49 +65,53 @@ class NotifySIGNL4(NotifyBase):
     notify_url = "https://connect.signl4.com/webhook/{secret}/"
 
     # Define object templates
-    templates = (
-        "{schema}://{secret}",
-    )
+    templates = ("{schema}://{secret}",)
 
     # Define our template tokens
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        # SIGNL4 team or integration secret
-        "secret": {
-            "name": _("Secret"),
-            "type": "string",
-            "private": True,
-            "required": True
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            # SIGNL4 team or integration secret
+            "secret": {
+                "name": _("Secret"),
+                "type": "string",
+                "private": True,
+                "required": True,
+            },
         },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        "service": {
-            "name": _("Service"),
-            "type": "string",
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "service": {
+                "name": _("Service"),
+                "type": "string",
+            },
+            "location": {
+                "name": _("Location"),
+                "type": "string",
+            },
+            "alerting_scenario": {
+                "name": _("Alerting Scenario"),
+                "type": "string",
+            },
+            "filtering": {
+                "name": _("Filtering"),
+                "type": "bool",
+                "default": False,
+            },
+            "external_id": {
+                "name": _("External ID"),
+                "type": "string",
+            },
+            "status": {
+                "name": _("Status"),
+                "type": "string",
+            },
         },
-        "location": {
-            "name": _("Location"),
-            "type": "string",
-        },
-        "alerting_scenario": {
-            "name": _("Alerting Scenario"),
-            "type": "string",
-        },
-        "filtering": {
-            "name": _("Filtering"),
-            "type": "bool",
-            "default": False,
-        },
-        "external_id": {
-            "name": _("External ID"),
-            "type": "string",
-        },
-        "status": {
-            "name": _("Status"),
-            "type": "string",
-        },
-    })
+    )
 
     def __init__(
         self,
@@ -118,7 +122,7 @@ class NotifySIGNL4(NotifyBase):
         filtering: Optional[bool] = None,
         external_id: Optional[str] = None,
         status: Optional[str] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """
         Initialize SIGNL4 Object
@@ -128,8 +132,10 @@ class NotifySIGNL4(NotifyBase):
         # SIGNL4 team or integration secret
         self.secret = validate_regex(secret)
         if not self.secret:
-            msg = "An invalid SIGNL4 team or integration secret " \
-                  "({}) was specified.".format(secret)
+            msg = (
+                "An invalid SIGNL4 team or integration secret "
+                "({}) was specified.".format(secret)
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -197,7 +203,9 @@ class NotifySIGNL4(NotifyBase):
 
         self.logger.debug(
             "SIGNL4 POST URL: %s (cert_verify=%s)",
-            notify_url, self.verify_certificate)
+            notify_url,
+            self.verify_certificate,
+        )
         self.logger.debug("SIGNL4 Payload: %r", payload)
 
         # Always call throttle before any remote server i/o is made
@@ -212,22 +220,24 @@ class NotifySIGNL4(NotifyBase):
                 timeout=self.request_timeout,
             )
             if r.status_code not in (
-                    requests.codes.ok, requests.codes.created,
-                    requests.codes.accepted):
+                requests.codes.ok,
+                requests.codes.created,
+                requests.codes.accepted,
+            ):
                 # We had a problem
-                status_str = \
-                    NotifySIGNL4.http_response_code_lookup(
-                        r.status_code)
+                status_str = NotifySIGNL4.http_response_code_lookup(
+                    r.status_code
+                )
 
                 self.logger.warning(
-                    "Failed to send SIGNL4 notification: "
-                    "{}{}error={}.".format(
-                        status_str,
-                        ", " if status_str else "",
-                        r.status_code))
+                    "Failed to send SIGNL4 notification: {}{}error={}.".format(
+                        status_str, ", " if status_str else "", r.status_code
+                    )
+                )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False
@@ -238,7 +248,9 @@ class NotifySIGNL4(NotifyBase):
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending SIGNL4 "
-                "notification to %s", self.host)
+                "notification to %s",
+                self.host,
+            )
             self.logger.debug("Socket Exception: %s", e)
 
             # Return; we're done
@@ -254,7 +266,8 @@ class NotifySIGNL4(NotifyBase):
         here.
         """
         return (
-            self.secure_protocol, self.secret,
+            self.secure_protocol,
+            self.secret,
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -293,7 +306,8 @@ class NotifySIGNL4(NotifyBase):
             schema=self.secure_protocol,
             # never encode hostname since we're expecting it to be a valid one
             secret=self.pprint(
-                self.secret, privacy, mode=PrivacyMode.Secret, safe=""),
+                self.secret, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
             params=NotifySIGNL4.urlencode(params),
         )
 
@@ -310,41 +324,44 @@ class NotifySIGNL4(NotifyBase):
             return results
 
         # The "secret" makes it easier to use yaml configuration
-        if "secret" in results["qsd"] and \
-                len(results["qsd"]["secret"]):
-            results["secret"] = \
-                NotifySIGNL4.unquote(results["qsd"]["secret"])
+        if "secret" in results["qsd"] and len(results["qsd"]["secret"]):
+            results["secret"] = NotifySIGNL4.unquote(results["qsd"]["secret"])
         else:
-            results["secret"] = \
-                NotifySIGNL4.unquote(results["host"])
+            results["secret"] = NotifySIGNL4.unquote(results["host"])
 
         if "service" in results["qsd"] and len(results["qsd"]["service"]):
-            results["service"] = \
-                NotifySIGNL4.unquote(results["qsd"]["service"])
+            results["service"] = NotifySIGNL4.unquote(
+                results["qsd"]["service"]
+            )
 
         if "location" in results["qsd"] and len(results["qsd"]["location"]):
-            results["location"] = \
-                NotifySIGNL4.unquote(results["qsd"]["location"])
+            results["location"] = NotifySIGNL4.unquote(
+                results["qsd"]["location"]
+            )
 
-        if "alerting_scenario" in results["qsd"] and \
-            len(results["qsd"]["alerting_scenario"]):
-            results["alerting_scenario"] = \
-                NotifySIGNL4.unquote(results["qsd"]["alerting_scenario"])
+        if "alerting_scenario" in results["qsd"] and len(
+            results["qsd"]["alerting_scenario"]
+        ):
+            results["alerting_scenario"] = NotifySIGNL4.unquote(
+                results["qsd"]["alerting_scenario"]
+            )
 
         if "filtering" in results["qsd"] and len(results["qsd"]["filtering"]):
-            results["filtering"] = \
-                parse_bool(
-                    NotifySIGNL4.unquote(
-                        results["qsd"]["filtering"],
-                        NotifySIGNL4.template_args["filtering"]["default"]))
+            results["filtering"] = parse_bool(
+                NotifySIGNL4.unquote(
+                    results["qsd"]["filtering"],
+                    NotifySIGNL4.template_args["filtering"]["default"],
+                )
+            )
 
-        if "external_id" in results["qsd"] and \
-            len(results["qsd"]["external_id"]):
-            results["external_id"] = \
-                NotifySIGNL4.unquote(results["qsd"]["external_id"])
+        if "external_id" in results["qsd"] and len(
+            results["qsd"]["external_id"]
+        ):
+            results["external_id"] = NotifySIGNL4.unquote(
+                results["qsd"]["external_id"]
+            )
 
         if "status" in results["qsd"] and len(results["qsd"]["status"]):
-            results["status"] = \
-                NotifySIGNL4.unquote(results["qsd"]["status"])
+            results["status"] = NotifySIGNL4.unquote(results["qsd"]["status"])
 
         return results

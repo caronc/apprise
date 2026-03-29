@@ -252,8 +252,8 @@ class URLBase:
                 self.socket_read_timeout = float(kwargs.get("rto"))
             except (TypeError, ValueError):
                 self.logger.warning(
-                    "Invalid socket read timeout (rto) was specified {}"
-                    .format(kwargs.get("rto"))
+                    "Invalid socket read timeout (rto)"
+                    " was specified {}".format(kwargs.get("rto"))
                 )
 
         if "cto" in kwargs:
@@ -262,8 +262,8 @@ class URLBase:
 
             except (TypeError, ValueError):
                 self.logger.warning(
-                    "Invalid socket connect timeout (cto) was specified {}"
-                    .format(kwargs.get("cto"))
+                    "Invalid socket connect timeout (cto)"
+                    " was specified {}".format(kwargs.get("cto"))
                 )
 
         if "tag" in kwargs:
@@ -408,7 +408,6 @@ class URLBase:
             self.__cached_url_identifier = None
 
         elif self.url_identifier in (None, True):
-
             # Prepare our object
             engine = hash_engine(
                 self.asset.storage_salt
@@ -460,28 +459,32 @@ class URLBase:
         elif isinstance(self.url_identifier, (list, tuple, set)):
             self.__cached_url_identifier = hash_engine(
                 self.asset.storage_salt
-                + b"".join([
-                    (
-                        x
-                        if isinstance(x, bytes)
-                        else str(x).encode(self.asset.encoding)
-                    )
-                    for x in self.url_identifier
-                ]),
+                + b"".join(
+                    [
+                        (
+                            x
+                            if isinstance(x, bytes)
+                            else str(x).encode(self.asset.encoding)
+                        )
+                        for x in self.url_identifier
+                    ]
+                ),
                 **kwargs,
             ).hexdigest()
 
         elif isinstance(self.url_identifier, dict):
             self.__cached_url_identifier = hash_engine(
                 self.asset.storage_salt
-                + b"".join([
-                    (
-                        x
-                        if isinstance(x, bytes)
-                        else str(x).encode(self.asset.encoding)
-                    )
-                    for x in self.url_identifier.values()
-                ]),
+                + b"".join(
+                    [
+                        (
+                            x
+                            if isinstance(x, bytes)
+                            else str(x).encode(self.asset.encoding)
+                        )
+                        for x in self.url_identifier.values()
+                    ]
+                ),
                 **kwargs,
             ).hexdigest()
 

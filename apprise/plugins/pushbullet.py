@@ -158,7 +158,6 @@ class NotifyPushBullet(NotifyBase):
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for no, attachment in enumerate(attach, start=1):
-
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -343,7 +342,8 @@ class NotifyPushBullet(NotifyBase):
                         # file handle is safely closed in `finally`; inline
                         # open is intentional
                         open(payload.path, "rb"),  # noqa: SIM115
-                    )}
+                    )
+                }
 
             r = requests.post(
                 url,
@@ -383,7 +383,8 @@ class NotifyPushBullet(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return False, response
 

@@ -191,7 +191,8 @@ class PluginManager(metaclass=Singleton):
             # The .py extension is optional as we support loading directories
             # too
             module_re = re.compile(
-                r"^(?P<name>(?!base|_)[a-z0-9_]+)(\.py)?$", re.I)
+                r"^(?P<name>(?!base|_)[a-z0-9_]+)(\.py)?$", re.I
+            )
 
             t_start = time.time()
             for f in os.listdir(module_path):
@@ -225,14 +226,16 @@ class PluginManager(metaclass=Singleton):
                 except ImportError:
                     # No problem, we can try again another way...
                     module = import_module(
-                        os.path.join(module_path, f), module_pyname)
+                        os.path.join(module_path, f), module_pyname
+                    )
                     if not module:
                         # logging found in import_module and not needed here
                         continue
 
                 module_class = None
                 for m_class in [
-                    obj for obj in dir(module)
+                    obj
+                    for obj in dir(module)
                     if self.module_filter_re.match(obj)
                 ]:
                     # Get our plugin
@@ -318,7 +321,8 @@ class PluginManager(metaclass=Singleton):
         # file that starts with an underscore or dash
         # We allow for __init__.py as well
         module_re = re.compile(
-            r"^(?P<name>[_a-z0-9][a-z0-9._-]+)?(\.py)?$", re.I)
+            r"^(?P<name>[_a-z0-9][a-z0-9._-]+)?(\.py)?$", re.I
+        )
 
         # Validate if we're a loadable Python file or not
         valid_python_file_re = re.compile(r".+\.py(o|c)?$", re.IGNORECASE)
@@ -511,7 +515,8 @@ class PluginManager(metaclass=Singleton):
                     "force loaded; overriding %s%s.",
                     ", ".join(conflict),
                     "custom notify function " if send_func else "",
-                    send_func.__name__ if send_func
+                    send_func.__name__
+                    if send_func
                     else plugin.__class__.__name__,
                 )
                 self.remove(*conflict, unload=False)
@@ -522,7 +527,8 @@ class PluginManager(metaclass=Singleton):
                     "loaded from %s%s.",
                     ", ".join(conflict),
                     "custom notify function " if send_func else "",
-                    send_func.__name__ if send_func
+                    send_func.__name__
+                    if send_func
                     else plugin.__class__.__name__,
                 )
                 return False
@@ -535,7 +541,8 @@ class PluginManager(metaclass=Singleton):
                     "loaded from %s%s.",
                     ", ".join(conflict),
                     "custom notify function " if send_func else "",
-                    send_func.__name__ if send_func
+                    send_func.__name__
+                    if send_func
                     else plugin.__class__.__name__,
                 )
                 return False
@@ -574,7 +581,8 @@ class PluginManager(metaclass=Singleton):
 
         else:
             module_name = hashlib.sha1(
-                "".join(schemas).encode("utf-8")).hexdigest()
+                "".join(schemas).encode("utf-8")
+            ).hexdigest()
             module_pyname = "{prefix}.{name}".format(
                 prefix="apprise.adhoc.module", name=module_name
             )
@@ -665,7 +673,8 @@ class PluginManager(metaclass=Singleton):
         for *lib_name* reaches zero - meaning no enabled plugin requires it.
         """
         to_remove = [
-            k for k in sys.modules
+            k
+            for k in sys.modules
             if k == lib_name or k.startswith(lib_name + ".")
         ]
 
@@ -746,7 +755,8 @@ class PluginManager(metaclass=Singleton):
         for plugin in self.plugins():
             # Get our plugin's schema list
             p_schemas = set(
-                parse_list(plugin.secure_protocol, plugin.protocol))
+                parse_list(plugin.secure_protocol, plugin.protocol)
+            )
 
             if not schemas & p_schemas:
                 if plugin.enabled:
@@ -873,7 +883,8 @@ class PluginManager(metaclass=Singleton):
                         p_schemas = {
                             s
                             for s in parse_list(
-                                plugin.secure_protocol, plugin.protocol)
+                                plugin.secure_protocol, plugin.protocol
+                            )
                             if s in self._schema_map
                         }
 

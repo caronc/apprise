@@ -317,10 +317,11 @@ class NotifyAfricasTalking(NotifyBase):
             self.logger.debug(f"Africas Talking Payload: {payload!s}")
 
             # Printable target detail
+            _batch = self.targets[index : index + batch_size]
             p_target = (
                 self.targets[index]
                 if batch_size == 1
-                else f"{len(self.targets[index:index + batch_size])} target(s)"
+                else f"{len(_batch)} target(s)"
             )
 
             # Always call throttle before any remote server i/o is made
@@ -366,7 +367,8 @@ class NotifyAfricasTalking(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

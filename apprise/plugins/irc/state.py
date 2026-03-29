@@ -126,10 +126,12 @@ class IRCStateMachine:
         self.state = IRCState.REGISTERING
         out: list[IRCAction] = []
         if self.ctx.password:
-            out.append(IRCAction(
-                IRCActionKind.SEND, line=f"PASS {self.ctx.password}"))
-        out.append(IRCAction(
-            IRCActionKind.SEND, line=f"NICK {self.ctx.desired_nick}"))
+            out.append(
+                IRCAction(IRCActionKind.SEND, line=f"PASS {self.ctx.password}")
+            )
+        out.append(
+            IRCAction(IRCActionKind.SEND, line=f"NICK {self.ctx.desired_nick}")
+        )
         out.append(
             IRCAction(
                 IRCActionKind.SEND,
@@ -150,12 +152,17 @@ class IRCStateMachine:
             if n in REGISTER_ERRORS:
                 self.ctx.last_error = f"{REGISTER_ERRORS[n]}: {_err(msg)}"
                 self.state = IRCState.ERROR
-                return [IRCAction(
-                    IRCActionKind.FAIL, reason=self.ctx.last_error)]
+                return [
+                    IRCAction(IRCActionKind.FAIL, reason=self.ctx.last_error)
+                ]
 
             if n in (432, 433):
-                actions.append(IRCAction(
-                    IRCActionKind.SEND, line=f"NICK {self.ctx.desired_nick}"))
+                actions.append(
+                    IRCAction(
+                        IRCActionKind.SEND,
+                        line=f"NICK {self.ctx.desired_nick}",
+                    )
+                )
                 return actions
 
             if n == 1:
@@ -176,8 +183,9 @@ class IRCStateMachine:
             if n in JOIN_ERRORS:
                 self.ctx.last_error = f"{JOIN_ERRORS[n]}: {_err(msg)}"
                 self.state = IRCState.ERROR
-                return [IRCAction(
-                    IRCActionKind.FAIL, reason=self.ctx.last_error)]
+                return [
+                    IRCAction(IRCActionKind.FAIL, reason=self.ctx.last_error)
+                ]
 
             if n == 443 and len(msg.params) >= 2:
                 chan = msg.params[1]
@@ -201,13 +209,15 @@ class IRCStateMachine:
         return actions
 
     def request_join(
-            self, channel: str, key: Optional[str] = None) -> list[IRCAction]:
+        self, channel: str, key: Optional[str] = None
+    ) -> list[IRCAction]:
         """Request a channel join and enter JOINING state."""
         self.state = IRCState.JOINING
 
         if key:
-            return [IRCAction(
-                IRCActionKind.SEND, line=f"JOIN {channel} {key}")]
+            return [
+                IRCAction(IRCActionKind.SEND, line=f"JOIN {channel} {key}")
+            ]
         return [IRCAction(IRCActionKind.SEND, line=f"JOIN {channel}")]
 
     def request_quit(self, message: str) -> list[IRCAction]:

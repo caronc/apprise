@@ -312,7 +312,6 @@ class NotifyTwitter(NotifyBase):
             # We need to upload our payload first so that we can source it
             # in remaining messages
             for no, attachment in enumerate(attach, start=1):
-
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -376,13 +375,15 @@ class NotifyTwitter(NotifyBase):
                 #   }
                 # }
 
-                response.update({
-                    # Update our response to additionally include the
-                    # attachment details
-                    "file_name": filename,
-                    "file_mime": attachment.mimetype,
-                    "file_path": attachment.path,
-                })
+                response.update(
+                    {
+                        # Update our response to additionally include the
+                        # attachment details
+                        "file_name": filename,
+                        "file_mime": attachment.mimetype,
+                        "file_path": attachment.path,
+                    }
+                )
 
                 # Save our pre-prepared payload for attachment posting
                 attachments.append(response)
@@ -785,7 +786,8 @@ class NotifyTwitter(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Mark our failure
                 return (False, content)
@@ -880,10 +882,12 @@ class NotifyTwitter(NotifyBase):
                     self.asecret, privacy, mode=PrivacyMode.Secret, safe=""
                 ),
                 targets=(
-                    "/".join([
-                        NotifyTwitter.quote(f"@{target}", safe="@")
-                        for target in self.targets
-                    ])
+                    "/".join(
+                        [
+                            NotifyTwitter.quote(f"@{target}", safe="@")
+                            for target in self.targets
+                        ]
+                    )
                     if self.targets
                     else ""
                 ),

@@ -424,8 +424,9 @@ def test_plugin_gnome_show_exception(mocker, obj):
     notification_instance = gi.repository.Notify.Notification.new.return_value
 
     # 3. Force the .show() method to raise an exception.
-    notification_instance.show.side_effect = \
-        Exception("Simulated Gnome Show Failure")
+    notification_instance.show.side_effect = Exception(
+        "Simulated Gnome Show Failure"
+    )
 
     # 4. Spy on the logger to verify the output.
     logger_spy = mocker.spy(obj, "logger")

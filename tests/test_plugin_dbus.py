@@ -73,9 +73,7 @@ def mock_dbus_module(mocker):
     gi = types.ModuleType("gi")
     gi.require_version = Mock()
     gi.repository = types.SimpleNamespace(
-        GdkPixbuf=types.SimpleNamespace(
-            Pixbuf=Mock(name="Pixbuf")
-        )
+        GdkPixbuf=types.SimpleNamespace(Pixbuf=Mock(name="Pixbuf"))
     )
     # Setup standard Pixbuf behavior
     mock_image = Mock()
@@ -90,14 +88,17 @@ def mock_dbus_module(mocker):
     gi.repository.GdkPixbuf.Pixbuf.new_from_file.return_value = mock_image
 
     # 4. Patch everything into sys.modules
-    mocker.patch.dict(sys.modules, {
-        "dbus": dbus,
-        "dbus.mainloop": mainloop_pkg,
-        "dbus.mainloop.glib": glib_module,
-        "dbus.mainloop.qt": qt_module,
-        "gi": gi,
-        "gi.repository": gi.repository
-    })
+    mocker.patch.dict(
+        sys.modules,
+        {
+            "dbus": dbus,
+            "dbus.mainloop": mainloop_pkg,
+            "dbus.mainloop.glib": glib_module,
+            "dbus.mainloop.qt": qt_module,
+            "gi": gi,
+            "gi.repository": gi.repository,
+        },
+    )
 
     return dbus
 
@@ -114,6 +115,7 @@ def test_plugin_dbus_initialization_strategies(mock_dbus_module, mocker):
     sys.modules["dbus.mainloop.qt"] = None
     reload_plugin("dbus")
     from apprise.plugins.dbus import LOOP_GLIB, LOOP_QT, NotifyDBus
+
     assert LOOP_GLIB is not None
     assert LOOP_QT is None
     assert NotifyDBus.enabled is True
@@ -122,24 +124,28 @@ def test_plugin_dbus_initialization_strategies(mock_dbus_module, mocker):
     # Reset modules
     mock_dbus_module.mainloop.qt.DBusQtMainLoop.return_value = "qt_loop"
 
-    mocker.patch.dict(sys.modules, {
-        "dbus.mainloop.glib": None,
-        "dbus.mainloop.qt": mock_dbus_module.mainloop.qt
-    })
+    mocker.patch.dict(
+        sys.modules,
+        {
+            "dbus.mainloop.glib": None,
+            "dbus.mainloop.qt": mock_dbus_module.mainloop.qt,
+        },
+    )
 
     reload_plugin("dbus")
     from apprise.plugins.dbus import LOOP_GLIB, LOOP_QT, NotifyDBus
+
     assert LOOP_GLIB is None
     assert LOOP_QT is not None
     assert NotifyDBus.enabled is True
 
     # Scenario C: Both fail
-    mocker.patch.dict(sys.modules, {
-        "dbus.mainloop.glib": None,
-        "dbus.mainloop.qt": None
-    })
+    mocker.patch.dict(
+        sys.modules, {"dbus.mainloop.glib": None, "dbus.mainloop.qt": None}
+    )
     reload_plugin("dbus")
     from apprise.plugins.dbus import NotifyDBus
+
     assert NotifyDBus.enabled is False
 
 
@@ -150,12 +156,14 @@ def test_plugin_dbus_image_support_initialization(mock_dbus_module, mocker):
     # Case 1: Success (Already set up by fixture)
     reload_plugin("dbus")
     from apprise.plugins.dbus import NOTIFY_DBUS_IMAGE_SUPPORT
+
     assert NOTIFY_DBUS_IMAGE_SUPPORT is True
 
     # Case 2: GI missing
     mocker.patch.dict(sys.modules, {"gi": None})
     reload_plugin("dbus")
     from apprise.plugins.dbus import NOTIFY_DBUS_IMAGE_SUPPORT
+
     assert NOTIFY_DBUS_IMAGE_SUPPORT is False
 
 
@@ -182,7 +190,8 @@ def test_plugin_dbus_send_success(mock_dbus_module, mocker):
     mock_dbus_module.SessionBus.assert_called()
     # Check Interface was created
     mock_dbus_module.Interface.assert_called_with(
-        mock_proxy, dbus_interface="org.freedesktop.Notifications")
+        mock_proxy, dbus_interface="org.freedesktop.Notifications"
+    )
     # Check Notify was called
     assert mock_interface.Notify.called
     args, _ = mock_interface.Notify.call_args
@@ -197,6 +206,7 @@ def test_plugin_dbus_send_no_title(mock_dbus_module):
     """
     reload_plugin("dbus")
     from apprise.plugins.dbus import NotifyDBus
+
     mock_interface = mock_dbus_module.Interface.return_value
 
     obj = NotifyDBus()
@@ -216,8 +226,9 @@ def test_plugin_dbus_send_connection_failure(mock_dbus_module):
     from apprise.plugins.dbus import NotifyDBus
 
     # Force constructor to crash
-    mock_dbus_module.SessionBus.side_effect = \
-        mock_dbus_module.DBusException("Connection Refused")
+    mock_dbus_module.SessionBus.side_effect = mock_dbus_module.DBusException(
+        "Connection Refused"
+    )
 
     obj = NotifyDBus()
     # Should handle exception and return False
@@ -247,12 +258,14 @@ def test_plugin_dbus_image_loading_failure(mock_dbus_module, mocker):
     # Force GdkPixbuf to crash
     import gi
 
-    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = \
-        Exception("Bad Image")
+    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = Exception(
+        "Bad Image"
+    )
 
     # Use Apprise.instantiate to handle parsing cleanly
     obj = apprise.Apprise.instantiate(
-        "dbus://?image=yes", suppress_exceptions=False)
+        "dbus://?image=yes", suppress_exceptions=False
+    )
     spy_logger = mocker.spy(obj, "logger")
 
     # Notification should still succeed (return True), just log a warning
@@ -260,7 +273,8 @@ def test_plugin_dbus_image_loading_failure(mock_dbus_module, mocker):
 
     # Verify the warning was logged
     spy_logger.warning.assert_called_with(
-        "Could not load notification icon (%s).", ANY)
+        "Could not load notification icon (%s).", ANY
+    )
 
 
 def test_plugin_dbus_url_parsing(mock_dbus_module):
@@ -272,20 +286,23 @@ def test_plugin_dbus_url_parsing(mock_dbus_module):
 
     # Test Urgency mapping
     obj = apprise.Apprise.instantiate(
-        "dbus://?urgency=high", suppress_exceptions=False)
+        "dbus://?urgency=high", suppress_exceptions=False
+    )
     assert isinstance(obj, NotifyDBus)
     assert obj.urgency == DBusUrgency.HIGH
     assert "urgency=high" in obj.url()
 
     obj = apprise.Apprise.instantiate(
-        "dbus://?priority=low", suppress_exceptions=False)
+        "dbus://?priority=low", suppress_exceptions=False
+    )
     assert isinstance(obj, NotifyDBus)
     assert obj.urgency == DBusUrgency.LOW
     assert "urgency=low" in obj.url()
 
     # Test X/Y coords
     obj = apprise.Apprise.instantiate(
-        "dbus://?x=100&y=200", suppress_exceptions=False)
+        "dbus://?x=100&y=200", suppress_exceptions=False
+    )
     assert obj.x_axis == 100
     assert obj.y_axis == 200
     assert "x=100" in obj.url()
@@ -331,7 +348,8 @@ def test_plugin_dbus_send_sets_xy_meta_payload(mock_dbus_module):
 
 
 def test_plugin_dbus_send_image_condition_false_skips_pixbuf(
-        mock_dbus_module, mocker):
+    mock_dbus_module, mocker
+):
     """
     Covers NOTIFY_DBUS_IMAGE_SUPPORT and icon_path flag
     """

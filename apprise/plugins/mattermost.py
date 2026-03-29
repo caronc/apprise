@@ -485,9 +485,7 @@ class NotifyMattermost(NotifyBase):
                 if image_url:
                     payload["icon_url"] = image_url
 
-                payload["username"] = (
-                    self.user if self.user else self.app_id
-                )
+                payload["username"] = self.user if self.user else self.app_id
 
                 if target:
                     payload["channel"] = target
@@ -498,9 +496,7 @@ class NotifyMattermost(NotifyBase):
                 url,
                 self.verify_certificate,
             )
-            self.logger.debug(
-                "Mattermost %s Payload: %s", self.mode, payload
-            )
+            self.logger.debug("Mattermost %s Payload: %s", self.mode, payload)
 
             self.throttle()
 
@@ -541,7 +537,8 @@ class NotifyMattermost(NotifyBase):
                 self.logger.warning(
                     "A Connection error occurred sending Mattermost "
                     "%s notification to %s.",
-                    self.mode, target,
+                    self.mode,
+                    target,
                 )
                 self.logger.debug("Socket Exception: %s", e)
                 has_error = True
@@ -593,11 +590,15 @@ class NotifyMattermost(NotifyBase):
                 else:
                     entries.append(f"+{value}")
 
-            params["to"] = ",".join(chain(
-                [NotifyMattermost.quote(v, safe="#+") for v in entries],
-                [NotifyMattermost.quote(x, safe="")
-                 for x in self._invalid_targets],
-            ))
+            params["to"] = ",".join(
+                chain(
+                    [NotifyMattermost.quote(v, safe="#+") for v in entries],
+                    [
+                        NotifyMattermost.quote(x, safe="")
+                        for x in self._invalid_targets
+                    ],
+                )
+            )
 
         default_port = 443 if self.secure else 80
         default_schema = self.secure_protocol if self.secure else self.protocol
@@ -682,15 +683,11 @@ class NotifyMattermost(NotifyBase):
 
         # Our Mode
         if "mode" in results["qsd"] and results["qsd"]["mode"]:
-            results["mode"] = NotifyMattermost.unquote(
-                results["qsd"]["mode"]
-            )
+            results["mode"] = NotifyMattermost.unquote(results["qsd"]["mode"])
 
         # Team support (bot mode lookup). This maps to `user`.
         if "team" in results["qsd"] and results["qsd"]["team"]:
-            results["user"] = NotifyMattermost.unquote(
-                results["qsd"]["team"]
-            )
+            results["user"] = NotifyMattermost.unquote(results["qsd"]["team"])
             if "mode" not in results:
                 results["mode"] = MattermostMode.BOT
 

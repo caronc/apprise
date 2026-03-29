@@ -1,18 +1,28 @@
 {
-  "python.testing.pytestArgs": [
-    "tests"
-  ],
-  "python.linting.enabled": true,
-  "python.linting.ruffEnabled": true,
-  "python.linting.ruffPath": "ruff",
-  "python.formatting.provider": "none",
-  "editor.formatOnSave": true,
+  // Use the Ruff extension (charliermarsh.ruff) as the sole formatter and linter
+  // for Python files. Install it from the VS Code marketplace or via
+  //   ext install charliermarsh.ruff
   "[python]": {
-    "editor.formatOnSave": false
+    "editor.defaultFormatter": "charliermarsh.ruff",
+    "editor.formatOnSave": true,
+    "editor.codeActionsOnSave": {
+      // Apply all auto-fixable lint violations on save (isort, pyupgrade, etc.)
+      "source.fixAll.ruff": "explicit",
+      // Keep imports sorted on save
+      "source.organizeImports.ruff": "explicit"
+    }
   },
-  "python.testing.cwd": "${workspaceFolder}",
-  "python.testing.unittestEnabled": false,
+
+  // Ruff reads its configuration from pyproject.toml automatically, so no
+  // separate ruff.configuration key is needed. Leave the extension defaults.
+
+  // Testing
   "python.testing.pytestEnabled": true,
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.cwd": "${workspaceFolder}",
+
+  // Python path
   "python.envFile": "${workspaceFolder}/.env",
   "terminal.integrated.env.linux": {
     "PYTHONPATH": "${workspaceFolder}"

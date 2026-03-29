@@ -156,13 +156,15 @@ class NotifyLine(NotifyBase):
         # Prepare our persistent_notification.create payload
         payload = {
             "to": None,
-            "messages": [{
-                "type": "text",
-                "text": body,
-                "sender": {
-                    "name": self.app_id,
-                },
-            }],
+            "messages": [
+                {
+                    "type": "text",
+                    "text": body,
+                    "sender": {
+                        "name": self.app_id,
+                    },
+                }
+            ],
         }
 
         # Acquire our image url if configured to do so
@@ -213,7 +215,8 @@ class NotifyLine(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

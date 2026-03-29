@@ -170,10 +170,12 @@ class NotifyClickatell(NotifyBase):
             schema=self.secure_protocol,
             source=f"{self.source}@" if self.source else "",
             apikey=self.pprint(self.apikey, privacy, safe="="),
-            targets="/".join([
-                NotifyClickatell.quote(t, safe="")
-                for t in chain(self.targets, self._invalid_targets)
-            ]),
+            targets="/".join(
+                [
+                    NotifyClickatell.quote(t, safe="")
+                    for t in chain(self.targets, self._invalid_targets)
+                ]
+            ),
             params=self.urlencode(params),
         )
 
@@ -247,7 +249,8 @@ class NotifyClickatell(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True

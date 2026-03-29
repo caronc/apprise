@@ -350,8 +350,7 @@ class NotifyAprs(NotifyBase):
             return False
 
         except socket.timeout as e:
-            self.logger.debug(
-                "Socket Timeout Exception socket_open: %s", e)
+            self.logger.debug("Socket Timeout Exception socket_open: %s", e)
             self.sock = None
             return False
 

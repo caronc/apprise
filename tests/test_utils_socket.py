@@ -216,8 +216,8 @@ def test_utils_socket_server_hostname_for_tls_ip_reverse():
     s = SocketTransport("203.0.113.10", 1, verify=True)
 
     with mock.patch(
-            "socket.gethostbyaddr",
-            return_value=("irc.example.com.", [], [])):
+        "socket.gethostbyaddr", return_value=("irc.example.com.", [], [])
+    ):
         assert s._server_hostname_for_tls() == "irc.example.com"
 
     with mock.patch("socket.gethostbyaddr", side_effect=OSError()):
@@ -255,9 +255,10 @@ def test_utils_socket_build_ssl_context():
     s = SocketTransport("example.com", 1, verify=True)
     ctx = _DummySSLContext(raise_on_minimum=False)
 
-    with mock.patch("certifi.where", return_value="/tmp/ca.pem"), mock.patch(
-        "ssl.create_default_context", return_value=ctx
-    ) as m:
+    with (
+        mock.patch("certifi.where", return_value="/tmp/ca.pem"),
+        mock.patch("ssl.create_default_context", return_value=ctx) as m,
+    ):
         result = s._build_ssl_context()
         assert result is ctx
         m.assert_called_once()
@@ -286,8 +287,9 @@ def test_utils_socket_build_ssl_context():
     s = SocketTransport("example.com", 1, verify=True)
     ctx = _DummySSLContext(raise_on_minimum=True)
 
-    with mock.patch("certifi.where", return_value="/tmp/ca.pem"), mock.patch(
-        "ssl.create_default_context", return_value=ctx
+    with (
+        mock.patch("certifi.where", return_value="/tmp/ca.pem"),
+        mock.patch("ssl.create_default_context", return_value=ctx),
     ):
         result = s._build_ssl_context()
         assert result is ctx
@@ -354,10 +356,11 @@ def test_utils_socket_tls_tests():
     ctx = mock.Mock()
     ctx.wrap_socket.return_value = tls_sock
 
-    with mock.patch.object(
-            s, "_build_ssl_context",
-            return_value=ctx), mock.patch.object(
-        s, "_server_hostname_for_tls", return_value="example.com"
+    with (
+        mock.patch.object(s, "_build_ssl_context", return_value=ctx),
+        mock.patch.object(
+            s, "_server_hostname_for_tls", return_value="example.com"
+        ),
     ):
         s.start_tls()
 
@@ -434,8 +437,7 @@ def test_utils_socket_read_blocking_timeout():
 
 
 def test_utils_socket_read_blocking_edge_cases() -> None:
-    """SocketTransport() Read Blocking Edge Cases
-    """
+    """SocketTransport() Read Blocking Edge Cases"""
     s = SocketTransport("example.com", 1, timeout=None)
 
     bad_sock = _DummySocket()
@@ -501,9 +503,10 @@ def test_utils_socket_write_flush():
     # Timeout path: can_write returns False
     sock = _DummySocket()
     s._sock = sock
-    with (mock.patch.object(s, "can_write",
-                            return_value=False),
-            pytest.raises(AppriseSocketError)):
+    with (
+        mock.patch.object(s, "can_write", return_value=False),
+        pytest.raises(AppriseSocketError),
+    ):
         s.write(b"test", timeout=0.1)
 
     # OSError triggers close
@@ -537,8 +540,8 @@ def test_utils_socket_exceptions():
 
 
 def test_utils_socket_close_exceptions():
-
     """SocketTransport() Close Exceptions."""
+
     class _BadShutdownSocket(_DummySocket):
         def shutdown(self, *_args, **_kwargs) -> None:
             raise Exception("shutdown fail")
@@ -591,7 +594,8 @@ def test_utils_socket_can_read_returns_bool():
 def test_utils_socket_connect_bind():
     """SocketTransport() bind() tests"""
     s = SocketTransport(
-        "example.com", 6667, bind_addr="127.0.0.1", bind_port=0)
+        "example.com", 6667, bind_addr="127.0.0.1", bind_port=0
+    )
     dummy = _DummySocket()
     dummy.bind = mock.Mock()
 
@@ -620,15 +624,17 @@ def test_utils_socket_secure_connect():
     s = SocketTransport("example.com", 6667, secure=True)
     dummy = _DummySocket()
 
-    with mock.patch("socket.socket", return_value=dummy), mock.patch.object(
-        s, "start_tls", autospec=True
-    ) as m:
+    with (
+        mock.patch("socket.socket", return_value=dummy),
+        mock.patch.object(s, "start_tls", autospec=True) as m,
+    ):
         s.connect()
         m.assert_called_once()
 
 
 def test_utils_socket_connect_exceptions():
     """SocketTransport() Connect Exceptions."""
+
     class _BadCloseSocket(_DummySocket):
         def connect(self, *_args, **_kwargs) -> None:
             raise OSError("connect fail")
@@ -639,8 +645,10 @@ def test_utils_socket_connect_exceptions():
     s = SocketTransport("example.com", 6667, secure=False)
     dummy = _BadCloseSocket()
 
-    with (mock.patch("socket.socket", return_value=dummy),
-          pytest.raises(AppriseSocketError)):
+    with (
+        mock.patch("socket.socket", return_value=dummy),
+        pytest.raises(AppriseSocketError),
+    ):
         s.connect()
 
     # transport should not keep the socket
@@ -713,8 +721,10 @@ def test_utils_socket_recv_error():
     sock._recv_side_effect = OSError("recv failed")
     s._sock = sock
 
-    with (mock.patch.object(s, "can_read", return_value=True),
-          pytest.raises(AppriseSocketError) as e):
+    with (
+        mock.patch.object(s, "can_read", return_value=True),
+        pytest.raises(AppriseSocketError) as e,
+    ):
         s.read(blocking=True)
 
     assert "recv failed" in str(e.value)
@@ -737,9 +747,7 @@ def test_utils_socket_write_empty_payload_does_not_set_had_io() -> None:
 
 
 def test_utils_socket_write_handling() -> None:
-    """SocketTransport() Write handling
-
-    """
+    """SocketTransport() Write handling"""
     s = SocketTransport("example.com", 1, timeout=None)
     s._sock = _DummySocket()
 
@@ -852,8 +860,7 @@ def test_utils_socket_read_blocking_connection() -> None:
 
 
 def test_utils_socket_read_blocking() -> None:
-    """SocketTransport() Read Blocking
-    """
+    """SocketTransport() Read Blocking"""
     s = SocketTransport("example.com", 1, timeout=(1.0, 0.5))
 
     bad_sock = _DummySocket()
@@ -930,11 +937,14 @@ def test_utils_socket_attempt_reconnect_no_io() -> None:
         mock.patch.object(s, "close") as m_close,
         mock.patch.object(s, "connect") as m_connect,
     ):
-        assert s._attempt_reconnect(
-            retries=1,
-            action="read",
-            exc=Exception("boom"),
-        ) is False
+        assert (
+            s._attempt_reconnect(
+                retries=1,
+                action="read",
+                exc=Exception("boom"),
+            )
+            is False
+        )
 
         # Should not attempt any reconnect work
         m_close.assert_not_called()
@@ -951,20 +961,24 @@ def test_utils_socket_attempt_reconnect_connect_exception() -> None:
     with (
         mock.patch.object(s, "close") as m_close,
         mock.patch.object(
-            s, "connect", side_effect=Exception("nope")) as m_connect,
+            s, "connect", side_effect=Exception("nope")
+        ) as m_connect,
     ):
-        assert s._attempt_reconnect(
-            retries=1,
-            action="write",
-            exc=Exception("boom"),
-        ) is False
+        assert (
+            s._attempt_reconnect(
+                retries=1,
+                action="write",
+                exc=Exception("boom"),
+            )
+            is False
+        )
 
         m_close.assert_called_once()
         m_connect.assert_called_once()
 
 
 def test_utils_socket_ssl_read_blocking() -> None:
-    """SocketTransport() read() blocking """
+    """SocketTransport() read() blocking"""
     s = SocketTransport("example.com", 1, timeout=None)
     sock = _DummySocket()
 

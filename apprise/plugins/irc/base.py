@@ -203,8 +203,8 @@ class NotifyIRC(NotifyBase):
         if isinstance(mode, str) and mode.strip():
             self.auth_mode = mode.strip().lower()
             self.auth_mode = next(
-                (a for a in IRC_AUTH_MODES
-                 if a.startswith(self.auth_mode)), None
+                (a for a in IRC_AUTH_MODES if a.startswith(self.auth_mode)),
+                None,
             )
             if self.auth_mode not in IRC_AUTH_MODES:
                 msg = f"The IRC auth mode specified ({mode}) is invalid."
@@ -253,25 +253,31 @@ class NotifyIRC(NotifyBase):
         for i in range(len(templates.IRC_TEMPLATES)):  # pragma: no branch
             self.logger.trace(
                 "Scanning %s against %s",
-                self.host, templates.IRC_TEMPLATES[i][0])
+                self.host,
+                templates.IRC_TEMPLATES[i][0],
+            )
 
             match = templates.IRC_TEMPLATES[i][1].match(self.host)
             if match:
                 self.logger.info(
-                    f"Applying {templates.IRC_TEMPLATES[i][0]} Defaults")
+                    f"Applying {templates.IRC_TEMPLATES[i][0]} Defaults"
+                )
 
                 # the secure flag can not be altered if defined in the template
                 self.secure = templates.IRC_TEMPLATES[i][2].get(
-                    "secure", self.secure,
+                    "secure",
+                    self.secure,
                 )
 
                 # store default port
                 self.port = templates.IRC_TEMPLATES[i][2].get(
-                    "port", self.port,
+                    "port",
+                    self.port,
                 )
 
                 self.auth_mode = templates.IRC_TEMPLATES[i][2].get(
-                    "mode", self.auth_mode,
+                    "mode",
+                    self.auth_mode,
                 )
                 break
 
@@ -307,7 +313,8 @@ class NotifyIRC(NotifyBase):
             # In ZNC mode, authentication is performed against the bouncer
             # itself. ZNC configurations expect the PASS line to include the
             # username.
-            password=self.password if self.auth_mode != IRCAuthMode.ZNC
+            password=self.password
+            if self.auth_mode != IRCAuthMode.ZNC
             else f"{self.user}:{self.password}",
             auth_mode=self.auth_mode,
             nick_generator=IRCClient.nick_generation,
@@ -322,9 +329,12 @@ class NotifyIRC(NotifyBase):
 
             # ZNC operates as a bouncer, so perform a quick sanity check that
             # the connection is alive before issuing commands.
-            if self.auth_mode == IRCAuthMode.ZNC \
-                    and not client.check_connection(
-                    timeout=min(5.0, float(self.send_timeout or 5.0))):
+            if (
+                self.auth_mode == IRCAuthMode.ZNC
+                and not client.check_connection(
+                    timeout=min(5.0, float(self.send_timeout or 5.0))
+                )
+            ):
                 raise AppriseSocketError("ZNC connection check failed")
 
             message = body if not title else f"{title} {body}".strip()
@@ -380,7 +390,8 @@ class NotifyIRC(NotifyBase):
 
     @property
     def url_identifier(
-            self) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
+        self,
+    ) -> tuple[str, Optional[str], Optional[str], Optional[str]]:
         """Return the pieces that uniquely identify this configuration."""
         return (
             self.secure_protocol if self.secure else self.protocol,
@@ -421,12 +432,20 @@ class NotifyIRC(NotifyBase):
         elif self.user:
             auth = "{user}@".format(user=self.quote(self.user, safe=""))
 
-        default_port = IRCClient.default_secure_port \
-            if self.secure else IRCClient.default_insecure_port
-
-        port = self.port if isinstance(self.port, int) else (
+        default_port = (
             IRCClient.default_secure_port
-            if self.secure else IRCClient.default_insecure_port
+            if self.secure
+            else IRCClient.default_insecure_port
+        )
+
+        port = (
+            self.port
+            if isinstance(self.port, int)
+            else (
+                IRCClient.default_secure_port
+                if self.secure
+                else IRCClient.default_insecure_port
+            )
         )
 
         port = "" if port == default_port else f":{port}"
@@ -437,18 +456,28 @@ class NotifyIRC(NotifyBase):
             auth=auth,
             host=self.host,
             port=port,
-            targets="/".join(chain(
-                [self.quote(f"#{c}" if not k else "#{}:{}".format(
-                    c,
-                    self.pprint(
-                        k,
-                        privacy,
-                        mode=PrivacyMode.Secret,
-                        safe="")),
-                    safe="#") for c, k in self.channels.items()],
-                [self.quote(f"@{u}", safe="@")
-                 for u in self.users],
-            )),
+            targets="/".join(
+                chain(
+                    [
+                        self.quote(
+                            f"#{c}"
+                            if not k
+                            else "#{}:{}".format(
+                                c,
+                                self.pprint(
+                                    k,
+                                    privacy,
+                                    mode=PrivacyMode.Secret,
+                                    safe="",
+                                ),
+                            ),
+                            safe="#",
+                        )
+                        for c, k in self.channels.items()
+                    ],
+                    [self.quote(f"@{u}", safe="@") for u in self.users],
+                )
+            ),
             params=self.urlencode(params),
         )
 

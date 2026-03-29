@@ -25,8 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Unit tests for :mod:`apprise.utils.sanitize`.
-"""
+"""Unit tests for :mod:`apprise.utils.sanitize`."""
 
 from __future__ import annotations
 

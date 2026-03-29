@@ -254,7 +254,6 @@ class NotifySNS(NotifyBase):
         topics = list(self.topics)
 
         while len(phone) > 0:
-
             # Get Phone No
             no = phone.pop(0)
 
@@ -272,7 +271,6 @@ class NotifySNS(NotifyBase):
 
         # Send all our defined topic id's
         while len(topics):
-
             # Get Topic
             topic = topics.pop(0)
 
@@ -364,7 +362,8 @@ class NotifySNS(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return (False, NotifySNS.aws_response_to_dict(r.text))
 
@@ -416,55 +415,64 @@ class NotifySNS(NotifyBase):
         )
 
         # Similar to headers; but a subset.  keys must be lowercase
-        signed_headers = OrderedDict([
-            ("content-type", headers["Content-Type"]),
-            (
-                "host",
-                f"{self.aws_service_name}"
-                f".{self.aws_region_name}.amazonaws.com",
-            ),
-            ("x-amz-date", headers["X-Amz-Date"]),
-        ])
+        signed_headers = OrderedDict(
+            [
+                ("content-type", headers["Content-Type"]),
+                (
+                    "host",
+                    f"{self.aws_service_name}"
+                    f".{self.aws_region_name}.amazonaws.com",
+                ),
+                ("x-amz-date", headers["X-Amz-Date"]),
+            ]
+        )
 
         #
         # Build Canonical Request Object
         #
-        canonical_request = "\n".join([
-            # Method
-            "POST",
-            # URL
-            self.aws_canonical_uri,
-            # Query String (none set for POST)
-            "",
-            # Header Content (must include \n at end!)
-            # All entries except characters in amazon date must be
-            # lowercase
-            "\n".join([f"{k}:{v}" for k, v in signed_headers.items()]) + "\n",
-            # Header Entries (in same order identified above)
-            ";".join(signed_headers.keys()),
-            # Payload
-            sha256(payload.encode("utf-8")).hexdigest(),
-        ])
+        canonical_request = "\n".join(
+            [
+                # Method
+                "POST",
+                # URL
+                self.aws_canonical_uri,
+                # Query String (none set for POST)
+                "",
+                # Header Content (must include \n at end!)
+                # All entries except characters in amazon date must be
+                # lowercase
+                "\n".join([f"{k}:{v}" for k, v in signed_headers.items()])
+                + "\n",
+                # Header Entries (in same order identified above)
+                ";".join(signed_headers.keys()),
+                # Payload
+                sha256(payload.encode("utf-8")).hexdigest(),
+            ]
+        )
 
         # Prepare Unsigned Signature
-        to_sign = "\n".join([
-            self.aws_auth_algorithm,
-            amzdate,
-            scope,
-            sha256(canonical_request.encode("utf-8")).hexdigest(),
-        ])
+        to_sign = "\n".join(
+            [
+                self.aws_auth_algorithm,
+                amzdate,
+                scope,
+                sha256(canonical_request.encode("utf-8")).hexdigest(),
+            ]
+        )
 
         # Our Authorization header
-        headers["Authorization"] = ", ".join([
-            (
-                f"{self.aws_auth_algorithm} "
-                f"Credential={self.aws_access_key_id}/{scope}"
-            ),
-            "SignedHeaders={signed_headers}".format(
-                signed_headers=";".join(signed_headers.keys()),
-            ),
-            f"Signature={self.aws_auth_signature(to_sign, reference)}",
-        ])
+        headers["Authorization"] = ", ".join(
+            [
+                (
+                    f"{self.aws_auth_algorithm} "
+                    f"Credential={self.aws_access_key_id}/{scope}"
+                ),
+                "SignedHeaders={signed_headers}".format(
+                    signed_headers=";".join(signed_headers.keys()),
+                ),
+                f"Signature={self.aws_auth_signature(to_sign, reference)}",
+            ]
+        )
 
         return headers
 
@@ -598,15 +606,17 @@ class NotifySNS(NotifyBase):
                     safe="",
                 ),
                 region=NotifySNS.quote(self.aws_region_name, safe=""),
-                targets="/".join([
-                    NotifySNS.quote(x)
-                    for x in chain(
-                        # Phone # are already prefixed with a plus symbol
-                        self.phone,
-                        # Topics are prefixed with a pound/hashtag symbol
-                        [f"#{x}" for x in self.topics],
-                    )
-                ]),
+                targets="/".join(
+                    [
+                        NotifySNS.quote(x)
+                        for x in chain(
+                            # Phone # are already prefixed with a plus symbol
+                            self.phone,
+                            # Topics are prefixed with a pound/hashtag symbol
+                            [f"#{x}" for x in self.topics],
+                        )
+                    ]
+                ),
                 params=NotifySNS.urlencode(params),
             )
         )
@@ -645,7 +655,6 @@ class NotifySNS(NotifyBase):
         # Section 1: Get Region and Access Secret
         index = 0
         for i, entry in enumerate(entries):
-
             # Are we at the region yet?
             result = IS_REGION.match(entry)
             if result:

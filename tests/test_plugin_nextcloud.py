@@ -36,11 +36,14 @@ import requests
 from apprise import Apprise, AppriseAsset, NotifyType, PersistentStoreMode
 from apprise.plugins.nextcloud import NotifyNextcloud
 
-NEXTCLOUD_GOOD_RESPONSE = dumps({
-    "ocs": {
-        "meta": {"status": "ok", "statuscode": 100},
-        "data": {"users": ["user1", "user2"]},
-    }})
+NEXTCLOUD_GOOD_RESPONSE = dumps(
+    {
+        "ocs": {
+            "meta": {"status": "ok", "statuscode": 100},
+            "data": {"users": ["user1", "user2"]},
+        }
+    }
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -206,7 +209,6 @@ apprise_url_tests = (
             "notify_response": False,
         },
     ),
-
     (
         "ncloud://localhost:8080/admin?+HeaderKey=HeaderValue",
         {
@@ -307,7 +309,8 @@ def test_plugin_nextcloud_url_prefix(mock_post):
     assert (
         mock_post.call_args_list[0][0][0]
         == "http://localhost/abcd/ocs/v2.php/apps/"
-        "admin_notifications/api/v1/notifications/admin")
+        "admin_notifications/api/v1/notifications/admin"
+    )
 
 
 @mock.patch("requests.post")
@@ -431,8 +434,10 @@ def test_plugin_nextcloud_persistent_storage(mock_get, mock_post, tmpdir):
         asset=asset,
     )
     # We failed to get our list
-    assert obj.send(
-        body="body", title="title", notify_type=NotifyType.INFO) is True
+    assert (
+        obj.send(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # User and Group looked up
     assert mock_get.call_count == 2
@@ -454,8 +459,10 @@ def test_plugin_nextcloud_persistent_storage(mock_get, mock_post, tmpdir):
         asset=asset,
     )
     # We succeeded this time
-    assert obj.send(
-        body="body", title="title", notify_type=NotifyType.INFO) is True
+    assert (
+        obj.send(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
 
     # Expect users u1 (group) only and pulled from cache
     assert mock_get.call_count == 0
@@ -530,8 +537,10 @@ def test_plugin_nextcloud_req_exception_and_empty_targets(mock_get, mock_post):
     assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is False
     assert mock_post.call_count == 0
     assert mock_get.call_count == 1
-    assert mock_get.call_args_list[0][0][0] \
+    assert (
+        mock_get.call_args_list[0][0][0]
         == "http://localhost/ocs/v1.php/cloud/groups/DevTeam"
+    )
     assert mock_get.call_args_list[0][1]["params"].get("format") == "json"
 
 
@@ -565,10 +574,13 @@ def test_plugin_nextcloud_json_empty_returns_empty(mock_get, mock_post):
     assert obj.send(body="x", title="y", notify_type=NotifyType.INFO) is True
     # Only direct userZ posts because both expansions return empty
     assert mock_get.call_count == 2
-    assert any("/cloud/users" in call[0][0]
-               for call in mock_get.call_args_list)
-    assert any("/cloud/groups/broken" in call[0][0]
-               for call in mock_get.call_args_list)
+    assert any(
+        "/cloud/users" in call[0][0] for call in mock_get.call_args_list
+    )
+    assert any(
+        "/cloud/groups/broken" in call[0][0]
+        for call in mock_get.call_args_list
+    )
 
     # userZ would get a notification
     assert mock_post.call_count == 1
@@ -630,8 +642,7 @@ def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
 
     # Extract the user segment from the URL of each call
     actual_users = {
-        call[0][0].split("/")[-1]
-        for call in mock_post.call_args_list
+        call[0][0].split("/")[-1] for call in mock_post.call_args_list
     }
 
     # Assert that the set of actual users matches the set of expected users
@@ -648,8 +659,7 @@ def test_plugin_nextcloud_caching_group_and_all(mock_get, mock_post):
 
     # We can re-verify our notifications went as expected:
     actual_users = {
-        call[0][0].split("/")[-1]
-        for call in mock_post.call_args_list
+        call[0][0].split("/")[-1] for call in mock_post.call_args_list
     }
 
     # Assert that the set of actual users matches the set of expected users

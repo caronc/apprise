@@ -2280,19 +2280,21 @@ def test_parse_list():
         ".mkv,.avi,.divx,.xvid,.mov,.wmv,.mp4,.mpg,.mpeg,.vob,.iso"
     )
 
-    assert results == sorted([
-        ".divx",
-        ".iso",
-        ".mkv",
-        ".mov",
-        ".mpg",
-        ".avi",
-        ".mpeg",
-        ".vob",
-        ".xvid",
-        ".wmv",
-        ".mp4",
-    ])
+    assert results == sorted(
+        [
+            ".divx",
+            ".iso",
+            ".mkv",
+            ".mov",
+            ".mpg",
+            ".avi",
+            ".mpeg",
+            ".vob",
+            ".xvid",
+            ".wmv",
+            ".mp4",
+        ]
+    )
 
     class StrangeObject:
         def __str__(self):
@@ -2314,19 +2316,21 @@ def test_parse_list():
         StrangeObject(),
     )
 
-    assert results == sorted([
-        ".divx",
-        ".iso",
-        ".mkv",
-        ".mov",
-        ".mpg",
-        ".avi",
-        ".mpeg",
-        ".vob",
-        ".xvid",
-        ".wmv",
-        ".mp4",
-    ])
+    assert results == sorted(
+        [
+            ".divx",
+            ".iso",
+            ".mkv",
+            ".mov",
+            ".mpg",
+            ".avi",
+            ".mpeg",
+            ".vob",
+            ".xvid",
+            ".wmv",
+            ".mp4",
+        ]
+    )
 
     # Garbage in is removed
     assert utils.parse.parse_list(object(), 42, None) == []
@@ -2350,19 +2354,21 @@ def test_parse_list():
         ".mov,.wmv,.mp4,.mpg",
     )
 
-    assert results == sorted([
-        ".divx",
-        ".wmv",
-        ".iso",
-        ".mkv",
-        ".mov",
-        ".mpg",
-        ".avi",
-        ".vob",
-        ".xvid",
-        ".mpeg",
-        ".mp4",
-    ])
+    assert results == sorted(
+        [
+            ".divx",
+            ".wmv",
+            ".iso",
+            ".mkv",
+            ".mov",
+            ".mpg",
+            ".avi",
+            ".vob",
+            ".xvid",
+            ".mpeg",
+            ".mp4",
+        ]
+    )
 
 
 def test_import_module(tmpdir):
@@ -2370,11 +2376,13 @@ def test_import_module(tmpdir):
     # Prepare ourselves a file to work with
     bad_file_base = tmpdir.mkdir("a")
     bad_file = bad_file_base.join("README.md")
-    bad_file.write(cleandoc("""
+    bad_file.write(
+        cleandoc("""
     I'm a README file, not a Python one.
 
     I can't be loaded
-    """))
+    """)
+    )
     assert utils.module.import_module(str(bad_file), "invalidfile1") is None
     assert (
         utils.module.import_module(str(bad_file_base), "invalidfile2") is None
@@ -2398,18 +2406,22 @@ def test_module_detection(tmpdir):
     # Prepare ourselves a file to work with
     notify_hook_a_base = tmpdir.mkdir("a")
     notify_hook_a = notify_hook_a_base.join("hook.py")
-    notify_hook_a.write(cleandoc("""
+    notify_hook_a.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     @notify(on="clihook")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
-    """))
+    """)
+    )
 
     notify_ignore = notify_hook_a_base.join("README.md")
-    notify_ignore.write(cleandoc("""
+    notify_ignore.write(
+        cleandoc("""
     We're not a .py file, so this file gets gracefully skipped
-    """))
+    """)
+    )
 
     # Not previously loaded
     assert "clihook" not in N_MGR
@@ -2439,14 +2451,16 @@ def test_module_detection(tmpdir):
     # Hidden files are ignored
     notify_hook_b_base = tmpdir.mkdir("b")
     notify_hook_b = notify_hook_b_base.join(".hook.py")
-    notify_hook_b.write(cleandoc("""
+    notify_hook_b.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     # this is in a hidden file so it will not load
     @notify(on="hidden")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
-    """))
+    """)
+    )
 
     assert "hidden" not in N_MGR
 
@@ -2482,7 +2496,8 @@ def test_module_detection(tmpdir):
     def create_hook(tdir, cache=True, on="valid1"):
         """Just a temporary hook creation tool for writing a working notify
         hook."""
-        tdir.write(cleandoc(f"""
+        tdir.write(
+            cleandoc(f"""
         from apprise.decorators import notify
 
         # this is a good hook but burried in hidden directory which won't
@@ -2490,7 +2505,8 @@ def test_module_detection(tmpdir):
         @notify(on="{on}")
         def mywrapper(body, title, notify_type, *args, **kwargs):
             pass
-        """))
+        """)
+        )
 
         N_MGR.module_detection([str(tdir)], cache=cache)
 
@@ -2527,9 +2543,11 @@ def test_module_detection(tmpdir):
     assert len(N_MGR._custom_module_map) == 1
 
     # If you update the module (corrupting it in the process and reload)
-    notify_hook_c.write(cleandoc("""
+    notify_hook_c.write(
+        cleandoc("""
     raise ValueError
-    """))
+    """)
+    )
 
     # Force no cache to cause the file to be replaced
     N_MGR.module_detection([str(notify_hook_c_base)], cache=False)
@@ -2581,7 +2599,8 @@ def test_module_detection(tmpdir):
     notify_hook_d.write("")
     notify_hook_e_base = notify_hook_c_base.mkdir(".ignore")
     notify_hook_e = notify_hook_e_base.join("__init__.py")
-    notify_hook_e.write(cleandoc("""
+    notify_hook_e.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     # this is a good hook but burried in hidden directory which won't
@@ -2589,7 +2608,8 @@ def test_module_detection(tmpdir):
     @notify(on="valid2")
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
-    """))
+    """)
+    )
 
     # Try to load our base directory again; this time we search by the
     # directory; the only edge case we're testing here is it will not
@@ -2661,7 +2681,8 @@ def test_module_detection(tmpdir):
     assert "valid3" not in N_MGR
     notify_hook_f_base = tmpdir.mkdir("f")
     notify_hook_f = notify_hook_f_base.join("invalid.py")
-    notify_hook_f.write(cleandoc("""
+    notify_hook_f.write(
+        cleandoc("""
     from apprise.decorators import notify
 
     # A very invalid hook type... on should not be None
@@ -2685,7 +2706,8 @@ def test_module_detection(tmpdir):
     def mywrapper(body, title, notify_type, *args, **kwargs):
         pass
 
-    """))
+    """)
+    )
 
     N_MGR.module_detection([str(notify_hook_f)])
 
@@ -3190,9 +3212,7 @@ def test_dir_size(tmpdir):
     assert size == 0
     assert len(errors) == 0
 
-    size, errors = utils.disk.dir_size(
-        "invalid-directory", missing_okay=False
-    )
+    size, errors = utils.disk.dir_size("invalid-directory", missing_okay=False)
     assert size == 0
     assert len(errors) == 1
     assert "invalid-directory" in errors
@@ -3300,8 +3320,10 @@ def test_time_zoneinfo():
         assert utils.time.zoneinfo("Cordoba") is None
         # the utils helper should still resolve this abbreviated (and
         #  lowercase) form
-        assert utils.time.zoneinfo("argentina/cordoba").key == \
-            "America/Argentina/Cordoba"
+        assert (
+            utils.time.zoneinfo("argentina/cordoba").key
+            == "America/Argentina/Cordoba"
+        )
 
     # Too ambiguous
     assert utils.time.zoneinfo("Argentina") is None

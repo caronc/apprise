@@ -232,8 +232,8 @@ class NotifyDiscord(NotifyBase):
         self.webhook_id = validate_regex(webhook_id)
         if not self.webhook_id:
             msg = (
-                f"An invalid Discord Webhook ID ({webhook_id}) was "
-                "specified.")
+                f"An invalid Discord Webhook ID ({webhook_id}) was specified."
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -286,7 +286,8 @@ class NotifyDiscord(NotifyBase):
             except (TypeError, ValueError):
                 msg = (
                     f"An invalid Discord flags setting ({flags}) was "
-                    "specified.")
+                    "specified."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg) from None
         else:
@@ -358,16 +359,18 @@ class NotifyDiscord(NotifyBase):
 
             if self.notify_format == NotifyFormat.MARKDOWN:
                 # Use embeds for payload
-                payload["embeds"] = [{
-                    "author": {
-                        "name": self.app_id,
-                        "url": self.app_url,
-                    },
-                    "title": title,
-                    "description": body,
-                    # Our color associated with our notification
-                    "color": self.color(notify_type, int),
-                }]
+                payload["embeds"] = [
+                    {
+                        "author": {
+                            "name": self.app_id,
+                            "url": self.app_url,
+                        },
+                        "title": title,
+                        "description": body,
+                        # Our color associated with our notification
+                        "color": self.color(notify_type, int),
+                    }
+                ]
 
                 if self.href:
                     payload["embeds"][0]["url"] = self.href
@@ -432,12 +435,14 @@ class NotifyDiscord(NotifyBase):
         if attach and self.attachment_support:
             # Update our payload; the idea is to preserve it's other detected
             # and assigned values for re-use here too
-            payload.update({
-                # Text-To-Speech
-                "tts": False,
-                # Wait until the upload has posted itself before continuing
-                "wait": True,
-            })
+            payload.update(
+                {
+                    # Text-To-Speech
+                    "tts": False,
+                    # Wait until the upload has posted itself before continuing
+                    "wait": True,
+                }
+            )
 
             #
             # Remove our text/title based content for attachment use
@@ -523,7 +528,6 @@ class NotifyDiscord(NotifyBase):
         # Our attachment path (if specified)
         files = None
         try:
-
             # Open our attachment path if required:
             if attach:
                 files = {
@@ -567,7 +571,6 @@ class NotifyDiscord(NotifyBase):
                 requests.codes.ok,
                 requests.codes.no_content,
             ):
-
                 # We had a problem
                 status_str = NotifyBase.http_response_code_lookup(
                     r.status_code
@@ -577,7 +580,6 @@ class NotifyDiscord(NotifyBase):
                     r.status_code == requests.codes.too_many_requests
                     and rate_limit > 0
                 ):
-
                     # handle rate limiting
                     self.logger.warning(
                         "Discord rate limiting in effect; "
@@ -605,7 +607,8 @@ class NotifyDiscord(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False
@@ -683,7 +686,8 @@ class NotifyDiscord(NotifyBase):
                 bname=botname,
                 webhook_id=self.pprint(self.webhook_id, privacy, safe=""),
                 webhook_token=self.pprint(
-                    self.webhook_token, privacy, safe=""),
+                    self.webhook_token, privacy, safe=""
+                ),
                 params=NotifyDiscord.urlencode(params),
             )
         )
@@ -868,7 +872,8 @@ class NotifyDiscord(NotifyBase):
 
     @staticmethod
     def extract_markdown_sections(
-            markdown: str) -> tuple[str, list[dict[str, str]]]:
+        markdown: str,
+    ) -> tuple[str, list[dict[str, str]]]:
         """Extract headers and their corresponding sections into embed
         fields."""
 
@@ -897,12 +902,18 @@ class NotifyDiscord(NotifyBase):
         for el in common:
             d = el.groupdict()
 
-            fields.append({
-                "name": d.get("name", "").strip("#`* \r\n\t\v"),
-                "value": "```{}\n{}```".format(
-                    "md" if d.get("value") else "",
-                    (d.get("value").strip() + "\n" if d.get("value") else ""),
-                ),
-            })
+            fields.append(
+                {
+                    "name": d.get("name", "").strip("#`* \r\n\t\v"),
+                    "value": "```{}\n{}```".format(
+                        "md" if d.get("value") else "",
+                        (
+                            d.get("value").strip() + "\n"
+                            if d.get("value")
+                            else ""
+                        ),
+                    ),
+                }
+            )
 
         return description, fields

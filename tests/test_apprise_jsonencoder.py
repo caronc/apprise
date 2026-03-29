@@ -166,8 +166,9 @@ def test_apprise_json_encoder_nested():
     assert isinstance(result["when"], str)
     assert "T" in result["when"]
     assert isinstance(result["payload"], str)
-    assert result["payload"] == \
-        base64.b64encode(b"binary data").decode("utf-8")
+    assert result["payload"] == base64.b64encode(b"binary data").decode(
+        "utf-8"
+    )
     assert isinstance(result["tags"], list)
     assert sorted(result["tags"]) == ["alpha", "beta"]
     assert result["label"] == "nested"
@@ -245,7 +246,8 @@ def test_apprise_json_method_write_failure(tmpdir):
     output = tmpdir.join("fail.json")
 
     with mock.patch(
-            "apprise.apprise.json.dump", side_effect=OSError("disk full")):
+        "apprise.apprise.json.dump", side_effect=OSError("disk full")
+    ):
         assert apobj.json(path=str(output)) is False
 
 

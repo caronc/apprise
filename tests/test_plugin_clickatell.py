@@ -198,10 +198,12 @@ def test_plugin_clickatell_edge_cases(mock_post):
 
     # a error response
     response.status_code = 400
-    response.content = dumps({
-        "code": 21211,
-        "message": "The 'To' number +1234567 is not a valid phone number.",
-    })
+    response.content = dumps(
+        {
+            "code": 21211,
+            "message": "The 'To' number +1234567 is not a valid phone number.",
+        }
+    )
     mock_post.return_value = response
 
     # Initialize our object

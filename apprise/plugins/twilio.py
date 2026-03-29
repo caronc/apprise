@@ -251,11 +251,12 @@ class NotifyTwilio(NotifyBase):
 
         # Set notification method
         if isinstance(method, str) and method:
-            self.method = next((
-                a
-                for a in TWILIO_NOTIFICATION_METHODS
-                if a.startswith(method.lower())
-            ),
+            self.method = next(
+                (
+                    a
+                    for a in TWILIO_NOTIFICATION_METHODS
+                    if a.startswith(method.lower())
+                ),
                 None,
             )
 
@@ -288,8 +289,10 @@ class NotifyTwilio(NotifyBase):
         )
 
         # Check compatibility between notification method and mode
-        if self.method == TwilioNotificationMethod.CALL and \
-                self.default_mode == TwilioMessageMode.WHATSAPP:
+        if (
+            self.method == TwilioNotificationMethod.CALL
+            and self.default_mode == TwilioMessageMode.WHATSAPP
+        ):
             msg = (
                 "The notification method Call is not valid along "
                 "message mode Whatsapp."
@@ -353,9 +356,10 @@ class NotifyTwilio(NotifyBase):
 
             # We can't use WhatsApp using short-codes as our source or
             # for phone calls
-            if ((len(self.source) in (5, 6)
-                 or self.method == TwilioNotificationMethod.CALL)
-                    and mode is TwilioMessageMode.WHATSAPP):
+            if (
+                len(self.source) in (5, 6)
+                or self.method == TwilioNotificationMethod.CALL
+            ) and mode is TwilioMessageMode.WHATSAPP:
                 self.logger.warning(
                     f"Dropped WhatsApp phone # ({entry}) because source"
                     " provided is a short-code or because notification"
@@ -478,7 +482,8 @@ class NotifyTwilio(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
@@ -504,9 +509,11 @@ class NotifyTwilio(NotifyBase):
     def body_maxlen(self):
         """The maximum allowable characters allowed in the body per message.
         It is dependent on the notification method."""
-        return self.body_sms_maxlen \
-            if self.method == TwilioNotificationMethod.SMS \
+        return (
+            self.body_sms_maxlen
+            if self.method == TwilioNotificationMethod.SMS
             else self.body_call_maxlen
+        )
 
     @property
     def url_identifier(self):
@@ -548,13 +555,19 @@ class NotifyTwilio(NotifyBase):
                 ),
                 safe="",
             ),
-            targets="/".join([
-                NotifyTwilio.quote(
-                    (x[1] if x[0] is TwilioMessageMode.TEXT else f"w:{x[1]}"),
-                    safe="",
-                )
-                for x in self.targets
-            ]),
+            targets="/".join(
+                [
+                    NotifyTwilio.quote(
+                        (
+                            x[1]
+                            if x[0] is TwilioMessageMode.TEXT
+                            else f"w:{x[1]}"
+                        ),
+                        safe="",
+                    )
+                    for x in self.targets
+                ]
+            ),
             params=NotifyTwilio.urlencode(params),
         )
 

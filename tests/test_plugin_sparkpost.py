@@ -365,23 +365,31 @@ def test_plugin_sparkpost_throttling(mock_post):
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
-    okay_response.content = dumps({
-        "results": {
-            "total_rejected_recipients": 0,
-            "total_accepted_recipients": 1,
-            "id": "11668787484950529",
+    okay_response.content = dumps(
+        {
+            "results": {
+                "total_rejected_recipients": 0,
+                "total_accepted_recipients": 1,
+                "id": "11668787484950529",
+            }
         }
-    })
+    )
 
     retry_response = requests.Request()
     retry_response.status_code = requests.codes.too_many_requests
-    retry_response.content = dumps({
-        "errors": [{
-            "description": "Unconfigured or unverified sending domain.",
-            "code": "7001",
-            "message": "Invalid domain",
-        }]
-    })
+    retry_response.content = dumps(
+        {
+            "errors": [
+                {
+                    "description": (
+                        "Unconfigured or unverified sending domain."
+                    ),
+                    "code": "7001",
+                    "message": "Invalid domain",
+                }
+            ]
+        }
+    )
 
     # Prepare Mock (force 2 retry responses and then one okay)
     mock_post.side_effect = (retry_response, retry_response, okay_response)
@@ -410,13 +418,15 @@ def test_plugin_sparkpost_attachments(mock_post):
 
     okay_response = requests.Request()
     okay_response.status_code = requests.codes.ok
-    okay_response.content = dumps({
-        "results": {
-            "total_rejected_recipients": 0,
-            "total_accepted_recipients": 1,
-            "id": "11668787484950529",
+    okay_response.content = dumps(
+        {
+            "results": {
+                "total_rejected_recipients": 0,
+                "total_accepted_recipients": 1,
+                "id": "11668787484950529",
+            }
         }
-    })
+    )
 
     # Assign our mock object our return value
     mock_post.return_value = okay_response

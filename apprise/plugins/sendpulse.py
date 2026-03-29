@@ -103,72 +103,78 @@ class NotifySendPulse(NotifyBase):
     )
 
     # Define our template arguments
-    template_tokens = dict(NotifyBase.template_tokens, **{
-        "user": {
-            "name": _("User Name"),
-            "type": "string",
-            "required": True,
+    template_tokens = dict(
+        NotifyBase.template_tokens,
+        **{
+            "user": {
+                "name": _("User Name"),
+                "type": "string",
+                "required": True,
+            },
+            "host": {
+                "name": _("Domain"),
+                "type": "string",
+                "required": True,
+            },
+            "client_id": {
+                "name": _("Client ID"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[A-Z0-9._-]+$", "i"),
+            },
+            "client_secret": {
+                "name": _("Client Secret"),
+                "type": "string",
+                "required": True,
+                "private": True,
+                "regex": (r"^[A-Z0-9._-]+$", "i"),
+            },
+            "target_email": {
+                "name": _("Target Email"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
-        "host": {
-            "name": _("Domain"),
-            "type": "string",
-            "required": True,
-        },
-        "client_id": {
-            "name": _("Client ID"),
-            "type": "string",
-            "required": True,
-            "private": True,
-            "regex": (r"^[A-Z0-9._-]+$", "i"),
-        },
-        "client_secret": {
-            "name": _("Client Secret"),
-            "type": "string",
-            "required": True,
-            "private": True,
-            "regex": (r"^[A-Z0-9._-]+$", "i"),
-        },
-        "target_email": {
-            "name": _("Target Email"),
-            "type": "string",
-            "map_to": "targets",
-        },
-        "targets": {
-            "name": _("Targets"),
-            "type": "list:string",
-        },
-    })
+    )
 
     # Define our template arguments
-    template_args = dict(NotifyBase.template_args, **{
-        "from": {
-            "name": _("From Email"),
-            "type": "string",
-            "map_to": "from_addr",
+    template_args = dict(
+        NotifyBase.template_args,
+        **{
+            "from": {
+                "name": _("From Email"),
+                "type": "string",
+                "map_to": "from_addr",
+            },
+            "template": {
+                # The template ID is an integer
+                "name": _("Template ID"),
+                "type": "int",
+            },
+            "id": {
+                "alias_of": "client_id",
+            },
+            "secret": {
+                "alias_of": "client_secret",
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "cc": {
+                "name": _("Carbon Copy"),
+                "type": "list:string",
+            },
+            "bcc": {
+                "name": _("Blind Carbon Copy"),
+                "type": "list:string",
+            },
         },
-        "template": {
-            # The template ID is an integer
-            "name": _("Template ID"),
-            "type": "int",
-        },
-        "id": {
-            "alias_of": "client_id",
-        },
-        "secret": {
-            "alias_of": "client_secret",
-        },
-        "to": {
-            "alias_of": "targets",
-        },
-        "cc": {
-            "name": _("Carbon Copy"),
-            "type": "list:string",
-        },
-        "bcc": {
-            "name": _("Blind Carbon Copy"),
-            "type": "list:string",
-        },
-    })
+    )
 
     # Support Template Dynamic Variables (Substitutions)
     template_kwargs = {
@@ -178,9 +184,18 @@ class NotifySendPulse(NotifyBase):
         },
     }
 
-    def __init__(self, client_id, client_secret, from_addr=None, targets=None,
-                 cc=None, bcc=None, template=None, template_data=None,
-                 **kwargs):
+    def __init__(
+        self,
+        client_id,
+        client_secret,
+        from_addr=None,
+        targets=None,
+        cc=None,
+        bcc=None,
+        template=None,
+        template_data=None,
+        **kwargs,
+    ):
         """
         Initialize Notify SendPulse Object
         """
@@ -195,10 +210,13 @@ class NotifySendPulse(NotifyBase):
         if self.user:
             if self.host:
                 # Prepare the bases of our email
-                from_addr_ = [from_addr_[0], "{}@{}".format(
-                    re.split(r"[\s@]+", self.user)[0],
-                    self.host,
-                )]
+                from_addr_ = [
+                    from_addr_[0],
+                    "{}@{}".format(
+                        re.split(r"[\s@]+", self.user)[0],
+                        self.host,
+                    ),
+                ]
 
             else:
                 result = is_email(self.user)
@@ -206,15 +224,17 @@ class NotifySendPulse(NotifyBase):
                     # Prepare the bases of our email and include domain
                     self.host = result["domain"]
                     from_addr_ = [
-                        result["name"] if result["name"]
-                        else from_addr_[0], self.user]
+                        result["name"] if result["name"] else from_addr_[0],
+                        self.user,
+                    ]
 
         if isinstance(from_addr, str):
             result = is_email(from_addr)
             if result:
                 from_addr_ = (
                     result["name"] if result["name"] else from_addr_[0],
-                    result["full_email"])
+                    result["full_email"],
+                )
             else:
                 # Only update the string but use the already detected info
                 from_addr_[0] = from_addr
@@ -224,7 +244,9 @@ class NotifySendPulse(NotifyBase):
             # Parse Source domain based on from_addr
             msg = "Invalid ~From~ email specified: {}".format(
                 "{} <{}>".format(from_addr_[0], from_addr_[1])
-                if from_addr_[0] else "{}".format(from_addr_[1]))
+                if from_addr_[0]
+                else "{}".format(from_addr_[1])
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -234,19 +256,24 @@ class NotifySendPulse(NotifyBase):
 
         # Client ID
         self.client_id = validate_regex(
-            client_id, *self.template_tokens["client_id"]["regex"])
+            client_id, *self.template_tokens["client_id"]["regex"]
+        )
         if not self.client_id:
-            msg = "An invalid SendPulse Client ID " \
-                  "({}) was specified.".format(client_id)
+            msg = "An invalid SendPulse Client ID ({}) was specified.".format(
+                client_id
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Client Secret
         self.client_secret = validate_regex(
-            client_secret, *self.template_tokens["client_secret"]["regex"])
+            client_secret, *self.template_tokens["client_secret"]["regex"]
+        )
         if not self.client_secret:
-            msg = "An invalid SendPulse Client Secret " \
-                  "({}) was specified.".format(client_secret)
+            msg = (
+                "An invalid SendPulse Client Secret "
+                "({}) was specified.".format(client_secret)
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -268,14 +295,17 @@ class NotifySendPulse(NotifyBase):
 
             except (TypeError, ValueError):
                 # Not a valid integer; ignore entry
-                err = "The SendPulse Template ID specified ({}) is invalid."\
-                    .format(template)
+                err = (
+                    "The SendPulse Template ID specified"
+                    f" ({template}) is invalid."
+                )
                 self.logger.warning(err)
                 raise TypeError(err) from None
 
         # Now our dynamic template data (if defined)
-        self.template_data = template_data \
-            if isinstance(template_data, dict) else {}
+        self.template_data = (
+            template_data if isinstance(template_data, dict) else {}
+        )
 
         if targets:
             # Validate recipients (to:) and drop bad ones:
@@ -288,8 +318,9 @@ class NotifySendPulse(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    "Dropped invalid To email "
-                    "({}) specified.".format(recipient),
+                    "Dropped invalid To email ({}) specified.".format(
+                        recipient
+                    ),
                 )
 
         else:
@@ -298,7 +329,6 @@ class NotifySendPulse(NotifyBase):
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
-
             result = is_email(recipient)
             if result:
                 self.cc.add(result["full_email"])
@@ -307,13 +337,13 @@ class NotifySendPulse(NotifyBase):
                 continue
 
             self.logger.warning(
-                "Dropped invalid Carbon Copy email "
-                "({}) specified.".format(recipient),
+                "Dropped invalid Carbon Copy email ({}) specified.".format(
+                    recipient
+                ),
             )
 
         # Validate recipients (bcc:) and drop bad ones:
         for recipient in parse_emails(bcc):
-
             result = is_email(recipient)
             if result:
                 self.bcc.add(result["full_email"])
@@ -351,23 +381,31 @@ class NotifySendPulse(NotifyBase):
 
         if len(self.cc) > 0:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for it's escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8").replace(",", "%2C")
-                for e in self.cc])
+            params["cc"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.cc
+                ]
+            )
 
         if len(self.bcc) > 0:
             # Handle our Blind Carbon Copy Addresses
-            params["bcc"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for it's escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8").replace(",", "%2C")
-                for e in self.bcc])
+            params["bcc"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.bcc
+                ]
+            )
 
         if self.template:
             # Handle our Template ID if if was specified
@@ -379,20 +417,25 @@ class NotifySendPulse(NotifyBase):
 
         # Append our template_data into our parameter list
         params.update(
-            {"+{}".format(k): v for k, v in self.template_data.items()})
+            {"+{}".format(k): v for k, v in self.template_data.items()}
+        )
 
         # a simple boolean check as to whether we display our target emails
         # or not
-        has_targets = \
-            not (len(self.targets) == 1 and self.targets[0] == self.from_addr)
+        has_targets = not (
+            len(self.targets) == 1 and self.targets[0] == self.from_addr
+        )
 
         return "{schema}://{source}/{cid}/{secret}/{targets}?{params}".format(
             schema=self.secure_protocol,
             source=self.from_addr,
             cid=self.pprint(self.client_id, privacy, safe=""),
             secret=self.pprint(self.client_secret, privacy, safe=""),
-            targets="" if not has_targets else "/".join(
-                [NotifySendPulse.quote(x, safe="") for x in self.targets]),
+            targets=""
+            if not has_targets
+            else "/".join(
+                [NotifySendPulse.quote(x, safe="") for x in self.targets]
+            ),
             params=NotifySendPulse.urlencode(params),
         )
 
@@ -421,32 +464,42 @@ class NotifySendPulse(NotifyBase):
 
         # If we get here, we're authenticated
         try:
-            expires = \
-                int(response.get("expires_in")) - self.token_expiry_edge
+            expires = int(response.get("expires_in")) - self.token_expiry_edge
             if expires <= self.token_expiry_edge:
                 self.logger.error(
-                    "SendPulse token expiry limit returned was invalid")
+                    "SendPulse token expiry limit returned was invalid"
+                )
                 return False
 
             elif expires > self.token_expiry:
                 self.logger.warning(
-                    "SendPulse token expiry limit fixed to: {}s"
-                    .format(self.token_expiry))
+                    "SendPulse token expiry limit fixed to: {}s".format(
+                        self.token_expiry
+                    )
+                )
                 expires = self.token_expiry - self.token_expiry_edge
 
         except (AttributeError, TypeError, ValueError):
             # expires_in was not an integer
             self.logger.warning(
                 "SendPulse token expiry limit presumed to be: {}s".format(
-                    self.token_expiry))
+                    self.token_expiry
+                )
+            )
             expires = self.token_expiry - self.token_expiry_edge
 
         self.store.set("access_token", access_token, expires=expires)
 
         return access_token
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, attach=None,
-             **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
         """
         Perform SendPulse Notification
         """
@@ -477,11 +530,16 @@ class NotifySendPulse(NotifyBase):
         # Prepare Email Message
         if self.notify_format == NotifyFormat.HTML:
             # HTML
-            payload_["email"].update({
-                "text": convert_between(
-                    NotifyFormat.HTML, NotifyFormat.TEXT, body),
-                "html": base64.b64encode(body.encode("utf-8")).decode("ascii"),
-            })
+            payload_["email"].update(
+                {
+                    "text": convert_between(
+                        NotifyFormat.HTML, NotifyFormat.TEXT, body
+                    ),
+                    "html": base64.b64encode(body.encode("utf-8")).decode(
+                        "ascii"
+                    ),
+                }
+            )
 
         else:  # Text
             payload_["email"]["text"] = body
@@ -496,36 +554,49 @@ class NotifySendPulse(NotifyBase):
                     # We could not access the attachment
                     self.logger.error(
                         "Could not access SendPulse attachment {}.".format(
-                            attachment.url(privacy=True)))
+                            attachment.url(privacy=True)
+                        )
+                    )
                     return False
 
                 try:
                     attachments[
-                        attachment.name if attachment.name
-                        else f"file{no:03}.dat"] = attachment.base64()
+                        attachment.name
+                        if attachment.name
+                        else f"file{no:03}.dat"
+                    ] = attachment.base64()
 
                 except exception.AppriseException:
                     # We could not access the attachment
                     self.logger.error(
                         "Could not access SendPulse attachment {}.".format(
-                            attachment.url(privacy=True)))
+                            attachment.url(privacy=True)
+                        )
+                    )
                     return False
 
                 self.logger.debug(
                     "Appending SendPulse attachment {}".format(
-                        attachment.url(privacy=True)))
+                        attachment.url(privacy=True)
+                    )
+                )
 
             # Append our attachments to the payload
-            payload_["email"].update({
-                "attachments_binary": attachments,
-            })
+            payload_["email"].update(
+                {
+                    "attachments_binary": attachments,
+                }
+            )
 
         if self.template:
-            payload_["email"].update({
-                "template": {
-                    "id": self.template,
-                    "variables": self.template_data,
-                }})
+            payload_["email"].update(
+                {
+                    "template": {
+                        "id": self.template,
+                        "variables": self.template_data,
+                    }
+                }
+            )
 
         targets = list(self.targets)
         while len(targets) > 0:
@@ -538,15 +609,13 @@ class NotifySendPulse(NotifyBase):
             # below code prepares this by ensuring the target isn't in the cc
             # list or bcc list. It also makes sure the cc list does not contain
             # any of the bcc entries
-            cc = (self.cc - self.bcc - {target})
-            bcc = (self.bcc - {target})
+            cc = self.cc - self.bcc - {target}
+            bcc = self.bcc - {target}
 
             #
             # prepare our 'to'
             #
-            to = {
-                "email": target
-            }
+            to = {"email": target}
             if target in self.names:
                 to["name"] = self.names[target]
 
@@ -577,7 +646,8 @@ class NotifySendPulse(NotifyBase):
 
             # Perform our post
             success, _response = self._fetch(
-                self.notify_email_url, payload, target, retry=1)
+                self.notify_email_url, payload, target, retry=1
+            )
             if not success:
                 has_error = True
                 continue
@@ -608,9 +678,11 @@ class NotifySendPulse(NotifyBase):
             # if required.
             self.logger.debug(
                 f"SendPulse POST URL: {url}"
-                f"(cert_verify={self.verify_certificate!r})")
+                f"(cert_verify={self.verify_certificate!r})"
+            )
             self.logger.debug(
-                "SendPulse Payload: %s", sanitize_payload(payload))
+                "SendPulse Payload: %s", sanitize_payload(payload)
+            )
 
         # Prepare our default response
         response = {}
@@ -636,23 +708,26 @@ class NotifySendPulse(NotifyBase):
                 #  - AttributeError = r is None
                 self.logger.warning("Invalid response from SendPulse server.")
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
                 return (False, {})
 
             # Reference status code
             status_code = r.status_code
 
             # Key likely expired, we'll reset it and try one more time
-            if status_code == requests.codes.unauthorized \
-                    and retry and self.login():
+            if (
+                status_code == requests.codes.unauthorized
+                and retry
+                and self.login()
+            ):
                 return self._fetch(url, payload, target, retry=retry - 1)
 
-            if status_code not in (
-                    requests.codes.ok, requests.codes.accepted):
+            if status_code not in (requests.codes.ok, requests.codes.accepted):
                 # We had a problem
-                status_str = \
-                    NotifySendPulse.http_response_code_lookup(
-                        status_code)
+                status_str = NotifySendPulse.http_response_code_lookup(
+                    status_code
+                )
 
                 if target:
                     self.logger.warning(
@@ -661,22 +736,26 @@ class NotifySendPulse(NotifyBase):
                             target,
                             status_str,
                             ", " if status_str else "",
-                            status_code))
+                            status_code,
+                        )
+                    )
                 else:
                     self.logger.warning(
                         "SendPulse Authentication Request failed: "
                         "{}{}error={}.".format(
-                            status_str,
-                            ", " if status_str else "",
-                            status_code))
+                            status_str, ", " if status_str else "", status_code
+                        )
+                    )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
             else:
                 if target:
                     self.logger.info(
-                        "Sent SendPulse notification to {}.".format(target))
+                        "Sent SendPulse notification to {}.".format(target)
+                    )
                 else:
                     self.logger.debug("SendPulse authentication successful")
 
@@ -685,7 +764,8 @@ class NotifySendPulse(NotifyBase):
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending SendPulse "
-                "notification to {}.".format(target))
+                "notification to {}.".format(target)
+            )
             self.logger.debug("Socket Exception: {}".format(str(e)))
 
         return (False, response)
@@ -722,18 +802,21 @@ class NotifySendPulse(NotifyBase):
         #                 |       |
         #                -from addr-
         if "from" in results["qsd"]:
-            results["from_addr"] = \
-                NotifySendPulse.unquote(results["qsd"]["from"].rstrip())
+            results["from_addr"] = NotifySendPulse.unquote(
+                results["qsd"]["from"].rstrip()
+            )
 
             if is_email(results["from_addr"]):
                 # Our hostname is free'd up to be interpreted as part of the
                 # targets
                 results["targets"].append(
-                    NotifySendPulse.unquote(results["host"]))
+                    NotifySendPulse.unquote(results["host"])
+                )
                 results["host"] = ""
 
-        if "user" in results["qsd"] and \
-                is_email(NotifySendPulse.unquote(results["user"])):
+        if "user" in results["qsd"] and is_email(
+            NotifySendPulse.unquote(results["user"])
+        ):
             # Our hostname is free'd up to be interpreted as part of the
             # targets
             results["targets"].append(NotifySendPulse.unquote(results["host"]))
@@ -745,8 +828,9 @@ class NotifySendPulse(NotifyBase):
         # check for our client id
         if "id" in results["qsd"] and len(results["qsd"]["id"]):
             # Store our Client ID
-            results["client_id"] = \
-                NotifySendPulse.unquote(results["qsd"]["id"])
+            results["client_id"] = NotifySendPulse.unquote(
+                results["qsd"]["id"]
+            )
 
         elif results["targets"]:
             # Store our Client ID
@@ -754,8 +838,9 @@ class NotifySendPulse(NotifyBase):
 
         if "secret" in results["qsd"] and len(results["qsd"]["secret"]):
             # Store our Client Secret
-            results["client_secret"] = \
-                NotifySendPulse.unquote(results["qsd"]["secret"])
+            results["client_secret"] = NotifySendPulse.unquote(
+                results["qsd"]["secret"]
+            )
 
         elif results["targets"]:
             # Store our Client Secret
@@ -764,22 +849,22 @@ class NotifySendPulse(NotifyBase):
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"].append(
-                NotifySendPulse.unquote(results["qsd"]["to"]))
+                NotifySendPulse.unquote(results["qsd"]["to"])
+            )
 
         # Handle Carbon Copy Addresses
         if "cc" in results["qsd"] and len(results["qsd"]["cc"]):
-            results["cc"] = \
-                NotifySendPulse.unquote(results["qsd"]["cc"])
+            results["cc"] = NotifySendPulse.unquote(results["qsd"]["cc"])
 
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
-            results["bcc"] = \
-                NotifySendPulse.unquote(results["qsd"]["bcc"])
+            results["bcc"] = NotifySendPulse.unquote(results["qsd"]["bcc"])
 
         # Handle Blind Carbon Copy Addresses
         if "template" in results["qsd"] and len(results["qsd"]["template"]):
-            results["template"] = \
-                NotifySendPulse.unquote(results["qsd"]["template"])
+            results["template"] = NotifySendPulse.unquote(
+                results["qsd"]["template"]
+            )
 
         # Add any template substitutions
         results["template_data"] = results["qsd+"]

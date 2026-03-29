@@ -81,8 +81,7 @@ apprise_url_tests = (
         },
     ),
     (
-        ("brevo://abcd:user@example.com/newuser@example.com"
-         "?reply=%20!"),
+        ("brevo://abcd:user@example.com/newuser@example.com?reply=%20!"),
         {
             # An invalid Reply-To address
             "instance": TypeError,
@@ -97,8 +96,10 @@ apprise_url_tests = (
         },
     ),
     (
-        ("brevo://abcd:user@example.com/newuser@example.com"
-         "?reply=user@example.ca"),
+        (
+            "brevo://abcd:user@example.com/newuser@example.com"
+            "?reply=user@example.ca"
+        ),
         {
             # A good email
             "instance": NotifyBrevo,

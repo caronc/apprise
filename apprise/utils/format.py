@@ -147,7 +147,7 @@ def smart_split(
     start = 0
     length = len(text)
 
-    while start < length:   # pragma: no branch
+    while start < length:  # pragma: no branch
         remaining = length - start
         if remaining <= limit:
             result.append(text[start:])

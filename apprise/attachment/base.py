@@ -173,15 +173,16 @@ class AttachBase(URLBase):
 
         # Validate mimetype if specified
         if self._mimetype and (
-                next(
-                    (
-                        t
-                        for t in mimetypes.types_map.values()
-                        if self._mimetype == t
-                    ),
-                    None,
-                )
-                is None):
+            next(
+                (
+                    t
+                    for t in mimetypes.types_map.values()
+                    if self._mimetype == t
+                ),
+                None,
+            )
+            is None
+        ):
             err = f"An invalid mime-type ({mimetype}) was specified."
             self.logger.warning(err)
             raise TypeError(err)
@@ -275,7 +276,6 @@ class AttachBase(URLBase):
                 and os.path.isfile(self.download_path)
                 and cache
             ):
-
                 # We have enough reason to look further into our cached content
                 # and verify it has not expired.
                 if cache is True:
@@ -316,7 +316,7 @@ class AttachBase(URLBase):
                     else base64.b64encode(f.read())
                 )
 
-        except (FileNotFoundError):
+        except FileNotFoundError:
             # We no longer have a path to open
             raise exception.AppriseFileNotFound("Attachment Missing") from None
 
@@ -328,7 +328,8 @@ class AttachBase(URLBase):
             )
             self.logger.debug(f"I/O Exception: {e!s}")
             raise exception.AppriseDiskIOError(
-                "Attachment Access Error") from e
+                "Attachment Access Error"
+            ) from e
 
     def invalidate(self):
         """Release any temporary data that may be open by child classes.

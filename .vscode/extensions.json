@@ -1,0 +1,8 @@
+{
+  "recommendations": [
+    // Ruff – linter and formatter for Python (replaces flake8, black, isort)
+    "charliermarsh.ruff",
+    // Python language support
+    "ms-python.python"
+  ]
+}

@@ -53,17 +53,62 @@ BREVO_HTTP_ERROR_MAP = {
 # Source: Brevo API Documentation & Transactional Attachment Guidelines
 BREVO_VALID_EXTENSIONS = (
     # Documents & Text
-    "xlsx", "xls", "ods", "docx", "docm", "doc", "csv", "pdf", "txt",
-    "rtf", "msg", "pub", "mobi", "ppt", "pptx", "eps", "odt", "ics",
-    "xml", "css", "html", "htm", "shtml",
+    "xlsx",
+    "xls",
+    "ods",
+    "docx",
+    "docm",
+    "doc",
+    "csv",
+    "pdf",
+    "txt",
+    "rtf",
+    "msg",
+    "pub",
+    "mobi",
+    "ppt",
+    "pptx",
+    "eps",
+    "odt",
+    "ics",
+    "xml",
+    "css",
+    "html",
+    "htm",
+    "shtml",
     # Images
-    "gif", "jpg", "jpeg", "png", "tif", "tiff", "bmp", "cgm",
+    "gif",
+    "jpg",
+    "jpeg",
+    "png",
+    "tif",
+    "tiff",
+    "bmp",
+    "cgm",
     # Archives
-    "zip", "tar", "ez", "pkpass",
+    "zip",
+    "tar",
+    "ez",
+    "pkpass",
     # Audio
-    "mp3", "m4a", "m4v", "wma", "ogg", "flac", "wav", "aif", "aifc", "aiff",
+    "mp3",
+    "m4a",
+    "m4v",
+    "wma",
+    "ogg",
+    "flac",
+    "wav",
+    "aif",
+    "aifc",
+    "aiff",
     # Video
-    "mp4", "mov", "avi", "mkv", "mpeg", "mpg", "wmv"
+    "mp4",
+    "mov",
+    "avi",
+    "mkv",
+    "mpeg",
+    "mpg",
+    "wmv",
 )
 
 
@@ -192,14 +237,15 @@ class NotifyBrevo(NotifyBase):
             result = is_email(reply_to)
             if not result:
                 msg = "An invalid Brevo Reply To ({}) was specified.".format(
-                    f"{reply_to}")
+                    f"{reply_to}"
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
             self.reply_to = (
-                    result["name"] if result["name"] else False,
-                    result["full_email"],
-                )
+                result["name"] if result["name"] else False,
+                result["full_email"],
+            )
 
         # Acquire Targets (To Emails)
         self.targets = []
@@ -213,7 +259,6 @@ class NotifyBrevo(NotifyBase):
         # Validate recipients (to:) and drop bad ones:
         if targets:
             for recipient in parse_list(targets):
-
                 result = is_email(recipient)
                 if result:
                     self.targets.append(result["full_email"])
@@ -228,7 +273,6 @@ class NotifyBrevo(NotifyBase):
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_list(cc):
-
             result = is_email(recipient)
             if result:
                 self.cc.add(result["full_email"])
@@ -240,7 +284,6 @@ class NotifyBrevo(NotifyBase):
 
         # Validate recipients (bcc:) and drop bad ones:
         for recipient in parse_list(bcc):
-
             result = is_email(recipient)
             if result:
                 self.bcc.add(result["full_email"])
@@ -322,7 +365,8 @@ class NotifyBrevo(NotifyBase):
         if not self.targets:
             # There is no one to email; we're done
             self.logger.warning(
-                "There are no Brevo email recipients to notify")
+                "There are no Brevo email recipients to notify"
+            )
             return False
 
         headers = {
@@ -384,21 +428,29 @@ class NotifyBrevo(NotifyBase):
 
                 # Use the attachment name if available, otherwise default to a
                 # generic name
-                raw_name = attachment.name \
-                    if attachment.name else f"file{no:03}.txt"
+                raw_name = (
+                    attachment.name if attachment.name else f"file{no:03}.txt"
+                )
 
                 # If the filename does NOT match a supported extension, append
                 # .txt
                 _, ext = splitext(raw_name)
-                safe_name = f"{raw_name}.txt" if (
-                    not ext or ext[1:].lower()
-                    not in BREVO_VALID_EXTENSIONS) else raw_name
+                safe_name = (
+                    f"{raw_name}.txt"
+                    if (
+                        not ext
+                        or ext[1:].lower() not in BREVO_VALID_EXTENSIONS
+                    )
+                    else raw_name
+                )
 
                 try:
-                    attachments.append({
-                        "content": attachment.base64(),
-                        "name": safe_name,
-                    })
+                    attachments.append(
+                        {
+                            "content": attachment.base64(),
+                            "name": safe_name,
+                        }
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -414,9 +466,11 @@ class NotifyBrevo(NotifyBase):
                 )
 
             # Append our attachments to the payload
-            payload_.update({
-                "attachment": attachments,
-            })
+            payload_.update(
+                {
+                    "attachment": attachments,
+                }
+            )
 
         if self.reply_to:
             payload_["replyTo"] = {"email": self.reply_to[1]}
@@ -456,7 +510,8 @@ class NotifyBrevo(NotifyBase):
                     f"(cert_verify={self.verify_certificate!r})"
                 )
                 self.logger.debug(
-                    "Brevo Payload: %s", sanitize_payload(payload))
+                    "Brevo Payload: %s", sanitize_payload(payload)
+                )
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -489,16 +544,15 @@ class NotifyBrevo(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        f"Sent Brevo notification to {target}."
-                    )
+                    self.logger.info(f"Sent Brevo notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -554,9 +608,7 @@ class NotifyBrevo(NotifyBase):
 
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
-            results["targets"] += NotifyBrevo.parse_list(
-                results["qsd"]["to"]
-            )
+            results["targets"] += NotifyBrevo.parse_list(results["qsd"]["to"])
 
         # Handle Carbon Copy Addresses
         if "cc" in results["qsd"] and len(results["qsd"]["cc"]):

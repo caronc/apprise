@@ -48,18 +48,22 @@ def mqtt_client_mock(mocker):
         raise pytest.skip("Requires that `paho-mqtt` is installed")
 
     # Establish mock of the `publish()` response object.
-    publish_result = Mock(**{
-        "rc": 0,
-        "is_published.return_value": True,
-    })
+    publish_result = Mock(
+        **{
+            "rc": 0,
+            "is_published.return_value": True,
+        }
+    )
 
     # Establish mock of the `Client()` object.
-    mock_client = Mock(**{
-        "connect.return_value": 0,
-        "reconnect.return_value": 0,
-        "is_connected.return_value": True,
-        "publish.return_value": publish_result,
-    })
+    mock_client = Mock(
+        **{
+            "connect.return_value": 0,
+            "reconnect.return_value": 0,
+            "is_connected.return_value": True,
+            "publish.return_value": publish_result,
+        }
+    )
     mocker.patch("paho.mqtt.client.Client", return_value=mock_client)
 
     return mock_client

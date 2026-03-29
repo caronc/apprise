@@ -155,10 +155,12 @@ def cwe312_url(url):
     # Apply our full path scan in all cases
     results["fullpath"] = (
         "/"
-        + "/".join([
-            cwe312_word(x)
-            for x in re.split(r"[\\/]+", results["fullpath"].lstrip("/"))
-        ])
+        + "/".join(
+            [
+                cwe312_word(x)
+                for x in re.split(r"[\\/]+", results["fullpath"].lstrip("/"))
+            ]
+        )
         if results["fullpath"]
         else ""
     )
@@ -182,28 +184,30 @@ def cwe312_url(url):
     params = ""
     if results["qsd"]:
         params = "?{}".format(
-            "&".join([
-                "{}={}".format(
-                    k,
-                    cwe312_word(
-                        v,
-                        force=(
-                            k
-                            in (
-                                "password",
-                                "secret",
-                                "pass",
-                                "token",
-                                "key",
-                                "id",
-                                "apikey",
-                                "to",
-                            )
+            "&".join(
+                [
+                    "{}={}".format(
+                        k,
+                        cwe312_word(
+                            v,
+                            force=(
+                                k
+                                in (
+                                    "password",
+                                    "secret",
+                                    "pass",
+                                    "token",
+                                    "key",
+                                    "id",
+                                    "apikey",
+                                    "to",
+                                )
+                            ),
                         ),
-                    ),
-                )
-                for k, v in results["qsd"].items()
-            ])
+                    )
+                    for k, v in results["qsd"].items()
+                ]
+            )
         )
 
     return "{schema}://{auth}{hostname}{port}{fullpath}{params}".format(

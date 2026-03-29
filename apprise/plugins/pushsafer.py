@@ -611,14 +611,16 @@ class NotifyPushSafer(NotifyBase):
                 try:
                     # Output must be in a DataURL format (that's what
                     # PushSafer calls it):
-                    attachments.append((
+                    attachments.append(
                         (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
-                        f"data:{attachment.mimetype};base64,{attachment.base64()}",
-                    ))
+                            (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            f"data:{attachment.mimetype};base64,{attachment.base64()}",
+                        )
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -678,7 +680,6 @@ class NotifyPushSafer(NotifyBase):
                     for c, attachment in enumerate(
                         attachments[idx : idx + len(PICTURE_PARAMETER)]
                     ):
-
                         # Get our attachment information
                         filename, dataurl = attachment
                         payload_.update({PICTURE_PARAMETER[c]: dataurl})
@@ -730,7 +731,8 @@ class NotifyPushSafer(NotifyBase):
                 f" {notify_url} (cert_verify={self.verify_certificate!r})"
             )
             self.logger.debug(
-                "PushSafer Payload: %s", sanitize_payload(payload))
+                "PushSafer Payload: %s", sanitize_payload(payload)
+            )
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -786,7 +788,8 @@ class NotifyPushSafer(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return False, response
 

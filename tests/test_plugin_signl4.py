@@ -39,9 +39,11 @@ from apprise.plugins.signl4 import (
 
 logging.disable(logging.CRITICAL)
 
-SIGNL4_GOOD_RESPONSE = dumps({
-    "eventId": "2516485120936941747_76d5cf30-27d2-4529-84ed-f31a8f2c72b1",
-})
+SIGNL4_GOOD_RESPONSE = dumps(
+    {
+        "eventId": "2516485120936941747_76d5cf30-27d2-4529-84ed-f31a8f2c72b1",
+    }
+)
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -136,7 +138,7 @@ apprise_url_tests = (
             "requests_response_text": SIGNL4_GOOD_RESPONSE,
         },
     ),
-        (
+    (
         "signl4://secret/?external_id=ar1234&status=new",
         {
             # European Region

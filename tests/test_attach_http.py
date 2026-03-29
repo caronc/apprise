@@ -299,8 +299,7 @@ def test_attach_http(mock_get, mock_request):
     # Because we could determine our mime type, we could build an extension
     # for our unknown filename
     assert (
-        attachment.name
-        == f"{AttachHTTP.unknown_filename}"
+        attachment.name == f"{AttachHTTP.unknown_filename}"
         f"{mimetypes.guess_extension(attachment.mimetype)}"
     )
     assert attachment

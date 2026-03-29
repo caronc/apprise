@@ -1440,11 +1440,14 @@ def test_config_base_yaml_trace_logging(tmpdir):
 """)
 
     # Patch logger methods to force and observe TRACE logging behaviour
-    with mock.patch.object(
-        ConfigBase.logger,
-        "isEnabledFor",
-        side_effect=lambda level: level == logging.TRACE,
-    ), mock.patch.object(ConfigBase.logger, "trace") as m_trace:
+    with (
+        mock.patch.object(
+            ConfigBase.logger,
+            "isEnabledFor",
+            side_effect=lambda level: level == logging.TRACE,
+        ),
+        mock.patch.object(ConfigBase.logger, "trace") as m_trace,
+    ):
         ac = AppriseConfig(paths=str(t))
         assert len(ac) == 1
         assert len(ac.servers()) == 1
@@ -1503,7 +1506,8 @@ def test_config_base_parse_url_invalid_format_removed():
     ConfigBase.parse_url(): cover invalid format handling (format removed)
     """
     r = ConfigBase.parse_url(
-        "file:///tmp/apprise.yml?format=definitely-not-a-format")
+        "file:///tmp/apprise.yml?format=definitely-not-a-format"
+    )
     assert isinstance(r, dict)
 
     # Invalid format should be dropped from results

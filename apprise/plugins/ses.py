@@ -326,10 +326,12 @@ class NotifySES(NotifyBase):
             for recipient in parse_emails(targets):
                 result = is_email(recipient)
                 if result:
-                    self.targets.append((
-                        result["name"] if result["name"] else False,
-                        result["full_email"],
-                    ))
+                    self.targets.append(
+                        (
+                            result["name"] if result["name"] else False,
+                            result["full_email"],
+                        )
+                    )
                     continue
 
                 self.logger.warning(
@@ -604,7 +606,8 @@ class NotifySES(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 return (False, NotifySES.aws_response_to_dict(r.text))
 
@@ -656,51 +659,60 @@ class NotifySES(NotifyBase):
         )
 
         # Similar to headers; but a subset.  keys must be lowercase
-        signed_headers = OrderedDict([
-            ("content-type", headers["Content-Type"]),
-            ("host", f"email.{self.aws_region_name}.amazonaws.com"),
-            ("x-amz-date", headers["X-Amz-Date"]),
-        ])
+        signed_headers = OrderedDict(
+            [
+                ("content-type", headers["Content-Type"]),
+                ("host", f"email.{self.aws_region_name}.amazonaws.com"),
+                ("x-amz-date", headers["X-Amz-Date"]),
+            ]
+        )
 
         #
         # Build Canonical Request Object
         #
-        canonical_request = "\n".join([
-            # Method
-            "POST",
-            # URL
-            self.aws_canonical_uri,
-            # Query String (none set for POST)
-            "",
-            # Header Content (must include \n at end!)
-            # All entries except characters in amazon date must be
-            # lowercase
-            "\n".join([f"{k}:{v}" for k, v in signed_headers.items()]) + "\n",
-            # Header Entries (in same order identified above)
-            ";".join(signed_headers.keys()),
-            # Payload
-            sha256(payload.encode("utf-8")).hexdigest(),
-        ])
+        canonical_request = "\n".join(
+            [
+                # Method
+                "POST",
+                # URL
+                self.aws_canonical_uri,
+                # Query String (none set for POST)
+                "",
+                # Header Content (must include \n at end!)
+                # All entries except characters in amazon date must be
+                # lowercase
+                "\n".join([f"{k}:{v}" for k, v in signed_headers.items()])
+                + "\n",
+                # Header Entries (in same order identified above)
+                ";".join(signed_headers.keys()),
+                # Payload
+                sha256(payload.encode("utf-8")).hexdigest(),
+            ]
+        )
 
         # Prepare Unsigned Signature
-        to_sign = "\n".join([
-            self.aws_auth_algorithm,
-            amzdate,
-            scope,
-            sha256(canonical_request.encode("utf-8")).hexdigest(),
-        ])
+        to_sign = "\n".join(
+            [
+                self.aws_auth_algorithm,
+                amzdate,
+                scope,
+                sha256(canonical_request.encode("utf-8")).hexdigest(),
+            ]
+        )
 
         # Our Authorization header
-        headers["Authorization"] = ", ".join([
-            (
-                f"{self.aws_auth_algorithm} "
-                f"Credential={self.aws_access_key_id}/{scope}"
-            ),
-            "SignedHeaders={signed_headers}".format(
-                signed_headers=";".join(signed_headers.keys()),
-            ),
-            f"Signature={self.aws_auth_signature(to_sign, reference)}",
-        ])
+        headers["Authorization"] = ", ".join(
+            [
+                (
+                    f"{self.aws_auth_algorithm} "
+                    f"Credential={self.aws_access_key_id}/{scope}"
+                ),
+                "SignedHeaders={signed_headers}".format(
+                    signed_headers=";".join(signed_headers.keys()),
+                ),
+                f"Signature={self.aws_auth_signature(to_sign, reference)}",
+            ]
+        )
 
         return headers
 
@@ -833,13 +845,15 @@ class NotifySES(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                "{}{}".format(
-                    "" if not e not in self.names else f"{self.names[e]}:",
-                    e,
-                )
-                for e in self.cc
-            ])
+            params["cc"] = ",".join(
+                [
+                    "{}{}".format(
+                        "" if not e not in self.names else f"{self.names[e]}:",
+                        e,
+                    )
+                    for e in self.cc
+                ]
+            )
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
@@ -875,15 +889,17 @@ class NotifySES(NotifyBase):
                 targets=(
                     ""
                     if not has_targets
-                    else "/".join([
-                        NotifySES.quote(
-                            "{}{}".format(
-                                "" if not e[0] else f"{e[0]}:", e[1]
-                            ),
-                            safe="",
-                        )
-                        for e in self.targets
-                    ])
+                    else "/".join(
+                        [
+                            NotifySES.quote(
+                                "{}{}".format(
+                                    "" if not e[0] else f"{e[0]}:", e[1]
+                                ),
+                                safe="",
+                            )
+                            for e in self.targets
+                        ]
+                    )
                 ),
                 params=NotifySES.urlencode(params),
             )
@@ -925,7 +941,6 @@ class NotifySES(NotifyBase):
         # Section 1: Get Region and Access Secret
         index = 0
         for index, entry in enumerate(entries, start=1):
-
             # Are we at the region yet?
             result = IS_REGION.match(entry)
             if result:

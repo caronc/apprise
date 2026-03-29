@@ -49,7 +49,15 @@ class XMLPayloadField:
 
 # Defines the method to send the notification
 METHODS = (
-    "POST", "GET", "DELETE", "PUT", "HEAD", "PATCH", "UPDATE", "OPTIONS")
+    "POST",
+    "GET",
+    "DELETE",
+    "PUT",
+    "HEAD",
+    "PATCH",
+    "UPDATE",
+    "OPTIONS",
+)
 
 
 class NotifyXML(NotifyBase):
@@ -284,17 +292,18 @@ class NotifyXML(NotifyBase):
                 NotifyXML.escape_html(notify_type.value, whitespace=False),
             ),
         ):
-
             if not self.payload_map[key]:
                 # Do not store element in payload response
                 continue
             payload_base[self.payload_map[key]] = value
 
         # Apply our payload extras
-        payload_base.update({
-            k: NotifyXML.escape_html(v, whitespace=False)
-            for k, v in self.payload_extras.items()
-        })
+        payload_base.update(
+            {
+                k: NotifyXML.escape_html(v, whitespace=False)
+                for k, v in self.payload_extras.items()
+            }
+        )
 
         # Base Entres
         xml_base = "".join(
@@ -389,8 +398,7 @@ class NotifyXML(NotifyBase):
                 f"XML POST URL: {url} "
                 f"(cert_verify={self.verify_certificate!r})"
             )
-            self.logger.debug(
-                "XML Payload: %s", sanitize_payload(payload))
+            self.logger.debug("XML Payload: %s", sanitize_payload(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -418,7 +426,8 @@ class NotifyXML(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

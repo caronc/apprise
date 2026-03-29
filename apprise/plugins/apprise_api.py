@@ -294,23 +294,27 @@ class NotifyAppriseAPI(NotifyBase):
                     if self.method == AppriseAPIMethod.JSON:
                         # Output must be in a DataURL format (that's what
                         # PushSafer calls it):
-                        attachments.append({
-                            "filename": filename,
-                            "base64": attachment.base64(),
-                            "mimetype": attachment.mimetype,
-                        })
+                        attachments.append(
+                            {
+                                "filename": filename,
+                                "base64": attachment.base64(),
+                                "mimetype": attachment.mimetype,
+                            }
+                        )
 
                     else:  # AppriseAPIMethod.FORM
-                        files.append((
-                            f"file{no:02d}",
+                        files.append(
                             (
-                                filename,
-                                # file handle is safely closed in `finally`;
-                                # inline open is intentional
-                                open(attachment.path, "rb"),  # noqa: SIM115
-                                attachment.mimetype,
-                            ),
-                        ))
+                                f"file{no:02d}",
+                                (
+                                    filename,
+                                    # file handle safely closed in
+                                    # `finally`; inline open intentional
+                                    open(attachment.path, "rb"),  # noqa: SIM115
+                                    attachment.mimetype,
+                                ),
+                            )
+                        )
 
                 except (TypeError, OSError, exception.AppriseException):
                     # We could not access the attachment
@@ -361,14 +365,16 @@ class NotifyAppriseAPI(NotifyBase):
         url += f"/notify/{self.token}"
 
         # Some entries can not be over-ridden
-        headers.update({
-            # Our response to be in JSON format always
-            "Accept": "application/json",
-            # Pass our Source UUID4 Identifier
-            "X-Apprise-ID": self.asset._uid,
-            # Pass our current recursion count to our upstream server
-            "X-Apprise-Recursion-Count": str(self.asset._recursion + 1),
-        })
+        headers.update(
+            {
+                # Our response to be in JSON format always
+                "Accept": "application/json",
+                # Pass our Source UUID4 Identifier
+                "X-Apprise-ID": self.asset._uid,
+                # Pass our current recursion count to our upstream server
+                "X-Apprise-Recursion-Count": str(self.asset._recursion + 1),
+            }
+        )
 
         # Some Debug Logging
         if self.logger.isEnabledFor(logging.DEBUG):
@@ -380,7 +386,8 @@ class NotifyAppriseAPI(NotifyBase):
                 f" {url} (cert_verify={self.verify_certificate!r})"
             )
             self.logger.debug(
-                "Apprise API Payload: %s", sanitize_payload(payload))
+                "Apprise API Payload: %s", sanitize_payload(payload)
+            )
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -409,7 +416,8 @@ class NotifyAppriseAPI(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

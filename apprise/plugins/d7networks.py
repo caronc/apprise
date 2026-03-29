@@ -220,15 +220,17 @@ class NotifyD7Networks(NotifyBase):
             "message_globals": {
                 "channel": "sms",
             },
-            "messages": [{
-                # Populated later on
-                "recipients": None,
-                "content": body,
-                "data_coding":
-                # auto is a better substitute over 'text' as text is easier to
-                # detect from a post than `unicode` is.
-                "auto" if not self.unicode else "unicode",
-            }],
+            "messages": [
+                {
+                    # Populated later on
+                    "recipients": None,
+                    "content": body,
+                    "data_coding":
+                    # auto is a better substitute over 'text' as text
+                    # is easier to detect from a post than `unicode`.
+                    "auto" if not self.unicode else "unicode",
+                }
+            ],
         }
 
         # use the list directly
@@ -239,7 +241,6 @@ class NotifyD7Networks(NotifyBase):
 
         target = None
         while len(targets):
-
             if self.batch:
                 # Prepare our payload
                 payload["messages"][0]["recipients"] = self.targets
@@ -308,14 +309,14 @@ class NotifyD7Networks(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-
                     if self.batch:
                         self.logger.info(
                             "Sent D7 Networks batch SMS notification to "
@@ -331,9 +332,10 @@ class NotifyD7Networks(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred sending D7 Networks:{} "
-                    .format(", ".join(self.targets))
-                    + "notification."
+                    "A Connection error occurred sending"
+                    " D7 Networks:{} notification.".format(
+                        ", ".join(self.targets)
+                    )
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
                 # Mark our failure

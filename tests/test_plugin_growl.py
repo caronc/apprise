@@ -283,7 +283,6 @@ def test_plugin_growl_general(mock_gntp):
 
     # iterate over our dictionary and test it out
     for url, meta in urls:
-
         # Our expected instance
         instance = meta.get("instance", None)
 

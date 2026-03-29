@@ -74,9 +74,7 @@ def test_persistent_storage_bad_mode(tmpdir):
     """Persistent Storage Bad Mode Testing."""
     # Create ourselves an attachment object set in Memory Mode only
     with pytest.raises(AttributeError):
-        PersistentStore(
-            namespace="abc", path=str(tmpdir), mode="invalid"
-        )
+        PersistentStore(namespace="abc", path=str(tmpdir), mode="invalid")
 
     with pytest.raises(AttributeError):
         AppriseAsset(storage_mode="invalid")
@@ -1270,11 +1268,13 @@ def test_persistent_storage_cache_object(tmpdir):
 
     # object type is not supported
     assert (
-        CacheObject.instantiate({
-            "v": 123,
-            "x": (datetime.now() - EPOCH).total_seconds(),
-            "c": object,
-        })
+        CacheObject.instantiate(
+            {
+                "v": 123,
+                "x": (datetime.now() - EPOCH).total_seconds(),
+                "c": object,
+            }
+        )
         is None
     )
 

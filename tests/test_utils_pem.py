@@ -408,14 +408,13 @@ def test_utils_pem_general(tmpdir):
         mock.patch.object(
             pem_c,
             "keygen",
-            side_effect=lambda *_, **__: setattr(
-                pem_c, "_ApprisePEMController__public_key", pubkey_ref
-            )
-            or True,
+            side_effect=lambda *_, **__: (
+                setattr(pem_c, "_ApprisePEMController__public_key", pubkey_ref)
+                or True
+            ),
         ) as mock_keygen,
         mock.patch.object(pem_c, "load_public_key", return_value=True),
     ):
-
         result = pem_c.public_key()
         assert result is pubkey_ref
         assert mock_keyfile.call_count == 2
@@ -434,7 +433,6 @@ def test_utils_pem_general(tmpdir):
             pem_c, "load_public_key", return_value=False
         ) as mock_load,
     ):
-
         # Ensure no key is preset initially
         pem_c._ApprisePEMController__public_key = None
 
@@ -455,14 +453,15 @@ def test_utils_pem_general(tmpdir):
         mock.patch.object(
             pem_c,
             "keygen",
-            side_effect=lambda *_, **__: setattr(
-                pem_c, "_ApprisePEMController__private_key", prvkey_ref
-            )
-            or True,
+            side_effect=lambda *_, **__: (
+                setattr(
+                    pem_c, "_ApprisePEMController__private_key", prvkey_ref
+                )
+                or True
+            ),
         ) as mock_keygen,
         mock.patch.object(pem_c, "load_private_key", return_value=True),
     ):
-
         result = pem_c.private_key()
         assert result is prvkey_ref
         assert mock_keyfile.call_count == 2
@@ -481,7 +480,6 @@ def test_utils_pem_general(tmpdir):
             pem_c, "load_private_key", return_value=False
         ) as mock_load,
     ):
-
         # Ensure no key is preset initially
         pem_c._ApprisePEMController__private_key = None
 

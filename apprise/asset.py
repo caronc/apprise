@@ -223,7 +223,7 @@ class AppriseAsset:
         storage_salt: Optional[Union[str, bytes]] = None,
         storage_idlen: Optional[int] = None,
         timezone: Optional[Union[str, tzinfo]] = None,
-        **kwargs: Any
+        **kwargs: Any,
     ) -> None:
         """Asset Initialization."""
         # Assign default arguments if specified
@@ -248,14 +248,16 @@ class AppriseAsset:
             # Define how our persistent storage behaves
             try:
                 self.__storage_mode = (
-                    storage_mode if isinstance(storage_mode, NotifyFormat)
+                    storage_mode
+                    if isinstance(storage_mode, NotifyFormat)
                     else PersistentStoreMode(storage_mode.lower())
                 )
 
             except (AttributeError, ValueError, TypeError):
                 err = (
                     f"An invalid persistent store mode ({storage_mode}) was "
-                    "specified.")
+                    "specified."
+                )
                 raise AttributeError(err) from None
 
         if isinstance(storage_idlen, int):
@@ -277,7 +279,8 @@ class AppriseAsset:
             self._tzinfo = zoneinfo(timezone)
             if not self._tzinfo:
                 raise AttributeError(
-                    "AppriseAsset timezone provided is invalid") from None
+                    "AppriseAsset timezone provided is invalid"
+                ) from None
         else:
             # Default our timezone to what is detected on the system
             self._tzinfo = datetime.now().astimezone().tzinfo
@@ -322,8 +325,7 @@ class AppriseAsset:
 
         # Attempt to get the type, otherwise return a default grey
         # if we couldn't look up the entry
-        color = self.html_notify_map.get(
-            notify_type, self.default_html_color)
+        color = self.html_notify_map.get(notify_type, self.default_html_color)
         if color_type is None:
             # This is the default return type
             return color
@@ -344,8 +346,7 @@ class AppriseAsset:
     def ascii(self, notify_type: NotifyType) -> str:
         """Returns an ascii representation based on passed in notify type."""
         # look our response up
-        return self.ascii_notify_map.get(
-            notify_type, self.default_ascii_chars)
+        return self.ascii_notify_map.get(notify_type, self.default_ascii_chars)
 
     def image_url(
         self,

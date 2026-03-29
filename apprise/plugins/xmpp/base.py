@@ -212,20 +212,22 @@ class NotifyXMPP(NotifyBase):
 
             except ValueError:
                 self.logger.warning(
-                    "Dropped invalid XMPP target (%s).", target)
+                    "Dropped invalid XMPP target (%s).", target
+                )
                 continue
             self.targets.append((mtype, jid))
 
         if isinstance(secure_mode, str) and secure_mode.strip():
             self.secure_mode = secure_mode.strip().lower()
             self.secure_mode = next(
-                (k for k in SECURE_MODES
-                 if k.startswith(self.secure_mode)), None
+                (k for k in SECURE_MODES if k.startswith(self.secure_mode)),
+                None,
             )
             if self.secure_mode not in SECURE_MODES:
                 msg = (
                     "The XMPP secure mode specified "
-                    f"({secure_mode}) is invalid.")
+                    f"({secure_mode}) is invalid."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -239,12 +241,14 @@ class NotifyXMPP(NotifyBase):
         # Prepare our roster check
         self.roster = (
             self.template_args["roster"]["default"]
-            if roster is None else bool(roster)
+            if roster is None
+            else bool(roster)
         )
 
         self.subject = (
             self.template_args["subject"]["default"]
-            if subject is None else bool(subject)
+            if subject is None
+            else bool(subject)
         )
 
         self.keepalive = (
@@ -271,8 +275,7 @@ class NotifyXMPP(NotifyBase):
 
         # MUC nickname: alphanumeric + underscore; falls back to the JID
         # username, then the app_id as a last resort
-        self.name = validate_regex(
-            name, r"^[a-zA-Z0-9_]+$") if name else None
+        self.name = validate_regex(name, r"^[a-zA-Z0-9_]+$") if name else None
         if self.name is None:
             self.name = self.user or self.app_id
 
@@ -294,7 +297,11 @@ class NotifyXMPP(NotifyBase):
         """Return the pieces that uniquely identify this configuration."""
         return (
             self.secure_protocol if self.secure else self.protocol,
-            self.host, self.xmpp_host, self.user, self.password, self.port,
+            self.host,
+            self.xmpp_host,
+            self.user,
+            self.password,
+            self.port,
         )
 
     def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
@@ -340,7 +347,8 @@ class NotifyXMPP(NotifyBase):
         # Use %23 for the MUC '#' prefix so it is not misread as a fragment.
         targets = "/".join(
             ("%23" if mode == "groupchat" else "") + self.quote(jid, safe="")
-            for (mode, jid) in self.targets)
+            for (mode, jid) in self.targets
+        )
 
         return "{schema}://{auth}{host}{port}/{targets}?{params}".format(
             schema=schema,
@@ -464,7 +472,8 @@ class NotifyXMPP(NotifyBase):
         # Targets from path
         results["targets"] = [
             NotifyXMPP.unquote(t)
-            for t in NotifyXMPP.split_path(results.get("fullpath"))]
+            for t in NotifyXMPP.split_path(results.get("fullpath"))
+        ]
 
         qd = results.get("qsd", {})
 
@@ -488,12 +497,10 @@ class NotifyXMPP(NotifyBase):
             results["keepalive"] = parse_bool(results["qsd"]["keepalive"])
 
         if "name" in results["qsd"] and len(results["qsd"]["name"]):
-            results["name"] = \
-                NotifyXMPP.unquote(results["qsd"]["name"])
+            results["name"] = NotifyXMPP.unquote(results["qsd"]["name"])
 
         if "xmpp" in results["qsd"] and len(results["qsd"]["xmpp"]):
-            results["xmpp_host"] = \
-                NotifyXMPP.unquote(results["qsd"]["xmpp"])
+            results["xmpp_host"] = NotifyXMPP.unquote(results["qsd"]["xmpp"])
 
         return results
 

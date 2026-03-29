@@ -772,7 +772,6 @@ def test_plugin_ntfy_message_to_attach(mock_post):
     body = "b" * NotifyNtfy.ntfy_json_upstream_size_limit
 
     for fmt in apprise.NOTIFY_FORMATS:
-
         # Prepare our object
         obj = apprise.Apprise.instantiate(
             f"ntfy://user:pass@localhost:8080/topic?format={fmt}"

@@ -128,14 +128,17 @@ def test_conversion_html_to_text():
     assert to_html("<hr>") == "---"
 
     # We need to handle HTML Encodings
-    assert to_html("""
+    assert (
+        to_html("""
         <html>
             <title>ignore this entry</title>
         <body>
           Let&apos;s handle&nbsp;special html encoding
           <hr/>
         </body>
-        """) == "Let's handle special html encoding\n---"
+        """)
+        == "Let's handle special html encoding\n---"
+    )
 
     # If you give nothing, you get nothing in return
     assert to_html("") == ""

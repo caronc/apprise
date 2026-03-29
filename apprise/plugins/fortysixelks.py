@@ -188,9 +188,7 @@ class Notify46Elks(NotifyBase):
 
         if not self.targets:
             # There is no one to email; we're done
-            self.logger.warning(
-                "There are no 46elks recipients to notify"
-            )
+            self.logger.warning("There are no 46elks recipients to notify")
             return False
 
         headers = {
@@ -230,10 +228,8 @@ class Notify46Elks(NotifyBase):
                 )
                 if r.status_code != requests.codes.ok:
                     # We had a problem
-                    status_str = (
-                        Notify46Elks.http_response_code_lookup(
-                            r.status_code
-                        )
+                    status_str = Notify46Elks.http_response_code_lookup(
+                        r.status_code
                     )
 
                     self.logger.warning(
@@ -247,16 +243,15 @@ class Notify46Elks(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
                     continue
 
                 else:
-                    self.logger.info(
-                        f"Sent 46elks notification to {target}."
-                    )
+                    self.logger.info(f"Sent 46elks notification to {target}.")
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -289,15 +284,18 @@ class Notify46Elks(NotifyBase):
         # Apprise URL can be condensed and target can be eliminated if its
         # our source phone no
         targets = (
-            [] if len(self.targets) == 1 and
-            self.source in self.targets else self.targets)
+            []
+            if len(self.targets) == 1 and self.source in self.targets
+            else self.targets
+        )
 
         return "{schema}://{user}:{pw}@{source}/{targets}?{params}".format(
             schema=self.secure_protocol[0],
             user=self.quote(self.user, safe=""),
             source=self.source if self.source else "",
             pw=self.pprint(
-                self.password, privacy, mode=PrivacyMode.Secret, safe=""),
+                self.password, privacy, mode=PrivacyMode.Secret, safe=""
+            ),
             targets="/".join(
                 [Notify46Elks.quote(x, safe="+") for x in targets]
             ),
@@ -348,17 +346,13 @@ class Notify46Elks(NotifyBase):
 
         # The 'from' makes it easier to use yaml configuration
         if "from" in results["qsd"] and len(results["qsd"]["from"]):
-            results["source"] = Notify46Elks.unquote(
-                results["qsd"]["from"]
-            )
+            results["source"] = Notify46Elks.unquote(results["qsd"]["from"])
 
         elif results["host"]:
             results["source"] = Notify46Elks.unquote(results["host"])
 
         # Store our remaining targets found on path
-        results["targets"].extend(
-            Notify46Elks.split_path(results["fullpath"])
-        )
+        results["targets"].extend(Notify46Elks.split_path(results["fullpath"]))
 
         # Support the 'to' variable so that we can support targets this way too
         # The 'to' makes it easier to use yaml configuration

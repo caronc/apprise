@@ -98,8 +98,9 @@ apprise_url_tests = (
     ),
     # Support Native URLs with arguments
     (
-        "https://api.ciscospark.com/v1/webhooks/incoming/{}?format=text"
-        .format("a" * 80),
+        "https://api.ciscospark.com/v1/webhooks/incoming/{}?format=text".format(
+            "a" * 80
+        ),
         {
             # token provided - we're good
             "instance": NotifyWebexTeams,

@@ -179,15 +179,20 @@ apprise_url_tests = (
         },
     ),
     # Test our paths
-    ("mmosts://localhost/a/path/3ccdd113474722377935511fc85d3dd4", {
-        "instance": NotifyMattermost}),
-    ("mmosts://localhost/////3ccdd113474722377935511fc85d3dd4///", {
-        "instance": NotifyMattermost}),
-
+    (
+        "mmosts://localhost/a/path/3ccdd113474722377935511fc85d3dd4",
+        {"instance": NotifyMattermost},
+    ),
+    (
+        "mmosts://localhost/////3ccdd113474722377935511fc85d3dd4///",
+        {"instance": NotifyMattermost},
+    ),
     # Mode parsing (prefix support)
     ("mmost://localhost/token?mode=w", {"instance": NotifyMattermost}),
-    ("mmost://localhost/token?mode=b&to=channel-id-1", {
-        "instance": NotifyMattermost}),
+    (
+        "mmost://localhost/token?mode=b&to=channel-id-1",
+        {"instance": NotifyMattermost},
+    ),
     (
         "mmost://localhost/token?mode=invalid",
         {
@@ -275,7 +280,8 @@ def test_plugin_mattermost_edge_cases():
 
 
 def test_plugin_mattermost_len_webhook_and_bot(
-        request_post_mock, request_get_mock):
+    request_post_mock, request_get_mock
+):
     """NotifyMattermost() __len__() behaviour."""
     # webhook: no channels -> 1
     obj = Apprise.instantiate("mmost://localhost/token")
@@ -315,7 +321,8 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert "mode=bot" in obj.url()
 
     obj = Apprise.instantiate(
-        "mmost://team@localhost/token?mode=bot&to=#chan,id1")
+        "mmost://team@localhost/token?mode=bot&to=#chan,id1"
+    )
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     assert len(obj) == 2
@@ -326,7 +333,8 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.notify("test") is True
 
     obj = Apprise.instantiate(
-        "mmost://team@localhost/token?mode=bot&to=#chan,id1")
+        "mmost://team@localhost/token?mode=bot&to=#chan,id1"
+    )
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     # Invalid response
@@ -334,7 +342,8 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.notify("test") is False
 
     obj = Apprise.instantiate(
-        "mmost://team@localhost/token?mode=bot&to=#chan,id1")
+        "mmost://team@localhost/token?mode=bot&to=#chan,id1"
+    )
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     # empty response
@@ -342,7 +351,8 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.notify("test") is False
 
     obj = Apprise.instantiate(
-        "mmost://team@localhost/token?mode=bot&to=#chan,id1")
+        "mmost://team@localhost/token?mode=bot&to=#chan,id1"
+    )
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     # upstream inquiry failure
@@ -442,7 +452,8 @@ def test_plugin_mattermost_webhook_payload_variants(request_post_mock, mocker):
     channel."""
     # Force image_url() to be deterministic for coverage
     mocker.patch.object(
-        NotifyMattermost, "image_url", return_value="http://img/ok.png")
+        NotifyMattermost, "image_url", return_value="http://img/ok.png"
+    )
 
     # Case 1: include_image=True (default) and no icon_url -> icon_url from
     obj = Apprise.instantiate("mmost://user@localhost/token?to=test")
@@ -459,7 +470,8 @@ def test_plugin_mattermost_webhook_payload_variants(request_post_mock, mocker):
     # Case 2: icon_url overrides include_image
     request_post_mock.reset_mock()
     obj = Apprise.instantiate(
-        "mmost://user@localhost/token?to=test&icon_url=http://x/icon.png")
+        "mmost://user@localhost/token?to=test&icon_url=http://x/icon.png"
+    )
     assert isinstance(obj, NotifyMattermost)
     assert obj.notify(body="body", title="title") is True
 
@@ -477,7 +489,8 @@ def test_plugin_mattermost_webhook_payload_variants(request_post_mock, mocker):
 
 
 def test_plugin_mattermost_webhook_http_error_and_exception(
-        request_post_mock, mocker):
+    request_post_mock, mocker
+):
     """Webhook mode error paths."""
     obj = Apprise.instantiate("mmost://localhost/token?to=test")
     assert isinstance(obj, NotifyMattermost)
@@ -536,7 +549,8 @@ def test_plugin_mattermost_bot_mode_requires_channel_id(request_post_mock):
 
 
 def test_plugin_mattermost_bot_mode_http_error_and_exception(
-        request_post_mock):
+    request_post_mock,
+):
     """Bot mode error paths."""
     bearer = "bearerToken"
     obj = Apprise.instantiate(f"mmost://localhost/{bearer}?mode=bot&to=id1")
@@ -554,7 +568,8 @@ def test_plugin_mattermost_bot_mode_http_error_and_exception(
 
 
 def test_plugin_mattermost_bot_channel_lookup_success(
-        request_post_mock, request_get_mock):
+    request_post_mock, request_get_mock
+):
     """Bot mode resolves #channel via team lookup."""
     bearer = "bearerToken"
     team = "myteam"
@@ -567,8 +582,9 @@ def test_plugin_mattermost_bot_channel_lookup_success(
     ).encode("utf-8")
 
     obj = Apprise.instantiate(
-        "mmost://localhost/{bearer}?mode=bot&team={team}&to={chan}"
-        .format(bearer=bearer, team=team, chan=channel)
+        "mmost://localhost/{bearer}?mode=bot&team={team}&to={chan}".format(
+            bearer=bearer, team=team, chan=channel
+        )
     )
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
@@ -587,7 +603,8 @@ def test_plugin_mattermost_bot_channel_lookup_success(
 
 
 def test_plugin_mattermost_bot_channel_lookup_partial_success(
-        request_post_mock, request_get_mock):
+    request_post_mock, request_get_mock
+):
     """One lookup fails, one succeeds, overall result is False."""
     bearer = "bearerToken"
     team = "myteam"
@@ -606,8 +623,9 @@ def test_plugin_mattermost_bot_channel_lookup_partial_success(
     request_get_mock.side_effect = side_effect
 
     obj = Apprise.instantiate(
-        "mmost://localhost/{bearer}?mode=bot&team={team}&to=#good,#bad"
-        .format(bearer=bearer, team=team)
+        "mmost://localhost/{bearer}?mode=bot&team={team}&to=#good,#bad".format(
+            bearer=bearer, team=team
+        )
     )
     assert isinstance(obj, NotifyMattermost)
     request_post_mock.return_value.status_code = requests.codes.created

@@ -316,10 +316,12 @@ class NotifySparkPost(NotifyBase):
             for recipient in parse_emails(targets):
                 result = is_email(recipient)
                 if result:
-                    self.targets.append((
-                        result["name"] if result["name"] else False,
-                        result["full_email"],
-                    ))
+                    self.targets.append(
+                        (
+                            result["name"] if result["name"] else False,
+                            result["full_email"],
+                        )
+                    )
                     continue
 
                 self.logger.warning(
@@ -388,7 +390,8 @@ class NotifySparkPost(NotifyBase):
                 f" {url} (cert_verify={self.verify_certificate})"
             )
             self.logger.debug(
-                "SparkPost Payload: %s", sanitize_payload(payload))
+                "SparkPost Payload: %s", sanitize_payload(payload)
+            )
 
         wait = None
 
@@ -407,7 +410,6 @@ class NotifySparkPost(NotifyBase):
         status_code = -1
 
         while 1:  # pragma: no branch
-
             # Always call throttle before any remote server i/o is made
             self.throttle(wait=wait)
             try:
@@ -440,7 +442,8 @@ class NotifySparkPost(NotifyBase):
                 # }
                 #
                 with contextlib.suppress(
-                        AttributeError, TypeError, ValueError):
+                    AttributeError, TypeError, ValueError
+                ):
                     # Load our JSON Object if we can
                     # ValueError = r.content is Unparsable
                     # TypeError = r.content is None
@@ -472,7 +475,8 @@ class NotifySparkPost(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 if status_code == requests.codes.too_many_requests and retry:
                     retry = retry - 1
@@ -565,15 +569,17 @@ class NotifySparkPost(NotifyBase):
 
                 try:
                     # Prepare API Upload Payload
-                    payload["content"]["attachments"].append({
-                        "name": (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
-                        "type": attachment.mimetype,
-                        "data": attachment.base64(),
-                    })
+                    payload["content"]["attachments"].append(
+                        {
+                            "name": (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            "type": attachment.mimetype,
+                            "data": attachment.base64(),
+                        }
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -661,14 +667,16 @@ class NotifySparkPost(NotifyBase):
             # Handle our bcc
             for addr in bcc:
                 # Add our recipient to our list
-                payload["recipients"].append({
-                    "address": {
-                        "email": addr,
-                        "header_to":
-                        # Take the first email in the To
-                        self.targets[index : index + batch_size][0][1],
-                    },
-                })
+                payload["recipients"].append(
+                    {
+                        "address": {
+                            "email": addr,
+                            "header_to":
+                            # Take the first email in the To
+                            self.targets[index : index + batch_size][0][1],
+                        },
+                    }
+                )
 
             if headers:
                 payload["content"]["headers"] = headers
@@ -717,13 +725,15 @@ class NotifySparkPost(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                "{}{}".format(
-                    "" if not e not in self.names else f"{self.names[e]}:",
-                    e,
-                )
-                for e in self.cc
-            ])
+            params["cc"] = ",".join(
+                [
+                    "{}{}".format(
+                        "" if not e not in self.names else f"{self.names[e]}:",
+                        e,
+                    )
+                    for e in self.cc
+                ]
+            )
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
@@ -743,13 +753,17 @@ class NotifySparkPost(NotifyBase):
             targets=(
                 ""
                 if not has_targets
-                else "/".join([
-                    NotifySparkPost.quote(
-                        "{}{}".format("" if not e[0] else f"{e[0]}:", e[1]),
-                        safe="",
-                    )
-                    for e in self.targets
-                ])
+                else "/".join(
+                    [
+                        NotifySparkPost.quote(
+                            "{}{}".format(
+                                "" if not e[0] else f"{e[0]}:", e[1]
+                            ),
+                            safe="",
+                        )
+                        for e in self.targets
+                    ]
+                )
             ),
             params=NotifySparkPost.urlencode(params),
         )

@@ -314,8 +314,8 @@ def apprise_test(do_notify):
     # preferred choice
     assert (
         do_notify(
-            a, title="my title", body="my body",
-            notify_type=NotifyType.WARNING)
+            a, title="my title", body="my body", notify_type=NotifyType.WARNING
+        )
         is True
     )
 
@@ -430,7 +430,6 @@ def apprise_test(do_notify):
             raise TypeError()
 
     class FailNotification(NotifyBase):
-
         def notify(self, **kwargs):
             # Pretend everything is okay
             return False
@@ -853,13 +852,11 @@ def test_apprise_schemas():
         secure_protocol = (None, object)
 
     class HtmlNotification(NotifyBase):
-
         protocol = ("html", "htm")
 
         secure_protocol = ("htmls", "htms")
 
     class MarkDownNotification(NotifyBase):
-
         protocol = "markdown"
 
         secure_protocol = "markdowns"
@@ -1256,10 +1253,8 @@ def test_apprise_asset(tmpdir):
 
     # Write a file
     sub.join(
-        f"{NotifyType.INFO.value}-"
-        f"{NotifyImageSize.XY_256.value}.png").write(
-            "the content doesn't matter for testing."
-    )
+        f"{NotifyType.INFO.value}-{NotifyImageSize.XY_256.value}.png"
+    ).write("the content doesn't matter for testing.")
 
     # Create an asset that will reference our file we just created
     a = AppriseAsset(
@@ -1818,7 +1813,6 @@ def test_apprise_details_plugin_verification():
         "group",
     )
     for entry in details["schemas"]:
-
         # Track the map_to entries (if specified); We need to make sure that
         # these properly map back
         map_to_entries = set()
@@ -1905,7 +1899,6 @@ def test_apprise_details_plugin_verification():
 
                     # Some verification
                     if arg["type"].startswith("choice"):
-
                         # choice:bool is redundant and should be swapped to
                         # just bool
                         assert not arg["type"].endswith("bool")
@@ -1913,7 +1906,8 @@ def test_apprise_details_plugin_verification():
                         # Choices require that a values list is provided
                         assert "values" in arg
                         assert isinstance(
-                            arg["values"], (list, tuple, frozenset, set))
+                            arg["values"], (list, tuple, frozenset, set)
+                        )
                         assert len(arg["values"]) > 0
 
                         # Test default
@@ -2241,22 +2235,27 @@ def test_notify_matrix_dynamic_importing(tmpdir):
     base.join("__init__.py").write("")
 
     # Test no app_id
-    base.join("NotifyBadFile1.py").write(cleandoc("""
+    base.join("NotifyBadFile1.py").write(
+        cleandoc("""
         class NotifyBadFile1:
             pass
-        """))
+        """)
+    )
 
     # No class of the same name
-    base.join("NotifyBadFile2.py").write(cleandoc("""
+    base.join("NotifyBadFile2.py").write(
+        cleandoc("""
         class BadClassName:
             pass
-        """))
+        """)
+    )
 
     # Exception thrown
     base.join("NotifyBadFile3.py").write("""raise ImportError()""")
 
     # Utilizes a schema:// already occupied (as string)
-    base.join("NotifyGoober.py").write(cleandoc("""
+    base.join("NotifyGoober.py").write(
+        cleandoc("""
         from apprise import NotifyBase
         class NotifyGoober(NotifyBase):
             # This class tests the fact we have a new class name, but we're
@@ -2272,10 +2271,12 @@ def test_notify_matrix_dynamic_importing(tmpdir):
             def parse_url(url, *args, **kwargs):
                 # always parseable
                 return ConfigBase.parse_url(url, verify_host=False)
-        """))
+        """)
+    )
 
     # Utilizes a schema:// already occupied (as tuple)
-    base.join("NotifyBugger.py").write(cleandoc("""
+    base.join("NotifyBugger.py").write(
+        cleandoc("""
         from apprise import NotifyBase
         class NotifyBugger(NotifyBase):
             # This class tests the fact we have a new class name, but we're
@@ -2292,6 +2293,7 @@ def test_notify_matrix_dynamic_importing(tmpdir):
             def parse_url(url, *args, **kwargs):
                 # always parseable
                 return ConfigBase.parse_url(url, verify_host=False)
-            """))
+            """)
+    )
 
     N_MGR.load_modules(path=str(base), name=module_name)

@@ -50,7 +50,15 @@ class JSONPayloadField:
 
 # Defines the method to send the notification
 METHODS = (
-    "POST", "GET", "DELETE", "PUT", "HEAD", "PATCH", "UPDATE", "OPTIONS")
+    "POST",
+    "GET",
+    "DELETE",
+    "PUT",
+    "HEAD",
+    "PATCH",
+    "UPDATE",
+    "OPTIONS",
+)
 
 
 class NotifyJSON(NotifyBase):
@@ -227,15 +235,17 @@ class NotifyJSON(NotifyBase):
                     return False
 
                 try:
-                    attachments.append({
-                        "filename": (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
-                        "base64": attachment.base64(),
-                        "mimetype": attachment.mimetype,
-                    })
+                    attachments.append(
+                        {
+                            "filename": (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            "base64": attachment.base64(),
+                            "mimetype": attachment.mimetype,
+                        }
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -260,7 +270,6 @@ class NotifyJSON(NotifyBase):
         }
 
         for key, value in self.payload_extras.items():
-
             if key in payload:
                 if not value:
                     # Do not store element in payload response
@@ -328,7 +337,8 @@ class NotifyJSON(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000])
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
 
                 # Return; we're done
                 return False

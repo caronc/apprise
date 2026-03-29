@@ -45,8 +45,9 @@ class AppriseAttachment:
 
     def __init__(
         self,
-        paths: Optional[Union[str, list[
-            Union[str, AttachBase, "AppriseAttachment"]]]] = None,
+        paths: Optional[
+            Union[str, list[Union[str, AttachBase, "AppriseAttachment"]]]
+        ] = None,
         asset: Optional[AppriseAsset] = None,
         cache: Union[bool, int] = True,
         location: Optional[Union[str, ContentLocation]] = None,
@@ -105,7 +106,8 @@ class AppriseAttachment:
         if location:
             try:
                 self.location = (
-                    location if isinstance(location, ContentLocation)
+                    location
+                    if isinstance(location, ContentLocation)
                     else ContentLocation(location.lower())
                 )
 

@@ -157,23 +157,32 @@ def test_config_base_detect_config_format():
     assert ConfigBase.detect_config_format("") is ConfigFormat.TEXT
 
     # Valid Text Configuration
-    assert ConfigBase.detect_config_format("""
+    assert (
+        ConfigBase.detect_config_format("""
     # A comment line over top of a URL
     mailto://userb:pass@gmail.com
-    """) is ConfigFormat.TEXT
+    """)
+        is ConfigFormat.TEXT
+    )
 
     # A text file that has semi-colon as comment characters
     # is valid too
-    assert ConfigBase.detect_config_format("""
+    assert (
+        ConfigBase.detect_config_format("""
     ; A comment line over top of a URL
     mailto://userb:pass@gmail.com
-    """) is ConfigFormat.TEXT
+    """)
+        is ConfigFormat.TEXT
+    )
 
     # Valid YAML Configuration
-    assert ConfigBase.detect_config_format("""
+    assert (
+        ConfigBase.detect_config_format("""
     # A comment line over top of a URL
     version: 1
-    """) is ConfigFormat.YAML
+    """)
+        is ConfigFormat.YAML
+    )
 
     # Just a whole lot of blank lines...
     assert ConfigBase.detect_config_format("\n\n\n") is ConfigFormat.TEXT
@@ -1304,14 +1313,16 @@ def test_config_base_config_parse_yaml_includes(
     ac = AppriseConfig(asset=asset, recursion=1)
 
     # Add our entry
-    ac.add_config(cleandoc("""
+    ac.add_config(
+        cleandoc("""
         # Include our Apprise Configuration from 2 locations
         include:
            - http://localhost:8000/get/test-001
            - http://localhost:8000/get/test-002
 
         # no further URLs defined
-    """))
+    """)
+    )
 
     # Force a fresh parse and get the loaded plugin
     servers = ac.servers()
@@ -1750,9 +1761,16 @@ urls:
     assert tzinfo.utcoffset(dt) is not None
 
 
-@pytest.mark.parametrize("garbage_yaml", [
-    "123", "3.1415", "true", "[UTC]", "{x: UTC}",
-])
+@pytest.mark.parametrize(
+    "garbage_yaml",
+    [
+        "123",
+        "3.1415",
+        "true",
+        "[UTC]",
+        "{x: UTC}",
+    ],
+)
 def test_yaml_asset_tz_garbage_types_only(tmpdir, garbage_yaml):
     """
     If only 'tz' is present and it is non-string, it is ignored.

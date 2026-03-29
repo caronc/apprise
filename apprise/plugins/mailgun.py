@@ -305,10 +305,12 @@ class NotifyMailgun(NotifyBase):
             for recipient in parse_emails(targets):
                 result = is_email(recipient)
                 if result:
-                    self.targets.append((
-                        result["name"] if result["name"] else False,
-                        result["full_email"],
-                    ))
+                    self.targets.append(
+                        (
+                            result["name"] if result["name"] else False,
+                            result["full_email"],
+                        )
+                    )
                     continue
 
                 self.logger.warning(
@@ -504,13 +506,15 @@ class NotifyMailgun(NotifyBase):
 
             if cc:
                 # Format our cc addresses to support the Name field
-                payload["cc"] = ",".join([
-                    formataddr(
-                        (self.names.get(addr, False), addr),
-                        charset="utf-8",
-                    )
-                    for addr in cc
-                ])
+                payload["cc"] = ",".join(
+                    [
+                        formataddr(
+                            (self.names.get(addr, False), addr),
+                            charset="utf-8",
+                        )
+                        for addr in cc
+                    ]
+                )
 
             # Format our bcc addresses to support the Name field
             if bcc:
@@ -535,14 +539,11 @@ class NotifyMailgun(NotifyBase):
 
             # For logging output of success and errors; we get a head count
             # of our outbound details:
+            _batch = self.targets[index : index + batch_size]
             verbose_dest = (
-                ", ".join(
-                    [x[1] for x in self.targets[index : index + batch_size]]
-                )
-                if len(self.targets[index : index + batch_size]) <= 3
-                else (
-                    f"{len(self.targets[index:index + batch_size])} recipients"
-                )
+                ", ".join([x[1] for x in _batch])
+                if len(_batch) <= 3
+                else f"{len(_batch)} recipients"
             )
 
             # Always call throttle before any remote server i/o is made
@@ -575,7 +576,8 @@ class NotifyMailgun(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
@@ -589,8 +591,7 @@ class NotifyMailgun(NotifyBase):
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending"
-                    f" Mailgun:{verbose_dest} "
-                    + "notification."
+                    f" Mailgun:{verbose_dest} " + "notification."
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
 
@@ -653,13 +654,15 @@ class NotifyMailgun(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                "{}{}".format(
-                    "" if not e not in self.names else f"{self.names[e]}:",
-                    e,
-                )
-                for e in self.cc
-            ])
+            params["cc"] = ",".join(
+                [
+                    "{}{}".format(
+                        "" if not e not in self.names else f"{self.names[e]}:",
+                        e,
+                    )
+                    for e in self.cc
+                ]
+            )
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
@@ -679,13 +682,17 @@ class NotifyMailgun(NotifyBase):
             targets=(
                 ""
                 if not has_targets
-                else "/".join([
-                    NotifyMailgun.quote(
-                        "{}{}".format("" if not e[0] else f"{e[0]}:", e[1]),
-                        safe="",
-                    )
-                    for e in self.targets
-                ])
+                else "/".join(
+                    [
+                        NotifyMailgun.quote(
+                            "{}{}".format(
+                                "" if not e[0] else f"{e[0]}:", e[1]
+                            ),
+                            safe="",
+                        )
+                        for e in self.targets
+                    ]
+                )
             ),
             params=NotifyMailgun.urlencode(params),
         )

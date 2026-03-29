@@ -384,10 +384,12 @@ class NotifyEmail(NotifyBase):
             for recipient in parse_emails(targets):
                 result = is_email(recipient)
                 if result:
-                    self.targets.append((
-                        result["name"] if result["name"] else False,
-                        result["full_email"],
-                    ))
+                    self.targets.append(
+                        (
+                            result["name"] if result["name"] else False,
+                            result["full_email"],
+                        )
+                    )
                     continue
 
                 self.logger.warning(
@@ -462,12 +464,15 @@ class NotifyEmail(NotifyBase):
         for i in range(len(templates.EMAIL_TEMPLATES)):  # pragma: no branch
             self.logger.trace(
                 "Scanning %s against %s",
-                from_addr, templates.EMAIL_TEMPLATES[i][0])
+                from_addr,
+                templates.EMAIL_TEMPLATES[i][0],
+            )
 
             match = templates.EMAIL_TEMPLATES[i][1].match(from_addr)
             if match:
                 self.logger.info(
-                    f"Applying {templates.EMAIL_TEMPLATES[i][0]} Defaults")
+                    f"Applying {templates.EMAIL_TEMPLATES[i][0]} Defaults"
+                )
 
                 # the secure flag can not be altered if defined in the template
                 self.secure = templates.EMAIL_TEMPLATES[i][2].get(
@@ -520,7 +525,6 @@ class NotifyEmail(NotifyBase):
                     "from_user" in templates.EMAIL_TEMPLATES[i][2]
                     and not self.from_addr[1]
                 ):
-
                     # Update our from address if defined
                     self.from_addr[1] = "{}@{}".format(
                         templates.EMAIL_TEMPLATES[i][2]["from_user"], self.host
@@ -695,39 +699,45 @@ class NotifyEmail(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for it's escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8",
-                ).replace(",", "%2C")
-                for e in self.cc
-            ])
+            params["cc"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.cc
+                ]
+            )
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
-            params["bcc"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for it's escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8",
-                ).replace(",", "%2C")
-                for e in self.bcc
-            ])
+            params["bcc"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.bcc
+                ]
+            )
 
         if self.reply_to:
             # Handle our Reply-To Addresses
-            params["reply"] = ",".join([
-                formataddr(
-                    (self.names.get(e, False), e),
-                    # Swap comma for its escaped url code (if detected) since
-                    # we're using that as a delimiter
-                    charset="utf-8",
-                ).replace(",", "%2C")
-                for e in self.reply_to
-            ])
+            params["reply"] = ",".join(
+                [
+                    formataddr(
+                        (self.names.get(e, False), e),
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
+                        charset="utf-8",
+                    ).replace(",", "%2C")
+                    for e in self.reply_to
+                ]
+            )
 
         # pull email suffix from username (if present)
         user = None if not self.user else self.user.split("@")[0]
@@ -769,15 +779,17 @@ class NotifyEmail(NotifyBase):
             targets=(
                 ""
                 if not has_targets
-                else "/".join([
-                    NotifyEmail.quote(
-                        "{}{}".format(
-                            "" if not e[0] else "{}:".format(e[0]), e[1]
-                        ),
-                        safe="",
-                    )
-                    for e in self.targets
-                ])
+                else "/".join(
+                    [
+                        NotifyEmail.quote(
+                            "{}{}".format(
+                                "" if not e[0] else "{}:".format(e[0]), e[1]
+                            ),
+                            safe="",
+                        )
+                        for e in self.targets
+                    ]
+                )
             ),
             params=NotifyEmail.urlencode(params),
         )
@@ -830,7 +842,6 @@ class NotifyEmail(NotifyBase):
         elif not is_hostname(
             results["host"], ipv4=False, ipv6=False, underscore=False
         ):
-
             if is_email(NotifyEmail.unquote(results["host"])):
                 # Don't lose defined email addresses
                 results["targets"].append(NotifyEmail.unquote(results["host"]))
@@ -1148,7 +1159,7 @@ class NotifyEmail(NotifyBase):
                 base.add_header(
                     "Autocrypt",
                     f"addr={formataddr((False, to_addr), charset='utf-8')}; "
-                    "prefer-encrypt=mutual"
+                    "prefer-encrypt=mutual",
                 )
 
                 # Set Encryption Info Part

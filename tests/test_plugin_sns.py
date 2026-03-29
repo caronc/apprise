@@ -379,15 +379,17 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     # Create our object
     a = Apprise()
 
-    a.add([
-        # Single Topic
-        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/us-west-2/TopicA",
-        # Multi-Topic
-        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/us-east-1/TopicA/TopicB/"
-        # Topic-Mix
-        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkce/us-west-2/"
-        "12223334444/TopicA",
-    ])
+    a.add(
+        [
+            # Single Topic
+            "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/us-west-2/TopicA",
+            # Multi-Topic
+            "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnl/us-east-1/TopicA/TopicB/"
+            # Topic-Mix
+            "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkce/us-west-2/"
+            "12223334444/TopicA",
+        ]
+    )
 
     # CreateTopic fails
     assert a.notify(title="", body="test") is False
@@ -460,15 +462,14 @@ def test_plugin_sns_detailed_failures(mocker):
         access_key_id="key",
         secret_access_key="secret",
         region_name="us-east-1",
-        targets=["+15555555555"]
+        targets=["+15555555555"],
     )
 
     # Force a 400 Bad Request
     mock_response_bad = mocker.Mock()
     mock_response_bad.status_code = 400
     mock_response_bad.text = (
-        "<ErrorResponse><Error><Message>Fail"
-        "</Message></Error></ErrorResponse>"
+        "<ErrorResponse><Error><Message>Fail</Message></Error></ErrorResponse>"
     )
 
     mock_response_bad.content = mock_response_bad.text.encode("utf-8")
@@ -482,7 +483,7 @@ def test_plugin_sns_detailed_failures(mocker):
         access_key_id="key",
         secret_access_key="secret",
         region_name="us-east-1",
-        targets=["#MyTopic"]
+        targets=["#MyTopic"],
     )
 
     # Force 400 on ANY request (which includes the first one: CreateTopic)

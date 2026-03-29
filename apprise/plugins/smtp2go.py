@@ -227,10 +227,12 @@ class NotifySMTP2Go(NotifyBase):
             for recipient in parse_emails(targets):
                 result = is_email(recipient)
                 if result:
-                    self.targets.append((
-                        result["name"] if result["name"] else False,
-                        result["full_email"],
-                    ))
+                    self.targets.append(
+                        (
+                            result["name"] if result["name"] else False,
+                            result["full_email"],
+                        )
+                    )
                     continue
 
                 self.logger.warning(
@@ -320,15 +322,17 @@ class NotifySMTP2Go(NotifyBase):
 
                 try:
                     # Format our attachment
-                    attachments.append({
-                        "filename": (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
-                        ),
-                        "fileblob": attachment.base64(),
-                        "mimetype": attachment.mimetype,
-                    })
+                    attachments.append(
+                        {
+                            "filename": (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            "fileblob": attachment.base64(),
+                            "mimetype": attachment.mimetype,
+                        }
+                    )
 
                 except exception.AppriseException:
                     # We could not access the attachment
@@ -428,18 +432,16 @@ class NotifySMTP2Go(NotifyBase):
                     f"(cert_verify={self.verify_certificate})"
                 )
                 self.logger.debug(
-                    "SMTP2Go Payload: %s", sanitize_payload(payload))
+                    "SMTP2Go Payload: %s", sanitize_payload(payload)
+                )
 
             # For logging output of success and errors; we get a head count
             # of our outbound details:
+            _batch = self.targets[index : index + batch_size]
             verbose_dest = (
-                ", ".join(
-                    [x[1] for x in self.targets[index : index + batch_size]]
-                )
-                if len(self.targets[index : index + batch_size]) <= 3
-                else (
-                    f"{len(self.targets[index:index + batch_size])} recipients"
-                )
+                ", ".join([x[1] for x in _batch])
+                if len(_batch) <= 3
+                else f"{len(_batch)} recipients"
             )
 
             # Always call throttle before any remote server i/o is made
@@ -470,7 +472,8 @@ class NotifySMTP2Go(NotifyBase):
                     )
 
                     self.logger.debug(
-                        "Response Details:\r\n%r", (r.content or b"")[:2000])
+                        "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    )
 
                     # Mark our failure
                     has_error = True
@@ -484,8 +487,7 @@ class NotifySMTP2Go(NotifyBase):
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending"
-                    f" SMTP2Go:{verbose_dest} "
-                    + "notification."
+                    f" SMTP2Go:{verbose_dest} " + "notification."
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
 
@@ -534,13 +536,15 @@ class NotifySMTP2Go(NotifyBase):
 
         if self.cc:
             # Handle our Carbon Copy Addresses
-            params["cc"] = ",".join([
-                "{}{}".format(
-                    "" if not e not in self.names else f"{self.names[e]}:",
-                    e,
-                )
-                for e in self.cc
-            ])
+            params["cc"] = ",".join(
+                [
+                    "{}{}".format(
+                        "" if not e not in self.names else f"{self.names[e]}:",
+                        e,
+                    )
+                    for e in self.cc
+                ]
+            )
 
         if self.bcc:
             # Handle our Blind Carbon Copy Addresses
@@ -560,13 +564,17 @@ class NotifySMTP2Go(NotifyBase):
             targets=(
                 ""
                 if not has_targets
-                else "/".join([
-                    NotifySMTP2Go.quote(
-                        "{}{}".format("" if not e[0] else f"{e[0]}:", e[1]),
-                        safe="",
-                    )
-                    for e in self.targets
-                ])
+                else "/".join(
+                    [
+                        NotifySMTP2Go.quote(
+                            "{}{}".format(
+                                "" if not e[0] else f"{e[0]}:", e[1]
+                            ),
+                            safe="",
+                        )
+                        for e in self.targets
+                    ]
+                )
             ),
             params=NotifySMTP2Go.urlencode(params),
         )

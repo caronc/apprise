@@ -87,8 +87,7 @@ def test_plugin_glib_gdkpixbuf_attribute_error(monkeypatch):
     gi.repository = types.SimpleNamespace(
         Gio=Mock(),
         GLib=types.SimpleNamespace(
-            Variant=Mock(),
-            Error=type("GLibError", (Exception,), {})
+            Variant=Mock(), Error=type("GLibError", (Exception,), {})
         ),
         # GdkPixbuf missing entirely triggers AttributeError
     )
@@ -109,6 +108,7 @@ def test_plugin_glib_gdkpixbuf_attribute_error(monkeypatch):
     reload_plugin("glib")
 
     from apprise.plugins import glib as plugin_glib
+
     assert plugin_glib.NOTIFY_GLIB_IMAGE_SUPPORT is False
 
 
@@ -122,7 +122,8 @@ def test_plugin_glib_basic_notify(enabled_glib_environment):
 def test_plugin_glib_url_includes_coordinates(enabled_glib_environment):
     """Test that x/y coordinates appear in the rendered URL."""
     obj = apprise.Apprise.instantiate(
-        "glib://_/?x=7&y=9", suppress_exceptions=False)
+        "glib://_/?x=7&y=9", suppress_exceptions=False
+    )
     url = obj.url(privacy=False)
 
     assert "x=7" in url
@@ -132,20 +133,26 @@ def test_plugin_glib_url_includes_coordinates(enabled_glib_environment):
 def test_plugin_glib_icon_fails_gracefully(mocker, enabled_glib_environment):
     """Simulate image load failure"""
     import gi
-    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = \
-        AttributeError("fail")
+
+    gi.repository.GdkPixbuf.Pixbuf.new_from_file.side_effect = AttributeError(
+        "fail"
+    )
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     spy = mocker.spy(obj, "logger")
     assert obj.notify("msg", title="t") is True
-    assert any("Could not load notification icon" in str(x)
-               for x in spy.warning.call_args_list)
+    assert any(
+        "Could not load notification icon" in str(x)
+        for x in spy.warning.call_args_list
+    )
 
 
 def test_plugin_glib_send_raises_glib_error(mocker, enabled_glib_environment):
     """Simulate GLib.Error in DBusProxy creation"""
     import gi
-    gi.repository.Gio.DBusProxy.new_for_bus_sync.side_effect = \
+
+    gi.repository.Gio.DBusProxy.new_for_bus_sync.side_effect = (
         gi.repository.GLib.Error("fail")
+    )
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     assert obj.notify("fail test") is False
 
@@ -177,9 +184,11 @@ def test_plugin_glib_send_raises_generic(mocker, enabled_glib_environment):
     # usage of `NotifyGLib.send()`. This test supplements that by simulating
     # the rare fallback case of a non-GLib-related exception during Notify().
     import gi
+
     if hasattr(gi, "repository"):
         pytest.skip(
-            "pygobject introspection active, test won't behave as expected")
+            "pygobject introspection active, test won't behave as expected"
+        )
 
     fake_iface = Mock()
     fake_iface.Notify.side_effect = RuntimeError("boom")
@@ -230,10 +239,12 @@ def test_plugin_glib_parse_url_fields():
 def test_plugin_glib_xy_axis_applied_to_variant(enabled_glib_environment):
     """Ensure x/y values are added to GLib.Variant payload."""
     obj = apprise.Apprise.instantiate(
-        "glib://_/?x=5&y=10", suppress_exceptions=False)
+        "glib://_/?x=5&y=10", suppress_exceptions=False
+    )
 
     # Patch GLib.Variant to track calls
     import gi
+
     spy_variant = Mock(wraps=gi.repository.GLib.Variant)
     gi.repository.GLib.Variant = spy_variant
 
@@ -247,7 +258,8 @@ def test_plugin_glib_xy_axis_applied_to_variant(enabled_glib_environment):
 def test_plugin_glib_no_image_support(monkeypatch, enabled_glib_environment):
     """Simulate GdkPixbuf unavailable"""
     monkeypatch.setattr(
-        "apprise.plugins.glib.NOTIFY_GLIB_IMAGE_SUPPORT", False)
+        "apprise.plugins.glib.NOTIFY_GLIB_IMAGE_SUPPORT", False
+    )
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     assert obj.notify("no image") is True
 
@@ -255,7 +267,8 @@ def test_plugin_glib_no_image_support(monkeypatch, enabled_glib_environment):
 def test_plugin_glib_url_redaction(enabled_glib_environment):
     """url() privacy mode redacts safely"""
     obj = apprise.Apprise.instantiate(
-        "glib://_/?image=no&urgency=high", suppress_exceptions=False)
+        "glib://_/?image=no&urgency=high", suppress_exceptions=False
+    )
     url = obj.url(privacy=True)
     assert "image=" in url
     assert "urgency=" in url
@@ -282,7 +295,8 @@ def test_plugin_glib_require_version_valueerror(monkeypatch):
 
     # Patch require_version after import
     monkeypatch.setattr(
-        gi, "require_version", Mock(side_effect=ValueError("fail")))
+        gi, "require_version", Mock(side_effect=ValueError("fail"))
+    )
 
     # Re-evaluate plugin support logic manually
     try:
@@ -322,11 +336,13 @@ def test_plugin_glib_gdkpixbuf_require_version_valueerror(monkeypatch):
 
     # Step 4: Confirm GdkPixbuf image support was not enabled
     from apprise.plugins import glib as plugin_glib
+
     assert plugin_glib.NOTIFY_GLIB_IMAGE_SUPPORT is False
 
 
 def test_plugin_glib_notify_generic_exception(
-        mocker, enabled_glib_environment):
+    mocker, enabled_glib_environment
+):
     """
     Test that a generic exception occurring during the notification send
     is caught and handled (returning False).
@@ -346,6 +362,7 @@ def test_plugin_glib_notify_generic_exception(
 
     # 4. Instantiate the plugin
     from apprise.plugins.glib import NotifyGLib
+
     obj = NotifyGLib(targets=["glib://"])
 
     # 5. Spy on the logger to ensure the warning is logged
@@ -357,4 +374,5 @@ def test_plugin_glib_notify_generic_exception(
 
     # 7. Verify the specific log message from glib.py
     logger_spy.warning.assert_called_with(
-        "Failed to send GLib/Gio notification.")
+        "Failed to send GLib/Gio notification."
+    )

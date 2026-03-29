@@ -324,8 +324,9 @@ class NotifyFluxer(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        if self.mode == FluxerMode.PRIVATE and \
-                self.__auto_cloud_host.search(self.host):
+        if self.mode == FluxerMode.PRIVATE and self.__auto_cloud_host.search(
+            self.host
+        ):
             # Is a Fluxer Cloud API
             self.mode = FluxerMode.CLOUD
             self.logger.warning(
@@ -336,30 +337,50 @@ class NotifyFluxer(NotifyBase):
             )
 
         # Text To Speech
-        self.tts = tts if isinstance(tts, bool) \
+        self.tts = (
+            tts
+            if isinstance(tts, bool)
             else parse_bool(tts, self.template_args["tts"]["default"])
+        )
 
         # Avatar
-        self.avatar = avatar if isinstance(avatar, bool) \
+        self.avatar = (
+            avatar
+            if isinstance(avatar, bool)
             else parse_bool(avatar, self.template_args["avatar"]["default"])
+        )
 
         # Footer
-        self.footer = footer if isinstance(footer, bool) \
+        self.footer = (
+            footer
+            if isinstance(footer, bool)
             else parse_bool(footer, self.template_args["footer"]["default"])
+        )
 
         # Footer Logo
-        self.footer_logo = footer_logo if isinstance(footer_logo, bool) \
+        self.footer_logo = (
+            footer_logo
+            if isinstance(footer_logo, bool)
             else parse_bool(
-                footer_logo, self.template_args["footer_logo"]["default"])
+                footer_logo, self.template_args["footer_logo"]["default"]
+            )
+        )
 
         # Include Image
-        self.include_image = include_image if isinstance(include_image, bool) \
+        self.include_image = (
+            include_image
+            if isinstance(include_image, bool)
             else parse_bool(
-                include_image, self.template_args["image"]["default"])
+                include_image, self.template_args["image"]["default"]
+            )
+        )
 
         # Fields
-        self.fields = fields if isinstance(fields, bool) \
+        self.fields = (
+            fields
+            if isinstance(fields, bool)
             else parse_bool(fields, self.template_args["fields"]["default"])
+        )
 
         self.thread_id = thread
         self.thread_name = thread_name
@@ -395,7 +416,6 @@ class NotifyFluxer(NotifyBase):
         attach=None,
         **kwargs: Any,
     ) -> bool:
-
         """Perform Fluxer Notification."""
 
         # Prepare our headers:
@@ -508,15 +528,16 @@ class NotifyFluxer(NotifyBase):
                         return False
 
         if attach and self.attachment_support:
-
             # Update our payload; the idea is to preserve it's other detected
             # and assigned values for re-use here too
-            payload.update({
-                # Text-To-Speech can be off so we don't read the filename
-                "tts": False,
-                # no tts; no need to wait
-                "wait": False,
-            })
+            payload.update(
+                {
+                    # Text-To-Speech can be off so we don't read the filename
+                    "tts": False,
+                    # no tts; no need to wait
+                    "wait": False,
+                }
+            )
 
             #
             # Remove our text/title based content for attachment use
@@ -617,19 +638,22 @@ class NotifyFluxer(NotifyBase):
         files = None
         data: dict[str, Any] | str
         try:
-
             # Open our attachment path if required:
             if attach:
                 #
                 # Fluxer requires content to be provided
                 #
-                payload.update({
-                    "content": attach.name,
-                    "attachments": [{
-                        "id": 0,
-                        "filename": attach.name,
-                    }],
-                })
+                payload.update(
+                    {
+                        "content": attach.name,
+                        "attachments": [
+                            {
+                                "id": 0,
+                                "filename": attach.name,
+                            }
+                        ],
+                    }
+                )
                 files = {
                     "files[0]": (
                         attach.name,
@@ -728,8 +752,9 @@ class NotifyFluxer(NotifyBase):
 
             # Reset Rate Limiting (a bit of a hacky approach for now)
             # TODO: Learn more about how ratelimiting works with Fluxer
-            self.ratelimit_reset = \
-                datetime.now(timezone.utc).replace(tzinfo=None)
+            self.ratelimit_reset = datetime.now(timezone.utc).replace(
+                tzinfo=None
+            )
             self.ratelimit_remaining = self.default_delay_sec
 
         except requests.RequestException as e:
@@ -741,7 +766,8 @@ class NotifyFluxer(NotifyBase):
 
         except OSError as e:
             self.logger.warning(
-                "An I/O error occurred while reading attachment(s)")
+                "An I/O error occurred while reading attachment(s)"
+            )
             self.logger.debug(f"I/O Exception: {e!s}")
             return False
 
@@ -838,7 +864,8 @@ class NotifyFluxer(NotifyBase):
             ),
             self.host if self.mode == FluxerMode.PRIVATE else "",
             (
-                "" if self.mode == FluxerMode.CLOUD
+                ""
+                if self.mode == FluxerMode.CLOUD
                 else (self.port if self.port else (443 if self.secure else 80))
             ),
             self.webhook_id,
@@ -867,8 +894,11 @@ class NotifyFluxer(NotifyBase):
         ]
 
         # Text To Speech
-        results["tts"] = parse_bool(results["qsd"].get(
-            "tts", NotifyFluxer.template_args["tts"]["default"]))
+        results["tts"] = parse_bool(
+            results["qsd"].get(
+                "tts", NotifyFluxer.template_args["tts"]["default"]
+            )
+        )
 
         # Mode override
         if "mode" in results["qsd"] and results["qsd"]["mode"]:
@@ -902,7 +932,7 @@ class NotifyFluxer(NotifyBase):
         results["footer_logo"] = parse_bool(
             results["qsd"].get(
                 "footer_logo",
-                NotifyFluxer.template_args["footer_logo"]["default"]
+                NotifyFluxer.template_args["footer_logo"]["default"],
             )
         )
         results["fields"] = parse_bool(
@@ -939,8 +969,11 @@ class NotifyFluxer(NotifyBase):
             results["format"] = NotifyFormat.MARKDOWN
 
         # Update Avatar Icon
-        results["avatar"] = parse_bool(results["qsd"].get(
-            "avatar", NotifyFluxer.template_args["avatar"]["default"]))
+        results["avatar"] = parse_bool(
+            results["qsd"].get(
+                "avatar", NotifyFluxer.template_args["avatar"]["default"]
+            )
+        )
 
         if "thread" in results["qsd"]:
             results["thread"] = NotifyFluxer.unquote(results["qsd"]["thread"])
@@ -1041,7 +1074,8 @@ class NotifyFluxer(NotifyBase):
 
     @staticmethod
     def extract_markdown_sections(
-            markdown: str) -> tuple[str, list[dict[str, str]]]:
+        markdown: str,
+    ) -> tuple[str, list[dict[str, str]]]:
         """Extract headers and their corresponding sections into embed
         fields."""
 
@@ -1070,12 +1104,18 @@ class NotifyFluxer(NotifyBase):
         for el in common:
             d = el.groupdict()
 
-            fields.append({
-                "name": d.get("name", "").strip("#`* \r\n\t\v"),
-                "value": "```{}\n{}```".format(
-                    "md" if d.get("value") else "",
-                    (d.get("value").strip() + "\n" if d.get("value") else ""),
-                ),
-            })
+            fields.append(
+                {
+                    "name": d.get("name", "").strip("#`* \r\n\t\v"),
+                    "value": "```{}\n{}```".format(
+                        "md" if d.get("value") else "",
+                        (
+                            d.get("value").strip() + "\n"
+                            if d.get("value")
+                            else ""
+                        ),
+                    ),
+                }
+            )
 
         return description, fields

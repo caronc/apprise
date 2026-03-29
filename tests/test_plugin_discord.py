@@ -147,8 +147,9 @@ apprise_url_tests = (
         },
     ),
     (
-        "https://discordapp.com/api/webhooks/{}/{}?footer=yes&botname=joe"
-        .format("0" * 10, "B" * 40),
+        "https://discordapp.com/api/webhooks/{}/{}?footer=yes&botname=joe".format(
+            "0" * 10, "B" * 40
+        ),
         {
             # Native URL Support with arguments
             "instance": NotifyDiscord,
@@ -166,33 +167,26 @@ apprise_url_tests = (
         },
     ),
     (
-        "discord://{}/{}?flags=1".format(
-            "i" * 24, "t" * 64
-        ),
+        "discord://{}/{}?flags=1".format("i" * 24, "t" * 64),
         {
             "instance": NotifyDiscord,
             "requests_response_code": requests.codes.no_content,
         },
     ),
     (
-        "discord://{}/{}?flags=-1".format(
-            "i" * 24, "t" * 64
-        ),
+        "discord://{}/{}?flags=-1".format("i" * 24, "t" * 64),
         {
             # invalid flags specified (variation 1)
             "instance": TypeError,
         },
     ),
     (
-        "discord://{}/{}?flags=invalid".format(
-            "i" * 24, "t" * 64
-        ),
+        "discord://{}/{}?flags=invalid".format("i" * 24, "t" * 64),
         {
             # invalid flags specified (variation 2)
             "instance": TypeError,
         },
     ),
-
     # different format support
     (
         "discord://{}/{}?format=markdown".format("i" * 24, "t" * 64),
@@ -1210,9 +1204,7 @@ def test_plugin_discord_attach_memory(mock_post):
     response.content = b""
     mock_post.return_value = response
 
-    obj = Apprise.instantiate(
-        f"discord://{webhook_id}/{webhook_token}/"
-    )
+    obj = Apprise.instantiate(f"discord://{webhook_id}/{webhook_token}/")
 
     mem = AttachMemory(
         content=b"<html><body><h1>Test</h1></body></html>",

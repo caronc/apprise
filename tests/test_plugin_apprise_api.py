@@ -294,9 +294,7 @@ def test_notify_apprise_api_payload_check(mock_post):
     # Assign our mock object our return value
     mock_post.return_value = okay_response
 
-    obj = Apprise.instantiate(
-        "apprise://user@localhost/mytoken1/?method=form"
-    )
+    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/?method=form")
     assert isinstance(obj, NotifyAppriseAPI)
 
     # Test URL with Attachment
@@ -327,9 +325,7 @@ def test_notify_apprise_api_payload_check(mock_post):
 
     mock_post.reset_mock()
 
-    obj = Apprise.instantiate(
-        "apprise://user@localhost/mytoken1/?method=json"
-    )
+    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/?method=json")
     assert isinstance(obj, NotifyAppriseAPI)
 
     assert (

@@ -203,7 +203,6 @@ class AppriseConfig:
 
         # Iterate over our configuration
         for config in configs:
-
             if isinstance(config, ConfigBase):
                 # Go ahead and just add our configuration into our list
                 self.configs.append(config)
@@ -296,8 +295,10 @@ class AppriseConfig:
             insecure_includes=insecure_includes,
         )
 
-        if not (instance.config_format and
-                instance.config_format.value in common.CONFIG_FORMATS):
+        if not (
+            instance.config_format
+            and instance.config_format.value in common.CONFIG_FORMATS
+        ):
             logger.warning(
                 "The format of the configuration could not be detected."
             )
@@ -345,7 +346,6 @@ class AppriseConfig:
         response = []
 
         for entry in self.configs:
-
             # Apply our tag matching based on our defined logic
             if is_exclusive_match(
                 logic=tag,

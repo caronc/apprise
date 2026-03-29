@@ -109,19 +109,22 @@ def test_plugin_irc_init_targets() -> None:
 def test_plugin_irc_modes() -> None:
     """NotifyIRC auth mode tests."""
     with (
-            mock.patch.object(NotifyIRC, "apply_irc_defaults"),
-            pytest.raises(TypeError)):
+        mock.patch.object(NotifyIRC, "apply_irc_defaults"),
+        pytest.raises(TypeError),
+    ):
         NotifyIRC(host="irc.example.com", targets=["#c"], mode="invalid")
 
     with mock.patch.object(NotifyIRC, "apply_irc_defaults"):
         # Case Insensitive
         result = NotifyIRC(
-            host="irc.example.com", targets=["#c"], mode="NICKServ")
+            host="irc.example.com", targets=["#c"], mode="NICKServ"
+        )
         assert "mode=nickserv" in result.url()
 
         # Case Insensitive
         result = NotifyIRC(
-            host="irc.example.com", targets=["#c"], mode="server")
+            host="irc.example.com", targets=["#c"], mode="server"
+        )
         assert "mode=" not in result.url()
 
 
@@ -219,7 +222,8 @@ def test_plugin_irc_send_error() -> None:
 def test_plugin_irc_url_id() -> None:
     """NotifyIRC url_identifier."""
     n = NotifyIRC(
-        host="irc.example.com", targets=["#c"], user="me", password="pw")
+        host="irc.example.com", targets=["#c"], user="me", password="pw"
+    )
     assert n.url_identifier == ("irc", "irc.example.com", "me", "pw")
 
     n.secure = True
@@ -332,7 +336,8 @@ def test_plugin_irc_protocol() -> None:
 def test_plugin_irc_state_machine() -> None:
     """State machine basics."""
     ctx = IRCContext(
-        desired_nick="n", accepted_nick="n", fullname="f", password="pw")
+        desired_nick="n", accepted_nick="n", fullname="f", password="pw"
+    )
     sm = IRCStateMachine(ctx)
 
     acts = sm.start_registration()
@@ -346,7 +351,8 @@ def test_plugin_irc_state_machine() -> None:
     assert sm.ctx.accepted_nick == "nick"
 
     ctx2 = IRCContext(
-        desired_nick="n", accepted_nick="n", fullname="f", password="pw")
+        desired_nick="n", accepted_nick="n", fullname="f", password="pw"
+    )
     sm2 = IRCStateMachine(ctx2)
     sm2.start_registration()
     fail = sm2.on_message(parse_irc_line(":srv 464 n :bad pass"))
@@ -395,6 +401,7 @@ def test_plugin_irc_client_nick_handling() -> None:
 
 def test_plugin_irc_client_handshake() -> None:
     """IRCClient handshake error path."""
+
     def gen(prefix: str, length: int, collision: int) -> str:
         return "newnick"
 
@@ -427,9 +434,10 @@ def test_plugin_irc_client_handshake() -> None:
         writes.append(str(line))
 
     with (
-            mock.patch.object(client, "_read", side_effect=_read),
-            mock.patch.object(client, "_write", side_effect=_write),
-            pytest.raises(AppriseSocketError)):
+        mock.patch.object(client, "_read", side_effect=_read),
+        mock.patch.object(client, "_write", side_effect=_write),
+        pytest.raises(AppriseSocketError),
+    ):
         client._handshake(deadline=time.monotonic() + 1.0, prefix="ap")
 
     assert any(w.startswith("PONG") for w in writes)
@@ -447,8 +455,10 @@ def test_plugin_irc_client_register() -> None:
     )
     client.transport = _DummyTransport()
 
-    with (mock.patch("time.monotonic", side_effect=[0.0, 1.0]),
-          pytest.raises(TimeoutError)):
+    with (
+        mock.patch("time.monotonic", side_effect=[0.0, 1.0]),
+        pytest.raises(TimeoutError),
+    ):
         client.register(timeout=0.01, prefix="ap")
 
     client2 = IRCClient(
@@ -602,8 +612,10 @@ def test_plugin_irc_client_write_timeout() -> None:
     """Write timeout."""
     c = IRCClient(host="h", nickname="n", fullname="f")
     c.transport = mock.Mock()
-    with (mock.patch("time.monotonic", return_value=10.0),
-          pytest.raises(TimeoutError)):
+    with (
+        mock.patch("time.monotonic", return_value=10.0),
+        pytest.raises(TimeoutError),
+    ):
         c._write("X", deadline=9.0)
 
 
@@ -676,7 +688,8 @@ def test_plugin_irc_client_handshake_paths() -> None:
     lines = ["PING :abc", ""]
     with (
         mock.patch.object(
-            c, "_read", side_effect=lambda deadline: lines.pop(0)),
+            c, "_read", side_effect=lambda deadline: lines.pop(0)
+        ),
         mock.patch.object(c, "_write") as m_write,
     ):
         c._handshake(deadline=time.monotonic() + 1.0, prefix="")
@@ -685,9 +698,11 @@ def test_plugin_irc_client_handshake_paths() -> None:
     lines = [":srv 433 n :in use", ""]
     with (
         mock.patch.object(
-            c, "_read", side_effect=lambda deadline: lines.pop(0)),
+            c, "_read", side_effect=lambda deadline: lines.pop(0)
+        ),
         mock.patch.object(
-            c, "_nickname_collision_handler", return_value="new"),
+            c, "_nickname_collision_handler", return_value="new"
+        ),
         mock.patch.object(c, "_write") as m_write,
     ):
         c._handshake(deadline=time.monotonic() + 1.0, prefix="ap")
@@ -695,13 +710,17 @@ def test_plugin_irc_client_handshake_paths() -> None:
 
     # FAIL action raises
     from apprise.plugins.irc.state import IRCAction, IRCActionKind
+
     lines = [":srv 464 n :bad pass", ""]
     with (
         mock.patch.object(
-            c, "_read", side_effect=lambda deadline: lines.pop(0)),
-        mock.patch.object(c.sm, "on_message", return_value=[
-            IRCAction(IRCActionKind.FAIL, reason="boom")
-        ]),
+            c, "_read", side_effect=lambda deadline: lines.pop(0)
+        ),
+        mock.patch.object(
+            c.sm,
+            "on_message",
+            return_value=[IRCAction(IRCActionKind.FAIL, reason="boom")],
+        ),
         pytest.raises(AppriseSocketError),
     ):
         c._handshake(deadline=time.monotonic() + 1.0, prefix="")
@@ -710,10 +729,13 @@ def test_plugin_irc_client_handshake_paths() -> None:
     lines = [":srv 001 n :welcome", ""]
     with (
         mock.patch.object(
-            c, "_read", side_effect=lambda deadline: lines.pop(0)),
-        mock.patch.object(c.sm, "on_message", return_value=[
-            IRCAction(IRCActionKind.SEND, line="NICK x")
-        ]),
+            c, "_read", side_effect=lambda deadline: lines.pop(0)
+        ),
+        mock.patch.object(
+            c.sm,
+            "on_message",
+            return_value=[IRCAction(IRCActionKind.SEND, line="NICK x")],
+        ),
         mock.patch.object(c, "_write") as m_write,
     ):
         c._handshake(deadline=time.monotonic() + 1.0, prefix="")
@@ -862,10 +884,9 @@ def test_plugin_irc_client_write_trace() -> None:
     with (
         mock.patch("time.monotonic", return_value=0.0),
         mock.patch(
-            "apprise.plugins.irc.client.logger.isEnabledFor",
-            return_value=True),
-        mock.patch(
-            "apprise.plugins.irc.client.logger.trace") as m_trace,
+            "apprise.plugins.irc.client.logger.isEnabledFor", return_value=True
+        ),
+        mock.patch("apprise.plugins.irc.client.logger.trace") as m_trace,
     ):
         c._write("HELLO", deadline=1.0)
         m_trace.assert_called_once()
@@ -886,10 +907,13 @@ def test_plugin_irc_client_handshake_send_without_line() -> None:
     lines = [":srv 001 n :welcome", ""]
     with (
         mock.patch.object(
-            c, "_read", side_effect=lambda deadline: lines.pop(0)),
-        mock.patch.object(c.sm, "on_message", return_value=[
-            IRCAction(IRCActionKind.SEND, line="")
-        ]),
+            c, "_read", side_effect=lambda deadline: lines.pop(0)
+        ),
+        mock.patch.object(
+            c.sm,
+            "on_message",
+            return_value=[IRCAction(IRCActionKind.SEND, line="")],
+        ),
         mock.patch.object(c, "_write") as m_write,
     ):
         c._handshake(deadline=time.monotonic() + 1.0, prefix="")
@@ -899,16 +923,21 @@ def test_plugin_irc_client_handshake_send_without_line() -> None:
 def test_plugin_irc_client_register_queue_ignores_empty_send() -> None:
     """Register ignores empty SEND."""
     c = IRCClient(
-        host="h", nickname="n", fullname="f", auth_mode=IRCAuthMode.NONE)
+        host="h", nickname="n", fullname="f", auth_mode=IRCAuthMode.NONE
+    )
     c.transport = mock.Mock()
 
     from apprise.plugins.irc.state import IRCAction, IRCActionKind
 
     with (
-        mock.patch.object(c.sm, "start_registration", return_value=[
-            IRCAction(IRCActionKind.SEND, line=None),
-            IRCAction(IRCActionKind.SEND, line=""),
-        ]),
+        mock.patch.object(
+            c.sm,
+            "start_registration",
+            return_value=[
+                IRCAction(IRCActionKind.SEND, line=None),
+                IRCAction(IRCActionKind.SEND, line=""),
+            ],
+        ),
         mock.patch.object(c, "_queue") as m_queue,
         mock.patch.object(c, "_flush"),
         mock.patch.object(c, "_handshake"),
@@ -929,10 +958,14 @@ def test_plugin_irc_client_join_queue_ignores_empty_send() -> None:
     from apprise.plugins.irc.state import IRCAction, IRCActionKind
 
     with (
-        mock.patch.object(c.sm, "request_join", return_value=[
-            IRCAction(IRCActionKind.SEND, line=None),
-            IRCAction(IRCActionKind.SEND, line=""),
-        ]),
+        mock.patch.object(
+            c.sm,
+            "request_join",
+            return_value=[
+                IRCAction(IRCActionKind.SEND, line=None),
+                IRCAction(IRCActionKind.SEND, line=""),
+            ],
+        ),
         mock.patch.object(c, "_queue") as m_queue,
         mock.patch.object(c, "_flush"),
         mock.patch.object(c, "_handshake"),
@@ -953,10 +986,14 @@ def test_plugin_irc_client_quit_queue_ignores_empty_send() -> None:
     from apprise.plugins.irc.state import IRCAction, IRCActionKind
 
     with (
-        mock.patch.object(c.sm, "request_quit", return_value=[
-            IRCAction(IRCActionKind.SEND, line=None),
-            IRCAction(IRCActionKind.SEND, line=""),
-        ]),
+        mock.patch.object(
+            c.sm,
+            "request_quit",
+            return_value=[
+                IRCAction(IRCActionKind.SEND, line=None),
+                IRCAction(IRCActionKind.SEND, line=""),
+            ],
+        ),
         mock.patch.object(c, "_queue") as m_queue,
         mock.patch.object(c, "_flush") as m_flush,
         mock.patch("time.monotonic", return_value=0.0),
@@ -1034,8 +1071,8 @@ def test_plugin_irc_send_znc_pass_rewrite() -> None:
     client.check_connection.return_value = True
 
     with mock.patch(
-            "apprise.plugins.irc.base.IRCClient",
-            return_value=client) as m_ctor:
+        "apprise.plugins.irc.base.IRCClient", return_value=client
+    ) as m_ctor:
         assert n.send("body") is True
 
     # Pull the kwargs passed into IRCClient(...)
@@ -1103,8 +1140,9 @@ def test_plugin_irc_client_join_queues_join_line_and_completes() -> None:
 
     # Ensure the queue branch was taken
     assert any(
-        call.args and isinstance(
-            call.args[0], str) and call.args[0].startswith("JOIN ")
+        call.args
+        and isinstance(call.args[0], str)
+        and call.args[0].startswith("JOIN ")
         for call in m_queue.call_args_list
     )
 

@@ -57,8 +57,9 @@ class NotifyImageSize(str, Enum):
 
 
 # Define our image sizes so we can verify if we need to
-NOTIFY_IMAGE_SIZES: frozenset[str] = \
-    frozenset(e.value for e in NotifyImageSize)
+NOTIFY_IMAGE_SIZES: frozenset[str] = frozenset(
+    e.value for e in NotifyImageSize
+)
 
 
 class NotifyFormat(str, Enum):
@@ -134,8 +135,9 @@ class ContentIncludeMode(str, Enum):
 
 
 # Define our file inclusion types so we can verify if we need to
-CONTENT_INCLUDE_MODES: frozenset[str] = \
-    frozenset(e.value for e in ContentIncludeMode)
+CONTENT_INCLUDE_MODES: frozenset[str] = frozenset(
+    e.value for e in ContentIncludeMode
+)
 
 
 class ContentLocation(str, Enum):
@@ -178,8 +180,9 @@ class PersistentStoreMode(str, Enum):
 
 
 # Define our persistent storage modes so we can verify if we need to
-PERSISTENT_STORE_MODES: frozenset[str] = \
-    frozenset(e.value for e in PersistentStoreMode)
+PERSISTENT_STORE_MODES: frozenset[str] = frozenset(
+    e.value for e in PersistentStoreMode
+)
 
 
 class PersistentStoreState(str, Enum):
@@ -198,8 +201,9 @@ class PersistentStoreState(str, Enum):
 
 
 # Define our persistent storage states so we can verify if we need to
-PERSISTENT_STORE_STATES: frozenset[str] = \
-    frozenset(e.value for e in PersistentStoreState)
+PERSISTENT_STORE_STATES: frozenset[str] = frozenset(
+    e.value for e in PersistentStoreState
+)
 
 # This is a reserved tag that is automatically assigned to every
 # Notification Plugin

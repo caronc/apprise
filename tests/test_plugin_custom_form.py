@@ -401,7 +401,6 @@ def test_plugin_custom_form_attachments(mock_request):
         "$file",
         "file$file",
     ):
-
         obj = Apprise.instantiate(
             f"form://user@localhost.localdomain/?attach-as={attach_as}"
         )
