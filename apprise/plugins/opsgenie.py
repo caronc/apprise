@@ -50,7 +50,7 @@ from json import dumps, loads
 
 import requests
 
-from ..common import NOTIFY_TYPES, NotifyType, PersistentStoreMode
+from ..common import NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -103,14 +103,6 @@ OPSGENIE_ACTIONS = (
     OpsgenieAlertAction.ACKNOWLEDGE,
     OpsgenieAlertAction.NOTE,
 )
-
-# Map all support Apprise Categories to Opsgenie Categories
-OPSGENIE_ALERT_MAP = {
-    NotifyType.INFO: OpsgenieAlertAction.CLOSE,
-    NotifyType.SUCCESS: OpsgenieAlertAction.CLOSE,
-    NotifyType.WARNING: OpsgenieAlertAction.NEW,
-    NotifyType.FAILURE: OpsgenieAlertAction.NEW,
-}
 
 
 # Regions
@@ -210,7 +202,7 @@ class NotifyOpsgenie(NotifyBase):
 
     # Defines our default message mapping
     opsgenie_message_map = {
-        # Add a note to existing alert
+        # Add a note to an existing alert
         NotifyType.INFO: OpsgenieAlertAction.NOTE,
         # Close existing alert
         NotifyType.SUCCESS: OpsgenieAlertAction.CLOSE,
@@ -409,7 +401,7 @@ class NotifyOpsgenie(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for k_, v_ in mapping.items():
                 # Get our mapping
-                k = next((t for t in NOTIFY_TYPES if t.startswith(k_)), None)
+                k = next((t for t in NotifyType if t.startswith(k_)), None)
                 if not k:
                     msg = (
                         f"The Opsgenie mapping key specified ({k_}) "
@@ -603,7 +595,7 @@ class NotifyOpsgenie(NotifyBase):
 
         # Get our Opsgenie Action
         action = (
-            OPSGENIE_ALERT_MAP[notify_type]
+            self.mapping[notify_type]
             if self.action == OpsgenieAlertAction.MAP
             else self.action
         )
@@ -823,7 +815,7 @@ class NotifyOpsgenie(NotifyBase):
                     for x in self.targets
                 ]
             ),
-            params=NotifyOpsgenie.urlencode(params),
+            params=NotifyOpsgenie.urlencode(params, safe=":"),
         )
 
     def __len__(self):

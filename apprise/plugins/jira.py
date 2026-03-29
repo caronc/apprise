@@ -46,7 +46,7 @@ from json import dumps, loads
 
 import requests
 
-from ..common import NOTIFY_TYPES, NotifyType, PersistentStoreMode
+from ..common import NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -103,14 +103,6 @@ JIRA_ACTIONS = (
     JiraAlertAction.ACKNOWLEDGE,
     JiraAlertAction.NOTE,
 )
-
-# Map all support Apprise Categories to Jira Categories
-JIRA_ALERT_MAP = {
-    NotifyType.INFO: JiraAlertAction.CLOSE,
-    NotifyType.SUCCESS: JiraAlertAction.CLOSE,
-    NotifyType.WARNING: JiraAlertAction.NEW,
-    NotifyType.FAILURE: JiraAlertAction.NEW,
-}
 
 
 # Regions
@@ -212,7 +204,7 @@ class NotifyJira(NotifyBase):
 
     # Defines our default message mapping
     jira_message_map = {
-        # Add a note to existing alert
+        # Add a note to an existing alert
         NotifyType.INFO: JiraAlertAction.NOTE,
         # Close existing alert
         NotifyType.SUCCESS: JiraAlertAction.CLOSE,
@@ -411,7 +403,7 @@ class NotifyJira(NotifyBase):
         if mapping and isinstance(mapping, dict):
             for _k, _v in mapping.items():
                 # Get our mapping
-                k = next((t for t in NOTIFY_TYPES if t.startswith(_k)), None)
+                k = next((t for t in NotifyType if t.startswith(_k)), None)
                 if not k:
                     msg = (
                         "The Jira mapping key specified ({}) "
@@ -601,7 +593,7 @@ class NotifyJira(NotifyBase):
 
         # Get our Jira Action
         action = (
-            JIRA_ALERT_MAP[notify_type]
+            self.mapping[notify_type]
             if self.action == JiraAlertAction.MAP
             else self.action
         )
@@ -722,7 +714,7 @@ class NotifyJira(NotifyBase):
                 elif action == JiraAlertAction.CLOSE:
                     url = f"{notify_url}/{request_id}/close"
 
-                else:  # action == JiraAlertAction.CLOSE:
+                else:  # action == JiraAlertAction.NOTE:
                     url = f"{notify_url}/{request_id}/notes"
 
                 # Perform our post
@@ -785,7 +777,9 @@ class NotifyJira(NotifyBase):
         params.update({"+{}".format(k): v for k, v in self.details.items()})
 
         # Append our assignment extra's into our parameters
-        params.update({":{}".format(k): v for k, v in self.mapping.items()})
+        params.update(
+            {":{}".format(k.value): v for k, v in self.mapping.items()}
+        )
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -822,7 +816,7 @@ class NotifyJira(NotifyBase):
                     for x in self.targets
                 ]
             ),
-            params=NotifyJira.urlencode(params),
+            params=NotifyJira.urlencode(params, safe=":"),
         )
 
     def __len__(self):

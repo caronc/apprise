@@ -363,8 +363,8 @@ apprise_url_tests = (
             "notify_type": NotifyType.FAILURE,
             # Our response expected server response
             "requests_response_text": JIRA_GOOD_RESPONSE,
-            # Throws a series of connection and transfer exceptions when this flag
-            # is set and tests that we gracfully handle them
+            # Throws a series of connection and transfer exceptions when this
+            # flag is set and tests that we gracfully handle them
             "test_requests_exceptions": True,
         },
     ),
@@ -483,3 +483,81 @@ def test_plugin_jira_edge_case(mock_post):
     # new key is new index
     assert instance.notify("test", "key2", NotifyType.FAILURE) is True
     assert len(instance.store.keys()) == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_jira_mapping(mock_post):
+    """
+    NotifyJira() Action Mapping
+
+    Verify that custom :key=value URL mappings correctly override the default
+    action taken for each notification type, and that self.mapping (not the
+    removed module-level constant) is used in send().
+    """
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = JIRA_GOOD_RESPONSE
+
+    base_url = "https://api.atlassian.com/jsm/ops/integration/v2/alerts"
+
+    # --- Default mapping: INFO → NOTE ---
+    # INFO adds a note to an existing alert; with no stored request IDs there
+    # is nothing to annotate, so no HTTP call is made.  send() still returns
+    # True (nothing to do is not an error).
+    instance = apprise.Apprise.instantiate("jira://apikey/@user")
+    assert isinstance(instance, NotifyJira)
+
+    assert instance.notify("body", "title", NotifyType.INFO) is True
+    assert mock_post.call_count == 0
+
+    # --- Default mapping: WARNING/FAILURE → NEW ---
+    # These should POST to the base alerts URL immediately.
+    mock_post.reset_mock()
+    assert instance.notify("body", "title", NotifyType.WARNING) is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[0][0] == base_url
+
+    mock_post.reset_mock()
+    assert instance.notify("body", "title", NotifyType.FAILURE) is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[0][0] == base_url
+
+    # --- Default mapping: SUCCESS → CLOSE ---
+    # instance already has stored request IDs from the WARNING/FAILURE calls
+    # above, so SUCCESS should POST to the /close endpoint.
+    mock_post.reset_mock()
+    assert instance.notify("body", "title", NotifyType.SUCCESS) is True
+    assert mock_post.call_count >= 1
+    assert mock_post.call_args[0][0].endswith("/close")
+
+    # Fresh instance: SUCCESS with no stored IDs → nothing to close, no call.
+    fresh = apprise.Apprise.instantiate("jira://apikey/@user")
+    mock_post.reset_mock()
+    assert fresh.notify("body", "title", NotifyType.SUCCESS) is True
+    assert mock_post.call_count == 0
+
+    # --- Custom mapping: :info=new overrides INFO → NOTE with INFO → NEW ---
+    instance2 = apprise.Apprise.instantiate("jira://apikey/@user?:info=new")
+    assert isinstance(instance2, NotifyJira)
+
+    mock_post.reset_mock()
+    assert instance2.notify("body", "title", NotifyType.INFO) is True
+    # A POST to the base alerts URL must have been made
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[0][0] == base_url
+
+    # --- URL round-trip preserves custom mapping ---
+    # The colon prefix is kept unencoded for readability.
+    url = instance2.url()
+    assert ":info=new" in url
+
+    # Re-instantiate from the reconstructed URL and verify the mapping
+    instance3 = apprise.Apprise.instantiate(url)
+    assert isinstance(instance3, NotifyJira)
+    assert instance3.mapping[NotifyType.INFO] == "new"
+
+    mock_post.reset_mock()
+    assert instance3.notify("body", "title", NotifyType.INFO) is True
+    assert mock_post.call_count == 1
+    assert mock_post.call_args[0][0] == base_url
