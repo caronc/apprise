@@ -597,18 +597,28 @@ def test_plugin_fluxer_429(
     # Force the rate-limit gate to run
     obj.ratelimit_remaining = 0.0
 
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
-    obj.ratelimit_reset = now + timedelta(seconds=2)
+    # Bracket the call with timestamps so the assertion is
+    # architecture-independent (slow ppc64le build machines can add
+    # hundreds of ms of overhead between captures of datetime.now()).
+    t_before = datetime.now(timezone.utc).replace(tzinfo=None)
+    obj.ratelimit_reset = t_before + timedelta(seconds=2)
 
     with mock.patch.object(obj, "throttle") as m_throttle:
         assert obj.send(body="test") is True
+
+    t_after = datetime.now(timezone.utc).replace(tzinfo=None)
 
     # We expect throttle(wait=~2.0) to be called.
     assert m_throttle.call_count >= 1
     wait = m_throttle.call_args_list[-1][1].get("wait")
 
     assert wait is not None
-    assert wait == pytest.approx(2.0, rel=0, abs=0.10)
+    # wait = ratelimit_reset - now_inside_plugin
+    # The plugin's 'now' is somewhere in [t_before, t_after], so:
+    #   lower bound: ratelimit_reset - t_after = 2.0 - elapsed
+    #   upper bound: ratelimit_reset - t_before = 2.0
+    elapsed = (t_after - t_before).total_seconds()
+    assert (2.0 - elapsed) <= wait <= 2.0
 
     # Call count
     assert mock_post.call_count == 1
