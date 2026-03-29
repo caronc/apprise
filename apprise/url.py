@@ -252,9 +252,8 @@ class URLBase:
                 self.socket_read_timeout = float(kwargs.get("rto"))
             except (TypeError, ValueError):
                 self.logger.warning(
-                    "Invalid socket read timeout (rto) was specified {}".format(
-                        kwargs.get("rto")
-                    )
+                    "Invalid socket read timeout (rto)"
+                    " was specified {}".format(kwargs.get("rto"))
                 )
 
         if "cto" in kwargs:
@@ -263,9 +262,8 @@ class URLBase:
 
             except (TypeError, ValueError):
                 self.logger.warning(
-                    "Invalid socket connect timeout (cto) was specified {}".format(
-                        kwargs.get("cto")
-                    )
+                    "Invalid socket connect timeout (cto)"
+                    " was specified {}".format(kwargs.get("cto"))
                 )
 
         if "tag" in kwargs:

@@ -579,8 +579,8 @@ class NotifyNotificationAPI(NotifyBase):
                 [
                     formataddr(
                         (self.names.get(e, False), e),
-                        # Swap comma for it's escaped url code (if detected) since
-                        # we're using that as a delimiter
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
                         charset="utf-8",
                     ).replace(",", "%2C")
                     for e in self.cc
@@ -593,8 +593,8 @@ class NotifyNotificationAPI(NotifyBase):
                 [
                     formataddr(
                         (self.names.get(e, False), e),
-                        # Swap comma for it's escaped url code (if detected) since
-                        # we're using that as a delimiter
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
                         charset="utf-8",
                     ).replace(",", "%2C")
                     for e in self.bcc

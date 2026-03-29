@@ -295,8 +295,9 @@ class NotifySendPulse(NotifyBase):
 
             except (TypeError, ValueError):
                 # Not a valid integer; ignore entry
-                err = "The SendPulse Template ID specified ({}) is invalid.".format(
-                    template
+                err = (
+                    "The SendPulse Template ID specified"
+                    f" ({template}) is invalid."
                 )
                 self.logger.warning(err)
                 raise TypeError(err) from None
@@ -384,8 +385,8 @@ class NotifySendPulse(NotifyBase):
                 [
                     formataddr(
                         (self.names.get(e, False), e),
-                        # Swap comma for it's escaped url code (if detected) since
-                        # we're using that as a delimiter
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
                         charset="utf-8",
                     ).replace(",", "%2C")
                     for e in self.cc
@@ -398,8 +399,8 @@ class NotifySendPulse(NotifyBase):
                 [
                     formataddr(
                         (self.names.get(e, False), e),
-                        # Swap comma for it's escaped url code (if detected) since
-                        # we're using that as a delimiter
+                        # Swap comma for its escaped url code (if
+                        # detected) since we use it as a delimiter
                         charset="utf-8",
                     ).replace(",", "%2C")
                     for e in self.bcc

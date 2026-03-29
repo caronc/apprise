@@ -344,7 +344,9 @@ class NotifyWorkflows(NotifyBase):
                 "type": "message",
                 "attachments": [
                     {
-                        "contentType": "application/vnd.microsoft.card.adaptive",
+                        "contentType": (
+                            "application/vnd.microsoft.card.adaptive"
+                        ),
                         "contentUrl": None,
                         "content": {
                             "$schema": schema,

@@ -302,9 +302,9 @@ class CustomHelpCommand(click.Command):
                     (
                         "list",
                         (
-                            "List all URL IDs associated with detected URL(s)."
-                            " This is also the default action run if nothing is"
-                            " provided"
+                            "List all URL IDs associated with detected"
+                            " URL(s). This is also the default action"
+                            " run if nothing is provided"
                         ),
                     ),
                     (

@@ -308,8 +308,8 @@ class NotifyAppriseAPI(NotifyBase):
                                 f"file{no:02d}",
                                 (
                                     filename,
-                                    # file handle is safely closed in `finally`;
-                                    # inline open is intentional
+                                    # file handle safely closed in
+                                    # `finally`; inline open intentional
                                     open(attachment.path, "rb"),  # noqa: SIM115
                                     attachment.mimetype,
                                 ),

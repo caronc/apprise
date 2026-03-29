@@ -168,9 +168,8 @@ class NotifyGLib(NotifyBase):
                 "default": GLibUrgency.NORMAL,
             },
             "priority": {
-                # Apprise uses 'priority' everywhere; it's just a nice consistent
-                # feel to be able to use it here as well. Just map the
-                # value back to 'priority'
+                # Apprise uses 'priority' everywhere; it's just a
+                # nice consistent feel. Map the value back to urgency.
                 "alias_of": "urgency",
             },
             "x": {
@@ -233,8 +232,9 @@ class NotifyGLib(NotifyBase):
 
             except (TypeError, ValueError):
                 # Invalid x/y values specified
-                msg = "The x,y coordinates specified ({},{}) are invalid.".format(
-                    x_axis, y_axis
+                msg = (
+                    "The x,y coordinates specified"
+                    f" ({x_axis},{y_axis}) are invalid."
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg) from None

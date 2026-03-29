@@ -226,8 +226,8 @@ class NotifyD7Networks(NotifyBase):
                     "recipients": None,
                     "content": body,
                     "data_coding":
-                    # auto is a better substitute over 'text' as text is easier to
-                    # detect from a post than `unicode` is.
+                    # auto is a better substitute over 'text' as text
+                    # is easier to detect from a post than `unicode`.
                     "auto" if not self.unicode else "unicode",
                 }
             ],
@@ -332,10 +332,10 @@ class NotifyD7Networks(NotifyBase):
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred sending D7 Networks:{} ".format(
+                    "A Connection error occurred sending"
+                    " D7 Networks:{} notification.".format(
                         ", ".join(self.targets)
                     )
-                    + "notification."
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
                 # Mark our failure

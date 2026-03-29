@@ -539,14 +539,11 @@ class NotifyMailgun(NotifyBase):
 
             # For logging output of success and errors; we get a head count
             # of our outbound details:
+            _batch = self.targets[index : index + batch_size]
             verbose_dest = (
-                ", ".join(
-                    [x[1] for x in self.targets[index : index + batch_size]]
-                )
-                if len(self.targets[index : index + batch_size]) <= 3
-                else (
-                    f"{len(self.targets[index : index + batch_size])} recipients"
-                )
+                ", ".join([x[1] for x in _batch])
+                if len(_batch) <= 3
+                else f"{len(_batch)} recipients"
             )
 
             # Always call throttle before any remote server i/o is made

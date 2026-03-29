@@ -462,8 +462,8 @@ apprise_url_tests = (
         "napi://user@client_id/cs19/id/user@example.ca",
         {
             "instance": NotifyNotificationAPI,
-            # Throws a series of connection and transfer exceptions when this flag
-            # is set and tests that we gracefully handle them
+            # Throws connection and transfer exceptions when this
+            # flag is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
             "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
         },

@@ -310,7 +310,9 @@ def test_plugin_whatsapp_edge_cases(mock_post):
         {
             "error": {
                 "code": 21211,
-                "message": "The 'To' number +1234567 is not a valid phone number.",
+                "message": (
+                    "The 'To' number +1234567 is not a valid phone number."
+                ),
             },
         }
     )

@@ -448,7 +448,7 @@ class NotifyOffice365(NotifyBase):
                     small_attachments.append(
                         {
                             "@odata.type": "#microsoft.graph.fileAttachment",
-                            # Name of the attachment (as it should appear in email)
+                            # Name of attachment (as it appears in email)
                             "name": (
                                 attachment.name
                                 if attachment.name

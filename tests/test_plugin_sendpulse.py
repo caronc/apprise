@@ -349,8 +349,8 @@ apprise_url_tests = (
         "sendpulse://user@example.com/client_id/cs19/",
         {
             "instance": NotifySendPulse,
-            # Throws a series of connection and transfer exceptions when this flag
-            # is set and tests that we gracefully handle them
+            # Throws connection and transfer exceptions when this
+            # flag is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
             "requests_response_text": SENDPULSE_GOOD_RESPONSE,
         },

@@ -381,7 +381,9 @@ def test_plugin_sparkpost_throttling(mock_post):
         {
             "errors": [
                 {
-                    "description": "Unconfigured or unverified sending domain.",
+                    "description": (
+                        "Unconfigured or unverified sending domain."
+                    ),
                     "code": "7001",
                     "message": "Invalid domain",
                 }
