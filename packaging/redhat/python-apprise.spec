@@ -63,23 +63,23 @@ notification services. It supports sending alerts to platforms such as: \
 `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `FCM`, `Feishu`, `Flock`, `Fluxer`, \
 `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, `Guilded`, \
-`Home Assistant`, `httpSMS`, `IFTTT`, `IRC`, `Jellyfin`, `Join`, `Kavenegar`, \
-`KODI`, `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, \
-`Mastodon`, `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
-`Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, \
-`Nextcloud`, `NextcloudTalk`, `Notica`, `NotificationAPI`, `Notifiarr`, \
-`Notifico`, `ntfy`, `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, \
-`PagerTree`, `ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, `Pushalot`, \
-`PushBullet`, `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, \
-`Pushy`, `PushDeer`, `QQ Push`, `Revolt`, `Reddit`, `Resend`, \
-`Rocket.Chat`, `RSyslog`, `SendGrid`, `SendPulse`, `ServerChan`, `Seven`, \
-`SFR`, `Signal`, `SIGNL4`, `SimplePush`, `Sinch`, `Slack`, `SMPP`, \
-`SMSEagle`, `SMS Manager`, `SMTP2Go`, `SparkPost`, `Splunk`, `Spike`, \
-`Spug Push`, `Super Toasty`, `Streamlabs`, `Stride`, `Synology Chat`, \
-`Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, `Twilio`, \
-`Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, `Vonage`, \
-`WebPush`, `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, `WxPusher`,
-`XBMC`, `XMPP`, and `Zulip`.}
+`Home Assistant`, `httpSMS`, `IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, \
+`Kavenegar`, `KODI`, `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, \
+`Mailgun`, `Mastodon`, `Mattermost`, `Matrix`, `MessageBird`, \
+`Microsoft Windows`, `Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, \
+`MyAndroid`, `Nexmo`, `Nextcloud`, `NextcloudTalk`, `Notica`, \
+`NotificationAPI`, `Notifiarr`, `Notifico`, `ntfy`, `Office365`, \
+`OneSignal`, `Opsgenie`, `PagerDuty`, `PagerTree`, `ParsePlatform`, `Plivo`, \
+`PopcornNotify`, `Prowl`, `Pushalot`, `PushBullet`, `Pushjet`, `PushMe`, \
+`Pushover`, `Pushplus`, `PushSafer`, `Pushy`, `PushDeer`, `QQ Push`, \
+`Revolt`, `Reddit`, `Resend`, `Rocket.Chat`, `RSyslog`, `SendGrid`, \
+`SendPulse`, `ServerChan`, `Seven`, `SFR`, `Signal`, `SIGNL4`, `SimplePush`, \
+`Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, `SparkPost`, \
+`Splunk`, `Spike`, `Spug Push`, `Super Toasty`, `Streamlabs`, `Stride`, \
+`Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, \
+`Twilio`, `Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, \
+`Vonage`, `WebPush`, `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, \
+`WxPusher`, `XBMC`, `XMPP`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
 Version:        1.9.9
