@@ -137,6 +137,69 @@ apprise_url_tests = (
             "response": False,
         },
     ),
+    # API Key + Valid User + 1 Group key (percent-encoded)
+    (
+        "pover://{}@{}/%23{}".format("u" * 30, "a" * 30, "g" * 30),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + 1 Group key (literal #)
+    (
+        "pover://{}@{}/#{}/".format("u" * 30, "a" * 30, "g" * 30),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + Group key (via to= percent-encoded)
+    (
+        "pover://{}@{}?to=%23{}".format("u" * 30, "a" * 30, "g" * 30),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + 2 Group keys (percent-encoded)
+    (
+        "pover://{}@{}/%23{}/%23{}".format(
+            "u" * 30, "a" * 30, "g" * 30, "h" * 30
+        ),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + 2 Group keys (literal #)
+    (
+        "pover://{}@{}/#{}/#{}/".format(
+            "u" * 30, "a" * 30, "g" * 30, "h" * 30
+        ),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + 1 Device + 1 Group key (percent-encoded)
+    (
+        "pover://{}@{}/DEVICE/%23{}".format("u" * 30, "a" * 30, "g" * 30),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + 1 Device + 1 Group key (literal #)
+    (
+        "pover://{}@{}/DEVICE/#{}".format("u" * 30, "a" * 30, "g" * 30),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # API Key + Valid User + invalid group (contains invalid chars)
+    (
+        "pover://{}@{}/%23invalid-group/".format("u" * 30, "a" * 30),
+        {
+            "instance": NotifyPushover,
+            # Notify will return False since the group key is invalid
+            # (contains a dash which is not alphanumeric)
+            "response": False,
+        },
+    ),
     # API Key + priority setting
     (
         "pover://{}@{}?priority=high".format("u" * 30, "a" * 30),
@@ -421,8 +484,9 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     obj = NotifyPushover(user_key=user_key, token=token, targets=devices)
     assert isinstance(obj, NotifyPushover)
-    # Our invalid device is ignored
-    assert len(obj.targets) == 2
+    # Our invalid device is ignored; 2 valid devices remain
+    assert len(obj.devices) == 2
+    assert len(obj.groups) == 0
 
     # We notify the 2 devices loaded
     assert (
@@ -434,9 +498,10 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     obj = NotifyPushover(user_key=user_key, token=token)
     assert isinstance(obj, NotifyPushover)
-    # Default is to send to all devices, so there will be a
-    # device defined here
-    assert len(obj.targets) == 1
+    # Default is to send to all devices (sentinel placed in devices list)
+    assert len(obj.devices) == 1
+    assert len(obj.groups) == 0
+    assert len(obj) == 1
 
     # This call succeeds because all of the devices are valid
     assert (
@@ -448,9 +513,50 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     obj = NotifyPushover(user_key=user_key, token=token, targets=set())
     assert isinstance(obj, NotifyPushover)
-    # Default is to send to all devices, so there will be a
-    # device defined here
-    assert len(obj.targets) == 1
+    # Default is to send to all devices (sentinel placed in devices list)
+    assert len(obj.devices) == 1
+    assert len(obj.groups) == 0
+    assert len(obj) == 1
+
+    # Group targets
+    group_key = "g" * 30
+    obj = NotifyPushover(
+        user_key=user_key, token=token, targets=f"#{group_key}"
+    )
+    assert isinstance(obj, NotifyPushover)
+    assert len(obj.devices) == 0
+    assert len(obj.groups) == 1
+    assert obj.groups[0] == group_key
+    assert len(obj) == 1
+
+    # Verify notification to a group succeeds (separate API call per group)
+    assert (
+        obj.notify(
+            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        )
+        is True
+    )
+
+    # Mix of device and group → 2 HTTP calls (1 device batch + 1 group)
+    obj = NotifyPushover(
+        user_key=user_key, token=token, targets=["device1", f"#{group_key}"]
+    )
+    assert isinstance(obj, NotifyPushover)
+    assert len(obj.devices) == 1
+    assert len(obj.groups) == 1
+    assert len(obj) == 2
+
+    # Invalid group key (contains dash — not alphanumeric)
+    obj = NotifyPushover(
+        user_key=user_key, token=token, targets="#invalid-group"
+    )
+    assert isinstance(obj, NotifyPushover)
+    # Invalid target is rejected; both lists empty → send() returns False
+    assert len(obj.devices) == 0
+    assert len(obj.groups) == 0
+
+    # Always 1 is returned as minimum
+    assert len(obj) == 1
 
     # No User Key specified
     with pytest.raises(TypeError):
