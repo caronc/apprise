@@ -222,10 +222,7 @@ class NotifyWebexTeams(NotifyBase):
                 (m for m in WEBEX_TEAMS_MODES if m.startswith(mode)), None
             )
             if self.mode not in WEBEX_TEAMS_MODES:
-                msg = (
-                    "The Webex Teams mode specified"
-                    f" ({mode}) is invalid."
-                )
+                msg = f"The Webex Teams mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -268,9 +265,7 @@ class NotifyWebexTeams(NotifyBase):
             # Bot access token: prefer 'access_token', fall back to 'token'
             _at = access_token or token
             if not _at:
-                msg = (
-                    "A Webex Teams bot access token must be specified."
-                )
+                msg = "A Webex Teams bot access token must be specified."
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -359,8 +354,7 @@ class NotifyWebexTeams(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                "A Connection error occurred sending"
-                " Webex Teams notification."
+                "A Connection error occurred sending Webex Teams notification."
             )
             self.logger.debug(f"Socket Exception: {e!s}")
             return False
@@ -372,8 +366,7 @@ class NotifyWebexTeams(NotifyBase):
 
         if not self.targets:
             self.logger.warning(
-                "Webex Teams Bot mode has no room IDs to notify, "
-                "aborting."
+                "Webex Teams Bot mode has no room IDs to notify, aborting."
             )
             return False
 
@@ -398,11 +391,7 @@ class NotifyWebexTeams(NotifyBase):
             else "text"
         )
 
-        has_attachment = (
-            attach
-            and self.attachment_support
-            and len(attach) > 0
-        )
+        has_attachment = attach and self.attachment_support and len(attach) > 0
 
         if not has_attachment:
             # --- Text-only message sent as JSON ---
@@ -429,10 +418,8 @@ class NotifyWebexTeams(NotifyBase):
                     timeout=self.request_timeout,
                 )
                 if r.status_code != requests.codes.ok:
-                    status_str = (
-                        NotifyWebexTeams.http_response_code_lookup(
-                            r.status_code, WEBEX_HTTP_ERROR_MAP
-                        )
+                    status_str = NotifyWebexTeams.http_response_code_lookup(
+                        r.status_code, WEBEX_HTTP_ERROR_MAP
                     )
                     self.logger.warning(
                         "Failed to send Webex Teams Bot"
@@ -450,8 +437,7 @@ class NotifyWebexTeams(NotifyBase):
                     return False
 
                 self.logger.info(
-                    "Sent Webex Teams Bot notification"
-                    f" to room {room_id}."
+                    f"Sent Webex Teams Bot notification to room {room_id}."
                 )
 
             except requests.RequestException as e:
@@ -515,10 +501,8 @@ class NotifyWebexTeams(NotifyBase):
                 )
 
                 if r.status_code != requests.codes.ok:
-                    status_str = (
-                        NotifyWebexTeams.http_response_code_lookup(
-                            r.status_code, WEBEX_HTTP_ERROR_MAP
-                        )
+                    status_str = NotifyWebexTeams.http_response_code_lookup(
+                        r.status_code, WEBEX_HTTP_ERROR_MAP
                     )
                     self.logger.warning(
                         "Failed to send Webex Teams attachment"
@@ -551,9 +535,7 @@ class NotifyWebexTeams(NotifyBase):
             except OSError as e:
                 self.logger.warning(
                     "An I/O error occurred while reading {}.".format(
-                        attachment.name
-                        if attachment.name
-                        else "attachment"
+                        attachment.name if attachment.name else "attachment"
                     )
                 )
                 self.logger.debug(f"I/O Exception: {e!s}")
@@ -570,11 +552,7 @@ class NotifyWebexTeams(NotifyBase):
     def body_maxlen(self):
         """The maximum allowable characters allowed in the body per message.
         Webhook mode is limited to 1000 chars; the Bot API allows 7439."""
-        return (
-            1000
-            if self.mode == WebexTeamsMode.WEBHOOK
-            else 7439
-        )
+        return 1000 if self.mode == WebexTeamsMode.WEBHOOK else 7439
 
     @property
     def url_identifier(self):
@@ -593,9 +571,7 @@ class NotifyWebexTeams(NotifyBase):
         """Returns the URL built dynamically based on specified arguments."""
 
         params = {"mode": self.mode}
-        params.update(
-            self.url_parameters(privacy=privacy, *args, **kwargs)
-        )
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.mode == WebexTeamsMode.WEBHOOK:
             return "{schema}://{token}/?{params}".format(
@@ -609,10 +585,7 @@ class NotifyWebexTeams(NotifyBase):
             schema=self.secure_protocol[0],
             token=self.pprint(self.access_token, privacy, safe=""),
             targets="/".join(
-                [
-                    NotifyWebexTeams.quote(r, safe="")
-                    for r in self.targets
-                ]
+                [NotifyWebexTeams.quote(r, safe="") for r in self.targets]
             ),
             params=NotifyWebexTeams.urlencode(params),
         )
@@ -627,9 +600,7 @@ class NotifyWebexTeams(NotifyBase):
 
         # Explicit mode parameter wins
         if "mode" in results["qsd"] and results["qsd"]["mode"]:
-            results["mode"] = NotifyWebexTeams.unquote(
-                results["qsd"]["mode"]
-            )
+            results["mode"] = NotifyWebexTeams.unquote(results["qsd"]["mode"])
 
         # Pull additional room-ID path entries (bot mode)
         entries = NotifyWebexTeams.split_path(results["fullpath"])

@@ -105,9 +105,7 @@ apprise_url_tests = (
     ),
     # Support Native Webhook URLs
     (
-        "https://api.ciscospark.com/v1/webhooks/incoming/{}".format(
-            "a" * 80
-        ),
+        "https://api.ciscospark.com/v1/webhooks/incoming/{}".format("a" * 80),
         {
             # token provided - we're good
             "instance": NotifyWebexTeams,
@@ -115,9 +113,7 @@ apprise_url_tests = (
     ),
     # Support New Native Webhook URLs
     (
-        "https://webexapis.com/v1/webhooks/incoming/{}".format(
-            "a" * 100
-        ),
+        "https://webexapis.com/v1/webhooks/incoming/{}".format("a" * 100),
         {
             # token provided - we're good
             "instance": NotifyWebexTeams,
@@ -170,9 +166,7 @@ apprise_url_tests = (
         {
             "instance": NotifyWebexTeams,
             "response": False,
-            "requests_response_code": (
-                requests.codes.internal_server_error
-            ),
+            "requests_response_code": (requests.codes.internal_server_error),
         },
     ),
     # Webhook mode: unusual HTTP response code
@@ -201,9 +195,7 @@ apprise_url_tests = (
         {
             "instance": NotifyWebexTeams,
             "response": False,
-            "requests_response_code": (
-                requests.codes.internal_server_error
-            ),
+            "requests_response_code": (requests.codes.internal_server_error),
         },
     ),
     # Bot mode: unusual HTTP response code
@@ -298,9 +290,7 @@ def test_plugin_webex_teams_webhook_mode():
 def test_plugin_webex_teams_bot_mode():
     """NotifyWebexTeams() Bot mode direct tests."""
 
-    obj = NotifyWebexTeams(
-        access_token=BOT_TOKEN, targets=[ROOM_ID]
-    )
+    obj = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[ROOM_ID])
     assert isinstance(obj, NotifyWebexTeams)
     assert obj.mode == WebexTeamsMode.BOT
     assert obj.access_token == BOT_TOKEN
@@ -335,9 +325,7 @@ def test_plugin_webex_teams_bot_mode():
     assert len(obj3.targets) == 2
 
     # No room IDs -> loads fine, but send() returns False
-    obj_no_rooms = NotifyWebexTeams(
-        access_token=BOT_TOKEN, targets=[]
-    )
+    obj_no_rooms = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[])
     assert isinstance(obj_no_rooms, NotifyWebexTeams)
     assert obj_no_rooms.send(body="test") is False
 
@@ -350,9 +338,7 @@ def test_plugin_webex_teams_bot_mode():
         NotifyWebexTeams(mode="bot", targets=[ROOM_ID])
 
     # Explicit mode=bot on a short (webhook-style) token
-    obj4 = NotifyWebexTeams(
-        token="a" * 80, mode="bot", targets=[ROOM_ID]
-    )
+    obj4 = NotifyWebexTeams(token="a" * 80, mode="bot", targets=[ROOM_ID])
     assert obj4.mode == WebexTeamsMode.BOT
     # The 'token' argument is used as access_token in bot mode
     assert obj4.access_token == "a" * 80
@@ -374,9 +360,7 @@ def test_plugin_webex_teams_body_maxlen():
     assert obj.body_maxlen == 1000
 
     # Bot mode: 7439 chars
-    obj = NotifyWebexTeams(
-        access_token=BOT_TOKEN, targets=[ROOM_ID]
-    )
+    obj = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[ROOM_ID])
     assert obj.body_maxlen == 7439
 
 
@@ -393,15 +377,11 @@ def test_plugin_webex_teams_mode_detection():
     assert obj.mode == WebexTeamsMode.WEBHOOK
 
     # Token longer than 160 chars -> fails webhook regex -> BOT
-    obj = NotifyWebexTeams(
-        token="a" * 200, targets=[ROOM_ID]
-    )
+    obj = NotifyWebexTeams(token="a" * 200, targets=[ROOM_ID])
     assert obj.mode == WebexTeamsMode.BOT
 
     # Token with hyphens (non-alphanumeric) -> fails webhook regex -> BOT
-    obj = NotifyWebexTeams(
-        access_token=BOT_TOKEN, targets=[ROOM_ID]
-    )
+    obj = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[ROOM_ID])
     assert obj.mode == WebexTeamsMode.BOT
 
 
@@ -409,9 +389,7 @@ def test_plugin_webex_teams_url_parsing():
     """NotifyWebexTeams() URL parsing edge cases."""
 
     # Webhook via ?token= param
-    result = NotifyWebexTeams.parse_url(
-        "wxteams://?token={}".format("a" * 80)
-    )
+    result = NotifyWebexTeams.parse_url("wxteams://?token={}".format("a" * 80))
     assert result is not None
     obj = NotifyWebexTeams(**result)
     assert obj.mode == WebexTeamsMode.WEBHOOK
@@ -446,9 +424,7 @@ def test_plugin_webex_teams_url_parsing():
 
     # Native webhook URL
     result = NotifyWebexTeams.parse_native_url(
-        "https://api.ciscospark.com/v1/webhooks/incoming/{}".format(
-            "a" * 80
-        )
+        "https://api.ciscospark.com/v1/webhooks/incoming/{}".format("a" * 80)
     )
     assert result is not None
     obj = NotifyWebexTeams(**result)
@@ -456,18 +432,19 @@ def test_plugin_webex_teams_url_parsing():
 
     # New native webhook URL
     result = NotifyWebexTeams.parse_native_url(
-        "https://webexapis.com/v1/webhooks/incoming/{}".format(
-            "a" * 100
-        )
+        "https://webexapis.com/v1/webhooks/incoming/{}".format("a" * 100)
     )
     assert result is not None
     obj = NotifyWebexTeams(**result)
     assert obj.mode == WebexTeamsMode.WEBHOOK
 
     # parse_native_url returns None for non-matching URLs
-    assert NotifyWebexTeams.parse_native_url(
-        "https://example.com/not/a/webex/url"
-    ) is None
+    assert (
+        NotifyWebexTeams.parse_native_url(
+            "https://example.com/not/a/webex/url"
+        )
+        is None
+    )
 
     # Webhook mode forced with ?mode=webhook even with path entries
     result = NotifyWebexTeams.parse_url(
@@ -547,9 +524,7 @@ def test_plugin_webex_teams_bot_send(mock_post):
     response.content = b""
     mock_post.return_value = response
 
-    obj = NotifyWebexTeams(
-        access_token=BOT_TOKEN, targets=[ROOM_ID]
-    )
+    obj = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[ROOM_ID])
 
     # Successful text send
     assert obj.send(body="hello from bot") is True
@@ -614,9 +589,7 @@ def test_plugin_webex_teams_bot_attachments(mock_post):
     response.content = b""
     mock_post.return_value = response
 
-    obj = NotifyWebexTeams(
-        access_token=BOT_TOKEN, targets=[ROOM_ID]
-    )
+    obj = NotifyWebexTeams(access_token=BOT_TOKEN, targets=[ROOM_ID])
 
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
@@ -697,9 +670,7 @@ def test_plugin_webex_teams_bot_attachments(mock_post):
 
     # Invalid/inaccessible attachment
     mock_post.reset_mock()
-    invalid_path = os.path.join(
-        TEST_VAR_DIR, "/invalid/path/to/file.jpg"
-    )
+    invalid_path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/file.jpg")
     bad_attach = AppriseAttachment(invalid_path)
     assert (
         obj.notify(
@@ -731,7 +702,5 @@ def test_plugin_webex_teams_apprise_integration(mock_post):
 
     # Bot mode via Apprise
     app2 = Apprise()
-    assert app2.add(
-        "wxteams://{}/{}".format(BOT_TOKEN, ROOM_ID)
-    )
+    assert app2.add("wxteams://{}/{}".format(BOT_TOKEN, ROOM_ID))
     assert app2.notify(body="bot test") is True
