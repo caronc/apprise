@@ -186,13 +186,19 @@ class NotifyHomeAssistant(NotifyBase):
     )
 
     def __init__(
-        self, accesstoken, nid=None, targets=None, batch=None, **kwargs
+        self,
+        accesstoken,
+        nid=None,
+        targets=None,
+        batch=None,
+        prefix=None,
+        **kwargs,
     ):
         """Initialize Home Assistant Object."""
         super().__init__(**kwargs)
 
         self.fullpath = kwargs.get("fullpath", "")
-        self.prefix = kwargs.get("prefix", "")
+        self.prefix = prefix if prefix else ""
 
         if not (self.secure or self.port):
             # Use default insecure port
