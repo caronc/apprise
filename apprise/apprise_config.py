@@ -35,6 +35,7 @@ from .config.base import ConfigBase
 from .logger import logger
 from .manager_config import ConfigurationManager
 from .url import URLBase
+from .utils.cwe312 import cwe312_url
 from .utils.logic import is_exclusive_match
 from .utils.parse import GET_SCHEMA_RE, parse_list
 
@@ -388,7 +389,7 @@ class AppriseConfig:
 
             # Some basic validation
             if schema not in C_MGR:
-                logger.warning(f"Unsupported schema {schema}.")
+                logger.error(f"Unsupported schema {schema}.")
                 return None
 
         # Parse our url details of the server object as dictionary containing
@@ -397,7 +398,14 @@ class AppriseConfig:
 
         if not results:
             # Failed to parse the server URL
-            logger.warning(f"Unparseable URL {url}.")
+            # CWE-312 (Secure Logging) Handling
+            secure_logging = (
+                asset.secure_logging
+                if isinstance(asset, AppriseAsset)
+                else True
+            )
+            loggable_url = url if not secure_logging else cwe312_url(url)
+            logger.error(f"Unparseable URL {loggable_url}.")
             return None
 
         # Build a list of tags to associate with the newly added notifications
@@ -426,7 +434,13 @@ class AppriseConfig:
 
             except Exception:
                 # the arguments are invalid or can not be used.
-                logger.warning(f"Could not load URL: {url}")
+                # CWE-312 (Secure Logging) Handling
+                loggable_url = (
+                    url
+                    if not results["asset"].secure_logging
+                    else cwe312_url(url)
+                )
+                logger.error(f"Could not load URL: {loggable_url}")
                 return None
 
         else:
