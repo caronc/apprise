@@ -247,7 +247,7 @@ class ConfigBase(URLBase):
 
                     # Some basic validation
                     if schema not in C_MGR:
-                        ConfigBase.logger.warning(
+                        ConfigBase.logger.error(
                             f"Unsupported include schema {schema}."
                         )
                         continue
@@ -262,7 +262,7 @@ class ConfigBase(URLBase):
                 results = C_MGR[schema].parse_url(url)
                 if not results:
                     # Failed to parse the server URL
-                    self.logger.warning(
+                    self.logger.error(
                         f"Unparseable include URL {loggable_url}"
                     )
                     continue
@@ -305,7 +305,7 @@ class ConfigBase(URLBase):
 
                 except Exception as e:
                     # the arguments are invalid or can not be used.
-                    self.logger.warning(
+                    self.logger.error(
                         f"Could not load include URL: {loggable_url}"
                     )
                     self.logger.debug(f"Loading Exception: {e!s}")
@@ -760,8 +760,9 @@ class ConfigBase(URLBase):
                 url, secure_logging=asset.secure_logging
             )
             if results is None:
-                # Failed to parse the server URL
-                ConfigBase.logger.warning(
+                # url_to_dict() already logged an error with the URL;
+                # repeat at debug level with line number for context.
+                ConfigBase.logger.debug(
                     f"Unparseable URL {loggable_url} on line {line}."
                 )
                 continue
@@ -819,7 +820,7 @@ class ConfigBase(URLBase):
 
             except Exception as e:
                 # the arguments are invalid or can not be used.
-                ConfigBase.logger.warning(
+                ConfigBase.logger.error(
                     "Could not load URL {} on line {}.".format(
                         entry["loggable_url"], entry["line"]
                     )
@@ -1088,7 +1089,9 @@ class ConfigBase(URLBase):
                     url, secure_logging=asset.secure_logging
                 )
                 if results_ is None:
-                    ConfigBase.logger.warning(
+                    # url_to_dict() already logged an error with the URL;
+                    # repeat at debug level with entry number for context.
+                    ConfigBase.logger.debug(
                         f"Unparseable URL {loggable_url}, entry #{no + 1}"
                     )
                     continue
@@ -1336,7 +1339,7 @@ class ConfigBase(URLBase):
 
             except Exception as e:
                 # the arguments are invalid or can not be used.
-                ConfigBase.logger.warning(
+                ConfigBase.logger.error(
                     "Could not load Apprise YAML configuration "
                     "entry #{}, item #{}".format(entry["entry"], entry["item"])
                 )
