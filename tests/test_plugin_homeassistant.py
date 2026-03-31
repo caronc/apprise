@@ -262,7 +262,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/notify/service"
     )
     posted_json = json.loads(mock_post.call_args_list[0][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" not in posted_json
     assert "message" in posted_json
     assert posted_json["message"] == "test"
@@ -296,7 +296,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/domain1/service3"
     )
     posted_json = json.loads(mock_post.call_args_list[0][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" not in posted_json
     assert "message" in posted_json
     assert posted_json["message"] == "test-body"
@@ -308,7 +308,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/notify/service2"
     )
     posted_json = json.loads(mock_post.call_args_list[1][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" not in posted_json
     assert "message" in posted_json
     assert posted_json["message"] == "test-body"
@@ -320,7 +320,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/notify/serviceA"
     )
     posted_json = json.loads(mock_post.call_args_list[2][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" in posted_json
     assert isinstance(posted_json["targets"], list)
     assert len(posted_json["targets"]) == 1
@@ -335,7 +335,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/notify/serviceA"
     )
     posted_json = json.loads(mock_post.call_args_list[3][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" in posted_json
     assert isinstance(posted_json["targets"], list)
     assert len(posted_json["targets"]) == 1
@@ -372,7 +372,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/domain1/service3"
     )
     posted_json = json.loads(mock_post.call_args_list[0][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" not in posted_json
     assert "message" in posted_json
     assert posted_json["message"] == "test-body"
@@ -384,7 +384,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/notify/service2"
     )
     posted_json = json.loads(mock_post.call_args_list[1][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" not in posted_json
     assert "message" in posted_json
     assert posted_json["message"] == "test-body"
@@ -396,7 +396,7 @@ def test_plugin_homeassistant_general(mock_post):
         == "http://localhost:8123/api/services/notify/serviceA"
     )
     posted_json = json.loads(mock_post.call_args_list[2][1]["data"])
-    assert "notification_id" in posted_json
+    assert "notification_id" not in posted_json
     assert "targets" in posted_json
     assert isinstance(posted_json["targets"], list)
     # Our batch groups our targets

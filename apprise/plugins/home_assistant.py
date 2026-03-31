@@ -101,11 +101,17 @@ class NotifyHomeAssistant(NotifyBase):
     # Define object templates
     templates = (
         "{schema}://{host}/{accesstoken}",
+        "{schema}://{host}/{accesstoken}/{targets}",
         "{schema}://{host}:{port}/{accesstoken}",
+        "{schema}://{host}:{port}/{accesstoken}/{targets}",
         "{schema}://{user}@{host}/{accesstoken}",
+        "{schema}://{user}@{host}/{accesstoken}/{targets}",
         "{schema}://{user}@{host}:{port}/{accesstoken}",
+        "{schema}://{user}@{host}:{port}/{accesstoken}/{targets}",
         "{schema}://{user}:{password}@{host}/{accesstoken}",
+        "{schema}://{user}:{password}@{host}/{accesstoken}/{targets}",
         "{schema}://{user}:{password}@{host}:{port}/{accesstoken}",
+        "{schema}://{user}:{password}@{host}:{port}/{accesstoken}/{targets}",
     )
 
     # Define our template tokens
@@ -167,6 +173,14 @@ class NotifyHomeAssistant(NotifyBase):
             },
             "to": {
                 "alias_of": "targets",
+            },
+            "token": {
+                # Shorthand alias for accesstoken in query string
+                "alias_of": "accesstoken",
+            },
+            "prefix": {
+                "name": _("Path Prefix"),
+                "type": "string",
             },
         },
     )
@@ -245,13 +259,11 @@ class NotifyHomeAssistant(NotifyBase):
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Sends Message."""
 
-        # Prepare our persistent_notification.create payload
+        # Base payload; notification_id is only added for persistent
+        # notification calls — other service domains reject it.
         payload = {
             "title": title,
             "message": body,
-            # Use a unique ID so we don't over-write the last message
-            # we posted. Otherwise use the notification id specified
-            "notification_id": self.nid if self.nid else str(uuid4()),
         }
 
         # Prepare our headers
@@ -321,17 +333,25 @@ class NotifyHomeAssistant(NotifyBase):
 
                     continue
 
-            if not self._ha_post(base_url, payload, headers, auth):
+            if not self._ha_post(
+                base_url,
+                payload,
+                headers,
+                auth,
+                persistent=not has_targets,
+            ):
                 return False
 
         return True
 
-    def _ha_post(self, url, payload, headers, auth=None):
+    def _ha_post(self, url, payload, headers, auth=None, persistent=False):
         """
         Wrapper to single upstream server post
         """
-        # Notification ID
-        payload["notification_id"] = self.nid if self.nid else str(uuid4())
+        # notification_id is only meaningful for persistent_notification;
+        # other HA service domains reject it with a 400.
+        if persistent:
+            payload["notification_id"] = self.nid if self.nid else str(uuid4())
 
         self.logger.debug(
             "Home Assistant POST URL: {} (cert_verify={!r})".format(
@@ -398,11 +418,7 @@ class NotifyHomeAssistant(NotifyBase):
             self.user,
             self.password,
             self.host,
-            (
-                self.port
-                if self.port
-                else (443 if self.secure else self.default_insecure_port)
-            ),
+            self.port,
             self.fullpath.rstrip("/"),
             self.accesstoken,
         )
