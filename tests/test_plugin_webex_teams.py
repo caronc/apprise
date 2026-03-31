@@ -656,8 +656,7 @@ def test_plugin_webex_teams_bot_attachments(mock_post):
 
     mock_post.return_value = response
 
-    # OSError raised by attachment.open() before 'files' dict is assigned
-    # exercises the finally: if files: False branch
+    # OSError raised by attachment.open() (before the file handle is used)
     mock_post.reset_mock()
     mock_post.side_effect = None
     with mock.patch(

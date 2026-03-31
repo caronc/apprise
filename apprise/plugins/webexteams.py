@@ -464,41 +464,42 @@ class NotifyWebexTeams(NotifyBase):
                 f" {attachment.url(privacy=True)}"
             )
 
-            files = None
             try:
-                files = {
-                    "files": (
-                        (
-                            attachment.name
-                            if attachment.name
-                            else f"file{no:03}.dat"
+                # open() returns a BytesIO for memory attachments; the
+                # context manager guarantees the handle is closed on exit
+                with attachment.open() as fp:
+                    files = {
+                        "files": (
+                            (
+                                attachment.name
+                                if attachment.name
+                                else f"file{no:03}.dat"
+                            ),
+                            fp,
+                            attachment.mimetype,
                         ),
-                        # open() returns a BytesIO for memory attachments
-                        attachment.open(),
-                        attachment.mimetype,
-                    ),
-                }
+                    }
 
-                data = {"roomId": room_id}
-                # Include message body only with the first attachment
-                if no == 1:
-                    data[text_key] = body
+                    data = {"roomId": room_id}
+                    # Include message body only with the first attachment
+                    if no == 1:
+                        data[text_key] = body
 
-                self.logger.debug(
-                    "Webex Teams Bot attachment POST URL:"
-                    f" {self.api_url}"
-                    f" (cert_verify={self.verify_certificate!r})"
-                )
+                    self.logger.debug(
+                        "Webex Teams Bot attachment POST URL:"
+                        f" {self.api_url}"
+                        f" (cert_verify={self.verify_certificate!r})"
+                    )
 
-                self.throttle()
-                r = requests.post(
-                    self.api_url,
-                    data=data,
-                    headers=headers,
-                    files=files,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                )
+                    self.throttle()
+                    r = requests.post(
+                        self.api_url,
+                        data=data,
+                        headers=headers,
+                        files=files,
+                        verify=self.verify_certificate,
+                        timeout=self.request_timeout,
+                    )
 
                 if r.status_code != requests.codes.ok:
                     status_str = NotifyWebexTeams.http_response_code_lookup(
@@ -540,11 +541,6 @@ class NotifyWebexTeams(NotifyBase):
                 )
                 self.logger.debug(f"I/O Exception: {e!s}")
                 return False
-
-            finally:
-                # Ensure the file handle is always closed
-                if files:
-                    files["files"][1].close()
 
         return True
 
