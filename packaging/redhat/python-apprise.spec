@@ -127,6 +127,7 @@ BuildRequires: python3dist(markdown)
 BuildRequires: python3dist(pyyaml)
 BuildRequires: python3dist(babel)
 BuildRequires: python3dist(cryptography)
+BuildRequires: python3dist(pynacl)
 BuildRequires: python3dist(certifi)
 BuildRequires: python3dist(tox)
 
@@ -144,6 +145,7 @@ Requires: python3dist(pyyaml)
 
 Recommends: python3dist(paho-mqtt)
 Recommends: python3dist(slixmpp)
+Recommends: python3dist(pynacl)
 
 %if 0%{?legacy_python_build} == 0
 # Logic for non-RHEL ≤ 9 systems
