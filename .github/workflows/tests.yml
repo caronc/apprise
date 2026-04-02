@@ -91,20 +91,20 @@ jobs:
       - name: Combine and generate coverage
         run: |
           pip install coverage
-      
+
           # Create a consistent temp dir
           mkdir -p coverage-inputs
-      
+
           # Copy and rename each coverage file to .coverage.job_name
           i=0
           for f in $(find coverage-artifacts -name .coverage); do
             cp "$f" "coverage-inputs/.coverage.$i"
             i=$((i+1))
           done
-      
+
           # Confirm files staged
           ls -alh coverage-inputs
-      
+
           # Combine them all
           coverage combine coverage-inputs
           coverage report
@@ -112,12 +112,12 @@ jobs:
 
       # Upload merged coverage results to Codecov for visualization
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          file: coverage.xml
+          files: coverage.xml
           verbose: false  # Used for debugging only
           fail_ci_if_error: false  # Avoid failing job if Codecov is down
         env:
-          CODECOV_PR:  ${{ github.event.pull_request.number }}
+          CODECOV_PR: ${{ github.event.pull_request.number }}
           CODECOV_SHA: ${{ github.sha }}
