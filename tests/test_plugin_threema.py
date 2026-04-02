@@ -351,6 +351,32 @@ def test_plugin_threema_e2e_url():
 
 
 @pytest.mark.skipif(not NACL_SUPPORT, reason="PyNaCl not installed")
+def test_plugin_threema_e2e_privkey_privacy_masking():
+    """url(privacy=True) masks the private key."""
+
+    obj = NotifyThreema(
+        user=GW_ID,
+        secret=SECRET,
+        targets=[RECIPIENT_ID],
+        privkey=VALID_PRIVKEY,
+    )
+
+    priv_url = obj.url(privacy=True)
+
+    # Full 64-char hex must not appear in the privacy URL
+    assert VALID_PRIVKEY_HEX not in priv_url
+    # The SDK-format "private:<hex>" form must not appear either
+    assert VALID_PRIVKEY not in priv_url
+
+    # pprint Outer mode yields "{first_char}...{last_char}" -- verify
+    # the masked token appears verbatim in the URL.
+    expected_mask = obj.pprint(
+        VALID_PRIVKEY_HEX, privacy=True, quote=False, safe="*"
+    )
+    assert expected_mask in priv_url
+
+
+@pytest.mark.skipif(not NACL_SUPPORT, reason="PyNaCl not installed")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_threema_e2e_send(mock_post, mock_get):

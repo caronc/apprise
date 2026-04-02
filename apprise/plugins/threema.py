@@ -410,7 +410,7 @@ class NotifyThreema(NotifyBase):
 
             # Some Debug Logging
             self.logger.debug(
-                "Threema Gateway GET URL:"
+                "Threema Gateway POST URL:"
                 f" {self.notify_url}"
                 f" (cert_verify={self.verify_certificate})"
             )
@@ -725,7 +725,13 @@ class NotifyThreema(NotifyBase):
         if self.mode == ThreemaMode.E2E:
             params["mode"] = ThreemaMode.E2E
             params["privkey"] = (
-                self.pprint(self._privkey, "key", safe="")
+                self.pprint(
+                    self._privkey,
+                    privacy=privacy,
+                    # Parmameters are quoted anyway; avoid double quote
+                    quote=False,
+                    safe="*",
+                )
                 if privacy
                 else f"private:{self._privkey}"
             )
