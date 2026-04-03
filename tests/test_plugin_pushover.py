@@ -709,14 +709,19 @@ def test_plugin_pushover_url_roundtrip(mock_post):
 
 
 def test_plugin_pushover_parse_url_title_unquote():
-    """NotifyPushover() parse_url() must unquote url_title like other fields."""
+    """NotifyPushover() parse_url() unquote url_title like other fields."""
     user_key = "u" * 30
     token = "a" * 30
 
     # url_title with percent-encoded spaces and special chars
-    url = (
-        "pover://{}@{}/?url_title=Hello%20World".format(user_key, token)
-    )
+    url = "pover://{}@{}/?url_title=Hello%20World".format(user_key, token)
+    parsed = NotifyPushover.parse_url(url)
+    assert parsed is not None
+    # Must be decoded, not raw percent-encoded
+    assert parsed["supplemental_url_title"] == "Hello World"
+
+    # Spacing is fine too
+    url = "pover://{}@{}/?url_title=Hello World".format(user_key, token)
     parsed = NotifyPushover.parse_url(url)
     assert parsed is not None
     # Must be decoded, not raw percent-encoded

@@ -592,8 +592,7 @@ class NotifyPushover(NotifyBase):
             self.logger.warning(
                 "A Connection error occurred sending Pushover"
                 ":{} notification.".format(
-                    payload.get("device")
-                    or "group:{}".format(payload["user"])
+                    payload.get("device") or "group:{}".format(payload["user"])
                 )
             )
             self.logger.debug(f"Socket Exception: {e!s}")
