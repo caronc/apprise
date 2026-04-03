@@ -26,7 +26,6 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import contextlib
-from itertools import chain
 import re
 
 import requests
@@ -43,6 +42,10 @@ PUSHOVER_SEND_TO_ALL = "ALL_DEVICES"
 
 # Used to detect a Device
 VALIDATE_DEVICE = re.compile(r"^\s*(?P<device>[a-z0-9_-]{1,25})\s*$", re.I)
+
+# Used to detect a Group key (same format as user key: alphanumeric, prefixed
+# with # or its URL-encoded equivalent %23)
+VALIDATE_GROUP = re.compile(r"^\s*(%23|#)(?P<group>[a-z0-9]+)\s*$", re.I)
 
 
 # Priorities
@@ -202,6 +205,12 @@ class NotifyPushover(NotifyBase):
                 "regex": (r"^[a-z0-9_-]{1,25}$", "i"),
                 "map_to": "targets",
             },
+            "target_group": {
+                "name": _("Target Group"),
+                "type": "string",
+                "prefix": "#",
+                "map_to": "targets",
+            },
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
@@ -284,26 +293,32 @@ class NotifyPushover(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Track our valid devices
+        # Track our valid devices and groups separately
         targets = parse_list(targets)
 
         # Track any invalid entries
         self.invalid_targets = []
+        self.devices = []
+        self.groups = []
 
-        if len(targets) == 0:
-            self.targets = (PUSHOVER_SEND_TO_ALL,)
+        if not targets:
+            # No targets specified at all: send to all devices of user
+            self.devices = [PUSHOVER_SEND_TO_ALL]
 
         else:
-            self.targets = []
             for target in targets:
+                result = VALIDATE_GROUP.match(target)
+                if result:
+                    self.groups.append(result.group("group"))
+                    continue
+
                 result = VALIDATE_DEVICE.match(target)
                 if result:
-                    # Store device information
-                    self.targets.append(result.group("device"))
+                    self.devices.append(result.group("device"))
                     continue
 
                 self.logger.warning(
-                    f"Dropped invalid Pushover device ({target}) specified.",
+                    f"Dropped invalid Pushover target ({target}) specified.",
                 )
                 self.invalid_targets.append(target)
 
@@ -373,67 +388,87 @@ class NotifyPushover(NotifyBase):
     ):
         """Perform Pushover Notification."""
 
-        if not self.targets:
+        if not self.devices and not self.groups:
             # There were no services to notify
             self.logger.warning("There were no Pushover targets to notify.")
             return False
 
-        # prepare JSON Object
-        payload = {
+        # Build the base payload shared across all sends
+        base_payload = {
             "token": self.token,
-            "user": self.user_key,
             "priority": str(self.priority),
             "title": title if title else self.app_desc,
             "message": body,
-            "device": ",".join(self.targets),
             "sound": self.sound,
         }
 
         if self.supplemental_url:
-            payload["url"] = self.supplemental_url
+            base_payload["url"] = self.supplemental_url
 
         if self.supplemental_url_title:
-            payload["url_title"] = self.supplemental_url_title
+            base_payload["url_title"] = self.supplemental_url_title
 
         if self.notify_format == NotifyFormat.HTML:
             # https://pushover.net/api#html
-            payload["html"] = 1
+            base_payload["html"] = 1
 
         elif self.notify_format == NotifyFormat.MARKDOWN:
-            payload["message"] = convert_between(
+            base_payload["message"] = convert_between(
                 NotifyFormat.MARKDOWN, NotifyFormat.HTML, body
             )
-            payload["html"] = 1
+            base_payload["html"] = 1
 
         if self.priority == PushoverPriority.EMERGENCY:
-            payload.update({"retry": self.retry, "expire": self.expire})
+            base_payload.update({"retry": self.retry, "expire": self.expire})
 
-        if attach and self.attachment_support:
-            # Create a copy of our payload
-            payload_ = payload.copy()
+        # Build per-target payloads:
+        #  - devices: one call with user=user_key, device=dev1,dev2,...
+        #  - groups: one call per group with user=group_key
+        payloads = []
+        if self.devices:
+            payloads.append(
+                {
+                    **base_payload,
+                    "user": self.user_key,
+                    "device": ",".join(self.devices),
+                }
+            )
+        for group_key in self.groups:
+            payloads.append(
+                {
+                    **base_payload,
+                    "user": group_key,
+                }
+            )
 
-            # Send with attachments
-            for no, attachment in enumerate(attach):
-                if no or not body:
-                    # To handle multiple attachments, clean up our message
-                    payload_["message"] = attachment.name
+        has_error = False
+        for payload in payloads:
+            if attach and self.attachment_support:
+                # Create a copy of our payload
+                payload_ = payload.copy()
 
-                if not self._send(payload_, attachment):
-                    # Mark our failure
-                    return False
+                # Send with attachments
+                for no, attachment in enumerate(attach):
+                    if no or not body:
+                        # To handle multiple attachments, clean up our message
+                        payload_["message"] = attachment.name
 
-                # Clear our title if previously set
-                payload_["title"] = ""
+                    if not self._send(payload_, attachment):
+                        # Mark our failure
+                        has_error = True
 
-                # No need to alarm for each consecutive attachment uploaded
-                # afterwards
-                payload_["sound"] = PushoverSound.NONE
+                    # Clear our title if previously set
+                    payload_["title"] = ""
 
-        else:
-            # Simple send
-            return self._send(payload)
+                    # No need to alarm for each consecutive attachment
+                    # uploaded afterwards
+                    payload_["sound"] = PushoverSound.NONE
 
-        return True
+            else:
+                if not self._send(payload):
+                    has_error = True
+
+        return not has_error
 
     def _send(self, payload, attach=None):
         """Wrapper to the requests (post) object."""
@@ -533,7 +568,7 @@ class NotifyPushover(NotifyBase):
                 self.logger.warning(
                     "Failed to send Pushover notification to {}: "
                     "{}{}error={}.".format(
-                        payload["device"],
+                        payload.get("device") or f"group:{payload['user']}",
                         status_str,
                         ", " if status_str else "",
                         r.status_code,
@@ -549,16 +584,16 @@ class NotifyPushover(NotifyBase):
             else:
                 self.logger.info(
                     "Sent Pushover notification to {}.".format(
-                        payload["device"]
+                        payload.get("device") or f"group:{payload['user']}"
                     )
                 )
 
         except requests.RequestException as e:
             self.logger.warning(
-                "A Connection error occurred sending Pushover:{} ".format(
-                    payload["device"]
+                "A Connection error occurred sending Pushover"
+                ":{} notification.".format(
+                    payload.get("device") or "group:{}".format(payload["user"])
                 )
-                + "notification."
             )
             self.logger.debug(f"Socket Exception: {e!s}")
 
@@ -590,6 +625,14 @@ class NotifyPushover(NotifyBase):
         """
         return (self.secure_protocol, self.user_key, self.token)
 
+    def __len__(self):
+        """Returns the number of HTTP requests this instance will make.
+
+        Devices are batched into a single call; each group requires its own.
+        """
+        # At least 1 if there are any valid targets
+        return max(1, (1 if self.devices else 0) + len(self.groups))
+
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
 
@@ -600,7 +643,14 @@ class NotifyPushover(NotifyBase):
                 if self.priority not in PUSHOVER_PRIORITIES
                 else PUSHOVER_PRIORITIES[self.priority]
             ),
+            "sound": self.sound,
         }
+
+        if self.supplemental_url:
+            params["url"] = self.supplemental_url
+
+        if self.supplemental_url_title:
+            params["url_title"] = self.supplemental_url_title
 
         # Only add expire and retry for emergency messages,
         # pushover ignores for all other priorities
@@ -610,24 +660,23 @@ class NotifyPushover(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        # Escape our devices
-        devices = "/".join(
+        # Assemble targets: devices (excluding sentinel), groups (%23-encoded),
+        # then any invalid entries so the URL round-trips faithfully
+        targets = "/".join(
             [
-                NotifyPushover.quote(x, safe="")
-                for x in chain(self.targets, self.invalid_targets)
+                NotifyPushover.quote(d, safe="")
+                for d in self.devices
+                if d != PUSHOVER_SEND_TO_ALL
             ]
+            + [NotifyPushover.quote(f"#{g}", safe="") for g in self.groups]
+            + [NotifyPushover.quote(x, safe="") for x in self.invalid_targets]
         )
 
-        if devices == PUSHOVER_SEND_TO_ALL:
-            # keyword is reserved for internal usage only; it's safe to remove
-            # it from the devices list
-            devices = ""
-
-        return "{schema}://{user_key}@{token}/{devices}/?{params}".format(
+        return "{schema}://{user_key}@{token}/{targets}/?{params}".format(
             schema=self.secure_protocol,
             user_key=self.pprint(self.user_key, privacy, safe=""),
             token=self.pprint(self.token, privacy, safe=""),
-            devices=devices,
+            targets=targets,
             params=NotifyPushover.urlencode(params),
         )
 
@@ -635,6 +684,16 @@ class NotifyPushover(NotifyBase):
     def parse_url(url):
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
+
+        # Encode any literal # in the path so group key prefixes survive
+        # Python's urlparse, which treats # as a fragment separator and
+        # silently drops everything after it.
+        if isinstance(url, str):
+            q_idx = url.find("?")
+            _path = url if q_idx < 0 else url[:q_idx]
+            _rest = "" if q_idx < 0 else url[q_idx:]
+            url = _path.replace("#", "%23") + _rest
+
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
@@ -662,7 +721,9 @@ class NotifyPushover(NotifyBase):
                 results["qsd"]["url"]
             )
         if "url_title" in results["qsd"] and len(results["qsd"]["url_title"]):
-            results["supplemental_url_title"] = results["qsd"]["url_title"]
+            results["supplemental_url_title"] = NotifyPushover.unquote(
+                results["qsd"]["url_title"]
+            )
 
         # Get expire and retry
         if "expire" in results["qsd"] and len(results["qsd"]["expire"]):
