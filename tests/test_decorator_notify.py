@@ -515,7 +515,8 @@ def test_notify_decorator_urls_with_space():
 
     assert meta.get("schema") == "posts"
     assert (
-        meta.get("url") == "posts://example.com/my%20endpoint?-token=ab+cdefg"
+        meta.get("url")
+        == "posts://example.com/my%20endpoint?-token=ab%20cdefg"
     )
     assert meta.get("qsd") == {"-token": "ab cdefg"}
     assert meta.get("host") == "example.com"
