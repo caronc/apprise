@@ -1300,7 +1300,7 @@ def test_url_assembly():
             **utils.parse.parse_url(url, verify_host=False)
         )
         == "schema://hostname:10/a%20space/file.php?"
-        "arg=a%2Bspace&arg2=a+space&arg3=a+space"
+        "arg=a%2Bspace&arg2=a%20space&arg3=a%20space"
     )
 
     # encode=True should only be used if you're passing in un-assembled
@@ -1310,7 +1310,7 @@ def test_url_assembly():
             **utils.parse.parse_url(url, verify_host=False), encode=True
         )
         == "schema://hostname:10/a%2520space/file.php?"
-        "arg=a%2Bspace&arg2=a+space&arg3=a+space"
+        "arg=a%2Bspace&arg2=a%20space&arg3=a%20space"
     )
 
     # But the following utilizes the encode=True and produces the
@@ -1328,7 +1328,7 @@ def test_url_assembly():
     assert (
         utils.parse.url_assembly(**content, encode=True)
         == "schema://hostname/a%20space/file.php?"
-        "arg=a%2Bspace&arg2=a+space&arg3=a+space"
+        "arg=a%2Bspace&arg2=a%20space&arg3=a%20space"
     )
 
 

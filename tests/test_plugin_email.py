@@ -1201,7 +1201,7 @@ def test_plugin_email_url_variations():
     assert obj.from_addr[0] == "Charles"
     assert obj.from_addr[1] == "from@example.jp"
     assert (
-        re.match(r".*from=Charles\+%3Cfrom%40example.jp%3E.*", obj.url())
+        re.match(r".*from=Charles%20%3Cfrom%40example.jp%3E.*", obj.url())
         is not None
     )
 
@@ -1702,7 +1702,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.secure_mode == "starttls"
     assert obj.url().startswith("mailtos://user:pass@example.com")
     # Test that our template over-ride worked
-    assert "reply=Chris+%3Cnoreply%40example.ca%3E" in obj.url()
+    assert "reply=Chris%20%3Cnoreply%40example.ca%3E" in obj.url()
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0

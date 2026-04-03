@@ -1011,8 +1011,18 @@ def urlencode(query, doseq=False, safe="", encoding=None, errors=None):
     """
     # Tidy query by eliminating any records set to None
     query_ = {k: v for (k, v) in query.items() if v is not None}
+    # Use quote (not quote_plus) so spaces become %20 rather than +.
+    # Apprise's parse_qsd intentionally leaves + raw (it is a reserved
+    # character in tokens/passwords), so values encoded with + can never
+    # round-trip cleanly.  %20 is decoded correctly by unquote() and is
+    # safe across all Apprise plugin URL round-trips.
     return _urlencode(
-        query_, doseq=doseq, safe=safe, encoding=encoding, errors=errors
+        query_,
+        doseq=doseq,
+        safe=safe,
+        encoding=encoding,
+        errors=errors,
+        quote_via=quote,
     )
 
 
