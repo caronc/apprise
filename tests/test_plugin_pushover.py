@@ -647,6 +647,83 @@ def test_plugin_pushover_config_files(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_pushover_group_request_exception(mock_post):
+    """NotifyPushover() group RequestException must not raise KeyError."""
+    user_key = "u" * 30
+    token = "a" * 30
+    group_key = "g" * 30
+
+    mock_post.side_effect = requests.RequestException("connection error")
+
+    obj = NotifyPushover(
+        user_key=user_key, token=token, targets=f"#{group_key}"
+    )
+    assert isinstance(obj, NotifyPushover)
+    assert len(obj.groups) == 1
+    assert len(obj.devices) == 0
+
+    # Must return False cleanly -- no KeyError from payload["device"]
+    assert obj.send(body="test") is False
+
+
+@mock.patch("requests.post")
+def test_plugin_pushover_url_roundtrip(mock_post):
+    """NotifyPushover() url() must preserve sound, url, and url_title."""
+    from apprise.plugins.pushover import NotifyPushover
+
+    user_key = "u" * 30
+    token = "a" * 30
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Instantiate with all three round-trip fields set
+    obj = NotifyPushover(
+        user_key=user_key,
+        token=token,
+        sound="bike",
+        supplemental_url="https://example.com",
+        supplemental_url_title="Click Here",
+    )
+    assert isinstance(obj, NotifyPushover)
+    assert obj.sound == "bike"
+    assert obj.supplemental_url == "https://example.com"
+    assert obj.supplemental_url_title == "Click Here"
+
+    # Round-trip via url() -> parse_url() -> re-instantiate
+    generated_url = obj.url()
+    assert "sound=bike" in generated_url
+    assert "url=" in generated_url
+    assert "url_title=" in generated_url
+
+    parsed = NotifyPushover.parse_url(generated_url)
+    assert parsed is not None
+    assert parsed["sound"] == "bike"
+    assert parsed["supplemental_url"] == "https://example.com"
+    assert parsed["supplemental_url_title"] == "Click Here"
+
+    obj2 = NotifyPushover(**parsed)
+    assert obj2.sound == "bike"
+    assert obj2.supplemental_url == "https://example.com"
+    assert obj2.supplemental_url_title == "Click Here"
+
+
+def test_plugin_pushover_parse_url_title_unquote():
+    """NotifyPushover() parse_url() must unquote url_title like other fields."""
+    user_key = "u" * 30
+    token = "a" * 30
+
+    # url_title with percent-encoded spaces and special chars
+    url = (
+        "pover://{}@{}/?url_title=Hello%20World".format(user_key, token)
+    )
+    parsed = NotifyPushover.parse_url(url)
+    assert parsed is not None
+    # Must be decoded, not raw percent-encoded
+    assert parsed["supplemental_url_title"] == "Hello World"
+
+
+@mock.patch("requests.post")
 def test_plugin_pushover_attach_memory(mock_post):
     """Regression: AttachMemory must be sendable without OSError."""
     from apprise.attachment.memory import AttachMemory

@@ -590,10 +590,11 @@ class NotifyPushover(NotifyBase):
 
         except requests.RequestException as e:
             self.logger.warning(
-                "A Connection error occurred sending Pushover:{} ".format(
-                    payload["device"]
+                "A Connection error occurred sending Pushover"
+                ":{} notification.".format(
+                    payload.get("device")
+                    or "group:{}".format(payload["user"])
                 )
-                + "notification."
             )
             self.logger.debug(f"Socket Exception: {e!s}")
 
@@ -643,7 +644,14 @@ class NotifyPushover(NotifyBase):
                 if self.priority not in PUSHOVER_PRIORITIES
                 else PUSHOVER_PRIORITIES[self.priority]
             ),
+            "sound": self.sound,
         }
+
+        if self.supplemental_url:
+            params["url"] = self.supplemental_url
+
+        if self.supplemental_url_title:
+            params["url_title"] = self.supplemental_url_title
 
         # Only add expire and retry for emergency messages,
         # pushover ignores for all other priorities
@@ -714,7 +722,9 @@ class NotifyPushover(NotifyBase):
                 results["qsd"]["url"]
             )
         if "url_title" in results["qsd"] and len(results["qsd"]["url_title"]):
-            results["supplemental_url_title"] = results["qsd"]["url_title"]
+            results["supplemental_url_title"] = NotifyPushover.unquote(
+                results["qsd"]["url_title"]
+            )
 
         # Get expire and retry
         if "expire" in results["qsd"] and len(results["qsd"]["expire"]):
