@@ -2128,7 +2128,6 @@ def test_plugin_matrix_room_create_on_not_found_join(
 _cryptography = pytest.importorskip(
     "cryptography",
     reason="Requires cryptography",
-    exc_type=ImportError,
 )
 
 
