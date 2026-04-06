@@ -2304,7 +2304,7 @@ class NotifyMatrix(NotifyBase):
         # Update the m.direct account-data mapping so other clients
         # recognise this room as a DM conversation.
         if self.user_id:
-            mdirect[user_id] = mdirect.get(user_id, []) + [room_id]
+            mdirect[user_id] = [*mdirect.get(user_id, []), room_id]
             self._fetch(
                 "/user/{}/account_data/m.direct".format(
                     NotifyMatrix.quote(self.user_id)
