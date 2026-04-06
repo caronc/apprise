@@ -2254,14 +2254,16 @@ class NotifyMatrix(NotifyBase):
             return cached
 
         # Fetch existing m.direct mapping from the server
+        mdirect = {}
         if self.user_id:
-            ok, mdirect, _ = self._fetch(
+            ok, resp, _ = self._fetch(
                 "/user/{}/account_data/m.direct".format(
                     NotifyMatrix.quote(self.user_id)
                 ),
                 method="GET",
             )
-            if ok and isinstance(mdirect, dict):
+            if ok and isinstance(resp, dict):
+                mdirect = resp
                 rooms = mdirect.get(user_id, [])
                 if rooms:
                     room_id = rooms[0]
@@ -2271,10 +2273,6 @@ class NotifyMatrix(NotifyBase):
                         expires=self.default_cache_expiry_sec,
                     )
                     return room_id
-            else:
-                mdirect = {}
-        else:
-            mdirect = {}
 
         # No existing DM room -- create one
         ok, response, _ = self._fetch(

@@ -526,12 +526,11 @@ class MatrixMegOlmSession:
                 _b64dec(sk_priv_b64)
             )
 
-        sk_pub = self._sk.public_key().public_bytes(
+        self._sk_pub = self._sk.public_key().public_bytes(
             Encoding.Raw, PublicFormat.Raw
         )
-        self._sk_pub = sk_pub
         # Session ID is the base64 of the Ed25519 signing public key
-        self.session_id = _b64enc(sk_pub)
+        self.session_id = _b64enc(self._sk_pub)
         self.created_at = (
             created_at if created_at is not None else _time.time()
         )
