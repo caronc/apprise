@@ -99,6 +99,13 @@ IS_ROOM_ID = re.compile(
     re.I,
 )
 
+# Matrix User ID (for DM targets); must start with @
+IS_USER = re.compile(
+    r"^\s*(@|%40)(?P<user>[A-Za-z0-9._=+/-]+)((:|%3A)"
+    r"(?P<home_server>[A-Za-z0-9.-]+))?\s*$",
+    re.I,
+)
+
 
 # Matrix is_image check
 IS_IMAGE = re.compile(r"^image/.*", re.I)
@@ -353,8 +360,15 @@ class NotifyMatrix(NotifyBase):
         """Initialize Matrix Object."""
         super().__init__(**kwargs)
 
-        # Prepare a list of rooms to connect and notify
-        self.rooms = parse_list(targets)
+        # Prepare a list of rooms to connect and notify; separate
+        # @user DM targets from room identifiers.
+        self.rooms = []
+        self.users = []
+        for _target in parse_list(targets):
+            if IS_USER.match(_target):
+                self.users.append(_target)
+            else:
+                self.rooms.append(_target)
 
         # our home server gets populated after a login/registration
         self.home_server = None
@@ -736,7 +750,7 @@ class NotifyMatrix(NotifyBase):
             # We need to register
             return False
 
-        if len(self.rooms) == 0:
+        if len(self.rooms) == 0 and not self.users:
             # Attempt to retrieve a list of already joined channels
             self.rooms = self._joined_rooms()
 
@@ -749,6 +763,18 @@ class NotifyMatrix(NotifyBase):
 
         # Create a copy of our rooms to join and message
         rooms = list(self.rooms)
+
+        # Resolve DM user targets (@user) to room IDs
+        for _user in self.users:
+            dm_room_id = self._dm_room_find_or_create(_user)
+            if dm_room_id:
+                rooms.append(dm_room_id)
+            else:
+                self.logger.warning(
+                    "Could not find or create a DM room for Matrix user %s.",
+                    _user,
+                )
+                has_error = True
 
         # Initiaize our error tracking
         has_error = False
@@ -2196,6 +2222,99 @@ class NotifyMatrix(NotifyBase):
             )
         return postokay
 
+    def _dm_room_find_or_create(self, user):
+        """Resolve *user* (``@localpart`` or ``@localpart:homeserver``)
+        to a Matrix room ID suitable for direct messaging.
+
+        Lookup order:
+        1. Persistent-store cache.
+        2. ``GET /user/{selfId}/account_data/m.direct`` -- check whether
+           an existing DM room already exists for this user.
+        3. ``POST /createRoom`` with ``is_direct=true`` and an invite for
+           the target user.  The ``m.direct`` account-data entry is then
+           updated so other clients also recognise the room as a DM.
+
+        Returns the room ID string on success, or ``None`` on failure.
+        """
+        result = IS_USER.match(user)
+        if not result:
+            self.logger.warning("Matrix DM: invalid user identifier %r.", user)
+            return None
+
+        home_server = (
+            result.group("home_server")
+            if result.group("home_server")
+            else self.home_server
+        )
+        user_id = "@{}:{}".format(result.group("user"), home_server)
+
+        cache_key = "dm_room_{}".format(user_id)
+        cached = self.store.get(cache_key)
+        if cached:
+            return cached
+
+        # Fetch existing m.direct mapping from the server
+        if self.user_id:
+            ok, mdirect, _ = self._fetch(
+                "/user/{}/account_data/m.direct".format(
+                    NotifyMatrix.quote(self.user_id)
+                ),
+                method="GET",
+            )
+            if ok and isinstance(mdirect, dict):
+                rooms = mdirect.get(user_id, [])
+                if rooms:
+                    room_id = rooms[0]
+                    self.store.set(
+                        cache_key,
+                        room_id,
+                        expires=self.default_cache_expiry_sec,
+                    )
+                    return room_id
+            else:
+                mdirect = {}
+        else:
+            mdirect = {}
+
+        # No existing DM room -- create one
+        ok, response, _ = self._fetch(
+            "/createRoom",
+            payload={
+                "is_direct": True,
+                "preset": "trusted_private_chat",
+                "invite": [user_id],
+            },
+        )
+        if not ok or not isinstance(response, dict):
+            self.logger.warning(
+                "Matrix DM: failed to create room for %s.", user_id
+            )
+            return None
+
+        room_id = response.get("room_id")
+        if not room_id:
+            return None
+
+        self.store.set(
+            cache_key,
+            room_id,
+            expires=self.default_cache_expiry_sec,
+        )
+
+        # Update the m.direct account-data mapping so other clients
+        # recognise this room as a DM conversation.
+        if self.user_id:
+            mdirect[user_id] = mdirect.get(user_id, []) + [room_id]
+            self._fetch(
+                "/user/{}/account_data/m.direct".format(
+                    NotifyMatrix.quote(self.user_id)
+                ),
+                payload=mdirect,
+                method="PUT",
+            )
+
+        return room_id
+
     # ---------------------------------------------------------------
     # Destructor / URL / parse
     # ---------------------------------------------------------------
@@ -2289,14 +2408,14 @@ class NotifyMatrix(NotifyBase):
                 else self.pprint(self.access_token, privacy, safe="")
             ),
             port=("" if not self.port else f":{self.port}"),
-            rooms=NotifyMatrix.quote("/".join(self.rooms)),
+            rooms=NotifyMatrix.quote("/".join(self.rooms + self.users)),
             params=NotifyMatrix.urlencode(params),
         )
 
     def __len__(self):
         """Returns the number of targets associated with this
         notification."""
-        targets = len(self.rooms)
+        targets = len(self.rooms) + len(self.users)
         return targets if targets > 0 else 1
 
     @staticmethod

@@ -3447,3 +3447,401 @@ def test_plugin_matrix_e2ee_account_bad_store_data():
     )
     # Bad data is suppressed; account is None until setup is called
     assert obj2._e2ee_account is None
+
+
+# ---------------------------------------------------------------------------
+# DM / direct-message tests
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_matrix_dm_target_separation():
+    """@user targets are separated from room targets at init time."""
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#general", "@alice", "@bob:other.com", "!room:h"],
+        discovery=False,
+    )
+    assert "#general" in obj.rooms
+    assert "!room:h" in obj.rooms
+    assert "@alice" in obj.users
+    assert "@bob:other.com" in obj.users
+    assert len(obj.rooms) == 2
+    assert len(obj.users) == 2
+
+    # __len__ accounts for both rooms and users
+    assert len(obj) == 4
+
+
+def test_plugin_matrix_dm_url_roundtrip():
+    """@user targets survive a url() -> parse_url() -> NotifyMatrix cycle."""
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#room", "@alice"],
+        discovery=False,
+        secure=True,
+    )
+    url = obj.url()
+    # @ is URL-encoded to %40 inside the path segment
+    assert "%40alice" in url
+
+    result = NotifyMatrix.parse_url(url)
+    assert result is not None
+    obj2 = NotifyMatrix(**result)
+    assert "@alice" in obj2.users
+    assert any("room" in r for r in obj2.rooms)
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_find_cached(mock_post, mock_get, mock_put):
+    """_dm_room_find_or_create returns cached room ID without HTTP calls."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_post.return_value = _mk_resp({})
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    # Seed the cache
+    obj.store.set("dm_room_@alice:h", "!dm123:h")
+
+    room_id = obj._dm_room_find_or_create("@alice")
+    assert room_id == "!dm123:h"
+    # No HTTP calls should have been made
+    assert mock_get.call_count == 0
+    assert mock_post.call_count == 0
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_find_via_mdirect(mock_post, mock_get, mock_put):
+    """_dm_room_find_or_create finds existing room from m.direct data."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mdirect = {"@alice:h": ["!existing_dm:h"]}
+    mock_get.return_value = _mk_resp(mdirect)
+    mock_post.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    room_id = obj._dm_room_find_or_create("@alice")
+    assert room_id == "!existing_dm:h"
+
+    # Result is now cached
+    assert obj.store.get("dm_room_@alice:h") == "!existing_dm:h"
+
+    # No createRoom POST should have been made
+    assert mock_post.call_count == 0
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_create_new(mock_post, mock_get, mock_put):
+    """_dm_room_find_or_create creates a new room when none exists."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    # GET m.direct returns empty (no existing DM for alice)
+    mock_get.return_value = _mk_resp({})
+    # First POST = createRoom, second = (not called)
+    mock_post.return_value = _mk_resp({"room_id": "!new_dm:h"})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    room_id = obj._dm_room_find_or_create("@alice")
+    assert room_id == "!new_dm:h"
+
+    # Should be cached
+    assert obj.store.get("dm_room_@alice:h") == "!new_dm:h"
+
+    # m.direct PUT should have been called to update the mapping
+    assert mock_put.call_count >= 1
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_create_failure(mock_post, mock_get, mock_put):
+    """_dm_room_find_or_create returns None when createRoom fails."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    mock_post.return_value = _mk_resp(
+        {"errcode": "M_FORBIDDEN"}, code=requests.codes.forbidden
+    )
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    assert obj._dm_room_find_or_create("@alice") is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_create_no_room_id(
+    mock_post, mock_get, mock_put
+):
+    """_dm_room_find_or_create returns None when createRoom omits room_id."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    # createRoom returns 200 but no room_id key
+    mock_post.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    assert obj._dm_room_find_or_create("@alice") is None
+
+
+def test_plugin_matrix_dm_invalid_user():
+    """_dm_room_find_or_create returns None for a malformed user target."""
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    # No @ prefix -- not a valid user target
+    assert obj._dm_room_find_or_create("notauser") is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_send_notification(mock_post, mock_get, mock_put):
+    """Sending to @user target resolves DM room and delivers message."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+    mock_post.side_effect = [
+        _mk_resp(
+            {"access_token": "tok", "user_id": "@u:h", "home_server": "h"}
+        ),  # login
+        _mk_resp({"room_id": "!new_dm:h"}),  # createRoom
+        _mk_resp({}),  # logout
+    ]
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+        e2ee=False,
+    )
+
+    # Pre-seed DM room so _room_join succeeds
+    def _join_side(*a, **kw):
+        return "!new_dm:h"
+
+    with (
+        mock.patch.object(obj, "_room_join", side_effect=_join_side),
+        mock.patch.object(
+            obj, "_dm_room_find_or_create", return_value="!new_dm:h"
+        ),
+    ):
+        assert obj.send(body="hello DM") is True
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_only_users_no_rooms_skips_joined(
+    mock_post, mock_get, mock_put
+):
+    """When only @user targets are present, _joined_rooms is not queried."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+    mock_post.side_effect = [
+        _mk_resp(
+            {"access_token": "tok", "user_id": "@u:h", "home_server": "h"}
+        ),  # login
+        _mk_resp({}),  # logout
+    ]
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+        e2ee=False,
+    )
+
+    with (
+        mock.patch.object(obj, "_joined_rooms", return_value=[]) as mock_jr,
+        mock.patch.object(obj, "_dm_room_find_or_create", return_value=None),
+    ):
+        obj.send(body="hi")
+        # _joined_rooms must NOT have been called
+        assert mock_jr.call_count == 0
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_create_mdirect_get_fails(
+    mock_post, mock_get, mock_put
+):
+    """_dm_room_find_or_create still creates room if m.direct GET fails."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    # GET fails (404)
+    mock_get.return_value = _mk_resp({}, code=404)
+    mock_post.return_value = _mk_resp({"room_id": "!fallback:h"})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    room_id = obj._dm_room_find_or_create("@alice")
+    assert room_id == "!fallback:h"
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_create_no_user_id(
+    mock_post, mock_get, mock_put
+):
+    """_dm_room_find_or_create creates room when user_id is None (skips
+    the m.direct GET and PUT)."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    mock_post.return_value = _mk_resp({"room_id": "!nodm:h"})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    # user_id intentionally left as None so the m.direct branch is skipped
+    obj.home_server = "h"
+
+    room_id = obj._dm_room_find_or_create("@alice")
+    assert room_id == "!nodm:h"
+    # No GET and no PUT for m.direct since user_id is None
+    assert mock_get.call_count == 0
+    assert mock_put.call_count == 0
