@@ -238,6 +238,7 @@ class NotifyMatrix(NotifyBase):
             },
             "token": {
                 "name": _("Access Token"),
+                "type": "string",
                 "private": True,
                 "map_to": "password",
             },
