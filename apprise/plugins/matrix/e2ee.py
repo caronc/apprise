@@ -55,6 +55,7 @@ try:
     )
     from cryptography.hazmat.primitives.asymmetric.ed25519 import (
         Ed25519PrivateKey,
+        Ed25519PublicKey,
     )
     from cryptography.hazmat.primitives.asymmetric.x25519 import (
         X25519PrivateKey,
@@ -172,6 +173,69 @@ def _canonical_json(obj):
         ensure_ascii=False,
         separators=(",", ":"),
     ).encode("utf-8")
+
+
+def _verify_ed25519(public_key_b64, message_bytes, signature_b64):
+    """Verify an Ed25519 signature.
+
+    Returns ``True`` when *signature_b64* is a valid signature of
+    *message_bytes* under *public_key_b64*.  Returns ``False`` on any
+    error (wrong key, bad signature, decode failure, etc.).
+
+    Requires ``MATRIX_E2EE_SUPPORT`` (the ``cryptography`` package).
+    """
+    try:
+        pub = Ed25519PublicKey.from_public_bytes(_b64dec(public_key_b64))
+        pub.verify(_b64dec(signature_b64), message_bytes)
+        return True
+    except Exception:
+        return False
+
+
+def verify_device_keys(dev_info, user_id, device_id):
+    """Verify the Ed25519 self-signature on a /keys/query device object.
+
+    The device must have signed the device-keys object (excluding the
+    ``signatures`` and ``unsigned`` fields) with its own Ed25519 key.
+
+    Returns ``True`` only when the signature is present and valid.
+    """
+    sig_key = "ed25519:{}".format(device_id)
+    ed25519_pub = dev_info.get("keys", {}).get(sig_key, "")
+    if not ed25519_pub:
+        return False
+
+    sig = dev_info.get("signatures", {}).get(user_id, {}).get(sig_key, "")
+    if not sig:
+        return False
+
+    # Signed payload: all fields except 'signatures' and 'unsigned'
+    signed_obj = {
+        k: v
+        for k, v in dev_info.items()
+        if k not in ("signatures", "unsigned")
+    }
+    return _verify_ed25519(ed25519_pub, _canonical_json(signed_obj), sig)
+
+
+def verify_signed_otk(otk_obj, user_id, device_id, ed25519_pub_b64):
+    """Verify the Ed25519 signature on a ``signed_curve25519`` OTK.
+
+    The device signs the OTK object (excluding ``signatures``) with the
+    same Ed25519 key published in its device keys.
+
+    Returns ``True`` only when the signature is present and valid.
+    """
+    sig = (
+        otk_obj.get("signatures", {})
+        .get(user_id, {})
+        .get("ed25519:{}".format(device_id), "")
+    )
+    if not sig:
+        return False
+
+    signed_obj = {k: v for k, v in otk_obj.items() if k != "signatures"}
+    return _verify_ed25519(ed25519_pub_b64, _canonical_json(signed_obj), sig)
 
 
 def encrypt_attachment(data):
@@ -541,24 +605,25 @@ class MatrixMegOlmSession:
         """Advance the MegOLM ratchet by one step.
 
         Advancement rule (MegOLM spec):
-          - Every message: R[3] = HMAC-SHA256(R[2], b'\\x03')
-          - Every 256 messages: first advance R[2], then cascade to R[3]
+          After message n, if (n+1) is a multiple of the threshold:
+          - Every 256 messages: advance R[2], then cascade to R[3]
           - Every 65536 messages: advance R[1] then cascade down
           - Every 2^24 messages: advance R[0] then cascade all the way
+          - Otherwise: R[3] = HMAC-SHA256(R[2], b'\\x03')
         """
         r = self._ratchet
-        i = self._counter
+        n1 = self._counter + 1  # next counter value
 
-        if i > 0 and i % (1 << 24) == 0:
+        if n1 % (1 << 24) == 0:
             r[0] = _hmac_sha256(r[0], b"\x00")
             r[1] = _hmac_sha256(r[0], b"\x01")
             r[2] = _hmac_sha256(r[1], b"\x02")
             r[3] = _hmac_sha256(r[2], b"\x03")
-        elif i > 0 and i % (1 << 16) == 0:
+        elif n1 % (1 << 16) == 0:
             r[1] = _hmac_sha256(r[1], b"\x01")
             r[2] = _hmac_sha256(r[1], b"\x02")
             r[3] = _hmac_sha256(r[2], b"\x03")
-        elif i > 0 and i % (1 << 8) == 0:
+        elif n1 % (1 << 8) == 0:
             r[2] = _hmac_sha256(r[2], b"\x02")
             r[3] = _hmac_sha256(r[2], b"\x03")
         else:
@@ -588,17 +653,21 @@ class MatrixMegOlmSession:
     def encrypt(self, payload_dict):
         """Encrypt *payload_dict* and return base64 MegOLM ciphertext.
 
-        Wire format:
-          version (1 B = 0x03) | counter (4 B big-endian)
-          | AES-CBC ciphertext | HMAC-SHA-256 (8 B) | Ed25519 sig (64 B)
+        Wire format (MegOLM spec, Section 4):
+          version (1 B = 0x03)
+          | Protobuf body (field 8: message_index varint,
+          |                field 9: ciphertext bytes)
+          | HMAC-SHA-256 (8 B)
+          | Ed25519 sig (64 B)
 
         Reference: MegOLM spec, Section 4.
         """
         plaintext = dumps(payload_dict).encode("utf-8")
         aes_key, mac_key, iv = self._message_keys()
 
-        ciphertext = _aes_cbc_encrypt(aes_key, iv, plaintext)
-        body = b"\x03" + struct.pack(">I", self._counter) + ciphertext
+        ct_bytes = _aes_cbc_encrypt(aes_key, iv, plaintext)
+        pb_body = _pb_varint_field(8, self._counter) + _pb_bytes(9, ct_bytes)
+        body = b"\x03" + pb_body
         mac = _hmac_sha256(mac_key, body)[:8]
         sig = self._sk.sign(body + mac)
 

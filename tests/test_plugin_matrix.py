@@ -2138,6 +2138,22 @@ def _rand_b64_32():
     return base64.b64encode(os.urandom(32)).decode()
 
 
+def _make_signed_otk(account, user_id, device_id, key_b64=None):
+    """Return a signed_curve25519 OTK dict signed by *account*.
+
+    Produces {"key": ..., "signatures": {user_id: {"ed25519:DEV": ...}}}
+    suitable for inclusion in a /keys/claim mock response.
+    """
+    from apprise.plugins.matrix.e2ee import _canonical_json
+
+    if key_b64 is None:
+        key_b64 = _rand_b64_32()
+    payload = {"key": key_b64}
+    sig = account.sign(_canonical_json(payload))
+    payload["signatures"] = {user_id: {"ed25519:{}".format(device_id): sig}}
+    return payload
+
+
 def test_plugin_matrix_e2ee_helpers():
     """e2ee helper functions."""
     from apprise.plugins.matrix.e2ee import (
@@ -2241,6 +2257,69 @@ def test_plugin_matrix_e2ee_olm_session():
     assert result2["type"] == 0
 
 
+def test_plugin_matrix_e2ee_verify_keys():
+    """verify_device_keys and verify_signed_otk accept/reject signatures."""
+    from apprise.plugins.matrix.e2ee import (
+        MatrixOlmAccount,
+        _canonical_json,
+        verify_device_keys,
+        verify_signed_otk,
+    )
+
+    acct = MatrixOlmAccount()
+    uid = "@alice:h"
+    dev = "DEVID"
+
+    # --- verify_device_keys ---
+
+    # Valid self-signed device keys -> True
+    dk = acct.device_keys_payload(uid, dev)
+    assert verify_device_keys(dk, uid, dev) is True
+
+    # Missing signatures field -> False
+    no_sig = {k: v for k, v in dk.items() if k != "signatures"}
+    assert verify_device_keys(no_sig, uid, dev) is False
+
+    # Wrong user_id in signatures -> False
+    wrong_uid = {
+        **dk,
+        "signatures": {"@wrong:h": dk["signatures"][uid]},
+    }
+    assert verify_device_keys(wrong_uid, uid, dev) is False
+
+    # Tampered key value -> False
+    tampered = {**dk, "keys": {**dk["keys"], f"ed25519:{dev}": "bad"}}
+    assert verify_device_keys(tampered, uid, dev) is False
+
+    # Missing ed25519 key entry -> False
+    no_keys = {**dk, "keys": {f"curve25519:{dev}": acct.identity_key}}
+    assert verify_device_keys(no_keys, uid, dev) is False
+
+    # --- verify_signed_otk ---
+
+    key_b64 = _rand_b64_32()
+    otk_obj = {"key": key_b64}
+    sig = acct.sign(_canonical_json(otk_obj))
+    signed_otk = {
+        **otk_obj,
+        "signatures": {uid: {f"ed25519:{dev}": sig}},
+    }
+
+    # Valid OTK -> True
+    assert verify_signed_otk(signed_otk, uid, dev, acct.signing_key) is True
+
+    # Missing signatures -> False
+    assert verify_signed_otk(otk_obj, uid, dev, acct.signing_key) is False
+
+    # Wrong signing key -> False
+    other = MatrixOlmAccount()
+    assert verify_signed_otk(signed_otk, uid, dev, other.signing_key) is False
+
+    # Tampered key value -> False
+    tampered_otk = {**signed_otk, "key": _rand_b64_32()}
+    assert verify_signed_otk(tampered_otk, uid, dev, acct.signing_key) is False
+
+
 def test_plugin_matrix_e2ee_megolm_session():
     """MatrixMegOlmSession encrypt, session_key, rotation, serialisation."""
     from apprise.plugins.matrix.e2ee import (
@@ -2273,24 +2352,26 @@ def test_plugin_matrix_e2ee_megolm_session():
     old = MatrixMegOlmSession(created_at=0.0)
     assert old.should_rotate()
 
-    # _advance branches
-    # -- normal step (else branch, counter starts at 0 so always else first)
-    s3 = MatrixMegOlmSession()
-    s3._advance()  # counter 0 -> 1  (else: R[3] only)
+    # _advance branches -- cascade fires when (n+1) % threshold == 0,
+    # i.e. when the counter is one less than a threshold multiple.
 
-    # -- %256 branch: counter == 256 before advance
+    # -- normal step (else branch)
+    s3 = MatrixMegOlmSession()
+    s3._advance()  # counter 0 -> 1  (1 % 256 != 0, else: R[3] only)
+
+    # -- %256 branch: next counter will be 256
     s4 = MatrixMegOlmSession()
-    s4._counter = 256
+    s4._counter = 255
     s4._advance()
 
-    # -- %65536 branch
+    # -- %65536 branch: next counter will be 65536
     s5 = MatrixMegOlmSession()
-    s5._counter = 65536
+    s5._counter = 65535
     s5._advance()
 
-    # -- %2^24 branch
+    # -- %2^24 branch: next counter will be 2^24
     s6 = MatrixMegOlmSession()
-    s6._counter = 1 << 24
+    s6._counter = (1 << 24) - 1
     s6._advance()
 
 
@@ -2410,7 +2491,6 @@ def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
 
     # Recipient device (acts as a room member)
     recipient = MatrixOlmAccount()
-    their_ik = recipient.identity_key
 
     login_resp = {
         "access_token": "tok123",
@@ -2419,32 +2499,22 @@ def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
         "device_id": "SENDERDEV",
     }
 
-    # One-time key value (32 bytes, base64)
-    otk_val = _rand_b64_32()
-
     members_resp = {
         "joined": {"@other:localhost": {}},
     }
 
+    # Properly signed device keys (required by verify_device_keys)
+    signed_dev = recipient.device_keys_payload("@other:localhost", "OTHERDEV")
     query_resp = {
-        "device_keys": {
-            "@other:localhost": {
-                "OTHERDEV": {
-                    "keys": {
-                        "curve25519:OTHERDEV": their_ik,
-                        "ed25519:OTHERDEV": recipient.signing_key,
-                    }
-                }
-            }
-        }
+        "device_keys": {"@other:localhost": {"OTHERDEV": signed_dev}}
     }
 
+    # Properly signed OTK (required by verify_signed_otk)
+    signed_otk = _make_signed_otk(recipient, "@other:localhost", "OTHERDEV")
     claim_resp = {
         "one_time_keys": {
             "@other:localhost": {
-                "OTHERDEV": {
-                    "curve25519:KEYID": otk_val,
-                }
+                "OTHERDEV": {"signed_curve25519:KEYID": signed_otk}
             }
         }
     }
@@ -2634,6 +2704,48 @@ def test_plugin_matrix_e2ee_upload_keys_http_fail(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+def test_plugin_matrix_whoami(mock_post, mock_get, mock_put):
+    """_whoami() resolves user_id and device_id from GET /account/whoami."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    obj = NotifyMatrix(
+        host="h",
+        password="rawtoken",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.access_token = "rawtoken"
+    obj.home_server = "h"
+
+    # Success: server returns user_id and device_id; home_server is
+    # extracted from user_id so DM targets resolve correctly.
+    mock_get.return_value = _mk_resp(
+        {"user_id": "@tok:h", "device_id": "TOKDEV"}
+    )
+    assert obj._whoami() is True
+    assert obj.user_id == "@tok:h"
+    assert obj.device_id == "TOKDEV"
+    assert obj.home_server == "h"
+    assert obj.store.get("user_id") == "@tok:h"
+    assert obj.store.get("device_id") == "TOKDEV"
+    assert obj.store.get("home_server") == "h"
+
+    # Failure: server returns non-200
+    obj.user_id = None
+    obj.device_id = None
+    mock_get.return_value = _mk_resp({}, code=401)
+    assert obj._whoami() is False
+    assert obj.user_id is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_matrix_e2ee_get_megolm_rotation(mock_post, mock_get, mock_put):
     """_e2ee_get_megolm rotates session after threshold."""
     from apprise.plugins.matrix.e2ee import (
@@ -2740,8 +2852,10 @@ def test_plugin_matrix_e2ee_room_members(mock_post, mock_get, mock_put):
     mock_post.return_value = _mk_resp({}, code=500)
     assert obj._e2ee_room_members("!r:h") is None
 
-    # Success
-    query_resp = {
+    # Unsigned device key -> device is rejected (empty result for that uid)
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    unsigned_resp = {
         "device_keys": {
             "@u:h": {
                 "DEV": {
@@ -2749,14 +2863,25 @@ def test_plugin_matrix_e2ee_room_members(mock_post, mock_get, mock_put):
                         "curve25519:DEV": "IK",
                         "ed25519:DEV": "SK",
                     }
+                    # no "signatures" field
                 }
             }
         }
     }
+    mock_get.return_value = _mk_resp({"joined": {"@u:h": {}}})
+    mock_post.return_value = _mk_resp(unsigned_resp)
+    result = obj._e2ee_room_members("!r:h")
+    assert result["@u:h"] == {}
+
+    # Properly signed device key -> device included
+    acct = MatrixOlmAccount()
+    signed_dev = acct.device_keys_payload("@u:h", "DEV")
+    query_resp = {"device_keys": {"@u:h": {"DEV": signed_dev}}}
+    mock_get.return_value = _mk_resp({"joined": {"@u:h": {}}})
     mock_post.return_value = _mk_resp(query_resp)
     result = obj._e2ee_room_members("!r:h")
     assert "@u:h" in result
-    assert result["@u:h"]["DEV"]["curve25519"] == "IK"
+    assert result["@u:h"]["DEV"]["curve25519"] == acct.identity_key
 
 
 @mock.patch("requests.put")
@@ -2811,7 +2936,7 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     }
     otk_resp = {
         "one_time_keys": {
-            "@sender:h": {"SDEV": {"curve25519:KID": _rand_b64_32()}}
+            "@sender:h": {"SDEV": {"signed_curve25519:KID": _rand_b64_32()}}
         }
     }
     mock_post.return_value = _mk_resp(otk_resp)
@@ -2830,16 +2955,24 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         )
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
-    # dict-valued OTK (with "key" field) succeeds end-to-end
+    # dict-valued OTK with valid signature succeeds end-to-end
     recipient = MatrixOlmAccount()
     their_ik = recipient.identity_key
-    their_otk = recipient.identity_key  # reuse as OTK
+    their_otk_b64 = _rand_b64_32()
+    signed_otk_dict = _make_signed_otk(
+        recipient, "@other:h", "DEV", their_otk_b64
+    )
     dict_members = {
-        "@other:h": {"DEV": {"curve25519": their_ik, "ed25519": "SK"}}
+        "@other:h": {
+            "DEV": {
+                "curve25519": their_ik,
+                "ed25519": recipient.signing_key,
+            }
+        }
     }
     dict_otk = {
         "one_time_keys": {
-            "@other:h": {"DEV": {"curve25519:KID": {"key": their_otk}}}
+            "@other:h": {"DEV": {"signed_curve25519:KID": signed_otk_dict}}
         }
     }
     mock_post.return_value = _mk_resp(dict_otk)
@@ -2849,12 +2982,33 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
-    # string-valued OTK (plain base64 string, not a dict)
+    # dict-valued OTK with no signatures -> OTK rejected, device skipped
+    unsigned_otk_dict = {"key": their_otk_b64}  # no "signatures" field
+    unsigned_otk_resp = {
+        "one_time_keys": {
+            "@other:h": {"DEV": {"signed_curve25519:KID": unsigned_otk_dict}}
+        }
+    }
+    mock_post.return_value = _mk_resp(unsigned_otk_resp)
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=dict_members
+    ):
+        # No valid OTK -> no messages built -> True (nothing to send)
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # string-valued OTK (plain base64 string -- unverified legacy fallback)
     str_members = {
-        "@other:h": {"DEV": {"curve25519": their_ik, "ed25519": "SK"}}
+        "@other:h": {
+            "DEV": {
+                "curve25519": their_ik,
+                "ed25519": recipient.signing_key,
+            }
+        }
     }
     str_otk = {
-        "one_time_keys": {"@other:h": {"DEV": {"curve25519:KID": their_otk}}}
+        "one_time_keys": {
+            "@other:h": {"DEV": {"signed_curve25519:KID": their_otk_b64}}
+        }
     }
     mock_post.return_value = _mk_resp(str_otk)
     mock_put.return_value = _mk_resp({})
@@ -2863,9 +3017,9 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
-    # OTK key not prefixed with "curve25519:" -> skipped, no OTK found
+    # OTK key not prefixed with "signed_curve25519:" -> skipped, no OTK found
     bad_key_otk = {
-        "one_time_keys": {"@other:h": {"DEV": {"ed25519:KID": their_otk}}}
+        "one_time_keys": {"@other:h": {"DEV": {"ed25519:KID": their_otk_b64}}}
     }
     mock_post.return_value = _mk_resp(bad_key_otk)
     with mock.patch.object(
@@ -2883,7 +3037,7 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
 
     # OTK value is neither dict nor str (e.g. integer) -> skipped
     non_str_otk = {
-        "one_time_keys": {"@other:h": {"DEV": {"curve25519:KID": 42}}}
+        "one_time_keys": {"@other:h": {"DEV": {"signed_curve25519:KID": 42}}}
     }
     mock_post.return_value = _mk_resp(non_str_otk)
     with mock.patch.object(
@@ -2892,8 +3046,11 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
     # create_outbound_session raises -> device is skipped gracefully
+    # Uses a string OTK (no sig check) so the Olm call is actually reached
     create_fail_otk = {
-        "one_time_keys": {"@other:h": {"DEV": {"curve25519:KID": their_otk}}}
+        "one_time_keys": {
+            "@other:h": {"DEV": {"signed_curve25519:KID": their_otk_b64}}
+        }
     }
     mock_post.return_value = _mk_resp(create_fail_otk)
     with (
@@ -2906,16 +3063,22 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
-    # sendToDevice PUT fails -> warning logged but returns True
-    full_members = {
-        "@other:h": {"DEV": {"curve25519": their_ik, "ed25519": "SK"}}
+    # sendToDevice PUT fails -> returns False (key-shared flag not set)
+    # Uses a signed OTK so the full Olm path is exercised before the PUT
+    full_signed_otk = _make_signed_otk(
+        recipient, "@other:h", "DEV", their_otk_b64
+    )
+    full_otk_resp = {
+        "one_time_keys": {
+            "@other:h": {"DEV": {"signed_curve25519:KID": full_signed_otk}}
+        }
     }
-    mock_post.return_value = _mk_resp(str_otk)
+    mock_post.return_value = _mk_resp(full_otk_resp)
     mock_put.return_value = _mk_resp({}, code=500)
     with mock.patch.object(
-        obj, "_e2ee_room_members", return_value=full_members
+        obj, "_e2ee_room_members", return_value=dict_members
     ):
-        assert obj._e2ee_share_room_key("!r:h", session) is True
+        assert obj._e2ee_share_room_key("!r:h", session) is False
 
 
 @mock.patch("requests.put")

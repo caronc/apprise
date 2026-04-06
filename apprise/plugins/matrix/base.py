@@ -65,6 +65,8 @@ from .e2ee import (
     MatrixMegOlmSession,
     MatrixOlmAccount,
     encrypt_attachment,
+    verify_device_keys,
+    verify_signed_otk,
 )
 
 # Define default path
@@ -750,6 +752,13 @@ class NotifyMatrix(NotifyBase):
             # We need to register
             return False
 
+        # When authenticating with a raw access token (no username) the
+        # login flow is skipped, so user_id and device_id are never returned
+        # by the server.  Resolve them via /account/whoami so that E2EE key
+        # upload and DM room lookup (m.direct) work correctly.
+        if not self.user and (not self.user_id or not self.device_id):
+            self._whoami()
+
         if len(self.rooms) == 0 and not self.users:
             # Attempt to retrieve a list of already joined channels
             self.rooms = self._joined_rooms()
@@ -764,6 +773,9 @@ class NotifyMatrix(NotifyBase):
         # Create a copy of our rooms to join and message
         rooms = list(self.rooms)
 
+        # Initialize our error tracking
+        has_error = False
+
         # Resolve DM user targets (@user) to room IDs
         for _user in self.users:
             dm_room_id = self._dm_room_find_or_create(_user)
@@ -775,9 +787,6 @@ class NotifyMatrix(NotifyBase):
                     _user,
                 )
                 has_error = True
-
-        # Initiaize our error tracking
-        has_error = False
 
         # E2EE setup (once per send call, not per room).
         # e2ee_capable means prerequisites are met; encryption is still
@@ -1182,6 +1191,51 @@ class NotifyMatrix(NotifyBase):
                 expires=self.default_cache_expiry_sec,
             )
 
+        return True
+
+    def _whoami(self):
+        """Resolve user_id, device_id, and home_server via GET /account/whoami.
+
+        Called when a raw access token is supplied (no login flow), so
+        the server never returned these identifiers directly.  Results
+        are cached in the persistent store for future calls.
+
+        Returns True on success, False otherwise.
+        """
+        ok, response, _ = self._fetch(
+            "/account/whoami", payload=None, method="GET"
+        )
+        if not (ok and isinstance(response, dict)):
+            return False
+
+        self.user_id = response.get("user_id") or self.user_id
+        self.device_id = response.get("device_id") or self.device_id
+
+        # Extract home_server from user_id (@localpart:homeserver) so that
+        # DM targets without an explicit homeserver resolve correctly.
+        if self.user_id and not self.home_server:
+            parts = self.user_id.split(":", 1)
+            if len(parts) == 2:
+                self.home_server = parts[1]
+
+        if self.user_id:
+            self.store.set(
+                "user_id",
+                self.user_id,
+                expires=self.default_cache_expiry_sec,
+            )
+        if self.device_id:
+            self.store.set(
+                "device_id",
+                self.device_id,
+                expires=self.default_cache_expiry_sec,
+            )
+        if self.home_server:
+            self.store.set(
+                "home_server",
+                self.home_server,
+                expires=self.default_cache_expiry_sec,
+            )
         return True
 
     def _logout(self):
@@ -1860,6 +1914,14 @@ class NotifyMatrix(NotifyBase):
         for uid, devices in resp.get("device_keys", {}).items():
             result[uid] = {}
             for dev_id, dev_info in devices.items():
+                if not verify_device_keys(dev_info, uid, dev_id):
+                    self.logger.debug(
+                        "Matrix E2EE: device key signature invalid "
+                        "for %s / %s; device skipped.",
+                        uid,
+                        dev_id,
+                    )
+                    continue
                 keys = dev_info.get("keys", {})
                 result[uid][dev_id] = {
                     "curve25519": keys.get("curve25519:{}".format(dev_id), ""),
@@ -1890,10 +1952,13 @@ class NotifyMatrix(NotifyBase):
         if not members:
             return True
 
-        # Build the claim request for all member devices
+        # Build the claim request for all member devices.
+        # "signed_curve25519" is the algorithm Matrix clients publish and
+        # servers are required to support; "curve25519" (unsigned) is
+        # deprecated and usually yields no keys on current servers.
         otk_request = {}
         for uid, devs in members.items():
-            otk_request[uid] = dict.fromkeys(devs, "curve25519")
+            otk_request[uid] = dict.fromkeys(devs, "signed_curve25519")
 
         postokay, otk_resp, _ = self._fetch(
             "/keys/claim",
@@ -1929,15 +1994,30 @@ class NotifyMatrix(NotifyBase):
                 if not their_ik:
                     continue
 
-                # Locate the OTK for this device
+                # Locate and verify the OTK for this device.
+                # Servers return signed_curve25519 keys (the algorithm we
+                # requested) as {"key": ..., "signatures": ...} dicts.
+                # The device Ed25519 key (already signature-verified above
+                # in _e2ee_room_members) is used to authenticate each OTK.
                 their_otk = None
                 otk_entry = otk_keys.get(uid, {}).get(dev_id, {})
                 if isinstance(otk_entry, dict):
                     for k, v in otk_entry.items():
-                        if not k.startswith("curve25519:"):
+                        if not k.startswith("signed_curve25519:"):
                             continue
                         if isinstance(v, dict):
-                            their_otk = v.get("key")
+                            ed25519_pub = dev_info.get("ed25519", "")
+                            if not ed25519_pub or not verify_signed_otk(
+                                v, uid, dev_id, ed25519_pub
+                            ):
+                                self.logger.debug(
+                                    "Matrix E2EE: OTK signature "
+                                    "invalid for %s / %s; skipped.",
+                                    uid,
+                                    dev_id,
+                                )
+                            else:
+                                their_otk = v.get("key")
                         elif isinstance(v, str):
                             their_otk = v
                         break
@@ -2000,7 +2080,7 @@ class NotifyMatrix(NotifyBase):
                 "Matrix E2EE: failed to deliver room key to devices in %s.",
                 room_id,
             )
-            # Not fatal -- the key may still have reached some devices
+            return False
 
         return True
 
