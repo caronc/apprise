@@ -241,6 +241,7 @@ class NotifyMatrix(NotifyBase):
                 "type": "string",
                 "private": True,
                 "map_to": "password",
+                "required": True,
             },
             "target_user": {
                 "name": _("Target User"),
