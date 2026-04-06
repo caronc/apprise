@@ -29,6 +29,13 @@
 # - https://github.com/matrix-org/matrix-python-sdk
 # - https://github.com/matrix-org/synapse/blob/master/docs/reverse_proxy.rst
 #
+# End-to-End Encryption references:
+# - https://spec.matrix.org/v1.11/client-server-api/
+#   #end-to-end-encryption
+# - https://gitlab.matrix.org/matrix-org/olm/-/blob/master/docs/olm.md
+# - https://gitlab.matrix.org/matrix-org/olm/-/blob/master/docs/megolm.md
+#
+import contextlib
 from json import dumps, loads
 import re
 from time import time
@@ -37,17 +44,23 @@ import uuid
 from markdown import markdown
 import requests
 
-from ..common import (
+from ...common import (
     NotifyFormat,
     NotifyImageSize,
     NotifyType,
     PersistentStoreMode,
 )
-from ..exception import AppriseException
-from ..locale import gettext_lazy as _
-from ..url import PrivacyMode
-from ..utils.parse import is_hostname, parse_bool, parse_list, validate_regex
-from .base import NotifyBase
+from ...exception import AppriseException
+from ...locale import gettext_lazy as _
+from ...url import PrivacyMode
+from ...utils.parse import (
+    is_hostname,
+    parse_bool,
+    parse_list,
+    validate_regex,
+)
+from ..base import NotifyBase
+from .e2ee import MATRIX_E2EE_SUPPORT, MatrixMegOlmSession, MatrixOlmAccount
 
 # Define default path
 MATRIX_V1_WEBHOOK_PATH = "/api/v1/matrix/hook"
@@ -306,6 +319,11 @@ class NotifyMatrix(NotifyBase):
                 "values": MATRIX_MESSAGE_TYPES,
                 "default": MatrixMessageType.TEXT,
             },
+            "e2ee": {
+                "name": _("End-to-End Encryption"),
+                "type": "bool",
+                "default": True,
+            },
             "token": {
                 "alias_of": "token",
             },
@@ -324,6 +342,7 @@ class NotifyMatrix(NotifyBase):
         include_image=None,
         discovery=None,
         hsreq=None,
+        e2ee=None,
         **kwargs,
     ):
         """Initialize Matrix Object."""
@@ -341,8 +360,14 @@ class NotifyMatrix(NotifyBase):
         # This gets initialized after a login/registration
         self.access_token = None
 
+        # Our device ID assigned by the Matrix server during login
+        self.device_id = None
+
         # This gets incremented for each request made against the v3 API
         self.transaction_id = 0
+
+        # Lazy-initialized E2EE account (MatrixOlmAccount or None)
+        self._e2ee_account = None
 
         # Place an image inline with the message body
         self.include_image = (
@@ -363,6 +388,13 @@ class NotifyMatrix(NotifyBase):
         # with the authenticated homeserver.
         self.hsreq = (
             self.template_args["hsreq"]["default"] if hsreq is None else hsreq
+        )
+
+        # End-to-end encryption (server mode only; requires cryptography)
+        self.e2ee = (
+            self.template_args["e2ee"]["default"]
+            if e2ee is None
+            else parse_bool(e2ee)
         )
 
         # Setup our mode
@@ -444,10 +476,20 @@ class NotifyMatrix(NotifyBase):
             # This gets initialized after a login/registration
             self.access_token = self.store.get("access_token")
 
+            # Device ID assigned by server
+            self.device_id = self.store.get("device_id")
+
         # This gets incremented for each request made against the v3 API
         self.transaction_id = (
             0 if not self.access_token else self.store.get("transaction_id", 0)
         )
+
+        # Restore E2EE account from store if available
+        if self.e2ee and MATRIX_E2EE_SUPPORT:
+            acct_data = self.store.get("e2ee_account")
+            if acct_data:
+                with contextlib.suppress(Exception):
+                    self._e2ee_account = MatrixOlmAccount.from_dict(acct_data)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Matrix Notification."""
@@ -504,7 +546,9 @@ class NotifyMatrix(NotifyBase):
         )
 
         self.logger.debug(
-            f"Matrix POST URL: {url} (cert_verify={self.verify_certificate!r})"
+            "Matrix POST URL: {} (cert_verify={!r})".format(
+                url, self.verify_certificate
+            )
         )
         self.logger.debug(f"Matrix Payload: {payload!s}")
 
@@ -527,12 +571,15 @@ class NotifyMatrix(NotifyBase):
 
                 self.logger.warning(
                     "Failed to send Matrix notification: {}{}error={}.".format(
-                        status_str, ", " if status_str else "", r.status_code
+                        status_str,
+                        ", " if status_str else "",
+                        r.status_code,
                     )
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    "Response Details:\r\n%r",
+                    (r.content or b"")[:2000],
                 )
 
                 # Return; we're done
@@ -701,6 +748,21 @@ class NotifyMatrix(NotifyBase):
         # Initiaize our error tracking
         has_error = False
 
+        # E2EE setup (once per send call, not per room).
+        # e2ee_capable means prerequisites are met; encryption is still
+        # decided per-room based on whether that room requires E2EE.
+        e2ee_capable = False
+        if self.e2ee and self.secure and MATRIX_E2EE_SUPPORT:
+            e2ee_capable = self._e2ee_setup()
+            if not e2ee_capable:
+                self.logger.warning(
+                    "Matrix E2EE setup failed; "
+                    "messages will be sent unencrypted."
+                )
+
+        # Prepare attachments once.  They are consumed by unencrypted rooms;
+        # E2EE rooms skip attachment delivery (media encryption is not yet
+        # supported) but other rooms in the same send call still receive them.
         attachments = None
         if attach and self.attachment_support:
             attachments = self._send_attachments(attach)
@@ -722,12 +784,29 @@ class NotifyMatrix(NotifyBase):
                 has_error = True
                 continue
 
+            if e2ee_capable and self._e2ee_room_encrypted(room_id):
+                # Room requires E2EE -- warn if attachments exist
+                if attach and self.attachment_support:
+                    self.logger.warning(
+                        "Matrix E2EE attachment encryption is not yet "
+                        "supported; attachments will be skipped."
+                    )
+                # E2EE path: encrypt and send as m.room.encrypted
+                if not self._e2ee_send_to_room(
+                    room_id, body, title, notify_type
+                ):
+                    has_error = True
+                continue
+
+            # --- Unencrypted path (existing behaviour) ---
+
             # Acquire our image url if we're configured to do so
             image_url = (
                 None if not self.include_image else self.image_url(notify_type)
             )
 
-            # Always use PUT with a transaction ID (spec-compliant since 2015)
+            # Always use PUT with a transaction ID
+            # (spec-compliant since 2015)
             path = "/rooms/{}/send/m.room.message/{}".format(
                 NotifyMatrix.quote(room_id), self.transaction_id
             )
@@ -794,7 +873,8 @@ class NotifyMatrix(NotifyBase):
             payload = {
                 "msgtype": f"m.{self.msgtype}",
                 "body": "{title}{body}".format(
-                    title="" if not title else f"# {title}\r\n", body=body
+                    title="" if not title else f"# {title}\r\n",
+                    body=body,
                 ),
             }
 
@@ -805,7 +885,7 @@ class NotifyMatrix(NotifyBase):
                     {
                         "format": "org.matrix.custom.html",
                         "formatted_body": "{title}{body}".format(
-                            title="" if not title else f"<h1>{title}</h1>",
+                            title=("" if not title else f"<h1>{title}</h1>"),
                             body=body,
                         ),
                     }
@@ -816,9 +896,10 @@ class NotifyMatrix(NotifyBase):
                     ""
                     if not title
                     else (
-                        "<h1>"
-                        f"{NotifyMatrix.escape_html(title, whitespace=False)}"
-                        "</h1>"
+                        "<h1>{}".format(
+                            NotifyMatrix.escape_html(title, whitespace=False)
+                        )
+                        + "</h1>"
                     )
                 )
 
@@ -922,8 +1003,8 @@ class NotifyMatrix(NotifyBase):
     def _register(self):
         """Register with the service if possible."""
 
-        # Prepare our Registration Payload. This will only work if registration
-        # is enabled for the public
+        # Prepare our Registration Payload. This will only work if
+        # registration is enabled for the public
         payload = {
             "kind": "user",
             "auth": {"type": "m.login.dummy"},
@@ -934,9 +1015,9 @@ class NotifyMatrix(NotifyBase):
             "kind": "user",
         }
 
-        # If a user is not specified, one will be randomly generated for you.
-        # If you do not specify a password, you will be unable to login to the
-        # account if you forget the access_token.
+        # If a user is not specified, one will be randomly generated for
+        # you. If you do not specify a password, you will be unable to
+        # login to the account if you forget the access_token.
         if self.user:
             payload["username"] = self.user
 
@@ -955,6 +1036,7 @@ class NotifyMatrix(NotifyBase):
         self.access_token = response.get("access_token")
         self.home_server = response.get("home_server")
         self.user_id = response.get("user_id")
+        self.device_id = response.get("device_id")
 
         self.store.set(
             "access_token",
@@ -969,6 +1051,12 @@ class NotifyMatrix(NotifyBase):
         self.store.set(
             "user_id", self.user_id, expires=self.default_cache_expiry_sec
         )
+        if self.device_id:
+            self.store.set(
+                "device_id",
+                self.device_id,
+                expires=self.default_cache_expiry_sec,
+            )
 
         if self.access_token is not None:
             # Store our token into our store
@@ -1007,8 +1095,8 @@ class NotifyMatrix(NotifyBase):
                 }
 
         else:
-            # It's not possible to register since we need these 2 values to
-            # make the action possible.
+            # It's not possible to register since we need these 2 values
+            # to make the action possible.
             self.logger.warning(
                 "Failed to login to Matrix server: "
                 "token or user/pass combo is missing."
@@ -1025,6 +1113,7 @@ class NotifyMatrix(NotifyBase):
         self.access_token = response.get("access_token")
         self.home_server = response.get("home_server")
         self.user_id = response.get("user_id")
+        self.device_id = response.get("device_id")
 
         if not self.access_token:
             return False
@@ -1045,6 +1134,12 @@ class NotifyMatrix(NotifyBase):
         self.store.set(
             "user_id", self.user_id, expires=self.default_cache_expiry_sec
         )
+        if self.device_id:
+            self.store.set(
+                "device_id",
+                self.device_id,
+                expires=self.default_cache_expiry_sec,
+            )
 
         return True
 
@@ -1079,10 +1174,18 @@ class NotifyMatrix(NotifyBase):
         self.access_token = None
         self.home_server = None
         self.user_id = None
+        self.device_id = None
+        self._e2ee_account = None
 
-        # clear our tokens
+        # clear our tokens (including E2EE upload flag so it re-uploads
+        # after a fresh login)
         self.store.clear(
-            "access_token", "home_server", "user_id", "transaction_id"
+            "access_token",
+            "home_server",
+            "user_id",
+            "transaction_id",
+            "device_id",
+            "e2ee_keys_uploaded",
         )
 
         self.logger.debug("Unauthenticated successfully with Matrix server.")
@@ -1092,8 +1195,9 @@ class NotifyMatrix(NotifyBase):
     def _room_join(self, room):
         """Joins a matrix room if we're not already in it.
 
-        Otherwise it attempts to create it if it doesn't exist and always
-        returns the room_id if it was successful, otherwise it returns None
+        Otherwise it attempts to create it if it doesn't exist and
+        always returns the room_id if it was successful, otherwise it
+        returns None
         """
 
         if not self.access_token:
@@ -1120,10 +1224,10 @@ class NotifyMatrix(NotifyBase):
                 else self.home_server
             )
 
-            # When hsreq is enabled (legacy behaviour), we always require a
-            # ':homeserver' segment on room IDs. Otherwise, we honour exactly
-            # what the caller provided and do not synthesise a homeserver when
-            # it was not specified.
+            # When hsreq is enabled (legacy behaviour), we always require
+            # a ':homeserver' segment on room IDs. Otherwise, we honour
+            # exactly what the caller provided and do not synthesise a
+            # homeserver when it was not specified.
             cache_key = f"!{room_token}:{home_server}"
             if explicit_home_server or self.hsreq:
                 room_id = cache_key
@@ -1213,9 +1317,9 @@ class NotifyMatrix(NotifyBase):
             return response.get("room_id")
 
         # Only attempt to create a room when the server clearly indicates
-        # the alias does not exist. A join can fail for many reasons, such as
-        # invite required, auth failure, or permissions, and in those cases
-        # auto-creating is both noisy and incorrect.
+        # the alias does not exist. A join can fail for many reasons, such
+        # as invite required, auth failure, or permissions, and in those
+        # cases auto-creating is both noisy and incorrect.
         if (
             status_code == requests.codes.not_found
             or response.get("errcode") == "M_NOT_FOUND"
@@ -1263,8 +1367,8 @@ class NotifyMatrix(NotifyBase):
             "room_alias_name": result.group("room"),
             # Set our channel name
             "name": "#{} - {}".format(result.group("room"), self.app_desc),
-            # hide the room by default; let the user open it up if they wish
-            # to others.
+            # hide the room by default; let the user open it up if they
+            # wish to others.
             "visibility": "private",
             "preset": "trusted_private_chat",
         }
@@ -1293,8 +1397,8 @@ class NotifyMatrix(NotifyBase):
         return response.get("room_id")
 
     def _joined_rooms(self):
-        """Returns a list of the current rooms the logged in user is a part
-        of."""
+        """Returns a list of the current rooms the logged in user is a
+        part of."""
 
         if not self.access_token:
             # No list is possible
@@ -1364,14 +1468,14 @@ class NotifyMatrix(NotifyBase):
         method="POST",
         url_override=None,
     ):
-        """Wrapper to request.post() to manage it's response better and make
-        the send() function cleaner and easier to maintain.
+        """Wrapper to request.post() to manage it's response better and
+        make the send() function cleaner and easier to maintain.
 
         This function always returns a 3-tuple:
             (success, response, status_code)
 
-        The response is a dict when JSON is parseable, otherwise an empty dict.
-        The status_code defaults to 500 on local failures.
+        The response is a dict when JSON is parseable, otherwise an empty
+        dict. The status_code defaults to 500 on local failures.
         """
 
         # Define our headers
@@ -1435,8 +1539,8 @@ class NotifyMatrix(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        # Define how many attempts we'll make if we get caught in a throttle
-        # event
+        # Define how many attempts we'll make if we get caught in a
+        # throttle event
         retries = self.default_retries if self.default_retries > 0 else 1
         while retries > 0:
             # Decrement our throttle retry count
@@ -1472,7 +1576,9 @@ class NotifyMatrix(NotifyBase):
                 status_code = r.status_code
 
                 self.logger.debug(
-                    f"Matrix Response: code={r.status_code}, {r.content!s}"
+                    "Matrix Response: code={}, {}".format(
+                        r.status_code, r.content
+                    )
                 )
                 response = loads(r.content)
 
@@ -1490,7 +1596,7 @@ class NotifyMatrix(NotifyBase):
 
                     self.logger.warning(
                         "Matrix server requested we throttle back "
-                        f"{wait_ms}ms; retries left {retries}."
+                        "{}ms; retries left {}.".format(wait_ms, retries)
                     )
                     self.logger.debug(f"Response Details:\r\n{r.content}")
 
@@ -1532,10 +1638,13 @@ class NotifyMatrix(NotifyBase):
                 )
                 return (False, {}, status_code)
 
-            except (requests.TooManyRedirects, requests.RequestException) as e:
+            except (
+                requests.TooManyRedirects,
+                requests.RequestException,
+            ) as e:
                 self.logger.warning(
-                    "A Connection error occurred while registering with Matrix"
-                    " server."
+                    "A Connection error occurred while registering "
+                    "with Matrix server."
                 )
                 self.logger.debug("Socket Exception: %s", e)
                 # Return; we're done
@@ -1555,6 +1664,404 @@ class NotifyMatrix(NotifyBase):
         # If we get here, we ran out of retries
         return (False, {}, status_code)
 
+    # ---------------------------------------------------------------
+    # E2EE helpers
+    # ---------------------------------------------------------------
+
+    def _e2ee_room_encrypted(self, room_id):
+        """Return ``True`` if *room_id* has E2EE enabled on the server.
+
+        The result is cached in the persistent store so subsequent sends
+        to the same room do not issue additional network requests.
+        """
+        cache_key = "e2ee_room_enc_{}".format(room_id)
+        cached = self.store.get(cache_key)
+        if cached is not None:
+            return cached
+
+        ok, response, _ = self._fetch(
+            "/rooms/{}/state/m.room.encryption".format(
+                NotifyMatrix.quote(room_id)
+            ),
+            method="GET",
+        )
+        result = ok and bool(response)
+        self.store.set(
+            cache_key,
+            result,
+            expires=self.default_cache_expiry_sec,
+        )
+        return result
+
+    def _e2ee_setup(self):
+        """Ensure the E2EE device account exists and keys are uploaded.
+
+        Creates a new :class:`MatrixOlmAccount` if one does not yet
+        exist in the persistent store, then calls
+        :meth:`_e2ee_upload_keys` if the server has not yet received
+        our device keys for the current access token.
+
+        Returns ``True`` on success, ``False`` on failure.
+        """
+        if self._e2ee_account is None:
+            acct_data = self.store.get("e2ee_account")
+            if acct_data:
+                try:
+                    self._e2ee_account = MatrixOlmAccount.from_dict(acct_data)
+                except Exception:
+                    self._e2ee_account = None
+
+            if self._e2ee_account is None:
+                self._e2ee_account = MatrixOlmAccount()
+                self.store.set(
+                    "e2ee_account",
+                    self._e2ee_account.to_dict(),
+                    expires=self.default_cache_expiry_sec,
+                )
+
+        if not self.store.get("e2ee_keys_uploaded"):
+            return self._e2ee_upload_keys()
+
+        return True
+
+    def _e2ee_upload_keys(self):
+        """POST device keys to ``/_matrix/client/v3/keys/upload``."""
+        if not self.user_id or not self.device_id:
+            self.logger.warning(
+                "Matrix E2EE: cannot upload keys without user_id "
+                "and device_id; ensure login completes first."
+            )
+            return False
+
+        payload = {
+            "device_keys": self._e2ee_account.device_keys_payload(
+                self.user_id, self.device_id
+            )
+        }
+        postokay, _, _ = self._fetch("/keys/upload", payload=payload)
+        if not postokay:
+            self.logger.warning("Matrix E2EE: device key upload failed.")
+            return False
+
+        self.store.set(
+            "e2ee_keys_uploaded",
+            True,
+            expires=self.default_cache_expiry_sec,
+        )
+        self.logger.debug(
+            "Matrix E2EE: device keys uploaded for %s / %s.",
+            self.user_id,
+            self.device_id,
+        )
+        return True
+
+    def _e2ee_get_megolm(self, room_id):
+        """Return the current outbound MegOLM session for *room_id*.
+
+        Creates a new session when none exists or when the existing one
+        has reached the rotation threshold.  Also clears the
+        ``e2ee_key_shared_*`` flag so the new session key is re-shared.
+        """
+        store_key = "e2ee_megolm_{}".format(room_id)
+        session_data = self.store.get(store_key)
+
+        if session_data:
+            session = MatrixMegOlmSession.from_dict(session_data)
+            if not session.should_rotate():
+                return session
+
+        # New or rotated session
+        session = MatrixMegOlmSession()
+        self.store.set(
+            store_key,
+            session.to_dict(),
+            expires=self.default_cache_expiry_sec,
+        )
+        # Clear key-shared flag so we share the new session key
+        self.store.clear("e2ee_key_shared_{}".format(room_id))
+        return session
+
+    def _e2ee_save_megolm(self, room_id, session):
+        """Persist the updated MegOLM session state."""
+        self.store.set(
+            "e2ee_megolm_{}".format(room_id),
+            session.to_dict(),
+            expires=self.default_cache_expiry_sec,
+        )
+
+    def _e2ee_room_members(self, room_id):
+        """Query device keys for all joined members of *room_id*.
+
+        Returns a nested dict::
+
+            {user_id: {device_id: {"curve25519": ..., "ed25519": ...}}}
+
+        Returns ``None`` on HTTP failure, empty dict when the room has
+        no members (unlikely but tolerated).
+        """
+        path = "/rooms/{}/joined_members".format(NotifyMatrix.quote(room_id))
+        postokay, response, _ = self._fetch(path, payload=None, method="GET")
+        if not postokay or not isinstance(response, dict):
+            return None
+
+        member_ids = list(response.get("joined", {}).keys())
+        if not member_ids:
+            return {}
+
+        postokay, resp, _ = self._fetch(
+            "/keys/query",
+            payload={"device_keys": {uid: [] for uid in member_ids}},
+        )
+        if not postokay or not isinstance(resp, dict):
+            return None
+
+        result = {}
+        for uid, devices in resp.get("device_keys", {}).items():
+            result[uid] = {}
+            for dev_id, dev_info in devices.items():
+                keys = dev_info.get("keys", {})
+                result[uid][dev_id] = {
+                    "curve25519": keys.get("curve25519:{}".format(dev_id), ""),
+                    "ed25519": keys.get("ed25519:{}".format(dev_id), ""),
+                }
+        return result
+
+    def _e2ee_share_room_key(self, room_id, session):
+        """Send the MegOLM session key to all devices in *room_id*.
+
+        Flow:
+          1. Fetch joined-member device keys via /keys/query
+          2. Claim one-time keys via /keys/claim
+          3. Create outbound Olm sessions and encrypt the room-key event
+          4. Deliver via PUT /sendToDevice/m.room.encrypted/{txnId}
+
+        Returns ``True`` on success (partial device failures are
+        tolerated), ``False`` only when a critical step fails.
+        """
+        members = self._e2ee_room_members(room_id)
+        if members is None:
+            self.logger.warning(
+                "Matrix E2EE: failed to query room members for %s.",
+                room_id,
+            )
+            return False
+
+        if not members:
+            return True
+
+        # Build the claim request for all member devices
+        otk_request = {}
+        for uid, devs in members.items():
+            otk_request[uid] = dict.fromkeys(devs, "curve25519")
+
+        postokay, otk_resp, _ = self._fetch(
+            "/keys/claim",
+            payload={"one_time_keys": otk_request},
+        )
+        if not postokay:
+            self.logger.warning("Matrix E2EE: failed to claim one-time keys.")
+            return False
+
+        otk_keys = (
+            otk_resp.get("one_time_keys", {})
+            if isinstance(otk_resp, dict)
+            else {}
+        )
+
+        # Build to-device message payload
+        to_device_msgs = {}
+        room_key_content = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+            "room_id": room_id,
+            "session_id": session.session_id,
+            "session_key": session.session_key(),
+        }
+
+        for uid, devices in members.items():
+            to_device_msgs[uid] = {}
+            for dev_id, dev_info in devices.items():
+                # Skip our own device to avoid self-Olm-session setup
+                if uid == self.user_id and dev_id == self.device_id:
+                    continue
+
+                their_ik = dev_info.get("curve25519", "")
+                if not their_ik:
+                    continue
+
+                # Locate the OTK for this device
+                their_otk = None
+                otk_entry = otk_keys.get(uid, {}).get(dev_id, {})
+                if isinstance(otk_entry, dict):
+                    for k, v in otk_entry.items():
+                        if not k.startswith("curve25519:"):
+                            continue
+                        if isinstance(v, dict):
+                            their_otk = v.get("key")
+                        elif isinstance(v, str):
+                            their_otk = v
+                        break
+
+                if not their_otk:
+                    continue
+
+                try:
+                    olm_session = self._e2ee_account.create_outbound_session(
+                        their_ik, their_otk
+                    )
+                except Exception:
+                    self.logger.debug(
+                        "Matrix E2EE: failed to build Olm session "
+                        "for %s / %s.",
+                        uid,
+                        dev_id,
+                    )
+                    continue
+
+                inner = dumps(
+                    {
+                        "type": "m.room_key",
+                        "content": room_key_content,
+                        "sender": self.user_id,
+                        "recipient": uid,
+                        "recipient_keys": {
+                            "ed25519": dev_info.get("ed25519", "")
+                        },
+                        "keys": {"ed25519": self._e2ee_account.signing_key},
+                        "sender_device": self.device_id,
+                    }
+                )
+                ciphertext = olm_session.encrypt(inner)
+
+                to_device_msgs[uid][dev_id] = {
+                    "algorithm": "m.olm.v1.curve25519-aes-sha2",
+                    "ciphertext": {their_ik: ciphertext},
+                    "sender_key": self._e2ee_account.identity_key,
+                }
+
+        # Only send if at least one device message was built
+        if not any(v for v in to_device_msgs.values()):
+            return True
+
+        self.transaction_id += 1
+        self.store.set(
+            "transaction_id",
+            self.transaction_id,
+            expires=self.default_cache_expiry_sec,
+        )
+        path = "/sendToDevice/m.room.encrypted/{}".format(self.transaction_id)
+        postokay, _, _ = self._fetch(
+            path,
+            payload={"messages": to_device_msgs},
+            method="PUT",
+        )
+        if not postokay:
+            self.logger.warning(
+                "Matrix E2EE: failed to deliver room key to devices in %s.",
+                room_id,
+            )
+            # Not fatal -- the key may still have reached some devices
+
+        return True
+
+    def _e2ee_send_to_room(self, room_id, body, title, notify_type):
+        """Encrypt and send one message to *room_id* via MegOLM.
+
+        Shares the MegOLM session key with room members when the
+        session is new or has just been rotated.
+        Returns ``True`` on success, ``False`` on failure.
+        """
+        session = self._e2ee_get_megolm(room_id)
+
+        # Share room key if this session has not been announced yet
+        shared_flag = "e2ee_key_shared_{}".format(room_id)
+        if not self.store.get(shared_flag):
+            if not self._e2ee_share_room_key(room_id, session):
+                return False
+            self.store.set(
+                shared_flag,
+                True,
+                expires=self.default_cache_expiry_sec,
+            )
+
+        # Build the inner plaintext event
+        msg_content = {
+            "msgtype": "m.{}".format(self.msgtype),
+            "body": "{title}{body}".format(
+                title="" if not title else "# {}\r\n".format(title),
+                body=body,
+            ),
+        }
+
+        if self.notify_format == NotifyFormat.HTML:
+            msg_content.update(
+                {
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": "{title}{body}".format(
+                        title=(
+                            "" if not title else "<h1>{}</h1>".format(title)
+                        ),
+                        body=body,
+                    ),
+                }
+            )
+
+        elif self.notify_format == NotifyFormat.MARKDOWN:
+            msg_content.update(
+                {
+                    "format": "org.matrix.custom.html",
+                    "formatted_body": "{title}{body}".format(
+                        title=(
+                            ""
+                            if not title
+                            else "<h1>{}</h1>".format(
+                                NotifyMatrix.escape_html(
+                                    title, whitespace=False
+                                )
+                            )
+                        ),
+                        body=markdown(body),
+                    ),
+                }
+            )
+
+        inner_event = {
+            "type": "m.room.message",
+            "content": msg_content,
+            "room_id": room_id,
+        }
+
+        ciphertext = session.encrypt(inner_event)
+        self._e2ee_save_megolm(room_id, session)
+
+        path = "/rooms/{}/send/m.room.encrypted/{}".format(
+            NotifyMatrix.quote(room_id), self.transaction_id
+        )
+        encrypted_payload = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+            "ciphertext": ciphertext,
+            "sender_key": self._e2ee_account.identity_key,
+            "session_id": session.session_id,
+            "device_id": self.device_id or "",
+        }
+
+        postokay, _, _ = self._fetch(
+            path, payload=encrypted_payload, method="PUT"
+        )
+
+        if self.access_token != self.password:
+            self.transaction_id += 1
+            self.store.set(
+                "transaction_id",
+                self.transaction_id,
+                expires=self.default_cache_expiry_sec,
+            )
+
+        return postokay
+
+    # ---------------------------------------------------------------
+    # Destructor / URL / parse
+    # ---------------------------------------------------------------
+
     def __del__(self):
         """Ensure we relinquish our token."""
         if self.mode == MatrixWebhookMode.T2BOT:
@@ -1562,8 +2069,8 @@ class NotifyMatrix(NotifyBase):
             return
 
         if self.store.mode != PersistentStoreMode.MEMORY:
-            # We no longer have to log out as we have persistant storage to
-            # re-use our credentials with
+            # We no longer have to log out as we have persistant storage
+            # to re-use our credentials with
             return
 
         if (
@@ -1595,7 +2102,8 @@ class NotifyMatrix(NotifyBase):
         )
 
     def url(self, privacy=False, *args, **kwargs):
-        """Returns the URL built dynamically based on specified arguments."""
+        """Returns the URL built dynamically based on specified
+        arguments."""
 
         # Define any URL parameters
         params = {
@@ -1606,6 +2114,9 @@ class NotifyMatrix(NotifyBase):
             "discovery": "yes" if self.discovery else "no",
             "hsreq": "yes" if self.hsreq else "no",
         }
+
+        if not self.e2ee:
+            params["e2ee"] = "no"
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -1632,7 +2143,7 @@ class NotifyMatrix(NotifyBase):
                 )
 
         return "{schema}://{auth}{hostname}{port}/{rooms}?{params}".format(
-            schema=self.secure_protocol if self.secure else self.protocol,
+            schema=(self.secure_protocol if self.secure else self.protocol),
             auth=auth,
             hostname=(
                 NotifyMatrix.quote(self.host, safe="")
@@ -1645,14 +2156,15 @@ class NotifyMatrix(NotifyBase):
         )
 
     def __len__(self):
-        """Returns the number of targets associated with this notification."""
+        """Returns the number of targets associated with this
+        notification."""
         targets = len(self.rooms)
         return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
-        """Parses the URL and returns enough arguments that can allow us to re-
-        instantiate this object."""
+        """Parses the URL and returns enough arguments that can allow us
+        to re-instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
@@ -1664,38 +2176,45 @@ class NotifyMatrix(NotifyBase):
         # Get our rooms
         results["targets"] = NotifyMatrix.split_path(results["fullpath"])
 
-        # Support the 'to' variable so that we can support rooms this way too
-        # The 'to' makes it easier to use yaml configuration
+        # Support the 'to' variable so that we can support rooms this
+        # way too.  The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"] += NotifyMatrix.parse_list(results["qsd"]["to"])
 
         # Boolean to include an image or not
         results["include_image"] = parse_bool(
             results["qsd"].get(
-                "image", NotifyMatrix.template_args["image"]["default"]
+                "image",
+                NotifyMatrix.template_args["image"]["default"],
             )
         )
 
         # Boolean to perform a server discovery
         results["discovery"] = parse_bool(
             results["qsd"].get(
-                "discovery", NotifyMatrix.template_args["discovery"]["default"]
+                "discovery",
+                NotifyMatrix.template_args["discovery"]["default"],
             )
         )
 
         # Boolean to enforce ':homeserver' on room IDs when missing
         results["hsreq"] = parse_bool(
             results["qsd"].get(
-                "hsreq", NotifyMatrix.template_args["hsreq"]["default"]
+                "hsreq",
+                NotifyMatrix.template_args["hsreq"]["default"],
             )
         )
+
+        # E2EE flag
+        if "e2ee" in results["qsd"]:
+            results["e2ee"] = parse_bool(results["qsd"]["e2ee"])
 
         # Get our mode
         results["mode"] = results["qsd"].get("mode")
 
-        # t2bot detection... look for just a hostname, and/or just a user/host
-        # if we match this; we can go ahead and set the mode (but only if
-        # it was otherwise not set)
+        # t2bot detection... look for just a hostname, and/or just a
+        # user/host if we match this; we can go ahead and set the mode
+        # (but only if it was otherwise not set)
         if (
             results["mode"] is None
             and not results["password"]
@@ -1814,7 +2333,8 @@ class NotifyMatrix(NotifyBase):
         if status_code == requests.codes.not_found:
             # This is an acceptable response; we're done
             self.logger.debug(
-                "Matrix Well-Known Base URI not found at %s", verify_url
+                "Matrix Well-Known Base URI not found at %s",
+                verify_url,
             )
 
             # Set our keys out for fast recall later on
@@ -1883,8 +2403,8 @@ class NotifyMatrix(NotifyBase):
             raise MatrixDiscoveryException(msg)
 
         #
-        # Our .well-known extraction was successful; now we need to verify
-        # that the version information resolves.
+        # Our .well-known extraction was successful; now we need to
+        # verify that the version information resolves.
         #
         verify_url = f"{base_url}/_matrix/client/versions"
         # Post our content
@@ -1951,7 +2471,8 @@ class NotifyMatrix(NotifyBase):
             self.store.set(
                 self.discovery_identity_key,
                 identity_url,
-                # Add 2 seconds to prevent this key from expiring before base
+                # Add 2 seconds to prevent this key from expiring before
+                # base
                 expires=self.discovery_cache_length_sec + 2,
             )
         else:
@@ -1959,7 +2480,8 @@ class NotifyMatrix(NotifyBase):
             self.store.set(
                 self.discovery_identity_key,
                 "",
-                # Add 2 seconds to prevent this key from expiring before base
+                # Add 2 seconds to prevent this key from expiring before
+                # base
                 expires=self.discovery_cache_length_sec + 2,
             )
 
@@ -1987,8 +2509,8 @@ class NotifyMatrix(NotifyBase):
             )
             raise
 
-        # If we get hear, we need to build our URL dynamically based on what
-        # was provided to us during the plugins initialization
+        # If we get hear, we need to build our URL dynamically based on
+        # what was provided to us during the plugins initialization
         return "{schema}://{hostname}{port}".format(
             schema="https" if self.secure else "http",
             hostname=self.host,

@@ -2118,3 +2118,1085 @@ def test_plugin_matrix_room_create_on_not_found_join(
     assert mock_post.call_count == 4
     assert mock_get.call_count == 1
     assert mock_put.call_count == 1
+
+
+# ---------------------------------------------------------------------------
+# E2EE unit tests (require the cryptography package)
+# ---------------------------------------------------------------------------
+
+# Skip all E2EE tests when cryptography is unavailable
+_cryptography = pytest.importorskip(
+    "cryptography",
+    reason="Requires cryptography",
+    exc_type=ImportError,
+)
+
+
+def _rand_b64_32():
+    """32 bytes of random data encoded as unpadded base64."""
+    import base64
+
+    return base64.b64encode(os.urandom(32)).decode()
+
+
+def test_plugin_matrix_e2ee_helpers():
+    """e2ee helper functions."""
+    from apprise.plugins.matrix.e2ee import (
+        _b64dec,
+        _b64enc,
+        _canonical_json,
+        _hmac_sha256,
+        _pb_bytes,
+        _pb_varint_field,
+        _varint,
+    )
+
+    # _b64enc / _b64dec round-trip
+    raw = b"\x00\x01\x02\x03"
+    assert _b64dec(_b64enc(raw)) == raw
+
+    # _b64dec tolerates missing padding and URL-safe chars
+    # "AA==" -> decode "AA" (2 chars, pad=2)
+    assert _b64dec("AA") == b"\x00"
+    # URL-safe chars are normalised
+    assert _b64dec("AA--") == _b64dec("AA++")
+
+    # _hmac_sha256 returns 32 bytes
+    mac = _hmac_sha256(b"\x00" * 32, b"data")
+    assert isinstance(mac, bytes) and len(mac) == 32
+
+    # _varint: n==0 -> single zero byte
+    assert _varint(0) == b"\x00"
+    # n>0 is encoded as multi-byte varint
+    assert _varint(128) == b"\x80\x01"
+
+    # _pb_bytes / _pb_varint_field produce bytes
+    pb = _pb_bytes(1, b"hello")
+    assert isinstance(pb, bytes) and len(pb) > 5
+    pv = _pb_varint_field(2, 42)
+    assert isinstance(pv, bytes)
+
+    # _canonical_json produces sorted-key JSON bytes
+    data = {"z": 1, "a": 2}
+    out = _canonical_json(data)
+    assert out.startswith(b'{"a"')
+
+
+def test_plugin_matrix_e2ee_olm_account():
+    """MatrixOlmAccount creation, signing, serialisation."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    # Fresh account
+    acct = MatrixOlmAccount()
+    assert isinstance(acct.identity_key, str)
+    assert isinstance(acct.signing_key, str)
+
+    # sign() accepts str and bytes
+    sig = acct.sign("hello")
+    assert isinstance(sig, str)
+    sig2 = acct.sign(b"hello")
+    assert isinstance(sig2, str)
+
+    # to_dict / from_dict round-trip
+    d = acct.to_dict()
+    assert "ik" in d and "sk" in d
+    restored = MatrixOlmAccount.from_dict(d)
+    assert restored.identity_key == acct.identity_key
+    assert restored.signing_key == acct.signing_key
+
+    # Explicit key construction from stored keys
+    acct2 = MatrixOlmAccount(
+        ik_priv_b64=d["ik"],
+        sk_priv_b64=d["sk"],
+    )
+    assert acct2.identity_key == acct.identity_key
+
+    # device_keys_payload produces a signed dict
+    payload = acct.device_keys_payload("@u:h", "DEVID")
+    assert "signatures" in payload
+    assert "algorithms" in payload
+
+
+def test_plugin_matrix_e2ee_olm_session():
+    """MatrixOlmSession encrypts and produces correct structure."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    acct = MatrixOlmAccount()
+    # Create a second account to act as recipient
+    recipient = MatrixOlmAccount()
+
+    session = acct.create_outbound_session(
+        recipient.identity_key,
+        recipient.identity_key,  # reuse IK as a stand-in OTK
+    )
+
+    assert session.their_identity_key == recipient.identity_key
+
+    # str plaintext
+    result = session.encrypt("test plaintext")
+    assert result["type"] == 0
+    assert isinstance(result["body"], str)
+
+    # bytes plaintext also accepted
+    result2 = session.encrypt(b"bytes input")
+    assert result2["type"] == 0
+
+
+def test_plugin_matrix_e2ee_megolm_session():
+    """MatrixMegOlmSession encrypt, session_key, rotation, serialisation."""
+    from apprise.plugins.matrix.e2ee import (
+        MEGOLM_ROTATION_MSGS,
+        MatrixMegOlmSession,
+    )
+
+    s = MatrixMegOlmSession()
+    assert isinstance(s.session_id, str)
+
+    # encrypt returns base64 ciphertext
+    ct = s.encrypt({"type": "m.room.message", "content": {}})
+    assert isinstance(ct, str)
+
+    # session_key returns base64
+    sk = s.session_key()
+    assert isinstance(sk, str)
+
+    # to_dict / from_dict round-trip
+    d = s.to_dict()
+    s2 = MatrixMegOlmSession.from_dict(d)
+    assert s2.session_id == s.session_id
+    assert s2._counter == s._counter
+
+    # should_rotate: explicit count threshold
+    assert not s.should_rotate(msg_count=MEGOLM_ROTATION_MSGS - 1)
+    assert s.should_rotate(msg_count=MEGOLM_ROTATION_MSGS)
+
+    # should_rotate: time threshold (old created_at)
+    old = MatrixMegOlmSession(created_at=0.0)
+    assert old.should_rotate()
+
+    # _advance branches
+    # -- normal step (else branch, counter starts at 0 so always else first)
+    s3 = MatrixMegOlmSession()
+    s3._advance()  # counter 0 -> 1  (else: R[3] only)
+
+    # -- %256 branch: counter == 256 before advance
+    s4 = MatrixMegOlmSession()
+    s4._counter = 256
+    s4._advance()
+
+    # -- %65536 branch
+    s5 = MatrixMegOlmSession()
+    s5._counter = 65536
+    s5._advance()
+
+    # -- %2^24 branch
+    s6 = MatrixMegOlmSession()
+    s6._counter = 1 << 24
+    s6._advance()
+
+
+# ---------------------------------------------------------------------------
+# E2EE integration tests -- URL parsing and send flow
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_matrix_e2ee_url_roundtrip():
+    """e2ee default is True; disabled state survives url() / parse_url()."""
+    # Default (no e2ee param) is now True
+    obj = NotifyMatrix(
+        host="matrix.example.com",
+        user="user",
+        password="pass",
+        targets=["#room"],
+    )
+    assert obj.e2ee is True
+    # Enabled is the default -- not written to URL
+    assert "e2ee" not in obj.url()
+
+    # Disabled survives round-trip
+    obj2 = NotifyMatrix(
+        host="matrix.example.com",
+        user="user",
+        password="pass",
+        targets=["#room"],
+        e2ee=False,
+    )
+    assert obj2.e2ee is False
+    u2 = obj2.url()
+    assert "e2ee=no" in u2
+
+    result = NotifyMatrix.parse_url(u2)
+    assert result is not None
+    assert result.get("e2ee") is False or str(result.get("e2ee")).lower() in (
+        "false",
+        "no",
+        "0",
+    )
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_insecure_connection(mock_post, mock_get, mock_put):
+    """e2ee=yes over insecure (matrix://) falls back to unencrypted."""
+    resp = mock.Mock()
+    resp.status_code = requests.codes.ok
+    resp.content = dumps(
+        {
+            "access_token": "tok",
+            "user_id": "@u:h",
+            "home_server": "h",
+            "device_id": "DEV",
+            "room_id": "!r:h",
+        }
+    ).encode()
+    mock_post.return_value = resp
+    mock_get.return_value = resp
+    mock_put.return_value = resp
+
+    # matrix:// (not matrixs://) -- E2EE silently skipped, plain delivery
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#room"],
+        e2ee=True,
+        # secure=False is the default for matrix:// URLs
+    )
+    assert not obj.secure
+    assert obj.send(body="test") is True
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_no_support(mock_post, mock_get, mock_put):
+    """e2ee=yes with MATRIX_E2EE_SUPPORT=False sends unencrypted."""
+    resp = mock.Mock()
+    resp.status_code = requests.codes.ok
+    resp.content = dumps(
+        {
+            "access_token": "tok",
+            "user_id": "@u:h",
+            "home_server": "h",
+            "device_id": "DEV",
+            "room_id": "!r:h",
+        }
+    ).encode()
+    mock_post.return_value = resp
+    mock_get.return_value = resp
+    mock_put.return_value = resp
+
+    with mock.patch(
+        "apprise.plugins.matrix.base.MATRIX_E2EE_SUPPORT",
+        False,
+    ):
+        obj = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["#room"],
+            e2ee=True,
+        )
+        # Should succeed (falls back to unencrypted)
+        assert obj.send(body="test") is True
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
+    """Full E2EE send path via _send_server_notification."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    # Recipient device (acts as a room member)
+    recipient = MatrixOlmAccount()
+    their_ik = recipient.identity_key
+
+    login_resp = {
+        "access_token": "tok123",
+        "user_id": "@sender:localhost",
+        "home_server": "localhost",
+        "device_id": "SENDERDEV",
+    }
+
+    # One-time key value (32 bytes, base64)
+    otk_val = _rand_b64_32()
+
+    members_resp = {
+        "joined": {"@other:localhost": {}},
+    }
+
+    query_resp = {
+        "device_keys": {
+            "@other:localhost": {
+                "OTHERDEV": {
+                    "keys": {
+                        "curve25519:OTHERDEV": their_ik,
+                        "ed25519:OTHERDEV": recipient.signing_key,
+                    }
+                }
+            }
+        }
+    }
+
+    claim_resp = {
+        "one_time_keys": {
+            "@other:localhost": {
+                "OTHERDEV": {
+                    "curve25519:KEYID": otk_val,
+                }
+            }
+        }
+    }
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    # POST sequence: login, keys/upload, join, keys/query, keys/claim, logout
+    mock_post.side_effect = [
+        _mk_resp(login_resp),
+        _mk_resp({}),  # keys/upload
+        _mk_resp({"room_id": "!room:localhost"}),  # join
+        _mk_resp(query_resp),  # keys/query
+        _mk_resp(claim_resp),  # keys/claim
+        _mk_resp({}),  # logout
+    ]
+    mock_get.return_value = _mk_resp(members_resp)
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="localhost",
+        user="sender",
+        password="pass",
+        targets=["#room"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    assert obj.send(body="hello", title="hi") is True
+
+    # PUT was called: sendToDevice + rooms/send/encrypted
+    assert mock_put.call_count >= 2
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send_cached_session(mock_post, mock_get, mock_put):
+    """E2EE send skips key-share when session key already shared."""
+    login_resp = {
+        "access_token": "tok",
+        "user_id": "@u:h",
+        "home_server": "h",
+        "device_id": "DEV",
+    }
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    # POST: login, keys/upload, join, logout
+    mock_post.side_effect = [
+        _mk_resp(login_resp),
+        _mk_resp({}),  # keys/upload
+        _mk_resp({"room_id": "!r:h"}),  # join
+        _mk_resp({}),  # logout
+    ]
+    mock_put.return_value = _mk_resp({})
+
+    from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    # Pre-seed room encryption state, MegOLM session, and key-shared flag
+    # so that no additional GETs or key-exchange PUTs are issued.
+    _sess = MatrixMegOlmSession()
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    obj.store.set("e2ee_megolm_!r:h", _sess.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", True)
+    assert obj.send(body="silent") is True
+    # Only one PUT for the encrypted message itself
+    assert mock_put.call_count == 1
+
+
+def test_plugin_matrix_e2ee_setup_restored():
+    """E2EE account restores from store via _e2ee_setup and __init__."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    acct = MatrixOlmAccount()
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    # Seed account + mark keys already uploaded
+    obj.store.set("e2ee_account", acct.to_dict())
+    obj.store.set("e2ee_keys_uploaded", True)
+
+    # Simulate state where account is not yet loaded in memory
+    obj._e2ee_account = None
+
+    # _e2ee_setup should restore the account from the store
+    assert obj._e2ee_setup() is True
+    assert obj._e2ee_account is not None
+    assert obj._e2ee_account.identity_key == acct.identity_key
+
+    # Bad account data in store -> _e2ee_setup creates a fresh account;
+    # the try/except in _e2ee_setup is exercised when from_dict raises.
+    obj._e2ee_account = None
+    obj.store.set("e2ee_account", {"bad": "data"})
+    obj.store.clear("e2ee_keys_uploaded")
+    with mock.patch.object(obj, "_e2ee_upload_keys", return_value=True):
+        result = obj._e2ee_setup()
+    assert result is True
+    assert obj._e2ee_account is not None
+
+    # Patch the store so __init__ sees a valid pre-existing account,
+    # exercising the success path of the contextlib.suppress block.
+    valid_data = obj._e2ee_account.to_dict()
+    with mock.patch(
+        "apprise.persistent_store.PersistentStore.get",
+        return_value=valid_data,
+    ):
+        obj2 = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["#r"],
+            e2ee=True,
+        )
+    assert obj2._e2ee_account is not None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_upload_keys_no_ids(mock_post, mock_get, mock_put):
+    """_e2ee_upload_keys returns False when user_id/device_id missing."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj._e2ee_account = MatrixOlmAccount()
+    # No user_id / device_id set
+    assert obj._e2ee_upload_keys() is False
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_upload_keys_http_fail(
+    mock_post, mock_get, mock_put
+):
+    """_e2ee_upload_keys returns False on HTTP error."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    resp = mock.Mock()
+    resp.status_code = 500
+    resp.content = dumps({}).encode()
+    mock_post.return_value = resp
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj._e2ee_account = MatrixOlmAccount()
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    obj.home_server = "h"
+    assert obj._e2ee_upload_keys() is False
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_get_megolm_rotation(mock_post, mock_get, mock_put):
+    """_e2ee_get_megolm rotates session after threshold."""
+    from apprise.plugins.matrix.e2ee import (
+        MEGOLM_ROTATION_MSGS,
+        MatrixMegOlmSession,
+    )
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+
+    # Seed a session that is already past the rotation threshold
+    stale = MatrixMegOlmSession()
+    stale._counter = MEGOLM_ROTATION_MSGS
+    obj.store.set("e2ee_megolm_!r:h", stale.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", True)
+
+    new_session = obj._e2ee_get_megolm("!r:h")
+    assert new_session.session_id != stale.session_id
+
+    # The shared flag should be cleared on rotation
+    assert obj.store.get("e2ee_key_shared_!r:h") is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_room_encrypted(mock_post, mock_get, mock_put):
+    """_e2ee_room_encrypted: cached, GET success, GET failure paths."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+
+    # Cache hit -- no GET fired
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    assert obj._e2ee_room_encrypted("!r:h") is True
+    assert mock_get.call_count == 0
+
+    # Cache miss, GET returns 200 with content -> True
+    obj.store.clear("e2ee_room_enc_!r:h")
+    mock_get.return_value = _mk_resp({"algorithm": "m.megolm.v1.aes-sha2"})
+    assert obj._e2ee_room_encrypted("!r:h") is True
+    assert mock_get.call_count == 1
+
+    # Cache is now populated
+    assert obj.store.get("e2ee_room_enc_!r:h") is True
+
+    # Cache miss, GET returns 404 -> False
+    obj.store.clear("e2ee_room_enc_!r:h")
+    mock_get.return_value = _mk_resp({}, code=404)
+    assert obj._e2ee_room_encrypted("!r:h") is False
+    assert obj.store.get("e2ee_room_enc_!r:h") is False
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_room_members(mock_post, mock_get, mock_put):
+    """_e2ee_room_members handles HTTP failures and empty rooms."""
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+
+    # joined_members HTTP failure -> None
+    mock_get.return_value = _mk_resp({}, code=500)
+    assert obj._e2ee_room_members("!r:h") is None
+
+    # No joined members -> empty dict
+    mock_get.return_value = _mk_resp({"joined": {}})
+    assert obj._e2ee_room_members("!r:h") == {}
+
+    # keys/query failure -> None
+    mock_get.return_value = _mk_resp({"joined": {"@u:h": {}}})
+    mock_post.return_value = _mk_resp({}, code=500)
+    assert obj._e2ee_room_members("!r:h") is None
+
+    # Success
+    query_resp = {
+        "device_keys": {
+            "@u:h": {
+                "DEV": {
+                    "keys": {
+                        "curve25519:DEV": "IK",
+                        "ed25519:DEV": "SK",
+                    }
+                }
+            }
+        }
+    }
+    mock_post.return_value = _mk_resp(query_resp)
+    result = obj._e2ee_room_members("!r:h")
+    assert "@u:h" in result
+    assert result["@u:h"]["DEV"]["curve25519"] == "IK"
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_share_room_key_branches(
+    mock_post, mock_get, mock_put
+):
+    """_e2ee_share_room_key edge cases."""
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@sender:h"
+    obj.device_id = "SDEV"
+    obj._e2ee_account = MatrixOlmAccount()
+    session = MatrixMegOlmSession()
+
+    # members failure -> False
+    with mock.patch.object(obj, "_e2ee_room_members", return_value=None):
+        assert obj._e2ee_share_room_key("!r:h", session) is False
+
+    # empty members -> True (nothing to send)
+    with mock.patch.object(obj, "_e2ee_room_members", return_value={}):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # keys/claim failure -> False
+    members = {"@other:h": {"DEV": {"curve25519": "IK", "ed25519": "SK"}}}
+    mock_post.return_value = _mk_resp({}, code=500)
+    with mock.patch.object(obj, "_e2ee_room_members", return_value=members):
+        assert obj._e2ee_share_room_key("!r:h", session) is False
+
+    # own device is skipped (sender uid + device match)
+    own_members = {
+        "@sender:h": {"SDEV": {"curve25519": "IK", "ed25519": "SK"}}
+    }
+    otk_resp = {
+        "one_time_keys": {
+            "@sender:h": {"SDEV": {"curve25519:KID": _rand_b64_32()}}
+        }
+    }
+    mock_post.return_value = _mk_resp(otk_resp)
+    mock_put.return_value = _mk_resp({})
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=own_members
+    ):
+        # All devices skipped -> no PUT; still returns True
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # missing curve25519 key -> device skipped
+    no_ik = {"@other:h": {"DEV": {"curve25519": "", "ed25519": "SK"}}}
+    with mock.patch.object(obj, "_e2ee_room_members", return_value=no_ik):
+        mock_post.return_value = _mk_resp(
+            {"one_time_keys": {"@other:h": {"DEV": {}}}}
+        )
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # dict-valued OTK (with "key" field) succeeds end-to-end
+    recipient = MatrixOlmAccount()
+    their_ik = recipient.identity_key
+    their_otk = recipient.identity_key  # reuse as OTK
+    dict_members = {
+        "@other:h": {"DEV": {"curve25519": their_ik, "ed25519": "SK"}}
+    }
+    dict_otk = {
+        "one_time_keys": {
+            "@other:h": {"DEV": {"curve25519:KID": {"key": their_otk}}}
+        }
+    }
+    mock_post.return_value = _mk_resp(dict_otk)
+    mock_put.return_value = _mk_resp({})
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=dict_members
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # string-valued OTK (plain base64 string, not a dict)
+    str_members = {
+        "@other:h": {"DEV": {"curve25519": their_ik, "ed25519": "SK"}}
+    }
+    str_otk = {
+        "one_time_keys": {"@other:h": {"DEV": {"curve25519:KID": their_otk}}}
+    }
+    mock_post.return_value = _mk_resp(str_otk)
+    mock_put.return_value = _mk_resp({})
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=str_members
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # OTK key not prefixed with "curve25519:" -> skipped, no OTK found
+    bad_key_otk = {
+        "one_time_keys": {"@other:h": {"DEV": {"ed25519:KID": their_otk}}}
+    }
+    mock_post.return_value = _mk_resp(bad_key_otk)
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=str_members
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # OTK entry is not a dict (unexpected server response format)
+    non_dict_otk = {"one_time_keys": {"@other:h": {"DEV": "invalid_format"}}}
+    mock_post.return_value = _mk_resp(non_dict_otk)
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=str_members
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # OTK value is neither dict nor str (e.g. integer) -> skipped
+    non_str_otk = {
+        "one_time_keys": {"@other:h": {"DEV": {"curve25519:KID": 42}}}
+    }
+    mock_post.return_value = _mk_resp(non_str_otk)
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=str_members
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # create_outbound_session raises -> device is skipped gracefully
+    create_fail_otk = {
+        "one_time_keys": {"@other:h": {"DEV": {"curve25519:KID": their_otk}}}
+    }
+    mock_post.return_value = _mk_resp(create_fail_otk)
+    with (
+        mock.patch.object(obj, "_e2ee_room_members", return_value=str_members),
+        mock.patch.object(
+            obj._e2ee_account,
+            "create_outbound_session",
+            side_effect=Exception("olm error"),
+        ),
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+    # sendToDevice PUT fails -> warning logged but returns True
+    full_members = {
+        "@other:h": {"DEV": {"curve25519": their_ik, "ed25519": "SK"}}
+    }
+    mock_post.return_value = _mk_resp(str_otk)
+    mock_put.return_value = _mk_resp({}, code=500)
+    with mock.patch.object(
+        obj, "_e2ee_room_members", return_value=full_members
+    ):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send_to_room_formats(
+    mock_post, mock_get, mock_put
+):
+    """_e2ee_send_to_room: HTML/Markdown format paths and key-share fail."""
+    from apprise.common import NotifyFormat
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    mock_put.return_value = _mk_resp({})
+
+    def _make_obj(fmt):
+        obj = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["#r"],
+            e2ee=True,
+        )
+        obj.notify_format = fmt
+        obj.access_token = "tok"
+        obj.home_server = "h"
+        obj.user_id = "@u:h"
+        obj.device_id = "DEV"
+        obj._e2ee_account = MatrixOlmAccount()
+        obj.store.set("e2ee_key_shared_!r:h", True)
+        return obj
+
+    # HTML format
+    obj = _make_obj(NotifyFormat.HTML)
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    assert (
+        obj._e2ee_send_to_room(
+            "!r:h", "<b>body</b>", "<h1>title</h1>", NotifyType.INFO
+        )
+        is True
+    )
+
+    # Markdown format
+    obj = _make_obj(NotifyFormat.MARKDOWN)
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    assert (
+        obj._e2ee_send_to_room("!r:h", "**bold**", "title", NotifyType.INFO)
+        is True
+    )
+
+    # key-share flags set after successful share (no pre-seeded flag)
+    obj = _make_obj(NotifyFormat.TEXT)
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    with mock.patch.object(obj, "_e2ee_share_room_key", return_value=True):
+        assert (
+            obj._e2ee_send_to_room("!r:h", "body", "", NotifyType.INFO) is True
+        )
+
+    # token-as-password mode: access_token == password skips txn increment
+    obj = _make_obj(NotifyFormat.TEXT)
+    obj.access_token = "same"
+    obj.password = "same"
+    session2 = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session2.to_dict())
+    assert obj._e2ee_send_to_room("!r:h", "body", "", NotifyType.INFO) is True
+
+    # key-share failure aborts send
+    obj = _make_obj(NotifyFormat.TEXT)
+    obj.store.clear("e2ee_key_shared_!r:h")
+    with mock.patch.object(obj, "_e2ee_share_room_key", return_value=False):
+        assert (
+            obj._e2ee_send_to_room("!r:h", "body", "", NotifyType.INFO)
+            is False
+        )
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_setup_failure(mock_post, mock_get, mock_put):
+    """When E2EE setup fails, send falls back to unencrypted."""
+    resp = mock.Mock()
+    resp.status_code = requests.codes.ok
+    resp.content = dumps(
+        {
+            "access_token": "tok",
+            "user_id": "@u:h",
+            "home_server": "h",
+            "device_id": "DEV",
+            "room_id": "!r:h",
+        }
+    ).encode()
+    # upload keys call fails
+    fail_resp = mock.Mock()
+    fail_resp.status_code = 500
+    fail_resp.content = dumps({}).encode()
+    mock_put.return_value = resp
+
+    mock_post.side_effect = [
+        resp,  # login
+        fail_resp,  # keys/upload -> failure
+        resp,  # join
+        resp,  # logout
+    ]
+    mock_get.return_value = resp
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    # Falls back to unencrypted -> send succeeds
+    assert obj.send(body="fallback") is True
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_attachment_skip(mock_post, mock_get, mock_put):
+    """E2EE mode warns and skips attachments."""
+    import tempfile
+
+    login_resp = {
+        "access_token": "tok",
+        "user_id": "@u:h",
+        "home_server": "h",
+        "device_id": "DEV",
+    }
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    mock_post.side_effect = [
+        _mk_resp(login_resp),
+        _mk_resp({}),  # keys/upload
+        _mk_resp({"room_id": "!r:h"}),  # join
+        _mk_resp({}),  # logout
+    ]
+    mock_get.return_value = _mk_resp({"joined": {}})
+    mock_put.return_value = _mk_resp({})
+
+    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+        f.write(b"test attachment")
+        attach_path = f.name
+
+    try:
+        attach = AppriseAttachment()
+        attach.add(attach_path)
+
+        obj = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["!r:h"],
+            e2ee=True,
+            secure=True,
+            discovery=False,
+        )
+        # Pre-seed room encryption state, session, and shared flag so
+        # E2EE is active without any key-share or room-enc GET round-trips.
+        from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+        _s = MatrixMegOlmSession()
+        obj.store.set("e2ee_room_enc_!r:h", True)
+        obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
+        obj.store.set("e2ee_key_shared_!r:h", True)
+        # attach provided but room is E2EE -> attachment skipped, send ok
+        assert obj.send(body="body", attach=attach) is True
+
+    finally:
+        os.unlink(attach_path)
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send_room_failure(mock_post, mock_get, mock_put):
+    """E2EE path returns False when _e2ee_send_to_room fails."""
+    login_resp = {
+        "access_token": "tok",
+        "user_id": "@u:h",
+        "home_server": "h",
+        "device_id": "DEV",
+    }
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    mock_post.side_effect = [
+        _mk_resp(login_resp),
+        _mk_resp({}),  # keys/upload
+        _mk_resp({"room_id": "!r:h"}),  # join
+        _mk_resp({}),  # logout
+    ]
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+
+    from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    _s = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", True)
+
+    with mock.patch.object(obj, "_e2ee_send_to_room", return_value=False):
+        assert obj.send(body="fail") is False
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_register_with_device_id(mock_post, mock_get, mock_put):
+    """Registration response that includes device_id persists it."""
+    r = mock.Mock()
+    r.status_code = requests.codes.ok
+    r.content = dumps(
+        {
+            "access_token": "tok",
+            "user_id": "@u:h",
+            "home_server": "h",
+            "device_id": "REG_DEV",
+        }
+    ).encode()
+    mock_post.return_value = r
+
+    obj = NotifyMatrix(host="h", discovery=False)
+    assert obj._register() is True
+    assert obj.device_id == "REG_DEV"
+    assert obj.store.get("device_id") == "REG_DEV"
+
+
+def test_plugin_matrix_e2ee_account_bad_store_data():
+    """Corrupt e2ee_account in store is silently ignored."""
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.store.set("e2ee_account", {"ik": "NOTVALID", "sk": "NOTVALID"})
+
+    # Re-instantiate with the same store to trigger the restore path
+    obj2 = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        store=obj.store,
+    )
+    # Bad data is suppressed; account is None until setup is called
+    assert obj2._e2ee_account is None
