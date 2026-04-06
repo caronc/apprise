@@ -2346,6 +2346,7 @@ class NotifyMatrix(NotifyBase):
         """
         return (
             self.secure_protocol if self.secure else self.protocol,
+            self.mode,
             (
                 self.host
                 if self.mode != MatrixWebhookMode.T2BOT
@@ -2355,6 +2356,14 @@ class NotifyMatrix(NotifyBase):
             self.user if self.mode != MatrixWebhookMode.T2BOT else None,
             self.password if self.mode != MatrixWebhookMode.T2BOT else None,
         )
+
+    @staticmethod
+    def runtime_deps():
+        """Return runtime dependency package names.
+
+        E2EE support requires the `cryptography` package.
+        """
+        return ("cryptography",)
 
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified
