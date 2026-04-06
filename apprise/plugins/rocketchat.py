@@ -138,6 +138,7 @@ class NotifyRocketChat(NotifyBase):
             },
             "token": {
                 "name": _("API Token"),
+                "type": "string",
                 "map_to": "password",
                 "private": True,
             },

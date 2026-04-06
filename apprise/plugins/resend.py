@@ -132,13 +132,18 @@ class NotifyResend(NotifyBase):
         NotifyBase.template_args,
         **{
             "from": {
+                "name": _("From Address"),
+                "type": "string",
                 "map_to": "from_addr",
             },
             "name": {
                 "name": _("From Name"),
+                "type": "string",
                 "map_to": "from_addr",
             },
             "apikey": {
+                "name": _("API Key"),
+                "type": "string",
                 "map_to": "apikey",
             },
             "reply": {

@@ -2122,6 +2122,52 @@ def test_apprise_details_plugin_verification():
                 assert arg in defined_tokens
 
 
+def test_apprise_details_plugin_raw_template_tokens():
+    """
+    API: Apprise() Raw Template Token Verification
+
+    Checks that every plugin's template_tokens and template_args declare
+    an explicit 'type' field before _sanitize_token can silently back-fill
+    a default.  _sanitize_token adds 'type': 'string' when the field is
+    missing, so the post-processed details() output always passes -- this
+    test catches the gap at the source.
+    """
+
+    # Valid Type Regular Expression Checker -- mirrors the one used by
+    # test_apprise_details_plugin_verification so both tests agree on what
+    # constitutes a valid type.
+    is_valid_type_re = re.compile(r"((choice|list):)?(string|bool|int|float)")
+
+    for plugin in N_MGR.plugins():
+        label = plugin.__name__
+
+        for section_name, raw in (
+            ("template_tokens", plugin.template_tokens),
+            ("template_args", plugin.template_args),
+        ):
+            for key, token in raw.items():
+                # alias_of entries are intentionally type-free; skip them
+                if "alias_of" in token:
+                    continue
+
+                assert "type" in token, (
+                    f"{label}.{section_name}[{key!r}] is missing a"
+                    " 'type' field. Every non-alias token must declare"
+                    " its type explicitly -- _sanitize_token silently"
+                    " fills in 'string' and the omission goes"
+                    " undetected by the post-processed details() checks."
+                )
+
+                assert isinstance(token["type"], str) and (
+                    is_valid_type_re.match(token["type"]) is not None
+                ), (
+                    f"{label}.{section_name}[{key!r}]['type'] ="
+                    f" {token['type']!r} is not a valid type string."
+                    " Expected one of: string, bool, int, float,"
+                    " choice:string, list:string, etc."
+                )
+
+
 @mock.patch("requests.request")
 @mock.patch("asyncio.gather", wraps=asyncio.gather)
 @mock.patch(
