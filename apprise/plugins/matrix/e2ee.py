@@ -174,6 +174,68 @@ def _canonical_json(obj):
     ).encode("utf-8")
 
 
+def encrypt_attachment(data):
+    """Encrypt *data* bytes for upload to a Matrix E2EE room.
+
+    Implements the Matrix attachment encryption spec (v2):
+      https://spec.matrix.org/v1.11/client-server-api/#sending-encrypted-attachments
+
+    Algorithm: AES-256-CTR.
+    IV: 8 random bytes followed by 8 zero bytes (avoids counter wrap).
+
+    Returns a ``(ciphertext, file_info)`` tuple where *file_info* is the
+    ``EncryptedFile`` object to embed in the ``m.room.message`` event:
+
+    .. code-block:: json
+
+        {
+            "v": "v2",
+            "key": { "kty": "oct", "alg": "A256CTR", "k": "<key>",
+                     "key_ops": ["encrypt", "decrypt"], "ext": true },
+            "iv": "<base64url-nopad 16-byte IV>",
+            "hashes": { "sha256": "<base64 SHA-256 of ciphertext>" }
+        }
+    """
+    key = os.urandom(32)
+    # IV: 8 random bytes + 8 zero bytes (spec requirement)
+    iv = os.urandom(8) + b"\x00" * 8
+
+    cipher = Cipher(
+        algorithms.AES(key),
+        modes.CTR(iv),
+        backend=default_backend(),
+    )
+    enc = cipher.encryptor()
+    ciphertext = enc.update(data) + enc.finalize()
+
+    # SHA-256 of the ciphertext (for integrity verification by recipients)
+    h = hashes.Hash(hashes.SHA256(), backend=default_backend())
+    h.update(ciphertext)
+    sha256_digest = h.finalize()
+
+    # JWK key: base64url no-padding
+    k_b64url = base64.urlsafe_b64encode(key).rstrip(b"=").decode()
+    # IV: base64url no-padding (spec uses unpadded base64)
+    iv_b64url = base64.urlsafe_b64encode(iv).rstrip(b"=").decode()
+    # SHA-256 hash: standard base64 no-padding
+    sha256_b64 = base64.b64encode(sha256_digest).rstrip(b"=").decode()
+
+    file_info = {
+        "v": "v2",
+        "key": {
+            "kty": "oct",
+            "key_ops": ["encrypt", "decrypt"],
+            "alg": "A256CTR",
+            "k": k_b64url,
+            "ext": True,
+        },
+        "iv": iv_b64url,
+        "hashes": {"sha256": sha256_b64},
+    }
+
+    return ciphertext, file_info
+
+
 # -----------------------------------------------------------------------
 # MatrixOlmAccount
 # -----------------------------------------------------------------------

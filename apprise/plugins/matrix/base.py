@@ -60,7 +60,12 @@ from ...utils.parse import (
     validate_regex,
 )
 from ..base import NotifyBase
-from .e2ee import MATRIX_E2EE_SUPPORT, MatrixMegOlmSession, MatrixOlmAccount
+from .e2ee import (
+    MATRIX_E2EE_SUPPORT,
+    MatrixMegOlmSession,
+    MatrixOlmAccount,
+    encrypt_attachment,
+)
 
 # Define default path
 MATRIX_V1_WEBHOOK_PATH = "/api/v1/matrix/hook"
@@ -760,15 +765,11 @@ class NotifyMatrix(NotifyBase):
                     "messages will be sent unencrypted."
                 )
 
-        # Prepare attachments once.  They are consumed by unencrypted rooms;
-        # E2EE rooms skip attachment delivery (media encryption is not yet
-        # supported) but other rooms in the same send call still receive them.
+        # Plaintext attachment payloads for unencrypted rooms.
+        # Lazy-initialized on the first unencrypted room so that purely
+        # E2EE setups never upload attachments in plaintext.
         attachments = None
-        if attach and self.attachment_support:
-            attachments = self._send_attachments(attach)
-            if attachments is False:
-                # take an early exit
-                return False
+        attachments_ready = False
 
         while len(rooms) > 0:
             # Get our room
@@ -785,20 +786,34 @@ class NotifyMatrix(NotifyBase):
                 continue
 
             if e2ee_capable and self._e2ee_room_encrypted(room_id):
-                # Room requires E2EE -- warn if attachments exist
-                if attach and self.attachment_support:
-                    self.logger.warning(
-                        "Matrix E2EE attachment encryption is not yet "
-                        "supported; attachments will be skipped."
-                    )
-                # E2EE path: encrypt and send as m.room.encrypted
+                # E2EE path: encrypt message and any attachments
                 if not self._e2ee_send_to_room(
                     room_id, body, title, notify_type
                 ):
                     has_error = True
+                    continue
+
+                if attach and self.attachment_support:
+                    session = self._e2ee_get_megolm(room_id)
+                    for attachment in attach:
+                        if not attachment:
+                            has_error = True
+                            break
+                        if not self._e2ee_send_attachment(
+                            attachment, room_id, session
+                        ):
+                            has_error = True
                 continue
 
             # --- Unencrypted path (existing behaviour) ---
+
+            # Upload attachments once; reuse content_uris for every
+            # subsequent unencrypted room in this send call.
+            if attach and self.attachment_support and not attachments_ready:
+                attachments = self._send_attachments(attach)
+                attachments_ready = True
+                if attachments is False:
+                    return False
 
             # Acquire our image url if we're configured to do so
             image_url = (
@@ -2056,6 +2071,129 @@ class NotifyMatrix(NotifyBase):
                 expires=self.default_cache_expiry_sec,
             )
 
+        return postokay
+
+    def _e2ee_send_attachment(self, attachment, room_id, session):
+        """Encrypt *attachment* and deliver it to *room_id* via MegOLM.
+
+        Steps:
+        1. Read the file into memory and encrypt with AES-256-CTR.
+        2. Upload the ciphertext to the media server (content_uri).
+        3. Build an ``m.room.message`` inner event whose ``file`` field
+           carries the EncryptedFile metadata (key + iv + sha256).
+        4. Encrypt the inner event with MegOLM and PUT to the room.
+
+        Returns ``True`` on success, ``False`` on any failure.
+        """
+        # Read file bytes
+        try:
+            with open(attachment.path, "rb") as fh:
+                file_data = fh.read()
+        except OSError as e:
+            self.logger.warning(
+                "Matrix E2EE: could not read attachment {}.".format(
+                    attachment.name or "file"
+                )
+            )
+            self.logger.debug(f"I/O Exception: {e!s}")
+            return False
+
+        # Encrypt locally with AES-256-CTR
+        ciphertext, file_info = encrypt_attachment(file_data)
+
+        # Upload the ciphertext to the media server.
+        # The encrypted bytes are posted directly rather than from a file
+        # path, so we call requests.post() directly instead of _fetch().
+        headers = {
+            "User-Agent": self.app_id,
+            "Content-Type": "application/octet-stream",
+            "Accept": "application/json",
+        }
+        if self.access_token:
+            headers["Authorization"] = f"Bearer {self.access_token}"
+
+        try:
+            base = self.base_url
+        except Exception:
+            return False
+
+        media_path = (
+            MATRIX_V3_MEDIA_PATH
+            if self.version == MatrixVersion.V3
+            else MATRIX_V2_MEDIA_PATH
+        )
+        upload_url = base + media_path + "/upload"
+
+        self.throttle()
+        try:
+            r = requests.post(
+                upload_url,
+                data=ciphertext,
+                params={"filename": attachment.name or "file"},
+                headers=headers,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
+        except requests.RequestException as e:
+            self.logger.warning(
+                "Matrix E2EE: connection error uploading encrypted attachment."
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
+            return False
+
+        try:
+            upload_resp = loads(r.content)
+        except Exception:
+            upload_resp = {}
+
+        if r.status_code != requests.codes.ok or not upload_resp.get(
+            "content_uri"
+        ):
+            self.logger.warning(
+                "Matrix E2EE: media upload failed (HTTP {}).".format(
+                    r.status_code
+                )
+            )
+            return False
+
+        file_info["url"] = upload_resp["content_uri"]
+
+        # Build the inner plaintext attachment event
+        is_image = IS_IMAGE.match(attachment.mimetype)
+        inner_event = {
+            "type": "m.room.message",
+            "content": {
+                "msgtype": "m.image" if is_image else "m.file",
+                "body": attachment.name or "file",
+                "file": file_info,
+            },
+            "room_id": room_id,
+        }
+
+        # Encrypt with MegOLM and send
+        ciphertext_event = session.encrypt(inner_event)
+        self._e2ee_save_megolm(room_id, session)
+
+        path = "/rooms/{}/send/m.room.encrypted/{}".format(
+            NotifyMatrix.quote(room_id), self.transaction_id
+        )
+        encrypted_payload = {
+            "algorithm": "m.megolm.v1.aes-sha2",
+            "ciphertext": ciphertext_event,
+            "sender_key": self._e2ee_account.identity_key,
+            "session_id": session.session_id,
+            "device_id": self.device_id or "",
+        }
+        postokay, _, _ = self._fetch(
+            path, payload=encrypted_payload, method="PUT"
+        )
+        if self.access_token != self.password:
+            self.transaction_id += 1
+            self.store.set(
+                "transaction_id",
+                self.transaction_id,
+                expires=self.default_cache_expiry_sec,
+            )
         return postokay
 
     # ---------------------------------------------------------------

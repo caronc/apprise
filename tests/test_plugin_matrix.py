@@ -1148,11 +1148,11 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     )
     assert (
         mock_post.call_args_list[1][0][0]
-        == "http://localhost/_matrix/media/v3/upload"
+        == "http://localhost/_matrix/client/v3/join/%23general%3Alocalhost"
     )
     assert (
         mock_post.call_args_list[2][0][0]
-        == "http://localhost/_matrix/client/v3/join/%23general%3Alocalhost"
+        == "http://localhost/_matrix/media/v3/upload"
     )
     assert (
         mock_put.call_args_list[0][0][0]
@@ -1500,7 +1500,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
         is True
     )
 
-    # Test our call count — login, upload, join use POST; sends use PUT
+    # Test our call count -- login, join, upload use POST; sends use PUT
     assert mock_post.call_count == 3
     assert (
         mock_post.call_args_list[0][0][0]
@@ -1508,12 +1508,12 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     )
     assert (
         mock_post.call_args_list[1][0][0]
-        == "https://matrix.example.com/_matrix/media/r0/upload"
+        == "https://matrix.example.com/_matrix/client/r0/"
+        "join/%23general%3Alocalhost"
     )
     assert (
         mock_post.call_args_list[2][0][0]
-        == "https://matrix.example.com/_matrix/client/r0/"
-        "join/%23general%3Alocalhost"
+        == "https://matrix.example.com/_matrix/media/r0/upload"
     )
     assert mock_put.call_count == 2
     assert (
@@ -3050,8 +3050,10 @@ def test_plugin_matrix_e2ee_setup_failure(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_matrix_e2ee_attachment_skip(mock_post, mock_get, mock_put):
-    """E2EE mode warns and skips attachments."""
+def test_plugin_matrix_e2ee_attachment_encrypted(
+    mock_post, mock_get, mock_put
+):
+    """E2EE mode encrypts and delivers attachments."""
     import tempfile
 
     login_resp = {
@@ -3060,6 +3062,7 @@ def test_plugin_matrix_e2ee_attachment_skip(mock_post, mock_get, mock_put):
         "home_server": "h",
         "device_id": "DEV",
     }
+    upload_resp = {"content_uri": "mxc://h/enc123"}
 
     def _mk_resp(d):
         r = mock.Mock()
@@ -3071,6 +3074,7 @@ def test_plugin_matrix_e2ee_attachment_skip(mock_post, mock_get, mock_put):
         _mk_resp(login_resp),
         _mk_resp({}),  # keys/upload
         _mk_resp({"room_id": "!r:h"}),  # join
+        _mk_resp(upload_resp),  # encrypted attachment upload
         _mk_resp({}),  # logout
     ]
     mock_get.return_value = _mk_resp({"joined": {}})
@@ -3093,16 +3097,259 @@ def test_plugin_matrix_e2ee_attachment_skip(mock_post, mock_get, mock_put):
             secure=True,
             discovery=False,
         )
-        # Pre-seed room encryption state, session, and shared flag so
-        # E2EE is active without any key-share or room-enc GET round-trips.
         from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
 
         _s = MatrixMegOlmSession()
         obj.store.set("e2ee_room_enc_!r:h", True)
         obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
         obj.store.set("e2ee_key_shared_!r:h", True)
-        # attach provided but room is E2EE -> attachment skipped, send ok
         assert obj.send(body="body", attach=attach) is True
+
+        # Two PUTs: encrypted message + encrypted attachment event
+        assert mock_put.call_count == 2
+
+    finally:
+        os.unlink(attach_path)
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send_attachment_errors(
+    mock_post, mock_get, mock_put
+):
+    """_e2ee_send_attachment error branches: OSError, network, HTTP fail."""
+    import tempfile
+
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    obj._e2ee_account = MatrixOlmAccount()
+    session = MatrixMegOlmSession()
+
+    # OSError reading file -> False
+    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+        f.write(b"data")
+        tmp_path = f.name
+
+    try:
+
+        class _BadAttach:
+            path = tmp_path
+            name = "f.txt"
+            mimetype = "text/plain"
+
+        with mock.patch("builtins.open", side_effect=OSError("no read")):
+            assert (
+                obj._e2ee_send_attachment(_BadAttach(), "!r:h", session)
+                is False
+            )
+
+        # Network error during upload -> False
+        with mock.patch(
+            "requests.post",
+            side_effect=requests.RequestException("boom"),
+        ):
+            assert (
+                obj._e2ee_send_attachment(_BadAttach(), "!r:h", session)
+                is False
+            )
+
+        # HTTP error from media server -> False
+        with mock.patch("requests.post", return_value=_mk_resp({}, code=500)):
+            assert (
+                obj._e2ee_send_attachment(_BadAttach(), "!r:h", session)
+                is False
+            )
+
+        # Upload succeeds but response body is not valid JSON -> treated as
+        # missing content_uri -> False
+        bad_json_resp = mock.Mock()
+        bad_json_resp.status_code = requests.codes.ok
+        bad_json_resp.content = b"not-json"
+        with mock.patch("requests.post", return_value=bad_json_resp):
+            assert (
+                obj._e2ee_send_attachment(_BadAttach(), "!r:h", session)
+                is False
+            )
+
+        # base_url raises -> False
+        with mock.patch(
+            "apprise.plugins.matrix.base.NotifyMatrix.base_url",
+            new_callable=mock.PropertyMock,
+            side_effect=Exception("discovery fail"),
+        ):
+            assert (
+                obj._e2ee_send_attachment(_BadAttach(), "!r:h", session)
+                is False
+            )
+
+        # No access_token -> Authorization header omitted, upload still works
+        obj_noauth = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["!r:h"],
+            e2ee=True,
+            secure=True,
+            discovery=False,
+        )
+        obj_noauth.access_token = None
+        obj_noauth.home_server = "h"
+        obj_noauth.user_id = "@u:h"
+        obj_noauth.device_id = "DEV"
+        obj_noauth._e2ee_account = MatrixOlmAccount()
+        sess_noauth = MatrixMegOlmSession()
+        with mock.patch(
+            "requests.post",
+            return_value=_mk_resp({"content_uri": "mxc://h/y"}),
+        ):
+            mock_put.return_value = _mk_resp({})
+            assert (
+                obj_noauth._e2ee_send_attachment(
+                    _BadAttach(), "!r:h", sess_noauth
+                )
+                is True
+            )
+
+        # access_token == password -> transaction ID not incremented
+        obj2 = NotifyMatrix(
+            host="h",
+            user="u",
+            password="tok",
+            targets=["!r:h"],
+            e2ee=True,
+            secure=True,
+            discovery=False,
+        )
+        obj2.access_token = "tok"
+        obj2.password = "tok"
+        obj2.home_server = "h"
+        obj2.user_id = "@u:h"
+        obj2.device_id = "DEV"
+        obj2._e2ee_account = MatrixOlmAccount()
+        sess2 = MatrixMegOlmSession()
+        txn_before = obj2.transaction_id
+        upload_r = _mk_resp({"content_uri": "mxc://h/x"})
+        put_r = _mk_resp({})
+        with mock.patch("requests.post", return_value=upload_r):
+            mock_put.return_value = put_r
+            result = obj2._e2ee_send_attachment(_BadAttach(), "!r:h", sess2)
+        assert result is True
+        assert obj2.transaction_id == txn_before
+
+    finally:
+        os.unlink(tmp_path)
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send_attachment_invalid(
+    mock_post, mock_get, mock_put
+):
+    """Invalid attachment and _e2ee_send_attachment failure mark has_error."""
+    import tempfile
+
+    login_resp = {
+        "access_token": "tok",
+        "user_id": "@u:h",
+        "home_server": "h",
+        "device_id": "DEV",
+    }
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    mock_post.side_effect = [
+        _mk_resp(login_resp),
+        _mk_resp({}),  # keys/upload
+        _mk_resp({"room_id": "!r:h"}),  # join
+        _mk_resp({}),  # logout
+    ]
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+
+    with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as f:
+        f.write(b"data")
+        attach_path = f.name
+
+    try:
+        from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+        obj = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["!r:h"],
+            e2ee=True,
+            secure=True,
+            discovery=False,
+        )
+        _s = MatrixMegOlmSession()
+        obj.store.set("e2ee_room_enc_!r:h", True)
+        obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
+        obj.store.set("e2ee_key_shared_!r:h", True)
+
+        attach = AppriseAttachment()
+        attach.add(attach_path)
+
+        # _e2ee_send_attachment fails -> send returns False
+        with mock.patch.object(
+            obj, "_e2ee_send_attachment", return_value=False
+        ):
+            assert obj.send(body="body", attach=attach) is False
+
+        # Invalid attachment (falsy) in list -> has_error set and loop breaks
+        mock_post.reset_mock()
+        mock_post.side_effect = [
+            _mk_resp(login_resp),
+            _mk_resp({}),  # keys/upload
+            _mk_resp({"room_id": "!r:h"}),  # join
+            _mk_resp({}),  # logout
+        ]
+        obj2 = NotifyMatrix(
+            host="h",
+            user="u",
+            password="pass",
+            targets=["!r:h"],
+            e2ee=True,
+            secure=True,
+            discovery=False,
+        )
+        _s2 = MatrixMegOlmSession()
+        obj2.store.set("e2ee_room_enc_!r:h", True)
+        obj2.store.set("e2ee_megolm_!r:h", _s2.to_dict())
+        obj2.store.set("e2ee_key_shared_!r:h", True)
+        # Add a non-existent file to get a falsy attachment
+        bad_attach = AppriseAttachment()
+        bad_attach.add("/nonexistent/path/file.txt")
+        with mock.patch.object(obj2, "_e2ee_send_to_room", return_value=True):
+            assert obj2.send(body="body", attach=bad_attach) is False
 
     finally:
         os.unlink(attach_path)
