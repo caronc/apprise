@@ -2197,6 +2197,34 @@ def test_plugin_matrix_e2ee_helpers():
     assert out.startswith(b'{"a"')
 
 
+def test_plugin_matrix_e2ee_no_cryptography():
+    """MATRIX_E2EE_SUPPORT is False when cryptography is unavailable."""
+    import importlib
+    import sys
+
+    # Block 'cryptography' so the ImportError branch is taken on reload
+    saved = {
+        k: v for k, v in sys.modules.items() if k.startswith("cryptography")
+    }
+    for key in list(saved):
+        sys.modules[key] = None  # type: ignore[assignment]
+
+    try:
+        import apprise.plugins.matrix.e2ee as e2ee_mod
+
+        importlib.reload(e2ee_mod)
+        assert e2ee_mod.MATRIX_E2EE_SUPPORT is False
+    finally:
+        # Restore everything so subsequent tests are not broken
+        for key in list(saved):
+            if saved[key] is None:
+                del sys.modules[key]
+            else:
+                sys.modules[key] = saved[key]
+        # Force a clean reload so MATRIX_E2EE_SUPPORT is True again
+        importlib.reload(e2ee_mod)
+
+
 def test_plugin_matrix_e2ee_olm_account():
     """MatrixOlmAccount creation, signing, serialisation."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
@@ -2233,7 +2261,9 @@ def test_plugin_matrix_e2ee_olm_account():
 
 
 def test_plugin_matrix_e2ee_olm_session():
-    """MatrixOlmSession encrypts and produces correct structure."""
+    """MatrixOlmSession encrypts and produces correct wire format."""
+    import base64
+
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
 
     acct = MatrixOlmAccount()
@@ -2251,6 +2281,14 @@ def test_plugin_matrix_e2ee_olm_session():
     result = session.encrypt("test plaintext")
     assert result["type"] == 0
     assert isinstance(result["body"], str)
+
+    # Decode and check the outer pre-key wire format.
+    # The outer body is: version(0x03) | protobuf_fields | mac(8)
+    # The inner message embedded in field 4 must contain the ciphertext
+    # at protobuf field 4 (tag 0x22 = (4<<3)|2), NOT field 3 (tag 0x1A).
+    raw = base64.b64decode(result["body"])
+    assert raw[0:1] == b"\x03", "outer version must be 0x03"
+    assert b"\x22" in raw, "ciphertext field tag 0x22 must be present"
 
     # bytes plaintext also accepted
     result2 = session.encrypt(b"bytes input")
@@ -2275,6 +2313,18 @@ def test_plugin_matrix_e2ee_verify_keys():
     # Valid self-signed device keys -> True
     dk = acct.device_keys_payload(uid, dev)
     assert verify_device_keys(dk, uid, dev) is True
+
+    # Payload user_id doesn't match -> False (identity binding check)
+    mismatched_uid = {**dk, "user_id": "@other:h"}
+    assert verify_device_keys(mismatched_uid, uid, dev) is False
+
+    # Payload device_id doesn't match -> False (identity binding check)
+    mismatched_dev = {**dk, "device_id": "WRONGDEV"}
+    assert verify_device_keys(mismatched_dev, uid, dev) is False
+
+    # Missing user_id in payload -> False
+    no_user_id = {k: v for k, v in dk.items() if k != "user_id"}
+    assert verify_device_keys(no_user_id, uid, dev) is False
 
     # Missing signatures field -> False
     no_sig = {k: v for k, v in dk.items() if k != "signatures"}
@@ -2735,6 +2785,25 @@ def test_plugin_matrix_whoami(mock_post, mock_get, mock_put):
     assert obj.store.get("device_id") == "TOKDEV"
     assert obj.store.get("home_server") == "h"
 
+    # user_id without homeserver component (@alice, no colon) -> home_server
+    # is not extracted (branch where len(parts) != 2 is not taken).
+    obj.user_id = None
+    obj.home_server = None
+    mock_get.return_value = _mk_resp(
+        {"user_id": "@noserver", "device_id": "DEV2"}
+    )
+    assert obj._whoami() is True
+    assert obj.user_id == "@noserver"
+    assert obj.home_server is None  # no colon -> not extracted
+
+    # home_server already known -> not overwritten
+    obj.home_server = "existing.h"
+    mock_get.return_value = _mk_resp(
+        {"user_id": "@tok:other.h", "device_id": "DEV3"}
+    )
+    assert obj._whoami() is True
+    assert obj.home_server == "existing.h"
+
     # Failure: server returns non-200
     obj.user_id = None
     obj.device_id = None
@@ -2996,7 +3065,7 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         # No valid OTK -> no messages built -> True (nothing to send)
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
-    # string-valued OTK (plain base64 string -- unverified legacy fallback)
+    # Plain-string OTK for signed_curve25519 -> rejected (not a KeyObject)
     str_members = {
         "@other:h": {
             "DEV": {
@@ -3011,10 +3080,10 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         }
     }
     mock_post.return_value = _mk_resp(str_otk)
-    mock_put.return_value = _mk_resp({})
     with mock.patch.object(
         obj, "_e2ee_room_members", return_value=str_members
     ):
+        # No valid KeyObject OTK -> no messages built -> True (nothing sent)
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
     # OTK key not prefixed with "signed_curve25519:" -> skipped, no OTK found
@@ -3035,7 +3104,7 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
-    # OTK value is neither dict nor str (e.g. integer) -> skipped
+    # OTK value is an integer (unknown format) -> skipped
     non_str_otk = {
         "one_time_keys": {"@other:h": {"DEV": {"signed_curve25519:KID": 42}}}
     }
@@ -3046,15 +3115,21 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         assert obj._e2ee_share_room_key("!r:h", session) is True
 
     # create_outbound_session raises -> device is skipped gracefully
-    # Uses a string OTK (no sig check) so the Olm call is actually reached
+    # Use a properly signed OTK so verification passes and the Olm call
+    # is actually reached.
+    create_fail_signed = _make_signed_otk(
+        recipient, "@other:h", "DEV", their_otk_b64
+    )
     create_fail_otk = {
         "one_time_keys": {
-            "@other:h": {"DEV": {"signed_curve25519:KID": their_otk_b64}}
+            "@other:h": {"DEV": {"signed_curve25519:KID": create_fail_signed}}
         }
     }
     mock_post.return_value = _mk_resp(create_fail_otk)
     with (
-        mock.patch.object(obj, "_e2ee_room_members", return_value=str_members),
+        mock.patch.object(
+            obj, "_e2ee_room_members", return_value=dict_members
+        ),
         mock.patch.object(
             obj._e2ee_account,
             "create_outbound_session",

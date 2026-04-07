@@ -1997,29 +1997,36 @@ class NotifyMatrix(NotifyBase):
                 # Locate and verify the OTK for this device.
                 # Servers return signed_curve25519 keys (the algorithm we
                 # requested) as {"key": ..., "signatures": ...} dicts.
-                # The device Ed25519 key (already signature-verified above
-                # in _e2ee_room_members) is used to authenticate each OTK.
+                # Locate and verify the OTK for this device.
+                # signed_curve25519 OTKs are always KeyObjects
+                # {"key": ..., "signatures": ...}; plain-string values
+                # are not valid for this algorithm and are rejected.
                 their_otk = None
                 otk_entry = otk_keys.get(uid, {}).get(dev_id, {})
                 if isinstance(otk_entry, dict):
                     for k, v in otk_entry.items():
                         if not k.startswith("signed_curve25519:"):
                             continue
-                        if isinstance(v, dict):
-                            ed25519_pub = dev_info.get("ed25519", "")
-                            if not ed25519_pub or not verify_signed_otk(
-                                v, uid, dev_id, ed25519_pub
-                            ):
-                                self.logger.debug(
-                                    "Matrix E2EE: OTK signature "
-                                    "invalid for %s / %s; skipped.",
-                                    uid,
-                                    dev_id,
-                                )
-                            else:
-                                their_otk = v.get("key")
-                        elif isinstance(v, str):
-                            their_otk = v
+                        if not isinstance(v, dict):
+                            self.logger.debug(
+                                "Matrix E2EE: OTK for %s / %s is "
+                                "not a KeyObject; skipped.",
+                                uid,
+                                dev_id,
+                            )
+                            break
+                        ed25519_pub = dev_info.get("ed25519", "")
+                        if not ed25519_pub or not verify_signed_otk(
+                            v, uid, dev_id, ed25519_pub
+                        ):
+                            self.logger.debug(
+                                "Matrix E2EE: OTK signature "
+                                "invalid for %s / %s; skipped.",
+                                uid,
+                                dev_id,
+                            )
+                        else:
+                            their_otk = v.get("key")
                         break
 
                 if not their_otk:

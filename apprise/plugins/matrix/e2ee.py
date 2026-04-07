@@ -195,11 +195,24 @@ def _verify_ed25519(public_key_b64, message_bytes, signature_b64):
 def verify_device_keys(dev_info, user_id, device_id):
     """Verify the Ed25519 self-signature on a /keys/query device object.
 
-    The device must have signed the device-keys object (excluding the
-    ``signatures`` and ``unsigned`` fields) with its own Ed25519 key.
+    Per the spec, the signed payload must carry ``user_id`` and
+    ``device_id`` fields whose values match the identity being
+    verified.  This prevents a malicious homeserver from substituting
+    keys from one device into the record of another.
 
-    Returns ``True`` only when the signature is present and valid.
+    Returns ``True`` only when all of the following hold:
+    - ``dev_info["user_id"] == user_id``
+    - ``dev_info["device_id"] == device_id``
+    - The Ed25519 self-signature over the canonical payload is valid.
     """
+    # Identity binding: payload fields must match who we think we're
+    # verifying.  Without this a server could swap key objects across
+    # users/devices and the signature would still verify.
+    if dev_info.get("user_id") != user_id:
+        return False
+    if dev_info.get("device_id") != device_id:
+        return False
+
     sig_key = "ed25519:{}".format(device_id)
     ed25519_pub = dev_info.get("keys", {}).get(sig_key, "")
     if not ed25519_pub:
@@ -530,15 +543,26 @@ class MatrixOlmSession:
         ciphertext = _aes_cbc_encrypt(aes_key, iv, plaintext)
 
         # -- Inner message  (version | fields | MAC) ---------------
+        # Field numbers from the Olm spec wire format:
+        #   0x0A = field 1, wire-type 2 (bytes)  -> Ratchet-Key
+        #   0x10 = field 2, wire-type 0 (varint) -> Chain-Index
+        #   0x22 = field 4, wire-type 2 (bytes)  -> Cipher-Text
+        # Note: there is no field 3 in the normal-message format; the
+        # ciphertext is field 4 (tag 0x22), NOT field 3 (tag 0x1A).
         inner = (
             b"\x03"
             + _pb_bytes(1, self._eph_pub)
             + _pb_varint_field(2, self._counter)
-            + _pb_bytes(3, ciphertext)
+            + _pb_bytes(4, ciphertext)
         )
         inner_mac = _hmac_sha256(mac_key, inner)[:8]
 
         # -- Outer pre-key message  --------------------------------
+        # Field numbers from the Olm spec wire format:
+        #   0x0A = field 1 (bytes) -> One-Time-Key (Bob's OTK being consumed)
+        #   0x12 = field 2 (bytes) -> Base-Key (Alice's ephemeral key)
+        #   0x1A = field 3 (bytes) -> Identity-Key (Alice's identity key)
+        #   0x22 = field 4 (bytes) -> Message (inner message + MAC)
         outer = (
             b"\x03"
             + _pb_bytes(1, self._their_otk_pub)
