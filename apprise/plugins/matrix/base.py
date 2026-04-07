@@ -2471,7 +2471,9 @@ class NotifyMatrix(NotifyBase):
         ):
             return
 
-        self._logout()
+        # Best-effort cleanup only
+        with contextlib.suppress(Exception):
+            self._logout()
 
     @property
     def url_identifier(self):

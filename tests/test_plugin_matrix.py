@@ -3735,6 +3735,15 @@ def test_plugin_matrix_e2ee_account_bad_store_data():
     assert obj2._e2ee_account is None
 
 
+def test_plugin_matrix_del_suppresses_logout_exceptions():
+    """__del__ should never raise if logout fails during GC cleanup."""
+    obj = NotifyMatrix(host="h", user="u", password="pass", targets=["#r"])
+    obj.access_token = "tok"
+
+    with mock.patch.object(obj, "_logout", side_effect=RuntimeError("boom")):
+        obj.__del__()
+
+
 # ---------------------------------------------------------------------------
 # DM / direct-message tests
 # ---------------------------------------------------------------------------
