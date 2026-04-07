@@ -2273,13 +2273,21 @@ class NotifyMatrix(NotifyBase):
 
         # Build the inner plaintext attachment event
         is_image = IS_IMAGE.match(attachment.mimetype)
+        content = {
+            "msgtype": "m.image" if is_image else "m.file",
+            "body": attachment.name or "file",
+            "file": file_info,
+            "info": {
+                "mimetype": attachment.mimetype,
+                "size": len(attachment),
+            },
+        }
+        if not is_image:
+            content["filename"] = attachment.name or "file"
+
         inner_event = {
             "type": "m.room.message",
-            "content": {
-                "msgtype": "m.image" if is_image else "m.file",
-                "body": attachment.name or "file",
-                "file": file_info,
-            },
+            "content": content,
             "room_id": room_id,
         }
 

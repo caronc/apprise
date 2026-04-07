@@ -3397,6 +3397,9 @@ def test_plugin_matrix_e2ee_send_attachment_errors(
             name = "f.txt"
             mimetype = "text/plain"
 
+            def __len__(self):
+                return 0
+
         with mock.patch("builtins.open", side_effect=OSError("no read")):
             assert (
                 obj._e2ee_send_attachment(_BadAttach(), "!r:h", session)
@@ -3495,6 +3498,20 @@ def test_plugin_matrix_e2ee_send_attachment_errors(
             result = obj2._e2ee_send_attachment(_BadAttach(), "!r:h", sess2)
         assert result is True
         assert obj2.transaction_id == txn_before
+
+        # Image mimetype -> is_image branch (no 'filename' field added)
+        class _ImageAttach:
+            path = tmp_path
+            name = "photo.png"
+            mimetype = "image/png"
+
+            def __len__(self):
+                return 4
+
+        with mock.patch("requests.post", return_value=upload_r):
+            mock_put.return_value = put_r
+            result = obj2._e2ee_send_attachment(_ImageAttach(), "!r:h", sess2)
+        assert result is True
 
     finally:
         os.unlink(tmp_path)
