@@ -913,6 +913,38 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     assert obj._room_create("#abc123:localhost") is None
     del obj
 
+    # _room_create with e2ee=True/secure=True embeds initial_state and
+    # pre-seeds the room encryption cache so a subsequent
+    # _e2ee_room_encrypted() call does not need a network round-trip.
+    request.status_code = requests.codes.ok
+    request.content = dumps(response_obj)
+    obj_e2ee = NotifyMatrix(
+        host="localhost",
+        user="u",
+        password="p",
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    obj_e2ee.access_token = "tok"
+    obj_e2ee.home_server = "localhost"
+    captured_payloads = []
+    _orig_fetch = obj_e2ee._fetch
+
+    def _capture_fetch(path, payload=None, **kw):
+        if path == "/createRoom":
+            captured_payloads.append(payload)
+        return _orig_fetch(path, payload=payload, **kw)
+
+    obj_e2ee._fetch = _capture_fetch
+    room_id = obj_e2ee._room_create("e2ee_room")
+    assert room_id == response_obj["room_id"]
+    assert len(captured_payloads) == 1
+    init_state = captured_payloads[0].get("initial_state", [])
+    assert any(s.get("type") == "m.room.encryption" for s in init_state)
+    assert obj_e2ee.store.get("e2ee_room_enc_{}".format(room_id)) is True
+    del obj_e2ee
+
     # Room detection
     request.status_code = requests.codes.ok
     request.content = dumps(response_obj)
@@ -4098,4 +4130,59 @@ def test_plugin_matrix_dm_room_create_no_user_id(
     assert room_id == "!nodm:h"
     # No GET and no PUT for m.direct since user_id is None
     assert mock_get.call_count == 0
-    assert mock_put.call_count == 0
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_dm_room_create_e2ee(mock_post, mock_get, mock_put):
+    """_dm_room_find_or_create with e2ee=True/secure=True embeds
+    initial_state and pre-seeds the room encryption cache."""
+    from apprise.plugins.matrix.base import MATRIX_E2EE_SUPPORT
+
+    if not MATRIX_E2EE_SUPPORT:
+        pytest.skip("cryptography package not installed")
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    mock_post.return_value = _mk_resp({"room_id": "!dm_e2ee:h"})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    captured_payloads = []
+    _orig_fetch = obj._fetch
+
+    def _capture_fetch(path, payload=None, **kw):
+        if path == "/createRoom":
+            captured_payloads.append(payload or {})
+        return _orig_fetch(path, payload=payload, **kw)
+
+    obj._fetch = _capture_fetch
+
+    room_id = obj._dm_room_find_or_create("@alice")
+    assert room_id == "!dm_e2ee:h"
+
+    # Verify initial_state was sent with m.room.encryption
+    assert len(captured_payloads) == 1
+    init_state = captured_payloads[0].get("initial_state", [])
+    assert any(s.get("type") == "m.room.encryption" for s in init_state)
+
+    # Room encryption cache must be pre-seeded
+    assert obj.store.get("e2ee_room_enc_!dm_e2ee:h") is True

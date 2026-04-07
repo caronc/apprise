@@ -1468,6 +1468,19 @@ class NotifyMatrix(NotifyBase):
             "preset": "trusted_private_chat",
         }
 
+        # When E2EE is requested, enable encryption at room-creation time so
+        # that the room is encrypted from its very first message.  This only
+        # applies when Apprise is the one creating the room; pre-existing
+        # rooms keep whatever encryption state the server already has.
+        if self.e2ee and self.secure and MATRIX_E2EE_SUPPORT:
+            payload["initial_state"] = [
+                {
+                    "type": "m.room.encryption",
+                    "state_key": "",
+                    "content": {"algorithm": "m.megolm.v1.aes-sha2"},
+                }
+            ]
+
         postokay, response, _ = self._fetch("/createRoom", payload=payload)
         if not postokay:
             # Failed to create channel
@@ -1480,16 +1493,27 @@ class NotifyMatrix(NotifyBase):
                 return self._room_id(room)
             return None
 
+        room_id = response.get("room_id")
+
         # Cache our entry for fast access later
         self.store.set(
             response.get("room_alias"),
             {
-                "id": response.get("room_id"),
+                "id": room_id,
                 "home_server": home_server,
             },
         )
 
-        return response.get("room_id")
+        # Pre-seed the room encryption cache so _e2ee_room_encrypted() does
+        # not issue a redundant GET -- we just set the encryption state.
+        if room_id and self.e2ee and self.secure and MATRIX_E2EE_SUPPORT:
+            self.store.set(
+                "e2ee_room_enc_{}".format(room_id),
+                True,
+                expires=self.default_cache_expiry_sec,
+            )
+
+        return room_id
 
     def _joined_rooms(self):
         """Returns a list of the current rooms the logged in user is a
@@ -2370,14 +2394,23 @@ class NotifyMatrix(NotifyBase):
                     return room_id
 
         # No existing DM room -- create one
-        ok, response, _ = self._fetch(
-            "/createRoom",
-            payload={
-                "is_direct": True,
-                "preset": "trusted_private_chat",
-                "invite": [user_id],
-            },
-        )
+        dm_payload = {
+            "is_direct": True,
+            "preset": "trusted_private_chat",
+            "invite": [user_id],
+        }
+
+        # When E2EE is requested, enable encryption at room-creation time.
+        if self.e2ee and self.secure and MATRIX_E2EE_SUPPORT:
+            dm_payload["initial_state"] = [
+                {
+                    "type": "m.room.encryption",
+                    "state_key": "",
+                    "content": {"algorithm": "m.megolm.v1.aes-sha2"},
+                }
+            ]
+
+        ok, response, _ = self._fetch("/createRoom", payload=dm_payload)
         if not ok or not isinstance(response, dict):
             self.logger.warning(
                 "Matrix DM: failed to create room for %s.", user_id
@@ -2393,6 +2426,14 @@ class NotifyMatrix(NotifyBase):
             room_id,
             expires=self.default_cache_expiry_sec,
         )
+
+        # Pre-seed the room encryption cache.
+        if self.e2ee and self.secure and MATRIX_E2EE_SUPPORT:
+            self.store.set(
+                "e2ee_room_enc_{}".format(room_id),
+                True,
+                expires=self.default_cache_expiry_sec,
+            )
 
         # Update the m.direct account-data mapping so other clients
         # recognise this room as a DM conversation.
