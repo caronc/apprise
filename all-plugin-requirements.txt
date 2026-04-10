@@ -17,6 +17,9 @@ paho-mqtt != 2.0.*
 # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
 PGPy
 
+# Provides blink1:// support
+hidapi
+
 # Provides smpp:// support
 smpplib
 

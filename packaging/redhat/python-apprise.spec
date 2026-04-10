@@ -59,7 +59,7 @@ Apprise is a Python package that simplifies access to many popular \
 notification services. It supports sending alerts to platforms such as: \
 \
 `46elks`, `AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`, \
-`Bark`, `BlueSky`, `Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, \
+`Bark`, `Blink(1)`, `BlueSky`, `Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, \
 `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, \
 `FCM`, `Feishu`, `Flock`, `Fluxer`, \
@@ -143,6 +143,7 @@ Requires: python3dist(cryptography)
 Requires: python3dist(certifi)
 Requires: python3dist(pyyaml)
 
+Recommends: python3dist(hidapi)
 Recommends: python3dist(paho-mqtt)
 Recommends: python3dist(slixmpp)
 

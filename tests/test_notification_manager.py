@@ -728,6 +728,7 @@ def test_manager_known_plugin_runtime_deps():
     """Plugins known to carry optional deps must declare runtime_deps()."""
     N_MGR.unload_modules()
 
+    from apprise.plugins.blink1 import NotifyBlink1
     from apprise.plugins.fcm import NotifyFCM
     from apprise.plugins.growl import NotifyGrowl
     from apprise.plugins.mqtt import NotifyMQTT
@@ -736,6 +737,7 @@ def test_manager_known_plugin_runtime_deps():
     from apprise.plugins.vapid import NotifyVapid
     from apprise.plugins.xmpp.base import NotifyXMPP
 
+    assert "hid" in NotifyBlink1.runtime_deps()
     assert "paho" in NotifyMQTT.runtime_deps()
     assert "gntp" in NotifyGrowl.runtime_deps()
     assert "smpplib" in NotifySMPP.runtime_deps()
