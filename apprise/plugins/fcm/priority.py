@@ -132,7 +132,7 @@ class FCMPriorityManager:
             FCMMode.OAuth2: {
                 "message": {
                     "android": {"priority": NotificationPriority.HIGH},
-                    "apns": {"headers": {"apns-priority": "10"}},
+                    "apns": {"headers": {"apns-priority": "10", "apns-push-type": "alert"}},
                     "webpush": {"headers": {"Urgency": "high"}},
                 }
             },
@@ -144,7 +144,7 @@ class FCMPriorityManager:
             FCMMode.OAuth2: {
                 "message": {
                     "android": {"priority": NotificationPriority.HIGH},
-                    "apns": {"headers": {"apns-priority": "10"}},
+                    "apns": {"headers": {"apns-priority": "10", "apns-push-type": "alert"}},
                     "webpush": {"headers": {"Urgency": "high"}},
                 }
             },
