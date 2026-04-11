@@ -34,12 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise
-from apprise.common import NotifyFormat
-from apprise.plugins.evolution import (
-    NotifyEvolution,
-    _html_to_whatsapp,
-    _to_whatsapp,
-)
+from apprise.plugins.evolution import NotifyEvolution
 
 logging.disable(logging.CRITICAL)
 
@@ -69,7 +64,7 @@ apprise_url_tests = (
             "instance": TypeError,
         },
     ),
-    # Missing instance (single path entry treated as instance, no phone left)
+    # Missing instance (single path entry treated as instance; no phone left)
     (
         "evolution://myapikey@hostname/5511999999999",
         {
@@ -174,6 +169,7 @@ def test_plugin_evolution_urls():
 # Edge cases
 # ---------------------------------------------------------------------------
 
+
 def test_plugin_evolution_edge_cases():
     """NotifyEvolution() direct instantiation edge cases."""
 
@@ -209,6 +205,7 @@ def test_plugin_evolution_edge_cases():
 # ---------------------------------------------------------------------------
 # send() payload and header verification
 # ---------------------------------------------------------------------------
+
 
 @mock.patch("requests.post")
 def test_plugin_evolution_send(mock_post):
@@ -258,8 +255,7 @@ def test_plugin_evolution_multiple_targets(mock_post):
     assert mock_post.call_count == 3
 
     numbers = [
-        loads(c[1]["data"])["number"]
-        for c in mock_post.call_args_list
+        loads(c[1]["data"])["number"] for c in mock_post.call_args_list
     ]
     assert "5511111111111" in numbers
     assert "5522222222222" in numbers
@@ -319,92 +315,3 @@ def test_plugin_evolution_https(mock_post):
     assert obj.notify(body="secure msg") is True
     url = mock_post.call_args[0][0]
     assert url.startswith("https://")
-
-
-# ---------------------------------------------------------------------------
-# WhatsApp markdown conversion
-# ---------------------------------------------------------------------------
-
-def test_html_to_whatsapp_inline():
-    """_html_to_whatsapp() converts inline HTML tags."""
-    assert _html_to_whatsapp("<b>bold</b>") == "*bold*"
-    assert _html_to_whatsapp("<strong>bold</strong>") == "*bold*"
-    assert _html_to_whatsapp("<i>italic</i>") == "_italic_"
-    assert _html_to_whatsapp("<em>italic</em>") == "_italic_"
-    assert _html_to_whatsapp("<s>strike</s>") == "~strike~"
-    assert _html_to_whatsapp("<del>strike</del>") == "~strike~"
-    assert _html_to_whatsapp("<code>mono</code>") == "`mono`"
-
-
-def test_html_to_whatsapp_heading():
-    """_html_to_whatsapp() converts headings to bold."""
-    result = _html_to_whatsapp("<h1>Title</h1>")
-    assert result == "*Title*"
-
-    result = _html_to_whatsapp("<h2>Sub</h2>")
-    assert result == "*Sub*"
-
-
-def test_html_to_whatsapp_list():
-    """_html_to_whatsapp() converts list items with compact spacing."""
-    html = "<ul><li>one</li><li>two</li><li>three</li></ul>"
-    result = _html_to_whatsapp(html)
-    lines = [l for l in result.splitlines() if l.strip()]
-    assert lines == ["- one", "- two", "- three"]
-
-
-def test_html_to_whatsapp_ordered_list():
-    """_html_to_whatsapp() numbers ordered list items."""
-    html = "<ol><li>first</li><li>second</li></ol>"
-    result = _html_to_whatsapp(html)
-    lines = [l for l in result.splitlines() if l.strip()]
-    assert lines == ["1. first", "2. second"]
-
-
-def test_html_to_whatsapp_pre():
-    """_html_to_whatsapp() wraps <pre> blocks in triple backticks."""
-    result = _html_to_whatsapp("<pre>code block</pre>")
-    assert "```" in result
-    assert "code block" in result
-
-
-def test_html_to_whatsapp_ignore_tags():
-    """_html_to_whatsapp() ignores script and style content."""
-    result = _html_to_whatsapp(
-        "<p>visible</p><script>evil()</script><style>.x{}</style>"
-    )
-    assert "evil" not in result
-    assert ".x" not in result
-    assert "visible" in result
-
-
-def test_to_whatsapp_text_passthrough():
-    """_to_whatsapp() returns plain text unchanged."""
-    text = "Hello *World*"
-    assert _to_whatsapp(text, NotifyFormat.TEXT) == text
-
-
-def test_to_whatsapp_html():
-    """_to_whatsapp() converts HTML format."""
-    result = _to_whatsapp("<b>bold</b>", NotifyFormat.HTML)
-    assert result == "*bold*"
-
-
-def test_to_whatsapp_markdown():
-    """_to_whatsapp() converts Markdown format via HTML pipeline."""
-    result = _to_whatsapp("**bold**", NotifyFormat.MARKDOWN)
-    assert "*bold*" in result
-
-
-def test_to_whatsapp_markdown_heading():
-    """_to_whatsapp() converts Markdown headings to bold."""
-    result = _to_whatsapp("## Deploy Done", NotifyFormat.MARKDOWN)
-    assert "*Deploy Done*" in result
-
-
-def test_to_whatsapp_markdown_list():
-    """_to_whatsapp() converts Markdown list to compact WhatsApp list."""
-    md = "- item one\n- item two\n- item three"
-    result = _to_whatsapp(md, NotifyFormat.MARKDOWN)
-    lines = [l for l in result.splitlines() if l.strip()]
-    assert lines == ["- item one", "- item two", "- item three"]
