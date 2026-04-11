@@ -71,6 +71,7 @@ The table below identifies the services this tool supports and some example serv
 | [Dot.](https://appriseit.com/services/dot/)  | dot:// | (TCP) 443 | dot://apikey@device_id/text/<br />dot://apikey@device_id/image/<br />**Note**: `device_id` is the Quote/0 hardware serial
 | [Emby](https://appriseit.com/services/emby/)  | emby:// or embys:// | (TCP) 8096 | emby://user@hostname/<br />emby://user:password@hostname
 | [Enigma2](https://appriseit.com/services/enigma2/)  | enigma2:// or enigma2s:// | (TCP) 80 or 443 | enigma2://hostname
+| [Evolution API](https://appriseit.com/services/evolution/) | evolution:// or evolutions:// | (TCP) 80 or 443 | evolution://apikey@hostname/instance/ToPhoneNo<br/>evolution://apikey@hostname:port/instance/ToPhoneNo<br/>evolution://apikey@hostname/instance/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [FCM](https://appriseit.com/services/fcm/) | fcm://    | (TCP) 443    | fcm://project@apikey/DEVICE_ID<br />fcm://project@apikey/#TOPIC<br/>fcm://project@apikey/DEVICE_ID1/#topic1/#topic2/DEVICE_ID2/
 | [Feishu](https://appriseit.com/services/feishu/) | feishu://    | (TCP) 443    | feishu://token
 | [Flock](https://appriseit.com/services/flock/) | flock://    | (TCP) 443    | flock://token<br/>flock://botname@token<br/>flock://app_token/u:userid<br/>flock://app_token/g:channel_id<br/>flock://app_token/u:userid/g:channel_id
