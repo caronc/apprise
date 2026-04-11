@@ -154,10 +154,7 @@ class NotifyEvolution(NotifyBase):
         # API Key
         self.apikey = validate_regex(apikey)
         if not self.apikey:
-            msg = (
-                "An invalid Evolution API key "
-                f"({apikey}) was specified."
-            )
+            msg = f"An invalid Evolution API key ({apikey}) was specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -230,8 +227,9 @@ class NotifyEvolution(NotifyBase):
             }
 
             self.logger.debug(
-                "Evolution API POST URL: {} "
-                "(cert_verify={!r})".format(url, self.verify_certificate)
+                "Evolution API POST URL: {} (cert_verify={!r})".format(
+                    url, self.verify_certificate
+                )
             )
             self.logger.debug(f"Evolution API Payload: {payload!s}")
 
@@ -315,8 +313,7 @@ class NotifyEvolution(NotifyBase):
         targets = self.phone if self.phone else self.invalid_targets
 
         return (
-            "{schema}://{apikey}@{host}{port}"
-            "/{instance}/{targets}?{params}"
+            "{schema}://{apikey}@{host}{port}/{instance}/{targets}?{params}"
         ).format(
             schema=self.secure_protocol if self.secure else self.protocol,
             apikey=(

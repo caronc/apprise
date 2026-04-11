@@ -117,8 +117,7 @@ apprise_url_tests = (
     ),
     # Multiple targets
     (
-        "evolution://myapikey@hostname/myinstance"
-        "/5511999999999/5521888888888",
+        "evolution://myapikey@hostname/myinstance/5511999999999/5521888888888",
         {
             "instance": NotifyEvolution,
         },
@@ -187,9 +186,7 @@ def test_plugin_evolution_edge_cases():
 
     # No instance
     with pytest.raises(TypeError):
-        NotifyEvolution(
-            apikey="key", instance=None, targets=["5511999999999"]
-        )
+        NotifyEvolution(apikey="key", instance=None, targets=["5511999999999"])
 
     # No targets
     with pytest.raises(TypeError):
@@ -254,9 +251,7 @@ def test_plugin_evolution_multiple_targets(mock_post):
     assert obj.notify(body="msg") is True
     assert mock_post.call_count == 3
 
-    numbers = [
-        loads(c[1]["data"])["number"] for c in mock_post.call_args_list
-    ]
+    numbers = [loads(c[1]["data"])["number"] for c in mock_post.call_args_list]
     assert "5511111111111" in numbers
     assert "5522222222222" in numbers
     assert "5533333333333" in numbers
@@ -290,9 +285,7 @@ def test_plugin_evolution_title_bold(mock_post):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
 
-    obj = Apprise.instantiate(
-        "evolution://key@host/inst/5511999999999"
-    )
+    obj = Apprise.instantiate("evolution://key@host/inst/5511999999999")
     assert obj.notify(body="body text", title="My Title") is True
 
     payload = loads(mock_post.call_args[1]["data"])
