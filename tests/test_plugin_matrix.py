@@ -710,6 +710,54 @@ def test_plugin_matrix_auth(mock_post, mock_get, mock_put):
     assert obj.access_token is None
     del obj
 
+    # Modern Matrix servers omit home_server from login/register responses.
+    # Apprise must derive it from user_id so room-alias resolution works.
+    modern_resp = {
+        "access_token": "tok99",
+        "user_id": "@bot:matrix.org",
+        "device_id": "DEVXYZ",
+        # no "home_server" key -- matches real matrix.org behaviour
+    }
+    request.status_code = requests.codes.ok
+    request.content = dumps(modern_resp)
+
+    # No home_server in response + no prior home_server -> derive from user_id
+    obj2 = NotifyMatrix(host="matrix.org", user="bot", password="pass")
+    assert obj2._login() is True
+    assert obj2.home_server == "matrix.org"
+
+    obj3 = NotifyMatrix(host="matrix.org", user="bot", password="pass")
+    assert obj3._register() is True
+    assert obj3.home_server == "matrix.org"
+
+    # No home_server in response + home_server already set -> not overwritten
+    obj4 = NotifyMatrix(host="matrix.org", user="bot", password="pass")
+    obj4.home_server = "already.set"
+    assert obj4._login() is True
+    assert obj4.home_server == "already.set"
+
+    obj5 = NotifyMatrix(host="matrix.org", user="bot", password="pass")
+    obj5.home_server = "already.set"
+    assert obj5._register() is True
+    assert obj5.home_server == "already.set"
+
+    # No home_server in response + user_id has no colon ->
+    # home_server stays None
+    no_colon_resp = {
+        "access_token": "tok88",
+        "user_id": "@nocoilon",
+        "device_id": "DEV88",
+    }
+    request.content = dumps(no_colon_resp)
+    obj6 = NotifyMatrix(host="matrix.org", user="bot", password="pass")
+    assert obj6._login() is True
+    assert obj6.home_server is None
+
+    obj7 = NotifyMatrix(host="matrix.org", user="bot", password="pass")
+    assert obj7._register() is True
+    assert obj7.home_server is None
+    del obj2, obj3, obj4, obj5, obj6, obj7
+
 
 @mock.patch("requests.put")
 @mock.patch("requests.get")
@@ -833,6 +881,19 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     assert obj.store.get("#abc123:localhost")["id"] == response_obj["room_id"]
     assert obj._room_join("abc123") == response_obj["room_id"]
 
+    # If home_server is missing, recover it from user_id so we never try
+    # to join a '#room:None' alias.
+    obj.store.clear()
+    obj.home_server = None
+    obj.user_id = "@apprise:localhost"
+    mock_post.reset_mock()
+    assert obj._room_join("abc123") == response_obj["room_id"]
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "http://host/_matrix/client/v3/join/%23abc123%3Alocalhost"
+    )
+
     obj.store.clear()
     assert obj._room_join("abc123:localhost") == response_obj["room_id"]
     # Use cache to get same results
@@ -850,6 +911,13 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     obj.store.clear()
     assert obj._room_join("%") is None
     assert obj._room_join(None) is None
+
+    obj.store.clear()
+    obj.home_server = None
+    obj.user_id = "@apprise"
+    mock_post.reset_mock()
+    assert obj._room_join("abc123") is None
+    assert mock_post.call_count == 0
 
     # 403 response; this will push for a room creation for alias based rooms
     # and these will fail
@@ -2294,9 +2362,7 @@ def test_plugin_matrix_e2ee_olm_account():
 
 def test_plugin_matrix_e2ee_olm_session():
     """MatrixOlmSession encrypts and produces correct wire format."""
-    import base64
-
-    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount, _b64dec
 
     acct = MatrixOlmAccount()
     # Create a second account to act as recipient
@@ -2315,16 +2381,231 @@ def test_plugin_matrix_e2ee_olm_session():
     assert isinstance(result["body"], str)
 
     # Decode and check the outer pre-key wire format.
-    # The outer body is: version(0x03) | protobuf_fields | mac(8)
-    # The inner message embedded in field 4 must contain the ciphertext
-    # at protobuf field 4 (tag 0x22 = (4<<3)|2), NOT field 3 (tag 0x1A).
-    raw = base64.b64decode(result["body"])
+    # Outer: version(0x03) | field1(OTK) | field2(EK) | field3(IK) |
+    #        field4(inner+mac) | outer_mac(8)
+    # Inner (in field 4): version(0x03) | field1(ratchet_key) |
+    #        field2(chain_index) | field4(ciphertext,tag=0x22) | inner_mac(8)
+    raw = _b64dec(result["body"])
     assert raw[0:1] == b"\x03", "outer version must be 0x03"
+    # field 4, wire-type 2 -> tag = (4<<3)|2 = 0x22 -- ciphertext in inner msg
     assert b"\x22" in raw, "ciphertext field tag 0x22 must be present"
+    # Outer field 1 (OTK, tag 0x0A), field 2 (EK, tag 0x12) must appear
+    assert b"\x0a" in raw, "outer OTK field (tag 0x0A) must be present"
+    assert b"\x12" in raw, "outer EK field (tag 0x12) must be present"
 
     # bytes plaintext also accepted
     result2 = session.encrypt(b"bytes input")
     assert result2["type"] == 0
+
+
+def test_plugin_matrix_e2ee_olm_roundtrip():
+    """Full Olm round-trip: Alice encrypts, Bob manually decrypts.
+
+    This test implements the Bob (inbound) side of the Olm X3DH and
+    message-decryption protocol using the same cryptography primitives,
+    verifying that our Alice-side implementation produces wire bytes that
+    a conformant receiver can decrypt.
+
+    Critical invariant verified: the outer base-key (pre-key field 2)
+    equals the inner ratchet-key (normal-message field 1).  They MUST be
+    the same ephemeral key E_A or the receiver cannot reconstruct the
+    session and decryption fails.
+    """
+    import hmac as _hmac_stdlib
+
+    from cryptography.hazmat.backends import default_backend
+    from cryptography.hazmat.primitives import hashes, hmac as _hmac_mod
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+    )
+    from cryptography.hazmat.primitives.ciphers import (
+        Cipher,
+        algorithms,
+        modes,
+    )
+    from cryptography.hazmat.primitives.kdf.hkdf import HKDF
+    from cryptography.hazmat.primitives.padding import PKCS7
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from apprise.plugins.matrix.e2ee import (
+        MatrixOlmAccount,
+        _b64dec,
+        _b64enc,
+    )
+
+    # -- helpers (Bob-side) -------------------------------------------
+
+    def _hmac(key, data):
+        h = _hmac_mod.HMAC(key, hashes.SHA256(), backend=default_backend())
+        h.update(data)
+        return h.finalize()
+
+    def _hkdf(ikm, length, salt, info):
+        return HKDF(
+            algorithm=hashes.SHA256(),
+            length=length,
+            salt=salt,
+            info=info,
+            backend=default_backend(),
+        ).derive(ikm)
+
+    def _aes_cbc_decrypt(key, iv, ciphertext):
+        cipher = Cipher(
+            algorithms.AES(key), modes.CBC(iv), backend=default_backend()
+        )
+        dec = cipher.decryptor()
+        padded = dec.update(ciphertext) + dec.finalize()
+        unpadder = PKCS7(128).unpadder()
+        return unpadder.update(padded) + unpadder.finalize()
+
+    def _read_varint(data, pos):
+        val, shift = 0, 0
+        while True:
+            b = data[pos]
+            pos += 1
+            val |= (b & 0x7F) << shift
+            shift += 7
+            if not (b & 0x80):
+                return val, pos
+
+    def _parse_pb_fields(data):
+        """Parse length-delimited protobuf body; return {field_num: bytes}."""
+        fields = {}
+        pos = 0
+        while pos < len(data):
+            tag, pos = _read_varint(data, pos)
+            field_num = tag >> 3
+            wire_type = tag & 0x07
+            if wire_type == 2:
+                length, pos = _read_varint(data, pos)
+                fields[field_num] = data[pos : pos + length]
+                pos += length
+            elif wire_type == 0:
+                val, pos = _read_varint(data, pos)
+                fields[field_num] = val
+            else:
+                raise ValueError("Unexpected wire type {}".format(wire_type))
+        return fields
+
+    # -- test setup ---------------------------------------------------
+
+    # Alice's account (sender)
+    alice = MatrixOlmAccount()
+
+    # Bob's account: identity key + a separate one-time key
+    bob = MatrixOlmAccount()
+    bob_otk_priv = X25519PrivateKey.generate()
+    bob_otk_pub = bob_otk_priv.public_key().public_bytes(
+        Encoding.Raw, PublicFormat.Raw
+    )
+    bob_otk_pub_b64 = _b64enc(bob_otk_pub)
+
+    # Bob's identity-key private (for DH computation)
+    bob_ik_priv = bob._ik
+
+    # Alice creates an outbound session to Bob using his real OTK
+    session = alice.create_outbound_session(
+        bob.identity_key,  # Bob's Curve25519 identity key
+        bob_otk_pub_b64,  # Bob's one-time key
+    )
+
+    plaintext = "hello from Alice"
+    result = session.encrypt(plaintext)
+    assert result["type"] == 0
+
+    # -- Bob-side decryption ------------------------------------------
+
+    raw = _b64dec(result["body"])
+
+    # Outer format: version(1) | pb_fields | outer_mac(8)
+    assert raw[0:1] == b"\x03", "outer version must be 0x03"
+    outer_body = raw[:-8]  # everything before the outer MAC
+    outer_mac_received = raw[-8:]
+
+    # Parse outer fields (skip version byte)
+    outer_fields = _parse_pb_fields(outer_body[1:])
+    otk_pub_in_msg = outer_fields[1]  # field 1: Bob's OTK public bytes
+    base_key = outer_fields[2]  # field 2: Alice's ephemeral E_A
+    alice_ik_pub = outer_fields[3]  # field 3: Alice's identity key
+
+    # The OTK bytes in the message must equal Bob's OTK public key
+    assert otk_pub_in_msg == bob_otk_pub, (
+        "OTK in pre-key message must match the OTK that was claimed"
+    )
+
+    # Bob computes X3DH (mirroring Alice's DH operations)
+    #   DH1 = X25519(OTK_B_priv, IK_A_pub)
+    #   DH2 = X25519(IK_B_priv, E_A_pub)
+    #   DH3 = X25519(OTK_B_priv, E_A_pub)
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PublicKey,
+    )
+
+    alice_ik = X25519PublicKey.from_public_bytes(alice_ik_pub)
+    e_a = X25519PublicKey.from_public_bytes(base_key)
+
+    dh1 = bob_otk_priv.exchange(alice_ik)
+    dh2 = bob_ik_priv.exchange(e_a)
+    dh3 = bob_otk_priv.exchange(e_a)
+
+    ikm = dh1 + dh2 + dh3
+    keys64 = _hkdf(ikm, 64, salt=None, info=b"OLM_ROOT")
+    root_key = keys64[:32]
+    chain_key = keys64[32:]
+    del root_key  # not needed for first-message decryption
+
+    # Derive message keys
+    msg_key = _hmac(chain_key, b"\x01")
+    keys80 = _hkdf(msg_key, 80, salt=b"\x00" * 32, info=b"OLM_KEYS")
+    aes_key = keys80[:32]
+    mac_key = keys80[32:64]
+    iv = keys80[64:80]
+
+    # Verify outer MAC
+    outer_mac_expected = _hmac(mac_key, outer_body)[:8]
+    assert _hmac_stdlib.compare_digest(
+        outer_mac_expected, outer_mac_received
+    ), "outer MAC verification failed"
+
+    # Parse field 4 (inner message + inner_mac)
+    inner_with_mac = outer_fields[4]
+    inner_body = inner_with_mac[:-8]
+    inner_mac_received = inner_with_mac[-8:]
+
+    # Verify inner MAC
+    _hmac(mac_key, b"\x03" + inner_body[1:])[:8]
+    # inner_body already starts with 0x03; mac over the full inner body
+    inner_mac_expected2 = _hmac(mac_key, inner_body)[:8]
+    assert _hmac_stdlib.compare_digest(
+        inner_mac_expected2, inner_mac_received
+    ), "inner MAC verification failed"
+
+    # Parse inner fields
+    # inner_body = version(0x03) | pb_fields
+    assert inner_body[0:1] == b"\x03", "inner version must be 0x03"
+    inner_fields = _parse_pb_fields(inner_body[1:])
+
+    # CRITICAL invariant:
+    # ratchet_key (inner field 1) == base_key (outer field 2)
+    ratchet_key = inner_fields[1]
+    assert ratchet_key == base_key, (
+        "Olm invariant violated: inner ratchet_key must equal outer base_key "
+        "(E_A must be used in BOTH positions per Olm spec Section 5.1). "
+        "Got ratchet_key={} base_key={}".format(
+            _b64enc(ratchet_key), _b64enc(base_key)
+        )
+    )
+
+    # Decrypt the AES-256-CBC ciphertext (inner field 4)
+    ciphertext = inner_fields[4]
+    decrypted = _aes_cbc_decrypt(aes_key, iv, ciphertext)
+
+    assert decrypted.decode("utf-8") == plaintext, (
+        "round-trip decryption failed: got {!r}".format(decrypted)
+    )
 
 
 def test_plugin_matrix_e2ee_verify_keys():
@@ -2405,6 +2686,7 @@ def test_plugin_matrix_e2ee_verify_keys():
 def test_plugin_matrix_e2ee_megolm_session():
     """MatrixMegOlmSession encrypt, session_key, rotation, serialisation."""
     from apprise.plugins.matrix.e2ee import (
+        MATRIX_MEGOLM_STORE_VERSION,
         MEGOLM_ROTATION_MSGS,
         MatrixMegOlmSession,
     )
@@ -2416,12 +2698,30 @@ def test_plugin_matrix_e2ee_megolm_session():
     ct = s.encrypt({"type": "m.room.message", "content": {}})
     assert isinstance(ct, str)
 
-    # session_key returns base64
+    # Verify MegOLM wire format (libolm message.cpp):
+    #   version(0x03) | field1_varint(msg_index,tag=0x08) |
+    #   field2_bytes(ciphertext,tag=0x12) | mac(8) | sig(64)
+    from apprise.plugins.matrix.e2ee import _b64dec
+
+    raw = _b64dec(ct)
+    assert raw[0:1] == b"\x03", "MegOLM version must be 0x03"
+    assert raw[1:2] == b"\x08", "MegOLM field 1 tag must be 0x08 (varint)"
+    # After tag 0x08: the varint counter value (0 -> single byte 0x00),
+    # then the ciphertext tag 0x12.
+    assert b"\x12" in raw, "MegOLM ciphertext field tag 0x12 must be present"
+
+    # session_key returns base64 -- verify wire format per libolm
+    # outbound_group_session.c: version(1) + counter(4) + ratchet(128)
+    # + ed25519_pub(32) + ed25519_sig(64) = 229 bytes raw = 308 base64 chars
     sk = s.session_key()
     assert isinstance(sk, str)
+    sk_raw = _b64dec(sk)
+    assert len(sk_raw) == 229, "session_key must be 229 bytes (sig included)"
+    assert sk_raw[0:1] == b"\x02", "session_key version must be 0x02"
 
     # to_dict / from_dict round-trip
     d = s.to_dict()
+    assert d["version"] == MATRIX_MEGOLM_STORE_VERSION
     s2 = MatrixMegOlmSession.from_dict(d)
     assert s2.session_id == s.session_id
     assert s2._counter == s._counter
@@ -2677,10 +2977,52 @@ def test_plugin_matrix_e2ee_send_cached_session(mock_post, mock_get, mock_put):
     _sess = MatrixMegOlmSession()
     obj.store.set("e2ee_room_enc_!r:h", True)
     obj.store.set("e2ee_megolm_!r:h", _sess.to_dict())
-    obj.store.set("e2ee_key_shared_!r:h", True)
+    obj.store.set("e2ee_key_shared_!r:h", _sess.session_id)
     assert obj.send(body="silent") is True
     # Only one PUT for the encrypted message itself
     assert mock_put.call_count == 1
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_send_legacy_shared_flag_rekeys(
+    mock_post, mock_get, mock_put
+):
+    """Legacy boolean key-share cache forces a fresh room-key share."""
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    obj._e2ee_account = MatrixOlmAccount()
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", True)
+
+    with (
+        mock.patch.object(
+            obj, "_e2ee_share_room_key", return_value=True
+        ) as share,
+        mock.patch.object(obj, "_fetch", return_value=(True, {}, 200)),
+    ):
+        assert (
+            obj._e2ee_send_to_room("!r:h", "body", "", NotifyType.INFO) is True
+        )
+
+    assert share.call_count == 1
+    assert obj.store.get("e2ee_key_shared_!r:h") == session.session_id
 
 
 def test_plugin_matrix_e2ee_setup_restored():
@@ -2699,6 +3041,15 @@ def test_plugin_matrix_e2ee_setup_restored():
     # Seed account + mark keys already uploaded
     obj.store.set("e2ee_account", acct.to_dict())
     obj.store.set("e2ee_keys_uploaded", True)
+    obj.store.set(
+        "e2ee_device_binding",
+        "{}|{}|{}|{}".format(
+            obj.user_id or "",
+            obj.device_id or "",
+            acct.identity_key,
+            acct.signing_key,
+        ),
+    )
 
     # Simulate state where account is not yet loaded in memory
     obj._e2ee_account = None
@@ -2733,6 +3084,33 @@ def test_plugin_matrix_e2ee_setup_restored():
             e2ee=True,
         )
     assert obj2._e2ee_account is not None
+
+
+def test_plugin_matrix_e2ee_setup_reuploads_on_binding_change():
+    """Changed device/account identity forces a fresh key upload."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    acct = MatrixOlmAccount()
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV_NEW"
+    obj._e2ee_account = acct
+    obj.store.set("e2ee_account", acct.to_dict())
+    obj.store.set("e2ee_keys_uploaded", True)
+    obj.store.set("e2ee_device_binding", "@u:h|DEV_OLD|oldik|oldsk")
+
+    with mock.patch.object(
+        obj, "_e2ee_upload_keys", return_value=True
+    ) as upload:
+        assert obj._e2ee_setup() is True
+
+    assert upload.call_count == 1
 
 
 @mock.patch("requests.put")
@@ -2781,6 +3159,44 @@ def test_plugin_matrix_e2ee_upload_keys_http_fail(
     obj.device_id = "DEV"
     obj.home_server = "h"
     assert obj._e2ee_upload_keys() is False
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_e2ee_upload_keys_success_marks_published(
+    mock_post, mock_get, mock_put
+):
+    """Successful upload clears the current unpublished OTK batch."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    resp = mock.Mock()
+    resp.status_code = requests.codes.ok
+    resp.content = dumps(
+        {"one_time_key_counts": {"signed_curve25519": 10}}
+    ).encode()
+    mock_post.return_value = resp
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+    )
+    obj._e2ee_account = MatrixOlmAccount()
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    obj.home_server = "h"
+
+    # Pre-generate one-time keys so we can verify they are marked published.
+    obj._e2ee_account.one_time_keys_payload(
+        obj.user_id, obj.device_id, count=3
+    )
+    assert obj._e2ee_account._otks
+    assert obj._e2ee_upload_keys() is True
+    assert obj._e2ee_account._otks == {}
 
 
 @mock.patch("requests.put")
@@ -2841,7 +3257,48 @@ def test_plugin_matrix_whoami(mock_post, mock_get, mock_put):
     obj.device_id = None
     mock_get.return_value = _mk_resp({}, code=401)
     assert obj._whoami() is False
-    assert obj.user_id is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_send_cached_token_recovers_home_server(
+    mock_post, mock_get, mock_put
+):
+    """Cached auth without home_server should be repaired via _whoami()."""
+
+    obj = NotifyMatrix(
+        host="matrix.org",
+        user="apprise",
+        password="pass",
+        targets=["#general"],
+    )
+    obj.access_token = "cached-token"
+    obj.user_id = None
+    obj.device_id = None
+    obj.home_server = None
+
+    whoami_called = {"count": 0}
+
+    def _fake_whoami():
+        whoami_called["count"] += 1
+        obj.user_id = "@apprise:matrix.org"
+        obj.device_id = "DEV42"
+        obj.home_server = "matrix.org"
+        return True
+
+    with (
+        mock.patch.object(obj, "_room_join", return_value="!room:matrix.org"),
+        mock.patch.object(obj, "_whoami", side_effect=_fake_whoami),
+        mock.patch.object(
+            obj, "_fetch", return_value=(True, {"event_id": "$1"}, 200)
+        ),
+    ):
+        assert obj.send("body", title="test") is True
+
+    assert whoami_called["count"] == 1
+    assert obj.home_server == "matrix.org"
+    assert obj.user_id == "@apprise:matrix.org"
 
 
 @mock.patch("requests.put")
@@ -2872,6 +3329,16 @@ def test_plugin_matrix_e2ee_get_megolm_rotation(mock_post, mock_get, mock_put):
     assert new_session.session_id != stale.session_id
 
     # The shared flag should be cleared on rotation
+    assert obj.store.get("e2ee_key_shared_!r:h") is None
+
+    # Legacy cached sessions without the current version marker are
+    # invalidated and replaced with a fresh session.
+    legacy = stale.to_dict()
+    del legacy["version"]
+    obj.store.set("e2ee_megolm_!r:h", legacy)
+    obj.store.set("e2ee_key_shared_!r:h", stale.session_id)
+    replaced = obj._e2ee_get_megolm("!r:h")
+    assert replaced.session_id != stale.session_id
     assert obj.store.get("e2ee_key_shared_!r:h") is None
 
 
@@ -3082,6 +3549,11 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         obj, "_e2ee_room_members", return_value=dict_members
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is True
+        payload = loads(mock_put.call_args.kwargs["data"])
+        dev_payload = payload["messages"]["@other:h"]["DEV"]
+        assert dev_payload["recipient_key"] == their_ik
+        assert dev_payload["sender_key"] == obj._e2ee_account.identity_key
+        assert "org.matrix.msgid" in dev_payload
 
     # dict-valued OTK with no signatures -> OTK rejected, device skipped
     unsigned_otk_dict = {"key": their_otk_b64}  # no "signatures" field
@@ -3223,13 +3695,13 @@ def test_plugin_matrix_e2ee_send_to_room_formats(
         obj.user_id = "@u:h"
         obj.device_id = "DEV"
         obj._e2ee_account = MatrixOlmAccount()
-        obj.store.set("e2ee_key_shared_!r:h", True)
         return obj
 
     # HTML format
     obj = _make_obj(NotifyFormat.HTML)
     session = MatrixMegOlmSession()
     obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
     assert (
         obj._e2ee_send_to_room(
             "!r:h", "<b>body</b>", "<h1>title</h1>", NotifyType.INFO
@@ -3241,6 +3713,7 @@ def test_plugin_matrix_e2ee_send_to_room_formats(
     obj = _make_obj(NotifyFormat.MARKDOWN)
     session = MatrixMegOlmSession()
     obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
     assert (
         obj._e2ee_send_to_room("!r:h", "**bold**", "title", NotifyType.INFO)
         is True
@@ -3261,6 +3734,7 @@ def test_plugin_matrix_e2ee_send_to_room_formats(
     obj.password = "same"
     session2 = MatrixMegOlmSession()
     obj.store.set("e2ee_megolm_!r:h", session2.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session2.session_id)
     assert obj._e2ee_send_to_room("!r:h", "body", "", NotifyType.INFO) is True
 
     # key-share failure aborts send
@@ -3371,7 +3845,7 @@ def test_plugin_matrix_e2ee_attachment_encrypted(
         _s = MatrixMegOlmSession()
         obj.store.set("e2ee_room_enc_!r:h", True)
         obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
-        obj.store.set("e2ee_key_shared_!r:h", True)
+        obj.store.set("e2ee_key_shared_!r:h", _s.session_id)
         assert obj.send(body="body", attach=attach) is True
 
         # Two PUTs: encrypted message + encrypted attachment event
@@ -3599,7 +4073,7 @@ def test_plugin_matrix_e2ee_send_attachment_invalid(
         _s = MatrixMegOlmSession()
         obj.store.set("e2ee_room_enc_!r:h", True)
         obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
-        obj.store.set("e2ee_key_shared_!r:h", True)
+        obj.store.set("e2ee_key_shared_!r:h", _s.session_id)
 
         attach = AppriseAttachment()
         attach.add(attach_path)
@@ -3630,7 +4104,7 @@ def test_plugin_matrix_e2ee_send_attachment_invalid(
         _s2 = MatrixMegOlmSession()
         obj2.store.set("e2ee_room_enc_!r:h", True)
         obj2.store.set("e2ee_megolm_!r:h", _s2.to_dict())
-        obj2.store.set("e2ee_key_shared_!r:h", True)
+        obj2.store.set("e2ee_key_shared_!r:h", _s2.session_id)
         # Add a non-existent file to get a falsy attachment
         bad_attach = AppriseAttachment()
         bad_attach.add("/nonexistent/path/file.txt")
@@ -3682,7 +4156,7 @@ def test_plugin_matrix_e2ee_send_room_failure(mock_post, mock_get, mock_put):
     obj.store.set("e2ee_room_enc_!r:h", True)
     _s = MatrixMegOlmSession()
     obj.store.set("e2ee_megolm_!r:h", _s.to_dict())
-    obj.store.set("e2ee_key_shared_!r:h", True)
+    obj.store.set("e2ee_key_shared_!r:h", _s.session_id)
 
     with mock.patch.object(obj, "_e2ee_send_to_room", return_value=False):
         assert obj.send(body="fail") is False
@@ -3709,6 +4183,58 @@ def test_plugin_matrix_register_with_device_id(mock_post, mock_get, mock_put):
     assert obj._register() is True
     assert obj.device_id == "REG_DEV"
     assert obj.store.get("device_id") == "REG_DEV"
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_login_reuses_device_id(mock_post, mock_get, mock_put):
+    """Login payload reuses the stored device ID when present."""
+    r = mock.Mock()
+    r.status_code = requests.codes.ok
+    r.content = dumps(
+        {
+            "access_token": "tok",
+            "user_id": "@u:h",
+            "home_server": "h",
+            "device_id": "DEV_REUSED",
+        }
+    ).encode()
+    mock_post.return_value = r
+
+    obj = NotifyMatrix(host="h", user="u", password="pass", discovery=False)
+    obj.device_id = "DEV_REUSED"
+    assert obj._login() is True
+
+    payload = mock_post.call_args.kwargs["data"]
+    assert '"device_id": "DEV_REUSED"' in payload
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_register_reuses_device_id(
+    mock_post, mock_get, mock_put
+):
+    """Register payload reuses the stored device ID when present."""
+    r = mock.Mock()
+    r.status_code = requests.codes.ok
+    r.content = dumps(
+        {
+            "access_token": "tok",
+            "user_id": "@u:h",
+            "home_server": "h",
+            "device_id": "DEV_REUSED",
+        }
+    ).encode()
+    mock_post.return_value = r
+
+    obj = NotifyMatrix(host="h", user="u", password="pass", discovery=False)
+    obj.device_id = "DEV_REUSED"
+    assert obj._register() is True
+
+    payload = mock_post.call_args.kwargs["data"]
+    assert '"device_id": "DEV_REUSED"' in payload
 
 
 def test_plugin_matrix_e2ee_account_bad_store_data():

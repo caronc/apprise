@@ -45,6 +45,7 @@ from json import dumps
 import os
 import struct
 import time as _time
+import uuid
 
 try:
     from cryptography.hazmat.backends import default_backend
@@ -88,6 +89,11 @@ MEGOLM_ROTATION_MSGS = 100
 # Rotate the MegOLM session after this many seconds (7 days)
 MEGOLM_ROTATION_AGE = 60 * 60 * 24 * 7
 
+# Bump this whenever the custom outbound MegOLM/session serialization or
+# interoperability-critical behavior changes. Older cached sessions are then
+# treated as incompatible and rotated automatically.
+MATRIX_MEGOLM_STORE_VERSION = 1
+
 
 # -----------------------------------------------------------------------
 # Private helpers
@@ -95,8 +101,8 @@ MEGOLM_ROTATION_AGE = 60 * 60 * 24 * 7
 
 
 def _b64enc(data):
-    """Standard base64 of *data* as a padded ASCII string."""
-    return base64.b64encode(data).decode("utf-8")
+    """Matrix-style unpadded base64 of *data* as ASCII."""
+    return base64.b64encode(data).rstrip(b"=").decode("utf-8")
 
 
 def _b64dec(s):
@@ -328,7 +334,13 @@ class MatrixOlmAccount:
     Reference: Olm spec, Section 2 ("Keys").
     """
 
-    def __init__(self, ik_priv_b64=None, sk_priv_b64=None):
+    def __init__(
+        self,
+        ik_priv_b64=None,
+        sk_priv_b64=None,
+        otks=None,
+        fallback_otk=None,
+    ):
         """Initialise from saved keys or generate a fresh key pair.
 
         Parameters are the base64-encoded raw 32-byte private key bytes
@@ -353,6 +365,8 @@ class MatrixOlmAccount:
         self._sk_pub = self._sk.public_key().public_bytes(
             Encoding.Raw, PublicFormat.Raw
         )
+        self._otks = dict(otks or {})
+        self._fallback_otk = fallback_otk
 
     # --- Public-key properties -------------------------------------------
 
@@ -389,6 +403,8 @@ class MatrixOlmAccount:
                     Encoding.Raw, PrivateFormat.Raw, NoEncryption()
                 )
             ),
+            "otks": self._otks,
+            "fallback_otk": self._fallback_otk,
         }
 
     @staticmethod
@@ -397,6 +413,8 @@ class MatrixOlmAccount:
         return MatrixOlmAccount(
             ik_priv_b64=data["ik"],
             sk_priv_b64=data["sk"],
+            otks=data.get("otks"),
+            fallback_otk=data.get("fallback_otk"),
         )
 
     # --- Key-upload payload ----------------------------------------------
@@ -426,6 +444,78 @@ class MatrixOlmAccount:
         }
         return device_keys
 
+    def _signed_curve25519_key(self, user_id, device_id, key_b64):
+        """Wrap a Curve25519 key in a signed KeyObject."""
+        payload = {"key": key_b64}
+        payload["signatures"] = {
+            user_id: {
+                "ed25519:{}".format(device_id): self.sign(
+                    _canonical_json(payload)
+                )
+            }
+        }
+        return payload
+
+    def _ensure_otks(self, count=10):
+        """Ensure at least *count* signed_curve25519 one-time keys exist."""
+        while len(self._otks) < count:
+            key_id = uuid.uuid4().hex[:10]
+            priv = X25519PrivateKey.generate()
+            priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+            self._otks[key_id] = _b64enc(
+                priv.private_bytes(
+                    Encoding.Raw, PrivateFormat.Raw, NoEncryption()
+                )
+            )
+
+    def one_time_keys_payload(self, user_id, device_id, count=10):
+        """Build signed ``one_time_keys`` for ``POST /keys/upload``."""
+        self._ensure_otks(count=count)
+        payload = {}
+        for key_id, priv_b64 in self._otks.items():
+            priv = X25519PrivateKey.from_private_bytes(_b64dec(priv_b64))
+            pub = priv.public_key().public_bytes(
+                Encoding.Raw, PublicFormat.Raw
+            )
+            payload["signed_curve25519:{}".format(key_id)] = (
+                self._signed_curve25519_key(user_id, device_id, _b64enc(pub))
+            )
+        return payload
+
+    def fallback_keys_payload(self, user_id, device_id):
+        """Build signed ``fallback_keys`` for ``POST /keys/upload``."""
+        if not self._fallback_otk:
+            key_id = uuid.uuid4().hex[:10]
+            priv = X25519PrivateKey.generate()
+            self._fallback_otk = {
+                "id": key_id,
+                "sk": _b64enc(
+                    priv.private_bytes(
+                        Encoding.Raw, PrivateFormat.Raw, NoEncryption()
+                    )
+                ),
+            }
+
+        priv = X25519PrivateKey.from_private_bytes(
+            _b64dec(self._fallback_otk["sk"])
+        )
+        pub = priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+        key_id = self._fallback_otk["id"]
+        return {
+            "signed_curve25519:{}".format(key_id): self._signed_curve25519_key(
+                user_id, device_id, _b64enc(pub)
+            )
+        }
+
+    def mark_keys_as_published(self):
+        """Mark the current OTK batch as published.
+
+        This mirrors stable python-olm's ``Account.mark_keys_as_published()``:
+        the uploaded one-time keys are no longer treated as the next
+        unpublished batch, so a subsequent upload can generate a fresh set.
+        """
+        self._otks.clear()
+
     # --- Outbound session ------------------------------------------------
 
     def create_outbound_session(
@@ -449,24 +539,39 @@ class MatrixOlmAccount:
             _b64dec(their_one_time_key_b64)
         )
 
-        # Ephemeral key pair (EK_A) -- discarded after session creation
+        # E_A is Alice's ephemeral key.  It serves BOTH as the Base-Key
+        # (outer pre-key field 2) AND as the initial Ratchet-Key (inner
+        # field 1).  The Olm spec Section 5.1 is explicit:
+        #   "E_A^pub is also the ratchet key for the first message."
+        # libolm passes the same keypair to both the X3DH and the ratchet
+        # initialisation (ratchet.cpp: initialise_as_alice receives base_key
+        # and uses it as the initial sender ratchet key).  Using two
+        # different keys here breaks decryption.
         eph = X25519PrivateKey.generate()
         eph_pub = eph.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
 
         # Triple DH  (Olm spec, Section 4.1)
         #   DH1 = X25519(IK_A, OTK_B)
-        #   DH2 = X25519(EK_A, IK_B)
-        #   DH3 = X25519(EK_A, OTK_B)
+        #   DH2 = X25519(E_A, IK_B)
+        #   DH3 = X25519(E_A, OTK_B)
         dh1 = self._ik.exchange(their_otk)
         dh2 = eph.exchange(their_ik)
         dh3 = eph.exchange(their_otk)
 
-        # Root-key derivation
-        #   IKM  = 0xFF*32 || DH1 || DH2 || DH3
-        #   salt = 0x00*32
+        # Root-key derivation (libolm ratchet.cpp initialise_as_alice /
+        # vodozemac shared_secret.rs Shared3DHSecret::expand):
+        #   IKM  = DH1 || DH2 || DH3  (96 bytes — no zero prefix)
+        #   salt = nullptr / 0x00*32   (RFC 5869: missing salt = HashLen zeros)
         #   info = "OLM_ROOT"
-        ikm = b"\xff" * 32 + dh1 + dh2 + dh3
-        keys = _hkdf_sha256(ikm, 64, salt=b"\x00" * 32, info=b"OLM_ROOT")
+        #
+        # libolm passes the 96-byte secret directly
+        # (session.cpp: secret[3 * CURVE25519_SHARED_SECRET_LENGTH]).
+        # vodozemac does the same (Shared3DHSecret is Box<[u8; 96]>).
+        # Adding any prefix produces a different PRK and therefore
+        # different root/chain keys, causing the recipient to fail to
+        # decrypt the Olm pre-key message that carries the MegOLM room key.
+        ikm = dh1 + dh2 + dh3
+        keys = _hkdf_sha256(ikm, 64, salt=None, info=b"OLM_ROOT")
         root_key = keys[:32]
         chain_key = keys[32:]
 
@@ -504,6 +609,9 @@ class MatrixOlmSession:
         chain_key,
     ):
         self._our_ik_pub = our_ik_pub
+        # eph_pub is Alice's ephemeral key E_A.  Per Olm spec Section 5.1,
+        # E_A^pub is used in BOTH the outer pre-key Base-Key field AND the
+        # inner normal-message Ratchet-Key field.  They must be identical.
         self._eph_pub = eph_pub
         self._their_otk_pub = their_otk_pub
         self._their_ik_pub = their_ik_pub
@@ -549,6 +657,8 @@ class MatrixOlmSession:
         #   0x22 = field 4, wire-type 2 (bytes)  -> Cipher-Text
         # Note: there is no field 3 in the normal-message format; the
         # ciphertext is field 4 (tag 0x22), NOT field 3 (tag 0x1A).
+        # E_A^pub appears in BOTH the inner Ratchet-Key (field 1) and the
+        # outer Base-Key (field 2) -- same bytes, same key, per spec.
         inner = (
             b"\x03"
             + _pb_bytes(1, self._eph_pub)
@@ -560,9 +670,17 @@ class MatrixOlmSession:
         # -- Outer pre-key message  --------------------------------
         # Field numbers from the Olm spec wire format:
         #   0x0A = field 1 (bytes) -> One-Time-Key (Bob's OTK being consumed)
-        #   0x12 = field 2 (bytes) -> Base-Key (Alice's ephemeral key)
+        #   0x12 = field 2 (bytes) -> Base-Key (Alice's E_A; same key as the
+        #                              first Ratchet-Key)
         #   0x1A = field 3 (bytes) -> Identity-Key (Alice's identity key)
-        #   0x22 = field 4 (bytes) -> Message (inner message + MAC)
+        #   0x22 = field 4 (bytes) -> Message (inner message + inner MAC)
+        #
+        # The outer pre-key message has NO trailing MAC of its own.
+        # libolm session.cpp allocates exactly
+        # encode_one_time_key_message_length() bytes — no extra space for an
+        # outer MAC.  vodozemac decodes the outer payload with prost (strict
+        # protobuf) so extra bytes after the last field cause a DecodeError
+        # and the session fails to establish.
         outer = (
             b"\x03"
             + _pb_bytes(1, self._their_otk_pub)
@@ -570,10 +688,9 @@ class MatrixOlmSession:
             + _pb_bytes(3, self._our_ik_pub)
             + _pb_bytes(4, inner + inner_mac)
         )
-        outer_mac = _hmac_sha256(mac_key, outer)[:8]
 
         self._counter += 1
-        return {"type": 0, "body": _b64enc(outer + outer_mac)}
+        return {"type": 0, "body": _b64enc(outer)}
 
 
 # -----------------------------------------------------------------------
@@ -656,10 +773,16 @@ class MatrixMegOlmSession:
         self._counter += 1
 
     def _message_keys(self):
-        """Derive (aes_key, mac_key, iv) from the current ratchet state."""
-        # All four 32-byte ratchet components concatenated = 128 bytes
-        state = b"".join(self._ratchet)
-        keys = _hkdf_sha256(state, 80, salt=None, info=b"MEGOLM_KEYS")
+        """Derive (aes_key, mac_key, iv) from R[3] of the ratchet state.
+
+        Per the MegOLM spec and libolm (megolm.c ``compute_message_key``),
+        only the 4th ratchet component R[3] (32 bytes) is the HKDF IKM.
+        Using the full concatenated ratchet state produces keys that no
+        standard client can reproduce, causing undecryptable messages.
+        """
+        keys = _hkdf_sha256(
+            self._ratchet[3], 80, salt=None, info=b"MEGOLM_KEYS"
+        )
         return keys[:32], keys[32:64], keys[64:80]
 
     # --- Rotation --------------------------------------------------------
@@ -690,7 +813,10 @@ class MatrixMegOlmSession:
         aes_key, mac_key, iv = self._message_keys()
 
         ct_bytes = _aes_cbc_encrypt(aes_key, iv, plaintext)
-        pb_body = _pb_varint_field(8, self._counter) + _pb_bytes(9, ct_bytes)
+        # MegOLM spec wire format (libolm message.cpp):
+        #   GROUP_MESSAGE_INDEX_TAG = 0x08  (field 1, wire-type 0 varint)
+        #   GROUP_CIPHERTEXT_TAG    = 0x12  (field 2, wire-type 2 bytes)
+        pb_body = _pb_varint_field(1, self._counter) + _pb_bytes(2, ct_bytes)
         body = b"\x03" + pb_body
         mac = _hmac_sha256(mac_key, body)[:8]
         sig = self._sk.sign(body + mac)
@@ -703,25 +829,34 @@ class MatrixMegOlmSession:
     def session_key(self):
         """Base64 MegOLM session key for sharing in ``m.room_key`` events.
 
-        Wire format:
+        Wire format (libolm outbound_group_session.c,
+        ``olm_outbound_group_session_key``):
           version (1 B = 0x02) | counter (4 B big-endian)
           | R[0..3] (128 B) | Ed25519 signing pub key (32 B)
+          | Ed25519 signature (64 B) over all preceding 165 bytes
 
-        Reference: MegOLM spec, Section 2.
+        The signature lets the recipient verify the session key came from the
+        device that owns the Ed25519 signing key published in /keys/upload.
+        Without it, vodozemac and other clients reject the key.
+
+        Reference: MegOLM spec, Section 2; libolm
+        ``outbound_group_session.c``.
         """
-        data = (
+        payload = (
             b"\x02"
             + struct.pack(">I", self._counter)
             + b"".join(self._ratchet)
             + self._sk_pub
         )
-        return _b64enc(data)
+        sig = self._sk.sign(payload)
+        return _b64enc(payload + sig)
 
     # --- Serialisation ---------------------------------------------------
 
     def to_dict(self):
         """Export session state for persistent storage."""
         return {
+            "version": MATRIX_MEGOLM_STORE_VERSION,
             "ratchet": [_b64enc(r) for r in self._ratchet],
             "counter": self._counter,
             "sk": _b64enc(
@@ -736,6 +871,8 @@ class MatrixMegOlmSession:
     @staticmethod
     def from_dict(data):
         """Restore from a ``to_dict()`` snapshot."""
+        if data.get("version") != MATRIX_MEGOLM_STORE_VERSION:
+            raise ValueError("Incompatible MegOLM session cache format")
         return MatrixMegOlmSession(
             ratchet=[_b64dec(r) for r in data["ratchet"]],
             counter=data["counter"],

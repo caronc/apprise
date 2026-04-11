@@ -500,6 +500,14 @@ class NotifyMatrix(NotifyBase):
             # Device ID assigned by server
             self.device_id = self.store.get("device_id")
 
+            # Older cache entries may have user_id/access_token persisted
+            # without home_server. Recover it from @user:homeserver so room
+            # aliases do not degrade into '#room:None'.
+            if not self.home_server and self.user_id:
+                parts = self.user_id.split(":", 1)
+                if len(parts) == 2:
+                    self.home_server = parts[1]
+
         # This gets incremented for each request made against the v3 API
         self.transaction_id = (
             0 if not self.access_token else self.store.get("transaction_id", 0)
@@ -756,8 +764,15 @@ class NotifyMatrix(NotifyBase):
         # login flow is skipped, so user_id and device_id are never returned
         # by the server.  Resolve them via /account/whoami so that E2EE key
         # upload and DM room lookup (m.direct) work correctly.
-        if not self.user and (not self.user_id or not self.device_id):
+        if (not self.user and (not self.user_id or not self.device_id)) or (
+            self.access_token and not self.home_server
+        ):
             self._whoami()
+
+        # Last-resort fallback: if home_server is still unknown, assume
+        # it matches the Matrix host we are connecting to.
+        if not self.home_server:
+            self.home_server = self.host
 
         if len(self.rooms) == 0 and not self.users:
             # Attempt to retrieve a list of already joined channels
@@ -1074,6 +1089,13 @@ class NotifyMatrix(NotifyBase):
         if self.password:
             payload["password"] = self.password
 
+        # Reuse a previously assigned device ID when available so Matrix
+        # keeps this notifier on a stable device identity across runs.
+        if self.device_id:
+            payload["device_id"] = self.device_id
+        else:
+            payload["initial_device_display_name"] = self.app_id
+
         # Register
         postokay, response, _ = self._fetch(
             "/register", payload=payload, params=params
@@ -1084,20 +1106,30 @@ class NotifyMatrix(NotifyBase):
 
         # Pull the response details
         self.access_token = response.get("access_token")
-        self.home_server = response.get("home_server")
         self.user_id = response.get("user_id")
         self.device_id = response.get("device_id")
+
+        # home_server may be absent in modern Matrix responses; derive
+        # from user_id when the server does not include it explicitly.
+        hs_from_response = response.get("home_server")
+        if hs_from_response:
+            self.home_server = hs_from_response
+        elif self.user_id and not self.home_server:
+            parts = self.user_id.split(":", 1)
+            if len(parts) == 2:
+                self.home_server = parts[1]
 
         self.store.set(
             "access_token",
             self.access_token,
             expires=self.default_cache_expiry_sec,
         )
-        self.store.set(
-            "home_server",
-            self.home_server,
-            expires=self.default_cache_expiry_sec,
-        )
+        if self.home_server:
+            self.store.set(
+                "home_server",
+                self.home_server,
+                expires=self.default_cache_expiry_sec,
+            )
         self.store.set(
             "user_id", self.user_id, expires=self.default_cache_expiry_sec
         )
@@ -1144,6 +1176,13 @@ class NotifyMatrix(NotifyBase):
                     "password": self.password,
                 }
 
+            # Reuse our last-known device ID when possible to avoid
+            # creating a brand-new Matrix device on every login.
+            if self.device_id:
+                payload["device_id"] = self.device_id
+            else:
+                payload["initial_device_display_name"] = self.app_id
+
         else:
             # It's not possible to register since we need these 2 values
             # to make the action possible.
@@ -1161,9 +1200,19 @@ class NotifyMatrix(NotifyBase):
 
         # Pull the response details
         self.access_token = response.get("access_token")
-        self.home_server = response.get("home_server")
         self.user_id = response.get("user_id")
         self.device_id = response.get("device_id")
+
+        # home_server was dropped from login responses in recent Matrix
+        # spec versions.  Only update if the server still returns it;
+        # otherwise derive it from user_id so room-alias resolution works.
+        hs_from_response = response.get("home_server")
+        if hs_from_response:
+            self.home_server = hs_from_response
+        elif self.user_id and not self.home_server:
+            parts = self.user_id.split(":", 1)
+            if len(parts) == 2:
+                self.home_server = parts[1]
 
         if not self.access_token:
             return False
@@ -1176,11 +1225,12 @@ class NotifyMatrix(NotifyBase):
             self.access_token,
             expires=self.default_cache_expiry_sec,
         )
-        self.store.set(
-            "home_server",
-            self.home_server,
-            expires=self.default_cache_expiry_sec,
-        )
+        if self.home_server:
+            self.store.set(
+                "home_server",
+                self.home_server,
+                expires=self.default_cache_expiry_sec,
+            )
         self.store.set(
             "user_id", self.user_id, expires=self.default_cache_expiry_sec
         )
@@ -1379,6 +1429,16 @@ class NotifyMatrix(NotifyBase):
             if not result.group("home_server")
             else result.group("home_server")
         )
+        if not home_server and self.user_id:
+            parts = self.user_id.split(":", 1)
+            if len(parts) == 2:
+                home_server = parts[1]
+        if not home_server:
+            self.logger.warning(
+                "Could not resolve a homeserver for Matrix room alias %s.",
+                room,
+            )
+            return None
 
         # tidy our room (alias) identifier
         room = "#{}:{}".format(result.group("room"), home_server)
@@ -1453,6 +1513,12 @@ class NotifyMatrix(NotifyBase):
             if result.group("home_server")
             else self.home_server
         )
+        if not home_server and self.user_id:
+            parts = self.user_id.split(":", 1)
+            if len(parts) == 2:
+                home_server = parts[1]
+        if not home_server:
+            return None
 
         # update our room details
         room = "#{}:{}".format(result.group("room"), home_server)
@@ -1562,6 +1628,12 @@ class NotifyMatrix(NotifyBase):
             if result.group("home_server")
             else self.home_server
         )
+        if not home_server and self.user_id:
+            parts = self.user_id.split(":", 1)
+            if len(parts) == 2:
+                home_server = parts[1]
+        if not home_server:
+            return None
 
         # update our room details
         room = "#{}:{}".format(result.group("room"), home_server)
@@ -1586,6 +1658,7 @@ class NotifyMatrix(NotifyBase):
         attachment=None,
         method="POST",
         url_override=None,
+        ok_status=None,
     ):
         """Wrapper to request.post() to manage it's response better and
         make the send() function cleaner and easier to maintain.
@@ -1595,6 +1668,11 @@ class NotifyMatrix(NotifyBase):
 
         The response is a dict when JSON is parseable, otherwise an empty
         dict. The status_code defaults to 500 on local failures.
+
+        *ok_status* is an optional collection of additional HTTP status codes
+        to treat as success (no warning logged).  Use it for calls where a
+        non-200 response is expected and meaningful, e.g. 404 on a state-event
+        probe that returns "not found" = "feature not enabled".
         """
 
         # Define our headers
@@ -1727,6 +1805,12 @@ class NotifyMatrix(NotifyBase):
 
                 elif r.status_code != requests.codes.ok:
                     # We had a problem
+                    if ok_status and r.status_code in ok_status:
+                        # Caller declared this status code acceptable
+                        # (e.g. 404 on a state-event probe).  Return
+                        # failure tuple silently -- no warning logged.
+                        return (False, response, status_code)
+
                     status_str = NotifyMatrix.http_response_code_lookup(
                         r.status_code, MATRIX_HTTP_ERROR_MAP
                     )
@@ -1803,6 +1887,9 @@ class NotifyMatrix(NotifyBase):
                 NotifyMatrix.quote(room_id)
             ),
             method="GET",
+            # 404 = no encryption state event = room is not encrypted;
+            # suppress the warning that _fetch would otherwise log.
+            ok_status={requests.codes.not_found},
         )
         result = ok and bool(response)
         self.store.set(
@@ -1838,6 +1925,23 @@ class NotifyMatrix(NotifyBase):
                     expires=self.default_cache_expiry_sec,
                 )
 
+        # Keys uploaded status must match the current Matrix device identity
+        # and the account keys we are about to use. This lets us recover from
+        # cached state where the homeserver assigned a different device_id or
+        # where the local E2EE account changed.
+        current_binding = (
+            "{}|{}|{}|{}".format(
+                self.user_id or "",
+                self.device_id or "",
+                self._e2ee_account.identity_key,
+                self._e2ee_account.signing_key,
+            )
+            if self._e2ee_account is not None
+            else ""
+        )
+        if self.store.get("e2ee_device_binding") != current_binding:
+            self.store.clear("e2ee_keys_uploaded")
+
         if not self.store.get("e2ee_keys_uploaded"):
             return self._e2ee_upload_keys()
 
@@ -1855,16 +1959,42 @@ class NotifyMatrix(NotifyBase):
         payload = {
             "device_keys": self._e2ee_account.device_keys_payload(
                 self.user_id, self.device_id
-            )
+            ),
+            "one_time_keys": self._e2ee_account.one_time_keys_payload(
+                self.user_id, self.device_id
+            ),
+            "fallback_keys": self._e2ee_account.fallback_keys_payload(
+                self.user_id, self.device_id
+            ),
         }
         postokay, _, _ = self._fetch("/keys/upload", payload=payload)
         if not postokay:
             self.logger.warning("Matrix E2EE: device key upload failed.")
             return False
 
+        # Mirror stable python-olm account behaviour: once uploaded, the
+        # current one-time key batch is considered published and a future
+        # upload should generate a fresh set.
+        self._e2ee_account.mark_keys_as_published()
+        self.store.set(
+            "e2ee_account",
+            self._e2ee_account.to_dict(),
+            expires=self.default_cache_expiry_sec,
+        )
+
         self.store.set(
             "e2ee_keys_uploaded",
             True,
+            expires=self.default_cache_expiry_sec,
+        )
+        self.store.set(
+            "e2ee_device_binding",
+            "{}|{}|{}|{}".format(
+                self.user_id,
+                self.device_id,
+                self._e2ee_account.identity_key,
+                self._e2ee_account.signing_key,
+            ),
             expires=self.default_cache_expiry_sec,
         )
         self.logger.debug(
@@ -1885,9 +2015,14 @@ class NotifyMatrix(NotifyBase):
         session_data = self.store.get(store_key)
 
         if session_data:
-            session = MatrixMegOlmSession.from_dict(session_data)
-            if not session.should_rotate():
-                return session
+            try:
+                session = MatrixMegOlmSession.from_dict(session_data)
+                if not session.should_rotate():
+                    return session
+            except Exception:
+                # Cached session is unreadable or from an older incompatible
+                # format; force creation of a fresh one below.
+                pass
 
         # New or rotated session
         session = MatrixMegOlmSession()
@@ -2069,6 +2204,9 @@ class NotifyMatrix(NotifyBase):
                     )
                     continue
 
+                sender_device_keys = self._e2ee_account.device_keys_payload(
+                    self.user_id, self.device_id
+                )
                 inner = dumps(
                     {
                         "type": "m.room_key",
@@ -2079,7 +2217,8 @@ class NotifyMatrix(NotifyBase):
                             "ed25519": dev_info.get("ed25519", "")
                         },
                         "keys": {"ed25519": self._e2ee_account.signing_key},
-                        "sender_device": self.device_id,
+                        "sender_device_keys": sender_device_keys,
+                        "org.matrix.msc4147.device_keys": sender_device_keys,
                     }
                 )
                 ciphertext = olm_session.encrypt(inner)
@@ -2087,7 +2226,9 @@ class NotifyMatrix(NotifyBase):
                 to_device_msgs[uid][dev_id] = {
                     "algorithm": "m.olm.v1.curve25519-aes-sha2",
                     "ciphertext": {their_ik: ciphertext},
+                    "recipient_key": their_ik,
                     "sender_key": self._e2ee_account.identity_key,
+                    "org.matrix.msgid": str(uuid.uuid4()),
                 }
 
         # Only send if at least one device message was built
@@ -2124,14 +2265,17 @@ class NotifyMatrix(NotifyBase):
         """
         session = self._e2ee_get_megolm(room_id)
 
-        # Share room key if this session has not been announced yet
+        # Share the room key unless this exact MegOLM session was already
+        # announced. Older stores may contain a legacy boolean flag; treat it
+        # as stale so the next send re-shares the key and repairs recipients
+        # that never received the original m.room_key.
         shared_flag = "e2ee_key_shared_{}".format(room_id)
-        if not self.store.get(shared_flag):
+        if self.store.get(shared_flag) != session.session_id:
             if not self._e2ee_share_room_key(room_id, session):
                 return False
             self.store.set(
                 shared_flag,
-                True,
+                session.session_id,
                 expires=self.default_cache_expiry_sec,
             )
 
