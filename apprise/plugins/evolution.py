@@ -286,7 +286,7 @@ class NotifyEvolution(NotifyBase):
 
     def __len__(self):
         """Returns the number of targets associated with this notification."""
-        return len(self.phone)
+        return max(1, len(self.phone))
 
     @property
     def url_identifier(self):
