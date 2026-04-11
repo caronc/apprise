@@ -47,9 +47,9 @@
 # Phone numbers must be in international format without the leading '+',
 # e.g. 5511999999999 for a Brazilian mobile number.
 
-import re
 from html.parser import HTMLParser
 from json import dumps
+import re
 
 import requests
 
@@ -62,7 +62,6 @@ from ..utils.parse import (
     validate_regex,
 )
 from .base import NotifyBase
-
 
 # ---------------------------------------------------------------------------
 # WhatsApp markdown rendering
@@ -156,10 +155,7 @@ class _HTMLToWhatsApp(HTMLParser):
         elif tag == "hr":
             self._buf.append("\n---\n")
 
-        elif tag == "p":
-            self._buf.append("\n")
-
-        elif tag in ("div", "blockquote"):
+        elif tag == "p" or tag in ("div", "blockquote"):
             self._buf.append("\n")
 
         elif tag == "ul":
@@ -177,7 +173,7 @@ class _HTMLToWhatsApp(HTMLParser):
                 self._buf.append("\n- ")
 
         elif tag == "a":
-            # Links: just emit the visible text (WhatsApp ignores markdown URLs)
+            # Links: emit visible text only (WhatsApp ignores markdown URLs)
             pass
 
         elif tag == "tr":

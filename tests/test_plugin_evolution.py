@@ -25,15 +25,15 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import logging
 from json import loads
+import logging
 from unittest import mock
 
+from helpers import AppriseURLTester
 import pytest
 import requests
-from helpers import AppriseURLTester
 
-from apprise import Apprise, NotifyType
+from apprise import Apprise
 from apprise.common import NotifyFormat
 from apprise.plugins.evolution import (
     NotifyEvolution,
@@ -179,11 +179,15 @@ def test_plugin_evolution_edge_cases():
 
     # No apikey
     with pytest.raises(TypeError):
-        NotifyEvolution(apikey=None, instance="inst", targets=["5511999999999"])
+        NotifyEvolution(
+            apikey=None, instance="inst", targets=["5511999999999"]
+        )
 
     # Blank apikey
     with pytest.raises(TypeError):
-        NotifyEvolution(apikey="   ", instance="inst", targets=["5511999999999"])
+        NotifyEvolution(
+            apikey="   ", instance="inst", targets=["5511999999999"]
+        )
 
     # No instance
     with pytest.raises(TypeError):
