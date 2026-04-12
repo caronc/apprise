@@ -59,13 +59,12 @@ Apprise is a Python package that simplifies access to many popular \
 notification services. It supports sending alerts to platforms such as: \
 \
 `46elks`, `AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`, \
-`Bark`, `Blink(1)`, `BlueSky`, `Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, `Chanify`, \
-`Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
-`Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, \
-`FCM`, `Feishu`, `Flock`, `Fluxer`, \
-`Free Mobile`, `Google Chat`, `Gotify`, `Growl`, `Guilded`, \
-`Home Assistant`, `httpSMS`, `IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, \
-`Kavenegar`, `KODI`, `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, \
+`Bark`, `Blink(1)`, `BlueSky`, `Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, \
+`Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
+`Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `FCM`, `Feishu`, \
+`Flock`, `Fluxer`, `Free Mobile`, `Google Chat`, `Gotify`, `Growl`, \
+`Guilded`, `Home Assistant`, `httpSMS`, `IFTTT`, `IRC`, `Jellyfin`, `Jira`, \
+`Join`, `Kavenegar`, `KODI`, `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, \
 `Mailgun`, `Mastodon`, `Mattermost`, `Matrix`, `MessageBird`, \
 `Microsoft Windows`, `Microsoft Teams`, `Misskey`, `MQTT`, `MSG91`, \
 `MyAndroid`, `Nexmo`, `Nextcloud`, `NextcloudTalk`, `Notica`, \
