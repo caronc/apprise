@@ -169,6 +169,13 @@ def test_plugin_evolution_urls():
 # ---------------------------------------------------------------------------
 
 
+def test_plugin_evolution_parse_url_no_path():
+    """NotifyEvolution.parse_url() returns instance=None when path is empty."""
+    result = NotifyEvolution.parse_url("evolution://key@host")
+    assert result is not None
+    assert result["instance"] is None
+
+
 def test_plugin_evolution_edge_cases():
     """NotifyEvolution() direct instantiation edge cases."""
 
