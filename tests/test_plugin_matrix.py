@@ -2359,6 +2359,18 @@ def test_plugin_matrix_e2ee_olm_account():
     assert "signatures" in payload
     assert "algorithms" in payload
 
+    # fallback_keys_payload: first call generates the fallback OTK (487->499
+    # branch: _fallback_otk is None so it is created, then the common path
+    # at line 499 runs).  Second call reuses the already-generated key
+    # (branch where _fallback_otk is already set is also covered).
+    fb1 = acct.fallback_keys_payload("@u:h", "DEVID")
+    assert len(fb1) == 1
+    fb_key_id1 = next(iter(fb1.keys()))
+    assert fb_key_id1.startswith("signed_curve25519:")
+    fb2 = acct.fallback_keys_payload("@u:h", "DEVID")
+    # second call returns the same key id (key not regenerated)
+    assert next(iter(fb2.keys())) == fb_key_id1
+
 
 def test_plugin_matrix_e2ee_olm_session():
     """MatrixOlmSession encrypts and produces correct wire format."""
@@ -2520,13 +2532,19 @@ def test_plugin_matrix_e2ee_olm_roundtrip():
 
     raw = _b64dec(result["body"])
 
-    # Outer format: version(1) | pb_fields | outer_mac(8)
+    # Outer pre-key message format (Olm spec Section 5.2):
+    #   version(1) | protobuf(field1=OTK, field2=base_key,
+    #                          field3=IK, field4=inner_message)
+    #
+    # There is NO outer MAC on the pre-key message.  Only the inner
+    # normal-message (field 4) has its own 8-byte MAC appended.
+    # Reference: olm.md Section 5.2; libolm session.cpp
+    # encode_one_time_key_message_length() (no MAC bytes allocated);
+    # vodozemac src/olm/messages/pre_key.rs decode() (no MAC consumed).
     assert raw[0:1] == b"\x03", "outer version must be 0x03"
-    outer_body = raw[:-8]  # everything before the outer MAC
-    outer_mac_received = raw[-8:]
 
-    # Parse outer fields (skip version byte)
-    outer_fields = _parse_pb_fields(outer_body[1:])
+    # Parse the full outer protobuf body (all bytes after the version byte)
+    outer_fields = _parse_pb_fields(raw[1:])
     otk_pub_in_msg = outer_fields[1]  # field 1: Bob's OTK public bytes
     base_key = outer_fields[2]  # field 2: Alice's ephemeral E_A
     alice_ik_pub = outer_fields[3]  # field 3: Alice's identity key
@@ -2557,30 +2575,24 @@ def test_plugin_matrix_e2ee_olm_roundtrip():
     chain_key = keys64[32:]
     del root_key  # not needed for first-message decryption
 
-    # Derive message keys
+    # Derive message keys from the initial chain key
     msg_key = _hmac(chain_key, b"\x01")
     keys80 = _hkdf(msg_key, 80, salt=b"\x00" * 32, info=b"OLM_KEYS")
     aes_key = keys80[:32]
     mac_key = keys80[32:64]
     iv = keys80[64:80]
 
-    # Verify outer MAC
-    outer_mac_expected = _hmac(mac_key, outer_body)[:8]
-    assert _hmac_stdlib.compare_digest(
-        outer_mac_expected, outer_mac_received
-    ), "outer MAC verification failed"
-
-    # Parse field 4 (inner message + inner_mac)
+    # Field 4 = inner_normal_message || 8-byte MAC.
+    # The inner normal message itself starts with version byte 0x03 followed
+    # by the protobuf body; the MAC covers the version + protobuf body.
     inner_with_mac = outer_fields[4]
-    inner_body = inner_with_mac[:-8]
+    inner_body = inner_with_mac[:-8]  # version(1) + pb_fields
     inner_mac_received = inner_with_mac[-8:]
 
-    # Verify inner MAC
-    _hmac(mac_key, b"\x03" + inner_body[1:])[:8]
-    # inner_body already starts with 0x03; mac over the full inner body
-    inner_mac_expected2 = _hmac(mac_key, inner_body)[:8]
+    # Verify the inner MAC (HMAC-SHA-256 of inner_body, truncated to 8 bytes)
+    inner_mac_expected = _hmac(mac_key, inner_body)[:8]
     assert _hmac_stdlib.compare_digest(
-        inner_mac_expected2, inner_mac_received
+        inner_mac_expected, inner_mac_received
     ), "inner MAC verification failed"
 
     # Parse inner fields
@@ -3498,6 +3510,17 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     with mock.patch.object(obj, "_e2ee_room_members", return_value=members):
         assert obj._e2ee_share_room_key("!r:h", session) is False
 
+    # keys/claim succeeds but server reports failures{} for remote servers
+    # (line 2160 branch: failures dict is non-empty -> debug log, still
+    # continues normally; no OTKs returned so built_count=0 -> True).
+    failures_resp = {
+        "one_time_keys": {},
+        "failures": {"remote.example": {"errcode": "M_UNREACHABLE"}},
+    }
+    mock_post.return_value = _mk_resp(failures_resp)
+    with mock.patch.object(obj, "_e2ee_room_members", return_value=members):
+        assert obj._e2ee_share_room_key("!r:h", session) is True
+
     # own device is skipped (sender uid + device match)
     own_members = {
         "@sender:h": {"SDEV": {"curve25519": "IK", "ed25519": "SK"}}
@@ -3551,9 +3574,11 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         assert obj._e2ee_share_room_key("!r:h", session) is True
         payload = loads(mock_put.call_args.kwargs["data"])
         dev_payload = payload["messages"]["@other:h"]["DEV"]
-        assert dev_payload["recipient_key"] == their_ik
         assert dev_payload["sender_key"] == obj._e2ee_account.identity_key
-        assert "org.matrix.msgid" in dev_payload
+        # recipient_key and org.matrix.msgid are non-standard fields
+        # that were removed; verify they are absent
+        assert "recipient_key" not in dev_payload
+        assert "org.matrix.msgid" not in dev_payload
 
     # dict-valued OTK with no signatures -> OTK rejected, device skipped
     unsigned_otk_dict = {"key": their_otk_b64}  # no "signatures" field
@@ -4721,3 +4746,151 @@ def test_plugin_matrix_dm_room_create_e2ee(mock_post, mock_get, mock_put):
 
     # Room encryption cache must be pre-seeded
     assert obj.store.get("e2ee_room_enc_!dm_e2ee:h") is True
+
+
+# ---------------------------------------------------------------------------
+# home_server recovery-from-user_id coverage tests
+# ---------------------------------------------------------------------------
+
+
+def test_plugin_matrix_init_recovers_home_server_from_user_id(tmpdir):
+    """__init__ extracts home_server from a cached user_id when home_server
+    was not stored (older cache entries that predate the home_server field)."""
+    # A disk-backed asset ensures two separate NotifyMatrix instances that
+    # share the same url_id() also share the same persistent store file.
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    # First instance: simulate a login that wrote user_id/access_token but
+    # did NOT write home_server (older Apprise behaviour).
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], asset=asset
+    )
+    obj.store.set("user_id", "@u:recovered.com")
+    obj.store.set("access_token", "tok")
+    # Flush to disk before the second instance reads it.
+    obj.store.flush()
+
+    # Second instance with the same credentials (same url_id) reads the store.
+    # The recovery branch (lines 506-509) should derive home_server from
+    # the stored user_id.
+    obj2 = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], asset=asset
+    )
+    assert obj2.home_server == "recovered.com"
+
+
+def test_plugin_matrix_init_no_home_server_recovery_without_colon(tmpdir):
+    """__init__ leaves home_server as None when the cached user_id has no
+    colon -- the recovery split yields a single part and the assignment is
+    skipped (covers the False branch of line 508)."""
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], asset=asset
+    )
+    # user_id with no colon -- split(":", 1) produces only one element.
+    obj.store.set("user_id", "nocolon")
+    obj.store.set("access_token", "tok")
+    obj.store.flush()
+
+    obj2 = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], asset=asset
+    )
+    # No colon in user_id means home_server cannot be extracted.
+    assert obj2.home_server is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_whoami_recovers_home_server_from_user_id(
+    mock_post, mock_get, mock_put
+):
+    """_whoami() extracts home_server from user_id when the server does not
+    return a home_server field and self.home_server is unset."""
+    r = mock.Mock()
+    r.status_code = requests.codes.ok
+    r.content = dumps(
+        {"user_id": "@u:whoami.example.com", "device_id": "DEVX"}
+    ).encode()
+    mock_get.return_value = r
+
+    obj = NotifyMatrix(host="h", user="u", password="pass", discovery=False)
+    obj.access_token = "tok"
+    obj.home_server = None
+
+    assert obj._whoami() is True
+    assert obj.home_server == "whoami.example.com"
+
+
+def test_plugin_matrix_room_create_recovers_home_server_from_user_id():
+    """_room_create() falls back to extracting home_server from user_id when
+    both the room alias and self.home_server carry no homeserver part."""
+    obj = NotifyMatrix(host="h", user="u", password="pass", targets=["#r"])
+    obj.access_token = "tok"
+    obj.home_server = None
+    obj.user_id = "@u:create.example.com"
+
+    # Capture the /createRoom POST so we can verify the room name used.
+    captured = {}
+
+    def _fake_fetch(path, payload=None, **kw):
+        if path == "/createRoom":
+            captured["payload"] = payload
+            return True, {"room_id": "!newroom:create.example.com"}, 200
+        return False, {}, 404
+
+    with mock.patch.object(obj, "_fetch", side_effect=_fake_fetch):
+        room_id = obj._room_create("#bare_alias")
+
+    assert room_id == "!newroom:create.example.com"
+    # The room name in the request must use the homeserver from user_id.
+    assert captured["payload"]["room_alias_name"] == "bare_alias"
+
+
+def test_plugin_matrix_room_create_returns_none_without_home_server():
+    """_room_create() returns None when neither the alias, self.home_server,
+    nor self.user_id can supply a homeserver component."""
+    obj = NotifyMatrix(host="h", user="u", password="pass", targets=["#r"])
+    obj.access_token = "tok"
+    obj.home_server = None
+    # user_id with no colon -> extraction yields nothing.
+    obj.user_id = "nocolon"
+
+    result = obj._room_create("#bare_alias")
+    assert result is None
+
+
+def test_plugin_matrix_room_id_recovers_home_server_from_user_id():
+    """_room_id() falls back to extracting home_server from user_id when both
+    the alias and self.home_server carry no homeserver part."""
+    obj = NotifyMatrix(host="h", user="u", password="pass", targets=["#r"])
+    obj.access_token = "tok"
+    obj.home_server = None
+    obj.user_id = "@u:lookup.example.com"
+
+    def _fake_fetch(path, payload=None, **kw):
+        return True, {"room_id": "!found:lookup.example.com"}, 200
+
+    with mock.patch.object(obj, "_fetch", side_effect=_fake_fetch):
+        room_id = obj._room_id("#bare_alias")
+
+    assert room_id == "!found:lookup.example.com"
+
+
+def test_plugin_matrix_room_id_returns_none_without_home_server():
+    """_room_id() returns None when neither the alias, self.home_server,
+    nor self.user_id can supply a homeserver component."""
+    obj = NotifyMatrix(host="h", user="u", password="pass", targets=["#r"])
+    obj.access_token = "tok"
+    obj.home_server = None
+    obj.user_id = "nocolon"
+
+    result = obj._room_id("#bare_alias")
+    assert result is None

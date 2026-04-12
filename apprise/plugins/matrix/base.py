@@ -2109,7 +2109,23 @@ class NotifyMatrix(NotifyBase):
             return False
 
         if not members:
+            self.logger.trace(
+                "Matrix E2EE: no room members found for %s; "
+                "skipping key share.",
+                room_id,
+            )
             return True
+
+        # Count total device slots being requested (for diagnostics)
+        total_devices = sum(len(devs) for devs in members.values())
+        self.logger.debug(
+            "Matrix E2EE: sharing session %s for room %s with "
+            "%d member(s) / %d device(s).",
+            session.session_id[:12],
+            room_id,
+            len(members),
+            total_devices,
+        )
 
         # Build the claim request for all member devices.
         # "signed_curve25519" is the algorithm Matrix clients publish and
@@ -2133,6 +2149,17 @@ class NotifyMatrix(NotifyBase):
             else {}
         )
 
+        # Log failures from the claim response
+        # spec: server populates failures{} with unreachable servers
+        failures = (
+            otk_resp.get("failures", {}) if isinstance(otk_resp, dict) else {}
+        )
+        if failures:
+            self.logger.debug(
+                "Matrix E2EE: /keys/claim reported failures for server(s): %s",
+                list(failures.keys()),
+            )
+
         # Build to-device message payload
         to_device_msgs = {}
         room_key_content = {
@@ -2141,72 +2168,152 @@ class NotifyMatrix(NotifyBase):
             "session_id": session.session_id,
             "session_key": session.session_key(),
         }
+        self.logger.trace(
+            "Matrix E2EE: room_key session_id=%s counter=%d",
+            session.session_id[:12],
+            session._counter,
+        )
+
+        skipped_own = 0
+        skipped_no_ik = 0
+        skipped_no_otk = 0
+        skipped_otk_invalid = 0
+        skipped_olm_fail = 0
+        built_count = 0
 
         for uid, devices in members.items():
             to_device_msgs[uid] = {}
             for dev_id, dev_info in devices.items():
                 # Skip our own device to avoid self-Olm-session setup
                 if uid == self.user_id and dev_id == self.device_id:
+                    skipped_own += 1
+                    self.logger.trace(
+                        "Matrix E2EE: skipping own device %s / %s.",
+                        uid,
+                        dev_id,
+                    )
                     continue
 
                 their_ik = dev_info.get("curve25519", "")
                 if not their_ik:
+                    skipped_no_ik += 1
+                    self.logger.trace(
+                        "Matrix E2EE: no curve25519 key for "
+                        "%s / %s; device skipped.",
+                        uid,
+                        dev_id,
+                    )
                     continue
 
                 # Locate and verify the OTK for this device.
                 # Servers return signed_curve25519 keys (the algorithm we
                 # requested) as {"key": ..., "signatures": ...} dicts.
-                # Locate and verify the OTK for this device.
                 # signed_curve25519 OTKs are always KeyObjects
                 # {"key": ..., "signatures": ...}; plain-string values
                 # are not valid for this algorithm and are rejected.
                 their_otk = None
                 otk_entry = otk_keys.get(uid, {}).get(dev_id, {})
+                self.logger.trace(
+                    "Matrix E2EE: OTK entry for %s / %s: keys=%s",
+                    uid,
+                    dev_id,
+                    list(otk_entry.keys())
+                    if isinstance(otk_entry, dict)
+                    else repr(type(otk_entry)),
+                )
                 if isinstance(otk_entry, dict):
                     for k, v in otk_entry.items():
                         if not k.startswith("signed_curve25519:"):
-                            continue
-                        if not isinstance(v, dict):
-                            self.logger.debug(
-                                "Matrix E2EE: OTK for %s / %s is "
-                                "not a KeyObject; skipped.",
+                            self.logger.trace(
+                                "Matrix E2EE: OTK key %r for %s / %s "
+                                "is not signed_curve25519; skipped.",
+                                k,
                                 uid,
                                 dev_id,
+                            )
+                            continue
+                        if not isinstance(v, dict):
+                            self.logger.trace(
+                                "Matrix E2EE: OTK for %s / %s is "
+                                "not a KeyObject (got %s); skipped.",
+                                uid,
+                                dev_id,
+                                type(v).__name__,
                             )
                             break
                         ed25519_pub = dev_info.get("ed25519", "")
                         if not ed25519_pub or not verify_signed_otk(
                             v, uid, dev_id, ed25519_pub
                         ):
+                            skipped_otk_invalid += 1
+                            # Keep at debug -- invalid signature is unexpected
+                            # and worth surfacing at -vv.
                             self.logger.debug(
                                 "Matrix E2EE: OTK signature "
-                                "invalid for %s / %s; skipped.",
+                                "invalid for %s / %s (ed25519_pub=%s); "
+                                "skipped.",
                                 uid,
                                 dev_id,
+                                ed25519_pub[:12] if ed25519_pub else "(empty)",
                             )
                         else:
                             their_otk = v.get("key")
+                            self.logger.trace(
+                                "Matrix E2EE: OTK accepted for "
+                                "%s / %s (key_id=%s).",
+                                uid,
+                                dev_id,
+                                k,
+                            )
                         break
+                else:
+                    self.logger.trace(
+                        "Matrix E2EE: no OTK dict for %s / %s "
+                        "(type=%s); device skipped.",
+                        uid,
+                        dev_id,
+                        type(otk_entry).__name__,
+                    )
 
                 if not their_otk:
+                    skipped_no_otk += 1
+                    self.logger.trace(
+                        "Matrix E2EE: no usable OTK for %s / %s; "
+                        "device skipped.",
+                        uid,
+                        dev_id,
+                    )
                     continue
 
                 try:
                     olm_session = self._e2ee_account.create_outbound_session(
                         their_ik, their_otk
                     )
-                except Exception:
+                except Exception as exc:
+                    skipped_olm_fail += 1
+                    # Keep at debug -- Olm session failure is unexpected.
                     self.logger.debug(
                         "Matrix E2EE: failed to build Olm session "
-                        "for %s / %s.",
+                        "for %s / %s: %s",
                         uid,
                         dev_id,
+                        exc,
                     )
                     continue
 
-                sender_device_keys = self._e2ee_account.device_keys_payload(
-                    self.user_id, self.device_id
-                )
+                # Build the m.room_key inner plaintext per Matrix spec:
+                #   https://spec.matrix.org/v1.11/client-server-api/#mroomkey
+                #
+                # Required fields only; non-standard extension fields
+                # (sender_device_keys, org.matrix.msc4147.device_keys) have
+                # been removed because they:
+                #   - Add ~930 bytes to an otherwise ~400-byte payload,
+                #     bloating the Olm ciphertext from ~400B to ~1640B.
+                #   - Are not part of the spec and may confuse strict
+                #     implementations (Element/matrix-sdk-crypto warns on
+                #     unknown fields in to-device events in some builds).
+                #   - Contain unsigned device-key material that recipients
+                #     should instead fetch via /keys/query for authenticity.
                 inner = dumps(
                     {
                         "type": "m.room_key",
@@ -2217,22 +2324,47 @@ class NotifyMatrix(NotifyBase):
                             "ed25519": dev_info.get("ed25519", "")
                         },
                         "keys": {"ed25519": self._e2ee_account.signing_key},
-                        "sender_device_keys": sender_device_keys,
-                        "org.matrix.msc4147.device_keys": sender_device_keys,
                     }
                 )
                 ciphertext = olm_session.encrypt(inner)
+                built_count += 1
+
+                self.logger.trace(
+                    "Matrix E2EE: Olm-encrypted room key for "
+                    "%s / %s (ciphertext type=%d, inner_len=%d).",
+                    uid,
+                    dev_id,
+                    ciphertext.get("type", -1),
+                    len(inner),
+                )
 
                 to_device_msgs[uid][dev_id] = {
                     "algorithm": "m.olm.v1.curve25519-aes-sha2",
                     "ciphertext": {their_ik: ciphertext},
-                    "recipient_key": their_ik,
                     "sender_key": self._e2ee_account.identity_key,
-                    "org.matrix.msgid": str(uuid.uuid4()),
                 }
+
+        self.logger.debug(
+            "Matrix E2EE: key-share summary for room %s: "
+            "built=%d skipped_own=%d skipped_no_ik=%d "
+            "skipped_no_otk=%d skipped_otk_invalid=%d "
+            "skipped_olm_fail=%d",
+            room_id,
+            built_count,
+            skipped_own,
+            skipped_no_ik,
+            skipped_no_otk,
+            skipped_otk_invalid,
+            skipped_olm_fail,
+        )
 
         # Only send if at least one device message was built
         if not any(v for v in to_device_msgs.values()):
+            self.logger.trace(
+                "Matrix E2EE: no to-device messages built for "
+                "room %s; nothing to send.",
+                room_id,
+            )
             return True
 
         self.transaction_id += 1
@@ -2254,6 +2386,13 @@ class NotifyMatrix(NotifyBase):
             )
             return False
 
+        self.logger.debug(
+            "Matrix E2EE: room key delivered to %d device(s) in %s "
+            "(txnId=%d).",
+            built_count,
+            room_id,
+            self.transaction_id,
+        )
         return True
 
     def _e2ee_send_to_room(self, room_id, body, title, notify_type):
@@ -2265,18 +2404,40 @@ class NotifyMatrix(NotifyBase):
         """
         session = self._e2ee_get_megolm(room_id)
 
+        self.logger.trace(
+            "Matrix E2EE: using MegOLM session %s counter=%d for %s.",
+            session.session_id[:12],
+            session._counter,
+            room_id,
+        )
+
         # Share the room key unless this exact MegOLM session was already
         # announced. Older stores may contain a legacy boolean flag; treat it
         # as stale so the next send re-shares the key and repairs recipients
         # that never received the original m.room_key.
         shared_flag = "e2ee_key_shared_{}".format(room_id)
-        if self.store.get(shared_flag) != session.session_id:
+        cached_shared = self.store.get(shared_flag)
+        if cached_shared != session.session_id:
+            self.logger.trace(
+                "Matrix E2EE: session key not yet shared "
+                "(cached=%r current=%r); sharing now.",
+                cached_shared[:12]
+                if isinstance(cached_shared, str)
+                else cached_shared,
+                session.session_id[:12],
+            )
             if not self._e2ee_share_room_key(room_id, session):
                 return False
             self.store.set(
                 shared_flag,
                 session.session_id,
                 expires=self.default_cache_expiry_sec,
+            )
+        else:
+            self.logger.trace(
+                "Matrix E2EE: session key already shared for "
+                "session %s; skipping key share.",
+                session.session_id[:12],
             )
 
         # Build the inner plaintext event
@@ -2328,6 +2489,15 @@ class NotifyMatrix(NotifyBase):
 
         ciphertext = session.encrypt(inner_event)
         self._e2ee_save_megolm(room_id, session)
+
+        self.logger.trace(
+            "Matrix E2EE: MegOLM ciphertext produced for room %s "
+            "(session_id=%s counter_before_encrypt=%d).",
+            room_id,
+            session.session_id[:12],
+            # _advance() already ran; counter is now N+1 after encrypt
+            session._counter - 1,
+        )
 
         path = "/rooms/{}/send/m.room.encrypted/{}".format(
             NotifyMatrix.quote(room_id), self.transaction_id

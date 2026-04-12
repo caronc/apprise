@@ -745,43 +745,61 @@ class MatrixMegOlmSession:
     def _advance(self):
         """Advance the MegOLM ratchet by one step.
 
-        Advancement rule (MegOLM spec):
-          After message n, if (n+1) is a multiple of the threshold:
-          - Every 256 messages: advance R[2], then cascade to R[3]
-          - Every 65536 messages: advance R[1] then cascade down
-          - Every 2^24 messages: advance R[0] then cascade all the way
-          - Otherwise: R[3] = HMAC-SHA256(R[2], b'\\x03')
+        Mirrors libolm megolm.c ``megolm_advance`` and vodozemac ratchet.rs
+        ``Ratchet::advance``.
+
+        The ratchet has 4 parts R[0..3].  On each step, determine the
+        highest-index part h that stays constant:
+          - counter+1 is a multiple of 2^24  → h=0 (advance R[0..3] from R[0])
+          - counter+1 is a multiple of 2^16  → h=1 (advance R[1..3] from R[1])
+          - counter+1 is a multiple of 2^8   → h=2 (advance R[2..3] from R[2])
+          - otherwise                         → h=3 (advance R[3] from R[3])
+
+        All derived parts are computed from the ORIGINAL value of R[h]
+        (saved before any modification), then R[h] itself is updated last.
+        This matches libolm's loop which processes higher indices first
+        (i = 3 down to h), ensuring data[h] is still the original when it
+        is finally overwritten at i==h.
         """
         r = self._ratchet
         n1 = self._counter + 1  # next counter value
 
         if n1 % (1 << 24) == 0:
-            r[0] = _hmac_sha256(r[0], b"\x00")
-            r[1] = _hmac_sha256(r[0], b"\x01")
-            r[2] = _hmac_sha256(r[1], b"\x02")
-            r[3] = _hmac_sha256(r[2], b"\x03")
+            # h=0: all four parts derived from original R[0]
+            orig = r[0]
+            r[3] = _hmac_sha256(orig, b"\x03")
+            r[2] = _hmac_sha256(orig, b"\x02")
+            r[1] = _hmac_sha256(orig, b"\x01")
+            r[0] = _hmac_sha256(orig, b"\x00")
         elif n1 % (1 << 16) == 0:
-            r[1] = _hmac_sha256(r[1], b"\x01")
-            r[2] = _hmac_sha256(r[1], b"\x02")
-            r[3] = _hmac_sha256(r[2], b"\x03")
+            # h=1: R[1..3] derived from original R[1]
+            orig = r[1]
+            r[3] = _hmac_sha256(orig, b"\x03")
+            r[2] = _hmac_sha256(orig, b"\x02")
+            r[1] = _hmac_sha256(orig, b"\x01")
         elif n1 % (1 << 8) == 0:
-            r[2] = _hmac_sha256(r[2], b"\x02")
-            r[3] = _hmac_sha256(r[2], b"\x03")
+            # h=2: R[2..3] derived from original R[2]
+            orig = r[2]
+            r[3] = _hmac_sha256(orig, b"\x03")
+            r[2] = _hmac_sha256(orig, b"\x02")
         else:
-            r[3] = _hmac_sha256(r[2], b"\x03")
+            # h=3: R[3] re-seeded from itself
+            r[3] = _hmac_sha256(r[3], b"\x03")
 
         self._counter += 1
 
     def _message_keys(self):
-        """Derive (aes_key, mac_key, iv) from R[3] of the ratchet state.
+        """Derive (aes_key, mac_key, iv) from the full ratchet state R_i.
 
-        Per the MegOLM spec and libolm (megolm.c ``compute_message_key``),
-        only the 4th ratchet component R[3] (32 bytes) is the HKDF IKM.
-        Using the full concatenated ratchet state produces keys that no
-        standard client can reproduce, causing undecryptable messages.
+        Per the MegOLM spec Section 4.3 and vodozemac (cipher/key.rs
+        ``new_megolm``), the HKDF IKM is the complete 128-byte ratchet value
+        R_i = R[0]||R[1]||R[2]||R[3].  Using only R[3] (32 bytes) produces
+        different keys from what any standard client derives.
+
+        Spec:  AES_KEY||HMAC_KEY||AES_IV = HKDF(0, R_i, "MEGOLM_KEYS", 80)
         """
         keys = _hkdf_sha256(
-            self._ratchet[3], 80, salt=None, info=b"MEGOLM_KEYS"
+            b"".join(self._ratchet), 80, salt=None, info=b"MEGOLM_KEYS"
         )
         return keys[:32], keys[32:64], keys[64:80]
 
