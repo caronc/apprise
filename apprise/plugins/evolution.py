@@ -87,9 +87,9 @@ class NotifyEvolution(NotifyBase):
     # before calling send().
     notify_format = NotifyFormat.MARKDOWN
 
-    # We handle the title ourselves in send() so that it arrives in
-    # WhatsApp as *bold* text.
-    title_maxlen = 250
+    # Evolution API has no separate title field; Apprise will merge the
+    # title into the body before calling send().
+    title_maxlen = 0
 
     # Define object URL templates
     templates = (
@@ -193,10 +193,6 @@ class NotifyEvolution(NotifyBase):
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Evolution API Notification."""
-
-        # Prepend title as bold if present
-        if title:
-            body = f"*{title}*\n\n{body}"
 
         # Build the base URL
         schema = "https" if self.secure else "http"

@@ -279,8 +279,8 @@ def test_plugin_evolution_partial_failure(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_evolution_title_bold(mock_post):
-    """NotifyEvolution() wraps the title in WhatsApp bold markers."""
+def test_plugin_evolution_title_in_body(mock_post):
+    """NotifyEvolution() merges the title into the body via Apprise."""
 
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
@@ -289,7 +289,8 @@ def test_plugin_evolution_title_bold(mock_post):
     assert obj.notify(body="body text", title="My Title") is True
 
     payload = loads(mock_post.call_args[1]["data"])
-    assert payload["text"].startswith("*My Title*")
+    assert "My Title" in payload["text"]
+    assert "body text" in payload["text"]
 
 
 @mock.patch("requests.post")
