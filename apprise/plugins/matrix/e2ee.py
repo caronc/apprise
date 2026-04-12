@@ -461,7 +461,6 @@ class MatrixOlmAccount:
         while len(self._otks) < count:
             key_id = uuid.uuid4().hex[:10]
             priv = X25519PrivateKey.generate()
-            priv.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
             self._otks[key_id] = _b64enc(
                 priv.private_bytes(
                     Encoding.Raw, PrivateFormat.Raw, NoEncryption()

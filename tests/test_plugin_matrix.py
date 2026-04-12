@@ -2224,11 +2224,12 @@ def test_plugin_matrix_room_create_on_not_found_join(
 # E2EE unit tests (require the cryptography package)
 # ---------------------------------------------------------------------------
 
-# Skip all E2EE tests when cryptography is unavailable
-_cryptography = pytest.importorskip(
-    "cryptography",
-    reason="Requires cryptography",
-)
+try:
+    import cryptography  # noqa: F401
+
+    CRYPTOGRAPHY_AVAILABLE = True
+except ImportError:
+    CRYPTOGRAPHY_AVAILABLE = False
 
 
 def _rand_b64_32():
@@ -2254,6 +2255,7 @@ def _make_signed_otk(account, user_id, device_id, key_b64=None):
     return payload
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_helpers():
     """e2ee helper functions."""
     from apprise.plugins.matrix.e2ee import (
@@ -2325,6 +2327,7 @@ def test_plugin_matrix_e2ee_no_cryptography():
         importlib.reload(e2ee_mod)
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_olm_account():
     """MatrixOlmAccount creation, signing, serialisation."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
@@ -2372,6 +2375,7 @@ def test_plugin_matrix_e2ee_olm_account():
     assert next(iter(fb2.keys())) == fb_key_id1
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_olm_session():
     """MatrixOlmSession encrypts and produces correct wire format."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount, _b64dec
@@ -2410,6 +2414,7 @@ def test_plugin_matrix_e2ee_olm_session():
     assert result2["type"] == 0
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_olm_roundtrip():
     """Full Olm round-trip: Alice encrypts, Bob manually decrypts.
 
@@ -2620,6 +2625,7 @@ def test_plugin_matrix_e2ee_olm_roundtrip():
     )
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_verify_keys():
     """verify_device_keys and verify_signed_otk accept/reject signatures."""
     from apprise.plugins.matrix.e2ee import (
@@ -2695,6 +2701,7 @@ def test_plugin_matrix_e2ee_verify_keys():
     assert verify_signed_otk(tampered_otk, uid, dev, acct.signing_key) is False
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_megolm_session():
     """MatrixMegOlmSession encrypt, session_key, rotation, serialisation."""
     from apprise.plugins.matrix.e2ee import (
@@ -2774,6 +2781,7 @@ def test_plugin_matrix_e2ee_megolm_session():
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_url_roundtrip():
     """e2ee default is True; disabled state survives url() / parse_url()."""
     # Default (no e2ee param) is now True
@@ -2811,6 +2819,7 @@ def test_plugin_matrix_e2ee_url_roundtrip():
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_insecure_connection(mock_post, mock_get, mock_put):
     """e2ee=yes over insecure (matrix://) falls back to unencrypted."""
     resp = mock.Mock()
@@ -2844,6 +2853,7 @@ def test_plugin_matrix_e2ee_insecure_connection(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_no_support(mock_post, mock_get, mock_put):
     """e2ee=yes with MATRIX_E2EE_SUPPORT=False sends unencrypted."""
     resp = mock.Mock()
@@ -2879,6 +2889,7 @@ def test_plugin_matrix_e2ee_no_support(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
     """Full E2EE send path via _send_server_notification."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
@@ -2949,6 +2960,7 @@ def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send_cached_session(mock_post, mock_get, mock_put):
     """E2EE send skips key-share when session key already shared."""
     login_resp = {
@@ -2998,6 +3010,7 @@ def test_plugin_matrix_e2ee_send_cached_session(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send_legacy_shared_flag_rekeys(
     mock_post, mock_get, mock_put
 ):
@@ -3037,6 +3050,7 @@ def test_plugin_matrix_e2ee_send_legacy_shared_flag_rekeys(
     assert obj.store.get("e2ee_key_shared_!r:h") == session.session_id
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_setup_restored():
     """E2EE account restores from store via _e2ee_setup and __init__."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
@@ -3098,6 +3112,7 @@ def test_plugin_matrix_e2ee_setup_restored():
     assert obj2._e2ee_account is not None
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_setup_reuploads_on_binding_change():
     """Changed device/account identity forces a fresh key upload."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
@@ -3128,6 +3143,7 @@ def test_plugin_matrix_e2ee_setup_reuploads_on_binding_change():
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_upload_keys_no_ids(mock_post, mock_get, mock_put):
     """_e2ee_upload_keys returns False when user_id/device_id missing."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
@@ -3147,6 +3163,7 @@ def test_plugin_matrix_e2ee_upload_keys_no_ids(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_upload_keys_http_fail(
     mock_post, mock_get, mock_put
 ):
@@ -3176,6 +3193,7 @@ def test_plugin_matrix_e2ee_upload_keys_http_fail(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_upload_keys_success_marks_published(
     mock_post, mock_get, mock_put
 ):
@@ -3316,6 +3334,7 @@ def test_plugin_matrix_send_cached_token_recovers_home_server(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_get_megolm_rotation(mock_post, mock_get, mock_put):
     """_e2ee_get_megolm rotates session after threshold."""
     from apprise.plugins.matrix.e2ee import (
@@ -3357,6 +3376,7 @@ def test_plugin_matrix_e2ee_get_megolm_rotation(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_room_encrypted(mock_post, mock_get, mock_put):
     """_e2ee_room_encrypted: cached, GET success, GET failure paths."""
 
@@ -3400,6 +3420,7 @@ def test_plugin_matrix_e2ee_room_encrypted(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_room_members(mock_post, mock_get, mock_put):
     """_e2ee_room_members handles HTTP failures and empty rooms."""
 
@@ -3467,6 +3488,7 @@ def test_plugin_matrix_e2ee_room_members(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_share_room_key_branches(
     mock_post, mock_get, mock_put
 ):
@@ -3688,6 +3710,7 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send_to_room_formats(
     mock_post, mock_get, mock_put
 ):
@@ -3775,6 +3798,7 @@ def test_plugin_matrix_e2ee_send_to_room_formats(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_setup_failure(mock_post, mock_get, mock_put):
     """When E2EE setup fails, send falls back to unencrypted."""
     resp = mock.Mock()
@@ -3818,6 +3842,7 @@ def test_plugin_matrix_e2ee_setup_failure(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_attachment_encrypted(
     mock_post, mock_get, mock_put
 ):
@@ -3883,6 +3908,7 @@ def test_plugin_matrix_e2ee_attachment_encrypted(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send_attachment_errors(
     mock_post, mock_get, mock_put
 ):
@@ -4051,6 +4077,7 @@ def test_plugin_matrix_e2ee_send_attachment_errors(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send_attachment_invalid(
     mock_post, mock_get, mock_put
 ):
@@ -4143,6 +4170,7 @@ def test_plugin_matrix_e2ee_send_attachment_invalid(
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_send_room_failure(mock_post, mock_get, mock_put):
     """E2EE path returns False when _e2ee_send_to_room fails."""
     login_resp = {
@@ -4262,6 +4290,7 @@ def test_plugin_matrix_register_reuses_device_id(
     assert '"device_id": "DEV_REUSED"' in payload
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_account_bad_store_data():
     """Corrupt e2ee_account in store is silently ignored."""
     obj = NotifyMatrix(

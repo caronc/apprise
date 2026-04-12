@@ -2575,6 +2575,16 @@ class NotifyMatrix(NotifyBase):
         )
         upload_url = base + media_path + "/upload"
 
+        self.logger.debug(
+            "Matrix E2EE: uploading encrypted attachment to %s "
+            "(name=%s size=%d iv=%s sha256=%s).",
+            upload_url,
+            attachment.name or "file",
+            len(ciphertext),
+            file_info.get("iv", "?"),
+            file_info.get("hashes", {}).get("sha256", "?"),
+        )
+
         self.throttle()
         try:
             r = requests.post(
@@ -2597,6 +2607,12 @@ class NotifyMatrix(NotifyBase):
         except Exception:
             upload_resp = {}
 
+        self.logger.debug(
+            "Matrix E2EE: upload response HTTP %d body=%r.",
+            r.status_code,
+            r.content[:200],
+        )
+
         if r.status_code != requests.codes.ok or not upload_resp.get(
             "content_uri"
         ):
@@ -2608,6 +2624,10 @@ class NotifyMatrix(NotifyBase):
             return False
 
         file_info["url"] = upload_resp["content_uri"]
+        self.logger.debug(
+            "Matrix E2EE: attachment content_uri=%s.",
+            upload_resp["content_uri"],
+        )
 
         # Build the inner plaintext attachment event
         is_image = IS_IMAGE.match(attachment.mimetype)
