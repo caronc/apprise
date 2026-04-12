@@ -58,6 +58,7 @@ keywords = [
     "Automated Packet Reporting System",
     "AWS",
     "Bark",
+    "Blink(1)",
     "BlueSky",
     "Brevo",
     "BulkSMS",
@@ -228,6 +229,9 @@ all-plugins = [
 
      # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
     "PGPy",
+
+    # Provides blink1:// support
+    "hidapi",
 
     # Provides smpp:// support
     "smpplib",
