@@ -27,8 +27,10 @@
 
 # You must generate a "Long-Lived Access Token". This can be done from your
 # Home Assistant Profile page.
-
+from itertools import chain
 from json import dumps
+import math
+import re
 from uuid import uuid4
 
 import requests
@@ -36,12 +38,41 @@ import requests
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import validate_regex
+from ..utils.parse import (
+    is_domain_service_target,
+    parse_bool,
+    parse_domain_service_targets,
+    validate_regex,
+)
 from .base import NotifyBase
+
+# This regex matches exactly 8 hex digits,
+# a dot, then exactly 64 hex digits. it can also be a JWT
+# token in which case it will be 180 characters+
+RE_IS_LONG_LIVED_TOKEN = re.compile(
+    r"^([0-9a-f]{8}\.[0-9a-f]{64}|[a-z0-9_-]+\.[a-z0-9_-]+\.[a-z0-9_-]+)$",
+    re.I,
+)
+
+# Define our supported device notification formats:
+# - service
+#     - default domain is always 'notify' if one isn't detected
+# - service:target
+# - service:target1,target2,target3
+# - domain.service
+# - domain.service:target
+# - domain.service:target1,target2,target3
+# -   - targets can be comma/space separated if more hten one
+# - service:target1,target2,target3
+
+# Define a persistent entry (used for handling message delivery
+PERSISTENT_ENTRY = (None, None, [])
 
 
 class NotifyHomeAssistant(NotifyBase):
-    """A wrapper for Home Assistant Notifications."""
+    """
+    A wrapper for Home Assistant Notifications
+    """
 
     # The default descriptive name associated with the Notification
     service_name = "HomeAssistant"
@@ -58,17 +89,29 @@ class NotifyHomeAssistant(NotifyBase):
     # Default to Home Assistant Default Insecure port of 8123 instead of 80
     default_insecure_port = 8123
 
+    # The maximum amount of services that can be notified in a single batch
+    default_batch_size = 10
+
+    # The default ha notification domain if one isn't detected
+    default_domain = "notify"
+
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/homeassistant/"
 
     # Define object templates
     templates = (
         "{schema}://{host}/{accesstoken}",
+        "{schema}://{host}/{accesstoken}/{targets}",
         "{schema}://{host}:{port}/{accesstoken}",
+        "{schema}://{host}:{port}/{accesstoken}/{targets}",
         "{schema}://{user}@{host}/{accesstoken}",
+        "{schema}://{user}@{host}/{accesstoken}/{targets}",
         "{schema}://{user}@{host}:{port}/{accesstoken}",
+        "{schema}://{user}@{host}:{port}/{accesstoken}/{targets}",
         "{schema}://{user}:{password}@{host}/{accesstoken}",
+        "{schema}://{user}:{password}@{host}/{accesstoken}/{targets}",
         "{schema}://{user}:{password}@{host}:{port}/{accesstoken}",
+        "{schema}://{user}:{password}@{host}:{port}/{accesstoken}/{targets}",
     )
 
     # Define our template tokens
@@ -101,6 +144,15 @@ class NotifyHomeAssistant(NotifyBase):
                 "private": True,
                 "required": True,
             },
+            "target_device": {
+                "name": _("Target Device"),
+                "type": "string",
+                "map_to": "targets",
+            },
+            "targets": {
+                "name": _("Targets"),
+                "type": "list:string",
+            },
         },
     )
 
@@ -114,14 +166,39 @@ class NotifyHomeAssistant(NotifyBase):
                 "type": "string",
                 "regex": (r"^[a-z0-9_-]+$", "i"),
             },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
+            "to": {
+                "alias_of": "targets",
+            },
+            "token": {
+                # Shorthand alias for accesstoken in query string
+                "alias_of": "accesstoken",
+            },
+            "prefix": {
+                "name": _("Path Prefix"),
+                "type": "string",
+            },
         },
     )
 
-    def __init__(self, accesstoken, nid=None, **kwargs):
+    def __init__(
+        self,
+        accesstoken,
+        nid=None,
+        targets=None,
+        batch=None,
+        prefix=None,
+        **kwargs,
+    ):
         """Initialize Home Assistant Object."""
         super().__init__(**kwargs)
 
         self.fullpath = kwargs.get("fullpath", "")
+        self.prefix = prefix if prefix else ""
 
         if not (self.secure or self.port):
             # Use default insecure port
@@ -149,18 +226,50 @@ class NotifyHomeAssistant(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+        # Prepare Batch Mode Flag
+        self.batch = (
+            self.template_args["batch"]["default"] if batch is None else batch
+        )
+
+        # Store our targets
+        self.targets = []
+
+        # Track our invalid targets
+        self._invalid_targets = []
+
+        if targets:
+            for target in parse_domain_service_targets(targets):
+                result = is_domain_service_target(
+                    target, domain=self.default_domain
+                )
+                if result:
+                    self.targets.append(
+                        (
+                            result["domain"],
+                            result["service"],
+                            result["targets"],
+                        )
+                    )
+                    continue
+
+                self.logger.warning(
+                    "Dropped invalid [domain.]service[:target] entry "
+                    "({}) specified.".format(target),
+                )
+                self._invalid_targets.append(target)
+        else:
+            self.targets = [PERSISTENT_ENTRY]
+
         return
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Sends Message."""
 
-        # Prepare our persistent_notification.create payload
+        # Base payload; notification_id is only added for persistent
+        # notification calls — other service domains reject it.
         payload = {
             "title": title,
             "message": body,
-            # Use a unique ID so we don't over-write the last message
-            # we posted. Otherwise use the notification id specified
-            "notification_id": self.nid if self.nid else str(uuid4()),
         }
 
         # Prepare our headers
@@ -181,20 +290,84 @@ class NotifyHomeAssistant(NotifyBase):
         if isinstance(self.port, int):
             url += f":{self.port}"
 
-        url += (
+        # Determine if we're doing it the old way (using persistent notices)
+        # or the new (supporting device targets)
+        has_targets = bool(
+            not self.targets or self.targets[0] is not PERSISTENT_ENTRY
+        )
+
+        if has_targets and not self.targets:
+            self.logger.warning(
+                "No valid Home Assistant service targets to notify."
+            )
+            return False
+
+        base_url = url + (
             self.fullpath.rstrip("/")
             + "/api/services/persistent_notification/create"
         )
 
+        # Send in batches if identified to do so
+        batch_size = 1 if not self.batch else self.default_batch_size
+
+        for target in self.targets:
+            # Use a unique ID so we don't over-write the last message we
+            # posted. Otherwise use the notification id specified
+            if has_targets:
+                # Base target details
+                domain = target[0]
+                service = target[1]
+
+                # Prepare our URL
+                base_url = (
+                    url
+                    + self.prefix.rstrip("/")
+                    + f"/api/services/{domain}/{service}"
+                )
+
+                # Possibly prepare batches
+                if target[2]:
+                    _payload = payload.copy()
+                    for index in range(0, len(target[2]), batch_size):
+                        _payload["targets"] = target[2][
+                            index : index + batch_size
+                        ]
+                        if not self._ha_post(
+                            base_url, _payload, headers, auth
+                        ):
+                            return False
+
+                    continue
+
+            if not self._ha_post(
+                base_url,
+                payload,
+                headers,
+                auth,
+                persistent=not has_targets,
+            ):
+                return False
+
+        return True
+
+    def _ha_post(self, url, payload, headers, auth=None, persistent=False):
+        """
+        Wrapper to single upstream server post
+        """
+        # notification_id is only meaningful for persistent_notification;
+        # other HA service domains reject it with a 400.
+        if persistent:
+            payload["notification_id"] = self.nid if self.nid else str(uuid4())
+
         self.logger.debug(
-            "Home Assistant POST URL:"
-            f" {url} (cert_verify={self.verify_certificate!r})"
+            "Home Assistant POST URL: {} (cert_verify={!r})".format(
+                url, self.verify_certificate
+            )
         )
-        self.logger.debug(f"Home Assistant Payload: {payload!s}")
+        self.logger.debug("Home Assistant Payload: {}".format(str(payload)))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
-
         try:
             r = requests.post(
                 url,
@@ -251,11 +424,7 @@ class NotifyHomeAssistant(NotifyBase):
             self.user,
             self.password,
             self.host,
-            (
-                self.port
-                if self.port
-                else (443 if self.secure else self.default_insecure_port)
-            ),
+            self.port,
             self.fullpath.rstrip("/"),
             self.accesstoken,
         )
@@ -264,7 +433,17 @@ class NotifyHomeAssistant(NotifyBase):
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
-        params = {}
+        params = {
+            "batch": "yes" if self.batch else "no",
+        }
+
+        if self.prefix not in ("", "/"):
+            params["prefix"] = (
+                "/"
+                if not self.prefix
+                else "/{}/".format(self.prefix.strip("/"))
+            )
+
         if self.nid:
             params["nid"] = self.nid
 
@@ -289,7 +468,13 @@ class NotifyHomeAssistant(NotifyBase):
 
         url = (
             "{schema}://{auth}{hostname}{port}{fullpath}"
-            "{accesstoken}/?{params}"
+            "{accesstoken}/{targets}?{params}"
+        )
+
+        # Determine if we're doing it the old way (using persistent notices)
+        # or the new (supporting device targets)
+        has_targets = bool(
+            not self.targets or self.targets[0] is not PERSISTENT_ENTRY
         )
 
         return url.format(
@@ -312,7 +497,52 @@ class NotifyHomeAssistant(NotifyBase):
                 )
             ),
             accesstoken=self.pprint(self.accesstoken, privacy, safe=""),
+            targets=""
+            if not has_targets
+            else "/".join(
+                chain(
+                    [
+                        NotifyHomeAssistant.quote(
+                            "{}.{}{}".format(
+                                x[0],
+                                x[1],
+                                "" if not x[2] else ":" + ",".join(x[2]),
+                            ),
+                            safe="",
+                        )
+                        for x in self.targets
+                    ],
+                    [
+                        NotifyHomeAssistant.quote(x, safe="")
+                        for x in self._invalid_targets
+                    ],
+                )
+            ),
             params=NotifyHomeAssistant.urlencode(params),
+        )
+
+    def __len__(self):
+        """
+        Returns the number of targets associated with this notification
+        """
+        #
+        # Factor batch into calculation
+        #
+
+        # Determine if we're doing it the old way (using persistent notices)
+        # or the new (supporting device targets)
+        has_targets = bool(
+            not self.targets or self.targets[0] is not PERSISTENT_ENTRY
+        )
+
+        if not has_targets:
+            return 1
+
+        # Handle targets
+        batch_size = 1 if not self.batch else self.default_batch_size
+        return sum(
+            math.ceil(len(identities) / batch_size) if identities else 1
+            for _, _, identities in self.targets
         )
 
     @staticmethod
@@ -325,23 +555,82 @@ class NotifyHomeAssistant(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Get our Long-Lived Access Token
-        if "accesstoken" in results["qsd"] and len(
-            results["qsd"]["accesstoken"]
-        ):
+        # Initialize targets
+        results["targets"] = []
+
+        # Get our Long-Lived Access Token — check query string first
+        # (?accesstoken= or the shorthand ?token=)
+        if "accesstoken" in results["qsd"] and results["qsd"]["accesstoken"]:
             results["accesstoken"] = NotifyHomeAssistant.unquote(
                 results["qsd"]["accesstoken"]
             )
+            # Remaining path elements become targets
+            results["targets"] = NotifyHomeAssistant.split_path(
+                results["fullpath"]
+            )
+            results["fullpath"] = ""
+
+        elif "token" in results["qsd"] and results["qsd"]["token"]:
+            results["accesstoken"] = NotifyHomeAssistant.unquote(
+                results["qsd"]["token"]
+            )
+            # Remaining path elements become targets
+            results["targets"] = NotifyHomeAssistant.split_path(
+                results["fullpath"]
+            )
+            results["fullpath"] = ""
 
         else:
-            # Acquire our full path
-            fullpath = NotifyHomeAssistant.split_path(results["fullpath"])
+            # Scan path forward; the first element matching the token
+            # regex is the access token.  Everything before it is the
+            # prefix path; everything after it (reversed for consistent
+            # call ordering) is treated as service targets.
+            tokens = NotifyHomeAssistant.split_path(results["fullpath"])
+            token_idx = None
+            for idx, t in enumerate(tokens):
+                if RE_IS_LONG_LIVED_TOKEN.match(t):
+                    token_idx = idx
+                    results["accesstoken"] = t
+                    break
 
-            # Otherwise pop the last element from our path to be it
-            results["accesstoken"] = fullpath.pop() if fullpath else None
+            if token_idx is not None:
+                # Elements after the token are service targets (reversed
+                # so the last URL segment is called first).
+                post_targets = list(reversed(tokens[token_idx + 1 :]))
+                # Elements before the token are also treated as service
+                # targets (reversed to maintain consistent ordering).
+                pre_targets = list(reversed(tokens[:token_idx]))
+                results["targets"] = post_targets + pre_targets
+                results["fullpath"] = ""
 
-            # Re-assemble our full path
-            results["fullpath"] = "/" + "/".join(fullpath) if fullpath else ""
+            elif tokens:
+                # No regex match — treat the last path element as the
+                # access token (plain token like "accesstoken" in tests).
+                results["accesstoken"] = tokens[-1]
+                results["fullpath"] = ""
+
+            else:
+                results["accesstoken"] = None
+
+        # Support ?to= for additional targets
+        if "to" in results["qsd"] and results["qsd"]["to"]:
+            results["targets"] += NotifyHomeAssistant.split_path(
+                NotifyHomeAssistant.unquote(results["qsd"]["to"])
+            )
+
+        # Support ?prefix= path-prefix override
+        if "prefix" in results["qsd"] and results["qsd"]["prefix"]:
+            results["prefix"] = NotifyHomeAssistant.unquote(
+                results["qsd"]["prefix"]
+            )
+
+        # Get Batch Mode Flag
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch",
+                NotifyHomeAssistant.template_args["batch"]["default"],
+            )
+        )
 
         # Allow the specification of a unique notification_id so that
         # it will always replace the last one sent.
