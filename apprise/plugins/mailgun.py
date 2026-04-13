@@ -124,8 +124,8 @@ class NotifyMailgun(NotifyBase):
 
     # Define object templates
     templates = (
-        "{schema}://{user}@{host}:{apikey}/",
-        "{schema}://{user}@{host}:{apikey}/{targets}",
+        "{schema}://{user}@{host}/{apikey}/",
+        "{schema}://{user}@{host}/{apikey}/{targets}",
     )
 
     # Define our template tokens
