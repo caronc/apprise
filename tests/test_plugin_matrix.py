@@ -55,6 +55,10 @@ MATRIX_GOOD_RESPONSE = dumps(
         "joined_rooms": ["!abc123:localhost", "!def456:localhost"],
         "access_token": "abcd1234",
         "home_server": "localhost",
+        # user_id is returned by /login and /account/whoami; including it
+        # here ensures self.user_id is set after login so _whoami() is not
+        # called unnecessarily (it only fires when user_id is still absent).
+        "user_id": "@apprise:localhost",
         # Simulate .well-known
         "m.homeserver": {"base_url": "https://matrix.example.com"},
         "m.identity_server": {"base_url": "https://vector.im"},

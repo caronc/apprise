@@ -760,13 +760,17 @@ class NotifyMatrix(NotifyBase):
             # We need to register
             return False
 
-        # When authenticating with a raw access token (no username) the
-        # login flow is skipped, so user_id and device_id are never returned
-        # by the server.  Resolve them via /account/whoami so that E2EE key
-        # upload and DM room lookup (m.direct) work correctly.
-        if (not self.user and (not self.user_id or not self.device_id)) or (
-            self.access_token and not self.home_server
-        ):
+        # Resolve user_id (and device_id / home_server as a side-effect) via
+        # /whoami whenever user_id is still absent after login/token setup.
+        # This covers all paths where the server does not return user_id:
+        #   - raw access-token auth (no /login flow at all)
+        #   - username + ?token= (password treated as token, not a login)
+        #   - servers that omit optional /login response fields
+        # Without user_id the m.direct lookup is skipped and
+        # each send creates a fresh orphan DM room instead of reusing the
+        # existing one.  home_server is recovered from user_id inside
+        # _whoami(); the fallback at handles any remaining gap.
+        if not self.user_id:
             self._whoami()
 
         # Last-resort fallback: if home_server is still unknown, assume
