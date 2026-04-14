@@ -29,13 +29,18 @@ import json
 
 # Disable logging for a cleaner testing output
 import logging
+import os
+from unittest import mock
 
 from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, AppriseAttachment
 from apprise.plugins.mattermost import MattermostMode, NotifyMattermost
+
+# Attachment test fixtures
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 logging.disable(logging.CRITICAL)
 
@@ -102,7 +107,11 @@ apprise_url_tests = (
             "mmost://localhost/3ccdd113474722377935511fc85d3dd4"
             "?to=test&team=chester"
         ),
-        {"instance": NotifyMattermost},
+        {
+            "instance": NotifyMattermost,
+            # Provide valid upload response so the attachment test passes
+            "requests_response_text": '{"file_infos": [{"id": "abc"}]}',
+        },
     ),
     (
         (
@@ -191,7 +200,11 @@ apprise_url_tests = (
     ("mmost://localhost/token?mode=w", {"instance": NotifyMattermost}),
     (
         "mmost://localhost/token?mode=b&to=channel-id-1",
-        {"instance": NotifyMattermost},
+        {
+            "instance": NotifyMattermost,
+            # Provide valid upload response so the attachment test passes
+            "requests_response_text": '{"file_infos": [{"id": "abc"}]}',
+        },
     ),
     (
         "mmost://localhost/token?mode=invalid",
@@ -634,3 +647,329 @@ def test_plugin_mattermost_bot_channel_lookup_partial_success(
     assert request_post_mock.call_count == 1
     posted_json = json.loads(request_post_mock.call_args_list[0][1]["data"])
     assert posted_json["channel_id"] == "cid-good"
+
+
+def test_plugin_mattermost_webhook_attachment_warning(request_post_mock):
+    """Webhook mode logs a warning when attachments are provided."""
+    obj = Apprise.instantiate("mmost://localhost/token")
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.mode == MattermostMode.WEBHOOK
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    # Webhook send still succeeds -- attachments are silently skipped
+    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert request_post_mock.call_count == 1
+
+    # No file upload should have been attempted
+    assert "files" not in str(request_post_mock.call_args)
+
+
+def test_plugin_mattermost_webhook_botname_in_url(request_post_mock):
+    """Webhook botname is the {user}@ URL prefix; ?botname= is an alias."""
+    # Both input forms resolve to the same object
+    obj = Apprise.instantiate("mmost://mybot@localhost/token?to=general")
+    obj2 = Apprise.instantiate(
+        "mmost://localhost/token?botname=mybot&to=general"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert isinstance(obj2, NotifyMattermost)
+    assert obj.mode == MattermostMode.WEBHOOK
+    assert obj.user == "mybot"
+    assert obj2.user == "mybot"
+
+    # url() uses the {user}@ prefix -- consistent with all Apprise plugins
+    url = obj.url()
+    assert "mybot@" in url
+    assert "botname" not in url
+
+    # Round-trip preserves the botname
+    obj3 = Apprise.instantiate(url)
+    assert isinstance(obj3, NotifyMattermost)
+    assert obj3.user == "mybot"
+    assert obj3.mode == MattermostMode.WEBHOOK
+
+    # Webhook payload carries username = botname
+    request_post_mock.return_value.status_code = requests.codes.ok
+    assert obj.notify(body="body", title="title") is True
+    posted = json.loads(request_post_mock.call_args_list[0][1]["data"])
+    assert posted["username"] == "mybot"
+
+
+def test_plugin_mattermost_bot_team_in_url(request_post_mock):
+    """Bot mode team is the {user}@ URL prefix; ?team= is an alias."""
+    obj = Apprise.instantiate("mmost://myteam@localhost/token?mode=bot&to=id1")
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.mode == MattermostMode.BOT
+    assert obj.user == "myteam"
+
+    # url() uses {user}@ prefix for the team too
+    url = obj.url()
+    assert "myteam@" in url
+    assert "mode=bot" in url
+
+
+def test_plugin_mattermost_bot_attachments(request_post_mock):
+    """Bot mode uploads attachments and includes file_ids in the post."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+    file_id = "uploaded-file-id-abc"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    def _mk_resp(content, code=requests.codes.ok):
+        r = requests.Request()
+        r.status_code = code
+        r.content = content
+        return r
+
+    upload_resp = _mk_resp(
+        json.dumps({"file_infos": [{"id": file_id}]}).encode("utf-8")
+    )
+    post_resp = _mk_resp(b"{}", requests.codes.created)
+
+    request_post_mock.side_effect = [upload_resp, post_resp]
+
+    obj = Apprise.instantiate(
+        f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.mode == MattermostMode.BOT
+
+    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert request_post_mock.call_count == 2
+
+    # First call is the file upload
+    upload_call = request_post_mock.call_args_list[0]
+    assert "/api/v4/files" in upload_call[0][0]
+    assert upload_call[1]["data"] == {"channel_id": channel_id}
+    assert "files" in upload_call[1]["files"]
+
+    # Second call is the post; it must include file_ids
+    post_call = request_post_mock.call_args_list[1]
+    assert "/api/v4/posts" in post_call[0][0]
+    post_json = json.loads(post_call[1]["data"])
+    assert post_json["file_ids"] == [file_id]
+    assert post_json["message"] == "title\r\nbody"
+    assert post_json["channel_id"] == channel_id
+
+
+def test_plugin_mattermost_bot_multi_attach_multi_target(request_post_mock):
+    """Multiple attachments and multiple targets each get their own uploads."""
+    bearer = "bearerToken"
+    ch1 = "channel-001"
+    ch2 = "channel-002"
+    fid1 = "fid-001"
+    fid2 = "fid-002"
+
+    attach = AppriseAttachment()
+    attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+    attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
+
+    def _mk_upload(fid):
+        r = requests.Request()
+        r.status_code = requests.codes.ok
+        r.content = json.dumps({"file_infos": [{"id": fid}]}).encode("utf-8")
+        return r
+
+    def _mk_post():
+        r = requests.Request()
+        r.status_code = requests.codes.created
+        r.content = b"{}"
+        return r
+
+    # 2 attachments x 2 targets = 4 upload calls + 2 post calls
+    request_post_mock.side_effect = [
+        _mk_upload(fid1),
+        _mk_upload(fid2),
+        _mk_post(),
+        _mk_upload(fid1),
+        _mk_upload(fid2),
+        _mk_post(),
+    ]
+
+    obj = Apprise.instantiate(
+        "mmost://localhost/{b}?mode=bot&to={c1},{c2}".format(
+            b=bearer, c1=ch1, c2=ch2
+        )
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert request_post_mock.call_count == 6
+
+    # Verify file_ids for each post
+    post1 = json.loads(request_post_mock.call_args_list[2][1]["data"])
+    assert post1["file_ids"] == [fid1, fid2]
+    assert post1["channel_id"] == ch1
+
+    post2 = json.loads(request_post_mock.call_args_list[5][1]["data"])
+    assert post2["file_ids"] == [fid1, fid2]
+    assert post2["channel_id"] == ch2
+
+
+def test_plugin_mattermost_bot_attachment_upload_http_error(
+    request_post_mock,
+):
+    """Upload HTTP error marks the whole target as failed."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    r = requests.Request()
+    r.status_code = requests.codes.internal_server_error
+    r.content = b""
+    request_post_mock.return_value = r
+
+    obj = Apprise.instantiate(
+        f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is False
+    # Only the upload was attempted; no post was made
+    assert request_post_mock.call_count == 1
+    assert "/api/v4/files" in request_post_mock.call_args_list[0][0][0]
+
+
+def test_plugin_mattermost_bot_attachment_request_exception(
+    request_post_mock,
+):
+    """RequestException during upload marks the target as failed."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    request_post_mock.side_effect = requests.RequestException("boom")
+
+    obj = Apprise.instantiate(
+        f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert request_post_mock.call_count == 1
+
+
+def test_plugin_mattermost_bot_attachment_ioerror(request_post_mock):
+    """OSError reading the attachment marks the target as failed."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    with mock.patch(
+        "apprise.attachment.file.AttachFile.open",
+        side_effect=OSError("disk error"),
+    ):
+        obj = Apprise.instantiate(
+            f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+        )
+        assert isinstance(obj, NotifyMattermost)
+        assert obj.notify(body="body", title="title", attach=attach) is False
+
+    # No HTTP request should have been made
+    assert request_post_mock.call_count == 0
+
+
+def test_plugin_mattermost_bot_attachment_bad_response(request_post_mock):
+    """Unparseable upload response marks the target as failed."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    r = requests.Request()
+    r.status_code = requests.codes.ok
+    r.content = b"not-json{{{"
+    request_post_mock.return_value = r
+
+    obj = Apprise.instantiate(
+        f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert request_post_mock.call_count == 1
+
+
+def test_plugin_mattermost_bot_attachment_no_file_id(request_post_mock):
+    """Upload response with empty file_id marks the target as failed."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    r = requests.Request()
+    r.status_code = requests.codes.ok
+    # file_infos present but id is empty
+    r.content = json.dumps({"file_infos": [{"id": ""}]}).encode("utf-8")
+    request_post_mock.return_value = r
+
+    obj = Apprise.instantiate(
+        f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is False
+
+
+def test_plugin_mattermost_bot_attachment_invalid(request_post_mock):
+    """An inaccessible attachment path marks the target as failed."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment("/path/does/not/exist.gif")
+
+    obj = Apprise.instantiate(
+        f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is False
+    # No upload request should be made for an invalid attachment
+    assert request_post_mock.call_count == 0
+
+
+def test_plugin_mattermost_bot_attachment_partial_target_failure(
+    request_post_mock,
+):
+    """Attachment upload failure on one target does not prevent others."""
+    bearer = "bearerToken"
+    ch1 = "channel-001"
+    ch2 = "channel-002"
+    fid = "fid-001"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    def _mk_upload_ok():
+        r = requests.Request()
+        r.status_code = requests.codes.ok
+        r.content = json.dumps({"file_infos": [{"id": fid}]}).encode("utf-8")
+        return r
+
+    def _mk_upload_fail():
+        r = requests.Request()
+        r.status_code = requests.codes.internal_server_error
+        r.content = b""
+        return r
+
+    def _mk_post():
+        r = requests.Request()
+        r.status_code = requests.codes.created
+        r.content = b"{}"
+        return r
+
+    # ch1: upload ok, post ok; ch2: upload fails
+    request_post_mock.side_effect = [
+        _mk_upload_ok(),
+        _mk_post(),
+        _mk_upload_fail(),
+    ]
+
+    obj = Apprise.instantiate(
+        "mmost://localhost/{b}?mode=bot&to={c1},{c2}".format(
+            b=bearer, c1=ch1, c2=ch2
+        )
+    )
+    assert isinstance(obj, NotifyMattermost)
+    # One target succeeded, one failed -> overall False
+    assert obj.notify(body="body", title="title", attach=attach) is False
+    # 1 upload + 1 post (ch1) + 1 upload-fail (ch2) = 3 calls
+    assert request_post_mock.call_count == 3
