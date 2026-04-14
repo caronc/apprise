@@ -44,6 +44,7 @@ This plugin supports 2 modes of operation:
 
 from __future__ import annotations
 
+import io
 from itertools import chain
 
 # Create an incoming webhook; the website will provide you with something like:
@@ -118,7 +119,7 @@ class NotifyMattermost(NotifyBase):
     # Mattermost does not have a title
     title_maxlen = 0
 
-    # Bot mode supports file attachments via /api/v4/files
+    # Attachment support defaults True; toggled off for webhook mode
     attachment_support = True
 
     # Allow persistent caching of bot channel lookups
@@ -261,6 +262,9 @@ class NotifyMattermost(NotifyBase):
                 raise TypeError(msg)
         else:
             self.mode = self.template_args["mode"]["default"]
+
+        # Enable attachment support only in bot mode
+        self.attachment_support = self.mode == MattermostMode.BOT
 
         # Token (webhook token in webhook mode, bearer token in bot mode)
         self.token = validate_regex(token)
@@ -439,6 +443,12 @@ class NotifyMattermost(NotifyBase):
             "Content-Type": "application/json",
         }
 
+        # Pre-read attachment content before the target loop so the same
+        # bytes can be sent to every target via a fresh io.BytesIO wrapper.
+        # AttachMemory streams close after the first read and cannot be
+        # re-opened; reading everything upfront avoids that problem.
+        attach_data: list[tuple[str, bytes, str]] = []
+
         if self.mode == MattermostMode.BOT:
             url = "{}://{}{}{}/api/v4/posts".format(
                 self.schema, self.host, port, self.fullpath.rstrip("/")
@@ -453,6 +463,40 @@ class NotifyMattermost(NotifyBase):
             headers["Authorization"] = f"Bearer {self.token}"
             expected = (requests.codes.created, requests.codes.ok)
 
+            if attach and self.attachment_support:
+                for no, attachment in enumerate(attach, start=1):
+                    if not attachment:
+                        self.logger.error(
+                            "Could not access Mattermost attachment %s.",
+                            attachment.url(privacy=True),
+                        )
+                        return False
+
+                    # Capture name and mimetype before open() so that
+                    # AttachMemory's exists() check (triggered by these
+                    # properties) does not fail on a closed stream.
+                    fname = attachment.name or f"file{no:03}.dat"
+                    mimetype = attachment.mimetype
+
+                    self.logger.debug(
+                        "Reading Mattermost attachment %s",
+                        attachment.url(privacy=True),
+                    )
+                    try:
+                        with attachment.open() as fp:
+                            content = fp.read()
+
+                    except OSError as e:
+                        self.logger.warning(
+                            "An I/O error occurred reading"
+                            " Mattermost attachment %s.",
+                            fname,
+                        )
+                        self.logger.debug("I/O Exception: %s", e)
+                        return False
+
+                    attach_data.append((fname, content, mimetype))
+
         else:  # self.mode == MattermostMode.WEBHOOK
             url = "{}://{}{}{}/hooks/{}".format(
                 self.schema,
@@ -462,12 +506,6 @@ class NotifyMattermost(NotifyBase):
                 self.token,
             )
             expected = (requests.codes.ok,)
-
-            if attach and self.attachment_support:
-                self.logger.warning(
-                    "Mattermost Webhook mode does not support"
-                    " attachments; switch to bot mode."
-                )
 
         # Iterate over our targets
         targets = self.targets.copy()
@@ -483,97 +521,38 @@ class NotifyMattermost(NotifyBase):
                     continue
 
             if self.mode == MattermostMode.BOT:
-                # Upload any attachments first and collect their file IDs.
-                # Each upload is scoped to the current channel_id.
+                # Upload pre-read attachment bytes scoped to this
+                # channel_id.  Fresh io.BytesIO wrappers are created for
+                # each target so all targets receive the same content.
                 file_ids: list[str] = []
                 attach_error = False
-                if attach and self.attachment_support:
+                if attach_data:
                     upload_headers: dict[str, str] = {
                         "User-Agent": self.app_id,
                         "Authorization": f"Bearer {self.token}",
                     }
-                    for no, attachment in enumerate(attach, start=1):
-                        if not attachment:
-                            self.logger.error(
-                                "Could not access Mattermost attachment %s.",
-                                attachment.url(privacy=True),
-                            )
-                            attach_error = True
-                            break
-
+                    for fname, content, mimetype in attach_data:
                         self.logger.debug(
                             "Posting Mattermost attachment %s",
-                            attachment.url(privacy=True),
+                            fname,
                         )
 
                         try:
-                            with attachment.open() as fp:
-                                self.throttle()
-                                r = requests.post(
-                                    upload_url,
-                                    data={"channel_id": target},
-                                    headers=upload_headers,
-                                    files={
-                                        "files": (
-                                            attachment.name
-                                            or f"file{no:03}.dat",
-                                            fp,
-                                            attachment.mimetype,
-                                        )
-                                    },
-                                    verify=self.verify_certificate,
-                                    timeout=self.request_timeout,
-                                )
-
-                            if r.status_code not in (
-                                requests.codes.created,
-                                requests.codes.ok,
-                            ):
-                                status = self.http_response_code_lookup(
-                                    r.status_code
-                                )
-                                self.logger.warning(
-                                    "Failed to upload Mattermost"
-                                    " attachment %s: %s, error=%d.",
-                                    attachment.name,
-                                    status,
-                                    r.status_code,
-                                )
-                                self.logger.debug(
-                                    "Response Details:\r\n%r",
-                                    (r.content or b"")[:2000],
-                                )
-                                attach_error = True
-                                break
-
-                            try:
-                                data = loads(r.content.decode("utf-8"))
-                                file_id = data.get("file_infos", [{}])[0].get(
-                                    "id", ""
-                                )
-
-                            except (
-                                AttributeError,
-                                TypeError,
-                                ValueError,
-                                IndexError,
-                            ):
-                                self.logger.warning(
-                                    "Failed to parse Mattermost"
-                                    " file upload response."
-                                )
-                                attach_error = True
-                                break
-
-                            if not file_id:
-                                self.logger.warning(
-                                    "Mattermost file upload"
-                                    " returned no file ID."
-                                )
-                                attach_error = True
-                                break
-
-                            file_ids.append(file_id)
+                            self.throttle()
+                            r = requests.post(
+                                upload_url,
+                                data={"channel_id": target},
+                                headers=upload_headers,
+                                files={
+                                    "files": (
+                                        fname,
+                                        io.BytesIO(content),
+                                        mimetype,
+                                    )
+                                },
+                                verify=self.verify_certificate,
+                                timeout=self.request_timeout,
+                            )
 
                         except requests.RequestException as e:
                             self.logger.warning(
@@ -585,15 +564,54 @@ class NotifyMattermost(NotifyBase):
                             attach_error = True
                             break
 
-                        except OSError as e:
-                            self.logger.warning(
-                                "An I/O error occurred reading"
-                                " Mattermost attachment %s.",
-                                attachment.name or "attachment",
+                        if r.status_code not in (
+                            requests.codes.created,
+                            requests.codes.ok,
+                        ):
+                            status = self.http_response_code_lookup(
+                                r.status_code
                             )
-                            self.logger.debug("I/O Exception: %s", e)
+                            self.logger.warning(
+                                "Failed to upload Mattermost"
+                                " attachment %s: %s, error=%d.",
+                                fname,
+                                status,
+                                r.status_code,
+                            )
+                            self.logger.debug(
+                                "Response Details:\r\n%r",
+                                (r.content or b"")[:2000],
+                            )
                             attach_error = True
                             break
+
+                        try:
+                            data = loads(r.content.decode("utf-8"))
+                            file_id = data.get("file_infos", [{}])[0].get(
+                                "id", ""
+                            )
+
+                        except (
+                            AttributeError,
+                            TypeError,
+                            ValueError,
+                            IndexError,
+                        ):
+                            self.logger.warning(
+                                "Failed to parse Mattermost"
+                                " file upload response."
+                            )
+                            attach_error = True
+                            break
+
+                        if not file_id:
+                            self.logger.warning(
+                                "Mattermost file upload returned no file ID."
+                            )
+                            attach_error = True
+                            break
+
+                        file_ids.append(file_id)
 
                 if attach_error:
                     has_error = True

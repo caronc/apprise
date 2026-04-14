@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.attachment.memory import AttachMemory
 from apprise.plugins.mattermost import MattermostMode, NotifyMattermost
 
 # Attachment test fixtures
@@ -650,14 +651,15 @@ def test_plugin_mattermost_bot_channel_lookup_partial_success(
 
 
 def test_plugin_mattermost_webhook_attachment_warning(request_post_mock):
-    """Webhook mode logs a warning when attachments are provided."""
+    """Webhook mode has attachment_support=False; pipeline drops attach."""
     obj = Apprise.instantiate("mmost://localhost/token")
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.WEBHOOK
+    assert obj.attachment_support is False
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
-    # Webhook send still succeeds -- attachments are silently skipped
+    # Pipeline silently drops the attachment; text message still succeeds
     assert obj.notify(body="body", title="title", attach=attach) is True
     assert request_post_mock.call_count == 1
 
@@ -973,3 +975,58 @@ def test_plugin_mattermost_bot_attachment_partial_target_failure(
     assert obj.notify(body="body", title="title", attach=attach) is False
     # 1 upload + 1 post (ch1) + 1 upload-fail (ch2) = 3 calls
     assert request_post_mock.call_count == 3
+
+
+def test_plugin_mattermost_bot_attachment_memory_multi_target(
+    request_post_mock,
+):
+    """AttachMemory streams are re-usable across multiple targets."""
+    bearer = "bearerToken"
+    ch1 = "channel-001"
+    ch2 = "channel-002"
+    fid = "fid-mem"
+
+    ac = AttachMemory(
+        content=b"GIF89a\x01\x00\x01\x00\x00\xff\x00,",
+        name="test.gif",
+        mimetype="image/gif",
+    )
+    attach = AppriseAttachment()
+    attach.add(ac)
+
+    def _mk_upload():
+        r = requests.Request()
+        r.status_code = requests.codes.ok
+        r.content = json.dumps({"file_infos": [{"id": fid}]}).encode("utf-8")
+        return r
+
+    def _mk_post():
+        r = requests.Request()
+        r.status_code = requests.codes.created
+        r.content = b"{}"
+        return r
+
+    # 1 attachment x 2 targets = 2 upload + 2 post calls
+    request_post_mock.side_effect = [
+        _mk_upload(),
+        _mk_post(),
+        _mk_upload(),
+        _mk_post(),
+    ]
+
+    obj = Apprise.instantiate(
+        "mmost://localhost/{b}?mode=bot&to={c1},{c2}".format(
+            b=bearer, c1=ch1, c2=ch2
+        )
+    )
+    assert isinstance(obj, NotifyMattermost)
+    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert request_post_mock.call_count == 4
+
+    post1 = json.loads(request_post_mock.call_args_list[1][1]["data"])
+    assert post1["file_ids"] == [fid]
+    assert post1["channel_id"] == ch1
+
+    post2 = json.loads(request_post_mock.call_args_list[3][1]["data"])
+    assert post2["file_ids"] == [fid]
+    assert post2["channel_id"] == ch2
