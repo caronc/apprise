@@ -37,7 +37,6 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
-from apprise.attachment.memory import AttachMemory
 from apprise.plugins.mattermost import MattermostMode, NotifyMattermost
 
 # Attachment test fixtures
@@ -980,19 +979,31 @@ def test_plugin_mattermost_bot_attachment_partial_target_failure(
 def test_plugin_mattermost_bot_attachment_memory_multi_target(
     request_post_mock,
 ):
-    """AttachMemory streams are re-usable across multiple targets."""
+    """Attachment bytes are pre-read once so every target gets a fresh stream.
+
+    Simulates an attachment whose open() raises ValueError on the second
+    call (as AttachMemory does when its BytesIO is closed after the first
+    read).  Our pre-read approach calls open() exactly once per attachment
+    before the target loop, then wraps the bytes in a fresh io.BytesIO for
+    each target upload.
+    """
     bearer = "bearerToken"
     ch1 = "channel-001"
     ch2 = "channel-002"
-    fid = "fid-mem"
+    fid = "fid-001"
 
-    ac = AttachMemory(
-        content=b"GIF89a\x01\x00\x01\x00\x00\xff\x00,",
-        name="test.gif",
-        mimetype="image/gif",
-    )
-    attach = AppriseAttachment()
-    attach.add(ac)
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    # Simulate a stream that closes after the first read: raise ValueError
+    # on any open() call beyond the first.
+    _orig_open = attach.attachments[0].open
+    open_calls = [0]
+
+    def _open_once(*args, **kwargs):
+        open_calls[0] += 1
+        if open_calls[0] > 1:
+            raise ValueError("stream already closed")
+        return _orig_open(*args, **kwargs)
 
     def _mk_upload():
         r = requests.Request()
@@ -1020,7 +1031,13 @@ def test_plugin_mattermost_bot_attachment_memory_multi_target(
         )
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is True
+
+    with mock.patch.object(attach.attachments[0], "open", _open_once):
+        assert obj.notify(body="body", title="title", attach=attach) is True
+
+    # open() was called exactly once (pre-read), not once per target
+    assert open_calls[0] == 1
+    # Both targets received their uploads
     assert request_post_mock.call_count == 4
 
     post1 = json.loads(request_post_mock.call_args_list[1][1]["data"])
