@@ -2952,13 +2952,23 @@ def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
         r.content = dumps(d).encode()
         return r
 
-    # POST sequence: login, keys/upload, join, keys/query, keys/claim, logout
+    # POST sequence:
+    # login, keys/upload (with OTK count), join, keys/query, keys/claim,
+    # keys/upload (OTK replenishment), logout
     mock_post.side_effect = [
         _mk_resp(login_resp),
-        _mk_resp({}),  # keys/upload
+        _mk_resp({"one_time_key_counts": {"signed_curve25519": 1}}),
         _mk_resp({"room_id": "!room:localhost"}),  # join
         _mk_resp(query_resp),  # keys/query
         _mk_resp(claim_resp),  # keys/claim
+        # Replenishment: remaining = 1 - 1 (built_count) = 0 < threshold
+        _mk_resp(
+            {
+                "one_time_key_counts": {
+                    "signed_curve25519": NotifyMatrix.default_e2ee_otk_count,
+                }
+            }
+        ),
         _mk_resp({}),  # logout
     ]
     mock_get.return_value = _mk_resp(members_resp)
@@ -3225,7 +3235,11 @@ def test_plugin_matrix_e2ee_upload_keys_success_marks_published(
     resp = mock.Mock()
     resp.status_code = requests.codes.ok
     resp.content = dumps(
-        {"one_time_key_counts": {"signed_curve25519": 10}}
+        {
+            "one_time_key_counts": {
+                "signed_curve25519": NotifyMatrix.default_e2ee_otk_count,
+            }
+        }
     ).encode()
     mock_post.return_value = resp
 
@@ -3249,6 +3263,10 @@ def test_plugin_matrix_e2ee_upload_keys_success_marks_published(
     assert obj._e2ee_account._otks
     assert obj._e2ee_upload_keys() is True
     assert obj._e2ee_account._otks == {}
+    # Server OTK count from the response is persisted for threshold checks.
+    assert obj.store.get("e2ee_otk_server_count") == (
+        NotifyMatrix.default_e2ee_otk_count
+    )
 
 
 @mock.patch("requests.put")
@@ -3727,6 +3745,98 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         obj, "_e2ee_room_members", return_value=dict_members
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is False
+
+
+@mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_e2ee_replenish_otks(mock_post):
+    """_e2ee_replenish_otks: threshold logic, diagnostics, and error paths."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    otk_count = NotifyMatrix.default_e2ee_otk_count
+    otk_threshold = NotifyMatrix.default_e2ee_otk_replenish_threshold
+
+    def _mk_resp(d, code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = dumps(d).encode()
+        return r
+
+    def _make_obj():
+        obj = NotifyMatrix(
+            host="h", user="u", password="pass", targets=["#r"], e2ee=True
+        )
+        obj.user_id = "@u:h"
+        obj.device_id = "DEV"
+        obj._e2ee_account = MatrixOlmAccount()
+        return obj
+
+    # --- missing credentials: no network call, returns False ---
+    obj = _make_obj()
+    obj.user_id = None
+    assert obj._e2ee_replenish_otks() is False
+    assert mock_post.call_count == 0
+
+    obj = _make_obj()
+    obj.device_id = None
+    assert obj._e2ee_replenish_otks() is False
+    assert mock_post.call_count == 0
+
+    # --- pool sufficient: skip upload ---
+    # Store a count well above threshold; claimed_count=1 -> remaining is
+    # above default_e2ee_otk_replenish_threshold so no upload should happen.
+    obj = _make_obj()
+    obj.store.set("e2ee_otk_server_count", otk_threshold + otk_count)
+    result = obj._e2ee_replenish_otks(claimed_count=1, skipped_no_otk=0)
+    assert result is True
+    assert mock_post.call_count == 0
+
+    # --- pool low: remaining < threshold triggers upload ---
+    obj = _make_obj()
+    obj.store.set("e2ee_otk_server_count", otk_threshold - 1)
+    mock_post.return_value = _mk_resp(
+        {"one_time_key_counts": {"signed_curve25519": otk_count}}
+    )
+    assert obj._e2ee_replenish_otks(claimed_count=0, skipped_no_otk=0) is True
+    assert mock_post.call_count == 1
+    assert obj.store.get("e2ee_otk_server_count") == otk_count
+    assert obj.store.get("e2ee_account") is not None
+    mock_post.reset_mock()
+
+    # --- unknown server count (no store entry): replenish as precaution ---
+    obj = _make_obj()
+    # e2ee_otk_server_count not set -> unknown
+    mock_post.return_value = _mk_resp(
+        {"one_time_key_counts": {"signed_curve25519": otk_count}}
+    )
+    assert obj._e2ee_replenish_otks(claimed_count=0, skipped_no_otk=0) is True
+    assert mock_post.call_count == 1
+    mock_post.reset_mock()
+
+    # --- skipped_no_otk > 0: always replenishes regardless of count ---
+    obj = _make_obj()
+    obj.store.set("e2ee_otk_server_count", otk_threshold + otk_count)
+    mock_post.return_value = _mk_resp(
+        {"one_time_key_counts": {"signed_curve25519": otk_count}}
+    )
+    assert obj._e2ee_replenish_otks(claimed_count=0, skipped_no_otk=2) is True
+    assert mock_post.call_count == 1
+    mock_post.reset_mock()
+
+    # --- upload failure: returns False, logs warning ---
+    obj = _make_obj()
+    obj.store.set("e2ee_otk_server_count", 0)
+    mock_post.return_value = _mk_resp({}, code=500)
+    assert obj._e2ee_replenish_otks(claimed_count=0, skipped_no_otk=0) is False
+    mock_post.reset_mock()
+
+    # --- response missing one_time_key_counts: new count defaults to 0 ---
+    obj = _make_obj()
+    obj.store.set("e2ee_otk_server_count", 0)
+    mock_post.return_value = _mk_resp({})  # no one_time_key_counts key
+    assert obj._e2ee_replenish_otks(claimed_count=0, skipped_no_otk=0) is True
+    assert obj.store.get("e2ee_otk_server_count") == 0
+    mock_post.reset_mock()
 
 
 @mock.patch("requests.put")
