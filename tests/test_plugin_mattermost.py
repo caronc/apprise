@@ -872,6 +872,26 @@ def test_plugin_mattermost_bot_attachment_ioerror(request_post_mock):
     assert request_post_mock.call_count == 0
 
 
+def test_plugin_mattermost_bot_attachment_valueerror(request_post_mock):
+    """ValueError from a closed stream is handled the same as OSError."""
+    bearer = "bearerToken"
+    channel_id = "channel-id-123"
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    with mock.patch(
+        "apprise.attachment.file.AttachFile.open",
+        side_effect=ValueError("I/O operation on closed file"),
+    ):
+        obj = Apprise.instantiate(
+            f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
+        )
+        assert isinstance(obj, NotifyMattermost)
+        assert obj.notify(body="body", title="title", attach=attach) is False
+
+    assert request_post_mock.call_count == 0
+
+
 def test_plugin_mattermost_bot_attachment_bad_response(request_post_mock):
     """Unparseable upload response marks the target as failed."""
     bearer = "bearerToken"

@@ -486,7 +486,7 @@ class NotifyMattermost(NotifyBase):
                         with attachment.open() as fp:
                             content = fp.read()
 
-                    except OSError as e:
+                    except (OSError, ValueError) as e:
                         self.logger.warning(
                             "An I/O error occurred reading"
                             " Mattermost attachment %s.",
