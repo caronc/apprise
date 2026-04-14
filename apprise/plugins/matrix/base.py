@@ -2514,12 +2514,13 @@ class NotifyMatrix(NotifyBase):
             )
             return True
 
-        self.transaction_id += 1
-        self.store.set(
-            "transaction_id",
-            self.transaction_id,
-            expires=self.default_cache_expiry_sec,
-        )
+        if self.access_token != self.password:
+            self.transaction_id += 1
+            self.store.set(
+                "transaction_id",
+                self.transaction_id,
+                expires=self.default_cache_expiry_sec,
+            )
         path = "/sendToDevice/m.room.encrypted/{}".format(self.transaction_id)
         postokay, _, _ = self._fetch(
             path,
@@ -2535,7 +2536,7 @@ class NotifyMatrix(NotifyBase):
 
         self.logger.debug(
             "Matrix E2EE: room key delivered to %d device(s) in %s "
-            "(txnId=%d).",
+            "(txnId=%s).",
             built_count,
             room_id,
             self.transaction_id,

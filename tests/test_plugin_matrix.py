@@ -3746,6 +3746,38 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     ):
         assert obj._e2ee_share_room_key("!r:h", session) is False
 
+    # token-as-password mode: transaction_id is a UUID, not an int.
+    # Previously, the unconditional `+= 1` raised TypeError (UUID + int).
+    # With the guard in place the UUID is used as-is and the send succeeds.
+    import uuid as _uuid_mod
+
+    uuid_obj = NotifyMatrix(
+        host="h", password="rawtoken", targets=["#r"], e2ee=True
+    )
+    uuid_obj.access_token = "rawtoken"
+    uuid_obj.password = "rawtoken"
+    uuid_obj.transaction_id = _uuid_mod.uuid4()  # UUID, not int
+    uuid_obj.home_server = "h"
+    uuid_obj.user_id = "@tok:h"
+    uuid_obj.device_id = "TOKDEV"
+    uuid_obj._e2ee_account = MatrixOlmAccount()
+
+    uuid_session = MatrixMegOlmSession()
+    uuid_otk = _make_signed_otk(recipient, "@other:h", "DEV", their_otk_b64)
+    uuid_claim = {
+        "one_time_keys": {
+            "@other:h": {"DEV": {"signed_curve25519:KID": uuid_otk}}
+        }
+    }
+    mock_post.return_value = _mk_resp(uuid_claim)
+    mock_put.return_value = _mk_resp({})
+    with mock.patch.object(
+        uuid_obj, "_e2ee_room_members", return_value=dict_members
+    ):
+        # Must not raise TypeError; transaction_id stays as UUID
+        assert uuid_obj._e2ee_share_room_key("!r:h", uuid_session) is True
+        assert isinstance(uuid_obj.transaction_id, _uuid_mod.UUID)
+
 
 @mock.patch("requests.post")
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
