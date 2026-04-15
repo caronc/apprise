@@ -336,9 +336,10 @@ class NotifyMatrix(NotifyBase):
                 "values": MATRIX_WEBHOOK_MODES,
                 "default": MatrixWebhookMode.DISABLED,
             },
-            "webhook_path": {
+            "path": {
                 "name": _("Webhook Path"),
                 "type": "string",
+                "map_to": "webhook_path",
                 "default": "/webhook",
             },
             "version": {
@@ -434,7 +435,7 @@ class NotifyMatrix(NotifyBase):
 
         # Public webhook path used by matrix-hookshot
         self.webhook_path = (
-            self.template_args["webhook_path"]["default"]
+            self.template_args["path"]["default"]
             if not isinstance(webhook_path, str) or not webhook_path.strip()
             else webhook_path.strip()
         )
@@ -3092,7 +3093,7 @@ class NotifyMatrix(NotifyBase):
         }
 
         if self.mode == MatrixWebhookMode.HOOKSHOT:
-            params["webhook_path"] = self.webhook_path
+            params["path"] = self.webhook_path
 
         if not self.e2ee:
             params["e2ee"] = "no"
@@ -3184,11 +3185,7 @@ class NotifyMatrix(NotifyBase):
             )
         )
 
-        if "webhook_path" in results["qsd"]:
-            results["webhook_path"] = NotifyMatrix.unquote(
-                results["qsd"]["webhook_path"]
-            )
-        elif "path" in results["qsd"]:
+        if "path" in results["qsd"]:
             results["webhook_path"] = NotifyMatrix.unquote(
                 results["qsd"]["path"]
             )

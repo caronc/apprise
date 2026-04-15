@@ -209,7 +209,7 @@ apprise_url_tests = (
     (
         (
             "matrixs://hookuser:hooktoken@hookshot.example"
-            "?mode=hookshot&webhook_path=%2Fpublic-hooks"
+            "?mode=hookshot&path=%2Fpublic-hooks"
         ),
         {
             "instance": NotifyMatrix,
@@ -1798,7 +1798,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
 
     obj = Apprise.instantiate(
         "matrixs://apprise:supersecret@hookshot.example"
-        "?mode=hookshot&format=html&webhook_path=%2Fpublic-hooks"
+        "?mode=hookshot&format=html&path=%2Fpublic-hooks"
     )
     assert obj is not None
 
@@ -1825,7 +1825,7 @@ def test_plugin_matrix_hookshot_webhook_empty_title(mock_post):
 
     obj = Apprise.instantiate(
         "matrixs://apprise:supersecret@hookshot.example"
-        "?mode=hookshot&format=markdown&webhook_path=%2Fpublic-hooks"
+        "?mode=hookshot&format=markdown&path=%2Fpublic-hooks"
     )
     assert obj is not None
 
@@ -1842,7 +1842,7 @@ def test_plugin_matrix_hookshot_path_normalization():
 
     obj = Apprise.instantiate(
         "matrixs://apprise:supersecret@hookshot.example"
-        "?mode=hookshot&webhook_path=public-hooks"
+        "?mode=hookshot&path=public-hooks"
     )
     assert obj is not None
     assert obj.webhook_path == "/public-hooks"
@@ -1859,7 +1859,7 @@ def test_plugin_matrix_hookshot_root_path_text(mock_post):
 
     obj = Apprise.instantiate(
         "matrixs://apprise:supersecret@hookshot.example"
-        "?mode=hookshot&format=text&webhook_path=%2F"
+        "?mode=hookshot&format=text&path=%2F"
     )
     assert obj is not None
     assert obj.notify(body="<b>Body</b>") is True
