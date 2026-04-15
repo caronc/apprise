@@ -36,7 +36,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.mastodon import NotifyMastodon
 
 logging.disable(logging.CRITICAL)
@@ -362,6 +362,211 @@ def test_plugin_mastodon_general(mock_post, mock_get):
         mock_get.call_args_list[0][0][0]
         == "https://host/api/v1/accounts/verify_credentials"
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_mastodon_pings(mock_post):
+    """NotifyMastodon() Ping Checks."""
+    token = "access_key"
+    host = "nuxref.com"
+
+    request = mock.Mock()
+    request.content = dumps({})
+    request.status_code = requests.codes.ok
+    request.headers = {}
+
+    mock_post.return_value = request
+
+    body = (
+        "Body **#déjà_vu** and @abc, plus #再会. "
+        "Ignore ##bad, #bad%, #123, email@miss, and duplicate "
+        "@abc #déjà_vu."
+    )
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        format=NotifyFormat.MARKDOWN,
+        ping="@abc,#déjà_vu,#radarr,radarr,#123,bad%",
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Mentions and hashtags are appended in a plain form Mastodon can resolve.
+    assert payload["status"] == f"{body} @abc #déjà_vu #再会 #radarr"
+
+    mock_post.reset_mock()
+
+    body = "Body with #solo only."
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        format=NotifyFormat.MARKDOWN,
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Markdown statuses can contribute visible mention and hashtag tokens.
+    assert payload["status"] == f"{body} #solo"
+
+    mock_post.reset_mock()
+
+    body = "<p>No tags in this formatted body.</p>"
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        format=NotifyFormat.HTML,
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # When no valid tag tokens are found, the status is not decorated.
+    assert payload["status"] == body
+
+    mock_post.reset_mock()
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        ping="@caronc,#apprise,#alerts",
+    )
+
+    assert isinstance(obj.url(), str)
+    assert "ping=" in obj.url()
+
+    results = NotifyMastodon.parse_url(obj.url())
+    assert results["ping"] == "#alerts,#apprise,@caronc"
+
+    assert NotifyMastodon.normalize_ping_token(" ") is None
+    assert NotifyMastodon.normalize_ping_token("alerts") is None
+    assert NotifyMastodon.valid_hashtag("#bad%") is False
+    assert obj.ping_tokens("bad%", normalize=True) == []
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        targets="#Apprise,#apprise",
+        ping="#Media,#media",
+    )
+    assert obj.tags == ["#Apprise"]
+    assert obj.ping == ["#Media"]
+
+    mock_post.reset_mock()
+
+    results = NotifyMastodon.parse_url(
+        f"mastodon://{token}@{host}/#apprise?ping=#apprise,#media"
+    )
+    obj = NotifyMastodon(**results)
+
+    assert obj.send(body="Body") is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Hashtag path entries and configured pings share de-duplication.
+    assert payload["status"] == "Body #apprise #media"
+
+    rebuilt_url = obj.url()
+    assert "/%23apprise" in rebuilt_url
+    assert "ping=%23apprise%2C%23media" in rebuilt_url
+
+    results = NotifyMastodon.parse_url(rebuilt_url)
+    assert results["targets"] == ["#apprise"]
+    assert results["ping"] == "#apprise,#media"
+
+
+@mock.patch("requests.post")
+def test_plugin_mastodon_text(mock_post):
+    """NotifyMastodon() Text Checks."""
+    token = "access_key"
+    host = "nuxref.com"
+
+    request = mock.Mock()
+    request.content = dumps({})
+    request.status_code = requests.codes.ok
+    request.headers = {}
+
+    mock_post.return_value = request
+
+    body = "Plain text keeps #déjà_vu and @abc exactly where they are."
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        format=NotifyFormat.TEXT,
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Plain text is already suitable for Mastodon and is left untouched.
+    assert payload["status"] == body
+
+    mock_post.reset_mock()
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        format=NotifyFormat.TEXT,
+        targets="@media,#homeassistant",
+        ping="radarr,@media,#homeassistant,#alerts,#123,bad%",
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Explicit path entries and ping values are appended without scanning for
+    # new plain text body tokens.
+    assert payload["status"] == f"{body} #alerts #homeassistant @media"
+
+
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_mastodon_direct(mock_post, mock_get):
+    """NotifyMastodon() Direct Checks."""
+    token = "access_key"
+    host = "nuxref.com"
+
+    request = mock.Mock()
+    request.content = dumps({})
+    request.status_code = requests.codes.ok
+    request.headers = {}
+
+    mock_post.return_value = request
+
+    body = "Direct body already contains @target."
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        targets="@target",
+        visibility="direct",
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+    assert mock_get.call_count == 0
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Explicit direct targets do not require a lookup for the authenticated
+    # account, and duplicate body mentions are not prepended.
+    assert payload["status"] == body
 
 
 @mock.patch("requests.post")
