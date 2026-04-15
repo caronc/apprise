@@ -144,7 +144,7 @@ class NotifyMastodon(NotifyBase):
     title_maxlen = 0
 
     # The maximum size of the message
-    body_maxlen = 500
+    mastodon_body_maxlen = 500
 
     # Default to text
     notify_format = NotifyFormat.TEXT
@@ -374,7 +374,7 @@ class NotifyMastodon(NotifyBase):
 
             has_error = True
             self.logger.warning(
-                f"Dropped invalid Mastodon user ({target}) specified.",
+                f"Dropped invalid Mastodon target ({target}) specified.",
             )
 
         if has_error and not (self.targets or self.tags):
@@ -413,6 +413,18 @@ class NotifyMastodon(NotifyBase):
             self.token,
             self.host,
             self.port if self.port else (443 if self.secure else 80),
+        )
+
+    @property
+    def body_maxlen(self):
+        """Return the body space available after configured status tokens."""
+
+        tokens = self.ping_tokens(
+            " ".join(self.targets + self.tags + self.ping),
+            normalize=True,
+        )
+        return max(
+            self.mastodon_body_maxlen - len(self.ping_payload(tokens)), 0
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -489,7 +501,7 @@ class NotifyMastodon(NotifyBase):
         if self.visibility == MastodonMessageVisibility.DIRECT:
             # Smart Target Detection for Direct Messages; this prevents us
             # from adding @user entries that were already placed in the body.
-            users = set(USER_DETECTION_RE.findall(body))
+            users = set(MENTION_DETECTION_RE.findall(body))
             targets = set(self.targets) - users
             if not self.targets:
                 result = self._whoami()

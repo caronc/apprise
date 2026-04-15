@@ -485,6 +485,20 @@ def test_plugin_mastodon_pings(mock_post):
     assert results["targets"] == ["#apprise"]
     assert results["ping"] == "#apprise,#media"
 
+    mock_post.reset_mock()
+
+    obj = NotifyMastodon(token=token, host=host, ping="#apprise")
+
+    assert obj.send(body="a" * obj.body_maxlen) is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # The effective body limit reserves room for configured status tokens.
+    assert obj.body_maxlen == obj.mastodon_body_maxlen - len(" #apprise")
+    assert len(payload["status"]) == obj.mastodon_body_maxlen
+    assert payload["status"].endswith(" #apprise")
+
 
 @mock.patch("requests.post")
 def test_plugin_mastodon_text(mock_post):
@@ -567,6 +581,26 @@ def test_plugin_mastodon_direct(mock_post, mock_get):
     # Explicit direct targets do not require a lookup for the authenticated
     # account, and duplicate body mentions are not prepended.
     assert payload["status"] == body
+
+    mock_post.reset_mock()
+
+    body = "Direct body contains email@target only."
+
+    obj = NotifyMastodon(
+        token=token,
+        host=host,
+        targets="@target",
+        visibility="direct",
+    )
+
+    assert obj.send(body=body) is True
+    assert mock_post.call_count == 1
+    assert mock_get.call_count == 0
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # Email-like text is not treated as a delivered direct-message mention.
+    assert payload["status"] == f"@target {body}"
 
 
 @mock.patch("requests.post")
