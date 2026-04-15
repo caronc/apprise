@@ -206,6 +206,28 @@ apprise_url_tests = (
             "privacy_url": "matrix://b...b/",
         },
     ),
+    (
+        (
+            "matrixs://hookuser:hooktoken@hookshot.example"
+            "?mode=hookshot&webhook_path=%2Fpublic-hooks"
+        ),
+        {
+            "instance": NotifyMatrix,
+            "privacy_url": (
+                "matrixs://hookuser:****@hookshot.example/"
+                "?image=no&mode=hookshot"
+            ),
+        },
+    ),
+    (
+        (
+            "matrixs://hookuser:hooktoken@hookshot.example"
+            "?mode=hookshot&path=public-hooks"
+        ),
+        {
+            "instance": NotifyMatrix,
+        },
+    ),
     # Image Reference
     (
         "matrixs://user:token@localhost?mode=slack&format=markdown&image=True",
@@ -1762,6 +1784,91 @@ def test_plugin_matrix_parse_native_url_no_match():
     assert (
         NotifyMatrix.parse_native_url("https://not-a-t2bot-url.com/some/path")
         is None
+    )
+
+
+@mock.patch("requests.post")
+def test_plugin_matrix_hookshot_webhook(mock_post):
+    """matrix-hookshot webhook mode uses hookshot URL/payload conventions."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@hookshot.example"
+        "?mode=hookshot&format=html&webhook_path=%2Fpublic-hooks"
+    )
+    assert obj is not None
+
+    assert obj.notify(title="Title", body="<b>Body</b>") is True
+
+    assert mock_post.call_args.args[0] == (
+        "https://hookshot.example/public-hooks/supersecret"
+    )
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["username"] == "apprise"
+    assert payload["text"] == "Title\r\n<b>Body</b>"
+    assert payload["html"] == "<h1>Title</h1><b>Body</b>"
+
+
+@mock.patch("requests.post")
+def test_plugin_matrix_hookshot_webhook_empty_title(mock_post):
+    """Hookshot webhook mode avoids extra separators for empty titles."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@hookshot.example"
+        "?mode=hookshot&format=markdown&webhook_path=%2Fpublic-hooks"
+    )
+    assert obj is not None
+
+    assert obj.notify(body="**Body**") is True
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["username"] == "apprise"
+    assert payload["text"] == "**Body**"
+    assert payload["html"] == "<p><strong>Body</strong></p>"
+
+
+def test_plugin_matrix_hookshot_path_normalization():
+    """Hookshot webhook paths normalize missing leading slashes."""
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@hookshot.example"
+        "?mode=hookshot&webhook_path=public-hooks"
+    )
+    assert obj is not None
+    assert obj.webhook_path == "/public-hooks"
+
+
+@mock.patch("requests.post")
+def test_plugin_matrix_hookshot_root_path_text(mock_post):
+    """Hookshot root paths and text mode stay literal."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@hookshot.example"
+        "?mode=hookshot&format=text&webhook_path=%2F"
+    )
+    assert obj is not None
+    assert obj.notify(body="<b>Body</b>") is True
+
+    assert mock_post.call_args.args[0] == (
+        "https://hookshot.example/supersecret"
+    )
+    assert loads(mock_post.call_args.kwargs["data"])["html"] == (
+        "&lt;b&gt;Body&lt;/b&gt;"
     )
 
 
