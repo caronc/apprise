@@ -53,6 +53,18 @@ USER_DETECTION_RE = re.compile(
     r"(@[A-Z0-9_]+(?:@[A-Z0-9_.-]+)?)(?=$|[\s,.&()\[\]]+)", re.I
 )
 
+MENTION_DETECTION_RE = re.compile(
+    r"(?<![\w@])(@[A-Z0-9_]+(?:@[A-Z0-9_.-]+)?)(?=$|[\s,.&()\[\]<>]+)",
+    re.I,
+)
+
+HASHTAG_DETECTION_RE = re.compile(
+    r"(?<![#%\w])(#[^\W_][\w]*)(?![#%\w])",
+    re.I,
+)
+
+HASHTAG_VALUE_RE = re.compile(r"^[^\W_][\w]*$", re.I)
+
 
 class MastodonMessageVisibility:
     """The visibility of any status message made."""
@@ -132,7 +144,7 @@ class NotifyMastodon(NotifyBase):
     title_maxlen = 0
 
     # The maximum size of the message
-    body_maxlen = 500
+    mastodon_body_maxlen = 500
 
     # Default to text
     notify_format = NotifyFormat.TEXT
@@ -236,6 +248,13 @@ class NotifyMastodon(NotifyBase):
                 "type": "bool",
                 "default": True,
             },
+            # Explicit mention and hashtag targets. Examples:
+            #  - ping=@caronc,@alice@example.com
+            #  - ping=#apprise,#notifications
+            "ping": {
+                "name": _("Ping Users/Tags"),
+                "type": "list:string",
+            },
         },
     )
 
@@ -250,6 +269,7 @@ class NotifyMastodon(NotifyBase):
         cache=True,
         key=None,
         language=None,
+        ping=None,
         **kwargs,
     ):
         """Initialize Notify Mastodon Object."""
@@ -331,6 +351,8 @@ class NotifyMastodon(NotifyBase):
 
         # Our target users
         self.targets = []
+        self.tags = []
+        tag_seen = set()
 
         # Track any errors
         has_error = False
@@ -342,12 +364,20 @@ class NotifyMastodon(NotifyBase):
                 self.targets.append("@" + match.group("user"))
                 continue
 
+            normalized = self.normalize_ping_token(target)
+            if normalized and normalized.startswith("#"):
+                key = normalized.casefold()
+                if key not in tag_seen:
+                    tag_seen.add(key)
+                    self.tags.append(normalized)
+                continue
+
             has_error = True
             self.logger.warning(
-                f"Dropped invalid Mastodon user ({target}) specified.",
+                f"Dropped invalid Mastodon target ({target}) specified.",
             )
 
-        if has_error and not self.targets:
+        if has_error and not (self.targets or self.tags):
             # We have specified that we want to notify one or more individual
             # and we failed to load any of them.  Since it's also valid to
             # notify no one at all (which means we notify ourselves), it's
@@ -355,6 +385,19 @@ class NotifyMastodon(NotifyBase):
             msg = "No Mastodon targets to notify."
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # Ping targets (tokens from URL, already split by parse_list)
+        self.ping = []
+        ping_seen = set()
+        for target in parse_list(ping):
+            normalized = self.normalize_ping_token(target)
+            if not normalized:
+                continue
+
+            key = normalized.casefold()
+            if key not in ping_seen:
+                ping_seen.add(key)
+                self.ping.append(normalized)
 
         return
 
@@ -370,6 +413,18 @@ class NotifyMastodon(NotifyBase):
             self.token,
             self.host,
             self.port if self.port else (443 if self.secure else 80),
+        )
+
+    @property
+    def body_maxlen(self):
+        """Return the body space available after configured status tokens."""
+
+        tokens = self.ping_tokens(
+            " ".join(self.targets + self.tags + self.ping),
+            normalize=True,
+        )
+        return max(
+            self.mastodon_body_maxlen - len(self.ping_payload(tokens)), 0
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -397,6 +452,9 @@ class NotifyMastodon(NotifyBase):
             # Override Language
             params["language"] = self.language
 
+        if self.ping:
+            params["ping"] = ",".join(self.ping)
+
         default_port = 443 if self.secure else 80
         return "{schema}://{token}@{host}{port}/{targets}?{params}".format(
             schema=(
@@ -413,7 +471,10 @@ class NotifyMastodon(NotifyBase):
                 else f":{self.port}"
             ),
             targets="/".join(
-                [NotifyMastodon.quote(x, safe="@") for x in self.targets]
+                [
+                    NotifyMastodon.quote(x, safe="@")
+                    for x in self.targets + self.tags
+                ]
             ),
             params=NotifyMastodon.urlencode(params),
         )
@@ -436,25 +497,21 @@ class NotifyMastodon(NotifyBase):
         # Build a list of our attachments
         attachments = []
 
-        # Smart Target Detection for Direct Messages; this prevents us from
-        # adding @user entries that were already placed in the message body
-        users = set(USER_DETECTION_RE.findall(body))
-        targets = users - set(self.targets.copy())
-        if (
-            not self.targets
-            and self.visibility == MastodonMessageVisibility.DIRECT
-        ):
-            result = self._whoami()
-            if not result:
-                # Could not access our status
-                return False
+        targets = set()
+        if self.visibility == MastodonMessageVisibility.DIRECT:
+            # Smart Target Detection for Direct Messages; this prevents us
+            # from adding @user entries that were already placed in the body.
+            users = set(MENTION_DETECTION_RE.findall(body))
+            targets = set(self.targets) - users
+            if not self.targets:
+                result = self._whoami()
+                if not result:
+                    # Could not access our status
+                    return False
 
-            myself = "@" + next(iter(result.keys()))
-            if myself in users:
-                targets.remove(myself)
-
-            else:
-                targets.add(myself)
+                myself = "@" + next(iter(result.keys()))
+                if myself not in users:
+                    targets.add(myself)
 
         if attach and self.attachment_support:
             # We need to upload our payload first so that we can source it
@@ -565,10 +622,39 @@ class NotifyMastodon(NotifyBase):
                 # Save our pre-prepared payload for attachment posting
                 attachments.append(response)
 
+        ping_tokens = []
+        seen = {target.casefold() for target in targets}
+        if self.notify_format == NotifyFormat.TEXT:
+            self.ping_tokens(body, seen=seen)
+
+        # Markdown content can carry visible mention and hashtag tokens.
+        # Other formats only append explicitly configured ping values.
+        if self.notify_format == NotifyFormat.MARKDOWN:
+            ping_tokens.extend(self.ping_tokens(body, seen=seen))
+            if self.targets or self.tags or self.ping:
+                ping_tokens.extend(
+                    self.ping_tokens(
+                        " ".join(self.targets + self.tags + self.ping),
+                        normalize=True,
+                        seen=seen,
+                    )
+                )
+
+        # Non-markdown content is not scanned for mention or hashtag tokens.
+        elif self.targets or self.tags or self.ping:
+            ping_tokens.extend(
+                self.ping_tokens(
+                    " ".join(self.targets + self.tags + self.ping),
+                    normalize=True,
+                    seen=seen,
+                )
+            )
+
+        status = "{} {}".format(" ".join(targets), body) if targets else body
+        status += self.ping_payload(ping_tokens)
+
         payload = {
-            "status": (
-                "{} {}".format(" ".join(targets), body) if targets else body
-            ),
+            "status": status,
             "sensitive": self.sensitive,
         }
 
@@ -783,6 +869,79 @@ class NotifyMastodon(NotifyBase):
             )
 
         return not has_error
+
+    def ping_tokens(self, *args, normalize=False, seen=None):
+        """
+        Takes one or more strings and returns Mastodon-recognizable mention
+        and hashtag tokens detected within.
+        """
+
+        results = []
+        seen = seen if seen is not None else set()
+
+        for arg in args:
+            if normalize:
+                for token in parse_list(arg):
+                    normalized = self.normalize_ping_token(token)
+                    if not normalized:
+                        continue
+
+                    key = normalized.casefold()
+                    if key not in seen:
+                        seen.add(key)
+                        results.append(normalized)
+
+                continue
+
+            for token in MENTION_DETECTION_RE.findall(arg):
+                key = token.casefold()
+                if key not in seen:
+                    seen.add(key)
+                    results.append(token)
+
+            for token in HASHTAG_DETECTION_RE.findall(arg):
+                if not self.valid_hashtag(token):
+                    continue
+
+                key = token.casefold()
+                if key not in seen:
+                    seen.add(key)
+                    results.append(token)
+
+        return results
+
+    @staticmethod
+    def ping_payload(tokens):
+        """Return a status suffix from one or more ping tokens."""
+
+        return (" " + " ".join(tokens)) if tokens else ""
+
+    @staticmethod
+    def normalize_ping_token(token):
+        """Normalize a configured ping token into a mention or hashtag."""
+
+        token = token.strip()
+        if not token:
+            return None
+
+        match = IS_USER.match(token)
+        if match and token.startswith("@") and match.group("user"):
+            return "@" + match.group("user")
+
+        if token.startswith("#"):
+            return token if NotifyMastodon.valid_hashtag(token) else None
+
+        return None
+
+    @staticmethod
+    def valid_hashtag(token):
+        """Return True if a token is a valid Mastodon hashtag."""
+
+        value = token[1:] if token.startswith("#") else token
+        if not HASHTAG_VALUE_RE.match(value):
+            return False
+
+        return not value.replace("_", "").isdecimal()
 
     def _whoami(self, lazy=True):
         """Looks details of current authenticated user."""
@@ -999,6 +1158,10 @@ class NotifyMastodon(NotifyBase):
     def parse_url(url):
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
+        if isinstance(url, str):
+            base, sep, query = url.partition("?")
+            url = base.replace("/#", "/%23") + sep + query
+
         results = NotifyBase.parse_url(url)
         if not results:
             # We're done early as we couldn't load the results
@@ -1040,6 +1203,10 @@ class NotifyMastodon(NotifyBase):
             results["language"] = NotifyMastodon.unquote(
                 results["qsd"]["language"]
             )
+
+        # Extract ping targets, comma/space separated
+        if "ping" in results["qsd"]:
+            results["ping"] = NotifyMastodon.unquote(results["qsd"]["ping"])
 
         # Get Sensitive Flag (for Attachments)
         results["sensitive"] = parse_bool(
