@@ -155,6 +155,9 @@ class MatrixWebhookMode:
     # Support the t2bot webhook plugin
     T2BOT = "t2bot"
 
+    # Support matrix-hookshot generic webhooks
+    HOOKSHOT = "hookshot"
+
 
 # webhook modes are placed into this list for validation purposes
 MATRIX_WEBHOOK_MODES = (
@@ -162,6 +165,7 @@ MATRIX_WEBHOOK_MODES = (
     MatrixWebhookMode.MATRIX,
     MatrixWebhookMode.SLACK,
     MatrixWebhookMode.T2BOT,
+    MatrixWebhookMode.HOOKSHOT,
 )
 
 
@@ -236,7 +240,8 @@ class NotifyMatrix(NotifyBase):
 
     # Define object templates
     templates = (
-        # Targets are ignored when using t2bot mode; only a token is required
+        # Targets are ignored when using t2bot/hookshot mode; only a token is
+        # required
         "{schema}://{token}",
         "{schema}://{user}@{token}",
         # Matrix Server
@@ -331,6 +336,12 @@ class NotifyMatrix(NotifyBase):
                 "values": MATRIX_WEBHOOK_MODES,
                 "default": MatrixWebhookMode.DISABLED,
             },
+            "path": {
+                "name": _("Webhook Path"),
+                "type": "string",
+                "map_to": "webhook_path",
+                "default": "/webhook",
+            },
             "version": {
                 "name": _("Matrix API Verion"),
                 "type": "choice:string",
@@ -366,6 +377,7 @@ class NotifyMatrix(NotifyBase):
         include_image=None,
         discovery=None,
         hsreq=None,
+        webhook_path=None,
         e2ee=None,
         **kwargs,
     ):
@@ -420,6 +432,16 @@ class NotifyMatrix(NotifyBase):
         self.hsreq = (
             self.template_args["hsreq"]["default"] if hsreq is None else hsreq
         )
+
+        # Public webhook path used by matrix-hookshot
+        self.webhook_path = (
+            self.template_args["path"]["default"]
+            if not isinstance(webhook_path, str) or not webhook_path.strip()
+            else webhook_path.strip()
+        )
+        if not self.webhook_path.startswith("/"):
+            self.webhook_path = f"/{self.webhook_path}"
+        self.webhook_path = self.webhook_path.rstrip("/") or "/"
 
         # End-to-end encryption (server mode only; requires cryptography)
         self.e2ee = (
@@ -555,7 +577,31 @@ class NotifyMatrix(NotifyBase):
             "Content-Type": "application/json",
         }
 
-        if self.mode != MatrixWebhookMode.T2BOT:
+        if self.mode == MatrixWebhookMode.T2BOT:
+            #
+            # t2bot Setup
+            #
+
+            # Prepare our URL
+            url = (
+                "https://webhooks.t2bot.io/api/v1/matrix/hook/"
+                f"{self.access_token}"
+            )
+
+        elif self.mode == MatrixWebhookMode.HOOKSHOT:
+            # Acquire our access token from our URL
+            access_token = self.password if self.password else self.user
+
+            # Prepare our public hookshot URL
+            url = "{schema}://{hostname}{port}{webhook_path}/{token}".format(
+                schema="https" if self.secure else "http",
+                hostname=self.host,
+                port=("" if not self.port else f":{self.port}"),
+                webhook_path=self.webhook_path.rstrip("/"),
+                token=access_token,
+            )
+
+        else:
             # Acquire our access token from our URL
             access_token = self.password if self.password else self.user
 
@@ -566,17 +612,6 @@ class NotifyMatrix(NotifyBase):
                 port=("" if not self.port else f":{self.port}"),
                 webhook_path=MATRIX_V1_WEBHOOK_PATH,
                 token=access_token,
-            )
-
-        else:
-            #
-            # t2bot Setup
-            #
-
-            # Prepare our URL
-            url = (
-                "https://webhooks.t2bot.io/api/v1/matrix/hook/"
-                f"{self.access_token}"
             )
 
         # Retrieve our payload
@@ -745,6 +780,46 @@ class NotifyMatrix(NotifyBase):
         if image_url:
             # t2bot can take an avatarUrl Entry
             payload["avatarUrl"] = image_url
+
+        return payload
+
+    def _hookshot_webhook_payload(
+        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+    ):
+        """Format the payload for a matrix-hookshot webhook."""
+
+        payload = {
+            "username": self.user if self.user else self.app_id,
+            "text": "",
+        }
+
+        if self.notify_format == NotifyFormat.HTML:
+            payload["text"] = body if not title else f"{title}\r\n{body}"
+            payload["html"] = "{title}{body}".format(
+                title=(
+                    ""
+                    if not title
+                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
+                ),
+                body=body,
+            )
+
+        elif self.notify_format == NotifyFormat.MARKDOWN:
+            payload["text"] = body if not title else f"{title}\r\n{body}"
+            payload["html"] = "{title}{body}".format(
+                title=(
+                    ""
+                    if not title
+                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
+                ),
+                body=markdown(body),
+            )
+
+        else:  # NotifyFormat.TEXT
+            payload["text"] = body if not title else f"{title}\r\n{body}"
+            payload["html"] = NotifyMatrix.escape_html(
+                payload["text"], convert_new_lines=True, whitespace=False
+            )
 
         return payload
 
@@ -2986,6 +3061,11 @@ class NotifyMatrix(NotifyBase):
                 else self.access_token
             ),
             self.port if self.port else (443 if self.secure else 80),
+            (
+                self.webhook_path
+                if self.mode == MatrixWebhookMode.HOOKSHOT
+                else None
+            ),
             self.user if self.mode != MatrixWebhookMode.T2BOT else None,
             self.password if self.mode != MatrixWebhookMode.T2BOT else None,
         )
@@ -3011,6 +3091,9 @@ class NotifyMatrix(NotifyBase):
             "discovery": "yes" if self.discovery else "no",
             "hsreq": "yes" if self.hsreq else "no",
         }
+
+        if self.mode == MatrixWebhookMode.HOOKSHOT:
+            params["path"] = self.webhook_path
 
         if not self.e2ee:
             params["e2ee"] = "no"
@@ -3101,6 +3184,11 @@ class NotifyMatrix(NotifyBase):
                 NotifyMatrix.template_args["hsreq"]["default"],
             )
         )
+
+        if "path" in results["qsd"]:
+            results["webhook_path"] = NotifyMatrix.unquote(
+                results["qsd"]["path"]
+            )
 
         # E2EE flag
         if "e2ee" in results["qsd"]:
