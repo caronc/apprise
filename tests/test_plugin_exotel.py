@@ -34,7 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
-from apprise.plugins.NotifyExotel import NotifyExotel
+from apprise.plugins.exotel import NotifyExotel
 
 logging.disable(logging.CRITICAL)
 
@@ -136,7 +136,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 32, "5" * 11
         ),
         {
-            # use get args to acomplish the same thing
+            # use get args to accomplish the same thing
             "instance": NotifyExotel,
         },
     ),
@@ -217,7 +217,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 32, "5" * 11
         ),
         {
-            # use get args to acomplish the same thing (use source
+            # use get args to accomplish the same thing (use source
             # instead of from)
             "instance": NotifyExotel,
         },
@@ -235,7 +235,7 @@ apprise_url_tests = (
         "exotel://{}:{}@{}".format("a" * 32, "b" * 32, "6" * 11),
         {
             "instance": NotifyExotel,
-            # throw a bizzare code forcing us to fail to look it up
+            # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
         },
@@ -245,7 +245,7 @@ apprise_url_tests = (
         {
             "instance": NotifyExotel,
             # Throws a series of connection and transfer exceptions when
-            # this flag is set and tests that we gracfully handle them
+            # this flag is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
         },
     ),
@@ -282,6 +282,9 @@ def test_plugin_exotel_edge_cases(mock_post):
     with pytest.raises(TypeError):
         NotifyExotel(sid=sid, token=token, source=source, apikey=" ")
 
+    with pytest.raises(TypeError):
+        NotifyExotel(sid=sid, token=token, source=source, region_name=" ")
+
     obj = Apprise.instantiate(
         "exotel://{}:{}@{}/{}?apikey={}&region=in&unicode=no"
         "&priority=high".format(sid, token, source, "/".join(targets), apikey)
@@ -289,6 +292,7 @@ def test_plugin_exotel_edge_cases(mock_post):
 
     assert isinstance(obj, NotifyExotel)
     assert len(obj) == len(targets)
+    assert set(obj.targets) == set(targets)
 
     assert obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
 
@@ -300,13 +304,27 @@ def test_plugin_exotel_edge_cases(mock_post):
     )
     assert first_call[1]["auth"] == (apikey, token)
 
-    payload = first_call[1]["data"]
-    assert payload["From"] == source
-    assert payload["To"] == targets[-1]
-    assert payload["Body"] == "title\r\nbody"
-    assert payload["EncodingType"] == "plain"
-    assert payload["Priority"] == "high"
-    assert "StatusCallback" not in payload
+    first_payload = first_call[1]["data"]
+    assert first_payload["From"] == source
+    assert first_payload["To"] == obj.targets[0]
+    assert first_payload["Body"] == "title\r\nbody"
+    assert first_payload["EncodingType"] == "plain"
+    assert first_payload["Priority"] == "high"
+    assert "StatusCallback" not in first_payload
+
+    second_call = mock_post.call_args_list[1]
+    assert second_call[0][0] == (
+        "https://api.in.exotel.com/v1/Accounts/{}/Sms/send".format(sid)
+    )
+    assert second_call[1]["auth"] == (apikey, token)
+
+    second_payload = second_call[1]["data"]
+    assert second_payload["From"] == source
+    assert second_payload["To"] == obj.targets[1]
+    assert second_payload["Body"] == "title\r\nbody"
+    assert second_payload["EncodingType"] == "plain"
+    assert second_payload["Priority"] == "high"
+    assert "StatusCallback" not in second_payload
 
     # Targets must not be part of the URL identifier.
     obj_cmp = Apprise.instantiate(

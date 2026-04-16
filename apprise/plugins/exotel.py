@@ -129,7 +129,7 @@ class NotifyExotel(NotifyBase):
     # The services URL
     service_url = "https://exotel.com/"
 
-    # The default protocol (nexmo kept for backwards compatibility)
+    # The default protocol
     secure_protocol = "exotel"
 
     # A URL that takes you to the setup/help of the specific protocol
@@ -168,7 +168,11 @@ class NotifyExotel(NotifyBase):
                 "name": _("From Phone No / Sender ID"),
                 "type": "string",
                 "required": True,
-                "regex": (r"^[A-Z0-9\s)(+_.-]+$", "i"),
+                "regex": (
+                    r"^(?:(?=.{3,16}$)(?=.*[A-Z.-])[A-Z0-9][A-Z0-9.-]*"
+                    r"|[0-9]{6}|\+?[0-9\s)(+-]{9,})$",
+                    "i",
+                ),
                 "map_to": "source",
             },
             "target_phone": {
@@ -279,23 +283,23 @@ class NotifyExotel(NotifyBase):
         self.invalid_targets = []
 
         # Store our region
-        try:
-            self.region_name = (
-                self.template_args["region"]["default"]
-                if region_name is None
-                else region_name.lower()
-            )
+        self.region_name = (
+            self.template_args["region"]["default"]
+            if region_name is None
+            else validate_regex(region_name)
+        )
+        if not self.region_name:
+            self.region_name = ""
+        else:
+            self.region_name = self.region_name.lower()
 
-            if self.region_name not in EXOTEL_REGIONS:
-                # allow the outer except to handle this common response
-                raise
-        except Exception:
+        if self.region_name not in EXOTEL_REGIONS:
             # Invalid region specified
             msg = "The Exotel region specified ({}) is invalid.".format(
                 region_name
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise TypeError(msg)
 
         # Define whether or not we should set the unicode flag
         self.unicode = (
@@ -316,10 +320,9 @@ class NotifyExotel(NotifyBase):
             # priority mapping
             self.priority = priority.lower().strip()
 
-            # This little bit of black magic allows us to match against
-            # low, lo, l (for low);
+            # Allow partial matching against supported priorities:
             # normal, norma, norm, nor, no, n (for normal)
-            # ... etc
+            # high, hig, hi, h (for high)
             result = (
                 next(
                     (
@@ -443,7 +446,7 @@ class NotifyExotel(NotifyBase):
                 r = requests.post(
                     notify_url,
                     auth=auth,
-                    data=payload,
+                    data=payload.copy(),
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
