@@ -396,7 +396,7 @@ class NotifyExotel(NotifyBase):
             self.targets.append(result["full"])
 
         if len(self.targets) == 0 and not self.invalid_targets:
-            # No sources specified, use our own phone no
+            # No targets specified, use our own source.
             self.targets.append(self.source)
 
         return

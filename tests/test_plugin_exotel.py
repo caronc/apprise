@@ -302,6 +302,32 @@ def test_plugin_exotel_edge_cases(mock_post):
     with pytest.raises(TypeError):
         NotifyExotel(sid=sid, token=token, source=source, priority=" ")
 
+    # Programmatic priority shorthand is supported as an Apprise convenience.
+    obj = NotifyExotel(sid=sid, token=token, source="5" * 11, priority="+")
+    assert obj.priority == "high"
+    assert obj.targets == ["5" * 11]
+
+    mock_post.reset_mock()
+    assert obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args_list[0][1]["data"]
+    assert payload["From"] == "5" * 11
+    assert payload["To"] == "5" * 11
+    assert payload["Priority"] == "high"
+
+    # When a Sender ID is provided without targets, pass it upstream as the
+    # implicit recipient and let Exotel decide whether it is deliverable.
+    obj = NotifyExotel(sid=sid, token=token, source=source)
+    assert obj.targets == [source]
+    assert len(obj) == 1
+
+    mock_post.reset_mock()
+    assert obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+    assert mock_post.call_count == 1
+    payload = mock_post.call_args_list[0][1]["data"]
+    assert payload["From"] == source
+    assert payload["To"] == source
+
     obj = Apprise.instantiate(
         "exotel://{}:{}@{}/{}?apikey={}&region=in&unicode=no"
         "&priority=high".format(sid, token, source, "/".join(targets), apikey)
@@ -311,6 +337,7 @@ def test_plugin_exotel_edge_cases(mock_post):
     assert len(obj) == len(targets)
     assert set(obj.targets) == set(targets)
 
+    mock_post.reset_mock()
     assert obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
 
     assert mock_post.call_count == len(targets)
@@ -371,6 +398,28 @@ def test_plugin_exotel_edge_cases(mock_post):
     assert payload["Priority"] == "high"
     assert "StatusCallback" not in payload
     assert "batch=yes" in obj.url()
+
+    batch_targets = tuple("6{:010d}".format(i) for i in range(101))
+    batch_obj = NotifyExotel(
+        sid=sid,
+        token=token,
+        source=source,
+        targets=batch_targets,
+        batch=True,
+    )
+    assert len(batch_obj) == 2
+
+    mock_post.reset_mock()
+    assert batch_obj.notify(
+        body="body", title="title", notify_type=NotifyType.INFO
+    )
+    assert mock_post.call_count == 2
+
+    first_payload = mock_post.call_args_list[0][1]["data"]
+    assert first_payload["To"] == list(batch_targets[:100])
+
+    second_payload = mock_post.call_args_list[1][1]["data"]
+    assert second_payload["To"] == list(batch_targets[100:])
 
     # Targets must not be part of the URL identifier.
     obj_cmp = Apprise.instantiate(
