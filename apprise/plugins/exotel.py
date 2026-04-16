@@ -123,6 +123,10 @@ class NotifyExotel(NotifyBase):
     A wrapper for Exotel Notifications
     """
 
+    # Exotel supports static bulk SMS by accepting an array of To values on
+    # the same /Sms/send endpoint.
+    default_batch_size = 100
+
     # The default descriptive name associated with the Notification
     service_name = "Exotel"
 
@@ -153,7 +157,7 @@ class NotifyExotel(NotifyBase):
         NotifyBase.template_tokens,
         **{
             "sid": {
-                "name": _("Secure ID"),
+                "name": _("Account SID"),
                 "type": "string",
                 "required": True,
                 "private": True,
@@ -214,6 +218,11 @@ class NotifyExotel(NotifyBase):
             "key": {
                 "alias_of": "apikey",
             },
+            "batch": {
+                "name": _("Batch Mode"),
+                "type": "bool",
+                "default": False,
+            },
             "unicode": {
                 # Unicode characters
                 "name": _("Unicode Characters"),
@@ -243,6 +252,7 @@ class NotifyExotel(NotifyBase):
         source,
         targets=None,
         apikey=None,
+        batch=None,
         unicode=None,
         priority=None,
         region_name=None,
@@ -308,6 +318,13 @@ class NotifyExotel(NotifyBase):
             else bool(unicode)
         )
 
+        # Define whether or not we should operate in batch mode
+        self.batch = (
+            self.template_args["batch"]["default"]
+            if batch is None
+            else bool(batch)
+        )
+
         #
         # Priority
         #
@@ -332,7 +349,7 @@ class NotifyExotel(NotifyBase):
                     ),
                     None,
                 )
-                if priority
+                if self.priority
                 else None
             )
 
@@ -418,8 +435,16 @@ class NotifyExotel(NotifyBase):
             "To": None,
         }
 
-        # Create a copy of the targets list
-        targets = list(self.targets)
+        # Prepare our targets
+        batch_size = 1 if not self.batch else self.default_batch_size
+        targets = (
+            list(self.targets)
+            if batch_size == 1
+            else [
+                self.targets[index : index + batch_size]
+                for index in range(0, len(self.targets), batch_size)
+            ]
+        )
 
         # Prepare our notify_url
         notify_url = EXOTEL_API_LOOKUP[self.region_name].format(sid=self.sid)
@@ -428,8 +453,14 @@ class NotifyExotel(NotifyBase):
             # Get our target to notify
             target = targets.pop(0)
 
-            # Prepare our user
+            # Prepare our user(s)
             payload["To"] = target
+
+            p_target = (
+                "{} targets".format(len(target))
+                if isinstance(target, list)
+                else target
+            )
 
             # Some Debug Logging
             self.logger.debug(
@@ -461,7 +492,7 @@ class NotifyExotel(NotifyBase):
                     self.logger.warning(
                         "Failed to send Exotel notification to {}: "
                         "{}{}error={}.".format(
-                            target,
+                            p_target,
                             status_str,
                             ", " if status_str else "",
                             r.status_code,
@@ -477,13 +508,15 @@ class NotifyExotel(NotifyBase):
                     continue
 
                 else:
-                    self.logger.info("Sent Exotel notification to %s.", target)
+                    self.logger.info(
+                        "Sent Exotel notification to %s.", p_target
+                    )
 
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending Exotel:%s "
                     "notification.",
-                    target,
+                    p_target,
                 )
                 self.logger.debug("Socket Exception: %s", str(e))
 
@@ -516,6 +549,7 @@ class NotifyExotel(NotifyBase):
 
         # Define any URL parameters
         params = {
+            "batch": "yes" if self.batch else "no",
             "unicode": "yes" if self.unicode else "no",
             "region": self.region_name,
             "priority": self.priority,
@@ -544,8 +578,17 @@ class NotifyExotel(NotifyBase):
 
     def __len__(self):
         """Returns the number of targets associated with this notification."""
+        batch_size = 1 if not self.batch else self.default_batch_size
         targets = len(self.targets)
-        return targets if targets > 0 else 1
+        if not targets:
+            return 1
+
+        if batch_size > 1:
+            targets = int(targets / batch_size) + (
+                1 if targets % batch_size else 0
+            )
+
+        return targets
 
     @staticmethod
     def parse_url(url):
@@ -615,6 +658,13 @@ class NotifyExotel(NotifyBase):
             results["priority"] = NotifyExotel.unquote(
                 results["qsd"]["priority"]
             )
+
+        # Get Batch Mode Flag
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch", NotifyExotel.template_args["batch"]["default"]
+            )
+        )
 
         # Unicode Characters
         results["unicode"] = parse_bool(

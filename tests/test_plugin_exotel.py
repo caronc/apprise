@@ -119,8 +119,6 @@ apprise_url_tests = (
         {
             # using short-code (5 characters) is not supported
             "instance": TypeError,
-            # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "exotel://...aaaa:b...b@12345",
         },
     ),
     (
@@ -128,6 +126,22 @@ apprise_url_tests = (
         {
             # using phone no with no target - we text ourselves in
             # this case
+            "instance": NotifyExotel,
+            # Our expected url(privacy=True) startswith() response:
+            "privacy_url": "exotel://****:b...b@55555555555/",
+        },
+    ),
+    (
+        "exotel://{}:{}@{}?batch=yes".format("a" * 32, "b" * 32, "5" * 11),
+        {
+            # Test batch flag
+            "instance": NotifyExotel,
+        },
+    ),
+    (
+        "exotel://{}:{}@{}?batch=no".format("a" * 32, "b" * 32, "5" * 11),
+        {
+            # Test batch flag
             "instance": NotifyExotel,
         },
     ),
@@ -285,6 +299,9 @@ def test_plugin_exotel_edge_cases(mock_post):
     with pytest.raises(TypeError):
         NotifyExotel(sid=sid, token=token, source=source, region_name=" ")
 
+    with pytest.raises(TypeError):
+        NotifyExotel(sid=sid, token=token, source=source, priority=" ")
+
     obj = Apprise.instantiate(
         "exotel://{}:{}@{}/{}?apikey={}&region=in&unicode=no"
         "&priority=high".format(sid, token, source, "/".join(targets), apikey)
@@ -325,6 +342,35 @@ def test_plugin_exotel_edge_cases(mock_post):
     assert second_payload["EncodingType"] == "plain"
     assert second_payload["Priority"] == "high"
     assert "StatusCallback" not in second_payload
+
+    obj = Apprise.instantiate(
+        "exotel://{}:{}@{}/{}?apikey={}&region=in&unicode=no"
+        "&priority=high&batch=yes".format(
+            sid, token, source, "/".join(targets), apikey
+        )
+    )
+    assert isinstance(obj, NotifyExotel)
+    assert len(obj) == 1
+    assert set(obj.targets) == set(targets)
+
+    mock_post.reset_mock()
+    assert obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+    assert mock_post.call_count == 1
+
+    first_call = mock_post.call_args_list[0]
+    assert first_call[0][0] == (
+        "https://api.in.exotel.com/v1/Accounts/{}/Sms/send".format(sid)
+    )
+    assert first_call[1]["auth"] == (apikey, token)
+
+    payload = first_call[1]["data"]
+    assert payload["From"] == source
+    assert payload["To"] == obj.targets
+    assert payload["Body"] == "title\r\nbody"
+    assert payload["EncodingType"] == "plain"
+    assert payload["Priority"] == "high"
+    assert "StatusCallback" not in payload
+    assert "batch=yes" in obj.url()
 
     # Targets must not be part of the URL identifier.
     obj_cmp = Apprise.instantiate(
