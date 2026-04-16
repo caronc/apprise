@@ -412,9 +412,6 @@ class NotifyOctopush(NotifyBase):
             self.api_login,
             self.api_key,
             self.sender,
-            self.purpose,
-            self.mtype,
-            self.replies,
         )
 
     def url(self, privacy=False, *args, **kwargs):

@@ -30,6 +30,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 from apprise import Apprise, NotifyType
@@ -202,6 +203,50 @@ def test_plugin_octopush_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+def test_plugin_octopush_parse_url_and_validation():
+    """NotifyOctopush() parse_url() and validation coverage."""
+
+    assert NotifyOctopush.parse_url(None) is None
+
+    with pytest.raises(TypeError):
+        NotifyOctopush(
+            api_login="user@myaccount.com",
+            api_key="apikey",
+            targets=("1234567890",),
+            purpose=" ",
+        )
+
+    results = NotifyOctopush.parse_url(
+        "octopush://sender:user@myaccount.com/apikey/1234567890"
+        "?to=2345678901&type=sms_premium&purpose=alert&batch=yes"
+        "&replies=no"
+    )
+    assert isinstance(results, dict)
+    assert results["api_key"] == "apikey"
+    assert results["api_login"] == "user@myaccount.com"
+    assert results["sender"] == "sender"
+    assert results["targets"] == ["1234567890", "2345678901"]
+    assert results["mtype"] == "sms_premium"
+    assert results["purpose"] == "alert"
+    assert results["batch"] is True
+    assert results["replies"] is False
+
+    results = NotifyOctopush.parse_url(
+        "octopush://_?login=user@myaccount.com&key=apikey&sender=abc"
+        "&to=3456789012&type=sms_low_cost&purpose=wholesale"
+        "&batch=no&replies=yes"
+    )
+    assert isinstance(results, dict)
+    assert results["api_key"] == "apikey"
+    assert results["api_login"] == "user@myaccount.com"
+    assert results["sender"] == "abc"
+    assert results["targets"] == ["3456789012"]
+    assert results["mtype"] == "sms_low_cost"
+    assert results["purpose"] == "wholesale"
+    assert results["batch"] is False
+    assert results["replies"] is True
 
 
 @mock.patch("requests.post")
