@@ -177,6 +177,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | [DAPNET](https://appriseit.com/services/dapnet/) | dapnet://  | (TCP) 80   | dapnet://user:pass@callsign<br/>dapnet://user:pass@callsign1/callsign2/callsignN
 | [D7 Networks](https://appriseit.com/services/d7networks/) | d7sms://  | (TCP) 443   | d7sms://token@PhoneNo<br/>d7sms://token@ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [DingTalk](https://appriseit.com/services/dingtalk/)  | dingtalk://   | (TCP) 443   | dingtalk://token/<br />dingtalk://token/ToPhoneNo<br />dingtalk://token/ToPhoneNo1/ToPhoneNo2/ToPhoneNo1/
+| [Exotel](https://appriseit.com/services/exotel/) | exotel://  | (TCP) 443   | exotel://sid:token@FromPhoneNo<br/>exotel://sid:token@FromPhoneNo/ToPhoneNo<br/>exotel://sid:token@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
 | [Free-Mobile](https://appriseit.com/services/freemobile/)  | freemobile://   | (TCP) 443   | freemobile://user@password/
 | [httpSMS](https://appriseit.com/services/httpsms/) | httpsms://  | (TCP) 443   | httpsms://ApiKey@FromPhoneNo<br/>httpsms://ApiKey@FromPhoneNo/ToPhoneNo<br/>httpsms://ApiKey@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Kavenegar](https://appriseit.com/services/kavenegar/) | kavenegar://  | (TCP) 443   | kavenegar://ApiKey/ToPhoneNo<br/>kavenegar://FromPhoneNo@ApiKey/ToPhoneNo<br/>kavenegar://ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN
