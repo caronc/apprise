@@ -27,9 +27,13 @@
 
 # Disable logging for a cleaner testing output
 import logging
+from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
+import requests
 
+from apprise import Apprise, NotifyType
 from apprise.plugins.NotifyExotel import NotifyExotel
 
 logging.disable(logging.CRITICAL)
@@ -65,6 +69,13 @@ apprise_url_tests = (
         },
     ),
     (
+        "exotel://{}:{}@/%20".format("a" * 32, "b" * 32),
+        {
+            # sid and token provided but no from
+            "instance": TypeError,
+        },
+    ),
+    (
         "exotel://{}:{}@{}".format("a" * 32, "b" * 32, "3" * 8),
         {
             # sid and token provided and from but invalid from no
@@ -75,6 +86,20 @@ apprise_url_tests = (
         "exotel://{}:{}@{}".format("a" * 32, "b" * 32, "3" * 9),
         {
             # sid and token provided and from
+            "instance": NotifyExotel,
+        },
+    ),
+    (
+        "exotel://{}:{}@EXOTEL/{}".format("a" * 32, "b" * 32, "3" * 9),
+        {
+            # sid and token provided with a sender ID source
+            "instance": NotifyExotel,
+        },
+    ),
+    (
+        "exotel://{}:{}@600123/{}".format("a" * 32, "b" * 32, "3" * 9),
+        {
+            # sid and token provided with a numeric sender ID source
             "instance": NotifyExotel,
         },
     ),
@@ -230,5 +255,89 @@ apprise_url_tests = (
 def test_plugin_exotel_urls():
     """NotifyExotel() Apprise URLs."""
 
+    assert NotifyExotel.setup_url == "https://appriseit.com/services/exotel/"
+
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_exotel_edge_cases(mock_post):
+    """NotifyExotel() Edge Cases."""
+
+    sid = "a" * 32
+    apikey = "api-key"
+    token = "b" * 32
+    source = "LM-EXOTEL"
+    targets = ("6" * 11, "7" * 11)
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+
+    mock_post.return_value = response
+
+    with pytest.raises(TypeError):
+        NotifyExotel(sid=sid, token=token, source=" ")
+
+    with pytest.raises(TypeError):
+        NotifyExotel(sid=sid, token=token, source=source, apikey=" ")
+
+    obj = Apprise.instantiate(
+        "exotel://{}:{}@{}/{}?apikey={}&region=in&unicode=no"
+        "&priority=high".format(sid, token, source, "/".join(targets), apikey)
+    )
+
+    assert isinstance(obj, NotifyExotel)
+    assert len(obj) == len(targets)
+
+    assert obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+
+    assert mock_post.call_count == len(targets)
+
+    first_call = mock_post.call_args_list[0]
+    assert first_call[0][0] == (
+        "https://api.in.exotel.com/v1/Accounts/{}/Sms/send".format(sid)
+    )
+    assert first_call[1]["auth"] == (apikey, token)
+
+    payload = first_call[1]["data"]
+    assert payload["From"] == source
+    assert payload["To"] == targets[-1]
+    assert payload["Body"] == "title\r\nbody"
+    assert payload["EncodingType"] == "plain"
+    assert payload["Priority"] == "high"
+    assert "StatusCallback" not in payload
+
+    # Targets must not be part of the URL identifier.
+    obj_cmp = Apprise.instantiate(
+        "exotel://{}:{}@{}/{}?region=in".format(sid, token, source, "8" * 11)
+    )
+    assert obj.url_id() != obj_cmp.url_id()
+
+    obj_cmp = Apprise.instantiate(
+        "exotel://{}:{}@{}/{}?apikey={}&region=in".format(
+            sid, token, source, "8" * 11, apikey
+        )
+    )
+    assert obj.url_id() == obj_cmp.url_id()
+
+    obj_cmp = Apprise.instantiate(
+        "exotel://{}:{}@{}/{}?key={}&region=in".format(
+            sid, token, source, "8" * 11, apikey
+        )
+    )
+    assert obj.url_id() == obj_cmp.url_id()
+
+    # Region changes the upstream API host and should alter the identifier.
+    obj_cmp = Apprise.instantiate(
+        "exotel://{}:{}@{}/{}?apikey={}&region=us".format(
+            sid, token, source, "8" * 11, apikey
+        )
+    )
+    assert obj.url_id() != obj_cmp.url_id()
+
+    # Even if all provided targets are invalid, Apprise treats the notifier
+    # as one logical request target for length purposes.
+    obj = Apprise.instantiate(f"exotel://{sid}:{token}@{source}/abcd")
+    assert isinstance(obj, NotifyExotel)
+    assert len(obj) == 1

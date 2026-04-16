@@ -26,13 +26,19 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from itertools import chain
+import re
 
 import requests
 
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from ..utils.parse import (
+    is_phone_no,
+    parse_bool,
+    parse_phone_no,
+    validate_regex,
+)
 from .base import NotifyBase
 
 
@@ -91,6 +97,26 @@ EXOTEL_REGIONS = (
     ExotelRegion.IN,
 )
 
+EXOTEL_SOURCE_RE = re.compile(r"^[A-Z0-9][A-Z0-9.-]{2,15}$", re.I)
+
+
+def parse_exotel_source(source):
+    """Parse an Exotel source as an ExoPhone or approved Sender ID."""
+    source = validate_regex(source)
+    if not source:
+        return None
+
+    result = is_phone_no(source, min_len=9)
+    if result:
+        return result["full"]
+
+    if EXOTEL_SOURCE_RE.match(source) and (
+        not source.isdigit() or len(source) == 6
+    ):
+        return source
+
+    return None
+
 
 class NotifyExotel(NotifyBase):
     """
@@ -139,10 +165,10 @@ class NotifyExotel(NotifyBase):
                 "required": True,
             },
             "from_phone": {
-                "name": _("From Phone No"),
+                "name": _("From Phone No / Sender ID"),
                 "type": "string",
                 "required": True,
-                "regex": (r"^\+?[0-9\s)(+-]+$", "i"),
+                "regex": (r"^[A-Z0-9\s)(+_.-]+$", "i"),
                 "map_to": "source",
             },
             "target_phone": {
@@ -175,6 +201,15 @@ class NotifyExotel(NotifyBase):
             "token": {
                 "alias_of": "token",
             },
+            "apikey": {
+                "name": _("API Key"),
+                "type": "string",
+                "private": True,
+                "map_to": "apikey",
+            },
+            "key": {
+                "alias_of": "apikey",
+            },
             "unicode": {
                 # Unicode characters
                 "name": _("Unicode Characters"),
@@ -203,6 +238,7 @@ class NotifyExotel(NotifyBase):
         token,
         source,
         targets=None,
+        apikey=None,
         unicode=None,
         priority=None,
         region_name=None,
@@ -225,6 +261,16 @@ class NotifyExotel(NotifyBase):
         if not self.token:
             msg = "An invalid Exotel API Token ({}) was specified.".format(
                 token
+            )
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # API Key used as the HTTP Basic Auth username. Older URLs did not
+        # carry this separately, so default it to the account SID.
+        self.apikey = validate_regex(apikey if apikey else sid)
+        if not self.apikey:
+            msg = "An invalid Exotel API Key ({}) was specified.".format(
+                apikey
             )
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -301,18 +347,17 @@ class NotifyExotel(NotifyBase):
         # The Source Phone #
         self.source = source
 
-        result = is_phone_no(source, min_len=9)
+        result = parse_exotel_source(source)
         if not result:
             msg = (
-                "The Account (From) Phone # specified ({}) is invalid.".format(
-                    source
-                )
+                "The Account (From) Phone # / Sender ID specified "
+                "({}) is invalid.".format(source)
             )
             self.logger.warning(msg)
             raise TypeError(msg)
 
         # Store our parsed value
-        self.source = result["full"]
+        self.source = result
 
         # Parse our targets
         self.targets = []
@@ -356,7 +401,7 @@ class NotifyExotel(NotifyBase):
         }
 
         # Our authentication
-        auth = (self.sid, self.token)
+        auth = (self.apikey, self.token)
 
         # Prepare our payload
         payload = {
@@ -365,8 +410,7 @@ class NotifyExotel(NotifyBase):
             "EncodingType": ExotelEncoding.UNICODE
             if self.unicode
             else ExotelEncoding.TEXT,
-            "priority": self.priority,
-            "StatusCallback": None,
+            "Priority": self.priority,
             # The to gets populated in the loop below
             "To": None,
         }
@@ -455,6 +499,7 @@ class NotifyExotel(NotifyBase):
         """
         return (
             self.secure_protocol,
+            self.apikey,
             self.sid,
             self.token,
             self.source,
@@ -472,6 +517,8 @@ class NotifyExotel(NotifyBase):
             "region": self.region_name,
             "priority": self.priority,
         }
+        if self.apikey != self.sid:
+            params["apikey"] = self.pprint(self.apikey, privacy, safe="")
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -494,7 +541,8 @@ class NotifyExotel(NotifyBase):
 
     def __len__(self):
         """Returns the number of targets associated with this notification."""
-        return len(self.targets)
+        targets = len(self.targets)
+        return targets if targets > 0 else 1
 
     @staticmethod
     def parse_url(url):
@@ -535,6 +583,15 @@ class NotifyExotel(NotifyBase):
             # Extract the API SID from an argument
             results["sid"] = NotifyExotel.unquote(results["qsd"]["sid"])
 
+        # API Key
+        if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
+            # Extract the API Key from an argument
+            results["apikey"] = NotifyExotel.unquote(results["qsd"]["apikey"])
+
+        elif "key" in results["qsd"] and len(results["qsd"]["key"]):
+            # Extract the API Key from an argument
+            results["apikey"] = NotifyExotel.unquote(results["qsd"]["key"])
+
         # Support the 'from'  and 'source' variable so that we can support
         # targets this way too.
         # The 'from' makes it easier to use yaml configuration
@@ -555,5 +612,12 @@ class NotifyExotel(NotifyBase):
             results["priority"] = NotifyExotel.unquote(
                 results["qsd"]["priority"]
             )
+
+        # Unicode Characters
+        results["unicode"] = parse_bool(
+            results["qsd"].get(
+                "unicode", NotifyExotel.template_args["unicode"]["default"]
+            )
+        )
 
         return results
