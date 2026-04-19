@@ -261,7 +261,9 @@ class NotifyDot(NotifyBase):
         self.icon = icon if isinstance(icon, str) else None
 
         # Image payload for the Image API (base64 PNG 296x152).
-        self.image_data = image_data if isinstance(image_data, str) else None
+        self.image_data = (
+            image_data if image_data and isinstance(image_data, str) else None
+        )
 
         # Link for tap-to-interact navigation.
         self.link = link if isinstance(link, str) else None
@@ -276,7 +278,9 @@ class NotifyDot(NotifyBase):
         self.dither_kernel = dither_kernel
 
         # Task Key for specifying which content to update
-        self.task_key = task_key if isinstance(task_key, str) else None
+        self.task_key = (
+            task_key if task_key and isinstance(task_key, str) else None
+        )
 
         # Text API endpoint (v2)
         self.text_api_url = (
