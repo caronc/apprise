@@ -55,6 +55,16 @@
 #   - ditherKernel (string, optional, default FLOYD_STEINBERG):
 #     dithering kernel.
 #   - taskKey (string, optional): specify which image API content to update.
+#
+# Mode selection:
+#   - text (default): smart dual-send mode.  Body/title go to the Text API;
+#     image= param or an attachment goes to the Image API.  When both are
+#     present, text is dispatched first, then image.  If only one is
+#     available, only that API is called.
+#   - image: only the Image API is called; body and title are ignored.
+#
+#   Providing image= in the URL without an explicit mode= leaves the mode
+#   as the default (text), which will send the image alongside any text.
 
 from contextlib import suppress
 import json
@@ -90,13 +100,15 @@ DOT_DITHER_KERNELS = (
     "DIFFUSION_2D",
 )
 
+# Supported API modes; first entry is the default
+DOT_MODES = ("text", "image")
+
 
 class NotifyDot(NotifyBase):
     """A wrapper for Dot. Notifications."""
 
     # The default descriptive name associated with the Notification
     service_name = "Dot."
-    # Alias: devices marketed as "Quote/0" remain discoverable.
 
     # The services URL
     service_url = "https://dot.mindreset.tech"
@@ -113,15 +125,10 @@ class NotifyDot(NotifyBase):
     # Support Attachments
     attachment_support = True
 
-    # Supported API modes
-    SUPPORTED_MODES = ("text", "image")
-
-    DEFAULT_MODE = "text"
-
     # Define object templates
-    templates = ("{schema}://{apikey}@{device_id}/{mode}/",)
+    templates = ("{schema}://{apikey}@{device_id}/",)
 
-    # Define our template arguments
+    # Define our template tokens
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
@@ -137,14 +144,6 @@ class NotifyDot(NotifyBase):
                 "required": True,
                 "map_to": "device_id",
             },
-            "mode": {
-                "name": _("API Mode"),
-                "type": "choice:string",
-                "values": SUPPORTED_MODES,
-                "default": DEFAULT_MODE,
-                "required": True,
-                "map_to": "mode",
-            },
         },
     )
 
@@ -152,6 +151,12 @@ class NotifyDot(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "mode": {
+                "name": _("API Mode"),
+                "type": "choice:string",
+                "values": DOT_MODES,
+                "default": DOT_MODES[0],
+            },
             "refresh": {
                 "name": _("Refresh Now"),
                 "type": "bool",
@@ -200,19 +205,12 @@ class NotifyDot(NotifyBase):
             },
         },
     )
-    # Note:
-    # - icon (Text API): base64 PNG icon (40px x 40px) in lower-left corner.
-    #   Can be provided via `icon` parameter or first attachment.
-    # - image (Image API): base64 PNG image (296px x 152px) supplied via
-    #   configuration `image` parameter or first attachment.
-    # - Only the first attachment is used; multiple attachments trigger a
-    #   warning.
 
     def __init__(
         self,
         apikey=None,
         device_id=None,
-        mode=DEFAULT_MODE,
+        mode=DOT_MODES[0],
         refresh_now=None,
         signature=None,
         icon=None,
@@ -243,16 +241,13 @@ class NotifyDot(NotifyBase):
             else self.template_args["refresh"]["default"]
         )
 
-        # API mode ("text" or "image")
+        # API mode
         self.mode = (
             mode.lower()
-            if isinstance(mode, str) and mode.lower() in self.SUPPORTED_MODES
-            else self.DEFAULT_MODE
+            if isinstance(mode, str) and mode.lower() in DOT_MODES
+            else DOT_MODES[0]
         )
-        if (
-            not isinstance(mode, str)
-            or mode.lower() not in self.SUPPORTED_MODES
-        ):
+        if not isinstance(mode, str) or mode.lower() not in DOT_MODES:
             self.logger.warning(
                 "Unsupported Dot mode (%s) specified; defaulting to '%s'.",
                 mode,
@@ -263,17 +258,10 @@ class NotifyDot(NotifyBase):
         self.signature = signature if isinstance(signature, str) else None
 
         # Icon for the Text API (base64 PNG 40x40, lower-left corner).
-        # Note: distinct from the Image API "image" field.
         self.icon = icon if isinstance(icon, str) else None
 
         # Image payload for the Image API (base64 PNG 296x152).
         self.image_data = image_data if isinstance(image_data, str) else None
-        if self.mode == "text" and self.image_data:
-            self.logger.warning(
-                "Image data provided in text mode; ignoring configurable"
-                " image payload."
-            )
-            self.image_data = None
 
         # Link for tap-to-interact navigation.
         self.link = link if isinstance(link, str) else None
@@ -292,17 +280,124 @@ class NotifyDot(NotifyBase):
 
         # Text API endpoint (v2)
         self.text_api_url = (
-            f"https://dot.mindreset.tech/api/authV2/open/device/"
+            "https://dot.mindreset.tech/api/authV2/open/device/"
             f"{self.device_id}/text"
         )
 
         # Image API endpoint (v2)
         self.image_api_url = (
-            f"https://dot.mindreset.tech/api/authV2/open/device/"
+            "https://dot.mindreset.tech/api/authV2/open/device/"
             f"{self.device_id}/image"
         )
 
         return
+
+    def _post(self, api_url, payload, headers):
+        """POST payload to api_url; return True on success, False otherwise."""
+
+        if self.logger.isEnabledFor(logging.DEBUG):
+            self.logger.debug(
+                "Dot POST URL: %s (cert_verify=%r)",
+                api_url,
+                self.verify_certificate,
+            )
+            self.logger.debug("Dot Payload %s", sanitize_payload(payload))
+
+        # Always call throttle before any remote server i/o is made
+        self.throttle()
+
+        try:
+            r = requests.post(
+                api_url,
+                data=json.dumps(payload),
+                headers=headers,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+            )
+
+            if r.status_code == requests.codes.ok:
+                self.logger.info(
+                    "Sent Dot notification to %s.", self.device_id
+                )
+                return True
+
+            status_str = NotifyDot.http_response_code_lookup(r.status_code)
+            self.logger.warning(
+                "Failed to send Dot notification to %s: %s%serror=%d.",
+                self.device_id,
+                status_str,
+                ", " if status_str else "",
+                r.status_code,
+            )
+            self.logger.debug(
+                "Response Details:\r\n%r", (r.content or b"")[:2000]
+            )
+            return False
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A Connection error occurred sending Dot notification to %s.",
+                self.device_id,
+            )
+            self.logger.debug("Socket Exception: %s", str(e))
+            return False
+
+    def _send_text(self, body, title, icon_data, headers):
+        """Send body/title via the Text API."""
+        payload = {"refreshNow": self.refresh_now}
+
+        if title:
+            payload["title"] = title
+        if body:
+            payload["message"] = body
+        if self.signature:
+            payload["signature"] = self.signature
+        if icon_data:
+            payload["icon"] = icon_data
+        if self.link:
+            payload["link"] = self.link
+        if self.task_key is not None:
+            payload["taskKey"] = self.task_key
+
+        return self._post(self.text_api_url, payload, headers)
+
+    def _send_image(self, image_data, headers):
+        """Send image_data via the Image API."""
+        payload = {
+            "image": image_data,
+            "refreshNow": self.refresh_now,
+        }
+
+        if self.link:
+            payload["link"] = self.link
+        if self.border is not None:
+            payload["border"] = self.border
+        if self.dither_type is not None:
+            payload["ditherType"] = self.dither_type
+        if self.dither_kernel is not None:
+            payload["ditherKernel"] = self.dither_kernel
+        if self.task_key is not None:
+            payload["taskKey"] = self.task_key
+
+        return self._post(self.image_api_url, payload, headers)
+
+    def _resolve_attachment(self, attach, warn_label):
+        """Return base64 string from the first usable attachment, or None."""
+        if not (attach and self.attachment_support):
+            return None
+        if len(attach) > 1:
+            self.logger.warning(
+                "Multiple attachments provided; only the first"
+                " one will be used as %s.",
+                warn_label,
+            )
+        try:
+            attachment = attach[0]
+            if attachment:
+                return attachment.base64()
+        except Exception as e:
+            self.logger.warning("Failed to process attachment: %s", str(e))
+        return None
 
     def send(
         self,
@@ -322,7 +417,6 @@ class NotifyDot(NotifyBase):
             self.logger.warning("No device ID was specified")
             return False
 
-        # Prepare our headers
         headers = {
             "Authorization": f"Bearer {self.apikey}",
             "Content-Type": "application/json",
@@ -330,176 +424,48 @@ class NotifyDot(NotifyBase):
         }
 
         if self.mode == "image":
+            # Image-only mode: body and title are ignored.
             if title or body:
                 self.logger.warning(
-                    "Title and body are not supported in image mode "
-                    "and will be ignored."
+                    "Title and body are not supported in image mode"
+                    " and will be ignored."
                 )
-
             image_data = (
-                self.image_data if isinstance(self.image_data, str) else None
+                self.image_data
+                if isinstance(self.image_data, str)
+                else self._resolve_attachment(attach, "image")
             )
-
-            # Use first attachment as image if no image_data provided
-            # attachment.base64() returns base64-encoded string for API
-            if not image_data and attach and self.attachment_support:
-                if len(attach) > 1:
-                    self.logger.warning(
-                        "Multiple attachments provided; only the first "
-                        "one will be used as image."
-                    )
-                try:
-                    attachment = attach[0]
-                    if attachment:
-                        # Convert attachment to base64-encoded string
-                        image_data = attachment.base64()
-                except Exception as e:
-                    self.logger.warning(f"Failed to process attachment: {e!s}")
-
             if not image_data:
                 self.logger.warning(
-                    "Image API mode selected but no image data was provided."
+                    "Image mode selected but no image data was provided."
                 )
                 return False
+            return self._send_image(image_data, headers)
 
-            # Use Image API
-            # Image API payload:
-            #   refreshNow: display timing control (optional).
-            #   image: base64 PNG 296x152 (required).
-            #   link: optional tap target.
-            #   border: optional frame color.
-            #   ditherType: optional dithering mode.
-            #   ditherKernel: optional dithering kernel.
-            #   taskKey: optional task identifier.
-            payload = {
-                "image": image_data,  # Image payload shown on screen
-                "refreshNow": self.refresh_now,
-            }
+        # Text mode (default): smart dual-send.
+        # Body/title go to the Text API; image data or attachment goes
+        # to the Image API.  Text is always dispatched before image.
+        image_data = (
+            self.image_data
+            if isinstance(self.image_data, str)
+            else self._resolve_attachment(attach, "image")
+        )
+        has_text = bool(body or title)
+        has_image = bool(image_data)
 
-            if self.link:
-                payload["link"] = self.link
-
-            if self.border is not None:
-                payload["border"] = self.border
-
-            if self.dither_type is not None:
-                payload["ditherType"] = self.dither_type
-
-            if self.dither_kernel is not None:
-                payload["ditherKernel"] = self.dither_kernel
-
-            if self.task_key is not None:
-                payload["taskKey"] = self.task_key
-
-            api_url = self.image_api_url
-
-        else:
-            # Use Text API
-            # Text API payload:
-            #   refreshNow: display timing control (optional).
-            #   title: optional title on screen.
-            #   message: optional body on screen.
-            #   signature: optional footer text.
-            #   icon: optional base64 PNG icon (40x40).
-            #   link: optional tap target.
-            #   taskKey: optional task identifier.
-            payload = {
-                "refreshNow": self.refresh_now,
-            }
-
-            if title:
-                payload["title"] = title
-
-            if body:
-                payload["message"] = body
-
-            if self.signature:
-                payload["signature"] = (
-                    self.signature
-                )  # Footer/signature displayed on screen
-
-            # Use first attachment as icon if no icon provided
-            # attachment.base64() returns base64-encoded string for API
-            icon_data = self.icon
-            if not icon_data and attach and self.attachment_support:
-                if len(attach) > 1:
-                    self.logger.warning(
-                        "Multiple attachments provided; only the first "
-                        "one will be used as icon."
-                    )
-                try:
-                    attachment = attach[0]
-                    if attachment:
-                        # Convert attachment to base64-encoded string
-                        icon_data = attachment.base64()
-                except Exception as e:
-                    self.logger.warning(f"Failed to process attachment: {e!s}")
-
-            if icon_data:
-                # Text API icon payload
-                payload["icon"] = icon_data
-
-            if self.link:
-                payload["link"] = self.link
-
-            if self.task_key is not None:
-                payload["taskKey"] = self.task_key
-
-            api_url = self.text_api_url
-
-        # Some Debug Logging
-        if self.logger.isEnabledFor(logging.DEBUG):
-            # Due to attachments; output can be quite heavy and io intensive
-            # To accommodate this, we only show our debug payload information
-            # if required.
-            self.logger.debug(
-                "Dot POST URL:"
-                f" {api_url} (cert_verify={self.verify_certificate!r})"
-            )
-            self.logger.debug("Dot Payload %s", sanitize_payload(payload))
-
-        # Always call throttle before any remote server i/o is made
-        self.throttle()
-
-        try:
-            r = requests.post(
-                api_url,
-                data=json.dumps(payload),
-                headers=headers,
-                verify=self.verify_certificate,
-                timeout=self.request_timeout,
-            )
-
-            if r.status_code == requests.codes.ok:
-                self.logger.info(f"Sent Dot notification to {self.device_id}.")
-                return True
-
-            # We had a problem
-            status_str = NotifyDot.http_response_code_lookup(r.status_code)
-
+        if not has_text and not has_image:
             self.logger.warning(
-                "Failed to send Dot notification to {}: {}{}error={}.".format(
-                    self.device_id,
-                    status_str,
-                    ", " if status_str else "",
-                    r.status_code,
-                )
+                "Nothing to send to Dot. device %s.", self.device_id
             )
-
-            self.logger.debug(
-                "Response Details:\r\n%r", (r.content or b"")[:2000]
-            )
-
             return False
 
-        except requests.RequestException as e:
-            self.logger.warning(
-                "A Connection error occurred sending Dot "
-                f"notification to {self.device_id}."
-            )
-            self.logger.debug(f"Socket Exception: {e!s}")
+        has_error = False
+        if has_text and not self._send_text(body, title, self.icon, headers):
+            has_error = True
 
-            return False
+        if has_image and not self._send_image(image_data, headers):
+            has_error = True
+        return not has_error
 
     @property
     def url_identifier(self):
@@ -516,54 +482,38 @@ class NotifyDot(NotifyBase):
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
 
-        # Define any URL parameters
         params = {}
-
-        # Add refresh parameter
         params["refresh"] = "yes" if self.refresh_now else "no"
 
-        if self.mode == "text":
-            if self.signature:
-                params["signature"] = self.signature
+        # Include mode only when non-default
+        if self.mode != DOT_MODES[0]:
+            params["mode"] = self.mode
 
-            if self.icon:
-                params["icon"] = self.icon
-
-            if self.link:
-                params["link"] = self.link
-
-        else:  # image mode
-            if self.image_data:
-                params["image"] = self.image_data
-
-            if self.link:
-                params["link"] = self.link
-
-            if self.border is not None:
-                params["border"] = str(self.border)
-
-            if self.dither_type and self.dither_type != "DIFFUSION":
-                params["dither_type"] = self.dither_type
-
-            if self.dither_kernel and self.dither_kernel != "FLOYD_STEINBERG":
-                params["dither_kernel"] = self.dither_kernel
-
-        # Add task_key if provided
+        if self.signature:
+            params["signature"] = self.signature
+        if self.icon:
+            params["icon"] = self.icon
+        if self.image_data:
+            params["image"] = self.image_data
+        if self.border is not None:
+            params["border"] = str(self.border)
+        if self.dither_type and self.dither_type != "DIFFUSION":
+            params["dither_type"] = self.dither_type
+        if self.dither_kernel and self.dither_kernel != "FLOYD_STEINBERG":
+            params["dither_kernel"] = self.dither_kernel
+        if self.link:
+            params["link"] = self.link
         if self.task_key:
             params["task_key"] = self.task_key
 
-        # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        mode_segment = f"/{self.mode}/"
-
-        return "{schema}://{apikey}@{device_id}{mode}?{params}".format(
+        return "{schema}://{apikey}@{device_id}/?{params}".format(
             schema=self.secure_protocol,
             apikey=self.pprint(
                 self.apikey, privacy, mode=PrivacyMode.Secret, safe=""
             ),
             device_id=NotifyDot.quote(self.device_id, safe=""),
-            mode=mode_segment,
             params=NotifyDot.urlencode(params),
         )
 
@@ -573,41 +523,47 @@ class NotifyDot(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """Parses the URL and returns enough arguments that can allow us to re-
-        instantiate this object."""
+        """Parses the URL and returns enough arguments that can allow us to
+        re-instantiate this object."""
 
         results = NotifyBase.parse_url(url)
         if not results:
-            # We're done early as we couldn't load the results
             return results
 
-        # Determine API mode from path (default to text)
-        mode = NotifyDot.DEFAULT_MODE
-        path_tokens = NotifyDot.split_path(results.get("fullpath"))
-        if path_tokens:
-            candidate = path_tokens.pop(0).lower()
-            if candidate in NotifyDot.SUPPORTED_MODES:
+        # Determine mode: explicit ?mode= wins; path provides backward compat.
+        mode = DOT_MODES[0]
+        if results["qsd"].get("mode"):
+            candidate = results["qsd"]["mode"].lower().strip()
+            if candidate in DOT_MODES:
                 mode = candidate
             else:
                 NotifyDot.logger.warning(
-                    "Unsupported Dot mode (%s) detected; defaulting to '%s'.",
+                    "Unsupported Dot mode (%s) specified; defaulting to '%s'.",
                     candidate,
-                    NotifyDot.DEFAULT_MODE,
+                    DOT_MODES[0],
                 )
+        else:
+            path_tokens = NotifyDot.split_path(results.get("fullpath"))
+            if path_tokens:
+                candidate = path_tokens[0].lower()
+                if candidate in DOT_MODES:
+                    mode = candidate
+                else:
+                    NotifyDot.logger.warning(
+                        "Unsupported Dot mode (%s) specified;"
+                        " defaulting to '%s'.",
+                        candidate,
+                        DOT_MODES[0],
+                    )
         results["mode"] = mode
-        remaining_path = "/".join(path_tokens)
-        results["fullpath"] = "/" + remaining_path if remaining_path else "/"
-        results["path"] = remaining_path
 
         # Extract API key from user
-        user = results.get("user")
-        if user:
-            results["apikey"] = NotifyDot.unquote(user)
+        if results.get("user"):
+            results["apikey"] = NotifyDot.unquote(results["user"])
 
         # Extract device ID from hostname
-        host = results.get("host")
-        if host:
-            results["device_id"] = NotifyDot.unquote(host)
+        if results.get("host"):
+            results["device_id"] = NotifyDot.unquote(results["host"])
 
         # Refresh Now
         refresh_value = results["qsd"].get("refresh")
@@ -615,48 +571,46 @@ class NotifyDot(NotifyBase):
             results["refresh_now"] = parse_bool(refresh_value.strip())
 
         # Signature
-        signature_value = results["qsd"].get("signature")
-        if signature_value:
-            results["signature"] = NotifyDot.unquote(signature_value.strip())
+        if results["qsd"].get("signature"):
+            results["signature"] = NotifyDot.unquote(
+                results["qsd"]["signature"].strip()
+            )
 
         # Icon
-        icon_value = results["qsd"].get("icon")
-        if icon_value:
-            results["icon"] = NotifyDot.unquote(icon_value.strip())
+        if results["qsd"].get("icon"):
+            results["icon"] = NotifyDot.unquote(results["qsd"]["icon"].strip())
 
         # Link
-        link_value = results["qsd"].get("link")
-        if link_value:
-            results["link"] = NotifyDot.unquote(link_value.strip())
+        if results["qsd"].get("link"):
+            results["link"] = NotifyDot.unquote(results["qsd"]["link"].strip())
 
         # Border
-        border_value = results["qsd"].get("border")
-        if border_value:
+        if results["qsd"].get("border"):
             with suppress(TypeError, ValueError):
-                results["border"] = int(border_value.strip())
+                results["border"] = int(results["qsd"]["border"].strip())
 
         # Dither Type
-        dither_type_value = results["qsd"].get("dither_type")
-        if dither_type_value:
+        if results["qsd"].get("dither_type"):
             results["dither_type"] = NotifyDot.unquote(
-                dither_type_value.strip()
+                results["qsd"]["dither_type"].strip()
             )
 
         # Dither Kernel
-        dither_kernel_value = results["qsd"].get("dither_kernel")
-        if dither_kernel_value:
+        if results["qsd"].get("dither_kernel"):
             results["dither_kernel"] = NotifyDot.unquote(
-                dither_kernel_value.strip()
+                results["qsd"]["dither_kernel"].strip()
             )
 
         # Image (Image API)
-        image_value = results["qsd"].get("image")
-        if image_value:
-            results["image_data"] = NotifyDot.unquote(image_value.strip())
+        if results["qsd"].get("image"):
+            results["image_data"] = NotifyDot.unquote(
+                results["qsd"]["image"].strip()
+            )
 
         # Task Key
-        task_key_value = results["qsd"].get("task_key")
-        if task_key_value:
-            results["task_key"] = NotifyDot.unquote(task_key_value.strip())
+        if results["qsd"].get("task_key"):
+            results["task_key"] = NotifyDot.unquote(
+                results["qsd"]["task_key"].strip()
+            )
 
         return results
