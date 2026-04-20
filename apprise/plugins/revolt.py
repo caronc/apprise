@@ -88,12 +88,19 @@ class NotifyRevolt(NotifyBase):
     title_maxlen = 100
 
     # Define object templates
-    templates = ("{schema}://{bot_token}/{targets}",)
+    templates = (
+        "{schema}://{bot_token}/{targets}",
+        "{schema}://{server_api_url}/{bot_token}/{targets}",
+    )
 
     # Defile out template tokens
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
+            "server_api_url": {
+                "name": _("Server API URL"),
+                "type": "string",
+            },
             "bot_token": {
                 "name": _("Bot Token"),
                 "type": "string",
@@ -138,9 +145,19 @@ class NotifyRevolt(NotifyBase):
         },
     )
 
-    def __init__(self, bot_token, targets, icon_url=None, link=None, **kwargs):
+    def __init__(
+        self,
+        bot_token,
+        targets,
+        icon_url=None,
+        link=None,
+        server_api_url=None,
+        **kwargs,
+    ):
         super().__init__(**kwargs)
 
+        if server_api_url:
+            self.notify_url = server_api_url
         # Bot Token
         self.bot_token = validate_regex(bot_token)
         if not self.bot_token:
@@ -402,14 +419,26 @@ class NotifyRevolt(NotifyBase):
             # We're done early as we couldn't load the results
             return results
 
-        # Store our bot token
-        bot_token = NotifyRevolt.unquote(results["host"])
+        _host = NotifyRevolt.unquote(results["host"])
+        selfhosted = _host.endswith("/")
+        if selfhosted:
+            r = requests.get(f"https://{_host}")
+            if r.ok:
+                results["server_api_url"] = f"https://{_host}"
 
-        # Now fetch the Channel IDs
-        targets = NotifyRevolt.split_path(results["fullpath"])
+                bot_token = NotifyRevolt.split_path(results["fullpath"])[0]
+                targets = NotifyRevolt.split_path(results["fullpath"])[1:]
+                results["bot_token"] = bot_token
+                results["targets"] = targets
+        else:
+            # Store our bot token
+            bot_token = NotifyRevolt.unquote(results["host"])
 
-        results["bot_token"] = bot_token
-        results["targets"] = targets
+            # Now fetch the Channel IDs
+            targets = NotifyRevolt.split_path(results["fullpath"])
+
+            results["bot_token"] = bot_token
+            results["targets"] = targets
 
         # Support the 'to' variable so that we can support rooms this way too
         # The 'to' makes it easier to use yaml configuration
