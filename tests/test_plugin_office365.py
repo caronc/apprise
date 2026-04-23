@@ -300,6 +300,50 @@ apprise_url_tests = (
             "test_requests_exceptions": True,
         },
     ),
+    # reply_to support — plain address
+    (
+        "o365://{aid}/{tenant}/{cid}/{secret}/{targets}"
+        "?reply_to=reply@example.org".format(
+            tenant="tenant",
+            cid="ab-cd-ef-gh",
+            aid="user@example.edu",
+            secret="abcd/123/3343/@jack/test",
+            targets="email1@test.ca",
+        ),
+        {
+            "instance": NotifyOffice365,
+            "requests_response_text": {
+                "expires_in": 2000,
+                "access_token": "abcd1234",
+                "mail": "user@example.ca",
+            },
+            "privacy_url": (
+                "azure://user@example.edu/t...t/a...h/****/email1@test.ca/"
+            ),
+        },
+    ),
+    # reply_to with URL-encoded (+) spaces in name
+    (
+        "o365://{aid}/{tenant}/{cid}/{secret}/{targets}"
+        "?reply_to=Reply+Person+reply@example.org".format(
+            tenant="tenant",
+            cid="ab-cd-ef-gh",
+            aid="user@example.edu",
+            secret="abcd/123/3343/@jack/test",
+            targets="email1@test.ca",
+        ),
+        {
+            "instance": NotifyOffice365,
+            "requests_response_text": {
+                "expires_in": 2000,
+                "access_token": "abcd1234",
+                "mail": "user@example.ca",
+            },
+            "privacy_url": (
+                "azure://user@example.edu/t...t/a...h/****/email1@test.ca/"
+            ),
+        },
+    ),
 )
 
 
@@ -1025,3 +1069,114 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
         == f"https://graph.microsoft.com/v1.0/users/{source}/sendMail"
     )
     mock_post.reset_mock()
+
+
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_office365_reply_to(mock_post, mock_get):
+    """NotifyOffice365() reply_to parameter support."""
+
+    tenant = "ff-gg-hh-ii-jj"
+    email = "user@example.net"
+    client_id = "aa-bb-cc-dd-ee"
+    secret = "abcd/1234/abcd@ajd@/test"
+    targets = "target@example.com"
+
+    payload = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234",
+        "mail": "user@example.net",
+    }
+    okay_response = mock.Mock()
+    okay_response.content = dumps(payload)
+    okay_response.status_code = requests.codes.ok
+    mock_post.return_value = okay_response
+    mock_get.return_value = okay_response
+
+    # named reply_to via direct instantiation
+    obj = NotifyOffice365(
+        source=email,
+        tenant=tenant,
+        client_id=client_id,
+        secret=secret,
+        targets=[targets],
+        reply_to=["Reply Person <reply@example.org>"],
+    )
+
+    assert isinstance(obj, NotifyOffice365)
+    assert len(obj.reply_to) == 1
+    assert "reply@example.org" in obj.reply_to
+
+    # url() round-trip includes reply_to
+    url = obj.url()
+    assert "reply_to=" in url
+
+    # send() adds replyTo with name to the payload
+    assert obj.notify(title="title", body="test") is True
+    assert mock_post.call_count == 2
+    sent_payload = loads(mock_post.call_args_list[1][1]["data"])
+    assert "replyTo" in sent_payload["message"]
+    assert (
+        sent_payload["message"]["replyTo"][0]["emailAddress"]["address"]
+        == "reply@example.org"
+    )
+    assert (
+        sent_payload["message"]["replyTo"][0]["emailAddress"]["name"]
+        == "Reply Person"
+    )
+    mock_post.reset_mock()
+
+    # reply_to without a name via URL query string
+    obj2 = Apprise.instantiate(
+        "o365://{email}/{tenant}/{client_id}/{secret}/{targets}"
+        "?reply_to=reply@example.org".format(
+            tenant=tenant,
+            email=email,
+            client_id=client_id,
+            secret=secret,
+            targets=targets,
+        )
+    )
+
+    assert isinstance(obj2, NotifyOffice365)
+    assert obj2.notify(title="t", body="b") is True
+    sent_payload = loads(mock_post.call_args_list[1][1]["data"])
+    assert "replyTo" in sent_payload["message"]
+    assert (
+        "name"
+        not in sent_payload["message"]["replyTo"][0]["emailAddress"]
+    )
+    mock_post.reset_mock()
+
+    # invalid reply_to address is dropped silently
+    obj3 = NotifyOffice365(
+        source=email,
+        tenant=tenant,
+        client_id=client_id,
+        secret=secret,
+        targets=[targets],
+        reply_to=["not-a-valid-email"],
+    )
+    assert isinstance(obj3, NotifyOffice365)
+    assert len(obj3.reply_to) == 0
+    # No replyTo in payload when reply_to is empty
+    assert obj3.notify(title="t", body="b") is True
+    sent_payload = loads(mock_post.call_args_list[1][1]["data"])
+    assert "replyTo" not in sent_payload["message"]
+    mock_post.reset_mock()
+
+    # parse_url picks up ?reply_to=
+    parsed = NotifyOffice365.parse_url(
+        "o365://{email}/{tenant}/{client_id}/{secret}/{targets}"
+        "?reply_to=reply@example.org".format(
+            tenant=tenant,
+            email=email,
+            client_id=client_id,
+            secret=secret,
+            targets=targets,
+        )
+    )
+    assert parsed is not None
+    assert "reply_to" in parsed
+    assert "reply@example.org" in parsed["reply_to"]

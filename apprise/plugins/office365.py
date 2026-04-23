@@ -172,6 +172,10 @@ class NotifyOffice365(NotifyBase):
                 "name": _("Blind Carbon Copy"),
                 "type": "list:string",
             },
+            "reply_to": {
+                "name": _("Reply To"),
+                "type": "list:string",
+            },
         },
     )
 
@@ -184,6 +188,7 @@ class NotifyOffice365(NotifyBase):
         targets=None,
         cc=None,
         bcc=None,
+        reply_to=None,
         **kwargs,
     ):
         """Initialize Office 365 Object."""
@@ -294,6 +299,23 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(
                 "Dropped invalid Blind Carbon Copy email "
                 f"({recipient}) specified.",
+            )
+
+        # Acquire Reply-To addresses
+        self.reply_to = set()
+        for recipient in parse_emails(reply_to):
+            email = is_email(recipient)
+            if email:
+                self.reply_to.add(email["full_email"])
+
+                # Index our name (if one exists)
+                self.names[email["full_email"]] = (
+                    email["name"] if email["name"] else False
+                )
+                continue
+
+            self.logger.warning(
+                f"Dropped invalid Reply-To email ({recipient}) specified.",
             )
 
         # Our token is acquired upon a successful login
@@ -420,6 +442,15 @@ class NotifyOffice365(NotifyBase):
                     },
                 }
             )
+
+        if self.reply_to:
+            reply_to_list = []
+            for addr in self.reply_to:
+                payload_ = {"address": addr}
+                if self.names.get(addr):
+                    payload_["name"] = self.names[addr]
+                reply_to_list.append({"emailAddress": payload_})
+            payload["message"]["replyTo"] = reply_to_list
 
         # Create a copy of the email list
         emails = list(self.targets)
@@ -887,6 +918,7 @@ class NotifyOffice365(NotifyBase):
                 requests.codes.created,
                 requests.codes.accepted,
             ):
+
                 # We had a problem
                 status_str = NotifyOffice365.http_response_code_lookup(
                     r.status_code
@@ -1012,6 +1044,16 @@ class NotifyOffice365(NotifyBase):
                 ]
             )
 
+        if self.reply_to:
+            # Handle our Reply-To Addresses
+            params["reply_to"] = ",".join([
+                "{}{}".format(
+                    "" if not self.names.get(e) else f"{self.names[e]}:",
+                    e,
+                )
+                for e in self.reply_to
+            ])
+
         return (
             "{schema}://{source}/{tenant}/{client_id}/{secret}"
             "/{targets}/?{params}".format(
@@ -1048,7 +1090,9 @@ class NotifyOffice365(NotifyBase):
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 
-        results = NotifyBase.parse_url(url, verify_host=False)
+        results = NotifyBase.parse_url(
+            url, verify_host=False, plus_to_space=True
+        )
         if not results:
             # We're done early as we couldn't load the results
             return results
@@ -1154,5 +1198,11 @@ class NotifyOffice365(NotifyBase):
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
             results["bcc"] = results["qsd"]["bcc"]
+
+        # Handle Reply-To Addresses
+        if "reply_to" in results["qsd"] and len(
+            results["qsd"]["reply_to"]
+        ):
+            results["reply_to"] = results["qsd"]["reply_to"]
 
         return results
