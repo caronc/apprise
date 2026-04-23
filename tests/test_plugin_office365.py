@@ -1143,10 +1143,7 @@ def test_plugin_office365_reply_to(mock_post, mock_get):
     assert obj2.notify(title="t", body="b") is True
     sent_payload = loads(mock_post.call_args_list[1][1]["data"])
     assert "replyTo" in sent_payload["message"]
-    assert (
-        "name"
-        not in sent_payload["message"]["replyTo"][0]["emailAddress"]
-    )
+    assert "name" not in sent_payload["message"]["replyTo"][0]["emailAddress"]
     mock_post.reset_mock()
 
     # invalid reply_to address is dropped silently

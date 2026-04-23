@@ -918,7 +918,6 @@ class NotifyOffice365(NotifyBase):
                 requests.codes.created,
                 requests.codes.accepted,
             ):
-
                 # We had a problem
                 status_str = NotifyOffice365.http_response_code_lookup(
                     r.status_code
@@ -1046,13 +1045,15 @@ class NotifyOffice365(NotifyBase):
 
         if self.reply_to:
             # Handle our Reply-To Addresses
-            params["reply_to"] = ",".join([
-                "{}{}".format(
-                    "" if not self.names.get(e) else f"{self.names[e]}:",
-                    e,
-                )
-                for e in self.reply_to
-            ])
+            params["reply_to"] = ",".join(
+                [
+                    "{}{}".format(
+                        "" if not self.names.get(e) else f"{self.names[e]}:",
+                        e,
+                    )
+                    for e in self.reply_to
+                ]
+            )
 
         return (
             "{schema}://{source}/{tenant}/{client_id}/{secret}"
@@ -1200,9 +1201,7 @@ class NotifyOffice365(NotifyBase):
             results["bcc"] = results["qsd"]["bcc"]
 
         # Handle Reply-To Addresses
-        if "reply_to" in results["qsd"] and len(
-            results["qsd"]["reply_to"]
-        ):
+        if "reply_to" in results["qsd"] and len(results["qsd"]["reply_to"]):
             results["reply_to"] = results["qsd"]["reply_to"]
 
         return results

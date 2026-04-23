@@ -1025,9 +1025,7 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
                 # at a higher level can at least report this to the end user
                 # and hopefully give them some indication as to what they
                 # may have done wrong.
-                result += list(
-                    filter(bool, re.split(STRING_DELIMITERS, arg))
-                )
+                result += list(filter(bool, re.split(STRING_DELIMITERS, arg)))
 
         elif isinstance(arg, (set, list, tuple)):
             # Use recursion to handle the list of Emails
