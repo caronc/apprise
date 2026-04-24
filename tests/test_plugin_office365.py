@@ -938,7 +938,8 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     )
     assert (
         mock_post.call_args_list[3][0][0]
-        == f"https://graph.microsoft.com/v1.0/users/{source}/sendMail"
+        == "https://graph.microsoft.com/v1.0/users/"
+        + f"{source}/messages/draft-id-no/send"
     )
     mock_post.reset_mock()
 
@@ -978,7 +979,8 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     )
     assert (
         mock_post.call_args_list[2][0][0]
-        == f"https://graph.microsoft.com/v1.0/users/{source}/sendMail"
+        == "https://graph.microsoft.com/v1.0/users/"
+        + f"{source}/messages/draft-id-no/send"
     )
     mock_post.reset_mock()
     mock_post.side_effect = None
@@ -1177,3 +1179,396 @@ def test_plugin_office365_reply_to(mock_post, mock_get):
     assert parsed is not None
     assert "reply_to" in parsed
     assert "reply@example.org" in parsed["reply_to"]
+
+
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_office365_personal_mode(mock_post, mock_get):
+    """NotifyOffice365() personal mode (refresh_token / consumer accounts)."""
+    from apprise.plugins.office365 import (
+        Office365Mode,
+    )
+
+    client_id = "aa-bb-cc-dd-ee"
+    seed_token = "seed-refresh-token-abc123"
+    new_token = "rotated-refresh-token-xyz789"
+    access_token = "access-token-live"
+
+    auth_payload = {
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "access_token": access_token,
+        "refresh_token": new_token,
+    }
+    okay_response = mock.Mock()
+    okay_response.content = dumps(auth_payload)
+    okay_response.status_code = requests.codes.ok
+    bad_response = mock.Mock()
+    bad_response.content = dumps({"error": "bad"})
+    bad_response.status_code = requests.codes.internal_server_error
+
+    mock_post.return_value = okay_response
+    mock_get.return_value = okay_response
+
+    #
+    # Auto-detection: @live.com triggers personal mode
+    #
+    obj = NotifyOffice365(
+        source="user@live.com",
+        client_id=client_id,
+        secret=seed_token,
+    )
+    assert isinstance(obj, NotifyOffice365)
+    assert obj.mode == Office365Mode.PERSONAL
+    assert obj.tenant is None
+    assert obj.from_email == "user@live.com"
+    assert obj.source_is_object_id is False
+
+    # All known personal domains trigger personal mode
+    for domain in ("hotmail.com", "outlook.com", "live.com", "msn.com"):
+        o = NotifyOffice365(
+            source=f"user@{domain}",
+            client_id=client_id,
+            secret=seed_token,
+        )
+        assert o.mode == Office365Mode.PERSONAL, (
+            f"expected personal mode for {domain}"
+        )
+
+    #
+    # Explicit mode=personal on a non-personal domain
+    #
+    obj_explicit = NotifyOffice365(
+        source="user@example.com",
+        client_id=client_id,
+        secret=seed_token,
+        mode=Office365Mode.PERSONAL,
+    )
+    assert obj_explicit.mode == Office365Mode.PERSONAL
+
+    #
+    # Explicit mode=org on a personal domain — still requires valid email
+    # source (no tenant needed for the personal flow, but org requires tenant)
+    #
+    with pytest.raises(TypeError):
+        # tenant is None but mode=org demands a valid tenant
+        NotifyOffice365(
+            source="user@live.com",
+            client_id=client_id,
+            secret=seed_token,
+            mode=Office365Mode.ORG,
+        )
+
+    #
+    # Personal mode requires source to be a valid email
+    #
+    with pytest.raises(TypeError):
+        NotifyOffice365(
+            source="not-an-email",
+            client_id=client_id,
+            secret=seed_token,
+            mode=Office365Mode.PERSONAL,
+        )
+
+    #
+    # Invalid mode string raises TypeError
+    #
+    with pytest.raises(TypeError):
+        NotifyOffice365(
+            source="user@live.com",
+            client_id=client_id,
+            secret=seed_token,
+            mode="invalid-mode",
+        )
+
+    #
+    # send() uses me/sendMail and me/messages (not users/{source}/...)
+    #
+    obj = NotifyOffice365(
+        source="user@live.com",
+        client_id=client_id,
+        secret=seed_token,
+        targets=["target@example.com"],
+    )
+    assert obj.mode == Office365Mode.PERSONAL
+    assert obj.notify(title="title", body="body") is True
+
+    # POST 0: token refresh  POST 1: sendMail
+    assert mock_post.call_count == 2
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    )
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == "https://graph.microsoft.com/v1.0/me/sendMail"
+    )
+    mock_post.reset_mock()
+
+    #
+    # Refresh token rotation: store holds the new token; url() emits it
+    #
+    stored = obj.store.get("refresh_token")
+    assert stored == new_token
+
+    generated_url = obj.url()
+    assert new_token in generated_url
+    assert seed_token not in generated_url
+    assert "mode=personal" in generated_url
+
+    # Privacy URL masks the token
+    private_url = obj.url(privacy=True)
+    assert new_token not in private_url
+    assert seed_token not in private_url
+
+    #
+    # Auth failure (bad token response) propagates correctly
+    #
+    mock_post.return_value = bad_response
+    obj2 = NotifyOffice365(
+        source="user@hotmail.com",
+        client_id=client_id,
+        secret=seed_token,
+    )
+    assert obj2.notify(title="t", body="b") is False
+    mock_post.reset_mock()
+    mock_post.return_value = okay_response
+
+    #
+    # Auth response missing expires_in
+    #
+    broken_payload = {"access_token": access_token}
+    broken_response = mock.Mock()
+    broken_response.content = dumps(broken_payload)
+    broken_response.status_code = requests.codes.ok
+    mock_post.return_value = broken_response
+    obj3 = NotifyOffice365(
+        source="user@live.com",
+        client_id=client_id,
+        secret=seed_token,
+    )
+    assert obj3.notify(title="t", body="b") is False
+    mock_post.reset_mock()
+    mock_post.return_value = okay_response
+
+    #
+    # parse_url: personal domain auto-detects without mode= param
+    #
+    parsed = NotifyOffice365.parse_url(
+        f"o365://user@live.com/{client_id}/{seed_token}/"
+    )
+    assert parsed is not None
+    assert parsed["mode"] == Office365Mode.PERSONAL
+    assert parsed["tenant"] is None
+    assert parsed["client_id"] == client_id
+    assert parsed["secret"] == seed_token
+
+    # Reconstructed object from parse_url
+    obj4 = Apprise.instantiate(
+        f"o365://user@live.com/{client_id}/{seed_token}/"
+    )
+    assert isinstance(obj4, NotifyOffice365)
+    assert obj4.mode == Office365Mode.PERSONAL
+
+    #
+    # parse_url: explicit ?mode=personal on non-personal domain
+    #
+    parsed2 = NotifyOffice365.parse_url(
+        f"o365://user@example.com/{client_id}/{seed_token}/?mode=personal"
+    )
+    assert parsed2 is not None
+    assert parsed2["mode"] == Office365Mode.PERSONAL
+
+    #
+    # parse_url: explicit ?mode=org on personal domain
+    #
+    parsed3 = NotifyOffice365.parse_url(
+        f"o365://user@live.com/tenant-id/{client_id}/{seed_token}/?mode=org"
+    )
+    assert parsed3 is not None
+    assert parsed3["mode"] == Office365Mode.ORG
+    assert parsed3["tenant"] == "tenant-id"
+
+    #
+    # url() round-trip for personal mode
+    #
+    obj5 = NotifyOffice365(
+        source="user@outlook.com",
+        client_id=client_id,
+        secret=seed_token,
+        targets=["recipient@example.com"],
+    )
+    url = obj5.url()
+    assert "mode=personal" in url
+    assert "outlook.com" in url
+    assert client_id in url
+    # No tenant segment
+    assert "tenant" not in url
+
+    # Round-trip: parse and reconstruct
+    parsed4 = NotifyOffice365.parse_url(url)
+    assert parsed4 is not None
+    assert parsed4["mode"] == Office365Mode.PERSONAL
+    obj6 = Apprise.instantiate(url)
+    assert isinstance(obj6, NotifyOffice365)
+    assert obj6.mode == Office365Mode.PERSONAL
+
+    #
+    # parse_url: unrecognised ?mode= value falls back to auto-detection
+    # (covers the branch where _mode is NOT in OFFICE365_MODES)
+    #
+    parsed5 = NotifyOffice365.parse_url(
+        f"o365://user@live.com/{client_id}/{seed_token}/?mode=bogus-value"
+    )
+    assert parsed5 is not None
+    # bogus mode is ignored; auto-detection kicks in → personal
+    assert parsed5["mode"] == Office365Mode.PERSONAL
+
+    #
+    # Personal mode supports cc/bcc/reply_to and emits them via url()
+    #
+    mock_post.reset_mock()
+    mock_post.return_value = okay_response
+    obj7 = NotifyOffice365(
+        source="user@outlook.com",
+        client_id=client_id,
+        secret=seed_token,
+        targets=["target@example.com"],
+        cc=["Carbon Copy <cc@example.com>"],
+        bcc=["Blind Copy <bcc@example.com>"],
+        reply_to=["Reply Person <reply@example.org>"],
+    )
+    assert isinstance(obj7, NotifyOffice365)
+
+    personal_url = obj7.url()
+    assert "mode=personal" in personal_url
+    assert "cc=Carbon%20Copy%3Acc%40example.com" in personal_url
+    assert "bcc=Blind%20Copy%3Abcc%40example.com" in personal_url
+    assert "reply_to=Reply%20Person%3Areply%40example.org" in personal_url
+
+    assert obj7.notify(title="title", body="body") is True
+    assert mock_post.call_count == 2
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == "https://graph.microsoft.com/v1.0/me/sendMail"
+    )
+    sent_payload = loads(mock_post.call_args_list[1][1]["data"])
+    assert sent_payload["message"]["ccRecipients"][0]["emailAddress"] == {
+        "address": "cc@example.com",
+        "name": "Carbon Copy",
+    }
+    assert sent_payload["message"]["bccRecipients"][0]["emailAddress"] == {
+        "address": "bcc@example.com",
+        "name": "Blind Copy",
+    }
+    assert sent_payload["message"]["replyTo"][0]["emailAddress"] == {
+        "address": "reply@example.org",
+        "name": "Reply Person",
+    }
+
+    #
+    # Auth succeeds but server returns no new refresh_token
+    # (covers the branch where `if new_refresh:` is falsy)
+    #
+    no_rotate_payload = {
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "access_token": access_token,
+        # no "refresh_token" key
+    }
+    no_rotate_response = mock.Mock()
+    no_rotate_response.content = dumps(no_rotate_payload)
+    no_rotate_response.status_code = requests.codes.ok
+    send_response = mock.Mock()
+    send_response.content = dumps({})
+    send_response.status_code = requests.codes.accepted
+
+    mock_post.side_effect = [no_rotate_response, send_response]
+    obj_nr = NotifyOffice365(
+        source="user@live.com",
+        client_id=client_id,
+        secret=seed_token,
+        targets=["target@example.com"],
+    )
+    assert obj_nr.notify(title="t", body="b") is True
+    # No new token stored — seed_token still in url()
+    assert obj_nr.store.get("refresh_token") is None
+    mock_post.reset_mock()
+    mock_post.side_effect = None
+    mock_post.return_value = okay_response
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_office365_personal_large_attachment(
+    mock_post, mock_get, mock_put
+):
+    """Personal mode large-attachment path (me/messages draft + send)."""
+    from apprise.plugins.office365 import Office365Mode
+
+    client_id = "aa-bb-cc-dd-ee"
+    seed_token = "seed-refresh-token-abc123"
+    new_token = "rotated-refresh-token-xyz789"
+    access_token = "access-token-live"
+
+    # Response that covers auth tokens, draft ID, and upload URL
+    payload = {
+        "token_type": "Bearer",
+        "expires_in": 3600,
+        "access_token": access_token,
+        "refresh_token": new_token,
+        "id": "draft-id-no",
+        "uploadUrl": "https://upload.url.example/session",
+    }
+    okay_response = mock.Mock()
+    okay_response.content = dumps(payload)
+    okay_response.status_code = requests.codes.ok
+    mock_post.return_value = okay_response
+    mock_get.return_value = okay_response
+    mock_put.return_value = okay_response
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    obj = NotifyOffice365(
+        source="user@live.com",
+        client_id=client_id,
+        secret=seed_token,
+        targets=["target@example.com"],
+    )
+    assert obj.mode == Office365Mode.PERSONAL
+
+    # Force all attachments to be "large" so the draft path is used
+    obj.outlook_attachment_inline_max = 50
+
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    # POST 0: token refresh  POST 1: draft create  POST 2: upload session
+    # POST 3: send draft
+    assert mock_post.call_count == 4
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    )
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == "https://graph.microsoft.com/v1.0/me/messages"
+    )
+    assert (
+        mock_post.call_args_list[2][0][0]
+        == "https://graph.microsoft.com/v1.0/me/"
+        "message/draft-id-no/attachments/createUploadSession"
+    )
+    assert (
+        mock_post.call_args_list[3][0][0] == "https://graph.microsoft.com/v1.0"
+        "/me/messages/draft-id-no/send"
+    )

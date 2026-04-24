@@ -33,10 +33,16 @@
 # https://docs.microsoft.com/en-us/graph/api/user-sendmail\
 #       ?view=graph-rest-1.0&tabs=http
 #
-# Note: One must set up Application Permissions (not Delegated Permissions)
+# Org mode uses Application Permissions (not Delegated Permissions):
 #       - Scopes required: Mail.Send
 #       - For Large Attachments: Mail.ReadWrite
 #       - For Email Lookups: User.Read.All
+#
+# Personal mode uses Delegated Permissions for consumer accounts
+#   (@live.com, @hotmail.com, @outlook.com, etc.):
+#       - Scopes required: Mail.Send offline_access
+#       - Requires a pre-obtained refresh_token (via device code flow)
+#       - See the plugin documentation for setup instructions
 #
 from datetime import datetime, timedelta
 import json
@@ -52,6 +58,67 @@ from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
+
+
+class Office365Mode:
+    """Operating mode for the Office 365 plugin."""
+
+    # Organizational (app-only / daemon): client_credentials grant.
+    # Requires a Microsoft Entra ID tenant admin.
+    ORG = "org"
+
+    # Personal consumer accounts: delegated refresh_token grant to
+    # the /consumers endpoint.  Works with @live.com, @hotmail.com,
+    # @outlook.com, and other Microsoft consumer domains.
+    PERSONAL = "personal"
+
+
+OFFICE365_MODES = (
+    Office365Mode.ORG,
+    Office365Mode.PERSONAL,
+)
+
+# Microsoft personal (consumer) account domains.  Sources whose domain
+# matches an entry here are automatically routed through the personal
+# refresh_token OAuth flow rather than the organizational
+# client_credentials flow.  Use mode= to override auto-detection.
+OFFICE365_PERSONAL_DOMAINS = frozenset(
+    (
+        "outlook.com",
+        "hotmail.com",
+        "hotmail.co.uk",
+        "hotmail.fr",
+        "hotmail.de",
+        "hotmail.it",
+        "hotmail.es",
+        "hotmail.ca",
+        "hotmail.nl",
+        "hotmail.be",
+        "hotmail.se",
+        "hotmail.no",
+        "hotmail.dk",
+        "hotmail.fi",
+        "hotmail.com.au",
+        "hotmail.com.br",
+        "live.com",
+        "live.ca",
+        "live.co.uk",
+        "live.com.au",
+        "live.fr",
+        "live.de",
+        "live.it",
+        "live.nl",
+        "live.be",
+        "live.no",
+        "live.se",
+        "live.dk",
+        "live.fi",
+        "live.es",
+        "live.mx",
+        "live.jp",
+        "msn.com",
+    )
+)
 
 
 class NotifyOffice365(NotifyBase):
@@ -76,8 +143,18 @@ class NotifyOffice365(NotifyBase):
     # URL to Microsoft Graph Server
     graph_url = "https://graph.microsoft.com"
 
-    # Authentication URL
+    # Org mode authentication URL (client_credentials grant)
     auth_url = "https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token"
+
+    # Personal mode authentication URL (refresh_token grant).
+    # /consumers services MSA (personal Microsoft accounts) only.
+    personal_auth_url = (
+        "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
+    )
+
+    # Delegated scopes for personal mode.
+    # offline_access is required to receive a rotating refresh_token.
+    personal_scope = "https://graph.microsoft.com/Mail.Send offline_access"
 
     # Support attachments
     attachment_support = True
@@ -93,9 +170,9 @@ class NotifyOffice365(NotifyBase):
     # Currently (as of 2025.10.06) this was documented to be 3MB
     outlook_attachment_inline_max = 3145728
 
-    # Use all the direct application permissions you have configured for your
-    # app. The endpoint should issue a token for the ones associated with the
-    # resource you want to use.
+    # Use all the direct application permissions you have configured for
+    # your app. The endpoint should issue a token for the ones associated
+    # with the resource you want to use.
     # see https://docs.microsoft.com/en-us/azure/active-directory/develop/\
     #       v2-permissions-and-consent#the-default-scope
     scope = ".default"
@@ -105,9 +182,12 @@ class NotifyOffice365(NotifyBase):
 
     # Define object templates
     templates = (
-        # Send as user (only supported method)
+        # Org mode (app-only / daemon auth): tenant required
         "{schema}://{source}/{tenant}/{client_id}/{secret}",
         "{schema}://{source}/{tenant}/{client_id}/{secret}/{targets}",
+        # Personal mode (delegated refresh_token auth): no tenant
+        "{schema}://{source}/{client_id}/{secret}",
+        "{schema}://{source}/{client_id}/{secret}/{targets}",
     )
 
     # Define our template tokens
@@ -176,32 +256,47 @@ class NotifyOffice365(NotifyBase):
                 "name": _("Reply To"),
                 "type": "list:string",
             },
+            "mode": {
+                "name": _("Mode"),
+                "type": "choice:string",
+                "values": OFFICE365_MODES,
+                "default": Office365Mode.ORG,
+            },
         },
     )
 
     def __init__(
         self,
-        tenant,
-        client_id,
-        secret,
+        tenant=None,
+        client_id=None,
+        secret=None,
         source=None,
         targets=None,
         cc=None,
         bcc=None,
         reply_to=None,
+        mode=None,
         **kwargs,
     ):
         """Initialize Office 365 Object."""
         super().__init__(**kwargs)
 
-        # Tenant identifier
-        self.tenant = validate_regex(
-            tenant, *self.template_tokens["tenant"]["regex"]
-        )
-        if not self.tenant:
-            msg = f"An invalid Office 365 Tenant({tenant}) was specified."
-            self.logger.warning(msg)
-            raise TypeError(msg)
+        # Resolve mode — explicit parameter wins, then auto-detect from domain
+        if mode and isinstance(mode, str):
+            _mode = mode.lower()
+            if _mode not in OFFICE365_MODES:
+                msg = f"The Office 365 mode specified ({mode}) is invalid."
+                self.logger.warning(msg)
+                raise TypeError(msg)
+            self.mode = _mode
+        else:
+            _src = is_email(source) if source else None
+            self.mode = (
+                Office365Mode.PERSONAL
+                if _src
+                and _src["domain"].lower() in OFFICE365_PERSONAL_DOMAINS
+                else Office365Mode.ORG
+            )
 
         # Store our email/ObjectID Source
         self.source = source
@@ -218,7 +313,7 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Client Secret (associated with generated OAuth2 Login)
+        # Client Secret (org) or seed Refresh Token (personal)
         self.secret = validate_regex(secret)
         if not self.secret:
             msg = (
@@ -227,6 +322,20 @@ class NotifyOffice365(NotifyBase):
             )
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        if self.mode == Office365Mode.ORG:
+            # Tenant identifier — required for org mode
+            self.tenant = validate_regex(
+                tenant, *self.template_tokens["tenant"]["regex"]
+            )
+            if not self.tenant:
+                msg = f"An invalid Office 365 Tenant ({tenant}) was specified."
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        else:
+            # Personal mode requires no tenant
+            self.tenant = None
 
         # For tracking our email -> name lookups
         self.names = {}
@@ -264,8 +373,8 @@ class NotifyOffice365(NotifyBase):
                 self.logger.warning("No Target Office 365 Email Detected")
 
             else:
-                # If our target email list is empty we want to add ourselves to
-                # it
+                # If our target email list is empty we want to add ourselves
+                # to it
                 self.targets.append((False, self.source))
 
         # Validate recipients (cc:) and drop bad ones:
@@ -318,35 +427,48 @@ class NotifyOffice365(NotifyBase):
                 f"Dropped invalid Reply-To email ({recipient}) specified.",
             )
 
-        # Our token is acquired upon a successful login
+        # Our access token is acquired upon a successful authentication
         self.token = None
 
         # Presume that our token has expired 'now'
         self.token_expiry = datetime.now()
 
-        # Our email source; we detect this if the source is an ObjectID
-        # If it is unknown we set this to None
-        # User is the email associated with the account
-        self.from_email = self.store.get("from")
+        # Set up sender identity.
+        # Personal mode: source must be an email — resolved directly.
+        # Org mode: source may be an Object ID — resolved via API on first
+        # send when necessary.
         result = is_email(self.source)
-        if result:
+
+        if self.mode == Office365Mode.PERSONAL:
+            if not result:
+                msg = (
+                    "A valid source email address is required for personal "
+                    f"mode; got ({self.source})."
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
             self.from_email = result["full_email"]
-            self.from_name = result["name"] or self.store.get("name")
+            self.from_name = result["name"] or None
+            self.source_is_object_id = False
 
         else:
-            self.from_name = self.store.get("name")
+            # Org mode: use cached from_email; fall back to API lookup
+            self.from_email = self.store.get("from")
+            if result:
+                self.from_email = result["full_email"]
+                self.from_name = result["name"] or self.store.get("name")
+            else:
+                self.from_name = self.store.get("name")
 
-        # Track whether our source looks like an Entra Object ID (GUID).
-        # This is used to provide clearer error handling when sender lookups
-        # fail.
-        self.source_is_object_id = bool(
-            not result
-            and validate_regex(
-                self.source,
-                r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$",
-                "i",
+            self.source_is_object_id = bool(
+                not result
+                and validate_regex(
+                    self.source,
+                    r"^[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}$",
+                    "i",
+                )
             )
-        )
 
         return
 
@@ -368,7 +490,9 @@ class NotifyOffice365(NotifyBase):
             self.logger.warning("There are no Email recipients to notify")
             return False
 
-        if self.from_email is None:
+        # For org mode, perform from_email lookup when source is an Object ID.
+        # Personal mode always has from_email set in __init__.
+        if self.mode == Office365Mode.ORG and self.from_email is None:
             if not self.authenticate():
                 # We could not authenticate ourselves; we're done
                 return False
@@ -399,8 +523,8 @@ class NotifyOffice365(NotifyBase):
                         "Could not get From email from the Azure endpoint."
                     )
 
-                    # Prevent re-occuring upstream fetches for info that isn't
-                    # there
+                    # Prevent re-occuring upstream fetches for info that
+                    # isn't there
                     self.from_email = False
 
                 else:
@@ -456,10 +580,16 @@ class NotifyOffice365(NotifyBase):
         emails = list(self.targets)
 
         # Define our URL to post to
-        url = f"{self.graph_url}/v1.0/users/{self.source}/sendMail"
+        if self.mode == Office365Mode.PERSONAL:
+            url = f"{self.graph_url}/v1.0/me/sendMail"
+        else:
+            url = f"{self.graph_url}/v1.0/users/{self.source}/sendMail"
 
         # Prepare our Draft URL
-        draft_url = f"{self.graph_url}/v1.0/users/{self.source}/messages"
+        if self.mode == Office365Mode.PERSONAL:
+            draft_url = f"{self.graph_url}/v1.0/me/messages"
+        else:
+            draft_url = f"{self.graph_url}/v1.0/users/{self.source}/messages"
 
         small_attachments = []
         large_attachments = []
@@ -594,7 +724,7 @@ class NotifyOffice365(NotifyBase):
                 )
 
             if bcc:
-                # Prepare our CC list
+                # Prepare our BCC list
                 payload["message"]["bccRecipients"] = []
                 for addr in bcc:
                     payload_ = {"address": addr}
@@ -671,18 +801,19 @@ class NotifyOffice365(NotifyBase):
                     continue
 
                 # Send off our draft
-                attach_url = (
-                    "https://graph.microsoft.com/v1.0/users/"
-                    "{}/messages/{}/send"
-                )
-
-                attach_url = attach_url.format(
-                    self.source,
-                    message_id,
-                )
+                if self.mode == Office365Mode.PERSONAL:
+                    attach_url = (
+                        "https://graph.microsoft.com/v1.0"
+                        f"/me/messages/{message_id}/send"
+                    )
+                else:
+                    attach_url = (
+                        "https://graph.microsoft.com/v1.0/users"
+                        f"/{self.source}/messages/{message_id}/send"
+                    )
 
                 # Trigger our send
-                postokay, response = self._fetch(url=url)
+                postokay, response = self._fetch(url=attach_url)
                 if not postokay:
                     self.logger.warning(
                         "Could not send drafted email id: {} ", message_id
@@ -710,10 +841,17 @@ class NotifyOffice365(NotifyBase):
             return False
 
         # Our Session URL
-        url = (
-            f"{self.graph_url}/v1.0/users/{self.source}/message/{message_id}"
-            + "/attachments/createUploadSession"
-        )
+        if self.mode == Office365Mode.PERSONAL:
+            url = (
+                f"{self.graph_url}/v1.0/me/message/{message_id}"
+                "/attachments/createUploadSession"
+            )
+        else:
+            url = (
+                f"{self.graph_url}/v1.0/users/{self.source}"
+                f"/message/{message_id}"
+                "/attachments/createUploadSession"
+            )
 
         file_size = len(attachment)
 
@@ -759,7 +897,9 @@ class NotifyOffice365(NotifyBase):
             headers = {
                 "User-Agent": self.app_id,
                 "Content-Length": str(len(chunk)),
-                "Content-Range": f"bytes {start_byte}-{end_byte}/{file_size}",
+                "Content-Range": (
+                    f"bytes {start_byte}-{end_byte}/{file_size}"
+                ),
             }
 
             # Upload the chunk
@@ -786,6 +926,12 @@ class NotifyOffice365(NotifyBase):
 
         # If we reach here, we've either expired, or we need to authenticate
         # for the first time.
+        if self.mode == Office365Mode.PERSONAL:
+            return self._personal_authenticate()
+        return self._org_authenticate()
+
+    def _org_authenticate(self):
+        """Acquires an access token via client_credentials (org mode)."""
 
         # Prepare our payload
         payload = {
@@ -832,8 +978,8 @@ class NotifyOffice365(NotifyBase):
         self.token = None
 
         try:
-            # Extract our time from our response and subtrace 10 seconds from
-            # it to give us some wiggle/grace people to re-authenticate if we
+            # Extract our time from our response and subtract 10 seconds from
+            # it to give us some wiggle/grace period to re-authenticate if we
             # need to
             self.token_expiry = datetime.now() + timedelta(
                 seconds=int(response.get("expires_in")) - 10
@@ -842,14 +988,54 @@ class NotifyOffice365(NotifyBase):
         except (ValueError, AttributeError, TypeError):
             # ValueError: expires_in wasn't an integer
             # TypeError: expires_in was None
-            # AttributeError: we could not extract anything from our response
-            #                object.
+            # AttributeError: we could not extract anything from response
             return False
 
         # Go ahead and store our token if it's available
         self.token = response.get("access_token")
 
         # We're authenticated
+        return bool(self.token)
+
+    def _personal_authenticate(self):
+        """Acquires an access token via refresh_token (personal mode)."""
+
+        # Prefer the stored (most recently rotated) token over the seed
+        # value from the URL — ensures we always use the latest credential
+        refresh_token = self.store.get("refresh_token") or self.secret
+
+        payload = {
+            "grant_type": "refresh_token",
+            "client_id": self.client_id,
+            "refresh_token": refresh_token,
+            "scope": self.personal_scope,
+        }
+
+        postokay, response = self._fetch(
+            url=self.personal_auth_url,
+            payload=payload,
+            content_type="application/x-www-form-urlencoded",
+        )
+        if not postokay:
+            return False
+
+        self.token = None
+
+        try:
+            self.token_expiry = datetime.now() + timedelta(
+                seconds=int(response.get("expires_in")) - 10
+            )
+
+        except (ValueError, AttributeError, TypeError):
+            return False
+
+        # Rotate the refresh token — store the newest one for next send.
+        # url() will emit this stored token so configs stay current.
+        new_refresh = response.get("refresh_token")
+        if new_refresh:
+            self.store.set("refresh_token", new_refresh)
+
+        self.token = response.get("access_token")
         return bool(self.token)
 
     def _fetch(
@@ -878,7 +1064,7 @@ class NotifyOffice365(NotifyBase):
 
         # Some Debug Logging
         if self.logger.isEnabledFor(logging.DEBUG):
-            # Due to attachments; output can be quite heavy and io intensive
+            # Due to attachments; output can be quite heavy and io intensive.
             # To accommodate this, we only show our debug payload information
             # if required.
             self.logger.debug(
@@ -945,9 +1131,8 @@ class NotifyOffice365(NotifyBase):
                 #  }}
                 # }
 
-                # Error 403; the below is returned if he User.Read.All
-                #           Application scope is not set and a lookup is
-                #           attempted.
+                # Error 403; the below is returned if User.Read.All was not
+                # granted and a user lookup was attempted.
                 # {
                 #   "error": {
                 #     "code": "Authorization_RequestDenied",
@@ -1007,6 +1192,13 @@ class NotifyOffice365(NotifyBase):
 
         Targets or end points should never be identified here.
         """
+        if self.mode == Office365Mode.PERSONAL:
+            return (
+                self.secure_protocol[0],
+                self.source,
+                self.client_id,
+                self.secret,
+            )
         return (
             self.secure_protocol[0],
             self.source,
@@ -1021,14 +1213,20 @@ class NotifyOffice365(NotifyBase):
         # Extend our parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        # Include mode only for personal — org is the default and omitting
+        # it keeps existing org URLs clean
+        if self.mode == Office365Mode.PERSONAL:
+            params["mode"] = self.mode
+
         if self.cc:
             # Handle our Carbon Copy Addresses
             params["cc"] = ",".join(
                 [
                     "{}{}".format(
-                        "" if not self.names.get(e) else f"{self.names[e]}:", e
+                        "" if not self.names.get(e) else f"{self.names[e]}:",
+                        e,
                     )
-                    for e in self.cc
+                    for e in sorted(self.cc)
                 ]
             )
 
@@ -1037,22 +1235,53 @@ class NotifyOffice365(NotifyBase):
             params["bcc"] = ",".join(
                 [
                     "{}{}".format(
-                        "" if not self.names.get(e) else f"{self.names[e]}:", e
+                        "" if not self.names.get(e) else f"{self.names[e]}:",
+                        e,
                     )
-                    for e in self.bcc
+                    for e in sorted(self.bcc)
                 ]
             )
 
         if self.reply_to:
-            # Handle our Reply-To Addresses
             params["reply_to"] = ",".join(
                 [
                     "{}{}".format(
                         "" if not self.names.get(e) else f"{self.names[e]}:",
                         e,
                     )
-                    for e in self.reply_to
+                    for e in sorted(self.reply_to)
                 ]
+            )
+
+        targets_str = "/".join(
+            [
+                NotifyOffice365.quote(
+                    "{}{}".format("" if not e[0] else f"{e[0]}:", e[1]),
+                    safe="@",
+                )
+                for e in self.targets
+            ]
+        )
+
+        if self.mode == Office365Mode.PERSONAL:
+            # Emit the most current refresh token — prefer the stored
+            # (rotated) value over the original seed so configs stay valid
+            current_secret = self.store.get("refresh_token") or self.secret
+            return (
+                "{schema}://{source}/{client_id}/{secret}"
+                "/{targets}/?{params}".format(
+                    schema=self.secure_protocol[0],
+                    source=self.source,
+                    client_id=self.pprint(self.client_id, privacy, safe=""),
+                    secret=self.pprint(
+                        current_secret,
+                        privacy,
+                        mode=PrivacyMode.Secret,
+                        safe="",
+                    ),
+                    targets=targets_str,
+                    params=NotifyOffice365.urlencode(params),
+                )
             )
 
         return (
@@ -1067,17 +1296,7 @@ class NotifyOffice365(NotifyBase):
                 secret=self.pprint(
                     self.secret, privacy, mode=PrivacyMode.Secret, safe=""
                 ),
-                targets="/".join(
-                    [
-                        NotifyOffice365.quote(
-                            "{}{}".format(
-                                "" if not e[0] else f"{e[0]}:", e[1]
-                            ),
-                            safe="@",
-                        )
-                        for e in self.targets
-                    ]
-                ),
+                targets=targets_str,
                 params=NotifyOffice365.urlencode(params),
             )
         )
@@ -1088,8 +1307,8 @@ class NotifyOffice365(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """Parses the URL and returns enough arguments that can allow us to re-
-        instantiate this object."""
+        """Parses the URL and returns enough arguments that can allow us to
+        re-instantiate this object."""
 
         results = NotifyBase.parse_url(
             url, verify_host=False, plus_to_space=True
@@ -1108,9 +1327,7 @@ class NotifyOffice365(NotifyBase):
         # Initialize our tenant
         results["tenant"] = None
 
-        # Initialize our email
-        results["email"] = None
-
+        # Legacy source alias in query-string form
         # From Email
         if "from" in results["qsd"] and len(results["qsd"]["from"]):
             # Extract the sending account's information
@@ -1127,17 +1344,35 @@ class NotifyOffice365(NotifyBase):
             # Object ID instead of email
             results["source"] = NotifyOffice365.unquote(results["host"])
 
-        # Tenant
-        if "tenant" in results["qsd"] and len(results["qsd"]["tenant"]):
-            # Extract the Tenant from the argument
-            results["tenant"] = NotifyOffice365.unquote(
-                results["qsd"]["tenant"]
+        # Detect mode — explicit ?mode= wins, then auto-detect from domain
+        results["mode"] = None
+        if "mode" in results["qsd"] and results["qsd"]["mode"]:
+            _mode = results["qsd"]["mode"].lower()
+            if _mode in OFFICE365_MODES:
+                results["mode"] = _mode
+
+        if results["mode"] is None:
+            _src = is_email(results.get("source", ""))
+            results["mode"] = (
+                Office365Mode.PERSONAL
+                if _src
+                and _src["domain"].lower() in OFFICE365_PERSONAL_DOMAINS
+                else Office365Mode.ORG
             )
 
-        elif entries:
-            results["tenant"] = NotifyOffice365.unquote(entries.pop(0))
+        if results["mode"] == Office365Mode.ORG:
+            # Org mode: first path segment is the tenant
+            # Tenant
+            if "tenant" in results["qsd"] and len(results["qsd"]["tenant"]):
+                # Extract the Tenant from the argument
+                results["tenant"] = NotifyOffice365.unquote(
+                    results["qsd"]["tenant"]
+                )
 
-        # OAuth2 ID
+            elif entries:
+                results["tenant"] = NotifyOffice365.unquote(entries.pop(0))
+
+        # OAuth2 ID (common to both modes; next path segment after tenant)
         if "oauth_id" in results["qsd"] and len(results["qsd"]["oauth_id"]):
             # Extract the API Key from an argument
             results["client_id"] = NotifyOffice365.unquote(
@@ -1145,7 +1380,7 @@ class NotifyOffice365(NotifyBase):
             )
 
         elif entries:
-            # Get our client_id is the first entry on the path
+            # Get our client_id; it is the first entry on the path
             results["client_id"] = NotifyOffice365.unquote(entries.pop(0))
 
         #
@@ -1161,14 +1396,14 @@ class NotifyOffice365(NotifyBase):
                 results["targets"].append(entry)
                 continue
 
-            # If we reach here, the entry we just popped is part of the secret
-            # key, so put it back
+            # If we reach here, the entry we just popped is part of the
+            # secret key, so put it back
             entries.append(NotifyOffice365.quote(entry, safe=""))
 
             # We're done
             break
 
-        # OAuth2 Secret
+        # OAuth2 Secret / Refresh Token
         if "oauth_secret" in results["qsd"] and len(
             results["qsd"]["oauth_secret"]
         ):
@@ -1185,8 +1420,8 @@ class NotifyOffice365(NotifyBase):
                 [NotifyOffice365.unquote(x) for x in entries]
             )
 
-        # Support the 'to' variable so that we can support targets this way too
-        # The 'to' makes it easier to use yaml configuration
+        # Support the 'to' variable so that we can support targets this way
+        # too. The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"] += NotifyOffice365.parse_list(
                 results["qsd"]["to"]
