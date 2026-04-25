@@ -208,12 +208,23 @@ apprise_url_tests = (
         },
     ),
     # ----------------------------------------------------------------
-    # Webhook channel with a named endpoint (?name=)
+    # Webhook channel with a named endpoint -- both input forms accepted
     # ----------------------------------------------------------------
     (
         "pushplus://{}?channel=webhook&name=myhook".format(GOOD_TOKEN),
         {
             "instance": NotifyPushplus,
+            # url() emits the compact schema://name@token form
+            "privacy_url": "pushplus://myhook@",
+            "requests_response_text": GOOD_RESPONSE,
+        },
+    ),
+    # schema://name@token form -- channel=webhook is implied
+    (
+        "pushplus://myhook@{}".format(GOOD_TOKEN),
+        {
+            "instance": NotifyPushplus,
+            "privacy_url": "pushplus://myhook@",
             "requests_response_text": GOOD_RESPONSE,
         },
     ),
@@ -439,15 +450,23 @@ def test_plugin_pushplus_url():
     url = obj.url()
     assert "channel=" not in url
 
-    # Webhook name emitted as ?name= only when channel is webhook
+    # When channel=webhook with a name, url() uses schema://name@token form
     obj = NotifyPushplus(
         token=GOOD_TOKEN,
         channel="webhook",
         webhook="myhook",
     )
     url = obj.url()
-    assert "name=myhook" in url
-    assert "channel=webhook" in url
+    assert "pushplus://myhook@" in url
+    # channel= and name= are both implied by user@ -- omitted from params
+    assert "channel=" not in url
+    assert "name=" not in url
+
+    # Privacy URL preserves the webhook name but masks the token
+    priv = obj.url(privacy=True)
+    assert "pushplus://myhook@" in priv
+    assert GOOD_TOKEN not in priv
+    assert "****" in priv
 
     # Webhook name suppressed when channel is not webhook
     obj = NotifyPushplus(
@@ -457,11 +476,14 @@ def test_plugin_pushplus_url():
     )
     url = obj.url()
     assert "name=" not in url
+    assert "@" not in url
 
-    # Webhook channel without a name -- no name= key in URL
+    # Webhook channel without a name uses the plain ?channel=webhook form
     obj = NotifyPushplus(token=GOOD_TOKEN, channel="webhook")
     url = obj.url()
     assert "name=" not in url
+    assert "channel=webhook" in url
+    assert "@" not in url
 
     # Invalid targets are preserved in the URL path for round-trip fidelity
     obj = NotifyPushplus(token=GOOD_TOKEN, targets=["bad!target"])
@@ -808,6 +830,27 @@ def test_plugin_pushplus_parse_url():
     # Webhook name extracted into the "webhook" key from ?name=
     result = NotifyPushplus.parse_url(
         "pushplus://{}?channel=webhook&name=myhook".format(GOOD_TOKEN)
+    )
+    assert result.get("webhook") == "myhook"
+    assert result.get("channel") == "webhook"
+
+    # schema://name@token form: user@ -> webhook, implies channel=webhook
+    result = NotifyPushplus.parse_url(
+        "pushplus://myhook@{}".format(GOOD_TOKEN)
+    )
+    assert result.get("webhook") == "myhook"
+    assert result.get("channel") == PushPlusChannel.WEBHOOK
+
+    # Explicit ?channel= overrides the webhook implication from user@
+    result = NotifyPushplus.parse_url(
+        "pushplus://myhook@{}?channel=mail".format(GOOD_TOKEN)
+    )
+    assert result.get("webhook") == "myhook"
+    assert result.get("channel") == "mail"
+
+    # ?name= takes precedence over user@ when both are supplied
+    result = NotifyPushplus.parse_url(
+        "pushplus://other@{}?channel=webhook&name=myhook".format(GOOD_TOKEN)
     )
     assert result.get("webhook") == "myhook"
     assert result.get("channel") == "webhook"

@@ -54,8 +54,12 @@
 #   Topic + delivery channel:
 #     pushplus://{token}/{topic}?channel=mail
 #
-#   Webhook channel with a named endpoint:
+#   Webhook channel with a named endpoint -- two equivalent forms:
 #     pushplus://{token}?channel=webhook&name={webhook_name}
+#     pushplus://{webhook_name}@{token}
+#
+#   When the schema://{name}@{token} form is used and no explicit channel=
+#   is given, the webhook channel is implied automatically.
 #
 #   Native PushPlus API URL (also accepted by parse_native_url):
 #     https://www.pushplus.plus/send?token={token}
@@ -247,15 +251,20 @@ class NotifyPushplus(NotifyBase):
             "topic": {
                 "alias_of": "targets",
             },
-            # Webhook endpoint name; only meaningful when channel=webhook
+            # Webhook endpoint name; only meaningful when channel=webhook.
+            # The URL parameter is ?name= but the __init__ kwarg is webhook=
+            # to avoid shadowing URLBase.name.
             "name": {
                 "name": _("Webhook Name"),
                 "type": "string",
+                "map_to": "webhook",
             },
         },
     )
 
-    def __init__(self, token, targets=None, channel=None, name=None, **kwargs):
+    def __init__(
+        self, token, targets=None, channel=None, webhook=None, **kwargs
+    ):
         """Initialize Pushplus Object."""
         super().__init__(**kwargs)
 
@@ -318,8 +327,11 @@ class NotifyPushplus(NotifyBase):
             self.invalid_targets.append(target)
 
         # Store the webhook name; only meaningful when channel=webhook.
-        # Accepted via ?name= in the URL (mapped via alias_of in template_args)
-        self.name = name if isinstance(name, str) and name else None
+        # Kept as self.webhook (not self.name) to avoid shadowing URLBase.name.
+        # Arrives via the ?name= URL parameter (mapped to webhook= by map_to).
+        self.webhook = (
+            webhook if isinstance(webhook, str) and webhook else None
+        )
 
         return
 
@@ -366,8 +378,8 @@ class NotifyPushplus(NotifyBase):
                 payload["topic"] = topic
 
             # Add the webhook name when the webhook channel is selected
-            if self.channel == PushPlusChannel.WEBHOOK and self.name:
-                payload["webhook"] = self.name
+            if self.channel == PushPlusChannel.WEBHOOK and self.webhook:
+                payload["webhook"] = self.webhook
 
             # Debug logging so the caller can inspect what will be sent
             self.logger.debug(
@@ -479,19 +491,22 @@ class NotifyPushplus(NotifyBase):
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
 
+        # When channel=webhook with a named endpoint, use the compact
+        # {name}@pushplus://{token} form.  Both ?channel=webhook and ?name=
+        # are implied by the user@ prefix and omitted from the query string.
+        webhook_prefix = (
+            self.channel == PushPlusChannel.WEBHOOK and self.webhook
+        )
+
         # Start with an empty params dict
         params = {}
 
-        # Include the delivery channel when it differs from the default.
-        # The schema alias (wechat:// / wecom://) is never emitted here --
-        # we always normalise back to pushplus:// + ?channel= for clarity.
-        if self.channel != PUSHPLUS_CHANNEL_DEFAULT:
+        # When not using the webhook prefix form, include ?channel= when it
+        # differs from the default.  The schema alias (wechat:// / wecom://)
+        # is never emitted here -- we always normalise back to pushplus://
+        # plus ?channel= for clarity.
+        if not webhook_prefix and self.channel != PUSHPLUS_CHANNEL_DEFAULT:
             params["channel"] = self.channel
-
-        # Include the webhook name (as ?name=) when the webhook channel
-        # is active.
-        if self.channel == PushPlusChannel.WEBHOOK and self.name:
-            params["name"] = self.name
 
         # Merge in standard Apprise URL parameters (verify, format, etc.)
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -506,6 +521,28 @@ class NotifyPushplus(NotifyBase):
             mode=PrivacyMode.Secret,
             safe="",
         )
+
+        # When using the webhook prefix form, the endpoint name goes in the
+        # user@ position (schema://name@token) -- channel=webhook and ?name=
+        # are both implied by the user@ presence and omitted from params.
+        if webhook_prefix:
+            name_str = NotifyPushplus.quote(self.webhook, safe="")
+            if targets:
+                return "{schema}://{name}@{token}/{targets}/?{params}".format(
+                    schema=self.secure_protocol[0],
+                    name=name_str,
+                    token=token_str,
+                    targets="/".join(
+                        NotifyPushplus.quote(t, safe="") for t in targets
+                    ),
+                    params=NotifyPushplus.urlencode(params),
+                )
+            return "{schema}://{name}@{token}/?{params}".format(
+                schema=self.secure_protocol[0],
+                name=name_str,
+                token=token_str,
+                params=NotifyPushplus.urlencode(params),
+            )
 
         if targets:
             # One or more topics: include them in the URL path
@@ -570,6 +607,17 @@ class NotifyPushplus(NotifyBase):
         # We store it internally as 'webhook' to avoid shadowing URLBase.name.
         if "name" in results["qsd"] and results["qsd"]["name"]:
             results["webhook"] = NotifyPushplus.unquote(results["qsd"]["name"])
+
+        # Support the {webhook_name}@pushplus://{token} short form.
+        # When user@ is present, it identifies the webhook endpoint name.
+        # If no channel was explicitly given, webhook is the implied channel.
+        if results.get("user"):
+            # Use user@ as the webhook name when ?name= was not also supplied
+            if "webhook" not in results:
+                results["webhook"] = NotifyPushplus.unquote(results["user"])
+            # Imply webhook channel when no explicit channel was specified
+            if "channel" not in results:
+                results["channel"] = PushPlusChannel.WEBHOOK
 
         return results
 
