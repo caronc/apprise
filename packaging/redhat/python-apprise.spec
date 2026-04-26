@@ -83,7 +83,7 @@ notification services. It supports sending alerts to platforms such as: \
 `WxPusher`, `XBMC`, `XMPP`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
-Version:        1.9.9
+Version:        1.10.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -236,6 +236,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Sun Apr 26 2026 Chris Caron <lead2gold@gmail.com> - 1.10.0-1
+- Updated to v1.10.0
+
 * Sat Mar 21 2026 Chris Caron <lead2gold@gmail.com> - 1.9.9-1
 - Updated to v1.9.9
 
