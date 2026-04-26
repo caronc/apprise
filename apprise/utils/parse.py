@@ -1029,7 +1029,10 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
 
         elif isinstance(arg, (set, list, tuple)):
             # Use recursion to handle the list of Emails
-            result += parse_emails(*arg, store_unparseable=store_unparseable)
+            result += parse_emails(
+                *arg,
+                store_unparseable=store_unparseable,
+            )
 
     return result
 
