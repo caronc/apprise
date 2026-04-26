@@ -107,3 +107,21 @@ def test_emojis_alternation_aliases():
     # runner / running
     assert emojis.apply_emojis(":runner:") == "🏃"
     assert emojis.apply_emojis(":running:") == "🏃"
+
+
+def test_emojis_lookup_no_pattern_match():
+    """emojis: _lookup() returns the raw token when _EMOJI_PATTERN_LIST is
+    empty (defensive fallback -- return text branch)."""
+
+    # Ensure the engine is initialised first.
+    emojis.apply_emojis(":smile:")
+
+    original = emojis._EMOJI_PATTERN_LIST
+    emojis._EMOJI_PATTERN_LIST = []
+    try:
+        # With no patterns to match against, _lookup falls through to
+        # "return text", so the matched token is passed back unchanged.
+        result = emojis.apply_emojis(":smile:")
+        assert result == ":smile:"
+    finally:
+        emojis._EMOJI_PATTERN_LIST = original
