@@ -2146,15 +2146,17 @@ EMOJI_MAP = {
     DELIM + r"wales" + DELIM: "🏴󠁧󠁢󠁷󠁬󠁳󠁿",
 }
 
-# Define our singlton
+# Define our singletons
 EMOJI_COMPILED_MAP = None
+# List of (compiled_fullmatch_pattern, emoji) for resolving alternation keys
+_EMOJI_PATTERN_LIST = None
 
 
 def apply_emojis(content):
     """Takes the content and swaps any matched emoji's found with their utf-8
     encoded mapping."""
 
-    global EMOJI_COMPILED_MAP
+    global EMOJI_COMPILED_MAP, _EMOJI_PATTERN_LIST
 
     if EMOJI_COMPILED_MAP is None:
         t_start = time.time()
@@ -2162,10 +2164,27 @@ def apply_emojis(content):
         EMOJI_COMPILED_MAP = re.compile(
             r"(" + "|".join(EMOJI_MAP.keys()) + r")", re.IGNORECASE
         )
+
+        # - EMOJI_MAP keys are regex patterns (e.g. ":(\+1|thumbsup):")
+        # - x.group() from a match cannot be used as a dict key directly.
+        #
+        # Build a per-entry compiled pattern for fullmatch lookups so
+        # alternation/optional-group keys resolve correctly.
+        _EMOJI_PATTERN_LIST = [
+            (re.compile(r"(?:" + pat + r")", re.IGNORECASE), emoji)
+            for pat, emoji in EMOJI_MAP.items()
+        ]
         logger.trace(f"Emoji engine loaded in {time.time() - t_start:.4f}s")
 
+    def _lookup(m):
+        text = m.group()
+        for pat, emoji in _EMOJI_PATTERN_LIST:
+            if pat.fullmatch(text):
+                return emoji
+        return text
+
     try:
-        return EMOJI_COMPILED_MAP.sub(lambda x: EMOJI_MAP[x.group()], content)
+        return EMOJI_COMPILED_MAP.sub(_lookup, content)
 
     except TypeError:
         # No change; but force string return
