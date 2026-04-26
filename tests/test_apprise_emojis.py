@@ -54,3 +54,56 @@ def test_emojis():
     assert emojis.apply_emojis(object) == ""
     assert emojis.apply_emojis(True) == ""
     assert emojis.apply_emojis(4.0) == ""
+
+
+def test_emojis_alternation_aliases():
+    """emojis: apply_emojis() handles regex alternation keys correctly."""
+
+    # thumbsup / +1
+    assert emojis.apply_emojis(":thumbsup:") == "👍"
+    assert emojis.apply_emojis(":+1:") == "👍"
+
+    # thumbsdown / -1
+    assert emojis.apply_emojis(":thumbsdown:") == "👎"
+    assert emojis.apply_emojis(":-1:") == "👎"
+
+    # laughing / satisfied
+    assert emojis.apply_emojis(":laughing:") == "😆"
+    assert emojis.apply_emojis(":satisfied:") == "😆"
+
+    # poop aliases
+    assert emojis.apply_emojis(":poop:") == "💩"
+    assert emojis.apply_emojis(":hankey:") == "💩"
+    assert emojis.apply_emojis(":shit:") == "💩"
+
+    # boom / collision
+    assert emojis.apply_emojis(":boom:") == "💥"
+    assert emojis.apply_emojis(":collision:") == "💥"
+
+    # exclamation aliases
+    assert emojis.apply_emojis(":exclamation:") == "❗"
+    assert emojis.apply_emojis(":heavy_exclamation_mark:") == "❗"
+
+    # knife / hocho
+    assert emojis.apply_emojis(":knife:") == "🔪"
+    assert emojis.apply_emojis(":hocho:") == "🔪"
+
+    # memo / pencil
+    assert emojis.apply_emojis(":memo:") == "📝"
+    assert emojis.apply_emojis(":pencil:") == "📝"
+
+    # uk / gb
+    assert emojis.apply_emojis(":uk:") == "🇬🇧"
+    assert emojis.apply_emojis(":gb:") == "🇬🇧"
+
+    # aliases embedded in text
+    assert emojis.apply_emojis("hello :thumbsup: world") == "hello 👍 world"
+    assert emojis.apply_emojis(":poop::boom:") == "💩💥"
+
+    # optional-group patterns: ':hand:' and ':raised_hand:' both map to ✋
+    assert emojis.apply_emojis(":hand:") == "✋"
+    assert emojis.apply_emojis(":raised_hand:") == "✋"
+
+    # runner / running
+    assert emojis.apply_emojis(":runner:") == "🏃"
+    assert emojis.apply_emojis(":running:") == "🏃"
