@@ -51,8 +51,9 @@ RUN \
 
 # Place our build file into the path
 COPY packaging/redhat/python-apprise.spec /
-RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
-    xargs dnf install -y && dnf clean all
+
+# Use builddep to resolve and install all spec dependencies correctly
+RUN dnf builddep -y /python-apprise.spec && dnf clean all
 
 # RPM build structure setup
 ENV FLAVOR=rpmbuild OS=centos DIST=el10
