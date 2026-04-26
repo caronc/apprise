@@ -468,6 +468,19 @@ def test_plugin_pushplus_url():
     assert GOOD_TOKEN not in priv
     assert "****" in priv
 
+    # Webhook prefix form with group topics -- schema://name@token/topic/ form
+    obj = NotifyPushplus(
+        token=GOOD_TOKEN,
+        channel="webhook",
+        webhook="myhook",
+        targets=["mygroup"],
+    )
+    url = obj.url()
+    assert "pushplus://myhook@" in url
+    assert "mygroup" in url
+    assert "channel=" not in url
+    assert "name=" not in url
+
     # Webhook name suppressed when channel is not webhook
     obj = NotifyPushplus(
         token=GOOD_TOKEN,
