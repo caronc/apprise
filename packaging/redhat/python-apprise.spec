@@ -146,6 +146,7 @@ Requires: python3dist(pyyaml)
 Recommends: python3dist(hidapi)
 Recommends: python3dist(paho-mqtt)
 Recommends: python3dist(slixmpp)
+Recommends: python3dist(pynacl)
 
 %if 0%{?legacy_python_build} == 0
 # Logic for non-RHEL ≤ 9 systems

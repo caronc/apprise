@@ -72,6 +72,10 @@ mkdir -p "$SOURCES_DIR"
 cp "$TARBALL" "$SOURCES_DIR/"
 find $APPRISE_DIR/packaging/redhat/ -iname '*.patch' -exec cp {} "$SOURCES_DIR" \;
 
+echo "==> Resolving dynamic dependencies from spec"
+sudo dnf builddep -y \
+   "$APPRISE_DIR/packaging/redhat/python-apprise.spec"
+
 echo "==> Building RPM (source and binary)"
 mkdir -p "$DIST_DIR"
 rpmbuild --define "_topdir $APPRISE_DIR" \
