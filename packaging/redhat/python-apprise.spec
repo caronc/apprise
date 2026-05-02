@@ -80,7 +80,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, \
 `Twilio`, `Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, \
 `Vonage`, `WebPush`, `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, \
-`WxPusher`, `XBMC`, `XMPP`, and `Zulip`.}
+`WxPusher`, `XBMC`, `XMPP`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
 Version:        1.10.0
