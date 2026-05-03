@@ -79,8 +79,8 @@ notification services. It supports sending alerts to platforms such as: \
 `Splunk`, `Spike`, `Spug Push`, `Super Toasty`, `Streamlabs`, `Stride`, \
 `Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, \
 `Twilio`, `Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, \
-`Vonage`, `WebPush`, `WeCom Bot`, `WhatsApp`, `Webex Teams`, `Workflows`, \
-`WxPusher`, `XBMC`, `XMPP`, `Zoom`, and `Zulip`.}
+`Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `WhatsApp`, \
+`Webex Teams`, `Workflows`, `WxPusher`, `XBMC`, `XMPP`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
 Version:        1.10.0
