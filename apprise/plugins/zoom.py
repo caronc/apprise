@@ -199,7 +199,9 @@ class NotifyZoom(NotifyBase):
         else:
             # Reject empty or whitespace-only strings before prefix matching;
             # an empty string would match every mode (false positive).
-            normalized_mode = mode.strip().lower() if isinstance(mode, str) else ""
+            normalized_mode = (
+                mode.strip().lower() if isinstance(mode, str) else ""
+            )
             if not normalized_mode:
                 self.mode = None
             else:
