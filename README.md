@@ -154,6 +154,7 @@ The table below identifies the services this tool supports and some example serv
 | [Vapid (WebPush)](https://appriseit.com/services/vapid/) | vapid://    | (TCP) 443    | vapid://subscriber/target<br/>vapid://subscriber/target?subfile=path&keyfile=path
 | [Viber](https://appriseit.com/services/viber/) | viber://    | (TCP) 443    | viber://token/target
 | [Webex Teams (Cisco)](https://appriseit.com/services/wxteams/) | wxteams://  | (TCP) 443   | wxteams://Token
+| [WeChat (WeCom)](https://appriseit.com/services/wechat/) | wechat://  | (TCP) 443   | wechat://CorpID:AppSecret@AgentID/@all<br/>wechat://CorpID:AppSecret@AgentID/UserID
 | [WeCom Bot](https://appriseit.com/services/wecombot/) | wecombot://  | (TCP) 443   | wecombot://BotKey
 | [WhatsApp](https://appriseit.com/services/whatsapp/) | whatsapp://  | (TCP) 443   | whatsapp://AccessToken@FromPhoneID/ToPhoneNo<br/>whatsapp://Template:AccessToken@FromPhoneID/ToPhoneNo
 | [WxPusher](https://appriseit.com/services/wxpusher/) | wxpusher://  | (TCP) 443   | wxpusher://AppToken@UserID1/UserID2/UserIDN<br/>wxpusher://AppToken@Topic1/Topic2/Topic3<br/>wxpusher://AppToken@UserID1/Topic1/

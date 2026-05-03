@@ -67,8 +67,8 @@
 # Schema alias for WeCom users:
 #   wecom://{token}    -- identical to pushplus://{token}?channel=cp
 #
-# Note: wechat:// is reserved for a future direct WeChat Official Account
-# API plugin and is not supported here.
+# For direct WeCom Application API notifications (without PushPlus as
+# intermediary), use the wechat:// plugin instead.
 #
 # API References:
 #   https://www.pushplus.plus/doc/guide/api.html
@@ -158,8 +158,7 @@ IS_TOPIC = re.compile(
 
 # Schema names that auto-select a specific delivery channel when used
 # in place of the default "pushplus" schema.  Mirrors the Kodi/XBMC pattern.
-# Note: wechat:// is intentionally omitted -- it is reserved for a future
-# direct WeChat Official Account API integration.
+# wechat:// belongs to the separate direct WeCom Application API plugin.
 PUSHPLUS_SCHEMA_MAP = {
     # wecom:// forces channel=cp (WeCom / Enterprise WeChat)
     "wecom": PushPlusChannel.WECOM,
@@ -176,8 +175,8 @@ class NotifyPushplus(NotifyBase):
     service_url = "https://www.pushplus.plus/"
 
     # The default protocol; wecom:// is accepted as a schema alias.
-    # Note: wechat:// is reserved for a future direct WeChat Official
-    # Account API plugin and is intentionally not listed here.
+    # wechat:// belongs to the direct WeCom Application API plugin and
+    # is intentionally not listed here.
     secure_protocol = ("pushplus", "wecom")
 
     # A URL that takes you to the setup/help of the specific protocol
