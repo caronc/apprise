@@ -269,8 +269,9 @@ def test_plugin_zoom_url_identifier():
     obj_full = NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="full")
     obj_simple = NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="simple")
     assert obj_full.url_identifier != obj_simple.url_identifier
-    assert ZoomMode.FULL in obj_full.url_identifier
-    assert ZoomMode.SIMPLE in obj_simple.url_identifier
+    # mode is the 4th element (index 3) of the identifier tuple
+    assert obj_full.url_identifier[3] == ZoomMode.FULL
+    assert obj_simple.url_identifier[3] == ZoomMode.SIMPLE
 
 
 @mock.patch("requests.post")

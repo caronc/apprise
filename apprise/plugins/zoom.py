@@ -199,13 +199,13 @@ class NotifyZoom(NotifyBase):
         else:
             # Reject empty or whitespace-only strings before prefix matching;
             # an empty string would match every mode (false positive).
-            _mode = mode.strip().lower() if isinstance(mode, str) else ""
-            if not _mode:
+            normalized_mode = mode.strip().lower() if isinstance(mode, str) else ""
+            if not normalized_mode:
                 self.mode = None
             else:
                 # Allow partial prefix matching (e.g. "sim" -> "simple")
                 self.mode = next(
-                    (m for m in ZOOM_MODES if m.startswith(_mode)),
+                    (m for m in ZOOM_MODES if m.startswith(normalized_mode)),
                     None,
                 )
             if not self.mode:
