@@ -322,6 +322,27 @@ apprise_url_tests = (
             ),
         },
     ),
+    # Disable Save Sent Items
+    (
+        "o365://{aid}/{tenant}/{cid}/{secret}/{targets}?savesent=no".format(
+            tenant="tenant",
+            cid="ab-cd-ef-gh",
+            aid="user@example.edu",
+            secret="abcd/123/3343/@jack/test",
+            targets="email1@test.ca",
+        ),
+        {
+            "instance": NotifyOffice365,
+            "requests_response_text": {
+                "expires_in": 2000,
+                "access_token": "abcd1234",
+                "mail": "user@example.ca",
+            },
+            "privacy_url": (
+                "azure://user@example.edu/t...t/a...h/****/email1@test.ca/"
+            ),
+        },
+    ),
     # reply_to with URL-encoded (+) spaces in name
     (
         "o365://{aid}/{tenant}/{cid}/{secret}/{targets}"
