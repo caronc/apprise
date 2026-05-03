@@ -123,6 +123,11 @@ class NotifyZoom(NotifyBase):
     # Maximum length for the head.text field (full mode only)
     title_maxlen = 250
 
+    # In simple mode the title is prepended into the body string, so the
+    # combined payload must stay within body_maxlen.  Setting this flag
+    # ensures Apprise enforces the combined limit across both modes.
+    overflow_amalgamate_title = True
+
     # Define object URL templates
     templates = ("{schema}://{webhook_id}/{token}",)
 
@@ -192,11 +197,17 @@ class NotifyZoom(NotifyBase):
             self.mode = ZOOM_MODE_DEFAULT
 
         else:
-            # Allow partial prefix matching (e.g. "sim" -> "simple")
-            self.mode = next(
-                (m for m in ZOOM_MODES if m.startswith(mode.lower())),
-                None,
-            )
+            # Reject empty or whitespace-only strings before prefix matching;
+            # an empty string would match every mode (false positive).
+            _mode = mode.strip().lower() if isinstance(mode, str) else ""
+            if not _mode:
+                self.mode = None
+            else:
+                # Allow partial prefix matching (e.g. "sim" -> "simple")
+                self.mode = next(
+                    (m for m in ZOOM_MODES if m.startswith(_mode)),
+                    None,
+                )
             if not self.mode:
                 msg = "The Zoom mode ({}) is invalid.".format(mode)
                 self.logger.warning(msg)
@@ -319,7 +330,7 @@ class NotifyZoom(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (self.secure_protocol, self.webhook_id, self.token)
+        return (self.secure_protocol, self.webhook_id, self.token, self.mode)
 
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified

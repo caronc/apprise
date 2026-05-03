@@ -196,6 +196,14 @@ def test_plugin_zoom_init():
     with pytest.raises(TypeError):
         NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="bogus")
 
+    # Empty string mode is also invalid (must not silently resolve to simple)
+    with pytest.raises(TypeError):
+        NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="")
+
+    # Whitespace-only mode is also invalid
+    with pytest.raises(TypeError):
+        NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="   ")
+
     # Valid: default mode
     obj = NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN)
     assert obj.mode == ZOOM_MODE_DEFAULT
@@ -246,7 +254,7 @@ def test_plugin_zoom_url_privacy():
 
 
 def test_plugin_zoom_url_identifier():
-    """Verify url_identifier contains webhook_id and token."""
+    """Verify url_identifier contains webhook_id, token, and mode."""
     obj = NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN)
     uid = obj.url_identifier
     assert "zoom" in uid
@@ -256,6 +264,13 @@ def test_plugin_zoom_url_identifier():
     # Two instances with different tokens are distinct
     obj2 = NotifyZoom(webhook_id=WEBHOOK_ID, token="other")
     assert obj.url_identifier != obj2.url_identifier
+
+    # Same credentials but different modes produce different identifiers
+    obj_full = NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="full")
+    obj_simple = NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="simple")
+    assert obj_full.url_identifier != obj_simple.url_identifier
+    assert ZoomMode.FULL in obj_full.url_identifier
+    assert ZoomMode.SIMPLE in obj_simple.url_identifier
 
 
 @mock.patch("requests.post")
