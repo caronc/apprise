@@ -623,7 +623,7 @@ class NotifyOffice365(NotifyBase):
                 },
             },
             # Below takes a string (not bool) of either 'true' or 'false'
-            "saveToSentItems": self.save_sent,
+            "saveToSentItems": "true" if self.save_sent else "false",
         }
 
         if self.from_email:
