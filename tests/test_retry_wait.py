@@ -32,9 +32,14 @@ from unittest import mock
 import pytest
 
 from apprise import Apprise, AppriseAsset
-from apprise.common import APPRISE_MAX_SERVICE_RETRY, APPRISE_MAX_SERVICE_WAIT
+from apprise.common import (
+    APPRISE_MAX_SERVICE_RETRY,
+    APPRISE_MAX_SERVICE_WAIT,
+    MATCH_ALL_TAG,
+)
 from apprise.manager_plugins import NotificationManager
 from apprise.plugins import NotifyBase
+from apprise.tag import AppriseTag
 
 logging.disable(logging.CRITICAL)
 
@@ -485,3 +490,544 @@ class TestAssetDefault:
         asset = AppriseAsset(default_service_retry=3)
         nb = _TestNotify(host="localhost", asset=asset, retry=1)
         assert nb.retry == 1
+
+
+class _RaisingNotify(NotifyBase):
+    """Plugin that raises a bare Exception from notify()."""
+
+    app_id = "RaisingApp"
+    app_desc = "Test"
+    notify_url = "raise://"
+    title_maxlen = 250
+    body_maxlen = 32768
+
+    def url(self, *args, **kwargs):
+        return "raise://localhost"
+
+    def send(self, **kwargs):
+        raise RuntimeError("plugin exploded")
+
+    async def async_notify(self, **kwargs):
+        raise RuntimeError("plugin exploded async")
+
+    @staticmethod
+    def parse_url(url):
+        return NotifyBase.parse_url(url, verify_host=False)
+
+
+class TestAppriseTag:
+    """Full branch coverage for AppriseTag."""
+
+    def test_parse_returns_same_instance(self):
+        """parse() short-circuits when the input is already an AppriseTag."""
+        t = AppriseTag("alerts", priority=2)
+        # Must return the exact same object, not a copy (tag.py line 93)
+        assert AppriseTag.parse(t) is t
+
+    def test_parse_fallback_for_unrecognised_input(self):
+        """parse() falls back to a raw-name tag when the regex has no match."""
+        # Input starting with '@' does not match _RE_TAG; the fallback branch
+        # (tag.py line 107) stores the whole input as the name.
+        t = AppriseTag.parse("@invalid")
+        assert str(t) == "@invalid"
+        assert t.priority == 0
+        assert t.retry is None
+
+    # --- __repr__ ---
+
+    def test_repr_plain(self):
+        """repr() with default priority and no retry is minimal."""
+        assert repr(AppriseTag("simple")) == "AppriseTag('simple')"
+
+    def test_repr_with_priority(self):
+        """repr() includes priority= when non-zero (tag.py lines 121-122)."""
+        r = repr(AppriseTag("test", priority=3))
+        assert "priority=3" in r
+
+    def test_repr_with_retry(self):
+        """repr() includes retry= when set (tag.py lines 123-125)."""
+        r = repr(AppriseTag("test", retry=5))
+        assert "retry=5" in r
+
+    def test_repr_with_priority_and_retry(self):
+        """repr() includes both fields when both are non-default."""
+        r = repr(AppriseTag("test", priority=2, retry=3))
+        assert "priority=2" in r
+        assert "retry=3" in r
+
+    # --- __eq__ ---
+
+    def test_eq_two_apprisetags_same_name(self):
+        """Two AppriseTag objects are equal when their names match,
+        regardless of priority or retry (tag.py line 148)."""
+        assert AppriseTag("abc") == AppriseTag("abc", priority=5)
+        assert AppriseTag("ABC") == AppriseTag("abc")
+
+    def test_eq_with_string(self):
+        """An AppriseTag equals a plain str by name (tag.py line 150)."""
+        assert AppriseTag("hello") == "hello"
+        assert AppriseTag("HELLO") == "hello"
+
+    def test_eq_not_equal_different_name(self):
+        assert AppriseTag("abc") != AppriseTag("xyz")
+        assert AppriseTag("abc") != "xyz"
+
+    def test_eq_returns_notimplemented_for_other_types(self):
+        """Comparing to a non-str/AppriseTag returns NotImplemented
+        (tag.py line 151)."""
+        result = AppriseTag("abc").__eq__(42)
+        assert result is NotImplemented
+
+    # --- __lt__ ---
+
+    def test_lt_two_apprisetags(self):
+        """__lt__ sorts by tag name (tag.py lines 159-160)."""
+        assert AppriseTag("abc") < AppriseTag("def")
+        assert not (AppriseTag("def") < AppriseTag("abc"))
+
+    def test_lt_with_string(self):
+        """AppriseTag can be less-than compared to a plain string
+        (tag.py lines 161-162)."""
+        assert AppriseTag("abc") < "def"
+        assert not (AppriseTag("zzz") < "aaa")
+
+    def test_lt_returns_notimplemented_for_other_types(self):
+        """__lt__ with non-str/AppriseTag returns NotImplemented
+        (tag.py line 163)."""
+        result = AppriseTag("abc").__lt__(42)
+        assert result is NotImplemented
+
+    # --- __bool__ ---
+
+    def test_bool_empty_tag_is_false(self):
+        """An AppriseTag with an empty name is falsy (tag.py line 167)."""
+        assert not AppriseTag("")
+        assert bool(AppriseTag("")) is False
+
+    def test_bool_nonempty_tag_is_true(self):
+        assert bool(AppriseTag("something")) is True
+
+    # --- set / dict integration ---
+
+    def test_apprisetag_in_set_with_plain_string(self):
+        """AppriseTag in a set is found by plain string membership test."""
+        s = {AppriseTag("endpoint")}
+        assert "endpoint" in s
+
+    def test_plain_string_in_set_with_apprisetag(self):
+        """A plain string is found in a set containing AppriseTag."""
+        s = {"endpoint"}
+        assert AppriseTag("endpoint") in s
+
+
+class TestStaticHelpers:
+    """Tests for _extract_filter_retry and _filter_has_explicit_priority
+    covering the nested-list branches not reached by integration tests."""
+
+    def test_extract_retry_from_nested_list(self):
+        """Retry suffix found inside a nested list entry (apprise.py:413)."""
+        # tag = [["alerts:3"]] -- outer list, inner list as AND group
+        result = Apprise._extract_filter_retry([["alerts:3"]])
+        assert result == 3
+
+    def test_extract_retry_from_list_of_strings(self):
+        """Retry suffix found in a plain-string list entry (apprise.py:417)."""
+        result = Apprise._extract_filter_retry(["alerts:3"])
+        assert result == 3
+
+    def test_extract_retry_none_when_absent(self):
+        """Returns None when no retry suffix is present."""
+        assert Apprise._extract_filter_retry("alerts") is None
+        assert Apprise._extract_filter_retry(["alerts"]) is None
+
+    def test_extract_retry_none_for_match_all(self):
+        assert Apprise._extract_filter_retry(MATCH_ALL_TAG) is None
+        assert Apprise._extract_filter_retry(None) is None
+
+    def test_has_priority_nested_list(self):
+        """Priority prefix found inside a nested list (apprise.py:438)."""
+        assert Apprise._filter_has_explicit_priority([["2:alerts"]])
+
+    def test_has_priority_list_of_strings(self):
+        """Priority prefix found in a plain-string list (apprise.py:441)."""
+        assert Apprise._filter_has_explicit_priority(["2:alerts"])
+
+    def test_has_priority_false_no_prefix(self):
+        assert not Apprise._filter_has_explicit_priority("alerts")
+        assert not Apprise._filter_has_explicit_priority(["alerts"])
+
+    def test_has_priority_false_for_match_all(self):
+        assert not Apprise._filter_has_explicit_priority(MATCH_ALL_TAG)
+        assert not Apprise._filter_has_explicit_priority(None)
+
+    # _notify_parallel_threadpool / _notify_parallel_asyncio zero-length -----
+
+    def test_threadpool_zero_servers_returns_true(self):
+        """Empty server list returns True immediately (apprise.py:940)."""
+        assert Apprise._notify_parallel_threadpool() is True
+
+    def test_asyncio_zero_servers_returns_true(self):
+        """Empty server list returns True immediately (apprise.py:1031)."""
+        result = asyncio.run(Apprise._notify_parallel_asyncio())
+        assert result is True
+
+
+class TestDispatchIntegration:
+    """End-to-end notify() tests covering the new priority/retry dispatch."""
+
+    def _make_server(self, host, priority, asset, fail_times=0):
+        """Create a _FailThenSucceedNotify with an AppriseTag in its tags."""
+        s = _FailThenSucceedNotify(
+            host=host, asset=asset, fail_times=fail_times
+        )
+        # Assign a fresh instance-level set rather than mutating the
+        # class-level tags set.  URLBase.tags is a class attribute (set());
+        # .add() would mutate it and share state across all instances.
+        # Assignment shadows the class attribute and gives each server its
+        # own set with the correct priority stored in the AppriseTag object.
+        s.tags = {AppriseTag("alerts", priority=priority, has_priority=True)}
+        return s
+
+    def test_filter_retry_override_via_tag_suffix(self):
+        """tag suffix ':N' overrides per-server retry for this call only.
+        Covers apprise.py line 551 (filter_retry injection)."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            # Server's own retry=0; tag suffix of 2 should allow 3 attempts
+            server = _FailThenSucceedNotify(
+                host="localhost",
+                asset=asset,
+                retry=0,
+                wait=0.0,
+                fail_times=2,
+            )
+            # Tag the server so the filter "failpass:2" (tag name "failpass",
+            # retry override 2) can match it via is_exclusive_match.
+            server.tags = {"failpass"}
+            a = Apprise(asset=asset)
+            a.add(server)
+
+            # "failpass:2" -> retry override of 2 (3 total attempts)
+            result = a.notify(body="test", tag="failpass:2")
+            assert result is True
+            assert server._calls == 3
+        finally:
+            N_MGR.unload_modules()
+
+    def test_exclusive_priority_dispatch_skips_other_priorities(self):
+        """Explicit priority prefix dispatches only matching-priority services.
+        Covers apprise.py lines 556-572."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s1 = self._make_server("host1", priority=1, asset=asset)
+            s2 = self._make_server("host2", priority=2, asset=asset)
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            # "2:alerts" -> only priority-2 service fires
+            result = a.notify(body="test", tag="2:alerts")
+            assert result is True
+            assert s1._calls == 0  # priority-1, not contacted
+            assert s2._calls == 1  # priority-2, contacted once
+        finally:
+            N_MGR.unload_modules()
+
+    def test_escalation_stops_when_highest_priority_group_succeeds(self):
+        """If priority-1 group all succeed, priority-2 group is not run."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s1 = self._make_server("host1", priority=1, asset=asset)
+            s2 = self._make_server("host2", priority=2, asset=asset)
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            result = a.notify(body="test", tag="alerts")
+            assert result is True
+            assert s1._calls == 1  # priority 1 succeeded
+            assert s2._calls == 0  # never escalated to
+        finally:
+            N_MGR.unload_modules()
+
+    def test_escalation_triggers_on_priority_group_failure(self):
+        """Priority-1 group failure escalates to priority-2 group."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            # priority-1 always fails
+            s1 = self._make_server(
+                "host1", priority=1, asset=asset, fail_times=999
+            )
+            # priority-2 always succeeds
+            s2 = self._make_server("host2", priority=2, asset=asset)
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            result = a.notify(body="test", tag="alerts")
+            assert result is True
+            assert s1._calls == 1
+            assert s2._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_async_notify_filter_retry_and_explicit_priority(self):
+        """async_notify() covers the same escalation/exclusive paths.
+        Covers apprise.py lines 630, 637-649."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset()
+            s1 = self._make_server("host1", priority=1, asset=asset)
+            s2 = self._make_server("host2", priority=2, asset=asset)
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            async def run_exclusive():
+                return await a.async_notify(body="test", tag="2:alerts")
+
+            async def run_escalation():
+                return await a.async_notify(body="test", tag="alerts")
+
+            # exclusive: only priority-2 fires
+            r = asyncio.run(run_exclusive())
+            assert r is True
+            assert s1._calls == 0
+            assert s2._calls == 1
+
+            # escalation: priority-1 succeeds, priority-2 skipped
+            s1._calls = 0
+            s2._calls = 0
+            r = asyncio.run(run_escalation())
+            assert r is True
+            assert s1._calls == 1
+            assert s2._calls == 0
+        finally:
+            N_MGR.unload_modules()
+
+    def test_plain_and_zero_prefix_are_equivalent(self):
+        """'family' and '0:family' are identical at priority 0.
+        A filter of '0:family' must match services tagged with plain
+        'family', and both forms must land in the same escalation group."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # s1: tagged with plain "family" (priority=0, has_priority=False)
+            s1 = _FailThenSucceedNotify(
+                host="host1", asset=asset, fail_times=0
+            )
+            s1.tags = {AppriseTag.parse("family")}
+
+            # s2: tagged with explicit "0:family" (priority=0,
+            # has_priority=True)
+            s2 = _FailThenSucceedNotify(
+                host="host2", asset=asset, fail_times=0
+            )
+            s2.tags = {AppriseTag.parse("0:family")}
+
+            # s3: lower-urgency fallback -- should never fire when p-0 succeeds
+            s3 = _FailThenSucceedNotify(
+                host="host3", asset=asset, fail_times=0
+            )
+            s3.tags = {AppriseTag.parse("1:family")}
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+            a.add(s3)
+
+            # Exclusive "0:family": plain "family" and "0:family" servers are
+            # both priority 0 and must both fire; priority-1 server is skipped.
+            result = a.notify(body="test", tag="0:family")
+            assert result is True
+            assert s1._calls == 1  # plain "family" matched by "0:family"
+            assert s2._calls == 1  # explicit "0:family" matched
+            assert s3._calls == 0  # priority 1, not priority 0 -- skipped
+
+            # Escalation "family": s1 and s2 are both in the priority-0
+            # group.  Both succeed, so s3 (priority 1) is never escalated to.
+            s1._calls = s2._calls = s3._calls = 0
+            result = a.notify(body="test", tag="family")
+            assert result is True
+            assert s1._calls == 1  # priority-0 group
+            assert s2._calls == 1  # same priority-0 group
+            assert s3._calls == 0  # not escalated to
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestExceptionHandling:
+    """Verify that plugin exceptions are caught and retried, not propagated."""
+
+    def test_sequential_exception_treated_as_failure(self):
+        """A plugin raising Exception is caught; delivery is marked failed."""
+        N_MGR["raise"] = _RaisingNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            server = _RaisingNotify(host="localhost", asset=asset, retry=0)
+            a = Apprise(asset=asset)
+            a.add(server)
+
+            result = a.notify(body="test")
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_sequential_exception_retried(self):
+        """Exception on first attempt is retried; later success counts."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+        N_MGR["raise"] = _RaisingNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            # Use a plugin that raises on the first attempt then succeeds
+            server = _FailThenSucceedNotify(
+                host="localhost", asset=asset, retry=1, wait=0.0, fail_times=1
+            )
+            # Patch notify to raise on the first call then succeed
+            call_count = [0]
+
+            def raising_then_ok(**kwargs):
+                call_count[0] += 1
+                if call_count[0] == 1:
+                    raise RuntimeError("transient error")
+                return True
+
+            server.send = raising_then_ok
+            a = Apprise(asset=asset)
+            a.add(server)
+
+            result = a.notify(body="test")
+            assert result is True
+            assert call_count[0] == 2
+        finally:
+            N_MGR.unload_modules()
+
+    def test_threadpool_future_exception_caught(self):
+        """An exception escaping a thread future is caught gracefully.
+        Covers apprise.py lines 1004-1006."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            # Need 2 servers to trigger the thread pool path
+            s1 = _FailThenSucceedNotify(
+                host="host1", asset=asset, fail_times=0
+            )
+            s2 = _FailThenSucceedNotify(
+                host="host2", asset=asset, fail_times=0
+            )
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            # Patch as_completed so one future raises when .result() is called
+            import concurrent.futures as cf
+
+            real_as_completed = cf.as_completed
+
+            def patched_as_completed(futures, **kw):
+                for i, f in enumerate(real_as_completed(futures, **kw)):
+                    if i == 0:
+                        # Wrap first future to raise on .result()
+                        m = mock.Mock()
+                        m.result.side_effect = RuntimeError("future boom")
+                        yield m
+                    else:
+                        yield f
+
+            with mock.patch(
+                "apprise.apprise.cf.as_completed", patched_as_completed
+            ):
+                result = a.notify(body="test")
+
+            # One future raised -> overall result is False
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_asyncio_exception_in_do_call_treated_as_failure(self):
+        """An exception inside do_call's retry loop is caught and the
+        service is marked as failed (covers the new try/except in do_call)."""
+        N_MGR["raise"] = _RaisingNotify
+
+        try:
+            asset = AppriseAsset()
+            server = _RaisingNotify(host="localhost", asset=asset, retry=0)
+            a = Apprise(asset=asset)
+            a.add(server)
+
+            async def run():
+                return await a.async_notify(body="test")
+
+            result = asyncio.run(run())
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_asyncio_gather_unhandled_exception(self):
+        """An exception escaping gather() is caught as a safety net.
+        Covers apprise.py lines 1090-1091."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset()
+            server = _FailThenSucceedNotify(
+                host="localhost", asset=asset, fail_times=0
+            )
+            a = Apprise(asset=asset)
+            a.add(server)
+
+            # Mock asyncio.gather to return an unexpected exception object
+            async def fake_gather(*args, **kw):
+                return [RuntimeError("escaped")]
+
+            async def run():
+                with mock.patch("apprise.apprise.asyncio.gather", fake_gather):
+                    return await a.async_notify(body="test")
+
+            result = asyncio.run(run())
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_asyncio_gather_type_error(self):
+        """A TypeError in gather results is caught and returns False.
+        Covers apprise.py lines 1093-1095."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset()
+            server = _FailThenSucceedNotify(
+                host="localhost", asset=asset, fail_times=0
+            )
+            a = Apprise(asset=asset)
+            a.add(server)
+
+            async def fake_gather(*args, **kw):
+                return [TypeError("validation")]
+
+            async def run():
+                with mock.patch("apprise.apprise.asyncio.gather", fake_gather):
+                    return await a.async_notify(body="test")
+
+            result = asyncio.run(run())
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
