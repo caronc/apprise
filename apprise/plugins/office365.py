@@ -55,7 +55,7 @@ from .. import exception
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
@@ -321,6 +321,11 @@ class NotifyOffice365(NotifyBase):
                 "values": OFFICE365_MODES,
                 "default": Office365Mode.ORG,
             },
+            "savesent": {
+                "name": _("Save to Sent Items"),
+                "type": "bool",
+                "default": True,
+            },
         },
     )
 
@@ -335,6 +340,7 @@ class NotifyOffice365(NotifyBase):
         bcc=None,
         reply_to=None,
         mode=None,
+        savesent=None,
         **kwargs,
     ):
         """Initialize Office 365 Object."""
@@ -395,6 +401,13 @@ class NotifyOffice365(NotifyBase):
         else:
             # Personal mode requires no tenant
             self.tenant = None
+
+        # Define whether or not we should operate in batch mode
+        self.save_sent = (
+            self.template_args["savesent"]["default"]
+            if savesent is None
+            else bool(savesent)
+        )
 
         # For tracking our email -> name lookups
         self.names = {}
@@ -610,7 +623,7 @@ class NotifyOffice365(NotifyBase):
                 },
             },
             # Below takes a string (not bool) of either 'true' or 'false'
-            "saveToSentItems": "true",
+            "saveToSentItems": "true" if self.save_sent else "false",
         }
 
         if self.from_email:
@@ -1269,8 +1282,13 @@ class NotifyOffice365(NotifyBase):
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
 
+        # Define any URL parameters
+        params = {
+            "savesent": "yes" if self.save_sent else "no",
+        }
+
         # Extend our parameters
-        params = self.url_parameters(privacy=privacy, *args, **kwargs)
+        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # Include mode only for personal — org is the default and omitting
         # it keeps existing org URLs clean
@@ -1498,4 +1516,11 @@ class NotifyOffice365(NotifyBase):
         if "reply_to" in results["qsd"] and len(results["qsd"]["reply_to"]):
             results["reply_to"] = results["qsd"]["reply_to"]
 
+        # Get Save Sent Items Flag
+        results["savesent"] = parse_bool(
+            results["qsd"].get(
+                "savesent",
+                NotifyOffice365.template_args["savesent"]["default"],
+            )
+        )
         return results
