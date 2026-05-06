@@ -512,7 +512,7 @@ def test_config_base_config_tag_groups_text():
 
     # Our first element is our group tags
     assert len(result[0].tags) == 2
-    assert "groupB" in result[0].tags
+    assert "groupb" in result[0].tags
     assert "4" in result[0].tags
 
     # No additional configuration is loaded
@@ -1455,9 +1455,9 @@ urls:
     assert len(result[0].tags) == 5
     assert "group2" in result[0].tags
     assert "group3" in result[0].tags
-    assert "groupL" in result[0].tags
-    assert "groupM" in result[0].tags
-    assert "tagA" in result[0].tags
+    assert "groupl" in result[0].tags
+    assert "groupm" in result[0].tags
+    assert "taga" in result[0].tags
 
     # No additional configuration is loaded
     assert len(config) == 0
@@ -1570,9 +1570,9 @@ urls:
     assert len(result[0].tags) == 5
     assert "group2" in result[0].tags
     assert "group3" in result[0].tags
-    assert "groupL" in result[0].tags
-    assert "groupM" in result[0].tags
-    assert "tagA" in result[0].tags
+    assert "groupl" in result[0].tags
+    assert "groupm" in result[0].tags
+    assert "taga" in result[0].tags
 
     # No additional configuration is loaded
     assert len(config) == 0
