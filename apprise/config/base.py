@@ -518,10 +518,12 @@ class ConfigBase(URLBase):
         #     definitions (accepting commas) followed by an equal sign we know
         #     we're dealing with a TEXT format.
 
-        # Define what a valid line should look like
+        # Define what a valid line should look like.
+        # The tag group allows an optional "N:" priority prefix so that
+        # "2:endpoint=ntfy://..." is recognised as TEXT format.
         valid_line_re = re.compile(
             r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(?P<text>((?P<tag>[ \t,a-z0-9_-]+)=)?[a-z0-9]+://.*)|"
+            r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]+)=)?[a-z0-9]+://.*)|"
             r"((?P<yaml>[a-z0-9]+):.*))?$",
             re.I,
         )
@@ -666,10 +668,12 @@ class ConfigBase(URLBase):
         # Prepare our Asset Object
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
 
-        # Define what a valid line should look like
+        # Define what a valid line should look like.
+        # The tags group allows an optional leading "N:" priority prefix so
+        # that entries like "2:endpoint=ntfy://..." are parsed correctly.
         valid_line_re = re.compile(
             r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
-            r"(\s*(?P<tags>[a-z0-9, \t_-]+)\s*=|=)?\s*"
+            r"(\s*(?P<tags>[a-z0-9, \t_:-]+)\s*=|=)?\s*"
             r"((?P<url>[a-z0-9]{1,32}://.*)|(?P<assign>[a-z0-9, \t_-]+))|"
             r"include\s+(?P<config>.+))?\s*$",
             re.I,

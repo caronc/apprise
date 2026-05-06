@@ -29,12 +29,15 @@ import asyncio
 from collections.abc import Generator
 from datetime import tzinfo
 from functools import partial
+import math
 import re
 from typing import Any, ClassVar, Optional, TypedDict, Union
 from zoneinfo import ZoneInfo
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import (
+    APPRISE_MAX_SERVICE_RETRY,
+    APPRISE_MAX_SERVICE_WAIT,
     NOTIFY_FORMATS,
     OVERFLOW_MODES,
     NotifyFormat,
@@ -212,6 +215,17 @@ class NotifyBase(URLBase):
     # Default Emoji Interpretation
     interpret_emojis = False
 
+    # Default retry count for failed notifications.  Plugins may override
+    # via ?retry=N in their URL; the asset's default_service_retry is used
+    # when no per-plugin value is set.
+    # Always in [0, APPRISE_MAX_SERVICE_RETRY].
+    service_retry = 0
+
+    # Default wait (seconds) between retry attempts.  Plugins may override
+    # via ?wait=N in their URL; the asset's default_service_wait is used when
+    # no per-plugin value is set.  Always in [0.0, APPRISE_MAX_SERVICE_WAIT].
+    service_wait = 0.0
+
     # Support Attachments; this defaults to being disabled.
     # Since apprise allows you to send attachments without a body or title
     # defined, by letting Apprise know the plugin won't support attachments
@@ -292,6 +306,22 @@ class NotifyBase(URLBase):
                 # runtime.
                 "_lookup_default": "timezone",
             },
+            "retry": {
+                "name": _("Service Retry"),
+                "type": "int",
+                "min": 0,
+                "max": APPRISE_MAX_SERVICE_RETRY,
+                "default": service_retry,
+                "_lookup_default": "service_retry",
+            },
+            "wait": {
+                "name": _("Inter-Retry Wait"),
+                "type": "float",
+                "min": 0.0,
+                "max": APPRISE_MAX_SERVICE_WAIT,
+                "default": service_wait,
+                "_lookup_default": "service_wait",
+            },
         },
     )
 
@@ -349,12 +379,88 @@ class NotifyBase(URLBase):
     # automatically initialized by specifying ?tz= on the Apprise URLs
     __tzinfo = None
 
+    @classmethod
+    def __init_subclass__(cls, **kwargs):
+        """Automatically wrap any __len__ defined on a subclass so that it
+        multiplies its base target count by (retry + 1).
+
+        This ensures every plugin's __len__ reflects the total number of
+        transmission attempts (targets * retry-factor) without requiring
+        each plugin to be updated individually.
+        """
+        super().__init_subclass__(**kwargs)
+        if "__len__" in cls.__dict__:
+            _orig = cls.__dict__["__len__"]
+
+            def _retry_aware_len(self, _orig=_orig):
+                return _orig(self) * (getattr(self, "retry", 0) + 1)
+
+            cls.__len__ = _retry_aware_len
+
     def __init__(self, **kwargs):
         """Initialize some general configuration that will keep things
         consistent when working with the notifiers that will inherit this
         class."""
 
         super().__init__(**kwargs)
+
+        # Initialize retry count from (in priority order):
+        #   1. kwargs["retry"]  (from ?retry= URL param or YAML retry: key)
+        #   2. asset.default_service_retry
+        # Always clamped to [0, APPRISE_MAX_SERVICE_RETRY].
+        _retry_raw = kwargs.get("retry")
+        if _retry_raw is not None:
+            try:
+                _retry_val = int(_retry_raw)
+                if _retry_val < 0:
+                    msg = f"Service retry count must be >= 0; got {_retry_raw}"
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
+                self.retry = min(_retry_val, APPRISE_MAX_SERVICE_RETRY)
+            except (TypeError, ValueError):
+                self.logger.warning(
+                    "Invalid retry value specified (%s); using default",
+                    _retry_raw,
+                )
+                self.retry = min(
+                    max(0, self.asset.default_service_retry),
+                    APPRISE_MAX_SERVICE_RETRY,
+                )
+        else:
+            self.retry = min(
+                max(0, self.asset.default_service_retry),
+                APPRISE_MAX_SERVICE_RETRY,
+            )
+
+        # Initialize wait (inter-retry delay) from (in priority order):
+        #   1. kwargs["wait"]  (from ?wait= URL param or YAML wait: key)
+        #   2. asset.default_service_wait
+        # Only valid non-negative finite floats are accepted; integers are
+        # promoted to float.  Invalid values fall back to the asset default.
+        # Negative values raise TypeError.
+        _wait_raw = kwargs.get("wait")
+        if _wait_raw is not None:
+            try:
+                _wait_val = float(_wait_raw)
+                if not math.isfinite(_wait_val) or _wait_val < 0.0:
+                    msg = f"Service retry wait must be >= 0; got {_wait_raw}"
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
+                self.wait = min(_wait_val, APPRISE_MAX_SERVICE_WAIT)
+            except (TypeError, ValueError):
+                self.logger.warning(
+                    "Invalid wait value specified (%s); using default",
+                    _wait_raw,
+                )
+                self.wait = min(
+                    max(0.0, self.asset.default_service_wait),
+                    APPRISE_MAX_SERVICE_WAIT,
+                )
+        else:
+            self.wait = min(
+                max(0.0, self.asset.default_service_wait),
+                APPRISE_MAX_SERVICE_WAIT,
+            )
 
         # Store our interpret_emoji's setting
         # If asset emoji value is set to a default of True and the user
@@ -917,6 +1023,16 @@ class NotifyBase(URLBase):
             "send() is not implemented by the child class."
         )
 
+    def __len__(self):
+        """Returns the number of HTTP requests this instance will make,
+        factoring in the configured retry count.
+
+        Subclasses that override this are automatically wrapped by
+        __init_subclass__ to apply the same retry multiplier, so they
+        should return their raw target count without worrying about retry.
+        """
+        return 1 * (self.retry + 1)
+
     def url_parameters(
         self,
         *args: Any,
@@ -941,6 +1057,14 @@ class NotifyBase(URLBase):
         if self.persistent_storage != NotifyBase.persistent_storage:
             params["store"] = "yes" if self.persistent_storage else "no"
 
+        # Include retry if non-zero so the URL fully describes the plugin
+        if self.retry:
+            params["retry"] = str(self.retry)
+
+        # Include wait if non-zero so the URL fully describes the plugin
+        if self.wait:
+            params["wait"] = str(self.wait)
+
         params.update(super().url_parameters(*args, **kwargs))
 
         # return default parameters
@@ -956,6 +1080,11 @@ class NotifyBase(URLBase):
 
         This is very specific and customized for Apprise.
 
+        In addition to the fields extracted by URLBase.parse_url(), this
+        method extracts the NotifyBase-level query-string parameters:
+        ``format``, ``overflow``, ``emojis``, ``tz``, ``store``, ``retry``,
+        and ``wait``.  Child classes should call this method via
+        ``super()`` and then layer their own parameter extraction on top.
 
         Args:
             url (str): The URL you want to fully parse.
@@ -1008,6 +1137,14 @@ class NotifyBase(URLBase):
 
         if "store" in results["qsd"]:
             results["store"] = results["qsd"]["store"]
+
+        # Global per-plugin retry count (?retry=N)
+        if "retry" in results["qsd"] and results["qsd"]["retry"]:
+            results["retry"] = results["qsd"]["retry"]
+
+        # Global per-plugin inter-retry wait (?wait=N)
+        if "wait" in results["qsd"] and results["qsd"]["wait"]:
+            results["wait"] = results["qsd"]["wait"]
 
         return results
 

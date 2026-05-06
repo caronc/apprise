@@ -63,6 +63,12 @@ The Apprise options are as follows:
   * `-g "all"`: Notify **ALL** services.
   * `(Omitted)`: Notify **untagged** services only.
 
+  Tag values may include an optional priority prefix and/or retry suffix:
+
+  * `-g "2:tagA"`: Match **only** entries for tagA assigned priority 2.
+  * `-g "tagA:3"`: Match all tagA entries, retrying each up to 3 times.
+  * `-g "2:tagA:3"`: Priority-2 tagA entries only, with up to 3 retries.
+
   `-Da`, `--disable-async`:
   Send notifications synchronously (one after the other) instead of
   all at once.
@@ -208,6 +214,18 @@ Notify only services tagged with BOTH "devops" AND "critical" (Intersection):
     $ apprise -vv -t "Intersection Test" \
        --config=~/apprise.yml \
        -g devops,critical
+
+Notify only priority-2 "alerts" services (exclusive priority filter):
+
+    $ apprise -vv -t "High Alert" \
+       --config=~/apprise.yml \
+       -g "2:alerts"
+
+Notify all "alerts" services and retry each up to 3 times on failure:
+
+    $ apprise -vv -t "Critical Event" \
+       --config=~/apprise.yml \
+       -g "alerts:3"
 
 Include an attachment:
 

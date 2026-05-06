@@ -36,6 +36,7 @@ from xml.sax.saxutils import escape as sax_escape
 from .asset import AppriseAsset
 from .locale import gettext_lazy as _
 from .logger import logger
+from .tag import AppriseTag
 from .utils.parse import (
     parse_bool,
     parse_list,
@@ -267,10 +268,16 @@ class URLBase:
                 )
 
         if "tag" in kwargs:
-            # We want to associate some tags with our notification service.
-            # the code below gets the 'tag' argument if defined, otherwise
-            # it just falls back to whatever was already defined globally
-            self.tags = set(parse_list(kwargs.get("tag"), self.tags))
+            # Parse all tags as AppriseTag objects so priority metadata is
+            # preserved.  Existing tags on the class (if any) are also
+            # converted so the set stays homogeneous.
+            existing = {
+                t if isinstance(t, AppriseTag) else AppriseTag.parse(str(t))
+                for t in self.tags
+            }
+            self.tags = existing | {
+                AppriseTag.parse(t) for t in parse_list(kwargs.get("tag"))
+            }
 
         # Tracks the time any i/o was made to the remote server.  This value
         # is automatically set and controlled through the throttle() call.

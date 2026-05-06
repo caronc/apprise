@@ -1103,7 +1103,10 @@ def main(
 
                     if entry.tags:
                         click.echo(
-                            "{:>10}: {}".format("tags", ", ".join(entry.tags))
+                            "{:>10}: {}".format(
+                                "tags",
+                                ", ".join(str(t) for t in entry.tags),
+                            )
                         )
 
         else:  # PersistentStorageMode.PRUNE or PersistentStorageMode.CLEAR
@@ -1174,7 +1177,12 @@ def main(
             )
 
             if server.tags:
-                click.echo("{:>10}: {}".format("tags", ", ".join(server.tags)))
+                click.echo(
+                    "{:>10}: {}".format(
+                        "tags",
+                        ", ".join(str(t) for t in server.tags),
+                    )
+                )
 
         # Initialize a default response of nothing matched, otherwise
         # if we matched at least one entry, we can return True

@@ -212,3 +212,13 @@ MATCH_ALL_TAG = "all"
 # Will cause notification to trigger under any circumstance even if an
 # exclusive tagging was provided.
 MATCH_ALWAYS_TAG = "always"
+
+# Maximum number of retries a service may attempt after an initial failure.
+# This cap prevents runaway retry loops; the effective value is clamped to
+# [0, APPRISE_MAX_SERVICE_RETRY] everywhere it is consumed.
+APPRISE_MAX_SERVICE_RETRY = 10
+
+# Maximum inter-retry wait (in seconds).  Prevents accidental multi-hour
+# sleeps from a misconfigured wait= value; clamped to
+# [0.0, APPRISE_MAX_SERVICE_WAIT] everywhere it is consumed.
+APPRISE_MAX_SERVICE_WAIT = 20.0

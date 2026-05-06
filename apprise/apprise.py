@@ -33,6 +33,7 @@ import concurrent.futures as cf
 from itertools import chain
 import json
 import os
+import time
 from typing import Any, Optional, Union
 
 from . import __version__, common, plugins
@@ -47,6 +48,7 @@ from .locale import AppriseLocale
 from .logger import logger
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase
+from .tag import AppriseTag
 from .utils.cwe312 import cwe312_url
 from .utils.json import AppriseJSONEncoder
 from .utils.logic import is_exclusive_match
@@ -391,6 +393,84 @@ class Apprise:
                     yield server
         return
 
+    @staticmethod
+    def _extract_filter_retry(tag):
+        """Return the retry override embedded in a filter tag, or None.
+
+        A filter like "3:endpoint:2" or "endpoint:2" carries ":2" as the
+        call-level retry count.  When present it overrides each matched
+        server's configured retry for this single notify() call.
+        """
+        if tag is None or tag == common.MATCH_ALL_TAG:
+            return None
+        for entry in (
+            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
+        ):
+            if isinstance(entry, (list, tuple, set)):
+                for tok in parse_list(entry):
+                    ft = AppriseTag.parse(tok)
+                    if ft.retry is not None:
+                        return ft.retry
+            else:
+                ft = AppriseTag.parse(str(entry))
+                if ft.retry is not None:
+                    return ft.retry
+        return None
+
+    @staticmethod
+    def _filter_has_explicit_priority(tag):
+        """Return True if any token in *tag* carries an explicit priority
+        prefix.
+
+        When True, notify() dispatches matched servers as a flat batch
+        (no escalation) because the caller selected an exact priority level.
+        When False, matched servers are grouped by their own tag priorities
+        and dispatched in ascending order with early-True exit.
+        """
+        if tag is None or tag == common.MATCH_ALL_TAG:
+            return False
+        for entry in (
+            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
+        ):
+            if isinstance(entry, (list, tuple, set)):
+                for tok in parse_list(entry):
+                    if AppriseTag.parse(tok).has_priority:
+                        return True
+            else:
+                if AppriseTag.parse(str(entry)).has_priority:
+                    return True
+        return False
+
+    @staticmethod
+    def _server_priority_for_filter(server, tag):
+        """Return the effective dispatch priority for *server* given *tag*.
+
+        The priority comes from the AppriseTag stored on the server whose
+        name matches one of the tag-filter names.  When multiple server tags
+        match, the minimum (highest-precedence) priority is returned.
+        Returns 0 when no matching priority tag is found.
+        """
+        if tag is None or tag == common.MATCH_ALL_TAG:
+            return 0
+
+        # Flatten the filter to a set of bare lowercase tag names.
+        filter_names = set()
+        for entry in (
+            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
+        ):
+            if isinstance(entry, (list, tuple, set)):
+                for t in parse_list(entry):
+                    filter_names.add(str(AppriseTag.parse(t)))
+            else:
+                filter_names.add(str(AppriseTag.parse(str(entry))))
+
+        priorities = [
+            stag.priority if isinstance(stag, AppriseTag) else 0
+            for stag in server.tags
+            if str(stag) in filter_names
+        ]
+        return min(priorities) if priorities else 0
+
     def notify(
         self,
         body: Union[str, bytes],
@@ -417,6 +497,23 @@ class Apprise:
         sent at all as a result of tag filtering and/or simply having empty
         configuration files that were read.
 
+        A filter tag may carry an optional priority prefix and/or retry suffix:
+
+          "endpoint"       -> match all entries; escalate by priority
+          "3:endpoint"     -> match ONLY priority-3 entries; flat dispatch
+          "endpoint:2"     -> match all entries; retry each up to 2 times
+          "3:endpoint:2"   -> exclusive priority-3 match with 2 retries
+
+        When no priority prefix is given, matched services are grouped by
+        their configured tag priority and dispatched in ascending order
+        (lowest number = highest urgency).  If every service in the lowest
+        priority group succeeds, Apprise returns True immediately without
+        running higher-numbered priority groups (escalation chain).
+
+        When an explicit priority prefix IS given (e.g. "3:endpoint"), only
+        services whose matching tag carries that exact priority are notified,
+        and all matched services are dispatched as a single flat batch.
+
         Attach can contain a list of attachment URLs.  attach can also be
         represented by an AttachBase() (or list of) object(s). This identifies
         the products you wish to notify
@@ -426,30 +523,89 @@ class Apprise:
         """
 
         try:
-            # Process arguments and build synchronous and asynchronous calls
-            # (this step can throw internal errors).
-            sequential_calls, parallel_calls = self._create_notify_calls(
-                body,
-                title,
-                notify_type=notify_type,
-                body_format=body_format,
-                tag=tag,
-                match_always=match_always,
-                attach=attach,
-                interpret_escapes=interpret_escapes,
+            all_calls = list(
+                self._create_notify_gen(
+                    body,
+                    title,
+                    notify_type=notify_type,
+                    body_format=body_format,
+                    tag=tag,
+                    match_always=match_always,
+                    attach=attach,
+                    interpret_escapes=interpret_escapes,
+                )
             )
 
         except TypeError:
-            # No notifications sent, and there was an internal error.
             return False
 
-        if not sequential_calls and not parallel_calls:
-            # Nothing to send
+        if not all_calls:
             return None
 
-        sequential_result = Apprise._notify_sequential(*sequential_calls)
-        parallel_result = Apprise._notify_parallel_threadpool(*parallel_calls)
-        return sequential_result and parallel_result
+        # A tag filter may carry a per-call retry suffix (e.g. "alerts:3").
+        # When present, inject it into each server's kwargs so the dispatch
+        # functions can pick it up and override the server's own retry setting
+        # for this call only.  The server's stored configuration is unchanged.
+        filter_retry = Apprise._extract_filter_retry(tag)
+        if filter_retry is not None:
+            all_calls = [
+                (s, dict(k, _retry_override=filter_retry))
+                for s, k in all_calls
+            ]
+
+        if Apprise._filter_has_explicit_priority(tag):
+            # Tag filter carries an explicit priority prefix (e.g. "2:alerts").
+            # Skip the escalation chain: dispatch all matched services as a
+            # single flat batch regardless of their individual tag priorities.
+            sequential = [
+                (s, k) for s, k in all_calls if not s.asset.async_mode
+            ]
+            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
+            seq_ok = (
+                Apprise._notify_sequential(*sequential) if sequential else True
+            )
+            par_ok = (
+                Apprise._notify_parallel_threadpool(*parallel)
+                if parallel
+                else True
+            )
+            return seq_ok and par_ok
+
+        # No explicit priority in the filter -- use the escalation chain.
+        # Group matched services by the priority stored on their matching tag;
+        # services without a priority prefix default to 0 (highest urgency).
+        # Dispatch groups in ascending numeric order.  If every service in
+        # the current group succeeds, stop immediately without touching the
+        # remaining lower-urgency groups.  Any failure in a group causes
+        # Apprise to fall through and escalate to the next priority group.
+        priority_groups: dict[int, list] = {}
+        for server, notify_kwargs in all_calls:
+            p = Apprise._server_priority_for_filter(server, tag)
+            priority_groups.setdefault(p, []).append((server, notify_kwargs))
+
+        for priority in sorted(priority_groups):
+            batch = priority_groups[priority]
+            # Split this priority group into sync and async halves.
+            sequential = [(s, k) for s, k in batch if not s.asset.async_mode]
+            parallel = [(s, k) for s, k in batch if s.asset.async_mode]
+            seq_ok = (
+                Apprise._notify_sequential(*sequential) if sequential else True
+            )
+            par_ok = (
+                Apprise._notify_parallel_threadpool(*parallel)
+                if parallel
+                else True
+            )
+            if seq_ok and par_ok:
+                # Every service in this priority group delivered successfully.
+                # Stop here; lower-urgency groups are not triggered.
+                return True
+            # At least one service in this group failed -- escalate to the
+            # next priority group and try those services instead.
+
+        # All priority groups were exhausted and the last group still had
+        # at least one failed delivery.
+        return False
 
     async def async_notify(self, *args: Any, **kwargs: Any) -> Optional[bool]:
         """Send a notification to all the plugins previously loaded, for
@@ -457,26 +613,66 @@ class Apprise:
 
         The arguments are identical to those of Apprise.notify().
         """
+        tag = kwargs.get("tag", common.MATCH_ALL_TAG)
+
         try:
-            # Process arguments and build synchronous and asynchronous calls
-            # (this step can throw internal errors).
-            sequential_calls, parallel_calls = self._create_notify_calls(
-                *args, **kwargs
-            )
+            all_calls = list(self._create_notify_gen(*args, **kwargs))
 
         except TypeError:
-            # No notifications sent, and there was an internal error.
             return False
 
-        if not sequential_calls and not parallel_calls:
-            # Nothing to send
+        if not all_calls:
             return None
 
-        sequential_result = Apprise._notify_sequential(*sequential_calls)
-        parallel_result = await Apprise._notify_parallel_asyncio(
-            *parallel_calls
-        )
-        return sequential_result and parallel_result
+        # Inject a per-call retry override when the tag filter includes one.
+        filter_retry = Apprise._extract_filter_retry(tag)
+        if filter_retry is not None:
+            all_calls = [
+                (s, dict(k, _retry_override=filter_retry))
+                for s, k in all_calls
+            ]
+
+        if Apprise._filter_has_explicit_priority(tag):
+            # Explicit priority prefix: flat dispatch, no escalation.
+            sequential = [
+                (s, k) for s, k in all_calls if not s.asset.async_mode
+            ]
+            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
+            seq_ok = (
+                Apprise._notify_sequential(*sequential) if sequential else True
+            )
+            par_ok = (
+                await Apprise._notify_parallel_asyncio(*parallel)
+                if parallel
+                else True
+            )
+            return seq_ok and par_ok
+
+        # Escalation chain: group by tag priority and dispatch highest urgency
+        # (lowest number) first.  Stop as soon as one entire group succeeds.
+        priority_groups: dict[int, list] = {}
+        for server, notify_kwargs in all_calls:
+            p = Apprise._server_priority_for_filter(server, tag)
+            priority_groups.setdefault(p, []).append((server, notify_kwargs))
+
+        for priority in sorted(priority_groups):
+            batch = priority_groups[priority]
+            sequential = [(s, k) for s, k in batch if not s.asset.async_mode]
+            parallel = [(s, k) for s, k in batch if s.asset.async_mode]
+            seq_ok = (
+                Apprise._notify_sequential(*sequential) if sequential else True
+            )
+            par_ok = (
+                await Apprise._notify_parallel_asyncio(*parallel)
+                if parallel
+                else True
+            )
+            if seq_ok and par_ok:
+                # Entire group succeeded; skip lower-urgency groups.
+                return True
+            # Group had failures; escalate to the next priority group.
+
+        return False
 
     def _create_notify_calls(self, *args, **kwargs):
         """Creates notifications for all the plugins loaded.
@@ -659,66 +855,153 @@ class Apprise:
 
     @staticmethod
     def _notify_sequential(*servers_kwargs):
-        """Process a list of notify() calls sequentially and synchronously."""
+        """Process a list of notify() calls sequentially and synchronously.
+
+        Each server is attempted once and then retried up to server.retry
+        additional times on failure before moving on.  When server.wait is
+        greater than zero, the process sleeps that many seconds between
+        each retry attempt.
+
+        A per-call retry override may be injected into kwargs under the key
+        ``_retry_override``; when present it takes precedence over the
+        server's own retry attribute for this invocation only.
+
+        Exceptions raised by a plugin's notify() -- including those from
+        third-party @notify-decorated functions that are outside our control
+        -- are caught here and treated as a delivery failure.  The retry
+        logic still applies, so a plugin that raises on the first attempt
+        will be retried the configured number of times before giving up.
+        """
 
         success = True
 
         for server, kwargs in servers_kwargs:
-            try:
-                # Send notification
-                result = server.notify(**kwargs)
-                success = success and result
+            # Pop the per-call override before forwarding kwargs to the
+            # plugin so it never sees the internal _retry_override key.
+            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
+            wait = getattr(server, "wait", 0.0)
 
-            except TypeError:
-                # These are our internally thrown notifications.
-                success = False
+            result = False
+            for attempt in range(retry + 1):
+                # Attempt delivery.  TypeError comes from Apprise's own
+                # validation; bare Exception guards against buggy or
+                # third-party plugins (including @notify decorators) that
+                # may raise unexpectedly.  Both are treated as failure so
+                # the retry loop can continue.
+                try:
+                    result = server.notify(**kwargs)
+                except TypeError:
+                    result = False
+                except Exception:
+                    logger.exception("Unhandled Notification Exception")
+                    result = False
 
-            except Exception:
-                # A catch all so we don't have to abort early
-                # just because one of our plugins has a bug in it.
-                logger.exception("Unhandled Notification Exception")
-                success = False
+                if result:
+                    # Delivered successfully; no need to retry this server.
+                    break
+
+                if attempt < retry:
+                    # Delivery failed and retries remain.  Log the attempt
+                    # number and pause before the next try.
+                    logger.warning(
+                        "Retry %d/%d for %s",
+                        attempt + 1,
+                        retry,
+                        server.service_name,
+                    )
+                    if wait > 0:
+                        time.sleep(wait)
+
+            # A single False result taints the overall batch result.
+            success = success and result
 
         return success
 
     @staticmethod
     def _notify_parallel_threadpool(*servers_kwargs):
-        """Process a list of notify() calls in parallel and synchronously."""
+        """Process a list of notify() calls in parallel via a thread pool.
+
+        Each server runs in its own thread.  Within each thread, the server
+        is retried up to server.retry additional times on failure with an
+        optional server.wait second sleep between each attempt.
+
+        Falls back to _notify_sequential() when only a single server is
+        given to avoid the overhead of spawning a thread pool for one call.
+
+        Exceptions from a plugin's notify() -- including those from
+        third-party @notify-decorated functions -- are caught inside each
+        thread and treated as delivery failures so the retry logic can
+        still run.
+        """
 
         n_calls = len(servers_kwargs)
 
-        # 0-length case
         if n_calls == 0:
             return True
 
-        # There's no need to use a thread pool for just a single notification
+        # Avoid thread-pool overhead for a single notification.
         if n_calls == 1:
             return Apprise._notify_sequential(servers_kwargs[0])
 
-        # Create log entry
         logger.info(
             "Notifying %d service(s) with threads.", len(servers_kwargs)
         )
 
+        def _call_with_retry(server, kwargs):
+            """Execute one server's notify() with retry/wait logic.
+
+            Runs inside a worker thread.  Pops ``_retry_override`` from
+            kwargs so it is never forwarded to the plugin's notify() call.
+            Exceptions are caught and treated as failures so the retry
+            loop continues even when a plugin raises unexpectedly.
+            """
+            # Pop the per-call override so it stays internal.
+            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
+            wait = getattr(server, "wait", 0.0)
+
+            result = False
+            for attempt in range(retry + 1):
+                # Same exception handling as _notify_sequential: TypeError
+                # from Apprise validation and bare Exception for buggy or
+                # third-party plugins both map to a retriable failure.
+                try:
+                    result = server.notify(**kwargs)
+                except TypeError:
+                    result = False
+                except Exception:
+                    logger.exception("Unhandled Notification Exception")
+                    result = False
+
+                if result:
+                    return True
+
+                if attempt < retry:
+                    logger.warning(
+                        "Retry %d/%d for %s",
+                        attempt + 1,
+                        retry,
+                        server.service_name,
+                    )
+                    if wait > 0:
+                        time.sleep(wait)
+
+            return result
+
+        # Submit all server calls to the thread pool and collect results.
         with cf.ThreadPoolExecutor() as executor:
             success = True
             futures = [
-                executor.submit(server.notify, **kwargs)
+                executor.submit(_call_with_retry, server, kwargs)
                 for (server, kwargs) in servers_kwargs
             ]
 
             for future in cf.as_completed(futures):
+                # future.result() re-raises any exception that escaped
+                # _call_with_retry (should not happen given the inner
+                # try/except, but guard here as a safety net).
                 try:
-                    result = future.result()
-                    success = success and result
-
-                except TypeError:
-                    # These are our internally thrown notifications.
-                    success = False
-
+                    success = success and future.result()
                 except Exception:
-                    # A catch all so we don't have to abort early
-                    # just because one of our plugins has a bug in it.
                     logger.exception("Unhandled Notification Exception")
                     success = False
 
@@ -726,27 +1009,75 @@ class Apprise:
 
     @staticmethod
     async def _notify_parallel_asyncio(*servers_kwargs):
-        """Process a list of async_notify() calls in parallel and
-        asynchronously."""
+        """Process a list of async_notify() calls concurrently via asyncio.
+
+        All coroutines are gathered with asyncio.gather().  Each server is
+        retried up to server.retry additional times on failure with an
+        optional asyncio.sleep(server.wait) between attempts.
+
+        Unlike the thread-pool path, there is no single-server optimisation
+        here because asyncio can pipeline work across coroutines while one
+        is awaiting I/O.
+
+        Exceptions from a plugin's async_notify() -- including those from
+        third-party @notify-decorated coroutines -- are caught inside each
+        coroutine and treated as delivery failures so the retry loop can
+        still run for that service.
+        """
 
         n_calls = len(servers_kwargs)
 
-        # 0-length case
         if n_calls == 0:
             return True
 
-        # (Unlike with the thread pool, we don't optimize for the single-
-        # notification case because asyncio can do useful work while waiting
-        # for that thread to complete)
-
-        # Create log entry
         logger.info(
             "Notifying %d service(s) asynchronously.", len(servers_kwargs)
         )
 
         async def do_call(server, kwargs):
-            return await server.async_notify(**kwargs)
+            """Coroutine driving one server's async_notify() with retry/wait.
 
+            Pops ``_retry_override`` from kwargs so it is never forwarded
+            to the plugin.  Exceptions are caught and treated as failures
+            so the retry loop continues even when a plugin raises
+            unexpectedly (e.g. a third-party @notify-decorated coroutine).
+            """
+            # Pop the per-call override so it stays internal.
+            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
+            wait = getattr(server, "wait", 0.0)
+
+            result = False
+            for attempt in range(retry + 1):
+                # Mirror the exception handling from the synchronous paths:
+                # TypeError from Apprise's own validation layer and bare
+                # Exception for any plugin that raises unexpectedly are both
+                # treated as retriable failures rather than hard crashes.
+                try:
+                    result = await server.async_notify(**kwargs)
+                except TypeError:
+                    result = False
+                except Exception:
+                    logger.exception("Unhandled Notification Exception")
+                    result = False
+
+                if result:
+                    return True
+
+                if attempt < retry:
+                    logger.warning(
+                        "Retry %d/%d for %s",
+                        attempt + 1,
+                        retry,
+                        server.service_name,
+                    )
+                    if wait > 0:
+                        await asyncio.sleep(wait)
+
+            return result
+
+        # Run all coroutines concurrently.  return_exceptions=True ensures
+        # that one coroutine raising does not cancel the others; any escaped
+        # exception (beyond what do_call already handles) is caught below.
         cors = (do_call(server, kwargs) for (server, kwargs) in servers_kwargs)
         results = await asyncio.gather(*cors, return_exceptions=True)
 
@@ -754,8 +1085,8 @@ class Apprise:
             isinstance(status, Exception) and not isinstance(status, TypeError)
             for status in results
         ):
-            # A catch all so we don't have to abort early just because
-            # one of our plugins has a bug in it.
+            # Safety net: an exception escaped do_call's own try/except.
+            # Log it and treat the whole batch as failed.
             logger.exception("Unhandled Notification Exception")
             return False
 

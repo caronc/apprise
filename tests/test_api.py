@@ -1787,6 +1787,8 @@ def test_apprise_details_plugin_verification():
         "format",
         "overflow",
         "emojis",
+        "retry",
+        "wait",
         # URLBase parameters:
         "verify",
         "cto",

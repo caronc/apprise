@@ -337,6 +337,24 @@ apprise -vv -t "Union Test" \
 apprise -vv -t "Intersection Test" \
    --config=~/apprise.yml \
    -g devops,critical
+```
+
+Tags also support an optional **priority prefix** and **retry suffix**. In your configuration file you assign a priority to a tag like `1:alerts` or `5:alerts`. A lower number means higher urgency.
+
+* **Escalation (no prefix)**: `-g alerts` dispatches priority-1 entries first. If they all succeed, Apprise returns early and never runs the priority-5 fallbacks. A failure in the lower-priority group triggers the next group as an escalation chain.
+* **Exclusive (with prefix)**: `-g "2:alerts"` notifies *only* services whose `alerts` tag has priority 2. No other priority levels are triggered.
+* **Per-call retry**: `-g "alerts:3"` retries each matched service up to 3 times on failure (overrides the service's own retry setting for this call only).
+* **Combined**: `-g "2:alerts:3"` -- exclusive priority-2 filter with up to 3 retries.
+
+```bash
+# Escalation: priority-1 first; skip priority-5 if all succeed
+apprise -vv -t "Alert" --config=~/apprise.yml -g alerts
+
+# Exclusive: only priority-2 alert services
+apprise -vv -t "Alert" --config=~/apprise.yml -g "2:alerts"
+
+# With retry override: retry each matched service up to 3 times
+apprise -vv -t "Alert" --config=~/apprise.yml -g "alerts:3"
 
 ## CLI File Attachments
 
