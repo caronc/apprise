@@ -578,13 +578,15 @@ class Apprise:
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
 
+            notify_format = server.effective_notify_format(body_format)
+
             # First we need to generate a key we will use to determine if we
             # need to build our data out.  Entries without are merged with
             # the body at this stage.
             key = (
-                server.notify_format
+                notify_format
                 if server.title_maxlen > 0
-                else f"_{server.notify_format}"
+                else f"_{notify_format}"
             )
 
             if server.interpret_emojis:
@@ -601,13 +603,13 @@ class Apprise:
                 if conversion_title_map[key] and server.title_maxlen <= 0:
                     conversion_title_map[key] = convert_between(
                         body_format,
-                        server.notify_format,
+                        notify_format,
                         content=conversion_title_map[key],
                     )
 
                 # Our body is always converted no matter what
                 conversion_body_map[key] = convert_between(
-                    body_format, server.notify_format, content=body
+                    body_format, notify_format, content=body
                 )
 
                 if interpret_escapes:

@@ -31,7 +31,7 @@ import re
 import requests
 
 from .. import exception
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.sanitize import sanitize_payload
@@ -80,6 +80,9 @@ class NotifyXML(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
+
+    # Preserve supported input formats for pass-through payloads
+    notify_formats = (NotifyFormat.TEXT, NotifyFormat.HTML)
 
     # Disable throttle rate for JSON requests since they are normally
     # local anyway

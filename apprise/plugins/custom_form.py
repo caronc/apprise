@@ -29,7 +29,7 @@ import re
 
 import requests
 
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from .base import NotifyBase
@@ -99,6 +99,9 @@ class NotifyForm(NotifyBase):
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
+
+    # Preserve supported input formats for pass-through payloads
+    notify_formats = (NotifyFormat.TEXT, NotifyFormat.HTML)
 
     # Disable throttle rate for Form requests since they are normally
     # local anyway

@@ -202,6 +202,11 @@ class NotifyBase(URLBase):
     # Default Notify Format
     notify_format = NotifyFormat.TEXT
 
+    # Supported Notify Formats. When more than one value is provided, the
+    # first remains the default unless a matching input format can be passed
+    # through without conversion.
+    notify_formats = ()
+
     # Default Overflow Mode
     overflow_mode = OverflowMode.UPSTREAM
 
@@ -383,6 +388,7 @@ class NotifyBase(URLBase):
                 )
             )
 
+        self._notify_format_explicit = False
         if "format" in kwargs:
             value = kwargs["format"]
             try:
@@ -398,6 +404,8 @@ class NotifyBase(URLBase):
                 )
                 self.logger.warning(err)
                 raise TypeError(err) from None
+
+            self._notify_format_explicit = True
 
         if "tz" in kwargs:
             value = kwargs["tz"]
@@ -904,6 +912,35 @@ class NotifyBase(URLBase):
                     )
 
         return response
+
+    def effective_notify_format(
+        self, body_format: Optional[NotifyFormat] = None
+    ) -> NotifyFormat:
+        """Return the notification format to use for the provided body.
+
+        Services that declare multiple supported formats can pass through an
+        input format they support unless the URL explicitly requested a
+        specific output format.
+        """
+
+        if self._notify_format_explicit or not self.notify_formats:
+            return self.notify_format
+
+        try:
+            body_format = (
+                body_format
+                if isinstance(body_format, NotifyFormat)
+                else NotifyFormat(body_format.lower())
+            )
+
+        except (AttributeError, ValueError):
+            return self.notify_format
+
+        return (
+            body_format
+            if body_format in self.notify_formats
+            else self.notify_format
+        )
 
     def send(
         self,

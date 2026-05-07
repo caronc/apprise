@@ -34,7 +34,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.custom_xml import NotifyXML
 
 logging.disable(logging.CRITICAL)
@@ -261,6 +261,24 @@ def test_plugin_custom_xml_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.request")
+def test_plugin_custom_xml_preserves_html_input(mock_request):
+    """NotifyXML() preserves HTML input in pass-through payloads."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    body = "A really <strong>bold</strong> message!"
+
+    obj = Apprise()
+    assert obj.add("xml://localhost") is True
+    assert obj.notify(body=body, body_format=NotifyFormat.HTML) is True
+
+    payload = mock_request.call_args_list[0][1]["data"]
+    assert "A really &lt;strong&gt;bold&lt;/strong&gt; message!" in payload
 
 
 @mock.patch("requests.request")
