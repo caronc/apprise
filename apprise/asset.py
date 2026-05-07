@@ -157,6 +157,13 @@ class AppriseAsset:
     # key.  Clamped to [0.0, APPRISE_MAX_SERVICE_WAIT].
     default_service_wait = 0.5
 
+    # When True, as soon as any independent OR tag chain exhausts all its
+    # priority groups without success, notify() / async_notify() return False
+    # immediately without running further escalation rounds for the surviving
+    # chains.  When False (the default), all chains are allowed to complete
+    # regardless of whether another chain has already failed.
+    abort_on_chain_failure = False
+
     # Defines the encoding of the content passed into Apprise
     encoding = "utf-8"
 

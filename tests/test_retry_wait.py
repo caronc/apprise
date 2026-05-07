@@ -37,6 +37,7 @@ from apprise.common import (
     APPRISE_MAX_SERVICE_WAIT,
     MATCH_ALL_TAG,
 )
+from apprise.config.base import ConfigBase
 from apprise.manager_plugins import NotificationManager
 from apprise.plugins import NotifyBase
 from apprise.tag import AppriseTag
@@ -982,8 +983,8 @@ class TestExceptionHandling:
             N_MGR.unload_modules()
 
     def test_asyncio_gather_unhandled_exception(self):
-        """An exception escaping gather() is caught as a safety net.
-        Covers apprise.py lines 1090-1091."""
+        """An Exception escaping the outer gather() round is caught as a
+        safety net and treated as a batch failure."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -994,8 +995,13 @@ class TestExceptionHandling:
             a = Apprise(asset=asset)
             a.add(server)
 
-            # Mock asyncio.gather to return an unexpected exception object
+            # Mock asyncio.gather to return an escaped exception object.
+            # Close any unawaited coroutines passed to the mock to avoid
+            # "coroutine was never awaited" RuntimeWarnings.
             async def fake_gather(*args, **kw):
+                for arg in args:
+                    if asyncio.iscoroutine(arg):
+                        arg.close()
                 return [RuntimeError("escaped")]
 
             async def run():
@@ -1008,8 +1014,7 @@ class TestExceptionHandling:
             N_MGR.unload_modules()
 
     def test_asyncio_gather_type_error(self):
-        """A TypeError in gather results is caught and returns False.
-        Covers apprise.py lines 1093-1095."""
+        """A TypeError in gather results is caught and returns False."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1021,6 +1026,9 @@ class TestExceptionHandling:
             a.add(server)
 
             async def fake_gather(*args, **kw):
+                for arg in args:
+                    if asyncio.iscoroutine(arg):
+                        arg.close()
                 return [TypeError("validation")]
 
             async def run():
@@ -1029,5 +1037,608 @@ class TestExceptionHandling:
 
             result = asyncio.run(run())
             assert result is False
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestConfigTagRetry:
+    """Config parsers must reject a retry suffix in service tag definitions.
+
+    A tag like 'alerts:3' is only valid at call-time (notify() filter / CLI).
+    Putting it in a config file creates ambiguity with the URL ?retry= param
+    and the YAML retry: key, so both parsers must warn and skip the entry.
+    """
+
+    def test_text_rejects_retry_suffix(self):
+        """'alerts:3=json://...' is rejected; no server loaded."""
+        servers, _ = ConfigBase.config_parse_text("alerts:3=json://localhost")
+        assert servers == []
+
+    def test_text_rejects_priority_and_retry_in_tag(self):
+        """'1:alerts:3=json://...' is rejected (priority + retry suffix)."""
+        servers, _ = ConfigBase.config_parse_text(
+            "1:alerts:3=json://localhost"
+        )
+        assert servers == []
+
+    def test_text_accepts_priority_tag_without_retry(self):
+        """'1:alerts=json://...' loads normally (priority prefix, no retry)."""
+        servers, _ = ConfigBase.config_parse_text("1:alerts=json://localhost")
+        assert len(servers) == 1
+
+    def test_text_accepts_plain_tag(self):
+        """'alerts=json://...' loads normally (no prefix, no retry)."""
+        servers, _ = ConfigBase.config_parse_text("alerts=json://localhost")
+        assert len(servers) == 1
+
+    def test_yaml_rejects_retry_suffix(self):
+        """YAML 'tag: alerts:3' is rejected; no server loaded."""
+        servers, _ = ConfigBase.config_parse_yaml(
+            "version: 1\nurls:\n  - json://localhost:\n      tag: alerts:3\n"
+        )
+        assert servers == []
+
+    def test_yaml_rejects_priority_and_retry_in_tag(self):
+        """YAML 'tag: 1:alerts:3' is rejected (priority + retry suffix)."""
+        servers, _ = ConfigBase.config_parse_yaml(
+            "version: 1\nurls:\n  - json://localhost:\n      tag: 1:alerts:3\n"
+        )
+        assert servers == []
+
+    def test_yaml_accepts_priority_tag_without_retry(self):
+        """YAML 'tag: 1:alerts' loads normally (priority prefix, no retry)."""
+        servers, _ = ConfigBase.config_parse_yaml(
+            "version: 1\nurls:\n  - json://localhost:\n      tag: 1:alerts\n"
+        )
+        assert len(servers) == 1
+
+    def test_yaml_accepts_plain_tag(self):
+        """YAML 'tag: alerts' loads normally (no prefix, no retry)."""
+        servers, _ = ConfigBase.config_parse_yaml(
+            "version: 1\nurls:\n  - json://localhost:\n      tag: alerts\n"
+        )
+        assert len(servers) == 1
+
+    def test_text_valid_entry_after_rejected_one_still_loads(self):
+        """A valid entry that follows a rejected one is still loaded."""
+        servers, _ = ConfigBase.config_parse_text(
+            "alerts:3=json://localhost\nalerts=json://localhost\n"
+        )
+        assert len(servers) == 1
+
+    def test_yaml_valid_entry_after_rejected_one_still_loads(self):
+        """A valid entry that follows a rejected one is still loaded."""
+        servers, _ = ConfigBase.config_parse_yaml(
+            "version: 1\n"
+            "urls:\n"
+            "  - json://localhost:\n"
+            "      tag: alerts:3\n"
+            "  - json://localhost:\n"
+            "      tag: alerts\n"
+        )
+        assert len(servers) == 1
+
+
+class TestMultiTagDispatch:
+    """Per-tag independent escalation and per-service retry for multi-tag OR
+    filters.
+
+    When notify() receives a filter with multiple OR tokens (e.g.
+    'devops management' or ['devops:3', 'management:2']), each token forms an
+    independent escalation chain and each service gets the retry value from the
+    token that matched it -- not a single global retry applied to all services.
+    """
+
+    def _make_tagged(self, tag_str, asset, fail_times=0):
+        """Create a _FailThenSucceedNotify tagged with a single AppriseTag."""
+        s = _FailThenSucceedNotify(
+            host=tag_str, asset=asset, fail_times=fail_times
+        )
+        # Assign instance-level set to avoid class-level mutation.
+        s.tags = {AppriseTag.parse(tag_str)}
+        return s
+
+    def _make_priority_tagged(self, tag_str, asset, fail_times=0):
+        """Create a server whose tag is an explicit-priority AppriseTag."""
+        ft = AppriseTag.parse(tag_str)
+        s = _FailThenSucceedNotify(
+            host=str(ft), asset=asset, fail_times=fail_times
+        )
+        s.tags = {ft}
+        return s
+
+    # ------------------------------------------------------------------
+    # Per-service retry via space-separated string
+    # ------------------------------------------------------------------
+
+    def test_per_service_retry_space_separated_string(self):
+        """'devops:3 management:2' applies retry=3 to devops services and
+        retry=2 to management services independently."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # devops service: fails 3 times; needs retry=3 to succeed
+            s_devops = _FailThenSucceedNotify(
+                host="devops", asset=asset, fail_times=3
+            )
+            s_devops.tags = {"devops"}
+
+            # management service: fails 2 times; needs retry=2 to succeed
+            s_mgmt = _FailThenSucceedNotify(
+                host="mgmt", asset=asset, fail_times=2
+            )
+            s_mgmt.tags = {"management"}
+
+            a = Apprise(asset=asset)
+            a.add(s_devops)
+            a.add(s_mgmt)
+
+            result = a.notify(body="test", tag="devops:3 management:2")
+            assert result is True
+            # devops: 1 initial + 3 retries = 4 total calls
+            assert s_devops._calls == 4
+            # management: 1 initial + 2 retries = 3 total calls
+            assert s_mgmt._calls == 3
+        finally:
+            N_MGR.unload_modules()
+
+    def test_per_service_retry_list_of_tokens(self):
+        """['devops:3', 'management:2'] gives the same per-service retry
+        result as a space-separated string."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            s_devops = _FailThenSucceedNotify(
+                host="devops", asset=asset, fail_times=3
+            )
+            s_devops.tags = {"devops"}
+
+            s_mgmt = _FailThenSucceedNotify(
+                host="mgmt", asset=asset, fail_times=2
+            )
+            s_mgmt.tags = {"management"}
+
+            a = Apprise(asset=asset)
+            a.add(s_devops)
+            a.add(s_mgmt)
+
+            result = a.notify(body="test", tag=["devops:3", "management:2"])
+            assert result is True
+            assert s_devops._calls == 4
+            assert s_mgmt._calls == 3
+        finally:
+            N_MGR.unload_modules()
+
+    # ------------------------------------------------------------------
+    # Independent escalation chains
+    # ------------------------------------------------------------------
+
+    def test_independent_chains_devops_success_does_not_skip_management(self):
+        """When devops chain succeeds at priority-1, management chain still
+        dispatches independently -- its priority-1 failure escalates to its
+        priority-2 server."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # devops chain: priority-1 succeeds; priority-2 must not fire
+            s_devops_p1 = _FailThenSucceedNotify(
+                host="d1", asset=asset, fail_times=0
+            )
+            s_devops_p1.tags = {
+                AppriseTag("devops", priority=1, has_priority=True)
+            }
+            s_devops_p2 = _FailThenSucceedNotify(
+                host="d2", asset=asset, fail_times=0
+            )
+            s_devops_p2.tags = {
+                AppriseTag("devops", priority=2, has_priority=True)
+            }
+
+            # management chain: priority-1 always fails; must escalate to
+            # priority-2
+            s_mgmt_p1 = _FailThenSucceedNotify(
+                host="m1", asset=asset, fail_times=999
+            )
+            s_mgmt_p1.tags = {
+                AppriseTag("management", priority=1, has_priority=True)
+            }
+            s_mgmt_p2 = _FailThenSucceedNotify(
+                host="m2", asset=asset, fail_times=0
+            )
+            s_mgmt_p2.tags = {
+                AppriseTag("management", priority=2, has_priority=True)
+            }
+
+            a = Apprise(asset=asset)
+            a.add(s_devops_p1)
+            a.add(s_devops_p2)
+            a.add(s_mgmt_p1)
+            a.add(s_mgmt_p2)
+
+            result = a.notify(body="test", tag="devops management")
+            assert result is True
+            assert s_devops_p1._calls == 1  # devops chain: p1 succeeded
+            assert s_devops_p2._calls == 0  # never escalated to
+            assert s_mgmt_p1._calls == 1  # management chain: p1 failed
+            assert s_mgmt_p2._calls == 1  # escalated to p2, succeeded
+        finally:
+            N_MGR.unload_modules()
+
+    def test_both_chains_must_succeed_for_true(self):
+        """notify() returns False when one chain exhausts all priority groups
+        without any group fully succeeding."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # devops chain: always succeeds
+            s_devops = _FailThenSucceedNotify(
+                host="d", asset=asset, fail_times=0
+            )
+            s_devops.tags = {"devops"}
+
+            # management chain: always fails
+            s_mgmt = _FailThenSucceedNotify(
+                host="m", asset=asset, fail_times=999
+            )
+            s_mgmt.tags = {"management"}
+
+            a = Apprise(asset=asset)
+            a.add(s_devops)
+            a.add(s_mgmt)
+
+            result = a.notify(body="test", tag="devops management")
+            assert result is False
+            assert s_devops._calls == 1  # its chain succeeded
+            assert s_mgmt._calls == 1  # its chain failed
+        finally:
+            N_MGR.unload_modules()
+
+    # ------------------------------------------------------------------
+    # Explicit-priority list with per-service retry (flat dispatch)
+    # ------------------------------------------------------------------
+
+    def test_explicit_priority_list_per_service_retry(self):
+        """['1:tag:2', '2:tag:0'] flat-dispatches both servers; each gets its
+        own retry: the priority-1 server gets retry=2 and the priority-2
+        server gets retry=0 (one attempt only)."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # priority-1 server: fails twice; needs retry=2 to succeed
+            s1 = _FailThenSucceedNotify(host="h1", asset=asset, fail_times=2)
+            s1.tags = {AppriseTag("tag", priority=1, has_priority=True)}
+
+            # priority-2 server: always succeeds; retry=0 means one attempt
+            s2 = _FailThenSucceedNotify(host="h2", asset=asset, fail_times=0)
+            s2.tags = {AppriseTag("tag", priority=2, has_priority=True)}
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            result = a.notify(body="test", tag=["1:tag:2", "2:tag:0"])
+            assert result is True
+            # s1: 1 initial + 2 retries = 3 total
+            assert s1._calls == 3
+            # s2: retry=0 -> exactly 1 attempt
+            assert s2._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    # ------------------------------------------------------------------
+    # CLI OR format (list of single-element lists)
+    # ------------------------------------------------------------------
+
+    def test_cli_or_format_independent_chains(self):
+        """CLI --tag 'devops:3' --tag 'management:2' generates
+        [['devops:3'], ['management:2']] -- single-element inner lists that
+        must be treated as independent OR chains, not AND groups."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            s_devops = _FailThenSucceedNotify(
+                host="devops", asset=asset, fail_times=3
+            )
+            s_devops.tags = {"devops"}
+
+            s_mgmt = _FailThenSucceedNotify(
+                host="mgmt", asset=asset, fail_times=2
+            )
+            s_mgmt.tags = {"management"}
+
+            a = Apprise(asset=asset)
+            a.add(s_devops)
+            a.add(s_mgmt)
+
+            # Simulate CLI: --tag "devops:3" --tag "management:2"
+            cli_tag = [["devops:3"], ["management:2"]]
+            result = a.notify(body="test", tag=cli_tag)
+            assert result is True
+            assert s_devops._calls == 4  # 1 initial + 3 retries
+            assert s_mgmt._calls == 3  # 1 initial + 2 retries
+        finally:
+            N_MGR.unload_modules()
+
+    def test_cli_and_format_shared_chain(self):
+        """CLI --tag 'devops, management' generates [['devops', 'management']]
+        -- a multi-element inner list that is an AND condition and uses a
+        single shared escalation chain."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # Server must carry BOTH tags to match
+            s_both = _FailThenSucceedNotify(
+                host="both", asset=asset, fail_times=0
+            )
+            s_both.tags = {"devops", "management"}
+
+            # Server with only "devops" -- must NOT match AND filter
+            s_devonly = _FailThenSucceedNotify(
+                host="devonly", asset=asset, fail_times=0
+            )
+            s_devonly.tags = {"devops"}
+
+            a = Apprise(asset=asset)
+            a.add(s_both)
+            a.add(s_devonly)
+
+            # Simulate CLI: --tag "devops, management" (AND condition)
+            cli_tag = [["devops", "management"]]
+            result = a.notify(body="test", tag=cli_tag)
+            assert result is True
+            assert s_both._calls == 1  # has both tags -- matched
+            assert s_devonly._calls == 0  # missing "management" -- not matched
+        finally:
+            N_MGR.unload_modules()
+
+    # ------------------------------------------------------------------
+    # Edge cases: explicit priority + AND, 3-chain OR, chain exhaustion
+    # ------------------------------------------------------------------
+
+    def test_and_filter_explicit_priority_no_match_returns_none(self):
+        """AND filter with an explicit priority that no server satisfies
+        returns None (no services dispatched at all)."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # Server is tagged 'alerts' at priority 2
+            s = _FailThenSucceedNotify(host="s", asset=asset, fail_times=0)
+            s.tags = {AppriseTag("alerts", priority=2, has_priority=True)}
+
+            a = Apprise(asset=asset)
+            a.add(s)
+
+            # Request 'alerts' at priority 1 AND 'backup' -- server has
+            # 'alerts' but at priority 2, not 1; nothing matches.
+            result = a.notify(body="test", tag=[["1:alerts", "backup"]])
+            assert result is None
+            assert s._calls == 0
+        finally:
+            N_MGR.unload_modules()
+
+    def test_three_or_chains_all_succeed(self):
+        """Three independent OR chains each succeed at their first priority
+        group; notify() returns True and each service is called once."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            s_a = _FailThenSucceedNotify(host="a", asset=asset, fail_times=0)
+            s_a.tags = {"alpha"}
+
+            s_b = _FailThenSucceedNotify(host="b", asset=asset, fail_times=0)
+            s_b.tags = {"beta"}
+
+            s_c = _FailThenSucceedNotify(host="c", asset=asset, fail_times=0)
+            s_c.tags = {"gamma"}
+
+            a = Apprise(asset=asset)
+            a.add(s_a)
+            a.add(s_b)
+            a.add(s_c)
+
+            result = a.notify(body="test", tag=["alpha", "beta", "gamma"])
+            assert result is True
+            assert s_a._calls == 1
+            assert s_b._calls == 1
+            assert s_c._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_three_or_chains_one_fails_overall_false(self):
+        """Three OR chains: two succeed, one exhausts all priority groups.
+        notify() returns False even though the other chains succeeded."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            s_a = _FailThenSucceedNotify(host="a", asset=asset, fail_times=0)
+            s_a.tags = {"alpha"}
+
+            # beta always fails (fail_times > any possible retry)
+            s_b = _FailThenSucceedNotify(host="b", asset=asset, fail_times=99)
+            s_b.tags = {"beta"}
+
+            s_c = _FailThenSucceedNotify(host="c", asset=asset, fail_times=0)
+            s_c.tags = {"gamma"}
+
+            a = Apprise(asset=asset)
+            a.add(s_a)
+            a.add(s_b)
+            a.add(s_c)
+
+            result = a.notify(body="test", tag=["alpha", "beta", "gamma"])
+            assert result is False
+            assert s_a._calls == 1  # alpha succeeded
+            assert s_c._calls == 1  # gamma succeeded
+        finally:
+            N_MGR.unload_modules()
+
+    def test_chain_escalation_to_second_priority_group(self):
+        """A chain whose priority-0 group fails escalates to the priority-1
+        group; the second group succeeds so notify() returns True."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # priority-0 server: always fails (no retry configured)
+            s_p0 = _FailThenSucceedNotify(
+                host="p0", asset=asset, fail_times=99
+            )
+            s_p0.tags = {AppriseTag("alerts", priority=0, has_priority=False)}
+
+            # priority-1 server: succeeds on first attempt
+            s_p1 = _FailThenSucceedNotify(host="p1", asset=asset, fail_times=0)
+            s_p1.tags = {AppriseTag("alerts", priority=1, has_priority=True)}
+
+            a = Apprise(asset=asset)
+            a.add(s_p0)
+            a.add(s_p1)
+
+            result = a.notify(body="test", tag="alerts")
+            assert result is True
+            # priority-0 group was attempted once and failed
+            assert s_p0._calls == 1
+            # priority-1 group was then tried as fallback
+            assert s_p1._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_all_priority_groups_exhausted_returns_false(self):
+        """When every priority group in a chain fails, notify() returns False
+        and all groups were attempted in order."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # priority-0 server: always fails
+            s_p0 = _FailThenSucceedNotify(
+                host="p0", asset=asset, fail_times=99
+            )
+            s_p0.tags = {AppriseTag("alerts", priority=0, has_priority=False)}
+
+            # priority-1 server: also always fails
+            s_p1 = _FailThenSucceedNotify(
+                host="p1", asset=asset, fail_times=99
+            )
+            s_p1.tags = {AppriseTag("alerts", priority=1, has_priority=True)}
+
+            a = Apprise(asset=asset)
+            a.add(s_p0)
+            a.add(s_p1)
+
+            result = a.notify(body="test", tag="alerts")
+            assert result is False
+            # Both groups were attempted
+            assert s_p0._calls == 1
+            assert s_p1._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestAbortOnChainFailure:
+    """AppriseAsset.abort_on_chain_failure controls early-abort behaviour.
+
+    When False (default): all chains are allowed to complete even if one
+    has already failed, so every configured URL gets at least one attempt.
+    When True: as soon as any chain exhausts all its priority groups without
+    success, notify() returns False immediately without running further
+    escalation rounds for the other chains.
+    """
+
+    def _make_tagged(self, tag_str, asset, fail_times=0):
+        s = _FailThenSucceedNotify(
+            host=tag_str, asset=asset, fail_times=fail_times
+        )
+        s.tags = {tag_str}
+        return s
+
+    def test_default_false_all_chains_complete(self):
+        """With abort_on_chain_failure=False (default), all chains run to
+        completion even if one chain has already failed."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # alpha always succeeds
+            s_a = self._make_tagged("alpha", asset, fail_times=0)
+
+            # beta always fails (exhausts its only group immediately)
+            s_b = self._make_tagged("beta", asset, fail_times=99)
+
+            # gamma always succeeds
+            s_c = self._make_tagged("gamma", asset, fail_times=0)
+
+            a = Apprise(asset=asset)
+            a.add(s_a)
+            a.add(s_b)
+            a.add(s_c)
+
+            result = a.notify(body="test", tag=["alpha", "beta", "gamma"])
+            assert result is False
+            # alpha and gamma were still dispatched despite beta failing
+            assert s_a._calls == 1
+            assert s_b._calls == 1
+            assert s_c._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_abort_on_chain_failure_true_stops_early(self):
+        """With abort_on_chain_failure=True, once beta exhausts all priority
+        groups without success, further escalation rounds for other chains
+        are skipped."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, abort_on_chain_failure=True)
+
+            # alpha: two priority levels; priority-0 always fails
+            s_a_p0 = _FailThenSucceedNotify(
+                host="a0", asset=asset, fail_times=99
+            )
+            s_a_p0.tags = {AppriseTag("alpha", priority=0, has_priority=False)}
+
+            s_a_p1 = _FailThenSucceedNotify(
+                host="a1", asset=asset, fail_times=0
+            )
+            s_a_p1.tags = {AppriseTag("alpha", priority=1, has_priority=True)}
+
+            # beta: one priority level; always fails
+            s_b = _FailThenSucceedNotify(host="b", asset=asset, fail_times=99)
+            s_b.tags = {"beta"}
+
+            a = Apprise(asset=asset)
+            a.add(s_a_p0)
+            a.add(s_a_p1)
+            a.add(s_b)
+
+            result = a.notify(body="test", tag=["alpha", "beta"])
+            assert result is False
+            # beta failed in round 1 and was exhausted -- abort triggered.
+            # alpha's p1 (escalation) should NOT have been attempted.
+            assert s_b._calls == 1
+            assert s_a_p0._calls == 1
+            assert s_a_p1._calls == 0  # skipped due to early abort
         finally:
             N_MGR.unload_modules()

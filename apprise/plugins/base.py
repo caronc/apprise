@@ -1031,7 +1031,7 @@ class NotifyBase(URLBase):
         __init_subclass__ to apply the same retry multiplier, so they
         should return their raw target count without worrying about retry.
         """
-        return 1 * (self.retry + 1)
+        return self.retry + 1
 
     def url_parameters(
         self,

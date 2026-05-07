@@ -37,6 +37,7 @@ from unittest import mock
 from urllib.parse import unquote
 
 from apprise import NotificationManager, utils
+from apprise.tag import AppriseTag
 
 logging.disable(logging.CRITICAL)
 
@@ -3016,6 +3017,80 @@ def test_exclusive_match():
         )
         is True
     )
+
+
+def test_exclusive_match_priority_tokens():
+    """utils: is_exclusive_match() with priority-prefixed filter tokens"""
+
+    # AppriseTag.__hash__ is name-only, so a set holds at most one entry per
+    # tag name -- matching real usage where each URL has one priority.
+    tag_ep3 = AppriseTag("endpoint", priority=3, has_priority=True)
+    tag_other = AppriseTag("other", priority=1, has_priority=True)
+
+    data = {tag_ep3, tag_other}
+
+    # Exact priority match
+    assert (
+        utils.logic.is_exclusive_match(logic="3:endpoint", data=data) is True
+    )
+
+    # Priority mismatch -- "2:endpoint" does not match priority-3 entry
+    assert (
+        utils.logic.is_exclusive_match(logic="2:endpoint", data=data) is False
+    )
+
+    # Name-only filter matches via O(1) hash path regardless of stored priority
+    assert utils.logic.is_exclusive_match(logic="endpoint", data=data) is True
+
+    # Absent tag returns False
+    assert utils.logic.is_exclusive_match(logic="absent", data=data) is False
+
+    # AND group: both tokens present with correct priorities
+    assert (
+        utils.logic.is_exclusive_match(
+            logic=[("3:endpoint", "1:other")], data=data
+        )
+        is True
+    )
+
+    # AND group: one priority mismatch fails the whole group
+    assert (
+        utils.logic.is_exclusive_match(
+            logic=[("2:endpoint", "1:other")], data=data
+        )
+        is False
+    )
+
+    # OR: failing AND group rescued by a matching single token
+    assert (
+        utils.logic.is_exclusive_match(
+            logic=[("2:endpoint", "1:other"), "3:endpoint"], data=data
+        )
+        is True
+    )
+
+    # OR: no term matches -- all fail
+    assert (
+        utils.logic.is_exclusive_match(
+            logic=[("2:endpoint", "1:other"), "99:endpoint"], data=data
+        )
+        is False
+    )
+
+    # Backward compat: plain strings in data matched by a priority-prefixed
+    # filter token (the for-loop fallback in _token_matches_data)
+    str_data = {"endpoint", "other"}
+    assert (
+        utils.logic.is_exclusive_match(logic="7:endpoint", data=str_data)
+        is True
+    )
+    assert (
+        utils.logic.is_exclusive_match(logic="7:absent", data=str_data)
+        is False
+    )
+
+    # match_all keyword short-circuits even with priority data
+    assert utils.logic.is_exclusive_match(logic="all", data=data) is True
 
 
 def test_apprise_validate_regex():

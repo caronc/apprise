@@ -437,9 +437,150 @@ class Apprise:
                     if AppriseTag.parse(tok).has_priority:
                         return True
             else:
-                if AppriseTag.parse(str(entry)).has_priority:
-                    return True
+                for tok in parse_list(str(entry)):
+                    if AppriseTag.parse(tok).has_priority:
+                        return True
         return False
+
+    @staticmethod
+    def _server_priority_for_tag_name(server, tag_name):
+        """Return the dispatch priority stored on *server* for *tag_name*.
+
+        Looks up the AppriseTag in server.tags whose bare name equals
+        *tag_name* and returns its priority.  Returns 0 when the tag is
+        absent or stored as a plain string (no explicit priority).
+        """
+        for stag in server.tags:
+            if str(stag) == tag_name:
+                return stag.priority if isinstance(stag, AppriseTag) else 0
+        return 0
+
+    @staticmethod
+    def _match_service_retry(server, tag):
+        """Return the call-time retry override for *server* given *tag*.
+
+        Iterates the OR tokens in *tag* in order.  The first token that
+        both carries a retry suffix AND matches *server* determines the
+        override.  Returns None when no such token exists.
+
+        Matching follows the same rules as _token_matches_data:
+          - no priority prefix  -> name-only match
+          - explicit priority   -> name + priority-exact match
+        """
+        if tag is None or tag == common.MATCH_ALL_TAG:
+            return None
+        for entry in (
+            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
+        ):
+            tokens = (
+                parse_list(entry)
+                if isinstance(entry, (list, tuple, set))
+                else parse_list(str(entry))
+            )
+            for tok in tokens:
+                ft = AppriseTag.parse(tok)
+                if ft.retry is None:
+                    continue
+                tag_name = str(ft)
+                if not ft.has_priority:
+                    if tag_name in server.tags:
+                        return ft.retry
+                else:
+                    for stag in server.tags:
+                        if isinstance(stag, AppriseTag):
+                            if (
+                                str(stag) == tag_name
+                                and stag.priority == ft.priority
+                            ):
+                                return ft.retry
+                        else:
+                            if str(stag).lower() == tag_name:
+                                return ft.retry
+        return None
+
+    @staticmethod
+    def _inject_per_service_retries(all_calls, tag):
+        """Return *all_calls* with per-service _retry_override injected.
+
+        For each (server, kwargs) pair, finds the first filter token in
+        *tag* that matches the service and carries a retry suffix.  When
+        found, injects that value as _retry_override so that all dispatch
+        paths (sequential, threadpool, asyncio) pick it up automatically.
+        Services with no matching retry token are left unchanged.
+        """
+        result = []
+        for server, kwargs in all_calls:
+            retry = Apprise._match_service_retry(server, tag)
+            if retry is not None:
+                kwargs = dict(kwargs, _retry_override=retry)
+            result.append((server, kwargs))
+        return result
+
+    @staticmethod
+    def _build_tag_chains(all_calls, tag):
+        """Group *all_calls* into per-OR-token escalation chains.
+
+        Returns {chain_key: {priority: [(server, kwargs)]}}.
+
+        Each service is assigned to the chain of the first OR token whose
+        bare tag name appears in the service's own tags.  The chain key is
+        that bare tag name.  Services that don't match any token by name
+        fall into a catch-all chain keyed as "".
+
+        When *tag* is MATCH_ALL_TAG or None, a single chain "" is built
+        using the existing _server_priority_for_filter logic.
+        """
+        if tag is None or tag == common.MATCH_ALL_TAG:
+            chain: dict[int, list] = {}
+            for server, kwargs in all_calls:
+                p = Apprise._server_priority_for_filter(server, tag)
+                chain.setdefault(p, []).append((server, kwargs))
+            return {"": chain}
+
+        # Flatten OR tokens; AND groups are kept as a single opaque entry
+        # that falls through to the catch-all chain.
+        #
+        # The CLI wraps each --tag value in a list via parse_list(), so a
+        # single --tag flag produces a single-element inner list such as
+        # [["alerts:3"]].  A single-element list is always a plain OR token
+        # (there is nothing to AND against), so we treat it the same as a
+        # bare string.  A multi-element inner list is a genuine AND condition
+        # (the server must carry every tag in the group) and falls through to
+        # the catch-all chain instead of getting its own independent chain.
+        or_tag_names: list[str] = []
+        for entry in (
+            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
+        ):
+            if isinstance(entry, (list, tuple, set)):
+                flat = parse_list(*entry) if entry else []
+                if len(flat) == 1:
+                    # single OR token wrapped in a list (CLI convention)
+                    or_tag_names.append(str(AppriseTag.parse(flat[0])))
+                else:
+                    or_tag_names.append("")  # AND group placeholder
+            else:
+                for tok in parse_list(str(entry)):
+                    or_tag_names.append(str(AppriseTag.parse(tok)))
+
+        chains: dict[str, dict[int, list]] = {}
+        for server, kwargs in all_calls:
+            for chain_key in or_tag_names:
+                if chain_key and chain_key in server.tags:
+                    p = Apprise._server_priority_for_tag_name(
+                        server, chain_key
+                    )
+                    chains.setdefault(chain_key, {}).setdefault(p, []).append(
+                        (server, kwargs)
+                    )
+                    break
+            else:
+                # fallback: use global priority
+                p = Apprise._server_priority_for_filter(server, tag)
+                chains.setdefault("", {}).setdefault(p, []).append(
+                    (server, kwargs)
+                )
+
+        return chains
 
     @staticmethod
     def _server_priority_for_filter(server, tag):
@@ -462,7 +603,8 @@ class Apprise:
                 for t in parse_list(entry):
                     filter_names.add(str(AppriseTag.parse(t)))
             else:
-                filter_names.add(str(AppriseTag.parse(str(entry))))
+                for t in parse_list(str(entry)):
+                    filter_names.add(str(AppriseTag.parse(t)))
 
         priorities = [
             stag.priority if isinstance(stag, AppriseTag) else 0
@@ -542,16 +684,11 @@ class Apprise:
         if not all_calls:
             return None
 
-        # A tag filter may carry a per-call retry suffix (e.g. "alerts:3").
-        # When present, inject it into each server's kwargs so the dispatch
-        # functions can pick it up and override the server's own retry setting
-        # for this call only.  The server's stored configuration is unchanged.
-        filter_retry = Apprise._extract_filter_retry(tag)
-        if filter_retry is not None:
-            all_calls = [
-                (s, dict(k, _retry_override=filter_retry))
-                for s, k in all_calls
-            ]
+        # Inject the per-service call-time retry override.  Each matched
+        # service gets the retry from the first filter token that both matches
+        # it and carries a retry suffix (e.g. "devops:3" applies retry=3 only
+        # to devops-tagged services, not to management-tagged services).
+        all_calls = Apprise._inject_per_service_retries(all_calls, tag)
 
         if Apprise._filter_has_explicit_priority(tag):
             # Tag filter carries an explicit priority prefix (e.g. "2:alerts").
@@ -571,41 +708,94 @@ class Apprise:
             )
             return seq_ok and par_ok
 
-        # No explicit priority in the filter -- use the escalation chain.
-        # Group matched services by the priority stored on their matching tag;
-        # services without a priority prefix default to 0 (highest urgency).
-        # Dispatch groups in ascending numeric order.  If every service in
-        # the current group succeeds, stop immediately without touching the
-        # remaining lower-urgency groups.  Any failure in a group causes
-        # Apprise to fall through and escalate to the next priority group.
-        priority_groups: dict[int, list] = {}
-        for server, notify_kwargs in all_calls:
-            p = Apprise._server_priority_for_filter(server, tag)
-            priority_groups.setdefault(p, []).append((server, notify_kwargs))
+        # No explicit priority in the filter -- use per-tag escalation chains.
+        #
+        # Each distinct OR token forms an independent chain.  Within a chain,
+        # services are grouped by their configured tag priority.  The lowest-
+        # numbered group (highest urgency) runs first.  If every service in
+        # that group succeeds the chain is done; any failure escalates to the
+        # next priority group.  notify() returns True only when every chain
+        # finds a fully-successful group.
+        #
+        # When multiple chains are active in the same round their current
+        # priority-group batches run concurrently via a thread pool so that
+        # one chain's services cannot delay another chain.
+        chains = Apprise._build_tag_chains(all_calls, tag)
 
-        for priority in sorted(priority_groups):
-            batch = priority_groups[priority]
-            # Split this priority group into sync and async halves.
-            sequential = [(s, k) for s, k in batch if not s.asset.async_mode]
-            parallel = [(s, k) for s, k in batch if s.asset.async_mode]
-            seq_ok = (
-                Apprise._notify_sequential(*sequential) if sequential else True
-            )
-            par_ok = (
-                Apprise._notify_parallel_threadpool(*parallel)
-                if parallel
-                else True
-            )
-            if seq_ok and par_ok:
-                # Every service in this priority group delivered successfully.
-                # Stop here; lower-urgency groups are not triggered.
-                return True
-            # At least one service in this group failed -- escalate to the
-            # next priority group and try those services instead.
+        def _run_batch(batch):
+            """Dispatch one priority-group batch; True = all services ok."""
+            seq = [(s, k) for s, k in batch if not s.asset.async_mode]
+            par = [(s, k) for s, k in batch if s.asset.async_mode]
+            seq_ok = Apprise._notify_sequential(*seq) if seq else True
+            par_ok = Apprise._notify_parallel_threadpool(*par) if par else True
+            return seq_ok and par_ok
 
-        # All priority groups were exhausted and the last group still had
-        # at least one failed delivery.
-        return False
+        # Per-chain state: priorities (sorted), groups dict, current index,
+        # and a flag marking whether a successful group has been found.
+        chain_states = {
+            key: {
+                "priorities": sorted(groups),
+                "groups": groups,
+                "idx": 0,
+                "succeeded": False,
+            }
+            for key, groups in chains.items()
+        }
+
+        while True:
+            # When abort_on_chain_failure is enabled, stop as soon as any
+            # chain has exhausted all its priority groups without success.
+            # With the default (False) all chains run to completion even if
+            # one has already failed, so every defined URL gets an attempt.
+            if self.asset.abort_on_chain_failure and any(
+                not st["succeeded"] and st["idx"] >= len(st["priorities"])
+                for st in chain_states.values()
+            ):
+                return False
+
+            # Collect chains that still need to try their next priority group.
+            active = [
+                (key, st)
+                for key, st in chain_states.items()
+                if not st["succeeded"] and st["idx"] < len(st["priorities"])
+            ]
+            if not active:
+                break  # every chain has either succeeded or been exhausted
+
+            if len(active) == 1:
+                # Single active chain: dispatch directly, no thread overhead.
+                _, st = active[0]
+                batch = st["groups"][st["priorities"][st["idx"]]]
+                if _run_batch(batch):
+                    st["succeeded"] = True
+                else:
+                    st["idx"] += 1  # escalate to next priority
+            else:
+                # Multiple active chains: run their current-priority batches
+                # concurrently so independent chains don't block each other.
+                with cf.ThreadPoolExecutor() as executor:
+                    future_map = {
+                        executor.submit(
+                            _run_batch,
+                            st["groups"][st["priorities"][st["idx"]]],
+                        ): (key, st)
+                        for key, st in active
+                    }
+                    for future in cf.as_completed(future_map):
+                        _, st = future_map[future]
+                        try:
+                            ok = future.result()
+                        except Exception:
+                            logger.exception(
+                                "Unhandled Notification Exception"
+                            )
+                            ok = False
+                        if ok:
+                            st["succeeded"] = True
+                        else:
+                            st["idx"] += 1  # escalate to next priority
+
+        return all(st["succeeded"] for st in chain_states.values())
 
     async def async_notify(self, *args: Any, **kwargs: Any) -> Optional[bool]:
         """Send a notification to all the plugins previously loaded, for
@@ -624,13 +814,8 @@ class Apprise:
         if not all_calls:
             return None
 
-        # Inject a per-call retry override when the tag filter includes one.
-        filter_retry = Apprise._extract_filter_retry(tag)
-        if filter_retry is not None:
-            all_calls = [
-                (s, dict(k, _retry_override=filter_retry))
-                for s, k in all_calls
-            ]
+        # Inject per-service call-time retry overrides (same logic as notify).
+        all_calls = Apprise._inject_per_service_retries(all_calls, tag)
 
         if Apprise._filter_has_explicit_priority(tag):
             # Explicit priority prefix: flat dispatch, no escalation.
@@ -648,31 +833,77 @@ class Apprise:
             )
             return seq_ok and par_ok
 
-        # Escalation chain: group by tag priority and dispatch highest urgency
-        # (lowest number) first.  Stop as soon as one entire group succeeds.
-        priority_groups: dict[int, list] = {}
-        for server, notify_kwargs in all_calls:
-            p = Apprise._server_priority_for_filter(server, tag)
-            priority_groups.setdefault(p, []).append((server, notify_kwargs))
+        # Per-tag independent escalation chains -- same semantics as notify().
+        #
+        # Each chain's current-priority batch is dispatched as a coroutine.
+        # All active chains' batches run concurrently via asyncio.gather() so
+        # async services across independent chains can make I/O progress
+        # simultaneously.  Only chains whose current batch failed advance to
+        # the next priority group (escalation).
+        chains = Apprise._build_tag_chains(all_calls, tag)
 
-        for priority in sorted(priority_groups):
-            batch = priority_groups[priority]
-            sequential = [(s, k) for s, k in batch if not s.asset.async_mode]
-            parallel = [(s, k) for s, k in batch if s.asset.async_mode]
-            seq_ok = (
-                Apprise._notify_sequential(*sequential) if sequential else True
-            )
+        async def _run_batch_async(batch):
+            """Dispatch one priority-group batch; True = all services ok."""
+            seq = [(s, k) for s, k in batch if not s.asset.async_mode]
+            par = [(s, k) for s, k in batch if s.asset.async_mode]
+            # Sequential items (async_mode=False) run blocking in the caller;
+            # async items are gathered concurrently.
+            seq_ok = Apprise._notify_sequential(*seq) if seq else True
             par_ok = (
-                await Apprise._notify_parallel_asyncio(*parallel)
-                if parallel
-                else True
+                await Apprise._notify_parallel_asyncio(*par) if par else True
             )
-            if seq_ok and par_ok:
-                # Entire group succeeded; skip lower-urgency groups.
-                return True
-            # Group had failures; escalate to the next priority group.
+            return seq_ok and par_ok
 
-        return False
+        chain_states = {
+            key: {
+                "priorities": sorted(groups),
+                "groups": groups,
+                "idx": 0,
+                "succeeded": False,
+            }
+            for key, groups in chains.items()
+        }
+
+        while True:
+            # Same abort_on_chain_failure guard as notify().
+            if self.asset.abort_on_chain_failure and any(
+                not st["succeeded"] and st["idx"] >= len(st["priorities"])
+                for st in chain_states.values()
+            ):
+                return False
+
+            active = [
+                (key, st)
+                for key, st in chain_states.items()
+                if not st["succeeded"] and st["idx"] < len(st["priorities"])
+            ]
+            if not active:
+                break  # every chain has either succeeded or been exhausted
+
+            # Run all active chains' current-priority batches concurrently.
+            # asyncio.gather() interleaves coroutines so async services across
+            # different chains can pipeline their I/O simultaneously.
+            # return_exceptions=True prevents one failing batch from cancelling
+            # the others; exceptions are treated as delivery failures below.
+            results = await asyncio.gather(
+                *(
+                    _run_batch_async(st["groups"][st["priorities"][st["idx"]]])
+                    for _, st in active
+                ),
+                return_exceptions=True,
+            )
+
+            for (_, st), ok in zip(active, results):
+                if isinstance(ok, Exception):
+                    # Escaped exception -- safety net; treat as failure.
+                    logger.exception("Unhandled Notification Exception")
+                    st["idx"] += 1
+                elif ok:
+                    st["succeeded"] = True
+                else:
+                    st["idx"] += 1  # escalate to next priority group
+
+        return all(st["succeeded"] for st in chain_states.values())
 
     def _create_notify_calls(self, *args, **kwargs):
         """Creates notifications for all the plugins loaded.
