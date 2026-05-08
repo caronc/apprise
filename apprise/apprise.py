@@ -1152,14 +1152,6 @@ class Apprise:
             # running 'success' accumulator.  This silently absorbs the
             # failure: the caller will not see it as a delivery error.
             #
-            # Why getattr() instead of self.optional?
-            #   getattr(server, "optional", False) guards against mock
-            #   objects and hypothetical future subclasses that may not
-            #   define the attribute at all.  In those cases the default
-            #   of False is used, which keeps the safe, conservative
-            #   behaviour: unexpected attribute absence propagates the
-            #   failure rather than silently swallowing it.
-            #
             # Interaction with retries:
             #   The retry loop above has already run.  optional= does not
             #   short-circuit or bypass retries -- it only changes the

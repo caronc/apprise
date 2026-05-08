@@ -1934,3 +1934,94 @@ class TestOptionalService:
             assert s._calls == 1
         finally:
             N_MGR.unload_modules()
+
+
+class TestCreateNotifyCalls:
+    """Cover Apprise._create_notify_calls() which splits servers into
+    sequential and parallel buckets based on their asset.async_mode flag."""
+
+    def test_splits_sequential_and_parallel(self):
+        """Sequential and parallel servers are split into separate lists."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+        try:
+            # With async_mode=False all loaded servers go to the sequential
+            # bucket; the parallel bucket remains empty.
+            asset_seq = AppriseAsset(async_mode=False)
+            s_seq = _FailThenSucceedNotify(
+                host="s1", asset=asset_seq, fail_times=0
+            )
+
+            a = Apprise(asset=asset_seq)
+            a.add(s_seq)
+
+            seq, par = a._create_notify_calls(body="test")
+            assert len(seq) == 1
+            assert len(par) == 0
+
+            # With async_mode=True the same server is placed in the parallel
+            # bucket instead.
+            asset_par = AppriseAsset(async_mode=True)
+            s_par = _FailThenSucceedNotify(
+                host="s2", asset=asset_par, fail_times=0
+            )
+
+            b = Apprise(asset=asset_par)
+            b.add(s_par)
+
+            seq2, par2 = b._create_notify_calls(body="test")
+            assert len(seq2) == 0
+            assert len(par2) == 1
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestAsyncioSafetyNet:
+    """Cover the safety-net branch in _notify_parallel_asyncio that handles
+    exceptions which escape do_call's own try/except block."""
+
+    def test_exception_outside_try_block_triggers_safety_net(self):
+        """An exception raised before the per-attempt try block (e.g. from
+        a misbehaving server.retry property) escapes do_call, is captured by
+        asyncio.gather(return_exceptions=True), and causes the batch to
+        return False via the safety-net handler.
+
+        A second well-behaved server is included so that results contains
+        both an Exception and a bool value, exercising both branches of the
+        inner ``if isinstance(status, Exception)`` check in the loop."""
+
+        class _RaisingRetryServer:
+            """Server whose retry property raises to simulate a broken plugin
+            that fails before the per-attempt try/except in do_call."""
+
+            service_name = "raiser"
+            asset = AppriseAsset(async_mode=True)
+            optional = False
+
+            @property
+            def retry(self):
+                # This exception is raised when do_call evaluates
+                # getattr(server, "retry", 0), which happens OUTSIDE the
+                # per-attempt try/except.  It therefore escapes do_call
+                # entirely and is captured by asyncio.gather as a value.
+                raise RuntimeError("injected: property raised outside try")
+
+            async def async_notify(self, **kwargs):
+                return True  # pragma: no cover -- never reached
+
+        class _GoodServer:
+            """Minimal well-behaved server that succeeds immediately."""
+
+            service_name = "good"
+
+            async def async_notify(self, **kwargs):
+                return True
+
+        raiser = _RaisingRetryServer()
+        good = _GoodServer()
+        # Two servers: raiser -> Exception in results; good -> True in results.
+        # The safety-net loop therefore hits both branches of the inner
+        # ``if isinstance(status, Exception)`` check.
+        result = asyncio.run(
+            Apprise._notify_parallel_asyncio((raiser, {}), (good, {}))
+        )
+        assert result is False
