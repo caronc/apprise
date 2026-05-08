@@ -1143,7 +1143,43 @@ class Apprise:
                     if wait > 0:
                         time.sleep(wait)
 
-            # A single False result taints the overall batch result.
+            # Optional-service check.
+            #
+            # At this point all retry attempts for 'server' have been
+            # exhausted (the for-loop above has finished).  If the final
+            # result is still False *and* the service is marked optional,
+            # we overwrite result to True before folding it into the
+            # running 'success' accumulator.  This silently absorbs the
+            # failure: the caller will not see it as a delivery error.
+            #
+            # Why getattr() instead of self.optional?
+            #   getattr(server, "optional", False) guards against mock
+            #   objects and hypothetical future subclasses that may not
+            #   define the attribute at all.  In those cases the default
+            #   of False is used, which keeps the safe, conservative
+            #   behaviour: unexpected attribute absence propagates the
+            #   failure rather than silently swallowing it.
+            #
+            # Interaction with retries:
+            #   The retry loop above has already run.  optional= does not
+            #   short-circuit or bypass retries -- it only changes the
+            #   interpretation of the *final* result once all attempts
+            #   are done.  A service with retry=3 and optional=True will
+            #   still be attempted four times before the failure is
+            #   absorbed here.
+            if not result and getattr(server, "optional", False):
+                logger.info(
+                    "Optional service '%s' failed; ignoring failure.",
+                    server.service_name,
+                )
+                result = True
+
+            # Fold this service's result into the running batch outcome.
+            # Boolean AND is used so that a single False from any required
+            # (non-optional) service permanently taints 'success' for the
+            # whole batch -- even if later services succeed.  Optional
+            # failures are already re-mapped to True above, so they never
+            # contribute a False here.
             success = success and result
 
         return success
@@ -1216,6 +1252,33 @@ class Apprise:
                     if wait > 0:
                         time.sleep(wait)
 
+            # Optional-service check (thread-pool path).
+            #
+            # All retry attempts for this server have been exhausted by the
+            # loop above.  If the final result is still False and the service
+            # is tagged as optional, return True from this worker function
+            # instead of False.  The caller (_notify_parallel_threadpool)
+            # collects each worker's return value via future.result() and
+            # ANDs them together; returning True here prevents this worker's
+            # failure from tainting the aggregate result.
+            #
+            # This is the thread-pool equivalent of the same check in
+            # _notify_sequential.  See the comment there for a full
+            # explanation of the getattr() guard and the retry interaction.
+            if not result and getattr(server, "optional", False):
+                logger.info(
+                    "Optional service '%s' failed; ignoring failure.",
+                    server.service_name,
+                )
+                # Return True so future.result() in the caller reports
+                # success for this optional worker thread.
+                return True
+
+            # Return the actual final delivery result for this service.
+            # True  means at least one attempt succeeded (retry short-
+            #       circuited out of the loop early via 'return True').
+            # False means every attempt failed and the service is required
+            #       (optional=False), so the failure is propagated.
             return result
 
         # Submit all server calls to the thread pool and collect results.
@@ -1304,6 +1367,32 @@ class Apprise:
                     if wait > 0:
                         await asyncio.sleep(wait)
 
+            # Optional-service check (asyncio coroutine path).
+            #
+            # All retry attempts have been exhausted by the async loop
+            # above.  If the final result is still False and the service
+            # is tagged optional, return True from this coroutine so that
+            # asyncio.gather() receives a truthy value for this task.
+            # The caller inspects all gathered results with all(); a True
+            # here ensures this coroutine does not lower the aggregate
+            # result for the batch.
+            #
+            # This is the asyncio equivalent of the same check in
+            # _notify_sequential and _call_with_retry.  See the comment
+            # in _notify_sequential for a full explanation of the getattr()
+            # guard and the interaction with the retry count.
+            if not result and getattr(server, "optional", False):
+                logger.info(
+                    "Optional service '%s' failed; ignoring failure.",
+                    server.service_name,
+                )
+                # Return True so asyncio.gather() sees a success value
+                # for this optional coroutine.
+                return True
+
+            # Return the actual final delivery result for this coroutine.
+            # True  means at least one async attempt succeeded.
+            # False means every attempt failed and the service is required.
             return result
 
         # Run all coroutines concurrently.  return_exceptions=True ensures

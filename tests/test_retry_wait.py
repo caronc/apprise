@@ -181,11 +181,14 @@ class TestUrlRoundTrip:
         assert "retry" in params
         assert params["retry"] == "2"
 
-    def test_wait_zero_not_in_url_parameters(self):
+    def test_wait_zero_always_in_url_parameters(self):
+        """retry= and wait= are always present, even at their zero defaults."""
         nb = _TestNotify(host="localhost", wait=0.0, retry=0)
         params = nb.url_parameters()
-        assert "wait" not in params
-        assert "retry" not in params
+        assert "wait" in params
+        assert params["wait"] == "0.0"
+        assert "retry" in params
+        assert params["retry"] == "0"
 
     def test_parse_url_extracts_wait(self):
         results = _TestNotify.parse_url("test://localhost?wait=2.5&retry=3")
@@ -1600,34 +1603,39 @@ class TestMultiTagDispatch:
 
         Covers the 'except Exception: ok = False' branch (apprise.py:788-792)
         that is only reachable when multiple chains are active simultaneously
-        (triggering the ThreadPoolExecutor path) and a batch raises
-        unexpectedly.
+        (triggering the ThreadPoolExecutor path) and _run_batch raises.
+        Uses _ExplodingAsset (raises on async_mode access) instead of
+        patching a @staticmethod, which is unreliable across Python versions
+        when the patched method runs inside a ThreadPoolExecutor worker.
         """
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
-            asset = AppriseAsset(async_mode=False)
+            # _ExplodingAsset.async_mode raises RuntimeError.  _run_batch
+            # reads s.asset.async_mode to split seq/par, so a batch with
+            # one of these servers raises and the future captures it.
+            class _ExplodingAsset(AppriseAsset):
+                @property
+                def async_mode(self):
+                    raise RuntimeError("injected async_mode access")
 
-            # Two servers with distinct tags give us two independent chains so
+            # Two servers with distinct tags -> two independent chains so
             # the ThreadPoolExecutor path (len(active) > 1) is taken.
-            s_a = _FailThenSucceedNotify(host="a", asset=asset, fail_times=0)
+            s_a = _FailThenSucceedNotify(
+                host="a", asset=_ExplodingAsset(), fail_times=0
+            )
             s_a.tags = {"alpha"}
 
-            s_b = _FailThenSucceedNotify(host="b", asset=asset, fail_times=0)
+            s_b = _FailThenSucceedNotify(
+                host="b", asset=_ExplodingAsset(), fail_times=0
+            )
             s_b.tags = {"beta"}
 
-            a = Apprise(asset=asset)
+            a = Apprise()
             a.add(s_a)
             a.add(s_b)
 
-            # Patch _notify_sequential to raise so _run_batch propagates the
-            # exception through the future, exercising the except clause.
-            with mock.patch.object(
-                Apprise,
-                "_notify_sequential",
-                side_effect=RuntimeError("injected"),
-            ):
-                result = a.notify(body="test", tag=["alpha", "beta"])
+            result = a.notify(body="test", tag=["alpha", "beta"])
 
             # Both chains raised instead of returning True -- overall False.
             assert result is False
@@ -1758,5 +1766,171 @@ class TestAbortOnChainFailure:
             assert s_b._calls == 1
             assert s_a_p0._calls == 1
             assert s_a_p1._calls == 0
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestOptionalService:
+    """optional=True silently absorbs per-service delivery failures.
+
+    The overall notify()/async_notify() result is True even when an
+    optional service cannot be reached, so callers are not penalised
+    for "nice to have" endpoints (e.g. home screens, debug logging).
+    """
+
+    def test_optional_default_false(self):
+        """optional defaults to False on a freshly constructed plugin."""
+        nb = _TestNotify(host="localhost")
+        assert nb.optional is False
+
+    def test_optional_url_includes_flag(self):
+        """url_parameters() always emits optional=yes or optional=no."""
+        nb = _TestNotify(host="localhost")
+        params = nb.url_parameters()
+        assert "optional" in params
+        assert params["optional"] == "no"
+
+        nb_opt = _TestNotify(host="localhost", optional=True)
+        params_opt = nb_opt.url_parameters()
+        assert params_opt["optional"] == "yes"
+
+    def test_optional_parse_url_yes(self):
+        """parse_url propagates optional=yes into the results dict."""
+        results = _TestNotify.parse_url("test://localhost?optional=yes")
+        assert results is not None
+        assert results.get("optional") is True
+
+    def test_optional_parse_url_no(self):
+        """parse_url propagates optional=no into the results dict."""
+        results = _TestNotify.parse_url("test://localhost?optional=no")
+        assert results is not None
+        assert results.get("optional") is False
+
+    def test_optional_kwarg_sets_attribute(self):
+        """Passing optional=True/False to __init__ sets .optional."""
+        nb_yes = _TestNotify(host="localhost", optional=True)
+        assert nb_yes.optional is True
+
+        nb_no = _TestNotify(host="localhost", optional=False)
+        assert nb_no.optional is False
+
+    def test_optional_sequential_failure_absorbed(self):
+        """Sequential dispatch: failed optional server -> overall True."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s = _FailThenSucceedNotify(host="s1", asset=asset, fail_times=99)
+            s.optional = True
+
+            a = Apprise(asset=asset)
+            a.add(s)
+
+            result = a.notify(body="test")
+            assert result is True
+            assert s._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_optional_threadpool_failure_absorbed(self):
+        """Thread-pool dispatch: failed optional servers -> overall True.
+
+        Two async_mode=True servers ensure _notify_parallel_threadpool
+        uses the actual thread pool (n_calls==1 falls back to sequential).
+        """
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            s1 = _FailThenSucceedNotify(host="s1", asset=asset, fail_times=99)
+            s1.optional = True
+            s2 = _FailThenSucceedNotify(host="s2", asset=asset, fail_times=99)
+            s2.optional = True
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            result = a.notify(body="test")
+            assert result is True
+        finally:
+            N_MGR.unload_modules()
+
+    def test_optional_asyncio_failure_absorbed(self):
+        """Asyncio dispatch: failed optional server -> overall True."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            s = _FailThenSucceedNotify(host="s1", asset=asset, fail_times=99)
+            s.optional = True
+
+            a = Apprise(asset=asset)
+            a.add(s)
+
+            result = asyncio.run(a.async_notify(body="test"))
+            assert result is True
+        finally:
+            N_MGR.unload_modules()
+
+    def test_optional_all_fail_all_optional_returns_true(self):
+        """When every server is optional and every server fails -> True."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            a = Apprise(asset=asset)
+            for i in range(3):
+                s = _FailThenSucceedNotify(
+                    host=f"s{i}", asset=asset, fail_times=99
+                )
+                s.optional = True
+                a.add(s)
+
+            result = a.notify(body="test")
+            assert result is True
+        finally:
+            N_MGR.unload_modules()
+
+    def test_optional_mixed_required_fails_returns_false(self):
+        """Required server failure taints result even with optional peers."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s_opt = _FailThenSucceedNotify(
+                host="opt", asset=asset, fail_times=99
+            )
+            s_opt.optional = True
+
+            s_req = _FailThenSucceedNotify(
+                host="req", asset=asset, fail_times=99
+            )
+            # s_req.optional is False (default)
+
+            a = Apprise(asset=asset)
+            a.add(s_opt)
+            a.add(s_req)
+
+            result = a.notify(body="test")
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_optional_success_unaffected(self):
+        """An optional server that succeeds is still counted as True."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s = _FailThenSucceedNotify(host="s1", asset=asset, fail_times=0)
+            s.optional = True
+
+            a = Apprise(asset=asset)
+            a.add(s)
+
+            result = a.notify(body="test")
+            assert result is True
+            assert s._calls == 1
         finally:
             N_MGR.unload_modules()
