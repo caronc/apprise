@@ -641,6 +641,45 @@ class TestStaticHelpers:
         assert Apprise._extract_filter_retry("alerts") is None
         assert Apprise._extract_filter_retry(["alerts"]) is None
 
+    def test_extract_retry_none_from_nested_list_no_suffix(self):
+        """Nested list without retry suffix returns None.
+
+        Covers the 'if ft.retry is not None' False branch (line 412) and the
+        inner for-loop completing without returning (branch 410->406).
+        """
+        result = Apprise._extract_filter_retry([["alerts"]])
+        assert result is None
+
+    def test_server_priority_for_tag_name_absent(self):
+        """Returns 0 when no tag in server.tags matches tag_name (line 456)."""
+        server = mock.Mock()
+        server.tags = {AppriseTag("alerts", priority=3, has_priority=True)}
+        assert Apprise._server_priority_for_tag_name(server, "backup") == 0
+
+    def test_match_service_retry_plain_string_tag_backward_compat(self):
+        """Plain string in server.tags matched by a priority-prefixed token.
+
+        Covers the else/str fallback inside _match_service_retry when stag is
+        not an AppriseTag instance and the name matches (lines 497-498).
+        """
+        server = mock.Mock()
+        server.tags = {"alerts"}  # plain string, not an AppriseTag
+        # "3:alerts:2" carries priority=3 + retry=2; plain "alerts" matches
+        result = Apprise._match_service_retry(server, "3:alerts:2")
+        assert result == 2
+
+    def test_match_service_retry_plain_string_tag_no_match(self):
+        """Plain string in server.tags that does not match returns None.
+
+        Covers the else-branch continuation (line 497->489) inside
+        _match_service_retry when the plain-string stag name differs from the
+        priority-prefixed filter token.
+        """
+        server = mock.Mock()
+        server.tags = {"other"}  # plain string -- does not match "alerts"
+        result = Apprise._match_service_retry(server, "3:alerts:2")
+        assert result is None
+
     def test_extract_retry_none_for_match_all(self):
         assert Apprise._extract_filter_retry(MATCH_ALL_TAG) is None
         assert Apprise._extract_filter_retry(None) is None
@@ -1555,6 +1594,46 @@ class TestMultiTagDispatch:
         finally:
             N_MGR.unload_modules()
 
+    def test_chain_dispatch_future_exception_treated_as_failure(self):
+        """An exception escaping _run_batch is caught in the chain-dispatch
+        ThreadPoolExecutor loop and treated as a delivery failure.
+
+        Covers the 'except Exception: ok = False' branch (apprise.py:788-792)
+        that is only reachable when multiple chains are active simultaneously
+        (triggering the ThreadPoolExecutor path) and a batch raises
+        unexpectedly.
+        """
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+
+            # Two servers with distinct tags give us two independent chains so
+            # the ThreadPoolExecutor path (len(active) > 1) is taken.
+            s_a = _FailThenSucceedNotify(host="a", asset=asset, fail_times=0)
+            s_a.tags = {"alpha"}
+
+            s_b = _FailThenSucceedNotify(host="b", asset=asset, fail_times=0)
+            s_b.tags = {"beta"}
+
+            a = Apprise(asset=asset)
+            a.add(s_a)
+            a.add(s_b)
+
+            # Patch _notify_sequential to raise so _run_batch propagates the
+            # exception through the future, exercising the except clause.
+            with mock.patch.object(
+                Apprise,
+                "_notify_sequential",
+                side_effect=RuntimeError("injected"),
+            ):
+                result = a.notify(body="test", tag=["alpha", "beta"])
+
+            # Both chains raised instead of returning True -- overall False.
+            assert result is False
+        finally:
+            N_MGR.unload_modules()
+
 
 class TestAbortOnChainFailure:
     """AppriseAsset.abort_on_chain_failure controls early-abort behaviour.
@@ -1640,5 +1719,44 @@ class TestAbortOnChainFailure:
             assert s_b._calls == 1
             assert s_a_p0._calls == 1
             assert s_a_p1._calls == 0  # skipped due to early abort
+        finally:
+            N_MGR.unload_modules()
+
+    def test_abort_on_chain_failure_true_async(self):
+        """abort_on_chain_failure=True triggers the same early-abort in
+        async_notify() (covers apprise.py line 873)."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, abort_on_chain_failure=True)
+
+            # alpha has two priority levels; priority-0 always fails
+            s_a_p0 = _FailThenSucceedNotify(
+                host="a0", asset=asset, fail_times=99
+            )
+            s_a_p0.tags = {AppriseTag("alpha", priority=0, has_priority=False)}
+
+            s_a_p1 = _FailThenSucceedNotify(
+                host="a1", asset=asset, fail_times=0
+            )
+            s_a_p1.tags = {AppriseTag("alpha", priority=1, has_priority=True)}
+
+            # beta has one priority level; always fails
+            s_b = _FailThenSucceedNotify(host="b", asset=asset, fail_times=99)
+            s_b.tags = {"beta"}
+
+            a = Apprise(asset=asset)
+            a.add(s_a_p0)
+            a.add(s_a_p1)
+            a.add(s_b)
+
+            result = asyncio.run(
+                a.async_notify(body="test", tag=["alpha", "beta"])
+            )
+            assert result is False
+            # beta was exhausted in round 1 -- abort fires before alpha's p1
+            assert s_b._calls == 1
+            assert s_a_p0._calls == 1
+            assert s_a_p1._calls == 0
         finally:
             N_MGR.unload_modules()
