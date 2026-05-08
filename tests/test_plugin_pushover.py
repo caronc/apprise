@@ -244,19 +244,19 @@ apprise_url_tests = (
             "instance": NotifyPushover,
         },
     ),
-    # API Key + emergency priority setting with emg_retry and expire
+    # API Key + emergency priority setting with interval and expire
     (
         "pover://{}@{}?priority=emergency&{}&{}".format(
-            "u" * 30, "a" * 30, "emg_retry=30", "expire=300"
+            "u" * 30, "a" * 30, "interval=30", "expire=300"
         ),
         {
             "instance": NotifyPushover,
         },
     ),
-    # API Key + emergency priority setting with text emg_retry
+    # API Key + emergency priority setting with text interval
     (
         "pover://{}@{}?priority=emergency&{}&{}".format(
-            "u" * 30, "a" * 30, "emg_retry=invalid", "expire=300"
+            "u" * 30, "a" * 30, "interval=invalid", "expire=300"
         ),
         {
             "instance": NotifyPushover,
@@ -265,7 +265,7 @@ apprise_url_tests = (
     # API Key + emergency priority setting with text expire
     (
         "pover://{}@{}?priority=emergency&{}&{}".format(
-            "u" * 30, "a" * 30, "emg_retry=30", "expire=invalid"
+            "u" * 30, "a" * 30, "interval=30", "expire=invalid"
         ),
         {
             "instance": NotifyPushover,
@@ -280,10 +280,10 @@ apprise_url_tests = (
             "instance": TypeError,
         },
     ),
-    # API Key + emergency priority setting with invalid emg_retry
+    # API Key + emergency priority setting with invalid interval
     (
         "pover://{}@{}?priority=emergency&{}".format(
-            "u" * 30, "a" * 30, "emg_retry=15"
+            "u" * 30, "a" * 30, "interval=15"
         ),
         {
             "instance": TypeError,

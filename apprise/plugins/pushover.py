@@ -244,7 +244,7 @@ class NotifyPushover(NotifyBase):
                 "map_to": "supplemental_url_title",
                 "type": "string",
             },
-            "emg_retry": {
+            "interval": {
                 "name": _("Emergency Retry Interval"),
                 "type": "int",
                 "min": 30,
@@ -270,7 +270,7 @@ class NotifyPushover(NotifyBase):
         targets=None,
         priority=None,
         sound=None,
-        emg_retry=None,
+        interval=None,
         expire=None,
         supplemental_url=None,
         supplemental_url_title=None,
@@ -353,9 +353,9 @@ class NotifyPushover(NotifyBase):
         # The following are for emergency alerts
         if self.priority == PushoverPriority.EMERGENCY:
             # How often to resend notification, in seconds (emergency only)
-            self.emg_retry = self.template_args["emg_retry"]["default"]
+            self.interval = self.template_args["interval"]["default"]
             with contextlib.suppress(ValueError, TypeError):
-                self.emg_retry = int(emg_retry)
+                self.interval = int(interval)
 
             # How long before the emergency alert expires, in seconds
             self.expire = self.template_args["expire"]["default"]
@@ -363,8 +363,10 @@ class NotifyPushover(NotifyBase):
                 # Acquire our expiry value
                 self.expire = int(expire)
 
-            if self.emg_retry < 30:
-                msg = "Pushover emergency retry must be at least 30 seconds."
+            if self.interval < 30:
+                msg = (
+                    "Pushover emergency interval must be at least 30 seconds."
+                )
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
@@ -420,7 +422,7 @@ class NotifyPushover(NotifyBase):
         if self.priority == PushoverPriority.EMERGENCY:
             base_payload.update(
                 {
-                    "retry": self.emg_retry,
+                    "retry": self.interval,
                     "expire": self.expire,
                 }
             )
@@ -656,10 +658,10 @@ class NotifyPushover(NotifyBase):
         if self.supplemental_url_title:
             params["url_title"] = self.supplemental_url_title
 
-        # Only add expire and emg_retry for emergency messages;
+        # Only add expire and interval for emergency messages;
         # Pushover ignores them for all other priorities
         if self.priority == PushoverPriority.EMERGENCY:
-            params.update({"expire": self.expire, "emg_retry": self.emg_retry})
+            params.update({"expire": self.expire, "interval": self.interval})
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -732,8 +734,8 @@ class NotifyPushover(NotifyBase):
         # Get expire and emergency retry interval
         if "expire" in results["qsd"] and len(results["qsd"]["expire"]):
             results["expire"] = results["qsd"]["expire"]
-        if "emg_retry" in results["qsd"] and len(results["qsd"]["emg_retry"]):
-            results["emg_retry"] = results["qsd"]["emg_retry"]
+        if "interval" in results["qsd"] and len(results["qsd"]["interval"]):
+            results["interval"] = results["qsd"]["interval"]
 
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):

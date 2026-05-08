@@ -586,6 +586,31 @@ def test_apprise_cli_nux_env(tmpdir):
     )
     assert result.exit_code == 0
 
+    # A tag that does not exist in the config produces no matches; the live
+    # run returns exit code 3 to signal "no services found".
+    result = runner.invoke(
+        cli.main,
+        ["-b", "no match", "--config", str(t), "--tag", "nonexistent"],
+    )
+    assert result.exit_code == 3
+
+    # --dry-run must mirror the live result: a non-matching tag also returns
+    # exit code 3, not 0.  This guards against dry-run masking "no services
+    # found" by always reporting success.
+    result = runner.invoke(
+        cli.main,
+        [
+            "-b",
+            "no match",
+            "--config",
+            str(t),
+            "--tag",
+            "nonexistent",
+            "--dry-run",
+        ],
+    )
+    assert result.exit_code == 3
+
     # Here is a case where we get what was expected; we also attach a file
     result = runner.invoke(
         cli.main,

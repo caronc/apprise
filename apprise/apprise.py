@@ -1274,11 +1274,8 @@ class Apprise:
                 # success for this optional worker thread.
                 return True
 
-            # Return the actual final delivery result for this service.
-            # True  means at least one attempt succeeded (retry short-
-            #       circuited out of the loop early via 'return True').
-            # False means every attempt failed and the service is required
-            #       (optional=False), so the failure is propagated.
+            # Every attempt for this service failed and it is not optional;
+            # propagate the failure to the caller.
             return result
 
         # Submit all server calls to the thread pool and collect results.
@@ -1390,9 +1387,8 @@ class Apprise:
                 # for this optional coroutine.
                 return True
 
-            # Return the actual final delivery result for this coroutine.
-            # True  means at least one async attempt succeeded.
-            # False means every attempt failed and the service is required.
+            # Every attempt for this service failed and it is not optional;
+            # propagate the failure to the caller.
             return result
 
         # Run all coroutines concurrently.  return_exceptions=True ensures
@@ -1401,17 +1397,14 @@ class Apprise:
         cors = (do_call(server, kwargs) for (server, kwargs) in servers_kwargs)
         results = await asyncio.gather(*cors, return_exceptions=True)
 
-        if any(
-            isinstance(status, Exception) and not isinstance(status, TypeError)
-            for status in results
-        ):
+        if any(isinstance(status, Exception) for status in results):
             # Safety net: an exception escaped do_call's own try/except.
-            # Log it and treat the whole batch as failed.
-            logger.exception("Unhandled Notification Exception")
-            return False
-
-        if any(isinstance(status, TypeError) for status in results):
-            # These are our internally thrown notifications.
+            # Log each one and treat the whole batch as failed.
+            for status in results:
+                if isinstance(status, Exception):
+                    logger.error(
+                        "Unhandled Notification Exception: %s", status
+                    )
             return False
 
         return all(results)
