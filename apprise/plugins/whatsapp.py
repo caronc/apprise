@@ -58,8 +58,18 @@ import requests
 
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
+from ..utils.parse import (
+    is_phone_no,
+    parse_phone_no,
+    validate_regex,
+)
 from .base import NotifyBase
+
+# Matches the numeric-only portion of a WhatsApp Cloud API group ID after any
+# '#' prefix and '@g.us' JID suffix have been stripped.  E.164 phone numbers
+# are capped at 15 digits; group IDs are 18-20 digits, so requiring 16+ gives
+# an unambiguous separation with no overlap.
+IS_GROUP_ID = re.compile(r"^[0-9]{16,}$")
 
 
 class NotifyWhatsApp(NotifyBase):
@@ -138,6 +148,18 @@ class NotifyWhatsApp(NotifyBase):
                 "type": "string",
                 "prefix": "+",
                 "regex": (r"^[0-9\s)(+-]+$", "i"),
+                "map_to": "targets",
+            },
+            # WhatsApp group IDs are purely numeric and 16+ digits long —
+            # safely above the 15-digit E.164 phone number maximum.
+            # The '#' prefix in the Apprise URL is recommended for clarity;
+            # bare 16+ digit strings are also accepted.
+            # The '@g.us' API JID suffix is added automatically at send time.
+            "target_group": {
+                "name": _("Target Group ID"),
+                "type": "string",
+                "prefix": "#",
+                "regex": (r"^[0-9]{16,}$", "i"),
                 "map_to": "targets",
             },
             "targets": {
@@ -250,20 +272,47 @@ class NotifyWhatsApp(NotifyBase):
             #
             self.template = None
 
-        # Parse our targets
+        # Parse our targets (phone numbers and/or group IDs).
+        #
+        # parse_phone_no does the heavy lifting: it handles formatted phone
+        # strings ("+1 (555) 987-6543", dashes, spaces, etc.) and, with the
+        # default store_unparseable=True, passes through anything it cannot
+        # identify as a phone so we can inspect it below.
+        # A '#' prefix on a group ID is silently stripped by the phone regex
+        # (the digits still match); a '@g.us' JID suffix causes the whole
+        # token to be kept as-is (the '@' breaks the phone pattern).
+        #
+        # For each token after parse_phone_no:
+        #   is_phone_no() succeeds -> valid phone, stored as E.164 '+XXX'
+        #   is_phone_no() fails    -> strip '@g.us', run IS_GROUP_ID:
+        #                            16+ pure digits -> group ('#digits')
+        #                            anything else   -> warn and drop
         self.targets = []
 
         for target in parse_phone_no(targets):
-            # Validate targets and drop bad ones:
+            # Validate as a phone number first
             result = is_phone_no(target)
-            if not result:
-                self.logger.warning(
-                    f"Dropped invalid phone # ({target}) specified.",
-                )
+            if result:
+                # Valid phone number; store in E.164 format
+                self.targets.append("+{}".format(result["full"]))
                 continue
 
-            # store valid phone number
-            self.targets.append("+{}".format(result["full"]))
+            # Not a valid phone — check whether it is a group ID.
+            # Strip both the '#' prefix (retained when parse_phone_no uses
+            # its unparseable-store path rather than the phone regex) and the
+            # '@g.us' JID suffix (the native Meta API group ID format).
+            gid = (
+                re.sub(r"@g\.us$", "", target, flags=re.I).strip().lstrip("#")
+            )
+            if IS_GROUP_ID.match(gid):
+                # Store with '#' prefix; '@g.us' is re-added at send time
+                self.targets.append(f"#{gid}")
+                continue
+
+            # Genuinely invalid — warn and drop
+            self.logger.warning(
+                f"Dropped invalid WhatsApp target ({target}) specified.",
+            )
 
         self.template_mapping = {}
         if template_mapping:
@@ -349,7 +398,7 @@ class NotifyWhatsApp(NotifyBase):
 
         payload = {
             "messaging_product": "whatsapp",
-            # The To gets populated in the loop below
+            # 'to' and 'recipient_type' are set per-target in the loop below
             "to": None,
         }
 
@@ -359,6 +408,7 @@ class NotifyWhatsApp(NotifyBase):
             #
             payload.update(
                 {
+                    # recipient_type is overridden per-target below
                     "recipient_type": "individual",
                     "type": "text",
                     "text": {"body": body},
@@ -413,8 +463,16 @@ class NotifyWhatsApp(NotifyBase):
             # Get our target to notify
             target = targets.pop(0)
 
-            # Prepare our user
-            payload["to"] = target
+            # Group targets are stored with a '#' prefix; phone numbers
+            # are stored in E.164 format ('+' prefix).
+            if target.startswith("#"):
+                # Reconstruct the full Meta API group ID (digits + @g.us)
+                payload["to"] = "{}@g.us".format(target[1:])
+                payload["recipient_type"] = "group"
+            else:
+                # Individual phone number
+                payload["to"] = target
+                payload["recipient_type"] = "individual"
 
             # Some Debug Logging
             self.logger.debug(
