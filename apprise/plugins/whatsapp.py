@@ -28,17 +28,28 @@
 # API Source:
 #   https://developers.facebook.com/docs/whatsapp/cloud-api/reference/messages
 #
-# 1. Register a developer account with Meta:
-#  https://developers.facebook.com/docs/whatsapp/cloud-api/get-started
-# 2. Enable 2 Factor Authentication (2FA) with your account (if not done
-#  already)
-# 3. Create a App using WhatsApp Product.  There are 2 to create an app from
-#   Do NOT chose the WhatsApp Webhook one (choose the other)
+# The setup is split across two Meta portals:
+#  - https://business.facebook.com  (Business Manager — System Users & tokens)
+#  - https://developers.facebook.com (Developer Dashboard — App & Phone ID)
 #
-#  When you click on the API Setup section of your new app you need to record
-#  both the access token and the From Phone Number ID.  Note that this not the
-#  from phone number itself, but it's ID.  It's displayed below and contains
-#  way more numbers then your typical phone number
+# 1. Create a Meta Business Manager account at https://business.facebook.com
+#    (or use an existing one).  WhatsApp Business Accounts (WABAs) and System
+#    Users live here.
+# 2. Create a Meta Developer account at https://developers.facebook.com and
+#    create a new App.  Add WhatsApp as a product.  If prompted, select the
+#    "Business" app type and choose "Connect to Customers (WhatsApp)" as the
+#    use case (you may need to click "Customise Use Case" on the home page).
+# 3. In Business Manager, go to Settings > Users > System Users, create a
+#    System User (Admin or Employee role), click "Add Assets", assign your
+#    WhatsApp app, and grant the whatsapp_business_messaging permission.
+#    Then click "Generate Token" and copy it — this is your permanent token.
+# 4. Switch back to the Developer Dashboard, open your app, then go to
+#    WhatsApp > API Setup (or Getting Started) to find your From Phone Number
+#    ID.  This is NOT your actual phone number; it is a separate numeric ID
+#    (roughly 14 digits) assigned by Meta to the sender number.
+# 5. During sandbox testing, verify any recipient phone number through Meta's
+#    interface.  For production, your business must be verified and placed on
+#    the appropriate messaging tier.
 
 from json import dumps, loads
 import re
@@ -69,8 +80,9 @@ class NotifyWhatsApp(NotifyBase):
     # 60/300 = 0.2
     request_rate_per_sec = 0.20
 
-    # Facebook Graph version
-    fb_graph_version = "v17.0"
+    # Facebook Graph version; bump this when Meta deprecates the current one.
+    # Release schedule: https://developers.facebook.com/docs/graph-api/changelog
+    fb_graph_version = "v21.0"
 
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/whatsapp/"
