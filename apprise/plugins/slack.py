@@ -117,12 +117,22 @@ class SlackMode:
     # Our token looks like: xoxb-1234-1234-abc124 or
     BOT = "bot"
 
+    # Slack Workflow Builder webhook
+    # URL: https://hooks.slack.com/workflows/T.../F.../X.../Y...
+    WORKFLOW = "workflow"
+
+    # Slack Workflow trigger webhook (newer format)
+    # URL: https://hooks.slack.com/triggers/T.../X.../Y...
+    WORKFLOW_TRIGGER = "trigger"
+
 
 # Define our Slack Modes
 SLACK_MODES = (
     SlackMode.WEBHOOK,
     SlackMode.WEBHOOK_GOV,
     SlackMode.BOT,
+    SlackMode.WORKFLOW,
+    SlackMode.WORKFLOW_TRIGGER,
 )
 
 
@@ -152,6 +162,11 @@ class NotifySlack(NotifyBase):
     # Slack Webhook URLs
     webhook_url = "https://hooks.slack.com/services"
     webhook_gov_url = "https://hooks.slack-gov.com/services"
+
+    # Slack Workflow Builder webhook URL bases
+    # See: https://slack.com/help/articles/360041352714
+    workflow_url = "https://hooks.slack.com/workflows"
+    workflow_trigger_url = "https://hooks.slack.com/triggers"
 
     # Slack API URL (used with Bots)
     api_url = "https://slack.com/api/{}"
@@ -257,6 +272,13 @@ class NotifySlack(NotifyBase):
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
+            },
+            # Workflow Builder path: all URL segments joined with slashes
+            # e.g. T05XXXX/Ft07XXXX/XXXXXXXX/YYYYYYYY
+            "workflow_path": {
+                "name": _("Workflow Path"),
+                "type": "string",
+                "private": True,
             },
         },
     )
@@ -374,6 +396,7 @@ class NotifySlack(NotifyBase):
         mode=None,
         template=None,
         tokens=None,
+        workflow_path=None,
         **kwargs,
     ):
         """Initialize Slack Object."""
@@ -389,10 +412,42 @@ class NotifySlack(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+        elif workflow_path:
+            # Workflow path implies workflow mode
+            self.mode = SlackMode.WORKFLOW
+
         else:  # Detect
             self.mode = SlackMode.BOT if access_token else SlackMode.WEBHOOK
 
-        if self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
+        if self.mode in (
+            SlackMode.WORKFLOW,
+            SlackMode.WORKFLOW_TRIGGER,
+        ):
+            # Workflow Builder mode: no OAuth token, no webhook tokens
+            self.access_token = None
+            self.token_a = None
+            self.token_b = None
+            self.token_c = None
+
+            # Parse workflow path segments from string or list
+            if isinstance(workflow_path, (list, tuple)):
+                self.workflow_path = [str(s) for s in workflow_path if s]
+            elif isinstance(workflow_path, str):
+                self.workflow_path = [s for s in workflow_path.split("/") if s]
+            else:
+                self.workflow_path = []
+
+            # At least 3 segments required (T.../X.../Y... minimum)
+            if len(self.workflow_path) < 3:
+                msg = (
+                    "A Slack Workflow URL requires at least 3 path"
+                    f" segments ({workflow_path!r} is invalid)."
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        elif self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
+            self.workflow_path = []
             self.access_token = None
             self.token_a = validate_regex(
                 token_a, *self.template_tokens["token_a"]["regex"]
@@ -427,6 +482,7 @@ class NotifySlack(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
         else:
+            self.workflow_path = []
             self.token_a = None
             self.token_b = None
             self.token_c = None
@@ -460,7 +516,14 @@ class NotifySlack(NotifyBase):
             # a flag lower to not set the channels
             self.channels.append(
                 None
-                if self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV)
+                if self.mode
+                in (
+                    SlackMode.WEBHOOK,
+                    SlackMode.WEBHOOK_GOV,
+                    # Workflow mode has no channel concept
+                    SlackMode.WORKFLOW,
+                    SlackMode.WORKFLOW_TRIGGER,
+                )
                 else self.default_notification_channel
             )
 
@@ -617,6 +680,35 @@ class NotifySlack(NotifyBase):
 
         # error tracking (used for function return)
         has_error = False
+
+        #
+        # Workflow Builder mode: fixed endpoint, no channel iteration
+        #
+        if self.mode in (SlackMode.WORKFLOW, SlackMode.WORKFLOW_TRIGGER):
+            if self.template:
+                # Use external Block Kit JSON template
+                payload = self.gen_payload(
+                    body, title, notify_type=notify_type, **kwargs
+                )
+                if payload is False:
+                    return False
+
+            else:
+                # Default payload: combine title and body into a single
+                # 'text' field -- the workflow must accept this variable.
+                payload = {
+                    "text": f"{title}: {body}" if title else body,
+                }
+
+            # Construct the workflow POST URL from stored path segments
+            wf_base = (
+                self.workflow_trigger_url
+                if self.mode is SlackMode.WORKFLOW_TRIGGER
+                else self.workflow_url
+            )
+            url = "{}/{}".format(wf_base, "/".join(self.workflow_path))
+            # _send() returns False on error, non-False on success
+            return self._send(url, payload) is not False
 
         #
         # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
@@ -1229,6 +1321,13 @@ class NotifySlack(NotifyBase):
                         and b"OK" in r.content
                     )
                 )
+            elif self.mode in (
+                SlackMode.WORKFLOW,
+                SlackMode.WORKFLOW_TRIGGER,
+            ):
+                # Workflow trigger webhooks confirm success via HTTP 200;
+                # the response body may be empty or non-standard JSON.
+                status_okay = r.status_code == requests.codes.ok
             elif r.content == b"ok":
                 # The text 'ok' is returned if this is a Webhook request
                 # So the below captures that as well.
@@ -1319,6 +1418,10 @@ class NotifySlack(NotifyBase):
 
         Targets or end points should never be identified here.
         """
+        if self.mode in (SlackMode.WORKFLOW, SlackMode.WORKFLOW_TRIGGER):
+            # Workflow mode is identified by its path segments
+            return (self.secure_protocol, self.mode, *self.workflow_path)
+
         return (
             self.secure_protocol,
             self.token_a,
@@ -1355,6 +1458,16 @@ class NotifySlack(NotifyBase):
         if self.user:
             botname = "{botname}@".format(
                 botname=NotifySlack.quote(self.user, safe=""),
+            )
+
+        if self.mode in (SlackMode.WORKFLOW, SlackMode.WORKFLOW_TRIGGER):
+            return "{schema}://{path}/?{params}".format(
+                schema=self.secure_protocol,
+                path="/".join(
+                    self.pprint(s, privacy, safe="")
+                    for s in self.workflow_path
+                ),
+                params=NotifySlack.urlencode(params),
             )
 
         if self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
@@ -1399,22 +1512,30 @@ class NotifySlack(NotifyBase):
         # The first token is stored in the hostname
         token = NotifySlack.unquote(results["host"])
 
-        # Get unquoted entries
+        # Get unquoted path entries
         entries = NotifySlack.split_path(results["fullpath"])
 
-        # Verify if our token_a us a bot token or part of a webhook:
-        if token.startswith("xo"):
+        # Peek at mode early to guide path parsing
+        _mode = results["qsd"].get("mode", "")
+
+        if _mode.startswith(("workflow", "trigger")):
+            # All path segments form the workflow_path
+            results["workflow_path"] = "/".join([token, *entries])
+            results["targets"] = []
+
+        # Verify if our token is a bot token or part of a webhook:
+        elif token.startswith("xo"):
             # We're dealing with a bot
             results["access_token"] = token
+            results["targets"] = entries
 
         else:
             # We're dealing with a webhook
             results["token_a"] = token
             results["token_b"] = entries.pop(0) if entries else None
             results["token_c"] = entries.pop(0) if entries else None
-
-        # assign remaining entries to the channels we wish to notify
-        results["targets"] = entries
+            # assign remaining entries to the channels we wish to notify
+            results["targets"] = entries
 
         # Support the token flag where you can set it to the bot token
         # or the webhook token (with slash delimiters)
@@ -1502,8 +1623,41 @@ class NotifySlack(NotifyBase):
         Supports:
           - https://hooks.slack.com/services/TOKEN_A/TOKEN_B/TOKEN_C
           - https://hooks.slack-gov.com/services/TOKEN_A/TOKEN_B/TOKEN_C
+          - https://hooks.slack.com/workflows/T.../F.../X.../Y...
+          - https://hooks.slack.com/triggers/T.../X.../Y...
         """
 
+        # Workflow Builder and trigger webhook URLs
+        wf_result = re.match(
+            r"^https?://hooks\.slack\.com/"
+            r"(?P<wf_type>workflows|triggers)/"
+            r"(?P<path>[A-Z0-9][A-Z0-9/_-]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
+        if wf_result:
+            wf_type = wf_result.group("wf_type").lower()
+            # Map URL path type to Apprise mode string
+            mode = (
+                SlackMode.WORKFLOW_TRIGGER
+                if wf_type == "triggers"
+                else SlackMode.WORKFLOW
+            )
+            path = wf_result.group("path").strip("/")
+            params = wf_result.group("params") or ""
+            sep = "&" if params else "?"
+            return NotifySlack.parse_url(
+                "{schema}://{path}/{params}{sep}mode={mode}".format(
+                    schema=NotifySlack.secure_protocol,
+                    path=path,
+                    params=params,
+                    sep=sep,
+                    mode=mode,
+                )
+            )
+
+        # Standard incoming webhook and government webhook URLs
         result = re.match(
             r"^https?://(?P<host>hooks\.slack(?P<gov>-gov)?\.com)/services/"
             r"(?P<token_a>[A-Z0-9]+)/"
