@@ -1723,6 +1723,102 @@ def test_plugin_slack_template_inaccessible(mock_request, tmpdir):
     assert mock_request.called is False
 
 
+def test_plugin_slack_template_add_failure():
+    """NotifySlack() - TypeError when AppriseAttachment.add() drops entry."""
+    # Simulate add() silently failing (returns 0 / len stays 0)
+    with mock.patch("apprise.plugins.slack.AppriseAttachment") as mock_cls:
+        inst = mock.MagicMock()
+        inst.__len__ = mock.Mock(return_value=0)
+        mock_cls.return_value = inst
+
+        with pytest.raises(TypeError):
+            NotifySlack(
+                token_a="T1JJ3T3L2",
+                token_b="A1BRTD4JD",
+                token_c="TIiajkdnlazkcOXrIdevi7FQ",
+                template="file:///some/template.json",
+            )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_template_content_not_dict(mock_request, tmpdir):
+    """NotifySlack() - template that parses to a JSON array is rejected."""
+    mock_request.return_value = mock.Mock(
+        **{"content": b"ok", "status_code": requests.codes.ok}
+    )
+
+    # Valid JSON but a list rather than an object
+    template = tmpdir.join("array.json")
+    template.write('[{"type": "section"}]')
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+        "?template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifySlack)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_request.called is False
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_template_block_not_dict(mock_request, tmpdir):
+    """NotifySlack() - non-dict entry in blocks list is rejected."""
+    mock_request.return_value = mock.Mock(
+        **{"content": b"ok", "status_code": requests.codes.ok}
+    )
+
+    # blocks list contains a string rather than a dict
+    template = tmpdir.join("bad_block.json")
+    template.write('{"blocks": ["not-a-dict"]}')
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+        "?template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifySlack)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_request.called is False
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_template_none_token_value(mock_request, tmpdir):
+    """NotifySlack() - None token value (e.g. app_image_url) is coerced
+    to empty string before JSON-escaping."""
+    mock_request.return_value = mock.Mock(
+        **{"content": b"ok", "status_code": requests.codes.ok}
+    )
+
+    # Template references app_image_url which will be None when
+    # include_image=False; old code produced corrupted JSON ("ul")
+    template = tmpdir.join("img.json")
+    template.write(
+        '{"blocks": [{"type": "section",'
+        ' "text": {"type": "mrkdwn",'
+        ' "text": "{{app_body}} img={{app_image_url}}"}}]}'
+    )
+
+    obj = Apprise.instantiate(
+        "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
+        "?image=no&template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifySlack)
+    # Must succeed -- None coerced to "" keeps the JSON valid
+    assert (
+        obj.notify(body="hello", title="t", notify_type=NotifyType.INFO)
+        is True
+    )
+    assert mock_request.called is True
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    block_text = payload["attachments"][0]["blocks"][0]["text"]["text"]
+    # app_image_url should expand to empty string, not "ul"
+    assert "img=" in block_text
+    assert "ul" not in block_text
+
+
 @mock.patch("requests.request")
 def test_plugin_slack_workflow_default_payload(mock_request):
     """NotifySlack() - Workflow Builder mode, default text payload."""

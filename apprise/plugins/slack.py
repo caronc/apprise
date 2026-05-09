@@ -584,6 +584,11 @@ class NotifySlack(NotifyBase):
         if template:
             # Add our definition to our template
             self.template.add(template)
+            if not len(self.template):
+                # add() failed (unsupported schema, unparseable URL, etc.)
+                msg = f"The Slack template ({template!r}) could not be loaded."
+                self.logger.warning(msg)
+                raise TypeError(msg)
             # Enforce maximum file size
             self.template[0].max_file_size = self.max_slack_template_size
 
@@ -647,9 +652,24 @@ class NotifySlack(NotifyBase):
         # Templates are always Block Kit JSON; enforce JSON escaping
         tokens["app_mode"] = TemplateType.JSON
 
+        # Coerce all substitution values to str before JSON-escaping.
+        # apply_template's _escape_json() calls json.dumps(v)[1:-1] which
+        # is only correct for strings; None produces "ul" and other non-
+        # string types produce similarly corrupted output.  app_mode is a
+        # TemplateType sentinel passed as a named parameter, not a
+        # substitution value, so it is left as-is.
+        safe_tokens = {
+            k: (
+                v
+                if k == "app_mode" or isinstance(v, str)
+                else ("" if v is None else str(v))
+            )
+            for k, v in tokens.items()
+        }
+
         try:
             with open(template.path) as fp:
-                content = apply_template(fp.read(), **tokens)
+                content = apply_template(fp.read(), **safe_tokens)
 
         except OSError:
             self.logger.error(
@@ -670,6 +690,15 @@ class NotifySlack(NotifyBase):
             self.logger.debug(f"JSONDecodeError: {e}")
             return False
 
+        # Template must parse to a JSON object, not an array or scalar
+        if not isinstance(content, dict):
+            self.logger.error(
+                "Slack template"
+                f" {template.url(privacy=True)} must be a JSON object"
+                " (got {}).".format(type(content).__name__)
+            )
+            return False
+
         # 'blocks' must be a non-empty list (Block Kit requirement)
         if (
             not isinstance(content.get("blocks"), list)
@@ -682,8 +711,11 @@ class NotifySlack(NotifyBase):
             )
             return False
 
-        # Every block must carry a 'type' string (Block Kit requirement)
-        if not all(isinstance(b.get("type"), str) for b in content["blocks"]):
+        # Every block must be a dict with a 'type' string (Block Kit)
+        if not all(
+            isinstance(b, dict) and isinstance(b.get("type"), str)
+            for b in content["blocks"]
+        ):
             self.logger.error(
                 "Slack template"
                 f" {template.url(privacy=True)} contains"
