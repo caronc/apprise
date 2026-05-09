@@ -543,9 +543,23 @@ apprise_url_tests = (
             "privacy_url": "slack://T...2/X...X/Y...Y/",
         },
     ),
-    # Workflow -- too few path segments
+    # Workflow mode -- too few segments (2 of required 4)
     (
         "slack://T1JJ3T3L2/XXXXXXXX/?mode=workflow",
+        {
+            "instance": TypeError,
+        },
+    ),
+    # Workflow mode -- wrong count: trigger's 3 segments rejected
+    (
+        "slack://T1JJ3T3L2/XXXXXXXX/YYYYYYYY/?mode=workflow",
+        {
+            "instance": TypeError,
+        },
+    ),
+    # Trigger mode -- wrong count: workflow's 4 segments rejected
+    (
+        "slack://T1JJ3T3L2/Ft07XXXX/XXXXXXXX/YYYYYYYY/?mode=trigger",
         {
             "instance": TypeError,
         },
@@ -1837,25 +1851,48 @@ def test_plugin_slack_workflow_url_roundtrip(mock_request):
 
 
 def test_plugin_slack_workflow_invalid_path():
-    """NotifySlack() - too few path segments raises TypeError."""
+    """NotifySlack() - invalid path segment counts raise TypeError."""
     from apprise.plugins.slack import NotifySlack as _NS
 
-    # Only 2 segments -- must raise
+    # Too few segments for explicit workflow mode (needs 4)
     with pytest.raises(TypeError):
         _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX"], mode="workflow")
 
-    # Empty path -- must raise
+    # Trigger's 3 segments rejected when mode=workflow is explicit
+    with pytest.raises(TypeError):
+        _NS(
+            workflow_path=["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"],
+            mode="workflow",
+        )
+
+    # Workflow's 4 segments rejected when mode=trigger is explicit
+    with pytest.raises(TypeError):
+        _NS(
+            workflow_path=["T1JJ3T3L2", "Ft07XXXX", "XXXXXXXX", "YYYY"],
+            mode="trigger",
+        )
+
+    # Empty path -- must raise (auto-detect path, 0 segments)
     with pytest.raises(TypeError):
         _NS(workflow_path=[], mode="workflow")
 
-    # Non-string / non-list type (else branch) -- must also raise
+    # Non-string / non-list type (else branch) -- 0 segments, must raise
     with pytest.raises(TypeError):
         _NS(workflow_path=42, mode="workflow")
 
-    # Providing workflow_path without mode auto-selects WORKFLOW mode
+    # Auto-detect: 4 segments -> WORKFLOW
     obj = _NS(workflow_path=["T1JJ3T3L2", "Ft07XXXX", "XXXXXXXX", "YYY"])
     assert obj.mode == "workflow"
     assert obj.workflow_path == ["T1JJ3T3L2", "Ft07XXXX", "XXXXXXXX", "YYY"]
+
+    # Auto-detect: 3 segments -> WORKFLOW_TRIGGER
+    obj = _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"])
+    assert obj.mode == "trigger"
+    assert obj.workflow_path == ["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"]
+
+    # Auto-detect: 2 segments -> TypeError (neither 3 nor 4)
+    with pytest.raises(TypeError):
+        _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX"])
 
 
 @mock.patch("requests.request")

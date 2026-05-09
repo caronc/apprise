@@ -403,7 +403,11 @@ class NotifySlack(NotifyBase):
         super().__init__(**kwargs)
 
         # Store our webhook mode
-        if mode and isinstance(mode, str):
+        # Track whether the caller supplied an explicit mode so we can
+        # decide later whether to validate exact segment count or
+        # auto-detect the workflow sub-mode from segment count.
+        _mode_explicit = bool(mode and isinstance(mode, str))
+        if _mode_explicit:
             self.mode = next(
                 (a for a in SLACK_MODES if a.startswith(mode)), None
             )
@@ -413,7 +417,8 @@ class NotifySlack(NotifyBase):
                 raise TypeError(msg)
 
         elif workflow_path:
-            # Workflow path implies workflow mode
+            # Mode will be determined by segment count below;
+            # use WORKFLOW as a sentinel so we enter the right branch.
             self.mode = SlackMode.WORKFLOW
 
         else:  # Detect
@@ -437,14 +442,35 @@ class NotifySlack(NotifyBase):
             else:
                 self.workflow_path = []
 
-            # At least 3 segments required (T.../X.../Y... minimum)
-            if len(self.workflow_path) < 3:
-                msg = (
-                    "A Slack Workflow URL requires at least 3 path"
-                    f" segments ({workflow_path!r} is invalid)."
-                )
-                self.logger.warning(msg)
-                raise TypeError(msg)
+            # Segment counts are fixed by Slack:
+            #   /workflows/ URLs have exactly 4 segments
+            #   /triggers/  URLs have exactly 3 segments
+            seg_count = len(self.workflow_path)
+            if _mode_explicit:
+                # Validate exact count for the declared mode
+                expected = 4 if self.mode == SlackMode.WORKFLOW else 3
+                if seg_count != expected:
+                    msg = (
+                        f"A Slack {self.mode!r} URL requires exactly"
+                        f" {expected} path segments"
+                        f" ({workflow_path!r} has {seg_count})."
+                    )
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
+            else:
+                # Auto-detect sub-mode from segment count
+                if seg_count == 4:
+                    self.mode = SlackMode.WORKFLOW
+                elif seg_count == 3:
+                    self.mode = SlackMode.WORKFLOW_TRIGGER
+                else:
+                    msg = (
+                        "A Slack Workflow URL requires exactly 3 or 4"
+                        f" path segments ({workflow_path!r} has"
+                        f" {seg_count})."
+                    )
+                    self.logger.warning(msg)
+                    raise TypeError(msg)
 
         elif self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
             self.workflow_path = []
@@ -1515,10 +1541,21 @@ class NotifySlack(NotifyBase):
         # Get unquoted path entries
         entries = NotifySlack.split_path(results["fullpath"])
 
-        # Peek at mode early to guide path parsing
-        _mode = results["qsd"].get("mode", "")
+        # Peek at mode early to guide path parsing.
+        # Resolve via the same prefix-matching used in __init__ so that
+        # abbreviated inputs (e.g. mode=tri or mode=work) are handled
+        # identically in both places.
+        _mode_raw = results["qsd"].get("mode", "")
+        _mode = (
+            next(
+                (a for a in SLACK_MODES if a.startswith(_mode_raw)),
+                "",
+            )
+            if _mode_raw
+            else ""
+        )
 
-        if _mode.startswith(("workflow", "trigger")):
+        if _mode in (SlackMode.WORKFLOW, SlackMode.WORKFLOW_TRIGGER):
             # All path segments form the workflow_path
             results["workflow_path"] = "/".join([token, *entries])
             results["targets"] = []
