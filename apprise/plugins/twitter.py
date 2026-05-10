@@ -721,12 +721,9 @@ class NotifyTwitter(NotifyBase):
                 ),
             }
 
-        elif json:
+        elif json and payload is not None:
             headers["Content-Type"] = "application/json"
             data = dumps(payload)
-
-        else:
-            data = payload
 
         auth = OAuth1(
             self.ckey,

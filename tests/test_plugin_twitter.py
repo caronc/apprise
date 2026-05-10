@@ -540,6 +540,62 @@ def test_plugin_twitter_general(mocker):
     assert obj.send(body="test") is True
 
 
+def test_plugin_twitter_garbage_responses(mocker):
+    """Verify garbage/invalid server responses are handled gracefully."""
+
+    mock_get = mocker.patch("requests.get")
+    mock_post = mocker.patch("requests.post")
+
+    ckey = "ckey"
+    csecret = "csecret"
+    akey = "akey"
+    asecret = "asecret"
+
+    # Base request mock returning HTTP 200
+    request = Mock()
+    request.status_code = requests.codes.ok
+    request.headers = {}
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+
+    # No targets -> _send_dm calls _whoami
+    obj = NotifyTwitter(ckey=ckey, csecret=csecret, akey=akey, asecret=asecret)
+
+    # _whoami: None content -> TypeError in loads() -> content = {}
+    # -> no "data" key in {} -> KeyError caught -> _whoami returns {}
+    request.content = None
+    assert obj.send(body="test") is False
+
+    # _whoami: malformed JSON -> ValueError in loads() -> content = {}
+    # -> same path as above
+    obj._whoami_cache = None
+    request.content = "{"
+    assert obj.send(body="test") is False
+
+    # _whoami: valid JSON but v1.1-style response (missing "data" key)
+    # -> KeyError in _whoami -> caught -> returns {}
+    obj._whoami_cache = None
+    request.content = json.dumps({"screen_name": "apprise", "id": 9876})
+    assert obj.send(body="test") is False
+
+    # Has targets -> _send_dm calls _user_lookup
+    obj2 = NotifyTwitter(
+        ckey=ckey,
+        csecret=csecret,
+        akey=akey,
+        asecret=asecret,
+        targets=TWITTER_SCREEN_NAME,
+    )
+
+    # _user_lookup: response is a list, not a dict
+    # -> isinstance(response, dict) is False -> continue -> no results
+    request.content = json.dumps(
+        [{"id": "9876", "username": TWITTER_SCREEN_NAME}]
+    )
+    assert obj2.send(body="test") is False
+
+
 def test_plugin_twitter_edge_cases():
     """NotifyTwitter() Edge Cases."""
 
