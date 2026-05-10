@@ -92,7 +92,7 @@ apprise_url_tests = (
             # No user mean's we message ourselves
             "instance": NotifyTwitter,
             # Expected notify() response False (because we won't be able
-            # to detect our user)
+            # to detect our user); default mock has no v2 data key
             "notify_response": False,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "x://c...y/****/a...2/****",
@@ -106,11 +106,9 @@ apprise_url_tests = (
         {
             # No user mean's we message ourselves
             "instance": NotifyTwitter,
-            # However we'll be okay if we return a proper response
+            # v2 whoami format: {"data": {"id": "...", "username": "..."}}
             "requests_response_text": {
-                "id": 12345,
-                "screen_name": "test",
-                # For attachment handling
+                "data": {"id": "12345", "username": "test"},
                 "media_id": 123,
             },
         },
@@ -120,11 +118,9 @@ apprise_url_tests = (
         {
             # No user mean's we message ourselves
             "instance": NotifyTwitter,
-            # However we'll be okay if we return a proper response
+            # v2 whoami format
             "requests_response_text": {
-                "id": 12345,
-                "screen_name": "test",
-                # For attachment handling
+                "data": {"id": "12345", "username": "test"},
                 "media_id": 123,
             },
         },
@@ -135,11 +131,9 @@ apprise_url_tests = (
         {
             # No user mean's we message ourselves
             "instance": NotifyTwitter,
-            # However we'll be okay if we return a proper response
+            # v2 whoami format
             "requests_response_text": {
-                "id": 12345,
-                "screen_name": "test",
-                # For attachment handling
+                "data": {"id": "12345", "username": "test"},
                 "media_id": 123,
             },
         },
@@ -151,10 +145,9 @@ apprise_url_tests = (
         {
             # No user mean's we message ourselves
             "instance": NotifyTwitter,
-            # However we'll be okay if we return a proper response
+            # v1.1-format response (missing "data" key) causes _whoami to fail
             "requests_response_text": {
                 "id": 12345,
-                # For attachment handling
                 "media_id": 123,
             },
             # due to a mangled response_text we'll fail
@@ -179,7 +172,10 @@ apprise_url_tests = (
         {
             # No Cache & No Batch
             "instance": NotifyTwitter,
-            "requests_response_text": [{"id": 12345, "screen_name": "user"}],
+            # v2 user lookup format
+            "requests_response_text": {
+                "data": [{"id": "12345", "username": "user"}]
+            },
         },
     ),
     (
@@ -187,7 +183,10 @@ apprise_url_tests = (
         {
             # We're good!
             "instance": NotifyTwitter,
-            "requests_response_text": [{"id": 12345, "screen_name": "user"}],
+            # v2 user lookup format
+            "requests_response_text": {
+                "data": [{"id": "12345", "username": "user"}]
+            },
         },
     ),
     (
@@ -220,14 +219,17 @@ apprise_url_tests = (
         {
             # We're good!
             "instance": NotifyTwitter,
-            "requests_response_text": [
-                {"id": 12345, "screen_name": "usera"},
-                {"id": 12346, "screen_name": "userb"},
-                {
-                    # A garbage entry we can test exception handling on
-                    "id": 123,
-                },
-            ],
+            # v2 user lookup format with multiple entries and a garbage entry
+            # to test exception handling
+            "requests_response_text": {
+                "data": [
+                    {"id": "12345", "username": "usera"},
+                    {"id": "12346", "username": "userb"},
+                    {
+                        # A garbage entry we can test exception handling on
+                    },
+                ]
+            },
         },
     ),
     (
@@ -288,11 +290,14 @@ def twitter_url():
 
 @pytest.fixture
 def good_message_response():
-    """Prepare a good tweet response."""
+    """Prepare a good v2 whoami response."""
+    # v2 /users/me format: {"data": {"id": "...", "username": "..."}}
     response = good_response(
         {
-            "screen_name": TWITTER_SCREEN_NAME,
-            "id": 9876,
+            "data": {
+                "id": "9876",
+                "username": TWITTER_SCREEN_NAME,
+            }
         }
     )
     return response
@@ -354,7 +359,7 @@ def bad_media_response():
 @pytest.fixture(autouse=True)
 def ensure_get_verify_credentials_is_mocked(mocker, good_message_response):
     """
-    Make sure requests to https://api.twitter.com/1.1/account/verify_credentials.json
+    Make sure requests to https://api.twitter.com/2/users/me
     do not escape the test harness, for all test case functions.
     """
     mock_get = mocker.patch("requests.get")
@@ -379,18 +384,21 @@ def test_plugin_twitter_general(mocker):
     akey = "akey"
     asecret = "asecret"
 
-    response_obj = [
-        {
-            "screen_name": TWITTER_SCREEN_NAME,
-            "id": 9876,
-        }
-    ]
+    # v2 user lookup response: {"data": [{"id": "...", "username": "..."}]}
+    user_lookup_obj = {
+        "data": [
+            {
+                "username": TWITTER_SCREEN_NAME,
+                "id": "9876",
+            }
+        ]
+    }
 
     # Epoch time:
     epoch = datetime.fromtimestamp(0, timezone.utc)
 
     request = Mock()
-    request.content = json.dumps(response_obj)
+    request.content = json.dumps(user_lookup_obj)
     request.status_code = requests.codes.ok
     request.headers = {
         "x-rate-limit-reset": (
@@ -474,18 +482,13 @@ def test_plugin_twitter_general(mocker):
 
     # Alter pending targets
     obj.targets.append("usera")
-    request.content = json.dumps(response_obj)
-    response_obj = [
-        {
-            "screen_name": "usera",
-            "id": 1234,
-        }
-    ]
+    # Response still in v2 user_lookup format from above
+    request.content = json.dumps(user_lookup_obj)
 
     assert obj.send(body="test") is True
 
     # Flush our cache forcing it is re-creating
-    NotifyTwitter._user_cache = {}
+    obj._user_cache = {}
     assert obj.send(body="test") is True
 
     # Cause content response to be None
@@ -506,34 +509,33 @@ def test_plugin_twitter_general(mocker):
     assert TWITTER_SCREEN_NAME in results["targets"]
 
     # cause a json parsing issue now
-    response_obj = None
-    assert obj.send(body="test") is True
-
-    response_obj = "{"
     assert obj.send(body="test") is True
 
     # Set ourselves up to handle whoami calls
 
     # Flush out our cache
-    NotifyTwitter._user_cache = {}
+    obj._user_cache = {}
 
-    response_obj = {
-        "screen_name": TWITTER_SCREEN_NAME,
-        "id": 9876,
+    # v2 whoami response: {"data": {"id": "...", "username": "..."}}
+    whoami_obj = {
+        "data": {
+            "username": TWITTER_SCREEN_NAME,
+            "id": "9876",
+        }
     }
-    request.content = json.dumps(response_obj)
+    request.content = json.dumps(whoami_obj)
 
     obj = NotifyTwitter(ckey=ckey, csecret=csecret, akey=akey, asecret=asecret)
 
     assert obj.send(body="test") is True
 
     # Alter the key forcing us to look up a new value of ourselves again
-    NotifyTwitter._user_cache = {}
-    NotifyTwitter._whoami_cache = None
+    obj._user_cache = {}
+    obj._whoami_cache = None
     obj.ckey = "different.then.it.was"
     assert obj.send(body="test") is True
 
-    NotifyTwitter._whoami_cache = None
+    obj._whoami_cache = None
     obj.ckey = "different.again"
     assert obj.send(body="test") is True
 
@@ -594,7 +596,7 @@ def test_plugin_twitter_dm_caching(
     """Verify that the `NotifyTwitter.{_user_cache,_whoami_cache}` caches work
     as intended."""
 
-    # This is the request to `account/verify_credentials.json`.
+    # This is the request to `https://api.twitter.com/2/users/me`.
     # Explicitly mock it here so the calls to it can be evaluated.
     mock_get = mocker.patch("requests.get")
     mock_get.return_value = good_message_response
@@ -622,14 +624,15 @@ def test_plugin_twitter_dm_caching(
     # Test call counts.
     assert mock_get.call_count == 1
     assert (
+        # v2 current-user endpoint replaced v1.1 verify_credentials
         mock_get.call_args_list[0][0][0]
-        == "https://api.twitter.com/1.1/account/verify_credentials.json"
+        == "https://api.twitter.com/2/users/me"
     )
 
     assert mock_post.call_count == 1
-    assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    # v2 DM endpoint; user id "9876" comes from good_message_response
+    assert mock_post.call_args_list[0][0][0].startswith(
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
 
     # Reset the mocks to start counting calls from scratch.
@@ -642,8 +645,8 @@ def test_plugin_twitter_dm_caching(
         is True
     )
 
-    # Calls to `verify_credentials.json` will get cached by `NotifyTwitter`.
-    # So, the `GET` request to `verify_credentials.json` should only have been
+    # Calls to `users/me` will get cached by `NotifyTwitter`.
+    # So, the `GET` request to `users/me` should only have been
     # issued once.
     assert mock_get.call_count == 0
     assert mock_post.call_count == 1
@@ -691,18 +694,20 @@ def test_plugin_twitter_dm_attachments_basic(
     # Test call counts.
     assert mock_get.call_count == 1
     assert (
+        # v2 whoami endpoint
         mock_get.call_args_list[0][0][0]
-        == "https://api.twitter.com/1.1/account/verify_credentials.json"
+        == "https://api.twitter.com/2/users/me"
     )
 
     assert mock_post.call_count == 2
     assert (
+        # Media upload still uses the v1.1 endpoint (allowed on all plans)
         mock_post.call_args_list[0][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
-    assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    assert mock_post.call_args_list[1][0][0].startswith(
+        # v2 DM endpoint
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
 
 
@@ -731,12 +736,13 @@ def test_plugin_twitter_dm_attachments_message_fails(
 
     assert mock_post.call_count == 2
     assert (
+        # Media upload still uses the v1.1 endpoint
         mock_post.call_args_list[0][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
-    assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    assert mock_post.call_args_list[1][0][0].startswith(
+        # v2 DM endpoint
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
 
 
@@ -841,6 +847,7 @@ def test_plugin_twitter_dm_attachments_multiple(
     )
 
     assert mock_post.call_count == 8
+    # First 4 calls are media uploads (v1.1 endpoint, unchanged)
     assert (
         mock_post.call_args_list[0][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
@@ -857,21 +864,18 @@ def test_plugin_twitter_dm_attachments_multiple(
         mock_post.call_args_list[3][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
-    assert (
-        mock_post.call_args_list[4][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    # Last 4 calls are DM sends via v2 endpoint
+    assert mock_post.call_args_list[4][0][0].startswith(
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
-    assert (
-        mock_post.call_args_list[5][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    assert mock_post.call_args_list[5][0][0].startswith(
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
-    assert (
-        mock_post.call_args_list[6][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    assert mock_post.call_args_list[6][0][0].startswith(
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
-    assert (
-        mock_post.call_args_list[7][0][0]
-        == "https://api.twitter.com/1.1/direct_messages/events/new.json"
+    assert mock_post.call_args_list[7][0][0].startswith(
+        "https://api.twitter.com/2/dm_conversations/with/"
     )
 
 
@@ -945,12 +949,13 @@ def test_plugin_twitter_tweet_attachments_basic(
     # Verify API calls.
     assert mock_post.call_count == 2
     assert (
+        # Media upload still uses the v1.1 endpoint
         mock_post.call_args_list[0][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        # Tweet now uses the v2 endpoint
+        mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
@@ -960,18 +965,14 @@ def test_plugin_twitter_tweet_attachments_more_logging(
 ):
     """
     NotifyTwitter() Tweet Attachment Checks - More logging
-
-    TODO: The "more logging" aspect is not verified yet?
     """
 
+    # v2 tweet response: {"data": {"id": "...", "text": "..."}}
     good_tweet_response = good_response(
         {
-            "screen_name": TWITTER_SCREEN_NAME,
-            "id": 9876,
-            # needed for additional logging
-            "id_str": "12345",
-            "user": {
-                "screen_name": TWITTER_SCREEN_NAME,
+            "data": {
+                "id": "12345",
+                "text": "body",
             },
         }
     )
@@ -983,8 +984,7 @@ def test_plugin_twitter_tweet_attachments_more_logging(
     obj = Apprise.instantiate(twitter_url)
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
-    # Send our notification (again); this time there will be more logging
-    # TODO: The "more logging" aspect is not verified yet?
+    # Send our notification
     assert (
         obj.notify(
             body="body",
@@ -1002,8 +1002,7 @@ def test_plugin_twitter_tweet_attachments_more_logging(
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
@@ -1037,8 +1036,7 @@ def test_plugin_twitter_tweet_attachments_bad_message_response(
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
@@ -1075,8 +1073,7 @@ def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
@@ -1114,8 +1111,7 @@ def test_plugin_twitter_tweet_attachments_upload_fails(
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
@@ -1204,18 +1200,16 @@ def test_plugin_twitter_tweet_attachments_multiple_batch(
         mock_post.call_args_list[3][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
+    # v2 tweet endpoint
     assert (
-        mock_post.call_args_list[4][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[4][0][0] == "https://api.twitter.com/2/tweets"
     )
     assert (
-        mock_post.call_args_list[5][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[5][0][0] == "https://api.twitter.com/2/tweets"
     )
     # The 2 images are grouped together (batch mode)
     assert (
-        mock_post.call_args_list[6][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[6][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
@@ -1275,21 +1269,18 @@ def test_plugin_twitter_tweet_attachments_multiple_nobatch(
         mock_post.call_args_list[3][0][0]
         == "https://upload.twitter.com/1.1/media/upload.json"
     )
+    # v2 tweet endpoint (one per image, no batching)
     assert (
-        mock_post.call_args_list[4][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[4][0][0] == "https://api.twitter.com/2/tweets"
     )
     assert (
-        mock_post.call_args_list[5][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[5][0][0] == "https://api.twitter.com/2/tweets"
     )
     assert (
-        mock_post.call_args_list[6][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[6][0][0] == "https://api.twitter.com/2/tweets"
     )
     assert (
-        mock_post.call_args_list[7][0][0]
-        == "https://api.twitter.com/1.1/statuses/update.json"
+        mock_post.call_args_list[7][0][0] == "https://api.twitter.com/2/tweets"
     )
 
 
