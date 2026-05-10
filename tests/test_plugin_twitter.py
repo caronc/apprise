@@ -358,7 +358,7 @@ def bad_media_response():
 
 
 @pytest.fixture(autouse=True)
-def ensure_get_verify_credentials_is_mocked(mocker, good_message_response):
+def ensure_whoami_is_mocked(mocker, good_message_response):
     """
     Make sure requests to https://api.twitter.com/2/users/me
     do not escape the test harness, for all test case functions.
@@ -509,7 +509,7 @@ def test_plugin_twitter_general(mocker):
     assert isinstance(results, dict) is True
     assert TWITTER_SCREEN_NAME in results["targets"]
 
-    # cause a json parsing issue now
+    # Valid JSON response; send succeeds
     assert obj.send(body="test") is True
 
     # Set ourselves up to handle whoami calls
@@ -777,7 +777,7 @@ def test_plugin_twitter_dm_attachments_basic(
 
     assert mock_post.call_count == 2
     assert (
-        # Media upload still uses the v1.1 endpoint (allowed on all plans)
+        # v2 media upload endpoint (available on all access tiers)
         mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
@@ -812,7 +812,7 @@ def test_plugin_twitter_dm_attachments_message_fails(
 
     assert mock_post.call_count == 2
     assert (
-        # Media upload still uses the v1.1 endpoint
+        # v2 media upload endpoint (available on all access tiers)
         mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
@@ -922,7 +922,7 @@ def test_plugin_twitter_dm_attachments_multiple(
     )
 
     assert mock_post.call_count == 8
-    # First 4 calls are media uploads (v1.1 endpoint, unchanged)
+    # First 4 calls are v2 media uploads
     assert (
         mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
@@ -1023,11 +1023,11 @@ def test_plugin_twitter_tweet_attachments_basic(
     # Verify API calls.
     assert mock_post.call_count == 2
     assert (
-        # Media upload still uses the v1.1 endpoint
+        # v2 media upload endpoint (available on all access tiers)
         mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        # Tweet now uses the v2 endpoint
+        # v2 tweet endpoint
         mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
     )
 
@@ -1379,4 +1379,72 @@ def test_plugin_twitter_tweet_attachments_multiple_oserror(
     )
     assert (
         mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
+    )
+
+
+@patch("requests.post")
+def test_plugin_twitter_tweet_attachments_jpeg_before_gif(
+    mock_post, twitter_url, good_media_response
+):
+    """
+    Verify that when PNG/JPEG attachments precede a GIF in batch mode,
+    the accumulated PNG/JPEG batch is flushed first, then the GIF is
+    emitted alone.  This exercises the ``if batch:`` flush branch inside
+    the non-batchable (GIF) path of _send_tweet.
+    """
+
+    # v2 tweet response
+    good_tweet_response = good_response(
+        {"data": {"id": "12345", "text": "body"}}
+    )
+
+    # 3 uploads (jpeg, png, gif) + 2 tweet sends = 5 post calls
+    mock_post.side_effect = [
+        good_media_response,
+        good_media_response,
+        good_media_response,
+        good_tweet_response,
+        good_tweet_response,
+    ]
+
+    # instantiate in tweet + batch mode
+    obj = Apprise.instantiate(twitter_url + "?mode=tweet")
+
+    # jpeg and png come first, then gif -- the gif triggers a flush of
+    # the pending jpeg/png batch before being emitted in its own tweet
+    attach = [
+        os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
+        os.path.join(TEST_VAR_DIR, "apprise-test.png"),
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
+    ]
+
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    # 3 media uploads + 2 tweet sends
+    assert mock_post.call_count == 5
+    # First 3 are v2 media uploads
+    assert (
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
+    )
+    assert (
+        mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
+    )
+    assert (
+        mock_post.call_args_list[2][0][0] == "https://api.x.com/2/media/upload"
+    )
+    # jpeg + png batched into one tweet
+    assert (
+        mock_post.call_args_list[3][0][0] == "https://api.twitter.com/2/tweets"
+    )
+    # gif emitted alone in its own tweet
+    assert (
+        mock_post.call_args_list[4][0][0] == "https://api.twitter.com/2/tweets"
     )

@@ -456,7 +456,7 @@ class NotifyTwitter(NotifyBase):
             batch = []
             for attachment in attachments:
                 # v2 media_ids must be strings
-                batch.append(str(attachment["media_id"]))
+                media_id = str(attachment["media_id"])
 
                 # Twitter supports batching images together.  This allows
                 # the batching of multiple images together.  Twitter also
@@ -472,14 +472,21 @@ class NotifyTwitter(NotifyBase):
                 # If you passed in, image, image, gif, image. <- This would
                 # produce 3 images (as the first 2 images could be lumped
                 # together as a batch)
-                if (
-                    not re.match(
-                        r"^image/(png|jpe?g)", attachment["file_mime"], re.I
-                    )
-                    or len(batch) >= batch_size
+                if not re.match(
+                    r"^image/(png|jpe?g)", attachment["file_mime"], re.I
                 ):
-                    batches.append(list(batch))
-                    batch = []
+                    # Non-batchable (e.g. GIF): flush any pending batch
+                    # first, then emit this attachment alone
+                    if batch:
+                        batches.append(list(batch))
+                        batch = []
+                    batches.append([media_id])
+                else:
+                    # PNG/JPEG: accumulate until the batch is full
+                    batch.append(media_id)
+                    if len(batch) >= batch_size:
+                        batches.append(list(batch))
+                        batch = []
 
             if batch:
                 batches.append(list(batch))
