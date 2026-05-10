@@ -41,9 +41,8 @@
 # X API v2 Current User endpoint:
 #   https://docs.x.com/x-api/users/user-lookup/api-reference/get-users-me
 #
-# Media upload still uses the v1.1 endpoint (permitted on all access levels):
-#   https://docs.x.com/x-api/v1/media/upload-media/api-reference/
-#       post-media-upload
+# X API v2 Media upload (available on all access tiers, including Free):
+#   https://docs.x.com/x-api/media/upload-media
 #
 # Free-tier accounts can ONLY post tweets (mode=tweet).
 # Sending Direct Messages (mode=dm, the default) requires a paid X API
@@ -126,10 +125,11 @@ class NotifyTwitter(NotifyBase):
     # Requires Basic+ X API subscription
     twitter_dm = "https://api.twitter.com/2/dm_conversations/with/{}/messages"
 
-    # Media upload still uses the v1.1 endpoint (allowed on all access levels):
+    # X API v2 Media Upload (available on all access tiers, including Free)
+    # media_category is required: "tweet_image" or "dm_image"
 
     # Twitter Media (Attachment) Upload Location
-    twitter_media = "https://upload.twitter.com/1.1/media/upload.json"
+    twitter_media = "https://api.x.com/2/media/upload"
 
     # it is documented on the site that the maximum images per tweet
     # is 4 (unless it's a GIF, then it's only 1)
@@ -359,12 +359,20 @@ class NotifyTwitter(NotifyBase):
                     f"{attachment.url(privacy=True)}"
                 )
 
+                # v2 media upload requires media_category:
+                # "tweet_image" for public tweets, "dm_image" for DMs
+                media_category = (
+                    "tweet_image"
+                    if self.mode == TwitterMessageMode.TWEET
+                    else "dm_image"
+                )
+
                 # Upload our image and get our id associated with it
-                # see: https://developer.twitter.com/en/docs/twitter-api/v1/\
-                #         media/upload-media/api-reference/post-media-upload
+                # see: https://docs.x.com/x-api/media/upload-media
                 postokay, response = self._fetch(
                     self.twitter_media,
                     payload=attachment,
+                    extra={"media_category": media_category},
                 )
 
                 if not postokay:
@@ -376,9 +384,13 @@ class NotifyTwitter(NotifyBase):
                     attachment.name if attachment.name else f"file{no:03}.dat"
                 )
 
-                if not (
-                    isinstance(response, dict) and response.get("media_id")
-                ):
+                # v2 response: {"data": {"id": "...", "media_key": "...", ...}}
+                try:
+                    media_id = response["data"]["id"]
+                except (TypeError, KeyError):
+                    media_id = None
+
+                if not media_id:
                     self.logger.debug(
                         "Could not attach the file to Twitter: %s (mime=%s)",
                         filename,
@@ -386,22 +398,10 @@ class NotifyTwitter(NotifyBase):
                     )
                     continue
 
-                # If we get here, our output will look something like this:
-                # {
-                #   "media_id": 710511363345354753,
-                #   "media_id_string": "710511363345354753",
-                #   "media_key": "3_710511363345354753",
-                #   "size": 11065,
-                #   "expires_after_secs": 86400,
-                #   "image": {
-                #     "image_type": "image/jpeg",
-                #     "w": 800,
-                #     "h": 320
-                #   }
-                # }
-
                 response.update(
                     {
+                        # Normalize id for _send_tweet/_send_dm consumption
+                        "media_id": media_id,
                         # Update our response to additionally include the
                         # attachment details
                         "file_name": filename,
@@ -644,17 +644,17 @@ class NotifyTwitter(NotifyBase):
 
         return results
 
-    def _user_lookup(self, screen_name, lazy=True):
-        """Looks up screen names and returns user IDs via v2.
+    def _user_lookup(self, usernames, lazy=True):
+        """Looks up usernames and returns user IDs via v2.
 
-        screen_name can be a list/set/tuple as well.
+        usernames can be a list/set/tuple as well.
         """
 
         # Contains a mapping of username to id
         results = {}
 
         # Build a unique set of names
-        names = parse_list(screen_name)
+        names = parse_list(usernames)
 
         if lazy and self._user_cache:
             # Use cached response
@@ -699,7 +699,7 @@ class NotifyTwitter(NotifyBase):
 
         return results
 
-    def _fetch(self, url, payload=None, method="POST", json=True):
+    def _fetch(self, url, payload=None, method="POST", json=True, extra=None):
         """Wrapper to Twitter API requests object."""
 
         headers = {
@@ -720,10 +720,16 @@ class NotifyTwitter(NotifyBase):
                     open(payload.path, "rb"),  # noqa: SIM115
                 ),
             }
+            # extra holds additional form fields (e.g. media_category)
+            data = extra
 
-        elif json and payload is not None:
-            headers["Content-Type"] = "application/json"
-            data = dumps(payload)
+        elif payload is not None:
+            if json:
+                headers["Content-Type"] = "application/json"
+                data = dumps(payload)
+            else:
+                # form-encoded or raw body (e.g. media upload helper)
+                data = payload
 
         auth = OAuth1(
             self.ckey,
@@ -784,7 +790,7 @@ class NotifyTwitter(NotifyBase):
                 # AttributeError = r is None
                 content = {}
 
-            if r.status_code != requests.codes.ok:
+            if not (200 <= r.status_code < 300):
                 # We had a problem
                 status_str = NotifyTwitter.http_response_code_lookup(
                     r.status_code

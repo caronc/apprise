@@ -321,16 +321,17 @@ def bad_message_response():
 
 @pytest.fixture
 def good_media_response():
-    """Prepare a good media response."""
+    """Prepare a good v2 media upload response."""
+    # v2 /2/media/upload format: {"data": {"id": "...", ...}}
     response = Mock()
     response.content = json.dumps(
         {
-            "media_id": 710511363345354753,
-            "media_id_string": "710511363345354753",
-            "media_key": "3_710511363345354753",
-            "size": 11065,
-            "expires_after_secs": 86400,
-            "image": {"image_type": "image/jpeg", "w": 800, "h": 320},
+            "data": {
+                "id": "710511363345354753",
+                "media_key": "3_710511363345354753",
+                "expires_after_secs": 86400,
+                "size": 11065,
+            }
         }
     )
     response.status_code = requests.codes.ok
@@ -595,6 +596,24 @@ def test_plugin_twitter_garbage_responses(mocker):
     )
     assert obj2.send(body="test") is False
 
+    # _fetch: json=False with a non-None payload -> raw body path
+    request.content = json.dumps({})
+    postokay, _ = obj._fetch(
+        "https://api.twitter.com/2/tweets",
+        payload="raw=data",
+        json=False,
+    )
+    assert postokay is True
+
+    # _fetch: HTTP 201 Created is treated as success (v2 POST endpoints)
+    request.status_code = requests.codes.created
+    request.content = json.dumps({"data": {"id": "1"}})
+    postokay, _response = obj._fetch(
+        "https://api.twitter.com/2/tweets",
+        payload={"text": "hi"},
+    )
+    assert postokay is True
+
 
 def test_plugin_twitter_edge_cases():
     """NotifyTwitter() Edge Cases."""
@@ -687,8 +706,9 @@ def test_plugin_twitter_dm_caching(
 
     assert mock_post.call_count == 1
     # v2 DM endpoint; user id "9876" comes from good_message_response
-    assert mock_post.call_args_list[0][0][0].startswith(
-        "https://api.twitter.com/2/dm_conversations/with/"
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
 
     # Reset the mocks to start counting calls from scratch.
@@ -758,12 +778,12 @@ def test_plugin_twitter_dm_attachments_basic(
     assert mock_post.call_count == 2
     assert (
         # Media upload still uses the v1.1 endpoint (allowed on all plans)
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
-    assert mock_post.call_args_list[1][0][0].startswith(
-        # v2 DM endpoint
-        "https://api.twitter.com/2/dm_conversations/with/"
+    assert (
+        # v2 DM endpoint; user id "9876" comes from good_message_response
+        mock_post.call_args_list[1][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
 
 
@@ -793,12 +813,12 @@ def test_plugin_twitter_dm_attachments_message_fails(
     assert mock_post.call_count == 2
     assert (
         # Media upload still uses the v1.1 endpoint
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
-    assert mock_post.call_args_list[1][0][0].startswith(
-        # v2 DM endpoint
-        "https://api.twitter.com/2/dm_conversations/with/"
+    assert (
+        # v2 DM endpoint; user id "9876" comes from good_message_response
+        mock_post.call_args_list[1][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
 
 
@@ -828,8 +848,7 @@ def test_plugin_twitter_dm_attachments_upload_fails(
     # Test call counts.
     assert mock_post.call_count == 1
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
 
 
@@ -905,33 +924,34 @@ def test_plugin_twitter_dm_attachments_multiple(
     assert mock_post.call_count == 8
     # First 4 calls are media uploads (v1.1 endpoint, unchanged)
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[2][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[2][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[3][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[3][0][0] == "https://api.x.com/2/media/upload"
     )
-    # Last 4 calls are DM sends via v2 endpoint
-    assert mock_post.call_args_list[4][0][0].startswith(
-        "https://api.twitter.com/2/dm_conversations/with/"
+    # Last 4 calls are DM sends via v2 endpoint; user id "9876" from
+    # good_message_response
+    assert (
+        mock_post.call_args_list[4][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
-    assert mock_post.call_args_list[5][0][0].startswith(
-        "https://api.twitter.com/2/dm_conversations/with/"
+    assert (
+        mock_post.call_args_list[5][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
-    assert mock_post.call_args_list[6][0][0].startswith(
-        "https://api.twitter.com/2/dm_conversations/with/"
+    assert (
+        mock_post.call_args_list[6][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
-    assert mock_post.call_args_list[7][0][0].startswith(
-        "https://api.twitter.com/2/dm_conversations/with/"
+    assert (
+        mock_post.call_args_list[7][0][0]
+        == "https://api.twitter.com/2/dm_conversations/with/9876/messages"
     )
 
 
@@ -967,12 +987,10 @@ def test_plugin_twitter_dm_attachments_multiple_oserror(
 
     assert mock_post.call_count == 2
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
     )
 
 
@@ -1006,8 +1024,7 @@ def test_plugin_twitter_tweet_attachments_basic(
     assert mock_post.call_count == 2
     assert (
         # Media upload still uses the v1.1 endpoint
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
         # Tweet now uses the v2 endpoint
@@ -1054,8 +1071,7 @@ def test_plugin_twitter_tweet_attachments_more_logging(
     # Verify API calls.
     assert mock_post.call_count == 2
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
         mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
@@ -1088,8 +1104,7 @@ def test_plugin_twitter_tweet_attachments_bad_message_response(
     # Verify API calls.
     assert mock_post.call_count == 2
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
         mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
@@ -1125,8 +1140,7 @@ def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
     # Verify API calls.
     assert mock_post.call_count == 2
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
         mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
@@ -1163,8 +1177,7 @@ def test_plugin_twitter_tweet_attachments_upload_fails(
     # Verify API calls.
     assert mock_post.call_count == 2
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
         mock_post.call_args_list[1][0][0] == "https://api.twitter.com/2/tweets"
@@ -1241,20 +1254,16 @@ def test_plugin_twitter_tweet_attachments_multiple_batch(
 
     assert mock_post.call_count == 7
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[2][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[2][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[3][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[3][0][0] == "https://api.x.com/2/media/upload"
     )
     # v2 tweet endpoint
     assert (
@@ -1310,20 +1319,16 @@ def test_plugin_twitter_tweet_attachments_multiple_nobatch(
 
     assert mock_post.call_count == 8
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[2][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[2][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[3][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[3][0][0] == "https://api.x.com/2/media/upload"
     )
     # v2 tweet endpoint (one per image, no batching)
     assert (
@@ -1370,10 +1375,8 @@ def test_plugin_twitter_tweet_attachments_multiple_oserror(
 
     assert mock_post.call_count == 2
     assert (
-        mock_post.call_args_list[0][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[0][0][0] == "https://api.x.com/2/media/upload"
     )
     assert (
-        mock_post.call_args_list[1][0][0]
-        == "https://upload.twitter.com/1.1/media/upload.json"
+        mock_post.call_args_list[1][0][0] == "https://api.x.com/2/media/upload"
     )
