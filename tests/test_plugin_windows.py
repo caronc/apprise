@@ -40,6 +40,89 @@ import apprise
 logging.disable(logging.CRITICAL)
 
 
+@pytest.fixture
+def mocked_win32_environment():
+    """Inject fake win32 modules, reload apprise, and fully restore
+    sys.modules on teardown.
+
+    Previously the setup lived inside test_plugin_windows_mocked itself,
+    with no cleanup.  That permanently abandoned all apprise.* module
+    objects, causing order-dependent failures in every test that runs
+    afterwards and holds a module-level `from apprise.plugins.X import`
+    reference.  A fixture with a yield guarantees cleanup even on failure.
+    """
+
+    # Build fake win32api
+    win32api = types.ModuleType("win32api")
+    win32api.GetModuleHandle = mock.Mock(name="win32api.GetModuleHandle")
+    win32api.PostQuitMessage = mock.Mock(name="win32api.PostQuitMessage")
+
+    # Build fake win32con
+    win32con = types.ModuleType("win32con")
+    win32con.CW_USEDEFAULT = mock.Mock(name="win32con.CW_USEDEFAULT")
+    win32con.IDI_APPLICATION = mock.Mock(name="win32con.IDI_APPLICATION")
+    win32con.IMAGE_ICON = mock.Mock(name="win32con.IMAGE_ICON")
+    win32con.LR_DEFAULTSIZE = 1
+    win32con.LR_LOADFROMFILE = 2
+    win32con.WM_DESTROY = mock.Mock(name="win32con.WM_DESTROY")
+    win32con.WM_USER = 0
+    win32con.WS_OVERLAPPED = 1
+    win32con.WS_SYSMENU = 2
+
+    # Build fake win32gui
+    win32gui = types.ModuleType("win32gui")
+    win32gui.CreateWindow = mock.Mock(name="win32gui.CreateWindow")
+    win32gui.DestroyWindow = mock.Mock(name="win32gui.DestroyWindow")
+    win32gui.LoadIcon = mock.Mock(name="win32gui.LoadIcon")
+    win32gui.LoadImage = mock.Mock(name="win32gui.LoadImage")
+    win32gui.NIF_ICON = 1
+    win32gui.NIF_INFO = mock.Mock(name="win32gui.NIF_INFO")
+    win32gui.NIF_MESSAGE = 2
+    win32gui.NIF_TIP = 4
+    win32gui.NIM_ADD = mock.Mock(name="win32gui.NIM_ADD")
+    win32gui.NIM_DELETE = mock.Mock(name="win32gui.NIM_DELETE")
+    win32gui.NIM_MODIFY = mock.Mock(name="win32gui.NIM_MODIFY")
+    win32gui.RegisterClass = mock.Mock(name="win32gui.RegisterClass")
+    win32gui.UnregisterClass = mock.Mock(name="win32gui.UnregisterClass")
+    win32gui.Shell_NotifyIcon = mock.Mock(name="win32gui.Shell_NotifyIcon")
+    win32gui.UpdateWindow = mock.Mock(name="win32gui.UpdateWindow")
+    win32gui.WNDCLASS = mock.Mock(name="win32gui.WNDCLASS")
+
+    # Save all apprise.* module references before wiping them.
+    # These are the same module objects whose __dict__ entries are
+    # pointed to by module-level imports in other test files; restoring
+    # them keeps those references valid after the test completes.
+    saved_apprise = {
+        k: v for k, v in sys.modules.items() if k.startswith("apprise.")
+    }
+
+    # Inject win32 stubs so the plugin's top-level import succeeds,
+    # then wipe apprise.* and reload so it picks them up.
+    sys.modules["win32api"] = win32api
+    sys.modules["win32con"] = win32con
+    sys.modules["win32gui"] = win32gui
+    for mod in list(saved_apprise):
+        del sys.modules[mod]
+    reload(apprise)
+
+    # Yield win32gui -- the test uses it to configure side-effects
+    yield win32gui
+
+    # --- Teardown ---
+    # Remove all apprise.* entries created during this test
+    for mod in [k for k in sys.modules if k.startswith("apprise.")]:
+        del sys.modules[mod]
+
+    # Remove the injected win32 stubs
+    for stub in ("win32api", "win32con", "win32gui"):
+        sys.modules.pop(stub, None)
+
+    # Restore the original apprise.* module objects so that any
+    # module-level `from apprise.plugins.X import NotifyX` in other
+    # test files continues to point at live (non-abandoned) module dicts.
+    sys.modules.update(saved_apprise)
+
+
 @pytest.mark.skipif(
     (
         "win32api" in sys.modules
@@ -48,68 +131,11 @@ logging.disable(logging.CRITICAL)
     ),
     reason="Requires non-windows platform",
 )
-def test_plugin_windows_mocked():
+def test_plugin_windows_mocked(mocked_win32_environment):
     """NotifyWindows() General Checks (via non-Windows platform)"""
 
-    # We need to fake our windows environment for testing purposes
-    win32api_name = "win32api"
-    win32api = types.ModuleType(win32api_name)
-    sys.modules[win32api_name] = win32api
-    win32api.GetModuleHandle = mock.Mock(
-        name=win32api_name + ".GetModuleHandle"
-    )
-    win32api.PostQuitMessage = mock.Mock(
-        name=win32api_name + ".PostQuitMessage"
-    )
-
-    win32con_name = "win32con"
-    win32con = types.ModuleType(win32con_name)
-    sys.modules[win32con_name] = win32con
-    win32con.CW_USEDEFAULT = mock.Mock(name=win32con_name + ".CW_USEDEFAULT")
-    win32con.IDI_APPLICATION = mock.Mock(
-        name=win32con_name + ".IDI_APPLICATION"
-    )
-    win32con.IMAGE_ICON = mock.Mock(name=win32con_name + ".IMAGE_ICON")
-    win32con.LR_DEFAULTSIZE = 1
-    win32con.LR_LOADFROMFILE = 2
-    win32con.WM_DESTROY = mock.Mock(name=win32con_name + ".WM_DESTROY")
-    win32con.WM_USER = 0
-    win32con.WS_OVERLAPPED = 1
-    win32con.WS_SYSMENU = 2
-
-    win32gui_name = "win32gui"
-    win32gui = types.ModuleType(win32gui_name)
-    sys.modules[win32gui_name] = win32gui
-    win32gui.CreateWindow = mock.Mock(name=win32gui_name + ".CreateWindow")
-    win32gui.DestroyWindow = mock.Mock(name=win32gui_name + ".DestroyWindow")
-    win32gui.LoadIcon = mock.Mock(name=win32gui_name + ".LoadIcon")
-    win32gui.LoadImage = mock.Mock(name=win32gui_name + ".LoadImage")
-    win32gui.NIF_ICON = 1
-    win32gui.NIF_INFO = mock.Mock(name=win32gui_name + ".NIF_INFO")
-    win32gui.NIF_MESSAGE = 2
-    win32gui.NIF_TIP = 4
-    win32gui.NIM_ADD = mock.Mock(name=win32gui_name + ".NIM_ADD")
-    win32gui.NIM_DELETE = mock.Mock(name=win32gui_name + ".NIM_DELETE")
-    win32gui.NIM_MODIFY = mock.Mock(name=win32gui_name + ".NIM_MODIFY")
-    win32gui.RegisterClass = mock.Mock(name=win32gui_name + ".RegisterClass")
-    win32gui.UnregisterClass = mock.Mock(
-        name=win32gui_name + ".UnregisterClass"
-    )
-    win32gui.Shell_NotifyIcon = mock.Mock(
-        name=win32gui_name + ".Shell_NotifyIcon"
-    )
-    win32gui.UpdateWindow = mock.Mock(name=win32gui_name + ".UpdateWindow")
-    win32gui.WNDCLASS = mock.Mock(name=win32gui_name + ".WNDCLASS")
-
-    # The following allows our mocked content to kick in. In python 3.x keys()
-    # returns an iterator, therefore we need to convert the keys() back into
-    # a list object to prevent from getting the error:
-    #    "RuntimeError: dictionary changed size during iteration"
-    #
-    for mod in list(sys.modules.keys()):
-        if mod.startswith("apprise."):
-            del sys.modules[mod]
-    reload(apprise)
+    # Retrieve the win32gui mock that the fixture set up
+    win32gui = mocked_win32_environment
 
     # Create our instance
     obj = apprise.Apprise.instantiate("windows://", suppress_exceptions=False)
