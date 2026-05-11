@@ -679,7 +679,9 @@ def test_plugin_workflows_template_add_failure():
             )
 
 
-def test_plugin_workflows_templating_content_not_dict(workflows_url, tmpdir):
+def test_plugin_workflows_templating_content_not_dict(
+    request_mock, workflows_url, tmpdir
+):
     """NotifyWorkflows() Templating - template that parses to a JSON
     array is rejected cleanly."""
     # Valid JSON but a list rather than an object; no HTTP call is made
@@ -692,10 +694,11 @@ def test_plugin_workflows_templating_content_not_dict(workflows_url, tmpdir):
         obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
         is False
     )
+    assert request_mock.called is False
 
 
 def test_plugin_workflows_templating_attachment_not_dict(
-    workflows_url, tmpdir
+    request_mock, workflows_url, tmpdir
 ):
     """NotifyWorkflows() Templating - non-dict in attachments rejected."""
     # attachments list contains a string rather than a dict; no HTTP call made
@@ -708,6 +711,7 @@ def test_plugin_workflows_templating_attachment_not_dict(
         obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
         is False
     )
+    assert request_mock.called is False
 
 
 def test_plugin_workflows_templating_none_token_value(
