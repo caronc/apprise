@@ -30,6 +30,7 @@ import json
 
 # Disable logging for a cleaner testing output
 import logging
+import sys
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -663,6 +664,10 @@ def test_plugin_workflows_templating_invalid_contenttype(
     assert request_mock.called is False
 
 
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="Python <3.10: see test_plugin_workflows_template_add_failure_py39",
+)
 def test_plugin_workflows_template_add_failure():
     """NotifyWorkflows() - TypeError when add() drops the entry."""
     # Simulate add() silently failing (len stays 0); no HTTP call needed
@@ -677,6 +682,41 @@ def test_plugin_workflows_template_add_failure():
                 signature="AbCdEfGhIjKlMnOpQrStUvWx",
                 template="file:///some/template.json",
             )
+
+
+# --- Python v3.9 Support ---
+# On Python 3.9, mock.patch() resolves a dotted target ("a.b.c.Name") by
+# walking getattr(pkg, "sub") chains rather than going straight to
+# sys.modules (that was fixed in Python 3.10+).
+# Delete this test once Python 3.9 reaches end-of-life.
+@pytest.mark.skipif(
+    sys.version_info >= (3, 10),
+    reason="Python 3.10+ mock.patch resolves via sys.modules directly",
+)
+def test_plugin_workflows_template_add_failure_py39_compat():
+    """NotifyWorkflows() - TypeError when add() drops the entry (Py 3.9)."""
+    import importlib
+
+    # Resolve the live module so patch.object and the class share the same
+    # module dict regardless of any sys.modules manipulation by earlier tests.
+    wf_mod = importlib.import_module("apprise.plugins.workflows")
+    _NotifyWorkflows = wf_mod.NotifyWorkflows
+
+    # Simulate add() silently failing (len stays 0); no HTTP call needed
+    with mock.patch.object(wf_mod, "AppriseAttachment") as mock_cls:
+        inst = mock.MagicMock()
+        inst.__len__ = mock.Mock(return_value=0)
+        mock_cls.return_value = inst
+
+        with pytest.raises(TypeError):
+            _NotifyWorkflows(
+                workflow="T00000000001",
+                signature="AbCdEfGhIjKlMnOpQrStUvWx",
+                template="file:///some/template.json",
+            )
+
+
+# --- End Python v3.9 Compat ---
 
 
 def test_plugin_workflows_templating_content_not_dict(
