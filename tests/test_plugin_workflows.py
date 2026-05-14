@@ -30,6 +30,7 @@ import json
 
 # Disable logging for a cleaner testing output
 import logging
+import sys
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -245,9 +246,10 @@ def simple_template(tmpdir):
         "type": "message",
         "attachments": [{
             "contentType": "application/vnd.microsoft.card.adaptive",
-            "contentUrl": None,
+            "contentUrl": null,
             "content": {
-                "$schema":"http://adaptivecards.io/schemas/adaptive-card.json",
+                "$schema":
+                    "http://adaptivecards.io/schemas/adaptive-card.json",
                 "type": "AdaptiveCard",
                 "version": "1.4",
                 "msteams": { "width": "full" },
@@ -256,10 +258,10 @@ def simple_template(tmpdir):
                         "type": "TextBlock",
                         "text": "**Test**",
                         "style": "heading"
-                    },
+                    }
                 ]
             }
-        ]
+        }]
     }
     """)
     )
@@ -407,17 +409,23 @@ def test_plugin_workflows_templating_basic_success(
     template.write(
         cleandoc("""
     {
-      "@type": "MessageCard",
-      "@context": "https://schema.org/extensions",
-      "summary": "{{app_id}}",
-      "themeColor": "{{app_color}}",
-      "sections": [
-        {
-          "activityImage": null,
-          "activityTitle": "{{app_title}}",
-          "text": "{{app_body}}"
+      "type": "message",
+      "attachments": [{
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema":
+            "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {"type": "TextBlock", "id": "app_id", "text": "{{app_id}}"},
+            {"type": "TextBlock", "id": "color", "text": "{{app_color}}"},
+            {"type": "TextBlock", "id": "title", "text": "{{app_title}}"},
+            {"type": "TextBlock", "id": "body", "text": "{{app_body}}"}
+          ]
         }
-      ]
+      }]
     }
     """)
     )
@@ -445,11 +453,15 @@ def test_plugin_workflows_templating_basic_success(
     # Our Posted JSON Object
     posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
     assert "NotifyType." not in request_mock.call_args_list[0][1]["data"]
-    assert "summary" in posted_json
-    assert posted_json["summary"] == "Apprise"
-    assert posted_json["themeColor"] == "#3AA3E3"
-    assert posted_json["sections"][0]["activityTitle"] == "title"
-    assert posted_json["sections"][0]["text"] == "body"
+    # Verify the Adaptive Card envelope
+    assert posted_json["type"] == "message"
+    content = posted_json["attachments"][0]["content"]
+    # Index body blocks by their id for easy lookup
+    blocks = {b["id"]: b["text"] for b in content["body"] if "id" in b}
+    assert blocks["app_id"] == "Apprise"
+    assert blocks["color"] == "#3AA3E3"
+    assert blocks["title"] == "title"
+    assert blocks["body"] == "body"
 
 
 def test_plugin_workflows_templating_invalid_json(
@@ -506,39 +518,37 @@ def test_plugin_workflows_templating_target_success(
 ):
     """
     NotifyWorkflows() Templating - success with target.
-    A more complicated example; uses a target.
+    A more complicated example; uses a custom token.
     """
 
     template = tmpdir.join("more_complicated_example.json")
     template.write(
         cleandoc("""
     {
-      "@type": "MessageCard",
-      "@context": "https://schema.org/extensions",
-      "summary": "{{app_desc}}",
-      "themeColor": "{{app_color}}",
-      "sections": [
-        {
-          "activityImage": null,
-          "activityTitle": "{{app_title}}",
-          "text": "{{app_body}}"
+      "type": "message",
+      "attachments": [{
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {
+          "$schema":
+            "http://adaptivecards.io/schemas/adaptive-card.json",
+          "type": "AdaptiveCard",
+          "version": "1.4",
+          "body": [
+            {"type": "TextBlock", "id": "desc", "text": "{{app_desc}}"},
+            {"type": "TextBlock", "id": "color", "text": "{{app_color}}"},
+            {"type": "TextBlock", "id": "title", "text": "{{app_title}}"},
+            {"type": "TextBlock", "id": "body", "text": "{{app_body}}"}
+          ],
+          "actions": [
+            {
+              "type": "Action.OpenUrl",
+              "title": "Open",
+              "url": "{{ target }}"
+            }
+          ]
         }
-      ],
-     "potentialAction": [{
-        "@type": "ActionCard",
-        "name": "Add a comment",
-        "inputs": [{
-            "@type": "TextInput",
-            "id": "comment",
-            "isMultiline": false,
-            "title": "Add a comment here for this task."
-        }],
-        "actions": [{
-            "@type": "HttpPOST",
-            "name": "Add Comment",
-            "target": "{{ target }}"
-        }]
-     }]
+      }]
     }
     """)
     )
@@ -566,17 +576,216 @@ def test_plugin_workflows_templating_target_success(
     # Our Posted JSON Object
     posted_json = json.loads(request_mock.call_args_list[0][1]["data"])
     assert "NotifyType." not in request_mock.call_args_list[0][1]["data"]
-    assert "summary" in posted_json
-    assert posted_json["summary"] == "Apprise Notifications"
-    assert posted_json["themeColor"] == "#3AA3E3"
-    assert posted_json["sections"][0]["activityTitle"] == "title"
-    assert posted_json["sections"][0]["text"] == "body"
+    # Verify the Adaptive Card envelope
+    assert posted_json["type"] == "message"
+    content = posted_json["attachments"][0]["content"]
+    # Index body blocks by their id for easy lookup
+    blocks = {b["id"]: b["text"] for b in content["body"] if "id" in b}
+    assert blocks["desc"] == "Apprise Notifications"
+    assert blocks["color"] == "#3AA3E3"
+    assert blocks["title"] == "title"
+    assert blocks["body"] == "body"
+    # The custom :target token must be substituted into the action URL
+    assert content["actions"][0]["url"] == "http://localhost"
 
-    # We even parsed our entry out of the URL
-    assert (
-        posted_json["potentialAction"][0]["actions"][0]["target"]
-        == "http://localhost"
+
+def test_plugin_workflows_templating_invalid_type(
+    request_mock, workflows_url, tmpdir
+):
+    """NotifyWorkflows() Templating - root 'type' != 'message' is rejected."""
+
+    template = tmpdir.join("bad_type.json")
+    template.write(
+        cleandoc("""
+    {
+      "type": "wrongtype",
+      "attachments": [{
+        "contentType": "application/vnd.microsoft.card.adaptive",
+        "contentUrl": null,
+        "content": {}
+      }]
+    }
+    """)
     )
+
+    obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
+    assert isinstance(obj, NotifyWorkflows)
+    # Validation rejects incorrect 'type' value
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+    assert request_mock.called is False
+
+
+def test_plugin_workflows_templating_missing_attachments(
+    request_mock, workflows_url, tmpdir
+):
+    """NotifyWorkflows() Templating - absent or empty attachments fails."""
+
+    template = tmpdir.join("no_attachments.json")
+
+    # Missing 'attachments' key entirely
+    template.write('{"type": "message"}')
+    obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
+    assert isinstance(obj, NotifyWorkflows)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+    assert request_mock.called is False
+
+    # Empty list is also rejected
+    template.write('{"type": "message", "attachments": []}')
+    obj2 = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
+    assert isinstance(obj2, NotifyWorkflows)
+    assert (
+        obj2.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+    assert request_mock.called is False
+
+
+def test_plugin_workflows_templating_invalid_contenttype(
+    request_mock, workflows_url, tmpdir
+):
+    """NotifyWorkflows() Templating - attachment missing contentType fails."""
+
+    template = tmpdir.join("no_contenttype.json")
+    template.write('{"type": "message", "attachments": [{"content": {}}]}')
+
+    obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
+    assert isinstance(obj, NotifyWorkflows)
+    # An attachment without a 'contentType' string is rejected
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+    assert request_mock.called is False
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 10),
+    reason="Python <3.10: see test_plugin_workflows_template_add_failure_py39",
+)
+def test_plugin_workflows_template_add_failure():
+    """NotifyWorkflows() - TypeError when add() drops the entry."""
+    # Simulate add() silently failing (len stays 0); no HTTP call needed
+    with mock.patch("apprise.plugins.workflows.AppriseAttachment") as mock_cls:
+        inst = mock.MagicMock()
+        inst.__len__ = mock.Mock(return_value=0)
+        mock_cls.return_value = inst
+
+        with pytest.raises(TypeError):
+            NotifyWorkflows(
+                workflow="T00000000001",
+                signature="AbCdEfGhIjKlMnOpQrStUvWx",
+                template="file:///some/template.json",
+            )
+
+
+# --- Python v3.9 Support ---
+# On Python 3.9, mock.patch() resolves a dotted target ("a.b.c.Name") by
+# walking getattr(pkg, "sub") chains rather than going straight to
+# sys.modules (that was fixed in Python 3.10+).
+# Delete this test once Python 3.9 reaches end-of-life.
+@pytest.mark.skipif(
+    sys.version_info >= (3, 10),
+    reason="Python 3.10+ mock.patch resolves via sys.modules directly",
+)
+def test_plugin_workflows_template_add_failure_py39_compat():
+    """NotifyWorkflows() - TypeError when add() drops the entry (Py 3.9)."""
+    import importlib
+
+    # Resolve the live module so patch.object and the class share the same
+    # module dict regardless of any sys.modules manipulation by earlier tests.
+    wf_mod = importlib.import_module("apprise.plugins.workflows")
+    _NotifyWorkflows = wf_mod.NotifyWorkflows
+
+    # Simulate add() silently failing (len stays 0); no HTTP call needed
+    with mock.patch.object(wf_mod, "AppriseAttachment") as mock_cls:
+        inst = mock.MagicMock()
+        inst.__len__ = mock.Mock(return_value=0)
+        mock_cls.return_value = inst
+
+        with pytest.raises(TypeError):
+            _NotifyWorkflows(
+                workflow="T00000000001",
+                signature="AbCdEfGhIjKlMnOpQrStUvWx",
+                template="file:///some/template.json",
+            )
+
+
+# --- End Python v3.9 Compat ---
+
+
+def test_plugin_workflows_templating_content_not_dict(
+    request_mock, workflows_url, tmpdir
+):
+    """NotifyWorkflows() Templating - template that parses to a JSON
+    array is rejected cleanly."""
+    # Valid JSON but a list rather than an object; no HTTP call is made
+    template = tmpdir.join("array.json")
+    template.write('[{"type": "message"}]')
+
+    obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
+    assert isinstance(obj, NotifyWorkflows)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+    assert request_mock.called is False
+
+
+def test_plugin_workflows_templating_attachment_not_dict(
+    request_mock, workflows_url, tmpdir
+):
+    """NotifyWorkflows() Templating - non-dict in attachments rejected."""
+    # attachments list contains a string rather than a dict; no HTTP call made
+    template = tmpdir.join("bad_attach.json")
+    template.write('{"type": "message", "attachments": ["not-a-dict"]}')
+
+    obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
+    assert isinstance(obj, NotifyWorkflows)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is False
+    )
+    assert request_mock.called is False
+
+
+def test_plugin_workflows_templating_none_token_value(
+    request_mock, workflows_url, tmpdir
+):
+    """NotifyWorkflows() Templating - None token value (e.g. app_image_url)
+    is coerced to empty string before JSON-escaping."""
+    # Template references app_image_url which will be None when
+    # include_image=False; old code produced corrupted JSON ("ul" from None)
+    template = tmpdir.join("img_ref.json")
+    template.write(
+        '{"type": "message", "attachments": [{'
+        '"contentType": "application/vnd.microsoft.card.adaptive",'
+        '"content": {"body": [{"type": "TextBlock",'
+        '"text": "{{app_body}} img={{app_image_url}}"}]}}]}'
+    )
+
+    # image=no forces app_image_url to None, exercising the None->""
+    # coercion in safe_tokens
+    obj = Apprise.instantiate(
+        f"{workflows_url}/?image=no&template={template!s}"
+    )
+    assert isinstance(obj, NotifyWorkflows)
+    # Must succeed -- None coerced to "" keeps the JSON valid
+    assert (
+        obj.notify(body="hello", title="t", notify_type=NotifyType.INFO)
+        is True
+    )
+    assert request_mock.called is True
+    posted_data = json.loads(request_mock.call_args_list[0][1]["data"])
+    body_text = posted_data["attachments"][0]["content"]["body"][0]["text"]
+    # app_image_url should expand to "" not "ul"
+    assert "img=" in body_text
+    assert "ul" not in body_text
 
 
 def test_workflows_yaml_config_missing_template_filename(

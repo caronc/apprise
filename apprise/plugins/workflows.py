@@ -259,6 +259,11 @@ class NotifyWorkflows(NotifyBase):
         if template:
             # Add our definition to our template
             self.template.add(template)
+            if not len(self.template):
+                # add() failed (unsupported schema, unparseable URL, etc.)
+                msg = "The Workflows template specified could not be loaded."
+                self.logger.warning(msg)
+                raise TypeError(msg)
             # Enforce maximum file size
             self.template[0].max_file_size = self.max_workflows_template_size
 
@@ -388,24 +393,84 @@ class NotifyWorkflows(NotifyBase):
         # Enforce Application mode
         tokens["app_mode"] = TemplateType.JSON
 
+        # Coerce all substitution values to str before JSON-escaping.
+        # apply_template's _escape_json() calls json.dumps(v)[1:-1] which
+        # is only correct for strings; None produces "ul" and other non-
+        # string types produce similarly corrupted output.  app_mode is a
+        # TemplateType sentinel passed as a named parameter, not a
+        # substitution value, so it is left as-is.
+        safe_tokens = {
+            k: (
+                v
+                if k == "app_mode" or isinstance(v, str)
+                else ("" if v is None else str(v))
+            )
+            for k, v in tokens.items()
+        }
+
         try:
             with open(template.path) as fp:
-                content = json.loads(apply_template(fp.read(), **tokens))
+                content = json.loads(apply_template(fp.read(), **safe_tokens))
 
         except OSError:
             self.logger.error(
-                f"MSTeam template {template.url(privacy=True)} could not be"
-                " read."
+                "Workflow template"
+                f" {template.url(privacy=True)} could not be read."
             )
-            return None
+            return False
 
         except JSONDecodeError as e:
             self.logger.error(
-                f"MSTeam template {template.url(privacy=True)} contains"
-                " invalid JSON."
+                "Workflow template"
+                f" {template.url(privacy=True)} contains invalid JSON."
             )
             self.logger.debug(f"JSONDecodeError: {e}")
-            return None
+            return False
+
+        # Validate the required payload structure for Workflows/Power Automate
+
+        # Template must parse to a JSON object, not an array or scalar
+        if not isinstance(content, dict):
+            self.logger.error(
+                "Workflow template"
+                f" {template.url(privacy=True)} must be a JSON object"
+                " (got {}).".format(type(content).__name__)
+            )
+            return False
+
+        # Root payload must be a Workflows/Power Automate 'message' type
+        if content.get("type") != "message":
+            self.logger.error(
+                "Workflow template"
+                f" {template.url(privacy=True)} must have"
+                " 'type': 'message'"
+                " (got {!r}).".format(content.get("type"))
+            )
+            return False
+
+        # Payload must carry a non-empty attachments list
+        if (
+            not isinstance(content.get("attachments"), list)
+            or not content["attachments"]
+        ):
+            self.logger.error(
+                "Workflow template"
+                f" {template.url(privacy=True)} must contain"
+                " a non-empty 'attachments' list."
+            )
+            return False
+
+        # Each attachment must be a dict with a contentType string
+        if not all(
+            isinstance(a, dict) and isinstance(a.get("contentType"), str)
+            for a in content["attachments"]
+        ):
+            self.logger.error(
+                "Workflow template"
+                f" {template.url(privacy=True)} contains an"
+                " attachment missing a 'contentType' string."
+            )
+            return False
 
         return content
 
