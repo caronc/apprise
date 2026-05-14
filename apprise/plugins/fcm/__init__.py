@@ -265,6 +265,7 @@ class NotifyFCM(NotifyBase):
         self.oauth = GoogleOAuth(
             user_agent=self.app_id,
             timeout=self.request_timeout,
+            allow_redirects=self.redirects,
             verify_certificate=self.verify_certificate,
         )
 
@@ -489,6 +490,7 @@ class NotifyFCM(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
                 if r.status_code not in (
                     requests.codes.ok,

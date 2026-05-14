@@ -936,6 +936,30 @@ def test_apprise_urlbase_object():
     assert base.request_url == "http://127.0.0.1/path/"
     assert base.url().startswith("http://user@127.0.0.1/path/")
 
+    # redirect= defaults to False (disabled for security)
+    results = URLBase.parse_url("https://localhost/path/?redirect=no")
+    assert results.get("redirect") is False
+    base = URLBase(**results)
+    assert base.redirects is False
+    # redirect=no is the default, so it must not appear in url() output
+    assert "redirect" not in base.url()
+
+    # redirect=yes enables redirect following and round-trips in the URL
+    results = URLBase.parse_url(
+        "http://user:pass@localhost:34/path/here?redirect=yes"
+    )
+    assert results.get("redirect") is True
+    base = URLBase(**results)
+    assert base.redirects is True
+    assert "redirect=yes" in base.url()
+
+    # redirect is False when not specified at all
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    assert results.get("redirect") is False
+    base = URLBase(**results)
+    assert base.redirects is False
+    assert "redirect" not in base.url()
+
     # Generic initialization
     base = URLBase(**{"schema": ""})
     assert base.request_timeout == (4.0, 4.0)
@@ -1796,6 +1820,7 @@ def test_apprise_details_plugin_verification():
         "optional",
         # URLBase parameters:
         "verify",
+        "redirect",
         "cto",
         "rto",
         "store",

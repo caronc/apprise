@@ -256,6 +256,7 @@ class NotifyThreema(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 if r.status_code != requests.codes.ok:

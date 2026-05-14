@@ -550,6 +550,7 @@ class NotifyDiscord(NotifyBase):
                 files=files,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             # Handle rate limiting (if specified)

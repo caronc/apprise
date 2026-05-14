@@ -269,6 +269,7 @@ class NotifySimplePush(NotifyBase):
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             # Get our SimplePush response (if it's possible)

@@ -235,6 +235,7 @@ class NotifyViber(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 # Viber returns the following on success:

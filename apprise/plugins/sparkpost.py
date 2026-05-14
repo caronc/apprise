@@ -419,6 +419,7 @@ class NotifySparkPost(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 # A Good response (200) looks like this:

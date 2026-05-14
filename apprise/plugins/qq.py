@@ -121,6 +121,7 @@ class NotifyQQ(NotifyBase):
                 data=payload,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             if response.status_code != requests.codes.ok:

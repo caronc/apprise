@@ -250,6 +250,7 @@ class NotifyVoipms(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 with contextlib.suppress(

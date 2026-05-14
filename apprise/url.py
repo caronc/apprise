@@ -120,6 +120,12 @@ class URLBase:
     # Secure sites should be verified against a Certificate Authority
     verify_certificate = True
 
+    # By default, HTTP redirects are not followed. Set to True to allow
+    # plugins to follow HTTP redirects when the remote server issues a 3xx
+    # response. Keeping this False prevents redirect-chain credential
+    # forwarding to destinations not explicitly configured by the operator.
+    redirects = False
+
     # Logging to our global logger
     logger = logger
 
@@ -147,6 +153,16 @@ class URLBase:
             # look up default using the following parent class value at
             # runtime.
             "_lookup_default": "verify_certificate",
+        },
+        "redirect": {
+            "name": _("Follow Redirects"),
+            # Whether to follow HTTP 3xx redirects
+            "type": "bool",
+            # Provide a default
+            "default": redirects,
+            # look up default using the following parent class value at
+            # runtime.
+            "_lookup_default": "redirects",
         },
         "rto": {
             "name": _("Socket Read Timeout"),
@@ -210,6 +226,10 @@ class URLBase:
         self.verify_certificate = parse_bool(
             kwargs.get("verify", URLBase.verify_certificate)
         )
+
+        # Redirect support; default to disabled to prevent credential
+        # forwarding to unintended destinations via 3xx redirect chains
+        self.redirects = parse_bool(kwargs.get("redirect", URLBase.redirects))
 
         # Schema
         self.schema = kwargs.get("schema", "unknown").lower()
@@ -830,6 +850,10 @@ class URLBase:
         if self.verify_certificate != URLBase.verify_certificate:
             params["verify"] = "yes" if self.verify_certificate else "no"
 
+        # Redirect following
+        if self.redirects != URLBase.redirects:
+            params["redirect"] = "yes" if self.redirects else "no"
+
         return params
 
     @staticmethod
@@ -859,6 +883,20 @@ class URLBase:
             # Support SSL Certificate 'verify' keyword. Default to being
             # enabled
             results["verify"] = True
+
+        if qsd_exists and "redirect" in results["qsd"]:
+            # Pulled from URL String
+            results["redirect"] = parse_bool(
+                results["qsd"].get("redirect", False)
+            )
+
+        elif "redirect" in results:
+            # Pulled from YAML Configuration
+            results["redirect"] = parse_bool(results.get("redirect", False))
+
+        else:
+            # HTTP redirects are disabled by default
+            results["redirect"] = False
 
         # Password overrides
         if "pass" in results:

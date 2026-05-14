@@ -151,6 +151,7 @@ class AttachHTTP(AttachBase):
                     params=self.qsd,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                     stream=True,
                 ) as r:
                     # Handle Errors
