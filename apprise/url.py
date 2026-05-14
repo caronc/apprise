@@ -228,8 +228,13 @@ class URLBase:
         )
 
         # Redirect support; default to disabled to prevent credential
-        # forwarding to unintended destinations via 3xx redirect chains
-        self.redirects = parse_bool(kwargs.get("redirect", URLBase.redirects))
+        # forwarding to unintended destinations via 3xx redirect chains.
+        # The asset-level http_redirects flag acts as the global default
+        # so operators can restore the historical behaviour without touching
+        # every individual URL.
+        self.redirects = parse_bool(
+            kwargs.get("redirect", self.asset.http_redirects)
+        )
 
         # Schema
         self.schema = kwargs.get("schema", "unknown").lower()

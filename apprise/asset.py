@@ -190,6 +190,14 @@ class AppriseAsset:
     # that you leave this option as is otherwise.
     secure_logging = True
 
+    # By default, HTTP redirects (3xx responses) are not followed. This
+    # prevents custom headers and credentials from being forwarded to
+    # destinations not explicitly configured by the operator. Set this to
+    # True to restore the historical behaviour globally across all plugins
+    # without having to add redirect=yes to every individual URL.
+    # Individual URLs can still override this via the redirect= parameter.
+    http_redirects = False
+
     # Optionally specify one or more path to attempt to scan for Python modules
     # By default, no paths are scanned.
     __plugin_paths = []
