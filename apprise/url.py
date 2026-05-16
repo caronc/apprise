@@ -898,9 +898,8 @@ class URLBase:
             # Pulled from YAML Configuration
             results["redirect"] = parse_bool(results.get("redirect", True))
 
-        else:
-            # HTTP redirects are enabled by default
-            results["redirect"] = True
+        # When redirect= is not specified, leave it absent so that URLBase
+        # __init__ falls back to asset.http_redirects as the global default.
 
         # Password overrides
         if "pass" in results:

@@ -953,12 +953,31 @@ def test_apprise_urlbase_object():
     assert base.redirects is False
     assert "redirect=no" in base.url()
 
-    # redirect is True when not specified at all
+    # redirect is absent from results when not specified -- URLBase inherits
+    # the global default from the asset (default asset has http_redirects=True)
     results = URLBase.parse_url("http://user@127.0.0.1/path/")
-    assert results.get("redirect") is True
+    assert results.get("redirect") is None
     base = URLBase(**results)
     assert base.redirects is True
     assert "redirect" not in base.url()
+
+    # AppriseAsset(http_redirects=False) flows through to every plugin when the
+    # URL does not specify redirect=
+    from apprise import AppriseAsset
+
+    asset_no_redirect = AppriseAsset(http_redirects=False)
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    assert results.get("redirect") is None
+    base = URLBase(**results, asset=asset_no_redirect)
+    assert base.redirects is False  # inherited the asset global
+    assert "redirect=no" in base.url()  # serialised as non-default
+
+    # URL-level redirect=yes overrides asset http_redirects=False
+    results = URLBase.parse_url("http://user@127.0.0.1/path/?redirect=yes")
+    assert results.get("redirect") is True
+    base = URLBase(**results, asset=asset_no_redirect)
+    assert base.redirects is True  # URL wins over asset
+    assert "redirect" not in base.url()  # yes is the class default, omitted
 
     # Generic initialization
     base = URLBase(**{"schema": ""})

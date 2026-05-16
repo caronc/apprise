@@ -622,13 +622,13 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert "tag" in meta
     assert isinstance(meta["tag"], set)
 
-    assert len(meta) == 9
+    assert len(meta) == 8
     # We carry all of our default arguments from the @notify's initialization
     assert meta["schema"] == "multi"
     assert meta["host"] == "hostname"
     assert meta["user"] == "user1"
     assert meta["verify"] is True
-    assert meta["redirect"] is True
+    assert "redirect" not in meta  # absent -- URLBase inherits asset default
     assert meta["password"] == "pass"
 
     # Verify our URL is correct
@@ -661,14 +661,14 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert "tag" in meta
     assert isinstance(meta["tag"], set)
 
-    assert len(meta) == 10
+    assert len(meta) == 9
     # We carry all of our default arguments from the @notify's initialization
     assert meta["schema"] == "multi"
     assert meta["host"] == "hostname"
     assert meta["user"] == "user2"
     assert meta["password"] == "pass2"
     assert meta["verify"] is False
-    assert meta["redirect"] is True
+    assert "redirect" not in meta  # absent -- URLBase inherits asset default
     assert meta["qsd"]["verify"] == "no"
 
     # Verify our URL is correct
