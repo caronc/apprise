@@ -345,7 +345,6 @@ def test_config_http(mock_post):
         """Simulates a 301 response returned when allow_redirects=False."""
 
         status_code = requests.codes.moved_permanently
-        is_redirect = True
         headers: ClassVar[dict[str, str]] = {}
         text = ""
 

@@ -539,7 +539,6 @@ def test_attach_http(mock_get, mock_request):
         """Simulates a 301 response returned when allow_redirects=False."""
 
         status_code = requests.codes.moved_permanently
-        is_redirect = True
         headers: ClassVar[dict[str, str]] = {}
 
         def raise_for_status(self):

@@ -956,7 +956,7 @@ def test_apprise_urlbase_object():
     # redirect is absent from results when not specified -- URLBase inherits
     # the global default from the asset (default asset has http_redirects=True)
     results = URLBase.parse_url("http://user@127.0.0.1/path/")
-    assert results.get("redirect") is None
+    assert "redirect" not in results
     base = URLBase(**results)
     assert base.redirects is True
     assert "redirect" not in base.url()
@@ -967,7 +967,7 @@ def test_apprise_urlbase_object():
 
     asset_no_redirect = AppriseAsset(http_redirects=False)
     results = URLBase.parse_url("http://user@127.0.0.1/path/")
-    assert results.get("redirect") is None
+    assert "redirect" not in results
     base = URLBase(**results, asset=asset_no_redirect)
     assert base.redirects is False  # inherited the asset global
     assert "redirect=no" in base.url()  # serialised as non-default
