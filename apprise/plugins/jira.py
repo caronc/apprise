@@ -535,6 +535,7 @@ class NotifyJira(NotifyBase):
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             # A Response might look like:

@@ -412,6 +412,7 @@ class NotifyXML(NotifyBase):
                 auth=auth,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
             if r.status_code < 200 or r.status_code >= 300:
                 # We had a problem

@@ -333,6 +333,7 @@ class NotifyAfricasTalking(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
                 # Sample response
                 # {

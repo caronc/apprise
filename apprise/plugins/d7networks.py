@@ -273,6 +273,7 @@ class NotifyD7Networks(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 if r.status_code not in (

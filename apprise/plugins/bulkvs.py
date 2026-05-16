@@ -257,6 +257,7 @@ class NotifyBulkVS(NotifyBase):
                     auth=auth,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 # A Response may look like:

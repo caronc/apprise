@@ -293,6 +293,7 @@ class NotifySFR(NotifyBase):
                     params=payload,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 try:

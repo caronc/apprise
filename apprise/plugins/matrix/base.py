@@ -636,6 +636,7 @@ class NotifyMatrix(NotifyBase):
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
             if r.status_code != requests.codes.ok:
                 # We had a problem
@@ -1856,6 +1857,7 @@ class NotifyMatrix(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
                 # Store status code
@@ -2830,6 +2832,7 @@ class NotifyMatrix(NotifyBase):
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
         except requests.RequestException as e:
             self.logger.warning(

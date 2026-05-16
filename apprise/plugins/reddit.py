@@ -600,6 +600,7 @@ class NotifyReddit(NotifyBase):
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             #  We attempt to login again and retry the original request
@@ -637,6 +638,7 @@ class NotifyReddit(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
 
             # Get our JSON content if it's possible

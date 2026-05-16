@@ -246,6 +246,7 @@ class NotifyIFTTT(NotifyBase):
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                 )
                 self.logger.debug(
                     f"IFTTT HTTP response headers: {r.headers!r}"

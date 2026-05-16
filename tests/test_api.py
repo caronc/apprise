@@ -936,6 +936,64 @@ def test_apprise_urlbase_object():
     assert base.request_url == "http://127.0.0.1/path/"
     assert base.url().startswith("http://user@127.0.0.1/path/")
 
+    # redirect= defaults to True (follows redirects, matching requests default)
+    results = URLBase.parse_url("https://localhost/path/?redirect=yes")
+    assert results.get("redirect") is True
+    base = URLBase(**results)
+    assert base.redirects is True
+    # redirect=yes is the default, so it must not appear in url() output
+    assert "redirect" not in base.url()
+
+    # redirect=no disables redirect following and round-trips in the URL
+    results = URLBase.parse_url(
+        "http://user:pass@localhost:34/path/here?redirect=no"
+    )
+    assert results.get("redirect") is False
+    base = URLBase(**results)
+    assert base.redirects is False
+    assert "redirect=no" in base.url()
+
+    # redirect is absent from results when not specified -- URLBase inherits
+    # the global default from the asset (default asset has http_redirects=True)
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    assert "redirect" not in results
+    base = URLBase(**results)
+    assert base.redirects is True
+    assert "redirect" not in base.url()
+
+    # AppriseAsset(http_redirects=False) flows through to every plugin when the
+    # URL does not specify redirect=
+    from apprise import AppriseAsset
+
+    asset_no_redirect = AppriseAsset(http_redirects=False)
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    assert "redirect" not in results
+    base = URLBase(**results, asset=asset_no_redirect)
+    assert base.redirects is False  # inherited the asset global
+    # redirects matches the asset default -- no override to serialise
+    assert "redirect" not in base.url()
+
+    # URL-level redirect=yes overrides asset http_redirects=False; the
+    # override must be preserved in url() so the round-trip is idempotent
+    results = URLBase.parse_url("http://user@127.0.0.1/path/?redirect=yes")
+    assert results.get("redirect") is True
+    base = URLBase(**results, asset=asset_no_redirect)
+    assert base.redirects is True  # URL wins over asset
+    assert "redirect=yes" in base.url()  # differs from asset default, emitted
+
+    # YAML config path: redirect= provided in the results dict directly
+    # (not via qsd) -- exercises the elif "redirect" in results branch in
+    # post_process_parse_url_results()
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    assert "redirect" not in results
+    results["redirect"] = "no"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("redirect") is False
+
+    results["redirect"] = "yes"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("redirect") is True
+
     # Generic initialization
     base = URLBase(**{"schema": ""})
     assert base.request_timeout == (4.0, 4.0)
@@ -1796,6 +1854,7 @@ def test_apprise_details_plugin_verification():
         "optional",
         # URLBase parameters:
         "verify",
+        "redirect",
         "cto",
         "rto",
         "store",

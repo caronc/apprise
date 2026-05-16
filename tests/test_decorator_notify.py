@@ -628,6 +628,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert meta["host"] == "hostname"
     assert meta["user"] == "user1"
     assert meta["verify"] is True
+    assert "redirect" not in meta  # absent -- URLBase inherits asset default
     assert meta["password"] == "pass"
 
     # Verify our URL is correct
@@ -667,6 +668,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert meta["user"] == "user2"
     assert meta["password"] == "pass2"
     assert meta["verify"] is False
+    assert "redirect" not in meta  # absent -- URLBase inherits asset default
     assert meta["qsd"]["verify"] == "no"
 
     # Verify our URL is correct

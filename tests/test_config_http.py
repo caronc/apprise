@@ -339,6 +339,34 @@ def test_config_http(mock_post):
     ch.max_error_buffer_size = 0
     assert ch.read() is None
 
+    # Test that a 3xx redirect is rejected when redirect=no is set; a
+    # status-code range guard (300-399) catches what raise_for_status() misses.
+    class RedirectResponse:
+        """Simulates a 301 response returned when allow_redirects=False."""
+
+        status_code = requests.codes.moved_permanently
+        headers: ClassVar[dict[str, str]] = {}
+        text = ""
+
+        def raise_for_status(self):
+            return
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            return
+
+    mock_post.return_value = RedirectResponse()
+    results = ConfigHTTP.parse_url("http://localhost/?redirect=no")
+    assert isinstance(results, dict)
+    ch_no_redir = ConfigHTTP(**results)
+    assert ch_no_redir.redirects is False
+    # read() must return None -- returning redirect HTML as config is wrong
+    assert ch_no_redir.read() is None
+    # Restore for downstream tests
+    mock_post.return_value = dummy_response
+
     # Exception handling
     for exception in REQUEST_EXCEPTIONS:
         mock_post.side_effect = exception

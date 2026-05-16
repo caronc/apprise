@@ -147,6 +147,7 @@ class NotifyPushDeer(NotifyBase):
                 notify_url,
                 data=payload,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             if r.status_code != requests.codes.ok:

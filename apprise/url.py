@@ -120,6 +120,12 @@ class URLBase:
     # Secure sites should be verified against a Certificate Authority
     verify_certificate = True
 
+    # By default, HTTP redirects are followed, matching the behaviour of the
+    # underlying requests library. Set to False to prevent redirect-chain
+    # credential forwarding to destinations not explicitly configured by the
+    # operator.
+    redirects = True
+
     # Logging to our global logger
     logger = logger
 
@@ -147,6 +153,16 @@ class URLBase:
             # look up default using the following parent class value at
             # runtime.
             "_lookup_default": "verify_certificate",
+        },
+        "redirect": {
+            "name": _("Follow Redirects"),
+            # Whether to follow HTTP 3xx redirects
+            "type": "bool",
+            # Provide a default
+            "default": redirects,
+            # look up default using the following parent class value at
+            # runtime.
+            "_lookup_default": "redirects",
         },
         "rto": {
             "name": _("Socket Read Timeout"),
@@ -209,6 +225,14 @@ class URLBase:
         # Certificate Verification (for SSL calls); default to being enabled
         self.verify_certificate = parse_bool(
             kwargs.get("verify", URLBase.verify_certificate)
+        )
+
+        # Redirect support; default to enabled to match the behaviour of the
+        # underlying requests library. The asset-level http_redirects flag
+        # acts as the global default so operators can disable redirect
+        # following across all plugins without touching every individual URL.
+        self.redirects = parse_bool(
+            kwargs.get("redirect", self.asset.http_redirects)
         )
 
         # Schema
@@ -830,6 +854,12 @@ class URLBase:
         if self.verify_certificate != URLBase.verify_certificate:
             params["verify"] = "yes" if self.verify_certificate else "no"
 
+        # Redirect following -- compare against the asset default, not the
+        # class constant, so that a per-URL override is preserved when the
+        # asset global has been changed (round-trip idempotency).
+        if self.redirects != self.asset.http_redirects:
+            params["redirect"] = "yes" if self.redirects else "no"
+
         return params
 
     @staticmethod
@@ -859,6 +889,19 @@ class URLBase:
             # Support SSL Certificate 'verify' keyword. Default to being
             # enabled
             results["verify"] = True
+
+        if qsd_exists and "redirect" in results["qsd"]:
+            # Pulled from URL String
+            results["redirect"] = parse_bool(
+                results["qsd"].get("redirect", True)
+            )
+
+        elif "redirect" in results:
+            # Pulled from YAML Configuration
+            results["redirect"] = parse_bool(results.get("redirect", True))
+
+        # When redirect= is not specified, leave it absent so that URLBase
+        # __init__ falls back to asset.http_redirects as the global default.
 
         # Password overrides
         if "pass" in results:

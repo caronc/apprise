@@ -1184,6 +1184,7 @@ class NotifySlack(NotifyBase):
                 params=params,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
             )
 
             # Attachment posts return a JSON string
@@ -1350,6 +1351,7 @@ class NotifySlack(NotifyBase):
                 files=files,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
+                allow_redirects=self.redirects,
                 params=params if params else None,
             )
 

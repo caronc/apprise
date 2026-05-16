@@ -151,10 +151,24 @@ class AttachHTTP(AttachBase):
                     params=self.qsd,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
                     stream=True,
                 ) as r:
                     # Handle Errors
                     r.raise_for_status()
+
+                    # raise_for_status() only covers 4xx/5xx; when redirect
+                    # following is disabled any 3xx must be treated as a
+                    # failure so we do not silently stream a redirect stub.
+                    # Using a status-code range rather than r.is_redirect
+                    # catches 3xx responses that lack a Location header.
+                    if not self.redirects and 300 <= r.status_code < 400:
+                        self.logger.error(
+                            "HTTP redirect encountered but redirect "
+                            "following is disabled:"
+                            f" {self.url(privacy=True)}"
+                        )
+                        return False
 
                     # Get our file-size (if known)
                     try:

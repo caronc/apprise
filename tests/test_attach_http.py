@@ -533,6 +533,35 @@ def test_attach_http(mock_get, mock_request):
     # No encoding if we choose
     assert isinstance(obj.base64(encoding=None), bytes)
 
+    # Test that a 3xx redirect is rejected when redirect=no is set; a
+    # status-code range guard (300-399) catches what raise_for_status() misses.
+    class RedirectResponse:
+        """Simulates a 301 response returned when allow_redirects=False."""
+
+        status_code = requests.codes.moved_permanently
+        headers: ClassVar[dict[str, str]] = {}
+
+        def raise_for_status(self):
+            return
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *args, **kwargs):
+            return
+
+    mock_get.return_value = RedirectResponse()
+    results = AttachHTTP.parse_url(
+        "http://user@localhost/filename.gif?redirect=no"
+    )
+    assert isinstance(results, dict)
+    obj_no_redir = AttachHTTP(**results)
+    assert obj_no_redir.redirects is False
+    # Download must fail -- streaming a redirect stub would be wrong
+    assert obj_no_redir.download() is False
+    # Restore for downstream tests
+    mock_get.return_value = dummy_response
+
     # Error cases:
     with mock.patch(
         "builtins.open",
