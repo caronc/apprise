@@ -120,11 +120,11 @@ class URLBase:
     # Secure sites should be verified against a Certificate Authority
     verify_certificate = True
 
-    # By default, HTTP redirects are not followed. Set to True to allow
-    # plugins to follow HTTP redirects when the remote server issues a 3xx
-    # response. Keeping this False prevents redirect-chain credential
-    # forwarding to destinations not explicitly configured by the operator.
-    redirects = False
+    # By default, HTTP redirects are followed, matching the behaviour of the
+    # underlying requests library. Set to False to prevent redirect-chain
+    # credential forwarding to destinations not explicitly configured by the
+    # operator.
+    redirects = True
 
     # Logging to our global logger
     logger = logger
@@ -227,11 +227,10 @@ class URLBase:
             kwargs.get("verify", URLBase.verify_certificate)
         )
 
-        # Redirect support; default to disabled to prevent credential
-        # forwarding to unintended destinations via 3xx redirect chains.
-        # The asset-level http_redirects flag acts as the global default
-        # so operators can restore the historical behaviour without touching
-        # every individual URL.
+        # Redirect support; default to enabled to match the behaviour of the
+        # underlying requests library. The asset-level http_redirects flag
+        # acts as the global default so operators can disable redirect
+        # following across all plugins without touching every individual URL.
         self.redirects = parse_bool(
             kwargs.get("redirect", self.asset.http_redirects)
         )
@@ -892,16 +891,16 @@ class URLBase:
         if qsd_exists and "redirect" in results["qsd"]:
             # Pulled from URL String
             results["redirect"] = parse_bool(
-                results["qsd"].get("redirect", False)
+                results["qsd"].get("redirect", True)
             )
 
         elif "redirect" in results:
             # Pulled from YAML Configuration
-            results["redirect"] = parse_bool(results.get("redirect", False))
+            results["redirect"] = parse_bool(results.get("redirect", True))
 
         else:
-            # HTTP redirects are disabled by default
-            results["redirect"] = False
+            # HTTP redirects are enabled by default
+            results["redirect"] = True
 
         # Password overrides
         if "pass" in results:

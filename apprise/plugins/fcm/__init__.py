@@ -265,7 +265,7 @@ class NotifyFCM(NotifyBase):
         self.oauth = GoogleOAuth(
             user_agent=self.app_id,
             timeout=self.request_timeout,
-            allow_redirects=self.redirects,
+            redirects=self.redirects,
             verify_certificate=self.verify_certificate,
         )
 

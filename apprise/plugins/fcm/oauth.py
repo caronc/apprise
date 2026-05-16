@@ -64,12 +64,19 @@ class GoogleOAuth:
     clock_skew = timedelta(seconds=10)
 
     def __init__(
-        self, user_agent=None, timeout=(5, 4), verify_certificate=True
+        self,
+        user_agent=None,
+        timeout=(5, 4),
+        verify_certificate=True,
+        redirects=True,
     ):
         """Initialize our OAuth object."""
 
         # Wether or not to verify ssl
         self.verify_certificate = verify_certificate
+
+        # Whether to follow HTTP 3xx redirects
+        self.redirects = redirects
 
         # Our (connect, read) timeout
         self.request_timeout = timeout
