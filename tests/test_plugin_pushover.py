@@ -968,20 +968,63 @@ def test_plugin_pushover_e2ee_field_encrypt():
     key_bytes = bytes.fromhex(valid_key)
 
     # Happy path: should return a non-empty ASCII base64 string
-    result = obj._encrypt_field("hello world", key_bytes)
+    plaintext = "hello world"
+    result = obj._encrypt_field(plaintext, key_bytes)
     assert isinstance(result, str)
     assert len(result) > 0
-    # Verify the blob decodes to IV (16 B) + ciphertext + HMAC (32 B)
-    import base64 as _b64
 
-    decoded = _b64.b64decode(result)
-    # Minimum: 16-byte IV + 16-byte ciphertext block + 32-byte HMAC = 64 B
-    assert len(decoded) >= 64
+    # Self-decryption round-trip: verify the blob layout and that
+    # decrypting it reproduces the original plaintext.
+    # This validates our AES + HMAC + gzip implementation matches
+    # the Pushover spec (IV || ciphertext || HMAC, all base64 encoded).
+    import base64 as _b64
+    import gzip as _gzip
+    import hmac as _hmac_std
+
+    from cryptography.hazmat.primitives import (
+        hashes as _h,
+        hmac as _hmac_crypt,
+        padding as _pad,
+    )
+    from cryptography.hazmat.primitives.ciphers import (
+        Cipher as _C,
+        algorithms as _alg,
+        modes as _mode,
+    )
+
+    blob = _b64.b64decode(result)
+    # Minimum: 16-byte IV + 16-byte AES block + 32-byte HMAC = 64 B
+    assert len(blob) >= 64
+
+    iv = blob[:16]
+    mac_from_blob = blob[-32:]
+    ct = blob[16:-32]
+
+    # Verify HMAC-SHA256 over IV || ciphertext
+    h = _hmac_crypt.HMAC(key_bytes, _h.SHA256())
+    h.update(iv + ct)
+    expected_mac = h.finalize()
+    assert _hmac_std.compare_digest(mac_from_blob, expected_mac)
+
+    # AES-256-CBC decrypt
+    cipher = _C(_alg.AES(key_bytes), _mode.CBC(iv))
+    decryptor = cipher.decryptor()
+    padded_plain = decryptor.update(ct) + decryptor.finalize()
+
+    # Remove PKCS7 padding
+    unpadder = _pad.PKCS7(128).unpadder()
+    compressed = unpadder.update(padded_plain) + unpadder.finalize()
+
+    # Gzip decompress and compare to original plaintext
+    recovered = _gzip.decompress(compressed).decode("utf-8")
+    assert recovered == plaintext
 
     # Empty string is also a valid input (compressed + encrypted)
     result_empty = obj._encrypt_field("", key_bytes)
     assert isinstance(result_empty, str)
     assert len(result_empty) > 0
+    blob_empty = _b64.b64decode(result_empty)
+    assert len(blob_empty) >= 64
 
     # Exception path: patch urandom to trigger the except/raise branch
     with (

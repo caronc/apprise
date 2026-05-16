@@ -439,8 +439,8 @@ class NotifyPushover(NotifyBase):
             if not VALIDATE_ENCRYPTION_KEY.match(_key):
                 msg = (
                     "Pushover encryption_key must be exactly 64 hex "
-                    "characters (256-bit AES key); got: "
-                    "{}".format(encryption_key)
+                    "characters (256-bit AES key); "
+                    "got {} chars".format(len(_key))
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)
@@ -471,9 +471,8 @@ class NotifyPushover(NotifyBase):
         3. Compute HMAC-SHA256 over (IV || ciphertext) with the same key
         4. Return base64(IV || ciphertext || HMAC)
 
-        Returns the encrypted base64 string, or the original plaintext
-        on any error (the caller will fall back to unencrypted in that
-        case).
+        Raises on any crypto error; the caller must not silently fall
+        back to sending plaintext when encryption fails.
         """
 
         try:
@@ -810,12 +809,7 @@ class NotifyPushover(NotifyBase):
 
         Targets or end points should never be identified here.
         """
-        return (
-            self.secure_protocol,
-            self.user_key,
-            self.token,
-            self.encryption_key,
-        )
+        return (self.secure_protocol, self.user_key, self.token)
 
     def __len__(self):
         """Returns the number of HTTP requests this instance will make.
