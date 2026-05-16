@@ -970,14 +970,16 @@ def test_apprise_urlbase_object():
     assert "redirect" not in results
     base = URLBase(**results, asset=asset_no_redirect)
     assert base.redirects is False  # inherited the asset global
-    assert "redirect=no" in base.url()  # serialised as non-default
+    # redirects matches the asset default -- no override to serialise
+    assert "redirect" not in base.url()
 
-    # URL-level redirect=yes overrides asset http_redirects=False
+    # URL-level redirect=yes overrides asset http_redirects=False; the
+    # override must be preserved in url() so the round-trip is idempotent
     results = URLBase.parse_url("http://user@127.0.0.1/path/?redirect=yes")
     assert results.get("redirect") is True
     base = URLBase(**results, asset=asset_no_redirect)
     assert base.redirects is True  # URL wins over asset
-    assert "redirect" not in base.url()  # yes is the class default, omitted
+    assert "redirect=yes" in base.url()  # differs from asset default, emitted
 
     # YAML config path: redirect= provided in the results dict directly
     # (not via qsd) -- exercises the elif "redirect" in results branch in

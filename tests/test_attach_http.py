@@ -533,8 +533,8 @@ def test_attach_http(mock_get, mock_request):
     # No encoding if we choose
     assert isinstance(obj.base64(encoding=None), bytes)
 
-    # Test that a 3xx redirect is rejected when redirect=no is set; the
-    # is_redirect guard catches responses that raise_for_status() misses.
+    # Test that a 3xx redirect is rejected when redirect=no is set; a
+    # status-code range guard (300-399) catches what raise_for_status() misses.
     class RedirectResponse:
         """Simulates a 301 response returned when allow_redirects=False."""
 

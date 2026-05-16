@@ -854,8 +854,10 @@ class URLBase:
         if self.verify_certificate != URLBase.verify_certificate:
             params["verify"] = "yes" if self.verify_certificate else "no"
 
-        # Redirect following
-        if self.redirects != URLBase.redirects:
+        # Redirect following -- compare against the asset default, not the
+        # class constant, so that a per-URL override is preserved when the
+        # asset global has been changed (round-trip idempotency).
+        if self.redirects != self.asset.http_redirects:
             params["redirect"] = "yes" if self.redirects else "no"
 
         return params
