@@ -323,6 +323,47 @@ apprise_url_tests = (
             "test_requests_exceptions": True,
         },
     ),
+    # E2EE: valid 64-char hex encryption key
+    (
+        "pover://{}@{}?key={}".format("u" * 30, "a" * 30, "b" * 64),
+        {
+            "instance": NotifyPushover,
+            "privacy_url": "pover://u...u@a...a",
+        },
+    ),
+    # E2EE: explicit e2ee=yes with key
+    (
+        "pover://{}@{}?key={}&e2ee=yes".format("u" * 30, "a" * 30, "c" * 64),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # E2EE: key present but e2ee=no (plaintext send)
+    (
+        "pover://{}@{}?key={}&e2ee=no".format("u" * 30, "a" * 30, "d" * 64),
+        {
+            "instance": NotifyPushover,
+        },
+    ),
+    # E2EE: invalid key (not 64 hex chars)
+    (
+        "pover://{}@{}?key=tooshort".format("u" * 30, "a" * 30),
+        {
+            "instance": TypeError,
+        },
+    ),
+    # E2EE: invalid key (correct length but non-hex)
+    (
+        "pover://{}@{}?key={}".format(
+            "u" * 30,
+            "a" * 30,
+            # 64 chars but contains 'z' which is not valid hex
+            "z" * 64,
+        ),
+        {
+            "instance": TypeError,
+        },
+    ),
 )
 
 
@@ -754,3 +795,199 @@ def test_plugin_pushover_attach_memory(mock_post):
 
     assert obj.notify(body="Test", attach=mem) is True
     assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_pushover_e2ee(mock_post):
+    """NotifyPushover() E2EE encryption support."""
+    import apprise.plugins.pushover as _pover_mod
+
+    user_key = "u" * 30
+    token = "a" * 30
+    # A valid 256-bit AES key expressed as 64 hex characters
+    valid_key = "ab" * 32  # 64 chars
+
+    response = mock.Mock()
+    response.content = dumps(
+        {"status": 1, "request": "647d2300-702c-4b38-8b2f-d56326ae460b"}
+    )
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # --- Invalid key: too short ---
+    with pytest.raises(TypeError):
+        NotifyPushover(user_key=user_key, token=token, encryption_key="abc")
+
+    # --- Invalid key: 64 chars but non-hex ---
+    with pytest.raises(TypeError):
+        NotifyPushover(user_key=user_key, token=token, encryption_key="z" * 64)
+
+    # --- Valid key: object instantiates correctly ---
+    obj = NotifyPushover(
+        user_key=user_key, token=token, encryption_key=valid_key
+    )
+    assert isinstance(obj, NotifyPushover)
+    assert obj.encryption_key == valid_key
+    # e2ee defaults to True
+    assert obj.e2ee is True
+
+    # --- e2ee=False: encryption disabled even when key present ---
+    obj_no_e2ee = NotifyPushover(
+        user_key=user_key, token=token, encryption_key=valid_key, e2ee=False
+    )
+    assert obj_no_e2ee.e2ee is False
+
+    # --- No key: e2ee flag is still stored but encryption is skipped ---
+    obj_nokey = NotifyPushover(user_key=user_key, token=token)
+    assert obj_nokey.encryption_key is None
+    # Send without key succeeds normally (no encryption path taken)
+    assert obj_nokey.send(body="test") is True
+    assert mock_post.call_count == 1
+    mock_post.reset_mock()
+
+    # --- URL round-trip with key: key and e2ee survive parse/reconstruct ---
+    generated = obj.url()
+    assert "key=" in generated
+    # e2ee=no is NOT emitted because the default is True
+    assert "e2ee=" not in generated
+
+    parsed = NotifyPushover.parse_url(generated)
+    assert parsed is not None
+    assert parsed["encryption_key"] == valid_key
+    obj2 = NotifyPushover(**parsed)
+    assert obj2.encryption_key == valid_key
+    assert obj2.e2ee is True
+    assert obj.url_identifier == obj2.url_identifier
+
+    # --- URL round-trip with key + e2ee=no ---
+    generated_no = obj_no_e2ee.url()
+    assert "e2ee=no" in generated_no
+
+    parsed_no = NotifyPushover.parse_url(generated_no)
+    assert parsed_no is not None
+    obj3 = NotifyPushover(**parsed_no)
+    assert obj3.e2ee is False
+    assert obj3.encryption_key == valid_key
+
+    # --- Privacy URL hides the key ---
+    priv = obj.url(privacy=True)
+    assert valid_key not in priv
+    assert "key=" in priv
+
+    # --- Successful encrypted send (patch support flag + _encrypt_field so
+    #     the test works in both minimal and qa tox environments) ---
+    _fake_enc = "FAKE_ENC_BASE64VALUE=="
+    mock_post.reset_mock()
+    with (
+        mock.patch.object(_pover_mod, "PUSHOVER_E2EE_SUPPORT", True),
+        mock.patch.object(obj, "_encrypt_field", return_value=_fake_enc),
+    ):
+        assert obj.send(body="Hello", title="World") is True
+        assert mock_post.call_count == 1
+        call_data = mock_post.call_args[1]["data"]
+        # The API must receive encrypted=1
+        assert call_data.get("encrypted") == 1
+        # message and title must be the fake-encrypted string
+        assert call_data["message"] == _fake_enc
+        assert call_data["title"] == _fake_enc
+
+    # --- Encrypted send with url and url_title fields ---
+    mock_post.reset_mock()
+    obj_url = NotifyPushover(
+        user_key=user_key,
+        token=token,
+        encryption_key=valid_key,
+        supplemental_url="https://example.com",
+        supplemental_url_title="Click",
+    )
+    with (
+        mock.patch.object(_pover_mod, "PUSHOVER_E2EE_SUPPORT", True),
+        mock.patch.object(obj_url, "_encrypt_field", return_value=_fake_enc),
+    ):
+        assert obj_url.send(body="body", title="title") is True
+        call_data = mock_post.call_args[1]["data"]
+        assert call_data.get("encrypted") == 1
+        assert call_data["url"] == _fake_enc
+        assert call_data["url_title"] == _fake_enc
+
+    # --- e2ee=False: plaintext send despite key being set ---
+    mock_post.reset_mock()
+    assert obj_no_e2ee.send(body="plaintext", title="ptitle") is True
+    call_data = mock_post.call_args[1]["data"]
+    assert "encrypted" not in call_data
+    assert call_data["message"] == "plaintext"
+    assert call_data["title"] == "ptitle"
+
+    # --- Fallback: PUSHOVER_E2EE_SUPPORT patched to False ---
+    mock_post.reset_mock()
+    orig_support = _pover_mod.PUSHOVER_E2EE_SUPPORT
+    _pover_mod.PUSHOVER_E2EE_SUPPORT = False
+    try:
+        # Should warn and fall back to sending unencrypted
+        result = obj.send(body="unenc body", title="unenc title")
+        assert result is True
+        assert mock_post.call_count == 1
+        call_data = mock_post.call_args[1]["data"]
+        # encrypted flag must NOT be set when we fell back
+        assert "encrypted" not in call_data
+        assert call_data["message"] == "unenc body"
+    finally:
+        _pover_mod.PUSHOVER_E2EE_SUPPORT = orig_support
+
+    # --- Crypto failure in _encrypt_field causes send() to return False ---
+    mock_post.reset_mock()
+    with (
+        mock.patch.object(_pover_mod, "PUSHOVER_E2EE_SUPPORT", True),
+        mock.patch.object(
+            obj, "_encrypt_field", side_effect=ValueError("boom")
+        ),
+    ):
+        result = obj.send(body="fail body", title="fail title")
+        assert result is False
+        assert mock_post.call_count == 0
+
+    # --- runtime_deps returns tuple containing 'cryptography' ---
+    deps = NotifyPushover.runtime_deps()
+    assert isinstance(deps, tuple)
+    assert "cryptography" in deps
+
+
+def test_plugin_pushover_e2ee_field_encrypt():
+    """Exercise _encrypt_field directly; skipped when cryptography absent."""
+    import apprise.plugins.pushover as _pover_mod
+
+    pytest.importorskip("cryptography")
+
+    user_key = "u" * 30
+    token = "a" * 30
+    valid_key = "ab" * 32  # 64 hex chars = 32-byte AES-256 key
+
+    obj = NotifyPushover(
+        user_key=user_key, token=token, encryption_key=valid_key
+    )
+    key_bytes = bytes.fromhex(valid_key)
+
+    # Happy path: should return a non-empty ASCII base64 string
+    result = obj._encrypt_field("hello world", key_bytes)
+    assert isinstance(result, str)
+    assert len(result) > 0
+    # Verify the blob decodes to IV (16 B) + ciphertext + HMAC (32 B)
+    import base64 as _b64
+
+    decoded = _b64.b64decode(result)
+    # Minimum: 16-byte IV + 16-byte ciphertext block + 32-byte HMAC = 64 B
+    assert len(decoded) >= 64
+
+    # Empty string is also a valid input (compressed + encrypted)
+    result_empty = obj._encrypt_field("", key_bytes)
+    assert isinstance(result_empty, str)
+    assert len(result_empty) > 0
+
+    # Exception path: patch urandom to trigger the except/raise branch
+    with (
+        mock.patch.object(
+            _pover_mod._os, "urandom", side_effect=OSError("rng failure")
+        ),
+        pytest.raises(OSError, match="rng failure"),
+    ):
+        obj._encrypt_field("boom", key_bytes)
