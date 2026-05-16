@@ -979,6 +979,19 @@ def test_apprise_urlbase_object():
     assert base.redirects is True  # URL wins over asset
     assert "redirect" not in base.url()  # yes is the class default, omitted
 
+    # YAML config path: redirect= provided in the results dict directly
+    # (not via qsd) -- exercises the elif "redirect" in results branch in
+    # post_process_parse_url_results()
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    assert "redirect" not in results
+    results["redirect"] = "no"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("redirect") is False
+
+    results["redirect"] = "yes"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("redirect") is True
+
     # Generic initialization
     base = URLBase(**{"schema": ""})
     assert base.request_timeout == (4.0, 4.0)
