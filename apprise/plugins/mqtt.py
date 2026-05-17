@@ -475,15 +475,32 @@ class NotifyMQTT(NotifyBase):
                 # if we reach here; we're at the bottom of our loop
                 # we loop around and do the next topic now
 
+        except ssl.CertificateError as e:
+            # Hostname/certificate mismatch; most specific SSL error
+            self.logger.warning(
+                f"MQTT SSL Certificate Error received from {url}"
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
+            return False
+
+        except ssl.SSLError as e:
+            # TLS handshake failure, ALPN negotiation error, malformed CA file,
+            # or any other SSL-layer problem not covered by CertificateError
+            self.logger.warning(f"MQTT SSL Error received from {url}")
+            self.logger.debug(f"Socket Exception: {e!s}")
+            return False
+
         except ConnectionError as e:
+            # Refused, reset, or dropped connections (subclass of OSError)
             self.logger.warning(f"MQTT Connection Error received from {url}")
             self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
-        except ssl.CertificateError as e:
-            self.logger.warning(
-                f"MQTT SSL Certificate Error received from {url}"
-            )
+        except OSError as e:
+            # Remaining socket/OS errors: TimeoutError, BrokenPipeError,
+            # PermissionError, etc. -- all subclasses of OSError not caught
+            # by the more specific handlers above
+            self.logger.warning(f"MQTT Socket Error received from {url}")
             self.logger.debug(f"Socket Exception: {e!s}")
             return False
 

@@ -421,8 +421,15 @@ def test_plugin_mqtt_exception_failure(mqtt_client_mock):
     # Emulate a situation where `connect()` raises an exception.
     mqtt_client_mock.connect.return_value = None
 
-    # Verify notification fails.
-    for side_effect in (ValueError, ConnectionError, ssl.CertificateError):
+    # Verify notification fails for every exception type that connect() or
+    # the TLS setup can raise (most-specific to least-specific order).
+    for side_effect in (
+        ssl.CertificateError,
+        ssl.SSLError,
+        ConnectionError,
+        OSError,
+        ValueError,
+    ):
         mqtt_client_mock.connect.side_effect = side_effect
         assert obj.notify(body="test=test") is False
 
