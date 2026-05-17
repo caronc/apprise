@@ -360,6 +360,7 @@ def test_plugin_ringc_url_and_identifier(mock_post):
         "ringc",
         CLIENT_ID,
         CLIENT_SECRET,
+        "secret",
         SOURCE.lstrip("+"),
     )
 
@@ -497,6 +498,25 @@ def test_plugin_ringc_auth_failure(mock_post):
     bad.status_code = requests.codes.internal_server_error
     bad.content = b"{}"
     mock_post.return_value = bad
+
+    obj = NotifyRingCentral(
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        source=SOURCE,
+        token="password",
+    )
+    assert obj.notify(body="Test") is False
+
+
+@mock.patch("requests.post")
+def test_plugin_ringc_auth_no_access_token(mock_post):
+    """NotifyRingCentral() returns False when 200 OK has no access_token."""
+    # A 200 OK response that lacks access_token is not a usable login;
+    # previously this would proceed with "Bearer None" as the auth header
+    empty_auth = mock.Mock()
+    empty_auth.status_code = requests.codes.ok
+    empty_auth.content = b"{}"
+    mock_post.return_value = empty_auth
 
     obj = NotifyRingCentral(
         client_id=CLIENT_ID,
@@ -725,12 +745,13 @@ def test_plugin_ringc_parse_url(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
     mock_post.return_value.content = b"{}"
 
-    # URL with all params in query string
-    url = "ringc://_?token={}&secret={}&from={}".format(
+    # URL with all params in query string; client_id goes in the host
+    url = "ringc://client_id?token={}&secret={}&from={}".format(
         "a" * 8, "b" * 16, "5" * 11
     )
     result = NotifyRingCentral.parse_url(url)
     assert result is not None
+    assert result["client_id"] == "client_id"
     assert result["token"] == "a" * 8
     assert result["client_secret"] == "b" * 16
     obj = NotifyRingCentral(**result)
@@ -755,7 +776,7 @@ def test_plugin_ringc_parse_url(mock_post):
     assert result4["environment"] == "sandbox"
 
     # ?source= override (alias for ?from=)
-    url5 = "ringc://_?token=abc&secret=xyz&source=15559990000"
+    url5 = "ringc://client_id?token=abc&secret=xyz&source=15559990000"
     result5 = NotifyRingCentral.parse_url(url5)
     assert result5 is not None
     assert result5["source"] == "15559990000"
@@ -766,7 +787,7 @@ def test_plugin_ringc_parse_url(mock_post):
     assert result6 is not None
     assert result6["mode"] == "basic"
 
-    # JWT auto-detection from token length (>60 chars)
+    # JWT auto-detection from token length (>60 chars) in URL userinfo
     url7 = "ringc://15559990000:{}@client_id/secret".format("x" * 70)
     result7 = NotifyRingCentral.parse_url(url7)
     assert result7 is not None
@@ -777,6 +798,17 @@ def test_plugin_ringc_parse_url(mock_post):
     result8 = NotifyRingCentral.parse_url(url8)
     assert result8 is not None
     assert result8["mode"] == RingCentralAuthMode.BASIC
+
+    # JWT auto-detection via ?token= query param; ?token= must be applied
+    # before mode detection so a long JWT supplied via query param is
+    # correctly classified as JWT, not BASIC
+    url9 = "ringc://client_id?token={}&secret=secret&from=15559990000".format(
+        "y" * 70
+    )
+    result9 = NotifyRingCentral.parse_url(url9)
+    assert result9 is not None
+    assert result9["mode"] == RingCentralAuthMode.JWT
+    assert result9["token"] == "y" * 70
 
     # Invalid URL returns None
     assert NotifyRingCentral.parse_url(None) is None

@@ -469,7 +469,8 @@ class NotifyRingCentral(NotifyBase):
             self._owner = response.get("owner_id")
             self._endpoint_id = response.get("endpoint_id")
 
-        return status
+        # A 200 OK without an access_token is not a usable login
+        return bool(self._access_token)
 
     def logout(self):
         """Revoke the current access token."""
@@ -747,6 +748,7 @@ class NotifyRingCentral(NotifyBase):
             self.secure_protocol,
             self.client_id,
             self.client_secret,
+            self.token,
             self.source,
         )
 
@@ -796,7 +798,7 @@ class NotifyRingCentral(NotifyBase):
         return len(self.targets) if self.targets else 1
 
     def __del__(self):
-        """Deconstructor -- revoke the auth token on cleanup."""
+        """Destructor -- revoke the auth token on cleanup."""
         with contextlib.suppress(Exception):
             self.logout()
 
@@ -839,6 +841,14 @@ class NotifyRingCentral(NotifyBase):
                 results["qsd"]["env"]
             )
 
+        # ?token= overrides the token extracted from the URL path;
+        # must be applied before mode auto-detection so that a JWT
+        # supplied via query parameter is detected correctly
+        if "token" in results["qsd"] and results["qsd"]["token"]:
+            results["token"] = NotifyRingCentral.unquote(
+                results["qsd"]["token"]
+            )
+
         # Auth mode: ?mode= wins; otherwise auto-detect from token length
         if "mode" in results["qsd"] and results["qsd"]["mode"]:
             results["mode"] = NotifyRingCentral.unquote(results["qsd"]["mode"])
@@ -847,12 +857,6 @@ class NotifyRingCentral(NotifyBase):
             results["mode"] = RingCentralAuthMode.JWT
         else:
             results["mode"] = RingCentralAuthMode.BASIC
-
-        # ?token= overrides the token extracted from the URL path
-        if "token" in results["qsd"] and results["qsd"]["token"]:
-            results["token"] = NotifyRingCentral.unquote(
-                results["qsd"]["token"]
-            )
 
         # ?secret= overrides the client secret extracted from the path
         if "secret" in results["qsd"] and results["qsd"]["secret"]:
