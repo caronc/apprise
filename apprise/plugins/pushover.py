@@ -25,16 +25,41 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import base64
 import contextlib
+import gzip
+import os as _os
 import re
 
 import requests
+
+# Optional dependency for E2EE field encryption.
+# When absent, encryption is silently skipped with a warning if the user
+# explicitly configured a key + e2ee=yes.
+try:
+    from cryptography.hazmat.primitives import (
+        hashes as _crypto_hashes,
+        hmac as _crypto_hmac,
+        padding as _crypto_pad,
+    )
+    from cryptography.hazmat.primitives.ciphers import (
+        Cipher as _Cipher,
+        algorithms as _crypto_algos,
+        modes as _crypto_modes,
+    )
+
+    # E2EE support is available
+    PUSHOVER_E2EE_SUPPORT = True
+
+except ImportError:
+    # E2EE support unavailable; `pip install cryptography` to enable
+    PUSHOVER_E2EE_SUPPORT = False
 
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_list, validate_regex
+from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
 
 # Flag used as a placeholder to sending to all devices
@@ -141,12 +166,24 @@ PUSHOVER_HTTP_ERROR_MAP = {
     401: "Unauthorized - Invalid Token.",
 }
 
+# Validate the E2EE encryption key: exactly 64 hexadecimal characters
+# representing a 256-bit AES key, matching the format required by the
+# Pushover E2EE API: https://pushover.net/api#e2ee
+VALIDATE_ENCRYPTION_KEY = re.compile(r"^[0-9a-f]{64}$", re.I)
+
 
 class NotifyPushover(NotifyBase):
     """A wrapper for Pushover Notifications."""
 
     # The default descriptive name associated with the Notification
     service_name = "Pushover"
+
+    # Optional dependency: cryptography is only needed for E2EE field
+    # encryption.  The plugin works without it; encryption is skipped
+    # with a warning when the package is absent.
+    requirements = {
+        "packages_recommended": "cryptography",
+    }
 
     # The services URL
     service_url = "https://pushover.net/"
@@ -260,6 +297,20 @@ class NotifyPushover(NotifyBase):
             "to": {
                 "alias_of": "targets",
             },
+            "key": {
+                "name": _("Encryption Key"),
+                "type": "string",
+                "private": True,
+                # Maps to the encryption_key __init__ parameter
+                "map_to": "encryption_key",
+            },
+            "e2ee": {
+                "name": _("E2EE"),
+                "type": "bool",
+                # Enabled by default when an encryption_key is provided;
+                # set to no to force plaintext even when a key is set
+                "default": True,
+            },
         },
     )
 
@@ -274,6 +325,8 @@ class NotifyPushover(NotifyBase):
         expire=None,
         supplemental_url=None,
         supplemental_url_title=None,
+        encryption_key=None,
+        e2ee=None,
         **kwargs,
     ):
         """Initialize Pushover Object."""
@@ -377,7 +430,83 @@ class NotifyPushover(NotifyBase):
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        # End-to-end encryption: validate and store the encryption key.
+        # The key must be exactly 64 hex characters (256-bit AES key).
+        if encryption_key:
+            # Normalise to lower-case hex string
+            _key = str(encryption_key).strip().lower()
+            if not VALIDATE_ENCRYPTION_KEY.match(_key):
+                msg = (
+                    "Pushover encryption_key must be exactly 64 hex "
+                    "characters (256-bit AES key); "
+                    "got {} chars".format(len(_key))
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            self.encryption_key = _key
+        else:
+            # No key -- E2EE is not possible
+            self.encryption_key = None
+
+        # e2ee flag: defaults to True (encrypt when a key is available).
+        # Set to False/no to force plaintext even when a key is configured.
+        self.e2ee = (
+            self.template_args["e2ee"]["default"]
+            if e2ee is None
+            else parse_bool(e2ee)
+        )
         return
+
+    def _encrypt_field(self, plaintext, key_bytes):
+        """Encrypt a single Pushover message field for E2EE.
+
+        Implements the field-level encryption scheme from
+        https://pushover.net/api#e2ee -- per field:
+
+        1. gzip-compress the plaintext string (UTF-8)
+        2. AES-256-CBC-encrypt the compressed data (random 16-byte IV,
+           PKCS7 padding) using the caller-supplied 256-bit key
+        3. Compute HMAC-SHA256 over (IV || ciphertext) with the same key
+        4. Return base64(IV || ciphertext || HMAC)
+
+        Raises on any crypto error; the caller must not silently fall
+        back to sending plaintext when encryption fails.
+        """
+
+        try:
+            # Compress the UTF-8 encoded plaintext
+            compressed = gzip.compress(plaintext.encode("utf-8"))
+
+            # Generate a random 16-byte initialisation vector
+            iv = _os.urandom(16)
+
+            # Pad the compressed data to a multiple of the AES block size
+            padder = _crypto_pad.PKCS7(128).padder()
+            padded = padder.update(compressed) + padder.finalize()
+
+            # AES-256-CBC encryption
+            cipher = _Cipher(
+                _crypto_algos.AES(key_bytes),
+                _crypto_modes.CBC(iv),
+            )
+            encryptor = cipher.encryptor()
+            ciphertext = encryptor.update(padded) + encryptor.finalize()
+
+            # HMAC-SHA256 over IV || ciphertext for integrity
+            h = _crypto_hmac.HMAC(key_bytes, _crypto_hashes.SHA256())
+            h.update(iv + ciphertext)
+            mac = h.finalize()
+
+            # Base64-encode the concatenated IV || ciphertext || HMAC
+            return base64.b64encode(iv + ciphertext + mac).decode("ascii")
+
+        except Exception as err:
+            self.logger.debug(
+                "Pushover E2EE field encryption failed: {}".format(err)
+            )
+            raise
 
     def send(
         self,
@@ -393,6 +522,20 @@ class NotifyPushover(NotifyBase):
             # There were no services to notify
             self.logger.warning("There were no Pushover targets to notify.")
             return False
+
+        # Determine whether E2EE field encryption should be applied.
+        # Conditions: user supplied a key, e2ee flag is True, and the
+        # cryptography package is installed.
+        do_encrypt = bool(self.encryption_key and self.e2ee)
+        if do_encrypt and not PUSHOVER_E2EE_SUPPORT:
+            # Encryption was explicitly requested but the library is absent;
+            # fall back to plaintext with a clear warning
+            self.logger.warning(
+                "Pushover E2EE requested but the 'cryptography' package "
+                "is not installed; sending message unencrypted. "
+                "Install it with: pip install cryptography"
+            )
+            do_encrypt = False
 
         # Build the base payload shared across all sends
         base_payload = {
@@ -426,6 +569,42 @@ class NotifyPushover(NotifyBase):
                     "expire": self.expire,
                 }
             )
+
+        # Apply field-level E2EE encryption when conditions are met.
+        # Encrypted fields: message, title, url, url_title.
+        # Reference: https://pushover.net/api#e2ee
+        if do_encrypt:
+            # Decode the hex key once for all fields in this send call
+            key_bytes = bytes.fromhex(self.encryption_key)
+
+            try:
+                # Encrypt each present field individually
+                base_payload["message"] = self._encrypt_field(
+                    base_payload["message"], key_bytes
+                )
+                base_payload["title"] = self._encrypt_field(
+                    base_payload["title"], key_bytes
+                )
+                if "url" in base_payload:
+                    base_payload["url"] = self._encrypt_field(
+                        base_payload["url"], key_bytes
+                    )
+                if "url_title" in base_payload:
+                    base_payload["url_title"] = self._encrypt_field(
+                        base_payload["url_title"], key_bytes
+                    )
+
+                # Signal to the Pushover API that fields are encrypted
+                base_payload["encrypted"] = 1
+
+            except Exception:
+                # Any failure in the crypto path is fatal -- do not send
+                # silently degraded (unencrypted) content when the caller
+                # expected encryption.
+                self.logger.warning(
+                    "Pushover E2EE encryption failed; notification not sent."
+                )
+                return False
 
         # Build per-target payloads:
         #  - devices: one call with user=user_key, device=dev1,dev2,...
@@ -664,6 +843,19 @@ class NotifyPushover(NotifyBase):
         if self.priority == PushoverPriority.EMERGENCY:
             params.update({"expire": self.expire, "interval": self.interval})
 
+        # Include E2EE parameters when a key is set.
+        # Use the short ?key= URL parameter for brevity.
+        if self.encryption_key:
+            params["key"] = (
+                self.pprint(self.encryption_key, privacy, safe="")
+                if privacy
+                else self.encryption_key
+            )
+            # Only emit e2ee=no when the user explicitly disabled it;
+            # the default (True) is implied when a key is present
+            if not self.e2ee:
+                params["e2ee"] = "no"
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -744,7 +936,26 @@ class NotifyPushover(NotifyBase):
                 results["qsd"]["to"]
             )
 
+        # E2EE encryption key (64-char hex string); URL param is ?key= for
+        # brevity, mapped to the encryption_key __init__ parameter
+        if "key" in results["qsd"] and results["qsd"]["key"]:
+            results["encryption_key"] = NotifyPushover.unquote(
+                results["qsd"]["key"]
+            )
+
+        # E2EE flag -- only parse when present; absence preserves default
+        if "e2ee" in results["qsd"] and results["qsd"]["e2ee"]:
+            results["e2ee"] = results["qsd"]["e2ee"]
+
         # Token
         results["token"] = NotifyPushover.unquote(results["host"])
 
         return results
+
+    @staticmethod
+    def runtime_deps():
+        """Return optional runtime dependency package names.
+
+        E2EE support requires the ``cryptography`` package.
+        """
+        return ("cryptography",)
