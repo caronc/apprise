@@ -27,22 +27,24 @@
 
 # Disable logging for a cleaner testing output
 import logging
+import os
 from unittest import mock
 
 from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, AppriseAttachment
 from apprise.plugins.ringcentral import (
     NotifyRingCentral,
     RingCentralAuthMode,
     RingCentralEnvironment,
-    RingCentralExtension,
 )
 
 logging.disable(logging.CRITICAL)
 
+# Path to static test attachment files
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 # Shared valid credential constants used across tests
 CLIENT_ID = "client_id"
@@ -124,13 +126,6 @@ apprise_url_tests = (
         },
     ),
     (
-        "ringc://18005554321:password@client_id/secret?ext=invalid",
-        {
-            # Invalid extension
-            "instance": TypeError,
-        },
-    ),
-    (
         "ringc://18005554321:password@client_id/secret?env=invalid",
         {
             # Invalid environment
@@ -152,8 +147,8 @@ apprise_url_tests = (
         {
             "instance": NotifyRingCentral,
             "requests_response_text": GOOD_RESPONSE,
-            "privacy_url": "ringc://18005554321:j...c@c...d/****/"
-            "1555123456/?env=prod&ext=sms&mode=jwt",
+            "privacy_url": "ringc://18005554321:j...c@c...d/****/1555123456/"
+            "?env=prod&mode=jwt",
         },
     ),
     # Valid JWT mode auto-detected from token length (>60 chars)
@@ -168,7 +163,7 @@ apprise_url_tests = (
     ),
     # Invalid phone number in targets (gets dropped, loopback used)
     (
-        "ringc://18005554321:jwt{}@client_id/secret/245/?ext=sms&env=sandbox".format(
+        "ringc://18005554321:jwt{}@client_id/secret/245/?env=sandbox".format(
             "c" * 60
         ),
         {
@@ -311,15 +306,6 @@ def test_plugin_ringc_init(mock_post):
             environment="invalid",
         )
 
-    # Invalid extension
-    with pytest.raises(TypeError):
-        NotifyRingCentral(
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET,
-            source=SOURCE,
-            extension="invalid",
-        )
-
     # Invalid JWT token in JWT mode
     with pytest.raises(TypeError):
         NotifyRingCentral(
@@ -380,6 +366,8 @@ def test_plugin_ringc_url_and_identifier(mock_post):
     full_url = obj.url()
     assert "ringc://" in full_url
     assert "mode=basic" in full_url
+    # ext= no longer emitted in URL
+    assert "ext=" not in full_url
 
     privacy_url = obj.url(privacy=True)
     assert "****" in privacy_url
@@ -642,8 +630,8 @@ def test_plugin_ringc_jwt_mode(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_ringc_environment_and_extension(mock_post):
-    """NotifyRingCentral() environment and extension handling."""
+def test_plugin_ringc_sandbox_environment(mock_post):
+    """NotifyRingCentral() sandbox environment routing."""
     from json import dumps as jdumps
 
     good = mock.Mock()
@@ -652,24 +640,81 @@ def test_plugin_ringc_environment_and_extension(mock_post):
 
     mock_post.side_effect = [good, good]
 
-    # Sandbox environment + MMS extension
+    # Sandbox environment with SMS (no attachments)
     obj = NotifyRingCentral(
         client_id=CLIENT_ID,
         client_secret=CLIENT_SECRET,
         source=SOURCE,
         token="password",
         environment=RingCentralEnvironment.SANDBOX,
-        extension=RingCentralExtension.MMS,
         targets=["15559998888"],
     )
     assert obj.environment == RingCentralEnvironment.SANDBOX
-    assert obj.extension == RingCentralExtension.MMS
-    assert obj.notify(body="MMS test") is True
+    assert obj.notify(body="Sandbox test") is True
 
-    # Verify .devtest appears in the URL called
+    # Verify .devtest appears in the URL and /sms is used (no attachments)
     notify_call = mock_post.call_args_list[1]
     assert ".devtest" in notify_call[0][0]
+    assert "/sms" in notify_call[0][0]
+
+
+@mock.patch("requests.post")
+def test_plugin_ringc_mms_attachment(mock_post):
+    """NotifyRingCentral() auto-selects MMS endpoint when attach present."""
+    from json import dumps as jdumps
+
+    good = mock.Mock()
+    good.status_code = requests.codes.ok
+    good.content = jdumps(GOOD_RESPONSE).encode()
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    # auth + MMS send = 2 calls
+    mock_post.side_effect = [good, good]
+
+    obj = NotifyRingCentral(
+        client_id=CLIENT_ID,
+        client_secret=CLIENT_SECRET,
+        source=SOURCE,
+        token="password",
+        targets=["15559998888"],
+    )
+    assert obj.notify(body="MMS test", attach=attach) is True
+    assert mock_post.call_count == 2
+
+    # Verify the MMS endpoint was used
+    notify_call = mock_post.call_args_list[1]
     assert "/mms" in notify_call[0][0]
+
+    # Inaccessible attachment causes failure (token is still cached)
+    mock_post.reset_mock()
+
+    with mock.patch("os.path.isfile", return_value=False):
+        bad_attach = AppriseAttachment(
+            os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+        )
+        assert obj.notify(body="Bad attach", attach=bad_attach) is False
+
+    # No HTTP calls should have been made (failed at attachment check)
+    assert mock_post.call_count == 0
+
+    # OSError from open() is caught and treated as a failed attachment
+    mock_post.reset_mock()
+
+    with mock.patch("builtins.open", side_effect=OSError("disk error")):
+        assert obj.notify(body="OSError test", attach=attach) is False
+
+    assert mock_post.call_count == 0
+
+    # MMS send HTTP error (attachment opens fine but server rejects)
+    mock_post.reset_mock()
+    bad_mms = mock.Mock()
+    bad_mms.status_code = requests.codes.internal_server_error
+    bad_mms.content = b"{}"
+    mock_post.side_effect = [bad_mms]
+
+    assert obj.notify(body="MMS HTTP fail", attach=attach) is False
+    assert mock_post.call_count == 1
 
 
 @mock.patch("requests.post")
@@ -703,12 +748,11 @@ def test_plugin_ringc_parse_url(mock_post):
     assert result3 is not None
     assert "15551234567" in result3["targets"]
 
-    # ?env= and ?ext= overrides
-    url4 = "ringc://15559990000:password@client_id/secret?env=sandbox&ext=mms"
+    # ?env= override
+    url4 = "ringc://15559990000:password@client_id/secret?env=sandbox"
     result4 = NotifyRingCentral.parse_url(url4)
     assert result4 is not None
     assert result4["environment"] == "sandbox"
-    assert result4["extension"] == "mms"
 
     # ?source= override (alias for ?from=)
     url5 = "ringc://_?token=abc&secret=xyz&source=15559990000"

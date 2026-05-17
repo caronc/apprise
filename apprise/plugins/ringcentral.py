@@ -33,7 +33,9 @@
 # Steps:
 #  1. Log in and click "Create App".
 #  2. Choose "REST API App" -> "Server/Bot (No UI)".
-#  3. Under permissions enable "SMS" (and "MMS" if desired).
+#  3. Under permissions enable "SMS" and "MMS" (MMS is needed for
+#     attachment support -- Apprise selects MMS automatically when
+#     attachments are present).
 #  4. Copy the Client ID and Client Secret from the app credentials tab.
 #
 # Two authentication modes are supported:
@@ -50,8 +52,12 @@
 # Alternatively, supply credentials as query parameters:
 #   ringc://_?token=JWT&secret=ClientSecret&from=SourcePhoneNo
 #
+# When attachments are provided, Apprise automatically uses the MMS
+# endpoint; otherwise SMS is used.
+#
 # API references:
 # - https://developers.ringcentral.com/api-reference/SMS/createSMSMessage
+# - https://developers.ringcentral.com/api-reference/MMS/createMMSMessage
 # - https://developers.ringcentral.com/api-reference/OAuth-2.0/getToken
 
 import base64
@@ -108,26 +114,6 @@ RINGCENTRAL_ENV_URL_SUFFIX = {
 }
 
 
-class RingCentralExtension:
-    """Message type extensions supported by RingCentral."""
-
-    SMS = "sms"
-    MMS = "mms"
-
-
-# Valid extension choices
-RINGCENTRAL_EXTENSIONS = (
-    RingCentralExtension.SMS,
-    RingCentralExtension.MMS,
-)
-
-# Maps extension choice to the API path segment
-RINGCENTRAL_EXT_API_PATH = {
-    RingCentralExtension.SMS: "sms",
-    RingCentralExtension.MMS: "mms",
-}
-
-
 class NotifyRingCentral(NotifyBase):
     """A wrapper for RingCentral Notifications."""
 
@@ -143,10 +129,19 @@ class NotifyRingCentral(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/ringcentral/"
 
-    # SMS/MMS send endpoint (environment and extension are substituted in)
-    notify_url = (
+    # Attachments are supported; MMS is selected automatically when present
+    attachment_support = True
+
+    # SMS endpoint (environment is substituted at send time)
+    notify_url_sms = (
         "https://platform{environment}.ringcentral.com/"
-        "restapi/v1.0/account/~/extension/~/{extension}"
+        "restapi/v1.0/account/~/extension/~/sms"
+    )
+
+    # MMS endpoint (used automatically when attachments are present)
+    notify_url_mms = (
+        "https://platform{environment}.ringcentral.com/"
+        "restapi/v1.0/account/~/extension/~/mms"
     )
 
     # OAuth token endpoint
@@ -247,13 +242,6 @@ class NotifyRingCentral(NotifyBase):
                 "default": RingCentralEnvironment.PRODUCTION,
                 "map_to": "environment",
             },
-            "ext": {
-                "name": _("Extension"),
-                "type": "choice:string",
-                "values": RINGCENTRAL_EXTENSIONS,
-                "default": RingCentralExtension.SMS,
-                "map_to": "extension",
-            },
             "token": {
                 "alias_of": "token",
             },
@@ -277,7 +265,6 @@ class NotifyRingCentral(NotifyBase):
         token=None,
         client_id=None,
         client_secret=None,
-        extension=None,
         mode=None,
         **kwargs,
     ):
@@ -398,36 +385,6 @@ class NotifyRingCentral(NotifyBase):
 
         # Store resolved environment
         self.environment = match
-
-        # Resolve extension (SMS vs MMS)
-        _extension = (
-            extension.lower().strip()
-            if isinstance(extension, str)
-            else RingCentralExtension.SMS
-        )
-        match = (
-            next(
-                (
-                    x
-                    for x in RINGCENTRAL_EXTENSIONS
-                    if x.startswith(_extension)
-                ),
-                None,
-            )
-            if _extension
-            else None
-        )
-        if not match:
-            msg = (
-                "An invalid RingCentral extension ({}) was specified.".format(
-                    extension
-                )
-            )
-            self.logger.warning(msg)
-            raise TypeError(msg)
-
-        # Store resolved extension
-        self.extension = match
 
         # Parse target phone numbers, dropping invalid ones
         self.targets = []
@@ -563,7 +520,14 @@ class NotifyRingCentral(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
         """Perform RingCentral Notification."""
 
         # Error tracking across multiple targets
@@ -576,31 +540,112 @@ class NotifyRingCentral(NotifyBase):
             )
             return False
 
-        # Bearer auth header (used for all send calls)
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer {}".format(self._access_token),
-        }
+        # Bearer auth header token (reused across send calls)
+        auth_header = "Bearer {}".format(self._access_token)
 
-        # Build the SMS/MMS endpoint URL
-        notify_url = self.notify_url.format(
-            environment=RINGCENTRAL_ENV_URL_SUFFIX[self.environment],
-            extension=RINGCENTRAL_EXT_API_PATH[self.extension],
-        )
+        # Auto-select MMS when attachments are present, SMS otherwise
+        use_mms = bool(attach and self.attachment_support and len(attach))
+
+        # Build the endpoint URL for the selected message type
+        if use_mms:
+            notify_url = self.notify_url_mms.format(
+                environment=RINGCENTRAL_ENV_URL_SUFFIX[self.environment],
+            )
+        else:
+            notify_url = self.notify_url_sms.format(
+                environment=RINGCENTRAL_ENV_URL_SUFFIX[self.environment],
+            )
 
         # If no targets specified, send to own number (loopback test)
         targets = list(self.targets) if self.targets else [self.source]
 
         for target in targets:
-            # Build a fresh payload for each recipient
-            payload = {
+            # Message metadata for this recipient
+            metadata = {
                 "from": {"phoneNumber": "+" + self.source},
                 "to": [{"phoneNumber": "+" + target}],
                 "text": body,
             }
 
-            # Send notification (throttle is handled inside _send)
-            status, _ = self._send(notify_url, dumps(payload), headers)
+            if use_mms:
+                # MMS: multipart/form-data -- JSON metadata + attachments
+                # Content-Type is set automatically by requests for multipart
+                headers = {
+                    "Authorization": auth_header,
+                }
+                files = [
+                    (
+                        "json",
+                        (None, dumps(metadata), "application/json"),
+                    ),
+                ]
+
+                # Track opened handles for guaranteed cleanup
+                handles = []
+                attach_ok = True
+
+                try:
+                    # Build attachment parts; abort target on first failure
+                    for attachment in attach:
+                        # Verify the attachment is accessible
+                        if not attachment:
+                            self.logger.warning(
+                                "Could not access RingCentral attachment %s.",
+                                attachment.url(privacy=True),
+                            )
+                            attach_ok = False
+                            break
+
+                        # Open handle; guard against I/O errors
+                        try:
+                            handle = attachment.open()
+                        except OSError as exc:
+                            self.logger.warning(
+                                "An I/O error occurred reading "
+                                "RingCentral attachment %s.",
+                                attachment.name,
+                            )
+                            self.logger.debug("I/O Exception: %s", str(exc))
+                            attach_ok = False
+                            break
+
+                        # Register handle for cleanup
+                        handles.append(handle)
+                        # Append the attachment part
+                        files.append(
+                            (
+                                "attachment",
+                                (
+                                    attachment.name,
+                                    handle,
+                                    attachment.mimetype,
+                                ),
+                            )
+                        )
+
+                    if not attach_ok:
+                        # Skip this target; mark overall failure
+                        has_error = True
+                        continue
+
+                    # Send MMS notification (multipart)
+                    status, _ = self._send(
+                        notify_url, None, headers, files=files
+                    )
+
+                finally:
+                    # Close all handles whether we succeeded or failed
+                    for handle in handles:
+                        handle.close()
+
+            else:
+                # SMS: plain JSON payload
+                headers = {
+                    "Content-Type": "application/json",
+                    "Authorization": auth_header,
+                }
+                status, _ = self._send(notify_url, dumps(metadata), headers)
+
             if status:
                 self.logger.info(
                     "Sent RingCentral notification to %s.", target
@@ -618,6 +663,7 @@ class NotifyRingCentral(NotifyBase):
         headers,
         name="notification",
         throttle=True,
+        files=None,
     ):
         """POST helper shared by login, logout, and send calls."""
 
@@ -646,6 +692,7 @@ class NotifyRingCentral(NotifyBase):
                 url,
                 data=payload,
                 headers=headers,
+                files=files,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
                 allow_redirects=self.redirects,
@@ -709,7 +756,6 @@ class NotifyRingCentral(NotifyBase):
         # Define any URL parameters
         params = {
             "env": str(self.environment),
-            "ext": str(self.extension),
             "mode": str(self.mode),
         }
 
@@ -791,12 +837,6 @@ class NotifyRingCentral(NotifyBase):
         if "env" in results["qsd"] and results["qsd"]["env"]:
             results["environment"] = NotifyRingCentral.unquote(
                 results["qsd"]["env"]
-            )
-
-        # Extension (from ?ext= query parameter)
-        if "ext" in results["qsd"] and results["qsd"]["ext"]:
-            results["extension"] = NotifyRingCentral.unquote(
-                results["qsd"]["ext"]
             )
 
         # Auth mode: ?mode= wins; otherwise auto-detect from token length
