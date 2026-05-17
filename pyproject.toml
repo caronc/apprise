@@ -228,9 +228,7 @@ all-plugins = [
     # provides growl:// support
     "gntp",
     # Provides mqtt:// support
-    # use any version other than 2.0.x due to:
-    #  - https://github.com/eclipse/paho.mqtt.python/issues/814
-    "paho-mqtt != 2.0.*",
+    "paho-mqtt >= 2.1.0",
 
      # Pretty Good Privacy (PGP) Provides mailto:// and deltachat:// support
     "PGPy",

@@ -50,6 +50,7 @@ NOTIFY_MQTT_SUPPORT_ENABLED = False
 try:
     # 3rd party modules
     import paho.mqtt.client as mqtt
+    from paho.mqtt.client import CallbackAPIVersion as _MQTTCallbackAPI
 
     # We're good to go!
     NOTIFY_MQTT_SUPPORT_ENABLED = True
@@ -67,7 +68,8 @@ try:
 
 except ImportError:
     # No problem; we just simply can't support this plugin because we're
-    # either using Linux, or simply do not have pywin32 installed.
+    # missing the required paho-mqtt >= 2.1.0 library.
+    _MQTTCallbackAPI = None
     MQTT_PROTOCOL_MAP = {}
 
 # A lookup map for relaying version to user
@@ -86,7 +88,7 @@ class NotifyMQTT(NotifyBase):
 
     requirements = {
         # Define our required packaging in order to work
-        "packages_required": "paho-mqtt != 2.0.*"
+        "packages_required": "paho-mqtt >= 2.1.0"
     }
 
     # The default descriptive name associated with the Notification
@@ -313,6 +315,7 @@ class NotifyMQTT(NotifyBase):
 
         # Our MQTT Client Object
         self.client = mqtt.Client(
+            _MQTTCallbackAPI.VERSION2,
             client_id=self.client_id,
             clean_session=not self.session,
             userdata=None,
@@ -347,7 +350,10 @@ class NotifyMQTT(NotifyBase):
                     )
 
                 if self.secure:
-                    if self.ca_certs is None:
+                    if self.verify_certificate and self.ca_certs is None:
+                        # CA certificates are only required when verification
+                        # is enabled; skip this check when verify=False so
+                        # that self-signed certificates are accepted.
                         self.logger.error(
                             "MQTT secure communication can not be verified, "
                             "CA certificates file missing"
@@ -355,10 +361,21 @@ class NotifyMQTT(NotifyBase):
                         return False
 
                     self.client.tls_set(
-                        ca_certs=self.ca_certs,
+                        # Only supply CA certs when verification is enabled;
+                        # passing them with CERT_NONE has no effect but is
+                        # cleaner to omit.
+                        ca_certs=(
+                            self.ca_certs if self.verify_certificate else None
+                        ),
                         certfile=None,
                         keyfile=None,
-                        cert_reqs=ssl.CERT_REQUIRED,
+                        # CERT_NONE disables chain validation when verify=False
+                        # so that self-signed certificates are accepted.
+                        cert_reqs=(
+                            ssl.CERT_REQUIRED
+                            if self.verify_certificate
+                            else ssl.CERT_NONE
+                        ),
                         tls_version=ssl.PROTOCOL_TLS,
                         ciphers=None,
                     )
@@ -458,15 +475,32 @@ class NotifyMQTT(NotifyBase):
                 # if we reach here; we're at the bottom of our loop
                 # we loop around and do the next topic now
 
+        except ssl.CertificateError as e:
+            # Hostname/certificate mismatch; most specific SSL error
+            self.logger.warning(
+                f"MQTT SSL Certificate Error received from {url}"
+            )
+            self.logger.debug(f"Socket Exception: {e!s}")
+            return False
+
+        except ssl.SSLError as e:
+            # TLS handshake failure, ALPN negotiation error, malformed CA file,
+            # or any other SSL-layer problem not covered by CertificateError
+            self.logger.warning(f"MQTT SSL Error received from {url}")
+            self.logger.debug(f"Socket Exception: {e!s}")
+            return False
+
         except ConnectionError as e:
+            # Refused, reset, or dropped connections (subclass of OSError)
             self.logger.warning(f"MQTT Connection Error received from {url}")
             self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
-        except ssl.CertificateError as e:
-            self.logger.warning(
-                f"MQTT SSL Certificate Error received from {url}"
-            )
+        except OSError as e:
+            # Remaining socket/OS errors: TimeoutError, BrokenPipeError,
+            # PermissionError, etc. -- all subclasses of OSError not caught
+            # by the more specific handlers above
+            self.logger.warning(f"MQTT Socket Error received from {url}")
             self.logger.debug(f"Socket Exception: {e!s}")
             return False
 

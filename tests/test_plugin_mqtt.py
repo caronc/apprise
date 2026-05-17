@@ -291,10 +291,48 @@ def test_plugin_mqtt_tls_no_verify_success(mqtt_client_mock):
     assert isinstance(obj, NotifyMQTT)
     assert obj.notify(body="test=test") is True
 
-    # Verify the right calls have been made to the MQTT client object.
-    # Let's only validate the single call of interest is present.
-    # Everything else is identical with `test_plugin_mqtt_tls_connect_success`.
+    # Chain validation must be disabled via CERT_NONE (not just hostname
+    # skipping via tls_insecure_set) so self-signed certs are accepted.
+    assert (
+        call.tls_set(
+            ca_certs=None,
+            certfile=None,
+            keyfile=None,
+            cert_reqs=ssl.CERT_NONE,
+            tls_version=ssl.PROTOCOL_TLS,
+            ciphers=None,
+        )
+        in mqtt_client_mock.mock_calls
+    )
     assert call.tls_insecure_set(True) in mqtt_client_mock.mock_calls
+
+
+def test_plugin_mqtt_tls_no_verify_no_ca_success(mqtt_client_mock, mocker):
+    """Verify TLS with verify=False succeeds without CA certificates."""
+
+    # Clear CA certificates -- with verify=False this should not block us
+    mocker.patch.object(NotifyMQTT, "CA_CERTIFICATE_FILE_LOCATIONS", [])
+
+    obj = apprise.Apprise.instantiate(
+        "mqtts://user:pass@localhost/my/topic?verify=False",
+        suppress_exceptions=False,
+    )
+    assert isinstance(obj, NotifyMQTT)
+
+    # Should succeed without CA certificates when verify is disabled
+    assert obj.notify(body="test=test") is True
+
+    assert (
+        call.tls_set(
+            ca_certs=None,
+            certfile=None,
+            keyfile=None,
+            cert_reqs=ssl.CERT_NONE,
+            tls_version=ssl.PROTOCOL_TLS,
+            ciphers=None,
+        )
+        in mqtt_client_mock.mock_calls
+    )
 
 
 def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):
@@ -383,8 +421,15 @@ def test_plugin_mqtt_exception_failure(mqtt_client_mock):
     # Emulate a situation where `connect()` raises an exception.
     mqtt_client_mock.connect.return_value = None
 
-    # Verify notification fails.
-    for side_effect in (ValueError, ConnectionError, ssl.CertificateError):
+    # Verify notification fails for every exception type that connect() or
+    # the TLS setup can raise (most-specific to least-specific order).
+    for side_effect in (
+        ssl.CertificateError,
+        ssl.SSLError,
+        ConnectionError,
+        OSError,
+        ValueError,
+    ):
         mqtt_client_mock.connect.side_effect = side_effect
         assert obj.notify(body="test=test") is False
 
