@@ -184,13 +184,102 @@ def test_fetch_wkd_key_success(tmpdir):
     assert isinstance(result, pgpy.PGPKey)
     mock_wkd.fetch.assert_called_once_with("user@example.com")
 
-    # Second call returns the cached key without hitting WKD again
+    # Second call must use the parsed-key cache -- wkd.fetch must NOT be
+    # called again (the cache check now happens before wkd.fetch())
     mock_wkd.fetch.reset_mock()
     result2 = ctrl._fetch_wkd_key("user@example.com")
-    # Cache stores it in __key_lookup; second fetch still calls wkd.fetch
-    # because the cache is keyed by path and WKD keys have no path --
-    # verify WKD is called again (no local file path cache hit)
     assert result2 is not None
+    mock_wkd.fetch.assert_not_called()
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_fetch_wkd_key_expired_cache_refetches(tmpdir):
+    """_fetch_wkd_key() drops an expired parsed-key cache entry and
+    re-fetches from WKD rather than returning the stale key."""
+    from datetime import datetime, timedelta, timezone
+    import hashlib
+
+    import pgpy
+
+    # Generate a key to serve as the fresh WKD result
+    key = pgpy.PGPKey.new(
+        pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+    )
+    uid = pgpy.PGPUID.new("Fresh", email="user@example.com")
+    key.add_uid(
+        uid,
+        usage={
+            pgpy.constants.KeyFlags.Sign,
+            pgpy.constants.KeyFlags.EncryptCommunications,
+        },
+        hashes=[pgpy.constants.HashAlgorithm.SHA256],
+        ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256],
+        compression=[pgpy.constants.CompressionAlgorithm.ZLIB],
+    )
+    pub_bytes = str(key.pubkey).encode()
+
+    mock_wkd = mock.Mock()
+    mock_wkd.fetch.return_value = pub_bytes
+    ctrl = ApprisePGPController(path=str(tmpdir), wkd=mock_wkd)
+
+    # Seed the parsed-key cache with an already-expired entry
+    cache_key = hashlib.sha1(b"wkd:user@example.com").hexdigest()
+    # Use the private name-mangled attribute
+    ctrl._ApprisePGPController__key_lookup[cache_key] = {
+        "public_key": None,
+        "expires": datetime.now(timezone.utc) - timedelta(seconds=1),
+    }
+
+    # The expired entry is discarded; WKD is fetched and result returned
+    result = ctrl._fetch_wkd_key("user@example.com")
+    assert result is not None
+    mock_wkd.fetch.assert_called_once_with("user@example.com")
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_fetch_wkd_key_prefers_recipient_over_sender(tmpdir):
+    """_fetch_wkd_key() tries recipient emails before self.email so that
+    the recipient's public key (not the sender's) is used for encryption."""
+    import pgpy
+
+    # Generate a key to represent the recipient's WKD result
+    key = pgpy.PGPKey.new(
+        pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+    )
+    uid = pgpy.PGPUID.new("Recipient", email="recipient@example.com")
+    key.add_uid(
+        uid,
+        usage={
+            pgpy.constants.KeyFlags.Sign,
+            pgpy.constants.KeyFlags.EncryptCommunications,
+        },
+        hashes=[pgpy.constants.HashAlgorithm.SHA256],
+        ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256],
+        compression=[pgpy.constants.CompressionAlgorithm.ZLIB],
+    )
+    pub_bytes = str(key.pubkey).encode()
+
+    # WKD returns a key only for the recipient address
+    def fake_fetch(email):
+        if email == "recipient@example.com":
+            return pub_bytes
+        return None
+
+    mock_wkd = mock.Mock(side_effect=fake_fetch)
+    mock_wkd.fetch.side_effect = fake_fetch
+    ctrl = ApprisePGPController(
+        path=str(tmpdir),
+        email="sender@example.com",
+        wkd=mock_wkd,
+    )
+
+    # The recipient's email is passed as a positional argument
+    result = ctrl._fetch_wkd_key("recipient@example.com")
+    assert result is not None
+    # sender@example.com must NOT have been tried before the recipient hit
+    calls = [call.args[0] for call in mock_wkd.fetch.call_args_list]
+    assert calls[0] == "recipient@example.com"
+    assert "sender@example.com" not in calls
 
 
 @pytest.mark.skipif(

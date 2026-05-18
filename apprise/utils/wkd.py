@@ -290,6 +290,16 @@ class AppriseWKDController:
             )
             return None
 
+        # Reject obvious non-PGP responses (e.g. an HTML error page served
+        # with HTTP 200 by a CDN or parked domain at the subdomain endpoint).
+        # Every OpenPGP binary packet has bit 7 set in its first byte; ASCII-
+        # armoured keys start with "-----".  HTML/JSON/text does not match
+        # either pattern, so we can skip the direct-method fallback slot from
+        # being silently eaten by a bad subdomain response.
+        if not (content[0] & 0x80 or content.startswith(b"-----")):
+            logger.debug("WKD response for %s is not PGP data; skipping", url)
+            return None
+
         return content
 
     def prune(self):

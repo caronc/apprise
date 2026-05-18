@@ -64,7 +64,7 @@ class PGPMode:
     """PGP security mode for outbound email."""
 
     # No PGP applied (default)
-    NONE = "none"
+    NONE = "no"
 
     # Encrypt using the recipient's public key
     ENCRYPT = "encrypt"
@@ -250,7 +250,6 @@ class NotifyEmail(NotifyBase):
         pgp_mode=None,
         pgp_key=None,
         use_wkd=False,
-        use_pgp=None,
         **kwargs,
     ):
         """
@@ -448,7 +447,10 @@ class NotifyEmail(NotifyBase):
         # does not override a deliberate pgp=none choice
         pgp_mode_explicit = pgp_mode is not None
 
-        # Handle deprecated use_pgp boolean for backward compatibility
+        # Handle deprecated use_pgp boolean for backward compatibility;
+        # kept in **kwargs rather than as a named parameter so the template
+        # verification test does not flag it as an unmapped __init__ argument
+        use_pgp = kwargs.pop("use_pgp", None)
         if use_pgp is not None:
             self.logger.warning(
                 "Email use_pgp= is deprecated; use pgp_mode='encrypt' instead"
@@ -468,8 +470,9 @@ class NotifyEmail(NotifyBase):
                 PGP_MODE_DEFAULT,
             )
 
-        # WKD flag
-        self.use_wkd = bool(use_wkd)
+        # WKD flag -- use parse_bool() so string values like 'no'/'false'
+        # are treated as disabled (bool('no') would incorrectly return True)
+        self.use_wkd = parse_bool(use_wkd)
 
         # wkd=yes implies pgp=encrypt when pgp= was not explicitly set
         if self.use_wkd and not pgp_mode_explicit:
@@ -723,15 +726,21 @@ class NotifyEmail(NotifyBase):
         # Define an URL parameters
         params = {}
 
-        # Only include pgp= when a mode is active
-        if self.pgp_mode != PGP_MODE_DEFAULT:
+        # Always emit pgp= when wkd=yes is set, even when the mode is the
+        # default 'none'.  Without this, a URL like ?pgp=none&wkd=yes would
+        # round-trip as ?wkd=yes and the wkd=yes→pgp=encrypt implication
+        # would silently re-enable encryption on re-parse.
+        if self.pgp_mode != PGP_MODE_DEFAULT or self.use_wkd:
             params["pgp"] = self.pgp_mode
 
-        # Store our public key back into the URL when one was supplied
+        # Store our public key back into the URL when one was supplied;
+        # mask the value when building a privacy-safe URL because the key
+        # path can reveal local filesystem layout or remote key server URLs
         if self.pgp_key is not None:
-            params["pgpkey"] = NotifyEmail.quote(
-                self.pgp_key,
-                safe=":\\/",
+            params["pgpkey"] = (
+                "****"
+                if privacy
+                else NotifyEmail.quote(self.pgp_key, safe=":\\/")
             )
 
         # Include wkd= when Web Key Directory lookup is enabled

@@ -196,7 +196,8 @@ def test_wkd_urls_lower_raises_attribute_error():
 @mock.patch("requests.get")
 def test_fetch_subdomain_success(mock_get):
     """fetch() returns key bytes when the subdomain URL responds with 200."""
-    key_bytes = b"fake-openpgp-key-data"
+    # 0x99 is a valid old-format OpenPGP packet header byte (bit 7 set)
+    key_bytes = b"\x99fake-openpgp-key-data"
 
     # Subdomain call succeeds
     mock_get.return_value = mock.Mock(
@@ -214,7 +215,7 @@ def test_fetch_subdomain_success(mock_get):
 @mock.patch("requests.get")
 def test_fetch_direct_fallback(mock_get):
     """fetch() tries the direct URL when the subdomain URL fails."""
-    key_bytes = b"another-fake-key"
+    key_bytes = b"\x99another-fake-key"
 
     # Subdomain -> 404, direct -> 200
     mock_get.side_effect = [
@@ -249,7 +250,7 @@ def test_fetch_both_fail(mock_get):
 @mock.patch("requests.get")
 def test_fetch_caches_result(mock_get):
     """A successful fetch is cached; subsequent calls skip the network."""
-    key_bytes = b"cached-key"
+    key_bytes = b"\x99cached-key"
     mock_get.return_value = mock.Mock(
         status_code=requests.codes.ok,
         content=key_bytes,
@@ -268,7 +269,7 @@ def test_fetch_caches_result(mock_get):
 @mock.patch("requests.get")
 def test_fetch_cache_case_insensitive(mock_get):
     """Cache lookup normalises the email address."""
-    key_bytes = b"normalised-key"
+    key_bytes = b"\x99normalised-key"
     mock_get.return_value = mock.Mock(
         status_code=requests.codes.ok,
         content=key_bytes,
@@ -285,7 +286,7 @@ def test_fetch_cache_case_insensitive(mock_get):
 @mock.patch("requests.get")
 def test_fetch_expired_cache_refetches(mock_get):
     """An expired cache entry triggers a new network request."""
-    key_bytes = b"refreshed-key"
+    key_bytes = b"\x99refreshed-key"
     mock_get.return_value = mock.Mock(
         status_code=requests.codes.ok,
         content=key_bytes,
@@ -374,6 +375,53 @@ def test_get_oversized_body_returns_none(mock_get):
     assert ctrl._get("https://example.com/key") is None
 
 
+@mock.patch("requests.get")
+def test_get_non_pgp_body_returns_none(mock_get):
+    """_get() returns None when the response body is not PGP data.
+
+    A subdomain endpoint that is a parked domain or CDN may return HTTP
+    200 with HTML content.  Without this guard, fetch() would cache the
+    HTML bytes and never try the direct-method fallback URL.
+    """
+    for non_pgp in (
+        b"<html><body>Not a key</body></html>",
+        b"<!DOCTYPE html>",
+        b"{}",
+        b"Not PGP data",
+    ):
+        mock_get.return_value = mock.Mock(
+            status_code=requests.codes.ok, content=non_pgp
+        )
+        ctrl = AppriseWKDController()
+        assert ctrl._get("https://example.com/key") is None, (
+            f"Expected None for non-PGP content: {non_pgp[:20]}"
+        )
+
+
+@mock.patch("requests.get")
+def test_get_binary_pgp_packet_accepted(mock_get):
+    """_get() accepts a response whose first byte has bit 7 set (OpenPGP
+    binary packet format)."""
+    # 0x99 is the old-format public-key packet header
+    pgp_binary = b"\x99\x01\xd6" + b"\x00" * 100
+    mock_get.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=pgp_binary
+    )
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") == pgp_binary
+
+
+@mock.patch("requests.get")
+def test_get_ascii_armoured_key_accepted(mock_get):
+    """_get() accepts ASCII-armoured PGP key material (starts with '-----')."""
+    armoured = b"-----BEGIN PGP PUBLIC KEY BLOCK-----\n..."
+    mock_get.return_value = mock.Mock(
+        status_code=requests.codes.ok, content=armoured
+    )
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") == armoured
+
+
 @mock.patch("requests.get", side_effect=requests.RequestException("timeout"))
 def test_get_request_exception_returns_none(mock_get):
     """_get() returns None when requests raises any RequestException."""
@@ -458,7 +506,7 @@ def test_get_passes_verify_and_timeout(mock_get):
     """_get() forwards verify_certificate, request_timeout, and
     allow_redirects to requests."""
     mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=b"key"
+        status_code=requests.codes.ok, content=b"\x99key"
     )
     ctrl = AppriseWKDController(
         verify_certificate=False, request_timeout=(1, 5), allow_redirects=False

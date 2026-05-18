@@ -2946,10 +2946,10 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
-    # pgp= absent -> pgp_mode defaults to 'none'
+    # pgp= absent -> pgp_mode defaults to 'no'
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
     assert obj is not None
-    assert obj.pgp_mode == "none"
+    assert obj.pgp_mode == "no"
     assert obj.use_wkd is False
 
     # pgp=encrypt -> pgp_mode = 'encrypt'
@@ -2960,21 +2960,21 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=e")
     assert obj.pgp_mode == "encrypt"
 
-    # pgp=none -> pgp_mode = 'none'
+    # pgp=none -> no mode match; falls to default 'no' (backward compat)
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=none")
-    assert obj.pgp_mode == "none"
+    assert obj.pgp_mode == "no"
 
-    # pgp=n (prefix shorthand) -> 'none'
+    # pgp=n -> prefix matches 'no'
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=n")
-    assert obj.pgp_mode == "none"
+    assert obj.pgp_mode == "no"
 
-    # pgp=no (backward compat) -> prefix matches 'none'; no deprecation
+    # pgp=no -> direct mode match; canonical URL form
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no")
-    assert obj.pgp_mode == "none"
+    assert obj.pgp_mode == "no"
 
-    # pgp=false -> parse_bool -> False -> 'none'; no deprecation warning
+    # pgp=false -> legacy bool path; no deprecation warning -> default 'no'
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=false")
-    assert obj.pgp_mode == "none"
+    assert obj.pgp_mode == "no"
 
     # pgp=yes -> parse_bool -> True -> 'encrypt' (deprecated path)
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=yes")
@@ -2984,10 +2984,10 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=true")
     assert obj.pgp_mode == "encrypt"
 
-    # url() emits 'pgp=encrypt' when mode is encrypt, and nothing when none
+    # url() emits 'pgp=encrypt' when mode is encrypt, and nothing when no
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
     assert "pgp=encrypt" in obj.url()
-    assert "pgp=none" not in obj.url()
+    assert "pgp=no" not in obj.url()
 
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
     assert "pgp=" not in obj.url()
@@ -3001,14 +3001,14 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     )
     assert obj.pgp_mode == "encrypt"
 
-    # use_pgp=False deprecated kwarg maps to pgp_mode='none'
+    # use_pgp=False deprecated kwarg maps to pgp_mode='no'
     obj = email.NotifyEmail(
         user="user",
         password="pass",
         host="nuxref.com",
         use_pgp=False,
     )
-    assert obj.pgp_mode == "none"
+    assert obj.pgp_mode == "no"
 
     # pgp_mode wins over use_pgp when both are supplied
     obj = email.NotifyEmail(
@@ -3019,6 +3019,19 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
         use_pgp=False,
     )
     assert obj.pgp_mode == "encrypt"
+
+    # pgpkey path is masked when privacy=True
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgp=encrypt&pgpkey=/path/to/my-pub.asc"
+    )
+    assert obj is not None
+    assert obj.pgp_key == "/path/to/my-pub.asc"
+    # Full URL includes pgpkey= (path may be percent-encoded in the query
+    # string); privacy URL must replace the value with **** (also encoded)
+    assert "pgpkey=" in obj.url(privacy=False)
+    # **** percent-encodes to %2A%2A%2A%2A in the query string
+    assert "pgpkey=%2A%2A%2A%2A" in obj.url(privacy=True)
+    assert "my-pub.asc" not in obj.url(privacy=True)
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -3051,9 +3064,27 @@ def test_plugin_email_wkd_param(mock_smtp, mock_smtpssl):
     assert "wkd=yes" in generated
     assert "pgp=encrypt" in generated
 
-    # wkd=yes alongside explicit pgp=none keeps none (explicit wins)
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=none&wkd=yes")
-    assert obj.pgp_mode == "none"
+    # wkd=yes alongside explicit pgp=no keeps no (explicit wins)
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no&wkd=yes")
+    assert obj.pgp_mode == "no"
+
+    # url() must emit pgp=no when wkd=yes and pgp=no is explicit so that
+    # the round-trip URL does not re-apply the wkd=yes->encrypt implication
+    generated = obj.url()
+    assert "pgp=no" in generated
+    assert "wkd=yes" in generated
+
+    # Parsing the round-trip URL must preserve pgp=no (not re-imply encrypt)
+    obj2 = Apprise.instantiate(generated)
+    assert obj2 is not None
+    assert obj2.pgp_mode == "no"
+    assert obj2.use_wkd is True
+
+    # use_wkd as a string 'no' must disable WKD (bool('no') would be True)
+    obj = email.NotifyEmail(
+        user="user", password="pass", host="nuxref.com", use_wkd="no"
+    )
+    assert obj.use_wkd is False
 
     # url() omits wkd= when disabled (it is the default)
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com")

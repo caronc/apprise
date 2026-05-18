@@ -315,22 +315,33 @@ class ApprisePGPController:
             # No WKD controller configured
             return None
 
-        # Include our own email as a fallback candidate
-        candidates = [self.email, *emails] if self.email else list(emails)
+        # Prefer supplied recipient emails; self.email is a last-resort
+        # fallback for when no recipient key is available (e.g. self-send).
+        # Putting self.email first would encrypt to the sender's key,
+        # leaving the recipient unable to decrypt the message.
+        candidates = [*emails, self.email] if self.email else list(emails)
 
         for email in candidates:
             if not email:
-                continue
-
-            # Fetch raw binary key material from WKD
-            key_bytes = self.wkd.fetch(email)
-            if not key_bytes:
                 continue
 
             # Derive a stable cache key from the email address
             cache_key = hashlib.sha1(
                 ("wkd:" + email.lower()).encode("utf-8")
             ).hexdigest()
+
+            # Return the previously parsed key when still valid
+            if cache_key in self.__key_lookup:
+                entry = self.__key_lookup[cache_key]
+                if entry["expires"] > datetime.now(timezone.utc):
+                    return entry["public_key"]
+                # Expired; remove so we re-fetch below
+                del self.__key_lookup[cache_key]
+
+            # Fetch raw binary key material from WKD
+            key_bytes = self.wkd.fetch(email)
+            if not key_bytes:
+                continue
 
             try:
                 public_key, _ = pgpy.PGPKey.from_blob(key_bytes)
