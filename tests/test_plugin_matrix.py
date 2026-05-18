@@ -2491,10 +2491,7 @@ def test_plugin_matrix_e2ee_olm_account():
     assert "signatures" in payload
     assert "algorithms" in payload
 
-    # fallback_keys_payload: first call generates the fallback OTK (487->499
-    # branch: _fallback_otk is None so it is created, then the common path
-    # at line 499 runs).  Second call reuses the already-generated key
-    # (branch where _fallback_otk is already set is also covered).
+    # fallback_keys_payload
     fb1 = acct.fallback_keys_payload("@u:h", "DEVID")
     assert len(fb1) == 1
     fb_key_id1 = next(iter(fb1.keys()))
@@ -3680,8 +3677,6 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
         assert obj._e2ee_share_room_key("!r:h", session) is False
 
     # keys/claim succeeds but server reports failures{} for remote servers
-    # (line 2160 branch: failures dict is non-empty -> debug log, still
-    # continues normally; no OTKs returned so built_count=0 -> True).
     failures_resp = {
         "one_time_keys": {},
         "failures": {"remote.example": {"errcode": "M_UNREACHABLE"}},
@@ -5085,7 +5080,7 @@ def test_plugin_matrix_init_recovers_home_server_from_user_id(tmpdir):
 def test_plugin_matrix_init_no_home_server_recovery_without_colon(tmpdir):
     """__init__ leaves home_server as None when the cached user_id has no
     colon -- the recovery split yields a single part and the assignment is
-    skipped (covers the False branch of line 508)."""
+    skipped."""
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir),

@@ -525,13 +525,13 @@ class TestAppriseTag:
     def test_parse_returns_same_instance(self):
         """parse() short-circuits when the input is already an AppriseTag."""
         t = AppriseTag("alerts", priority=2)
-        # Must return the exact same object, not a copy (tag.py line 93)
+        # Must return the exact same object, not a copy
         assert AppriseTag.parse(t) is t
 
     def test_parse_fallback_for_unrecognised_input(self):
         """parse() falls back to a raw-name tag when the regex has no match."""
         # Input starting with '@' does not match _RE_TAG; the fallback branch
-        # (tag.py line 107) stores the whole input as the name.
+        # stores the whole input as the name.
         t = AppriseTag.parse("@invalid")
         assert str(t) == "@invalid"
         assert t.priority == 0
@@ -563,12 +563,12 @@ class TestAppriseTag:
 
     def test_eq_two_apprisetags_same_name(self):
         """Two AppriseTag objects are equal when their names match,
-        regardless of priority or retry (tag.py line 148)."""
+        regardless of priority or retry."""
         assert AppriseTag("abc") == AppriseTag("abc", priority=5)
         assert AppriseTag("ABC") == AppriseTag("abc")
 
     def test_eq_with_string(self):
-        """An AppriseTag equals a plain str by name (tag.py line 150)."""
+        """An AppriseTag equals a plain str by name."""
         assert AppriseTag("hello") == "hello"
         assert AppriseTag("HELLO") == "hello"
 
@@ -577,8 +577,7 @@ class TestAppriseTag:
         assert AppriseTag("abc") != "xyz"
 
     def test_eq_returns_notimplemented_for_other_types(self):
-        """Comparing to a non-str/AppriseTag returns NotImplemented
-        (tag.py line 151)."""
+        """Comparing to a non-str/AppriseTag returns NotImplemented"""
         result = AppriseTag("abc").__eq__(42)
         assert result is NotImplemented
 
@@ -596,15 +595,14 @@ class TestAppriseTag:
         assert not (AppriseTag("zzz") < "aaa")
 
     def test_lt_returns_notimplemented_for_other_types(self):
-        """__lt__ with non-str/AppriseTag returns NotImplemented
-        (tag.py line 163)."""
+        """__lt__ with non-str/AppriseTag returns NotImplemented"""
         result = AppriseTag("abc").__lt__(42)
         assert result is NotImplemented
 
     # --- __bool__ ---
 
     def test_bool_empty_tag_is_false(self):
-        """An AppriseTag with an empty name is falsy (tag.py line 167)."""
+        """An AppriseTag with an empty name is falsy"""
         assert not AppriseTag("")
         assert bool(AppriseTag("")) is False
 
@@ -647,14 +645,14 @@ class TestStaticHelpers:
     def test_extract_retry_none_from_nested_list_no_suffix(self):
         """Nested list without retry suffix returns None.
 
-        Covers the 'if ft.retry is not None' False branch (line 412) and the
-        inner for-loop completing without returning (branch 410->406).
+        Covers the 'if ft.retry is not None' False branch and the
+        inner for-loop completing without returning.
         """
         result = Apprise._extract_filter_retry([["alerts"]])
         assert result is None
 
     def test_server_priority_for_tag_name_absent(self):
-        """Returns 0 when no tag in server.tags matches tag_name (line 456)."""
+        """Returns 0 when no tag in server.tags matches tag_name."""
         server = mock.Mock()
         server.tags = {AppriseTag("alerts", priority=3, has_priority=True)}
         assert Apprise._server_priority_for_tag_name(server, "backup") == 0
@@ -672,12 +670,7 @@ class TestStaticHelpers:
         assert result == 2
 
     def test_match_service_retry_plain_string_tag_no_match(self):
-        """Plain string in server.tags that does not match returns None.
-
-        Covers the else-branch continuation (line 497->489) inside
-        _match_service_retry when the plain-string stag name differs from the
-        priority-prefixed filter token.
-        """
+        """Plain string in server.tags that does not match returns None."""
         server = mock.Mock()
         server.tags = {"other"}  # plain string -- does not match "alerts"
         result = Apprise._match_service_retry(server, "3:alerts:2")
@@ -732,8 +725,7 @@ class TestDispatchIntegration:
         return s
 
     def test_filter_retry_override_via_tag_suffix(self):
-        """tag suffix ':N' overrides per-server retry for this call only.
-        Covers apprise.py line 551 (filter_retry injection)."""
+        """tag suffix ':N' overrides per-server retry for this call only."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1732,7 +1724,7 @@ class TestAbortOnChainFailure:
 
     def test_abort_on_chain_failure_true_async(self):
         """abort_on_chain_failure=True triggers the same early-abort in
-        async_notify() (covers apprise.py line 873)."""
+        async_notify()"""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
