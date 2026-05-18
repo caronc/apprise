@@ -34,6 +34,31 @@ from ..asset import AppriseAsset
 from ..exception import ApprisePluginException
 from ..logger import logger
 
+
+def _ensure_imghdr_shim():
+    """Install a minimal imghdr shim when the module is absent.
+
+    pgpy 0.6.0 imports imghdr, which was removed from the standard
+    library in Python 3.13 (PEP 594). pgpy's only use of imghdr is
+    ImageEncoding.encodingof(), which Apprise never calls. Returning
+    None from what() is the same safe fallback the library uses
+    internally for non-JPEG data.
+    """
+    try:
+        import imghdr  # noqa: F401
+    except ImportError:
+        import sys
+        import types
+
+        # Build a minimal stand-in with the single function pgpy calls
+        shim = types.ModuleType("imghdr")
+        shim.what = lambda file=None, h=None: None
+        sys.modules["imghdr"] = shim
+
+
+# Install shim before pgpy attempts its top-level import of imghdr
+_ensure_imghdr_shim()
+
 try:
     import pgpy
 
@@ -61,12 +86,20 @@ class ApprisePGPController:
     max_pgp_public_key_size = 8000
 
     def __init__(
-        self, path, pub_keyfile=None, email=None, asset=None, **kwargs
+        self,
+        path,
+        pub_keyfile=None,
+        email=None,
+        asset=None,
+        wkd=None,
+        **kwargs,
     ):
         """Path should be the directory keys can be written and read from such
         as <notifyobject>.store.path.
 
-        Optionally additionally specify a keyfile to explicitly open
+        Optionally additionally specify a keyfile to explicitly open, and/or
+        an AppriseWKDController to enable Web Key Directory key discovery
+        when no local key is found.
         """
 
         # PGP hash
@@ -77,6 +110,9 @@ class ApprisePGPController:
 
         # Our email
         self.email = email
+
+        # Optional WKD controller for automatic key discovery
+        self.wkd = wkd
 
         # Prepare our Asset Object
         self.asset = (
@@ -267,11 +303,73 @@ class ApprisePGPController:
             None,
         )
 
+    def _fetch_wkd_key(self, *emails):
+        """Attempt a Web Key Directory lookup for each email in turn.
+
+        Returns a pgpy.PGPKey on the first successful fetch, or None if
+        WKD is not configured, no emails are provided, or all lookups
+        fail.
+        """
+
+        if self.wkd is None:
+            # No WKD controller configured
+            return None
+
+        # Include our own email as a fallback candidate
+        candidates = [self.email, *emails] if self.email else list(emails)
+
+        for email in candidates:
+            if not email:
+                continue
+
+            # Fetch raw binary key material from WKD
+            key_bytes = self.wkd.fetch(email)
+            if not key_bytes:
+                continue
+
+            # Derive a stable cache key from the email address
+            cache_key = hashlib.sha1(
+                ("wkd:" + email.lower()).encode("utf-8")
+            ).hexdigest()
+
+            try:
+                public_key, _ = pgpy.PGPKey.from_blob(key_bytes)
+
+            except NameError:
+                # pgpy not installed
+                logger.debug(
+                    "PGPy not installed; skipping WKD key for %s",
+                    email,
+                )
+                continue
+
+            except Exception:
+                # Malformed or unsupported key data from WKD
+                logger.debug("WKD key parse failed for %s; skipping", email)
+                continue
+
+            # Cache the successfully parsed key
+            self.__key_lookup[cache_key] = {
+                "public_key": public_key,
+                "expires": datetime.now(timezone.utc)
+                + timedelta(seconds=86400),
+            }
+
+            logger.debug("Loaded PGP public key via WKD for %s", email)
+            return public_key
+
+        return None
+
     def public_key(self, *emails, autogen=None):
         """Opens a spcified pgp public file and returns the key from it which
         is used to encrypt the message."""
         path = self.public_keyfile(*emails)
         if not path:
+            # Try Web Key Directory before falling back to autogen
+            wkd_key = self._fetch_wkd_key(*emails)
+            if wkd_key is not None:
+                return wkd_key
+
             if (
                 autogen if autogen is not None else self.asset.pgp_autogen
             ) and self.keygen(*emails):
@@ -346,6 +444,10 @@ class ApprisePGPController:
             for key, value in self.__key_lookup.items()
             if value["expires"] > datetime.now(timezone.utc)
         }
+
+        # Also prune the WKD in-memory cache when a controller is set
+        if self.wkd is not None:
+            self.wkd.prune()
 
     @property
     def pub_keyfile(self):

@@ -41,7 +41,7 @@ from ...conversion import convert_between
 from ...locale import gettext_lazy as _
 from ...logger import logger
 from ...url import PrivacyMode
-from ...utils import pgp as _pgp
+from ...utils import pgp as _pgp, wkd as _wkd
 from ...utils.parse import (
     is_email,
     is_hostname,
@@ -58,6 +58,26 @@ from .common import (
     SecureMailMode,
     WebBaseLogin,
 )
+
+
+class PGPMode:
+    """PGP security mode for outbound email."""
+
+    # No PGP applied (default)
+    NONE = "none"
+
+    # Encrypt using the recipient's public key
+    ENCRYPT = "encrypt"
+
+
+# Ordered tuple of all valid PGP modes; prefix matching uses this order
+PGP_MODES = (
+    PGPMode.NONE,
+    PGPMode.ENCRYPT,
+)
+
+# The mode used when ?pgp= is absent or empty
+PGP_MODE_DEFAULT = PGPMode.NONE
 
 
 class NotifyEmail(NotifyBase):
@@ -173,10 +193,11 @@ class NotifyEmail(NotifyBase):
                 "map_to": "reply_to",
             },
             "pgp": {
-                "name": _("PGP Encryption"),
-                "type": "bool",
-                "map_to": "use_pgp",
-                "default": False,
+                "name": _("PGP Security Mode"),
+                "type": "choice:string",
+                "values": PGP_MODES,
+                "default": PGP_MODE_DEFAULT,
+                "map_to": "pgp_mode",
             },
             "pgpkey": {
                 "name": _("PGP Public Key Path"),
@@ -185,6 +206,12 @@ class NotifyEmail(NotifyBase):
                 # By default persistent storage is referenced
                 "default": "",
                 "map_to": "pgp_key",
+            },
+            "wkd": {
+                "name": _("Web Key Directory"),
+                "type": "bool",
+                "default": False,
+                "map_to": "use_wkd",
             },
             "to": {
                 "name": _("To Email"),
@@ -220,8 +247,10 @@ class NotifyEmail(NotifyBase):
         bcc=None,
         reply_to=None,
         headers=None,
-        use_pgp=None,
+        pgp_mode=None,
         pgp_key=None,
+        use_wkd=False,
+        use_pgp=None,
         **kwargs,
     ):
         """
@@ -415,22 +444,62 @@ class NotifyEmail(NotifyBase):
         if not self.smtp_host:
             self.smtp_host = self.host
 
+        # Track whether pgp_mode was explicitly provided so wkd= implication
+        # does not override a deliberate pgp=none choice
+        pgp_mode_explicit = pgp_mode is not None
+
+        # Handle deprecated use_pgp boolean for backward compatibility
+        if use_pgp is not None:
+            self.logger.warning(
+                "Email use_pgp= is deprecated; use pgp_mode='encrypt' instead"
+            )
+            # Only override pgp_mode when the caller did not also pass it
+            if pgp_mode is None:
+                pgp_mode = PGPMode.ENCRYPT if use_pgp else PGPMode.NONE
+                # use_pgp counts as an explicit setting
+                pgp_mode_explicit = True
+
+        # Resolve PGP mode via prefix match (allows 'e', 'en', 'encrypt')
+        if not pgp_mode:
+            self.pgp_mode = PGP_MODE_DEFAULT
+        else:
+            self.pgp_mode = next(
+                (m for m in PGP_MODES if m.startswith(str(pgp_mode).lower())),
+                PGP_MODE_DEFAULT,
+            )
+
+        # WKD flag
+        self.use_wkd = bool(use_wkd)
+
+        # wkd=yes implies pgp=encrypt when pgp= was not explicitly set
+        if self.use_wkd and not pgp_mode_explicit:
+            self.pgp_mode = PGPMode.ENCRYPT
+
+        # Build a WKD controller when WKD key discovery is requested
+        wkd_ctrl = (
+            _wkd.AppriseWKDController(
+                asset=self.asset,
+                verify_certificate=self.verify_certificate,
+                request_timeout=self.request_timeout,
+                allow_redirects=self.redirects,
+            )
+            if self.use_wkd
+            else None
+        )
+
         # Prepare our Pretty Good Privacy Object
         self.pgp = _pgp.ApprisePGPController(
             path=self.store.path,
             pub_keyfile=pgp_key,
             email=self.from_addr[1],
             asset=self.asset,
+            wkd=wkd_ctrl,
         )
 
         # We store so we can generate a URL later on
         self.pgp_key = pgp_key
 
-        self.use_pgp = (
-            use_pgp if not None else self.template_args["pgp"]["default"]
-        )
-
-        if self.use_pgp and not _pgp.PGP_SUPPORT:
+        if self.pgp_mode != PGP_MODE_DEFAULT and not _pgp.PGP_SUPPORT:
             self.logger.warning(
                 "PGP Support is not available on this installation; "
                 "ask admin to install PGPy"
@@ -601,7 +670,7 @@ class NotifyEmail(NotifyBase):
                 attach=attach,
                 headers=headers,
                 names=self.names,
-                pgp=self.pgp if self.use_pgp else None,
+                pgp=(self.pgp if self.pgp_mode != PGP_MODE_DEFAULT else None),
                 tzinfo=self.tzinfo,
             ):
                 try:
@@ -652,13 +721,22 @@ class NotifyEmail(NotifyBase):
         """
 
         # Define an URL parameters
-        params = {
-            "pgp": "yes" if self.use_pgp else "no",
-        }
+        params = {}
 
-        # Store our public key back into your URL
+        # Only include pgp= when a mode is active
+        if self.pgp_mode != PGP_MODE_DEFAULT:
+            params["pgp"] = self.pgp_mode
+
+        # Store our public key back into the URL when one was supplied
         if self.pgp_key is not None:
-            params["pgp_key"] = NotifyEmail.quote(self.pgp_key, safe=":\\/")
+            params["pgpkey"] = NotifyEmail.quote(
+                self.pgp_key,
+                safe=":\\/",
+            )
+
+        # Include wkd= when Web Key Directory lookup is enabled
+        if self.use_wkd:
+            params["wkd"] = "yes"
 
         # Append our headers into our parameters
         params.update({"+{}".format(k): v for k, v in self.headers.items()})
@@ -850,12 +928,35 @@ class NotifyEmail(NotifyBase):
             # value if invalid; we'll attempt to figure this out later on
             results["host"] = ""
 
-        # Get PGP Flag
-        results["use_pgp"] = parse_bool(
-            results["qsd"].get(
-                "pgp", NotifyEmail.template_args["pgp"]["default"]
+        # Get PGP mode -- accept the new choice strings (none, encrypt)
+        # with prefix matching, and fall back to legacy boolean parsing
+        # for backward compatibility with existing ?pgp=yes/no URLs.
+        pgp_raw = results["qsd"].get("pgp", "")
+        if pgp_raw:
+            pgp_mode = next(
+                (m for m in PGP_MODES if m.startswith(str(pgp_raw).lower())),
+                None,
             )
-        )
+            if pgp_mode is None:
+                # Not a recognised mode string; try legacy boolean
+                if parse_bool(pgp_raw):
+                    logger.warning(
+                        "Email ?pgp=%s is deprecated;"
+                        " use ?pgp=encrypt instead",
+                        pgp_raw,
+                    )
+                    pgp_mode = PGPMode.ENCRYPT
+                else:
+                    pgp_mode = PGP_MODE_DEFAULT
+            results["pgp_mode"] = pgp_mode
+
+        # Get Web Key Directory flag
+        if "wkd" in results["qsd"] and results["qsd"]["wkd"]:
+            results["use_wkd"] = parse_bool(results["qsd"]["wkd"])
+
+        # wkd=yes implies pgp=encrypt when pgp= was not present in the URL
+        if results.get("use_wkd") and "pgp_mode" not in results:
+            results["pgp_mode"] = PGPMode.ENCRYPT
 
         # Get PGP Public Key Override
         if "pgpkey" in results["qsd"] and results["qsd"]["pgpkey"]:
