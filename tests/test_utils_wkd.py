@@ -143,8 +143,8 @@ def test_wkd_urls_case_normalised():
 def test_wkd_urls_local_part_encoded():
     """wkd_urls() percent-encodes special characters in the local part."""
     sub, direct = AppriseWKDController.wkd_urls("first+last@example.com")
-    assert "first%2Blast" in sub or "first+last" in sub
-    assert "first%2Blast" in direct or "first+last" in direct
+    assert "first%2Blast" in sub
+    assert "first%2Blast" in direct
 
 
 def test_wkd_urls_no_at_sign():
@@ -180,6 +180,35 @@ def test_wkd_urls_none_input():
     sub, direct = AppriseWKDController.wkd_urls(None)
     assert sub is None
     assert direct is None
+
+
+def test_wkd_urls_non_string_input():
+    """wkd_urls() returns (None, None) for non-string truthy inputs.
+
+    Without the isinstance guard, ``"@" not in 123`` raises TypeError
+    before the try/except block can handle it.
+    """
+    for bad in (123, 12.5, object(), ["user@example.com"]):
+        sub, direct = AppriseWKDController.wkd_urls(bad)
+        assert sub is None
+        assert direct is None
+
+
+def test_wkd_urls_ipv4_domain_rejected():
+    """wkd_urls() returns (None, None) for emails with an IPv4 domain.
+
+    WKD is defined for DNS hostnames only (RFC 9080).  Allowing IP
+    literals as the domain creates an SSRF vector because WKD discovery
+    turns recipient domains into outbound HTTPS requests.
+    """
+    for addr in (
+        "user@127.0.0.1",
+        "user@192.168.1.1",
+        "user@10.0.0.1",
+    ):
+        sub, direct = AppriseWKDController.wkd_urls(addr)
+        assert sub is None, f"Expected None for IP domain: {addr}"
+        assert direct is None, f"Expected None for IP domain: {addr}"
 
 
 def test_wkd_urls_lower_raises_attribute_error():
@@ -369,6 +398,17 @@ def test_fetch_none():
     """fetch() returns None when called with None."""
     ctrl = AppriseWKDController()
     assert ctrl.fetch(None) is None
+
+
+def test_fetch_non_string_input():
+    """fetch() returns None for non-string truthy inputs.
+
+    Without the isinstance guard, ``"@" not in 123`` raises TypeError
+    before the method can return None for invalid input.
+    """
+    ctrl = AppriseWKDController()
+    for bad in (123, 12.5, object(), ["user@example.com"]):
+        assert ctrl.fetch(bad) is None
 
 
 def test_fetch_at_only():

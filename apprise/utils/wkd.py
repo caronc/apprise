@@ -167,7 +167,7 @@ class AppriseWKDController:
         """
 
         # Validate and split the email address
-        if not email or "@" not in email:
+        if not isinstance(email, str) or not email or "@" not in email:
             return None, None
 
         try:
@@ -182,7 +182,7 @@ class AppriseWKDController:
         # crafted email like user@legit.com@attacker.test splits to
         # domain="legit.com@attacker.test", causing the WKD request to
         # reach attacker.test with legit.com as URL credentials.
-        if not is_hostname(domain, ipv4=True, ipv6=False, underscore=False):
+        if not is_hostname(domain, ipv4=False, ipv6=False, underscore=False):
             return None, None
 
         # SHA-1 of the lower-cased local part, then z-base32 encoded
@@ -219,7 +219,7 @@ class AppriseWKDController:
         """
 
         # Reject obviously invalid input
-        if not email or "@" not in email:
+        if not isinstance(email, str) or not email or "@" not in email:
             return None
 
         # Normalise for cache lookups
