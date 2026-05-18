@@ -315,11 +315,14 @@ class ApprisePGPController:
             # No WKD controller configured
             return None
 
-        # Prefer supplied recipient emails; self.email is a last-resort
-        # fallback for when no recipient key is available (e.g. self-send).
-        # Putting self.email first would encrypt to the sender's key,
-        # leaving the recipient unable to decrypt the message.
-        candidates = [*emails, self.email] if self.email else list(emails)
+        # Use only the supplied recipient emails when provided. Fall back
+        # to self.email only when no recipient emails were supplied
+        # (for example, an explicit self-send). Otherwise a missed
+        # recipient WKD lookup could incorrectly encrypt to the sender's
+        # key, leaving the intended recipient unable to decrypt.
+        candidates = (
+            list(emails) if emails else ([self.email] if self.email else [])
+        )
 
         for email in candidates:
             if not email:

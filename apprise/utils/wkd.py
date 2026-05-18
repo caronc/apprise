@@ -59,6 +59,7 @@ import requests
 from ..asset import AppriseAsset
 from ..exception import ApprisePluginException
 from ..logger import logger
+from .parse import is_hostname
 
 
 class AppriseWKDException(ApprisePluginException):
@@ -177,6 +178,13 @@ class AppriseWKDController:
         if not local or not domain:
             return None, None
 
+        # Reject domains that fail hostname validation.  Without this, a
+        # crafted email like user@legit.com@attacker.test splits to
+        # domain="legit.com@attacker.test", causing the WKD request to
+        # reach attacker.test with legit.com as URL credentials.
+        if not is_hostname(domain, ipv4=True, ipv6=False, underscore=False):
+            return None, None
+
         # SHA-1 of the lower-cased local part, then z-base32 encoded
         hash_val = cls.zb32_encode(
             hashlib.sha1(local.encode("utf-8")).digest()
@@ -260,34 +268,76 @@ class AppriseWKDController:
         logger.debug("WKD GET %s", url)
 
         try:
-            r = requests.get(
+            with requests.get(
                 url,
                 headers={"User-Agent": self.asset.app_id},
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
                 allow_redirects=self.allow_redirects,
-            )
+                # Stream so we can abort early without buffering everything
+                stream=True,
+            ) as r:
+                if r.status_code != requests.codes.ok:
+                    logger.debug(
+                        "WKD returned HTTP %d for %s", r.status_code, url
+                    )
+                    return None
 
-        except requests.RequestException as exc:
-            # Connection refused, DNS failure, TLS error, timeout, etc.
+                # Verify the final URL after any redirects is still HTTPS.
+                # Following a redirect to HTTP would expose the key material
+                # to interception and break the WKD trust model.
+                if not r.url.lower().startswith("https://"):
+                    logger.debug(
+                        "WKD redirect ended on non-HTTPS URL for %s; skipping",
+                        url,
+                    )
+                    return None
+
+                # Reject early when the server advertises an oversized body
+                # before we read a single byte
+                content_length = r.headers.get("Content-Length")
+                if content_length is not None:
+                    try:
+                        if int(content_length) > self.max_response_size:
+                            logger.warning(
+                                "WKD response too large (%s bytes) for"
+                                " %s; skipping",
+                                content_length,
+                                url,
+                            )
+                            return None
+                    except (TypeError, ValueError):
+                        # Malformed Content-Length; let the chunk
+                        # accumulation guard catch any actual oversize
+                        pass
+
+                # Consume the body in 8 KiB chunks, checking cumulative
+                # size after each chunk so we abort before the full body
+                # is in memory
+                content = bytearray()
+                for chunk in r.iter_content(chunk_size=8192):
+                    if not chunk:
+                        continue
+                    content.extend(chunk)
+                    if len(content) > self.max_response_size:
+                        logger.warning(
+                            "WKD response too large (%d bytes) for"
+                            " %s; skipping",
+                            len(content),
+                            url,
+                        )
+                        return None
+
+                content = bytes(content)
+
+        except Exception as exc:
+            # Connection refused, DNS failure, TLS error, timeout mid-
+            # stream, disk full, connection reset, IncompleteRead, etc.
             logger.debug("WKD request failed for %s: %s", url, str(exc))
             return None
 
-        if r.status_code != requests.codes.ok:
-            logger.debug("WKD returned HTTP %d for %s", r.status_code, url)
-            return None
-
-        content = r.content
         if not content:
             logger.debug("WKD returned empty body for %s", url)
-            return None
-
-        if len(content) > self.max_response_size:
-            logger.warning(
-                "WKD response too large (%d bytes) for %s; skipping",
-                len(content),
-                url,
-            )
             return None
 
         # Reject obvious non-PGP responses (e.g. an HTML error page served

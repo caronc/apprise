@@ -3027,10 +3027,9 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     assert obj is not None
     assert obj.pgp_key == "/path/to/my-pub.asc"
     # Full URL includes pgpkey= (path may be percent-encoded in the query
-    # string); privacy URL must replace the value with **** (also encoded)
+    # string); privacy URL must replace the value with literal ****
     assert "pgpkey=" in obj.url(privacy=False)
-    # **** percent-encodes to %2A%2A%2A%2A in the query string
-    assert "pgpkey=%2A%2A%2A%2A" in obj.url(privacy=True)
+    assert "pgpkey=****" in obj.url(privacy=True)
     assert "my-pub.asc" not in obj.url(privacy=True)
 
 
@@ -3086,6 +3085,13 @@ def test_plugin_email_wkd_param(mock_smtp, mock_smtpssl):
     )
     assert obj.use_wkd is False
 
+    # Direct __init__ call with use_wkd=True and no pgp_mode
+    obj = email.NotifyEmail(
+        user="user", password="pass", host="nuxref.com", use_wkd=True
+    )
+    assert obj.use_wkd is True
+    assert obj.pgp_mode == "encrypt"
+
     # url() omits wkd= when disabled (it is the default)
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
     assert "wkd=" not in obj.url()
@@ -3135,6 +3141,10 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     # Patch WKD fetch to return our generated public key
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
         assert obj.notify("test body") is True
+
+    # Clear the parsed-key cache so the second block cannot reuse the
+    # key loaded above -- we need the fetch mock to be the sole source
+    obj.pgp._ApprisePGPController__key_lookup.clear()
 
     # WKD returning None with autogen disabled falls through gracefully
     asset.pgp_autogen = False

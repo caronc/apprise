@@ -878,7 +878,7 @@ class NotifyEmail(NotifyBase):
                     ]
                 )
             ),
-            params=NotifyEmail.urlencode(params),
+            params=NotifyEmail.urlencode(params, safe="*"),
         )
 
     @property

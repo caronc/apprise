@@ -90,18 +90,28 @@ def test_zb32_encode_single_byte():
 
 
 def test_zb32_encode_known_vector():
-    """Verify encoding of the 20-byte SHA-1 of 'test' local part.
+    """Verify z-base32 encoding against independently computed single-byte
+    reference values.
 
-    The expected value is produced by the same algorithm implemented here;
-    this guards against accidental alphabet or bit-shift regressions.
+    These expected strings are derived from first principles: each 5-bit
+    group maps directly to _ZB32[value], and leftover bits are
+    left-aligned.  They do NOT call zb32_encode() to generate the
+    expected string, so a regression in the alphabet or bit-shifting
+    logic will cause at least one assertion to fail.
+
+    0xf8 = 11111000:
+      group1 (bits 0-4): 11111 = 31 -> '9'
+      leftover (bits 5-7) << 2: 00000 = 0 -> 'y'
+    0xa8 = 10101000:
+      group1 (bits 0-4): 10101 = 21 -> 'i'
+      leftover (bits 5-7) << 2: 00000 = 0 -> 'y'
+    0x08 = 00001000:
+      group1 (bits 0-4): 00001 = 1 -> 'b'
+      leftover (bits 5-7) << 2: 00000 = 0 -> 'y'
     """
-    import hashlib
-
-    digest = hashlib.sha1(b"test").digest()
-    expected = AppriseWKDController.zb32_encode(digest)
-
-    # Re-encode to confirm idempotency
-    assert AppriseWKDController.zb32_encode(digest) == expected
+    assert AppriseWKDController.zb32_encode(b"\xf8") == "9y"
+    assert AppriseWKDController.zb32_encode(b"\xa8") == "iy"
+    assert AppriseWKDController.zb32_encode(b"\x08") == "by"
 
 
 # ---------------------------------------------------------------------------
@@ -188,9 +198,53 @@ def test_wkd_urls_lower_raises_attribute_error():
     assert direct is None
 
 
+def test_wkd_urls_domain_injection_rejected():
+    """wkd_urls() returns (None, None) for emails whose domain contains
+    characters that would rewrite the URL host.
+
+    user@legit.com@attacker.test splits to domain='legit.com@attacker.test'
+    which, when embedded in an HTTPS URL, sends the request to attacker.test
+    with legit.com as URL credentials.  The is_hostname() guard rejects it.
+    """
+    for bad_email in (
+        "user@example.com@attacker.test",
+        "user@example.com/path",
+        "user@example.com:8080",
+        "user@example.com space",
+    ):
+        sub, direct = AppriseWKDController.wkd_urls(bad_email)
+        assert sub is None, f"Expected None for domain injection: {bad_email}"
+        assert direct is None, (
+            f"Expected None for domain injection: {bad_email}"
+        )
+
+
 # ---------------------------------------------------------------------------
 # AppriseWKDController.fetch -- happy path
 # ---------------------------------------------------------------------------
+
+
+def _make_resp(status_code, chunks=None, url=None):
+    """Build a context-manager-compatible requests.Response mock.
+
+    ``chunks`` is a list of byte strings that iter_content() will yield.
+    Pass an empty list for an empty body.  Leave as None when the status
+    code is non-200 and the body will never be consumed.
+    ``url`` sets r.url (the final URL after any redirects).  When omitted
+    the attribute is a MagicMock, which passes the HTTPS check because
+    MagicMock().lower().startswith() is truthy.
+    """
+    resp = mock.MagicMock(status_code=status_code)
+    resp.__enter__ = mock.Mock(return_value=resp)
+    resp.__exit__ = mock.Mock(return_value=False)
+    # Default to an empty headers dict so r.headers.get("Content-Length")
+    # returns None; tests that need a specific header override this
+    resp.headers = {}
+    if url is not None:
+        resp.url = url
+    if chunks is not None:
+        resp.iter_content.return_value = iter(chunks)
+    return resp
 
 
 @mock.patch("requests.get")
@@ -199,11 +253,8 @@ def test_fetch_subdomain_success(mock_get):
     # 0x99 is a valid old-format OpenPGP packet header byte (bit 7 set)
     key_bytes = b"\x99fake-openpgp-key-data"
 
-    # Subdomain call succeeds
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok,
-        content=key_bytes,
-    )
+    # Subdomain call succeeds; iter_content yields the key in one chunk
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[key_bytes])
 
     ctrl = AppriseWKDController()
     result = ctrl.fetch("user@example.com")
@@ -217,10 +268,10 @@ def test_fetch_direct_fallback(mock_get):
     """fetch() tries the direct URL when the subdomain URL fails."""
     key_bytes = b"\x99another-fake-key"
 
-    # Subdomain -> 404, direct -> 200
+    # Subdomain -> 404 (body never consumed), direct -> 200 with key bytes
     mock_get.side_effect = [
-        mock.Mock(status_code=404, content=b""),
-        mock.Mock(status_code=requests.codes.ok, content=key_bytes),
+        _make_resp(404),
+        _make_resp(requests.codes.ok, chunks=[key_bytes]),
     ]
 
     ctrl = AppriseWKDController()
@@ -233,7 +284,7 @@ def test_fetch_direct_fallback(mock_get):
 @mock.patch("requests.get")
 def test_fetch_both_fail(mock_get):
     """fetch() returns None when both WKD URLs fail."""
-    mock_get.return_value = mock.Mock(status_code=404, content=b"")
+    mock_get.return_value = _make_resp(404)
 
     ctrl = AppriseWKDController()
     result = ctrl.fetch("user@example.com")
@@ -251,10 +302,7 @@ def test_fetch_both_fail(mock_get):
 def test_fetch_caches_result(mock_get):
     """A successful fetch is cached; subsequent calls skip the network."""
     key_bytes = b"\x99cached-key"
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok,
-        content=key_bytes,
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[key_bytes])
 
     ctrl = AppriseWKDController()
     result1 = ctrl.fetch("user@example.com")
@@ -270,10 +318,7 @@ def test_fetch_caches_result(mock_get):
 def test_fetch_cache_case_insensitive(mock_get):
     """Cache lookup normalises the email address."""
     key_bytes = b"\x99normalised-key"
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok,
-        content=key_bytes,
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[key_bytes])
 
     ctrl = AppriseWKDController()
     ctrl.fetch("User@Example.COM")
@@ -287,10 +332,7 @@ def test_fetch_cache_case_insensitive(mock_get):
 def test_fetch_expired_cache_refetches(mock_get):
     """An expired cache entry triggers a new network request."""
     key_bytes = b"\x99refreshed-key"
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok,
-        content=key_bytes,
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[key_bytes])
 
     ctrl = AppriseWKDController()
 
@@ -349,7 +391,7 @@ def test_fetch_at_only():
 def test_get_non_200_returns_none(mock_get):
     """_get() returns None for any non-200 HTTP status."""
     for code in (301, 400, 403, 404, 500):
-        mock_get.return_value = mock.Mock(status_code=code, content=b"body")
+        mock_get.return_value = _make_resp(code)
         ctrl = AppriseWKDController()
         assert ctrl._get("https://example.com/key") is None
 
@@ -357,21 +399,78 @@ def test_get_non_200_returns_none(mock_get):
 @mock.patch("requests.get")
 def test_get_empty_body_returns_none(mock_get):
     """_get() returns None when the response body is empty."""
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=b""
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[])
     ctrl = AppriseWKDController()
     assert ctrl._get("https://example.com/key") is None
 
 
 @mock.patch("requests.get")
-def test_get_oversized_body_returns_none(mock_get):
-    """_get() returns None when the response exceeds max_response_size."""
-    ctrl = AppriseWKDController()
-    oversized = b"x" * (ctrl.max_response_size + 1)
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=oversized
+def test_get_empty_chunk_is_skipped(mock_get):
+    """_get() skips empty bytestrings yielded by iter_content().
+
+    Some HTTP adapters yield b"" sentinel chunks between real chunks;
+    the in-loop ``if not chunk: continue`` guard must skip them so they
+    do not corrupt the accumulated content or trigger a false empty-body
+    result.
+    """
+    # Interleave an empty sentinel before a valid PGP binary chunk
+    key_bytes = b"\x99" + b"\x00" * 8
+    mock_get.return_value = _make_resp(
+        requests.codes.ok, chunks=[b"", key_bytes]
     )
+    ctrl = AppriseWKDController()
+    result = ctrl._get("https://example.com/key")
+    assert result == key_bytes
+
+
+@mock.patch("requests.get")
+def test_get_oversized_via_content_length_returns_none(mock_get):
+    """_get() rejects early when Content-Length already exceeds the limit.
+
+    iter_content() must not be called at all -- we detect the oversize
+    from the header before reading any bytes.
+    """
+    ctrl = AppriseWKDController()
+    resp = _make_resp(requests.codes.ok)
+    resp.headers = {"Content-Length": str(ctrl.max_response_size + 1)}
+    mock_get.return_value = resp
+    assert ctrl._get("https://example.com/key") is None
+    resp.iter_content.assert_not_called()
+
+
+@mock.patch("requests.get")
+def test_get_valid_content_length_within_limit_proceeds(mock_get):
+    """_get() proceeds to read chunks when Content-Length is within the limit.
+
+    This exercises the branch where content_length is not None and the
+    parsed value does not exceed max_response_size.
+    """
+    key_bytes = b"\x99valid-key"
+    resp = _make_resp(requests.codes.ok, chunks=[key_bytes])
+    resp.headers = {"Content-Length": str(len(key_bytes))}
+    mock_get.return_value = resp
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") == key_bytes
+
+
+@mock.patch("requests.get")
+def test_get_malformed_content_length_proceeds(mock_get):
+    """_get() ignores a malformed Content-Length and reads chunks normally."""
+    key_bytes = b"\x99valid-key"
+    resp = _make_resp(requests.codes.ok, chunks=[key_bytes])
+    resp.headers = {"Content-Length": "not-a-number"}
+    mock_get.return_value = resp
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") == key_bytes
+
+
+@mock.patch("requests.get")
+def test_get_oversized_body_returns_none(mock_get):
+    """_get() returns None when accumulated chunks exceed max_response_size."""
+    ctrl = AppriseWKDController()
+    # Single chunk one byte over the limit triggers the in-loop guard
+    oversized = b"\x99" + b"x" * ctrl.max_response_size
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[oversized])
     assert ctrl._get("https://example.com/key") is None
 
 
@@ -389,9 +488,7 @@ def test_get_non_pgp_body_returns_none(mock_get):
         b"{}",
         b"Not PGP data",
     ):
-        mock_get.return_value = mock.Mock(
-            status_code=requests.codes.ok, content=non_pgp
-        )
+        mock_get.return_value = _make_resp(requests.codes.ok, chunks=[non_pgp])
         ctrl = AppriseWKDController()
         assert ctrl._get("https://example.com/key") is None, (
             f"Expected None for non-PGP content: {non_pgp[:20]}"
@@ -404,9 +501,7 @@ def test_get_binary_pgp_packet_accepted(mock_get):
     binary packet format)."""
     # 0x99 is the old-format public-key packet header
     pgp_binary = b"\x99\x01\xd6" + b"\x00" * 100
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=pgp_binary
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[pgp_binary])
     ctrl = AppriseWKDController()
     assert ctrl._get("https://example.com/key") == pgp_binary
 
@@ -415,9 +510,7 @@ def test_get_binary_pgp_packet_accepted(mock_get):
 def test_get_ascii_armoured_key_accepted(mock_get):
     """_get() accepts ASCII-armoured PGP key material (starts with '-----')."""
     armoured = b"-----BEGIN PGP PUBLIC KEY BLOCK-----\n..."
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=armoured
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[armoured])
     ctrl = AppriseWKDController()
     assert ctrl._get("https://example.com/key") == armoured
 
@@ -430,12 +523,55 @@ def test_get_request_exception_returns_none(mock_get):
 
 
 @mock.patch("requests.get")
+def test_get_stream_oserror_returns_none(mock_get):
+    """_get() returns None when iter_content() raises OSError mid-stream.
+
+    Covers disk-full, connection-reset, and other IO-level failures that
+    surface after the HTTP headers have been received successfully.
+    """
+    resp = _make_resp(requests.codes.ok)
+    resp.iter_content.side_effect = OSError("connection reset by peer")
+    mock_get.return_value = resp
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") is None
+
+
+@mock.patch("requests.get")
+def test_get_stream_generic_exception_returns_none(mock_get):
+    """_get() returns None when iter_content() raises an unexpected exception.
+
+    Covers urllib3 IncompleteRead, read-timeout mid-stream, and any other
+    exception not otherwise categorised.
+    """
+    resp = _make_resp(requests.codes.ok)
+    resp.iter_content.side_effect = Exception("unexpected streaming error")
+    mock_get.return_value = resp
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") is None
+
+
+@mock.patch("requests.get")
+def test_get_http_redirect_rejected(mock_get):
+    """_get() returns None when a redirect lands on a non-HTTPS URL.
+
+    A redirect from HTTPS to HTTP would expose key material to interception
+    and break the WKD trust model.
+    """
+    resp = _make_resp(
+        requests.codes.ok,
+        chunks=[b"\x99key"],
+        url="http://attacker.example.com/hu/abc",
+    )
+    mock_get.return_value = resp
+    ctrl = AppriseWKDController()
+    assert ctrl._get("https://example.com/key") is None
+
+
+@mock.patch("requests.get")
 def test_get_success_returns_bytes(mock_get):
     """_get() returns the response bytes on HTTP 200 with content."""
     payload = b"\x99\xaa\xbb\xcc"
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=payload
-    )
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[payload])
     ctrl = AppriseWKDController()
     assert ctrl._get("https://example.com/key") == payload
 
@@ -503,11 +639,9 @@ def test_custom_allow_redirects():
 
 @mock.patch("requests.get")
 def test_get_passes_verify_and_timeout(mock_get):
-    """_get() forwards verify_certificate, request_timeout, and
-    allow_redirects to requests."""
-    mock_get.return_value = mock.Mock(
-        status_code=requests.codes.ok, content=b"\x99key"
-    )
+    """_get() forwards verify_certificate, request_timeout, allow_redirects,
+    and stream=True to requests."""
+    mock_get.return_value = _make_resp(requests.codes.ok, chunks=[b"\x99key"])
     ctrl = AppriseWKDController(
         verify_certificate=False, request_timeout=(1, 5), allow_redirects=False
     )
@@ -517,3 +651,4 @@ def test_get_passes_verify_and_timeout(mock_get):
     assert kwargs["verify"] is False
     assert kwargs["timeout"] == (1, 5)
     assert kwargs["allow_redirects"] is False
+    assert kwargs["stream"] is True
