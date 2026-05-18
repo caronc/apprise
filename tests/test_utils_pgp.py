@@ -283,6 +283,21 @@ def test_public_key_wkd_fails_falls_through_to_autogen(tmpdir):
     mock_wkd.fetch.assert_called()
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
+def test_public_key_malformed_local_file_returns_none(tmpdir):
+    """public_key() returns None gracefully when the local .asc file is
+    not valid PGP data (pgpy raises during parse)."""
+    # Write a file with non-PGP content under a name that public_keyfile()
+    # will discover automatically
+    bad_key_path = tmpdir.join("pub.asc")
+    bad_key_path.write("this is not a pgp key\n")
+
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    # No autogen so the only candidate is the malformed file above
+    result = ctrl.public_key(autogen=False)
+    assert result is None
+
+
 # ---------------------------------------------------------------------------
 # prune() -- WKD delegation
 # ---------------------------------------------------------------------------

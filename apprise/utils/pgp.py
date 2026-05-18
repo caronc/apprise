@@ -406,6 +406,11 @@ class ApprisePGPController:
             logger.debug(f"I/O Exception: {e}")
             return None
 
+        except Exception:
+            # Malformed or non-PGP file content (e.g. pgpy.errors.PGPError)
+            logger.warning("PGP Public Key file could not be parsed: %s", path)
+            return None
+
         self.__key_lookup[key] = {
             "public_key": public_key,
             "expires": datetime.now(timezone.utc) + timedelta(seconds=86400),
