@@ -133,11 +133,44 @@ def test_wkd_urls_structure():
 
 
 def test_wkd_urls_case_normalised():
-    """wkd_urls() lower-cases the email before building URLs."""
-    sub1, dir1 = AppriseWKDController.wkd_urls("User@Example.COM")
-    sub2, dir2 = AppriseWKDController.wkd_urls("user@example.com")
-    assert sub1 == sub2
-    assert dir1 == dir2
+    """wkd_urls() produces the same hash and domain for differently-cased
+    inputs, but preserves the original local-part case in ?l= (RFC 9080).
+
+    The hash component uses the lower-cased local part (spec requirement),
+    the domain is always lower-cased (URL canonicalisation), and the ?l=
+    query parameter carries the unchanged original local part -- so two
+    addresses that differ only in local-part capitalisation will share the
+    same hash/path but differ in their ?l= value.
+    """
+    sub_upper, dir_upper = AppriseWKDController.wkd_urls("User@Example.COM")
+    sub_lower, dir_lower = AppriseWKDController.wkd_urls("user@example.com")
+
+    # Hash and domain parts must be identical
+    assert sub_upper.split("?")[0] == sub_lower.split("?")[0]
+    assert dir_upper.split("?")[0] == dir_lower.split("?")[0]
+
+    # ?l= must carry the original (unchanged) local part
+    assert "?l=User" in sub_upper
+    assert "?l=user" in sub_lower
+
+    # Domain is always lower-cased regardless of input
+    assert "example.com" in sub_lower
+
+
+def test_wkd_urls_l_param_preserves_original_case():
+    """?l= carries the unchanged local-part per RFC 9080.
+
+    The spec example: Joe.Doe@Example.ORG ->
+      ?l=Joe.Doe  (original case, not lowercased)
+    The hash is computed from the lowercased local part; only ?l= keeps
+    the original capitalisation.
+    """
+    sub, direct = AppriseWKDController.wkd_urls("Joe.Doe@Example.ORG")
+    assert "?l=Joe.Doe" in sub
+    assert "?l=Joe.Doe" in direct
+    # Domain part is always lowercased in the URL path
+    assert "example.org" in sub
+    assert "example.org" in direct
 
 
 def test_wkd_urls_local_part_encoded():
@@ -212,15 +245,17 @@ def test_wkd_urls_ipv4_domain_rejected():
 
 
 def test_wkd_urls_lower_raises_attribute_error():
-    """wkd_urls() returns (None, None) when email.lower() raises.
+    """wkd_urls() returns (None, None) when email.split() raises.
 
     Covers the defensive except branch for string-like objects that pass
-    the '@' membership check but fail during normalisation.
+    the '@' membership check but fail during splitting.  (After the
+    RFC 9080 case-preservation fix, split() is called before lower(), so
+    breaking split() is what exercises this path.)
     """
 
     class BrokenStr(str):
-        def lower(self):
-            raise AttributeError("broken lower")
+        def split(self, *args, **kwargs):
+            raise AttributeError("broken split")
 
     sub, direct = AppriseWKDController.wkd_urls(BrokenStr("user@example.com"))
     assert sub is None

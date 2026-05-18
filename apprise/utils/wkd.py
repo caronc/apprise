@@ -171,7 +171,12 @@ class AppriseWKDController:
             return None, None
 
         try:
-            local, domain = email.lower().split("@", 1)
+            # Split before lowercasing so the original local-part case
+            # is preserved for the ?l= query parameter (RFC 9080 requires
+            # the unchanged local-part; only the hash uses lowercase)
+            local_orig, domain = email.split("@", 1)
+            local = local_orig.lower()
+            domain = domain.lower()
         except (ValueError, AttributeError):
             return None, None
 
@@ -190,8 +195,8 @@ class AppriseWKDController:
             hashlib.sha1(local.encode("utf-8")).digest()
         )
 
-        # URL-encode the local part for the ?l= query parameter
-        quoted_local = quote(local)
+        # URL-encode the original (unchanged) local part for ?l= per RFC 9080
+        quoted_local = quote(local_orig)
 
         # Subdomain method (preferred per RFC 9080)
         subdomain_url = (
@@ -231,8 +236,10 @@ class AppriseWKDController:
             logger.debug("WKD cache hit for %s", email_key)
             return cached["data"]
 
-        # Build the two WKD URLs
-        subdomain_url, direct_url = self.wkd_urls(email_key)
+        # Build the two WKD URLs; pass the stripped original (not the
+        # lowercased key) so wkd_urls() can preserve the local-part case
+        # in the ?l= parameter as required by RFC 9080
+        subdomain_url, direct_url = self.wkd_urls(email.strip())
         if not subdomain_url:
             # wkd_urls() returned None, None -- email was malformed
             return None
