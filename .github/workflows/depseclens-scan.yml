@@ -1,0 +1,123 @@
+# .github/workflows/depseclens-scan.yml
+# DepSecLens — dependency security scan on every Pull Request.
+#
+# What this does:
+#   1. Triggers when a PR touches Python dependency files
+#   2. Runs DepSecLens CLI against your DepSecLens backend
+#   3. Posts (or updates) a summary comment on the PR
+#   4. Fails the check if a CRITICAL vulnerability is found
+#
+# Before using this workflow, see examples/github-action/README.md for setup.
+
+name: DepSecLens Scan
+
+on:
+  pull_request:
+    paths:
+      - 'requirements.txt'
+      - 'requirements/**.txt'
+      - 'requirements-*.txt'
+      - 'pyproject.toml'
+      - 'setup.py'
+      - 'setup.cfg'
+      - 'Pipfile'
+      - 'Pipfile.lock'
+      - 'poetry.lock'
+  workflow_dispatch:  # allow manual trigger from the Actions tab
+
+permissions:
+  contents: read
+  pull-requests: write   # required to post / update the PR comment
+
+jobs:
+  scan:
+    name: Dependency security scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 35   # backend analysis can be slow on first run
+
+    steps:
+      # ── 1. Check out the repo being scanned ────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Check out the DepSecLens repo just to grab the CLI ──────────
+      #     Change `repository:` to point at YOUR fork / instance of DepSecLens.
+      - name: Checkout DepSecLens CLI
+        uses: actions/checkout@v4
+        with:
+          repository: ChayanidTermph/DepSecLens   # ⚠️ change to your fork
+          path: .depseclens
+          ref: main
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      # ── 3. Run the analysis ────────────────────────────────────────────
+      #     continue-on-error so the comment step still runs even if --fail-on fires.
+      - name: Run DepSecLens analyze
+        id: scan
+        continue-on-error: true
+        env:
+          DEPSECLENS_API_URL: ${{ secrets.DEPSECLENS_API_URL }}
+          DEPSECLENS_TOKEN:   ${{ secrets.DEPSECLENS_TOKEN }}
+        run: |
+          node .depseclens/cli/bin/depseclens.js analyze \
+            --ci \
+            --out depseclens-summary.md \
+            --fail-on critical \
+            --timeout 1800
+
+      # ── 4. Post (or update) the PR comment ─────────────────────────────
+      - name: Comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- depseclens-summary -->';
+
+            let body;
+            try {
+              body = fs.readFileSync('depseclens-summary.md', 'utf-8');
+            } catch (err) {
+              body = '⚠️ **DepSecLens** — analysis did not complete. ' +
+                     'Check the workflow logs for details.';
+            }
+            body = marker + '\n' + body;
+
+            // Look for an existing DepSecLens comment we can update (sticky).
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              per_page: 100
+            });
+
+            const existing = comments.find(c => c.body && c.body.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body
+              });
+              core.info(`Updated existing comment #${existing.id}`);
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body
+              });
+              core.info('Posted new DepSecLens comment');
+            }
+
+      # ── 5. Re-surface failure so the check goes red ────────────────────
+      - name: Fail workflow if scan failed
+        if: steps.scan.outcome == 'failure'
+        run: |
+          echo "::error::DepSecLens scan failed or found critical vulnerabilities."
+          exit 1
