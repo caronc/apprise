@@ -29,6 +29,7 @@
 from datetime import datetime, timedelta, timezone
 import logging
 from unittest import mock
+from urllib.parse import urlparse
 
 import requests
 
@@ -168,9 +169,9 @@ def test_wkd_urls_l_param_preserves_original_case():
     sub, direct = AppriseWKDController.wkd_urls("Joe.Doe@Example.ORG")
     assert "?l=Joe.Doe" in sub
     assert "?l=Joe.Doe" in direct
-    # Domain part is always lowercased in the URL path
-    assert "example.org" in sub
-    assert "example.org" in direct
+    # Domain part is always lowercased in the URL host
+    assert urlparse(sub).hostname == "openpgpkey.example.org"
+    assert urlparse(direct).hostname == "example.org"
 
 
 def test_wkd_urls_local_part_encoded():
