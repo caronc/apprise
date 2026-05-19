@@ -219,6 +219,7 @@ class NotifySessionOGS(NotifyBase):
                 "name": _("Public Key"),
                 "type": "string",
                 "required": True,
+                "map_to": "public_key",
             },
             # URL password field carries the 64-hex Ed25519 seed.
             "password": {
@@ -226,6 +227,7 @@ class NotifySessionOGS(NotifyBase):
                 "type": "string",
                 "private": True,
                 "required": True,
+                "map_to": "seed",
             },
             "targets": {
                 "name": _("Rooms"),
