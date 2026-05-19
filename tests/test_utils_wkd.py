@@ -155,7 +155,7 @@ def test_wkd_urls_case_normalised():
     assert "?l=user" in sub_lower
 
     # Domain is always lower-cased regardless of input
-    assert "example.com" in sub_lower
+    assert urlparse(sub_lower).hostname == "openpgpkey.example.com"
 
 
 def test_wkd_urls_l_param_preserves_original_case():
