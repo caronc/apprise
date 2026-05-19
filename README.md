@@ -136,6 +136,7 @@ The table below identifies the services this tool supports and some example serv
 | [SendGrid](https://appriseit.com/services/sendgrid/) | sendgrid://  | (TCP) 443   | sendgrid://APIToken:FromEmail/<br />sendgrid://APIToken:FromEmail/ToEmail<br />sendgrid://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [SendPulse](https://appriseit.com/services/sendpulse/) | sendpulse://  | (TCP) 443   | sendpulse://user@host/ClientId/ClientSecret<br />sendpulse://user@host/ClientId/clientSecret/ToEmail<br />sendpulse://user@host/ClientId/ClientSecret/ToEmail1/ToEmail2/ToEmailN/
 | [ServerChan](https://appriseit.com/services/serverchan/) | schan://   | (TCP) 443    | schan://sendkey/
+| [Session Open Group Server](https://appriseit.com/services/sogs/) | session:// or sessions:// | (TCP) 80 or 443 | sessions://hostname/ServerPubKey/Room?privkey=seed<br/>sessions://hostname/ServerPubKey/Room1/Room2?privkey=seed<br/>sessions://hostname:port/ServerPubKey/Room?privkey=seed<br/>session://hostname/ServerPubKey/Room?privkey=seed
 | [Signal API](https://appriseit.com/services/signal/) | signal://  or signals:// | (TCP) 80 or 443  | signal://hostname:port/FromPhoneNo<br/>signal://hostname:port/FromPhoneNo/ToPhoneNo<br/>signal://hostname:port/FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [SIGNL4](https://appriseit.com/services/signl4/) | signl4://  | (TCP) 80 or 443  | signl4://hostname
 | [SimplePush](https://appriseit.com/services/simplepush/) | spush://   | (TCP) 443    | spush://apikey<br />spush://salt:password@apikey<br />spush://apikey?event=Apprise
