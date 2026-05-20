@@ -47,7 +47,7 @@ jobs:
         with:
           repository: ChayanidTermph/DepSecLens   # ⚠️ change to your fork
           path: .depseclens
-          ref: main
+          ref: depseclens-fullver                 # branch that holds the code
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
