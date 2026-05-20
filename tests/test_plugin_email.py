@@ -242,7 +242,28 @@ TEST_URLS = (
     (
         "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=yes",
         {
-            # Test pgp flag
+            # Test deprecated pgp=yes flag (backward compat)
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=encrypt",
+        {
+            # Test canonical pgp=encrypt mode string
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=e",
+        {
+            # Test pgp= prefix shorthand ('e' -> 'encrypt')
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com?wkd=yes",
+        {
+            # Test wkd= flag in isolation (no pgp mode set)
             "instance": email.NotifyEmail,
         },
     ),
@@ -2575,7 +2596,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     utils.pgp.PGP_SUPPORT = False
     # Forces to run through section of code that produces a warning there is
     # no PGP
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=yes")
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
     # No PGP Support and set enabled
     assert obj.notify("test body") is False
 
@@ -2583,7 +2604,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     utils.pgp.PGP_SUPPORT = True
 
     # Initialize our email (no from name)
-    obj = Apprise.instantiate("mailto://user2:pass@nuxref.com?pgp=yes")
+    obj = Apprise.instantiate("mailto://user2:pass@nuxref.com?pgp=encrypt")
 
     # Nothing to lookup
     assert obj.pgp.public_keyfile() is None
@@ -2912,6 +2933,223 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Key is a binary image; definitely not a valid key
     assert obj.notify("test") is False
+
+
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
+    """NotifyEmail() pgp_mode parameter and backward-compat use_pgp."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # pgp= absent -> pgp_mode defaults to 'no'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
+    assert obj is not None
+    assert obj.pgp_mode == "no"
+    assert obj.use_wkd is False
+
+    # pgp=encrypt -> pgp_mode = 'encrypt'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
+    assert obj.pgp_mode == "encrypt"
+
+    # pgp=e (prefix shorthand) -> pgp_mode = 'encrypt'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=e")
+    assert obj.pgp_mode == "encrypt"
+
+    # pgp=none -> no mode match; falls to default 'no' (backward compat)
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=none")
+    assert obj.pgp_mode == "no"
+
+    # pgp=n -> prefix matches 'no'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=n")
+    assert obj.pgp_mode == "no"
+
+    # pgp=no -> direct mode match; canonical URL form
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no")
+    assert obj.pgp_mode == "no"
+
+    # pgp=false -> legacy bool path; no deprecation warning -> default 'no'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=false")
+    assert obj.pgp_mode == "no"
+
+    # pgp=yes -> parse_bool -> True -> 'encrypt' (deprecated path)
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=yes")
+    assert obj.pgp_mode == "encrypt"
+
+    # pgp=true -> same deprecated path
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=true")
+    assert obj.pgp_mode == "encrypt"
+
+    # url() emits 'pgp=encrypt' when mode is encrypt, and nothing when no
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
+    assert "pgp=encrypt" in obj.url()
+    assert "pgp=no" not in obj.url()
+
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
+    assert "pgp=" not in obj.url()
+
+    # use_pgp=True deprecated kwarg maps to pgp_mode='encrypt'
+    obj = email.NotifyEmail(
+        user="user",
+        password="pass",
+        host="nuxref.com",
+        use_pgp=True,
+    )
+    assert obj.pgp_mode == "encrypt"
+
+    # use_pgp=False deprecated kwarg maps to pgp_mode='no'
+    obj = email.NotifyEmail(
+        user="user",
+        password="pass",
+        host="nuxref.com",
+        use_pgp=False,
+    )
+    assert obj.pgp_mode == "no"
+
+    # pgp_mode wins over use_pgp when both are supplied
+    obj = email.NotifyEmail(
+        user="user",
+        password="pass",
+        host="nuxref.com",
+        pgp_mode="encrypt",
+        use_pgp=False,
+    )
+    assert obj.pgp_mode == "encrypt"
+
+    # pgpkey path is masked when privacy=True
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgp=encrypt&pgpkey=/path/to/my-pub.asc"
+    )
+    assert obj is not None
+    assert obj.pgp_key == "/path/to/my-pub.asc"
+    # Full URL includes pgpkey= (path may be percent-encoded in the query
+    # string); privacy URL must replace the value with literal ****
+    assert "pgpkey=" in obj.url(privacy=False)
+    assert "pgpkey=****" in obj.url(privacy=True)
+    assert "my-pub.asc" not in obj.url(privacy=True)
+
+
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_wkd_param(mock_smtp, mock_smtpssl):
+    """NotifyEmail() wkd= URL parameter and url() round-trip."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # wkd=yes -> use_wkd=True; a WKD controller is wired into pgp
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?wkd=yes")
+    assert obj.use_wkd is True
+    assert obj.pgp.wkd is not None
+
+    # wkd=yes without pgp= implies pgp=encrypt
+    assert obj.pgp_mode == "encrypt"
+
+    # wkd=no -> use_wkd=False
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?wkd=no")
+    assert obj.use_wkd is False
+    assert obj.pgp.wkd is None
+
+    # url() includes wkd=yes when enabled; pgp=encrypt is implied
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?wkd=yes")
+    generated = obj.url()
+    assert "wkd=yes" in generated
+    assert "pgp=encrypt" in generated
+
+    # wkd=yes alongside explicit pgp=no keeps no (explicit wins)
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no&wkd=yes")
+    assert obj.pgp_mode == "no"
+
+    # url() must emit pgp=no when wkd=yes and pgp=no is explicit so that
+    # the round-trip URL does not re-apply the wkd=yes->encrypt implication
+    generated = obj.url()
+    assert "pgp=no" in generated
+    assert "wkd=yes" in generated
+
+    # Parsing the round-trip URL must preserve pgp=no (not re-imply encrypt)
+    obj2 = Apprise.instantiate(generated)
+    assert obj2 is not None
+    assert obj2.pgp_mode == "no"
+    assert obj2.use_wkd is True
+
+    # use_wkd as a string 'no' must disable WKD (bool('no') would be True)
+    obj = email.NotifyEmail(
+        user="user", password="pass", host="nuxref.com", use_wkd="no"
+    )
+    assert obj.use_wkd is False
+
+    # Direct __init__ call with use_wkd=True and no pgp_mode
+    obj = email.NotifyEmail(
+        user="user", password="pass", host="nuxref.com", use_wkd=True
+    )
+    assert obj.use_wkd is True
+    assert obj.pgp_mode == "encrypt"
+
+    # url() omits wkd= when disabled (it is the default)
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
+    assert "wkd=" not in obj.url()
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
+    """Email send uses the WKD-fetched key when no local key exists."""
+    import pgpy
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # Generate a real key pair to serve as the WKD response
+    key = pgpy.PGPKey.new(
+        pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+    )
+    uid = pgpy.PGPUID.new("Chris", email="chris@nuxref.com")
+    key.add_uid(
+        uid,
+        usage={
+            pgpy.constants.KeyFlags.Sign,
+            pgpy.constants.KeyFlags.EncryptCommunications,
+        },
+        hashes=[pgpy.constants.HashAlgorithm.SHA256],
+        ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256],
+        compression=[pgpy.constants.CompressionAlgorithm.ZLIB],
+    )
+    pub_bytes = str(key.pubkey).encode()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    obj = Apprise.instantiate(
+        "mailto://chris:pass@nuxref.com?pgp=encrypt&wkd=yes",
+        asset=asset,
+    )
+    assert obj.use_wkd is True
+
+    # Patch WKD fetch to return our generated public key
+    with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
+        assert obj.notify("test body") is True
+
+    # Clear the parsed-key cache so the second block cannot reuse the
+    # key loaded above -- we need the fetch mock to be the sole source
+    obj.pgp._ApprisePGPController__key_lookup.clear()
+
+    # WKD returning None with autogen disabled falls through gracefully
+    asset.pgp_autogen = False
+    with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
+        assert obj.notify("test body") is False
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
