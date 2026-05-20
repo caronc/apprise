@@ -266,6 +266,17 @@ class NotifySessionOGS(NotifyBase):
         """Initialize Session Open Group Server Object."""
         super().__init__(**kwargs)
 
+        # Raise a clear error when the cryptography library is absent so
+        # callers get an explicit message rather than a confusing
+        # AttributeError from None.from_private_bytes().
+        if not NOTIFY_SESSIONOGS_ENABLED:
+            msg = (
+                "The cryptography library is required for SOGS "
+                "notifications.  Install it with: pip install cryptography"
+            )
+            self.logger.warning(msg)
+            raise ImportError(msg)
+
         # Validate the public key (64-char hex Curve25519 public key).
         _pk = (public_key or "").strip().lower()
         if not IS_PUBLIC_KEY.match(_pk):

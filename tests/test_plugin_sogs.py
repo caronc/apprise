@@ -225,6 +225,11 @@ def test_plugin_sogs_no_cryptography():
     obj = Apprise.instantiate(BASE_URL)
     assert obj is None
 
+    # Direct instantiation must raise ImportError with a helpful message,
+    # not the confusing AttributeError from None.from_private_bytes().
+    with pytest.raises(ImportError, match="cryptography"):
+        NotifySessionOGS(public_key=PUBLIC_KEY, seed=SEED, targets=[ROOM])
+
 
 @pytest.mark.skipif(
     "cryptography" not in sys.modules,
