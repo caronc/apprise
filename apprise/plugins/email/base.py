@@ -66,13 +66,18 @@ class PGPMode:
     # No PGP applied (default)
     NONE = "no"
 
-    # Encrypt using the recipient's public key
+    # Sign using the sender's private key; encrypt opportunistically when
+    # a recipient public key is available (via WKD or pgppub=)
+    SIGN = "sign"
+
+    # Encrypt using the recipient's public key (fails if no key found)
     ENCRYPT = "encrypt"
 
 
 # Ordered tuple of all valid PGP modes; prefix matching uses this order
 PGP_MODES = (
     PGPMode.NONE,
+    PGPMode.SIGN,
     PGPMode.ENCRYPT,
 )
 
@@ -199,13 +204,26 @@ class NotifyEmail(NotifyBase):
                 "default": PGP_MODE_DEFAULT,
                 "map_to": "pgp_mode",
             },
-            "pgpkey": {
+            "pgppub": {
                 "name": _("PGP Public Key Path"),
                 "type": "string",
                 "private": True,
                 # By default persistent storage is referenced
                 "default": "",
                 "map_to": "pgp_key",
+            },
+            # Backward-compat alias; deprecated in favour of pgppub=
+            # Handled in parse_url() with a deprecation warning.
+            "pgpkey": {
+                "alias_of": "pgppub",
+            },
+            "pgpprv": {
+                "name": _("PGP Private Key Path"),
+                "type": "string",
+                "private": True,
+                # By default persistent storage is referenced
+                "default": "",
+                "map_to": "pgp_privkey",
             },
             "wkd": {
                 "name": _("Web Key Directory"),
@@ -249,6 +267,7 @@ class NotifyEmail(NotifyBase):
         headers=None,
         pgp_mode=None,
         pgp_key=None,
+        pgp_privkey=None,
         use_wkd=False,
         **kwargs,
     ):
@@ -494,6 +513,7 @@ class NotifyEmail(NotifyBase):
         self.pgp = _pgp.ApprisePGPController(
             path=self.store.path,
             pub_keyfile=pgp_key,
+            prv_keyfile=pgp_privkey,
             email=self.from_addr[1],
             asset=self.asset,
             wkd=wkd_ctrl,
@@ -501,6 +521,9 @@ class NotifyEmail(NotifyBase):
 
         # We store so we can generate a URL later on
         self.pgp_key = pgp_key
+
+        # Store the private key path so it can be round-tripped via url()
+        self.pgp_privkey = pgp_privkey
 
         if self.pgp_mode != PGP_MODE_DEFAULT and not _pgp.PGP_SUPPORT:
             self.logger.warning(
@@ -673,7 +696,8 @@ class NotifyEmail(NotifyBase):
                 attach=attach,
                 headers=headers,
                 names=self.names,
-                pgp=(self.pgp if self.pgp_mode != PGP_MODE_DEFAULT else None),
+                pgp=self.pgp,
+                pgp_mode=self.pgp_mode,
                 tzinfo=self.tzinfo,
             ):
                 try:
@@ -737,10 +761,19 @@ class NotifyEmail(NotifyBase):
         # mask the value when building a privacy-safe URL because the key
         # path can reveal local filesystem layout or remote key server URLs
         if self.pgp_key is not None:
-            params["pgpkey"] = (
+            params["pgppub"] = (
                 "****"
                 if privacy
                 else NotifyEmail.quote(self.pgp_key, safe=":\\/")
+            )
+
+        # Store the private key path in the URL in the same way; masked
+        # in privacy mode because private key paths are sensitive
+        if self.pgp_privkey is not None:
+            params["pgpprv"] = (
+                "****"
+                if privacy
+                else NotifyEmail.quote(self.pgp_privkey, safe=":\\/")
             )
 
         # Include wkd= when Web Key Directory lookup is enabled
@@ -967,9 +1000,28 @@ class NotifyEmail(NotifyBase):
         if results.get("use_wkd") and "pgp_mode" not in results:
             results["pgp_mode"] = PGPMode.ENCRYPT
 
-        # Get PGP Public Key Override
+        # Get PGP Public Key Override (canonical name: pgppub=)
+        if "pgppub" in results["qsd"] and results["qsd"]["pgppub"]:
+            results["pgp_key"] = NotifyEmail.unquote(results["qsd"]["pgppub"])
+
+        # Backward-compat: pgpkey= is the old name for pgppub=; emit a
+        # deprecation warning and map it through so existing URLs still work.
         if "pgpkey" in results["qsd"] and results["qsd"]["pgpkey"]:
-            results["pgp_key"] = NotifyEmail.unquote(results["qsd"]["pgpkey"])
+            logger.warning(
+                "Email ?pgpkey= is deprecated; use ?pgppub= instead."
+                " Support for pgpkey= will be removed in a future release."
+            )
+            # Only override pgp_key when pgppub= was not also present
+            if "pgp_key" not in results:
+                results["pgp_key"] = NotifyEmail.unquote(
+                    results["qsd"]["pgpkey"]
+                )
+
+        # Get PGP Private Key Override (canonical name: pgpprv=)
+        if "pgpprv" in results["qsd"] and results["qsd"]["pgpprv"]:
+            results["pgp_privkey"] = NotifyEmail.unquote(
+                results["qsd"]["pgpprv"]
+            )
 
         # The From address is a must; either through the use of templates
         # from= entry and/or merging the user and hostname together, this
@@ -1068,6 +1120,9 @@ class NotifyEmail(NotifyBase):
         # Pretty Good Privacy Support; Pass in an
         # ApprisePGPController if you wish to use it
         pgp=None,
+        # PGP mode string (PGPMode.NONE / PGPMode.SIGN / PGPMode.ENCRYPT);
+        # controls whether to sign, encrypt, or both
+        pgp_mode=None,
         # Define our timezone; if one isn't provided, then we use
         # the system time instead
         tzinfo=None,
@@ -1089,15 +1144,13 @@ class NotifyEmail(NotifyBase):
             names: This is a dictionary of email addresses as keys and the
                    Names to associate with them when sending the email.
                    This is cross referenced for the cc and bcc lists
-            pgp:   Encrypting the message using Pretty Good Privacy support
-                   This requires that the pgp_path provided exists and
-                   keys can be referenced here to perform the encryption
-                   with. If a key isn't found, one will be generated.
-
-                   pgp support requires the 'PGPy' Python library to be
-                   available.
-
-                   Pass in an ApprisePGPController() if you wish to use this
+            pgp:      ApprisePGPController for signing and/or encrypting
+                      email via Pretty Good Privacy.  Pass None to skip.
+            pgp_mode: PGPMode string controlling what PGP operation to
+                      perform.  PGPMode.ENCRYPT encrypts (existing
+                      behaviour).  PGPMode.SIGN signs with the sender's
+                      private key and opportunistically encrypts when a
+                      recipient public key is available.
         """
         if not to:
             # There is no one to email; we're done
@@ -1105,7 +1158,7 @@ class NotifyEmail(NotifyBase):
             logger.warning(msg)
             raise AppriseEmailException(msg) from None
 
-        elif pgp and not _pgp.PGP_SUPPORT:
+        elif pgp and pgp_mode != PGP_MODE_DEFAULT and not _pgp.PGP_SUPPORT:
             msg = "PGP Support unavailable; install PGPy library"
             logger.warning(msg)
             raise AppriseEmailException(msg) from None
@@ -1240,7 +1293,90 @@ class NotifyEmail(NotifyBase):
                         mixed.attach(app)
                 base = mixed
 
-            if pgp:
+            if pgp and pgp_mode == PGPMode.SIGN:
+                logger.debug("Securing Email with PGP Signature")
+
+                # Sign the raw MIME body before any outer headers are
+                # attached; the signature covers only the content part
+                sig_result = pgp.sign(base.as_string())
+
+                if not sig_result:
+                    # Signing was requested but could not be performed;
+                    # this is a hard failure for the sign mode
+                    msg = "Unable to sign email via PGP"
+                    logger.warning(msg)
+                    raise AppriseEmailException(msg)
+
+                # Unpack the signature and its hash algorithm label
+                sig_str, micalg = sig_result
+
+                # Build the RFC 3156 multipart/signed container
+                signed = MIMEMultipart(
+                    "signed",
+                    micalg=micalg,
+                    protocol="application/pgp-signature",
+                )
+
+                # First part: the original message body (must not be
+                # modified after this point as the signature covers it)
+                signed.attach(base)
+
+                # Second part: the detached PGP signature block
+                sig_part = MIMEBase("application", "pgp-signature")
+                sig_part.set_payload(sig_str)
+                sig_part.add_header(
+                    "Content-Disposition",
+                    "attachment",
+                    filename="signature.asc",
+                )
+                signed.attach(sig_part)
+
+                # Replace base with the signed container so the rest of
+                # the function continues to work unchanged
+                base = signed
+
+                # Opportunistic encryption: try to find the recipient's
+                # public key and encrypt the signed payload if found.
+                # autogen=False prevents a fake key from being auto-created
+                # for the recipient -- only pre-existing keys (WKD lookups
+                # or explicit pgppub= files) qualify for encryption.
+                # A missing key is NOT an error in sign mode -- we simply
+                # send the signed (unencrypted) email instead.
+                enc_content = pgp.encrypt(
+                    base.as_string(), to_addr, autogen=False
+                )
+                if enc_content:
+                    logger.debug("PGP public key found; adding encryption")
+
+                    # Wrap the signed body in a multipart/encrypted
+                    # container (the signed payload becomes the ciphertext)
+                    enc = MIMEMultipart(
+                        "encrypted",
+                        protocol="application/pgp-encrypted",
+                    )
+
+                    # Autocrypt header for DeltaChat / compatible clients
+                    enc.add_header(
+                        "Autocrypt",
+                        "addr={}; prefer-encrypt=mutual".format(
+                            formataddr((False, to_addr), charset="utf-8")
+                        ),
+                    )
+
+                    # Version identifier part (required by RFC 3156)
+                    ver_part = MIMEText("Version: 1", "plain")
+                    ver_part.set_type("application/pgp-encrypted")
+                    enc.attach(ver_part)
+
+                    # Encrypted data part
+                    data_part = MIMEBase("application", "octet-stream")
+                    data_part.set_payload(enc_content)
+                    enc.attach(data_part)
+
+                    # Replace base with the fully encrypted container
+                    base = enc
+
+            elif pgp and pgp_mode == PGPMode.ENCRYPT:
                 logger.debug("Securing Email with PGP Encryption")
                 # Set our header information to include in the encryption
                 base["From"] = formataddr(

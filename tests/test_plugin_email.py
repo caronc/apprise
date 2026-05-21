@@ -261,10 +261,46 @@ TEST_URLS = (
         },
     ),
     (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=sign",
+        {
+            # Test pgp=sign mode string
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=s",
+        {
+            # Test pgp= prefix shorthand ('s' -> 'sign')
+            "instance": email.NotifyEmail,
+        },
+    ),
+    (
         "mailtos://%20@domain.com?user=admin@mail-domain.com?wkd=yes",
         {
             # Test wkd= flag in isolation (no pgp mode set)
             "instance": email.NotifyEmail,
+        },
+    ),
+    (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com"
+        "&pgp=encrypt&pgpkey=%2Fpath%2Fto%2Fpub.asc",
+        {
+            # Test deprecated pgpkey= alias; exercises the deprecation
+            # warning branch in parse_url() and maps to pgp_key.
+            # notify() returns False because the key path does not exist.
+            "instance": email.NotifyEmail,
+            "response": False,
+        },
+    ),
+    (
+        "mailtos://%20@domain.com?user=admin@mail-domain.com"
+        "&pgp=encrypt&pgppub=%2Fpath%2Fto%2Fpub.asc"
+        "&pgpkey=%2Fold%2Fpath.asc",
+        {
+            # Test pgppub= wins over deprecated pgpkey= when both present.
+            # notify() returns False because the key path does not exist.
+            "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (
@@ -2649,7 +2685,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # Prepare PGP while providing it a key
     obj = Apprise.instantiate(
         "mailto://pgp:pass@nuxref.com?pgp=yes&"
-        f"pgpkey={obj.pgp.public_keyfile()}",
+        f"pgppub={obj.pgp.public_keyfile()}",
         asset=asset,
     )
 
@@ -2699,7 +2735,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare Invalid PGP Key
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes&pgpkey=invalid", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=yes&pgppub=invalid", asset=asset
     )
 
     # Returns false
@@ -3020,16 +3056,16 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     )
     assert obj.pgp_mode == "encrypt"
 
-    # pgpkey path is masked when privacy=True
+    # pgppub= path is masked when privacy=True
     obj = Apprise.instantiate(
-        "mailto://user:pass@nuxref.com?pgp=encrypt&pgpkey=/path/to/my-pub.asc"
+        "mailto://user:pass@nuxref.com?pgp=encrypt&pgppub=/path/to/my-pub.asc"
     )
     assert obj is not None
     assert obj.pgp_key == "/path/to/my-pub.asc"
-    # Full URL includes pgpkey= (path may be percent-encoded in the query
+    # Full URL includes pgppub= (path may be percent-encoded in the query
     # string); privacy URL must replace the value with literal ****
-    assert "pgpkey=" in obj.url(privacy=False)
-    assert "pgpkey=****" in obj.url(privacy=True)
+    assert "pgppub=" in obj.url(privacy=False)
+    assert "pgppub=****" in obj.url(privacy=True)
     assert "my-pub.asc" not in obj.url(privacy=True)
 
 
@@ -3150,6 +3186,306 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     asset.pgp_autogen = False
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
         assert obj.notify("test body") is False
+
+
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_mode_param(mock_smtp, mock_smtpssl):
+    """NotifyEmail() pgp=sign mode round-trip and attribute checks."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # pgp=sign sets pgp_mode to 'sign'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=sign")
+    assert obj is not None
+    assert obj.pgp_mode == "sign"
+
+    # pgp=s (prefix shorthand) also resolves to 'sign'
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=s")
+    assert obj is not None
+    assert obj.pgp_mode == "sign"
+
+    # url() round-trip preserves pgp=sign
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=sign")
+    generated = obj.url()
+    assert "pgp=sign" in generated
+    obj2 = Apprise.instantiate(generated)
+    assert obj2 is not None
+    assert obj2.pgp_mode == "sign"
+
+    # pgp=sign + wkd=yes: sign mode is respected; wkd implication does NOT
+    # override an explicit pgp=sign to pgp=encrypt
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=sign&wkd=yes")
+    assert obj.pgp_mode == "sign"
+    assert obj.use_wkd is True
+
+
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_privkey_param(mock_smtp, mock_smtpssl, tmpdir):
+    """NotifyEmail() pgpprv= URL parameter round-trip."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+
+    # pgpprv= is stored on the instance
+    obj = Apprise.instantiate(
+        f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}"
+    )
+    assert obj is not None
+    assert obj.pgp_privkey == prv_path
+
+    # url() includes pgpprv= in plain mode, masks it in privacy mode
+    plain = obj.url(privacy=False)
+    priv = obj.url(privacy=True)
+    assert "pgpprv=" in plain
+    assert prv_path in plain or "valid-prv.asc" in plain
+    assert "pgpprv=****" in priv
+
+    # Round-trip: parse the generated URL and verify pgp_privkey is preserved
+    parsed = email.NotifyEmail.parse_url(plain)
+    assert parsed is not None
+    assert "pgp_privkey" in parsed
+    assert "valid-prv.asc" in parsed["pgp_privkey"]
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
+    """pgp=sign mode produces a multipart/signed email on send."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}",
+        asset=asset,
+    )
+    assert obj is not None
+
+    # Notification should succeed and sendmail should be called once
+    assert obj.notify("test body") is True
+    assert mock_socket.sendmail.call_count == 1
+
+    # The emitted email must contain the multipart/signed structure
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert "multipart/signed" in raw
+    assert "application/pgp-signature" in raw
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_no_privkey_fails(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """pgp=sign with no accessible private key causes send to fail."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    # Sign mode requested but no private key in tmpdir and none specified
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgp=sign",
+        asset=asset,
+    )
+    assert obj is not None
+    assert obj.notify("test body") is False
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_opportunistic_encrypt(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """pgp=sign with WKD: signs always, encrypts when WKD key found."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+
+    # Generate a public key to serve as the WKD payload
+    key = pgpy.PGPKey.new(
+        pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+    )
+    uid = pgpy.PGPUID.new("User", email="user@nuxref.com")
+    key.add_uid(
+        uid,
+        usage={
+            pgpy.constants.KeyFlags.Sign,
+            pgpy.constants.KeyFlags.EncryptCommunications,
+        },
+        hashes=[pgpy.constants.HashAlgorithm.SHA256],
+        ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256],
+        compression=[pgpy.constants.CompressionAlgorithm.ZLIB],
+    )
+    pub_bytes = str(key.pubkey).encode()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        f"mailto://user:pass@nuxref.com?pgp=sign&wkd=yes&pgpprv={prv_path}",
+        asset=asset,
+    )
+    assert obj is not None
+    assert obj.pgp_mode == "sign"
+
+    # With WKD returning a public key: sign + encrypt
+    with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
+        assert obj.notify("test body") is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    # The outer structure is multipart/encrypted (the signed body is inside)
+    assert "multipart/encrypted" in raw
+    mock_socket.sendmail.reset_mock()
+
+    # Clear the cache so the next call re-queries WKD
+    obj.pgp._ApprisePGPController__key_lookup.clear()
+
+    # With WKD returning nothing: sign only, no failure
+    with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
+        assert obj.notify("test body") is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    # No encryption this time; just a signed message
+    assert "multipart/signed" in raw
+    assert "multipart/encrypted" not in raw
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_no_pgp_support(mock_smtp, mock_smtpssl):
+    """pgp=sign fails gracefully when PGPy is not installed."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+    obj = Apprise.instantiate(
+        f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}"
+    )
+    assert obj is not None
+
+    # Simulate PGPy not installed
+    import apprise.utils.pgp as pgp_utils
+
+    real_support = pgp_utils.PGP_SUPPORT
+    pgp_utils.PGP_SUPPORT = False
+    try:
+        assert obj.notify("test body") is False
+    finally:
+        pgp_utils.PGP_SUPPORT = real_support
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_encrypt_none_mode(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """prepare_emails() skips PGP entirely when pgp_mode is PGPMode.NONE."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+
+    # pgp=no disables all PGP even when a private key is provided
+    obj = Apprise.instantiate(
+        f"mailto://user:pass@nuxref.com?pgp=no&pgpprv={prv_path}",
+        asset=asset,
+    )
+    assert obj is not None
+    assert obj.notify("test body") is True
+
+    # The email must not contain any PGP markers
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert "pgp-signature" not in raw.lower()
+    assert "pgp-encrypted" not in raw.lower()
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
+    """pgp=sign auto-discovers a private key generated by keygen()."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgp=sign",
+        asset=asset,
+    )
+    assert obj is not None
+
+    # Generate the key pair into the storage directory
+    assert obj.pgp.keygen() is True
+
+    # Now send -- the auto-generated private key must be discovered.
+    # With both keys present the message is sign+encrypted; the signing
+    # step is the behavior under test, so we only assert success here.
+    assert obj.notify("test body") is True
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")

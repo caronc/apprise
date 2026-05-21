@@ -89,6 +89,7 @@ class ApprisePGPController:
         self,
         path,
         pub_keyfile=None,
+        prv_keyfile=None,
         email=None,
         asset=None,
         wkd=None,
@@ -97,9 +98,9 @@ class ApprisePGPController:
         """Path should be the directory keys can be written and read from such
         as <notifyobject>.store.path.
 
-        Optionally additionally specify a keyfile to explicitly open, and/or
-        an AppriseWKDController to enable Web Key Directory key discovery
-        when no local key is found.
+        Optionally additionally specify a pub_keyfile and/or prv_keyfile to
+        use explicit key files, and/or an AppriseWKDController to enable Web
+        Key Directory key discovery when no local key is found.
         """
 
         # PGP hash
@@ -133,6 +134,20 @@ class ApprisePGPController:
 
         else:
             self._pub_keyfile = None
+
+        if prv_keyfile:
+            # Create an Attachment for the private key as well so that remote
+            # paths and other Apprise-supported sources are supported
+            self._prv_keyfile = AppriseAttachment(asset=self.asset)
+
+            # Add our definition to our pgp_key reference
+            self._prv_keyfile.add(prv_keyfile)
+
+            # Enforce maximum file size (private keys are similar in size)
+            self._prv_keyfile[0].max_file_size = self.max_pgp_public_key_size
+
+        else:
+            self._prv_keyfile = None
 
     def keygen(self, email=None, name=None, force=False):
         """Generates a set of keys based on email configured."""
@@ -303,6 +318,172 @@ class ApprisePGPController:
             None,
         )
 
+    def private_keyfile(self):
+        """Returns the path to the private key file if one can be found.
+
+        Returns the explicit path when prv_keyfile was provided, looks for a
+        matching auto-generated key in self.path otherwise.  Returns False
+        when an explicit keyfile was given but could not be accessed, and
+        None when no key file could be located at all.
+        """
+
+        if self._prv_keyfile is not None:
+            # Use the explicitly-provided private key attachment
+            pgp_key = self._prv_keyfile[0]
+            if not pgp_key:
+                # We could not access the attachment
+                logger.error(
+                    "Could not access PGP Private Key"
+                    f" {pgp_key.url(privacy=True)}."
+                )
+                return False
+
+            return pgp_key.path
+
+        elif not self.path:
+            # No storage path; cannot search for auto-generated keys
+            return None
+
+        # Candidate filenames in ascending priority order (last wins in
+        # insert(0, ...) so the first insert ends up highest priority)
+        fnames = [
+            "pgp-private.asc",
+            "pgp-prv.asc",
+            "private.asc",
+            "prv.asc",
+        ]
+
+        # Prefer keys named after the sender email when we know it
+        if self.email:
+            entry = self.email.split("@")[0].lower()
+            fnames.insert(0, f"{entry}-prv.asc")
+
+            # Full lowercase email (highest priority)
+            entry = self.email.lower()
+            fnames.insert(0, f"{entry}-prv.asc")
+
+        return next(
+            (
+                os.path.join(self.path, fname)
+                for fname in fnames
+                if os.path.isfile(os.path.join(self.path, fname))
+            ),
+            None,
+        )
+
+    def private_key(self):
+        """Loads and returns the PGP private key object.
+
+        Reads from the explicit prv_keyfile if one was provided, otherwise
+        scans the persistent storage path for an auto-generated private key.
+        Returns None when no usable private key could be found or loaded.
+        Passphrase-protected keys are not supported and will be rejected.
+        """
+
+        # Locate the private key file
+        path = self.private_keyfile()
+        if not path:
+            # No private key available -- warn only when the caller expected
+            # one (False means an explicit file was unreachable)
+            if path is False:
+                logger.warning("PGP Private Key could not be accessed")
+            return None
+
+        # Build a cache key distinct from public-key entries for the same path
+        cache_key = hashlib.sha1(
+            ("prv:" + os.path.abspath(path)).encode("utf-8")
+        ).hexdigest()
+
+        # Return the cached key when it is still valid
+        if cache_key in self.__key_lookup:
+            entry = self.__key_lookup[cache_key]
+            if entry["expires"] > datetime.now(timezone.utc):
+                return entry["private_key"]
+
+            # Expired -- remove and re-load below
+            del self.__key_lookup[cache_key]
+
+        try:
+            with open(path) as key_file:
+                private_key, _ = pgpy.PGPKey.from_blob(key_file.read())
+
+        except NameError:
+            # PGPy not installed
+            logger.debug("PGPy not installed; skipping PGP signing: %s", path)
+            return None
+
+        except FileNotFoundError:
+            # File was found but disappeared before we could open it
+            logger.debug("PGP Private Key file not found: %s", path)
+            return None
+
+        except OSError as e:
+            logger.warning("Error accessing PGP Private Key file %s", path)
+            logger.debug(f"I/O Exception: {e}")
+            return None
+
+        except Exception:
+            # Malformed or non-PGP file content
+            logger.warning(
+                "PGP Private Key file could not be parsed: %s", path
+            )
+            return None
+
+        if private_key.is_protected:
+            # Apprise does not support passphrase-protected private keys
+            # because it runs unattended; a protected key would block sending
+            logger.warning(
+                "PGP Private Key is passphrase-protected; "
+                "Apprise does not support passphrase-protected keys"
+            )
+            return None
+
+        # Cache the successfully loaded key
+        self.__key_lookup[cache_key] = {
+            "private_key": private_key,
+            "expires": datetime.now(timezone.utc) + timedelta(seconds=86400),
+        }
+
+        return private_key
+
+    def sign(self, message):
+        """Creates a detached PGP signature for the given message string.
+
+        Returns a (signature_str, micalg) tuple on success where
+        signature_str is the armored PGP signature block and micalg is the
+        MIME hash algorithm label (e.g. 'pgp-sha256') for the
+        Content-Type header of the multipart/signed container.
+        Returns None when signing is not possible.
+        """
+
+        # Load our private key
+        private_key = self.private_key()
+        if not private_key:
+            logger.warning(
+                "PGP signing skipped: no usable private key available"
+            )
+            return None
+
+        try:
+            # Create a detached signature over the message text
+            sig = private_key.sign(message)
+
+            # Map the hash algorithm to the MIME micalg label
+            micalg = "pgp-" + sig.hash_algorithm.name.lower()
+
+            return (str(sig), micalg)
+
+        except NameError:
+            # PGPy not installed; must come before pgpy.errors.PGPError so
+            # that evaluating that except clause doesn't itself raise NameError
+            logger.debug("PGPy not installed; skipping PGP signing")
+
+        except pgpy.errors.PGPError:
+            # Key may lack the Sign capability or be otherwise incompatible
+            logger.debug("PGP signing failed; key may lack Sign capability")
+
+        return None
+
     def _fetch_wkd_key(self, *emails):
         """Attempt a Web Key Directory lookup for each email in turn.
 
@@ -432,11 +613,16 @@ class ApprisePGPController:
         return public_key
 
     # Encrypt message using the recipient's public key
-    def encrypt(self, message, *emails):
-        """If provided a path to a pgp-key, content is encrypted."""
+    def encrypt(self, message, *emails, autogen=None):
+        """If provided a path to a pgp-key, content is encrypted.
 
-        # Acquire our key
-        public_key = self.public_key(*emails)
+        Pass autogen=False to suppress key auto-generation during the
+        public-key lookup.  This is used in sign mode for opportunistic
+        encryption: only encrypt when a pre-existing key is found.
+        """
+
+        # Acquire our key; autogen controls whether a missing key is created
+        public_key = self.public_key(*emails, autogen=autogen)
         if not public_key:
             # Encryption not possible
             return False
@@ -480,5 +666,20 @@ class ApprisePGPController:
                 False
                 if not self._pub_keyfile[0]
                 else self._pub_keyfile[0].path
+            )
+        )
+
+    @property
+    def prv_keyfile(self):
+        """Returns the Private Keyfile Path if set, otherwise returns None.
+        Returns False when an explicit keyfile was provided but could not
+        be accessed."""
+        return (
+            None
+            if self._prv_keyfile is None
+            else (
+                False
+                if not self._prv_keyfile[0]
+                else self._prv_keyfile[0].path
             )
         )

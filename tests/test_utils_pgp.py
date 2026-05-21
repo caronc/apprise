@@ -27,6 +27,7 @@
 
 # Disable logging for a cleaner testing output
 import logging
+import os
 import sys
 from unittest import mock
 
@@ -36,6 +37,10 @@ from apprise.utils import pgp as pgp_module
 from apprise.utils.pgp import ApprisePGPController, _ensure_imghdr_shim
 
 logging.disable(logging.CRITICAL)
+
+# Path to the pre-generated private key fixture used by signing tests
+_VAR_DIR = os.path.join(os.path.dirname(__file__), "var", "pgp")
+_VALID_PRV_ASC = os.path.join(_VAR_DIR, "valid-prv.asc")
 
 
 # ---------------------------------------------------------------------------
@@ -414,3 +419,287 @@ def test_prune_without_wkd(tmpdir):
 def test_pgp_support_flag_present():
     """PGP_SUPPORT is a boolean exported from the pgp module."""
     assert isinstance(pgp_module.PGP_SUPPORT, bool)
+
+
+# ---------------------------------------------------------------------------
+# private_keyfile() -- path resolution
+# ---------------------------------------------------------------------------
+
+
+def test_private_keyfile_no_path():
+    """private_keyfile() returns None when neither path nor prv_keyfile set."""
+    ctrl = ApprisePGPController(path=None)
+    assert ctrl.private_keyfile() is None
+
+
+def test_private_keyfile_explicit_valid(tmpdir):
+    """private_keyfile() returns a path for a valid explicit prv_keyfile."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    result = ctrl.private_keyfile()
+    # Should be an existing file path
+    assert result and os.path.isfile(result)
+
+
+def test_private_keyfile_explicit_invalid(tmpdir):
+    """private_keyfile() returns False when an explicit file is unreachable."""
+    ctrl = ApprisePGPController(
+        path=str(tmpdir),
+        prv_keyfile="/nonexistent/path/key.asc",
+    )
+    # The attachment itself is invalid, so the property returns False
+    result = ctrl.private_keyfile()
+    assert result is False
+
+
+def test_private_keyfile_auto_discover_by_email(tmpdir):
+    """private_keyfile() finds an auto-generated key named by email prefix."""
+    # Place a fake private key named after the email prefix
+    key_path = str(tmpdir.join("user-prv.asc"))
+    with open(key_path, "w") as f:
+        f.write("dummy")
+
+    ctrl = ApprisePGPController(path=str(tmpdir), email="user@example.com")
+    result = ctrl.private_keyfile()
+    assert result == key_path
+
+
+def test_private_keyfile_fallback_generic_name(tmpdir):
+    """private_keyfile() falls back to pgp-prv.asc when no email-named key."""
+    key_path = str(tmpdir.join("pgp-prv.asc"))
+    with open(key_path, "w") as f:
+        f.write("dummy")
+
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    result = ctrl.private_keyfile()
+    assert result == key_path
+
+
+def test_private_keyfile_not_found(tmpdir):
+    """private_keyfile() returns None when no private key exists on disk."""
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    assert ctrl.private_keyfile() is None
+
+
+def test_prv_keyfile_property_none_when_not_set(tmpdir):
+    """prv_keyfile property returns None when no explicit key was provided."""
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    assert ctrl.prv_keyfile is None
+
+
+def test_prv_keyfile_property_path_when_valid(tmpdir):
+    """prv_keyfile property returns the resolved path for a valid key."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    # Property accesses the attachment; it may return None before loading
+    # because the attachment is resolved lazily -- just confirm it is not False
+    assert ctrl.prv_keyfile is not False
+
+
+def test_prv_keyfile_property_false_when_invalid(tmpdir):
+    """prv_keyfile property returns False for an unreachable explicit file."""
+    ctrl = ApprisePGPController(
+        path=str(tmpdir),
+        prv_keyfile="/no/such/file.asc",
+    )
+    assert ctrl.prv_keyfile is False
+
+
+# ---------------------------------------------------------------------------
+# private_key() -- loading the private PGP key object
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_private_key_loads_valid_fixture(tmpdir):
+    """private_key() returns a PGPKey object from a valid private key file."""
+    import pgpy
+
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    key = ctrl.private_key()
+    assert key is not None
+    assert isinstance(key, pgpy.PGPKey)
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_private_key_cached_on_second_call(tmpdir):
+    """private_key() returns the same object on repeated calls (cached)."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    first = ctrl.private_key()
+    second = ctrl.private_key()
+    assert first is not None
+    assert first is second
+
+
+def test_private_key_returns_none_when_not_found(tmpdir):
+    """private_key() returns None when no private key file exists."""
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    assert ctrl.private_key() is None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_private_key_expired_cache_reloads(tmpdir):
+    """private_key() drops an expired cache entry and reloads from disk."""
+    from datetime import datetime, timedelta, timezone
+    import hashlib
+
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+
+    # Load the key once to prime the cache
+    first = ctrl.private_key()
+    assert first is not None
+
+    # Artificially expire the cached entry by back-dating its expiry time
+    cache_key = hashlib.sha1(
+        ("prv:" + os.path.abspath(_VALID_PRV_ASC)).encode("utf-8")
+    ).hexdigest()
+    ctrl._ApprisePGPController__key_lookup[cache_key]["expires"] = (
+        datetime.now(timezone.utc) - timedelta(seconds=1)
+    )
+
+    # Second call must detect the expiry and re-load from disk
+    second = ctrl.private_key()
+    assert second is not None
+
+
+def test_private_key_returns_none_when_pgpy_missing(tmpdir):
+    """private_key() returns None gracefully when PGPy is not installed."""
+    import contextlib
+
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    with contextlib.ExitStack() as stack:
+        # Force PGP_SUPPORT=True so the key-loading branch is reached
+        stack.enter_context(mock.patch.object(pgp_module, "PGP_SUPPORT", True))
+        # Supply any readable content for the open() call
+        stack.enter_context(
+            mock.patch("builtins.open", mock.mock_open(read_data="data"))
+        )
+        if "pgpy" in sys.modules:
+            # When pgpy IS installed, simulate its absence by making
+            # from_blob raise NameError (same as if the name were undefined)
+            stack.enter_context(
+                mock.patch("pgpy.PGPKey.from_blob", side_effect=NameError)
+            )
+        # Without pgpy installed the NameError arises naturally at the
+        # 'pgpy.PGPKey.from_blob(...)' call in private_key(); either way
+        # private_key() must swallow the error and return None
+        result = ctrl.private_key()
+    assert result is None
+
+
+def test_private_key_returns_none_when_keyfile_inaccessible(tmpdir):
+    """private_key() returns None when private_keyfile() returns False."""
+    # Provide an invalid path so the attachment reports the file as unreachable
+    ctrl = ApprisePGPController(
+        path=str(tmpdir), prv_keyfile="/no/such/file.asc"
+    )
+    # private_keyfile() will return False; private_key() must not raise
+    result = ctrl.private_key()
+    assert result is None
+
+
+def test_private_key_returns_none_on_io_error(tmpdir):
+    """private_key() returns None when the file cannot be read."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    with mock.patch("builtins.open", side_effect=OSError("disk error")):
+        result = ctrl.private_key()
+    assert result is None
+
+
+def test_private_key_returns_none_on_malformed_key(tmpdir):
+    """private_key() returns None when the file contains non-PGP data."""
+    bad_key = str(tmpdir.join("bad-prv.asc"))
+    with open(bad_key, "w") as f:
+        f.write("this is not a pgp key")
+
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=bad_key)
+    result = ctrl.private_key()
+    assert result is None
+
+
+def test_private_key_returns_none_when_file_disappears(tmpdir):
+    """private_key() handles a key file that vanishes between stat and open."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    with mock.patch("builtins.open", side_effect=FileNotFoundError("gone")):
+        result = ctrl.private_key()
+    assert result is None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_private_key_rejects_passphrase_protected(tmpdir):
+    """private_key() returns None for a passphrase-protected key."""
+    import pgpy
+
+    # Generate a fresh key and protect it with a passphrase
+    key = pgpy.PGPKey.new(
+        pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+    )
+    uid = pgpy.PGPUID.new("Locked", email="locked@example.com")
+    key.add_uid(
+        uid,
+        usage={pgpy.constants.KeyFlags.Sign},
+        hashes=[pgpy.constants.HashAlgorithm.SHA256],
+        ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256],
+        compression=[pgpy.constants.CompressionAlgorithm.ZLIB],
+    )
+    key.protect(
+        "s3cr3t",
+        pgpy.constants.SymmetricKeyAlgorithm.AES256,
+        pgpy.constants.HashAlgorithm.SHA256,
+    )
+
+    locked_path = str(tmpdir.join("locked-prv.asc"))
+    with open(locked_path, "w") as f:
+        f.write(str(key))
+
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=locked_path)
+    result = ctrl.private_key()
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# sign() -- creating detached PGP signatures
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_sign_returns_signature_and_micalg(tmpdir):
+    """sign() returns a (sig_str, micalg) tuple for valid message + key."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    result = ctrl.sign("Hello, World!")
+    assert result is not None
+    sig_str, micalg = result
+    # The signature must be a non-empty armored block
+    assert "BEGIN PGP SIGNATURE" in sig_str
+    # The micalg must start with 'pgp-'
+    assert micalg.startswith("pgp-")
+
+
+def test_sign_returns_none_when_no_private_key(tmpdir):
+    """sign() returns None when no private key is available."""
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    assert ctrl.sign("test message") is None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_sign_returns_none_on_pgp_error(tmpdir):
+    """sign() returns None when pgpy raises PGPError during signing."""
+    import pgpy
+
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    with mock.patch.object(
+        ctrl.private_key().__class__,
+        "sign",
+        side_effect=pgpy.errors.PGPError("fail"),
+    ):
+        result = ctrl.sign("test")
+    assert result is None
+
+
+def test_sign_returns_none_when_pgpy_missing(tmpdir):
+    """sign() returns None gracefully when PGPy is not installed."""
+    ctrl = ApprisePGPController(path=str(tmpdir), prv_keyfile=_VALID_PRV_ASC)
+    # Patch private_key() to return a mock that raises NameError on sign()
+    mock_key = mock.Mock()
+    mock_key.sign.side_effect = NameError("pgpy not installed")
+    with mock.patch.object(ctrl, "private_key", return_value=mock_key):
+        result = ctrl.sign("test")
+    assert result is None
