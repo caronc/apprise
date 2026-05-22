@@ -266,6 +266,10 @@ def test_plugin_sogs_init(mock_post):
     assert len(obj.rooms) == len(obj2.rooms)
 
 
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_public_key(mock_post):
     """TypeError is raised when public_key is absent or invalid."""
@@ -285,6 +289,10 @@ def test_plugin_sogs_missing_public_key(mock_post):
         )
 
 
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_seed(mock_post):
     """TypeError is raised when seed is absent or invalid."""
