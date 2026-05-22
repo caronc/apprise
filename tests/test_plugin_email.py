@@ -240,45 +240,57 @@ TEST_URLS = (
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=yes",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=yes",
         {
-            # Test deprecated pgp=yes flag (backward compat)
+            # Test deprecated pgp=yes flag (backward compat); notify() fails
+            # because no key is provided and PGP requires one to be useful.
             "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=encrypt",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=encrypt",
         {
-            # Test canonical pgp=encrypt mode string
+            # Test canonical pgp=encrypt mode string; notify() fails because
+            # no public key is available to encrypt with.
             "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=e",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=e",
         {
-            # Test pgp= prefix shorthand ('e' -> 'encrypt')
+            # Test pgp= prefix shorthand ('e' -> 'encrypt'); notify() fails
+            # because no public key is available to encrypt with.
             "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=sign",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=sign",
         {
-            # Test pgp=sign mode string
+            # Test pgp=sign mode string; notify() fails because no private key
+            # is provided and signing requires one.
             "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com?pgp=s",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=s",
         {
-            # Test pgp= prefix shorthand ('s' -> 'sign')
+            # Test pgp= prefix shorthand ('s' -> 'sign'); notify() fails
+            # because no private key is provided.
             "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com?wkd=yes",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&wkd=yes",
         {
-            # Test wkd= flag in isolation (no pgp mode set)
+            # wkd=yes implies pgp=encrypt; notify() fails because no public
+            # key can be discovered (no WKD server behind this test address).
             "instance": email.NotifyEmail,
+            "response": False,
         },
     ),
     (

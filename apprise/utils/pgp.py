@@ -85,6 +85,12 @@ class ApprisePGPController:
     # If it is more than this, then it is not accepted
     max_pgp_public_key_size = 8000
 
+    # Private keys can be materially larger than public keys, especially for
+    # 4096-bit RSA or keys carrying multiple subkeys and UIDs; 32K is
+    # generous enough to accommodate all realistic cases without being
+    # unbounded.
+    max_pgp_private_key_size = 32000
+
     def __init__(
         self,
         path,
@@ -143,8 +149,9 @@ class ApprisePGPController:
             # Add our definition to our pgp_key reference
             self._prv_keyfile.add(prv_keyfile)
 
-            # Enforce maximum file size (private keys are similar in size)
-            self._prv_keyfile[0].max_file_size = self.max_pgp_public_key_size
+            # Enforce a private-key-specific size limit; private keys can be
+            # larger than public keys (4096-bit RSA, multiple subkeys/UIDs)
+            self._prv_keyfile[0].max_file_size = self.max_pgp_private_key_size
 
         else:
             self._prv_keyfile = None
@@ -264,6 +271,59 @@ class ApprisePGPController:
         )
         return True
 
+    def _pub_key_candidates(self, *emails):
+        """Returns the ordered list of candidate public-key filenames to
+        search, highest priority first.
+
+        Shared by public_keyfile() and the diagnostic warning in public_key()
+        so both always reflect exactly the same search order.
+        """
+
+        # Base candidates, lowest priority first
+        fnames = [
+            "pgp-public.asc",
+            "pgp-pub.asc",
+            "public.asc",
+            "pub.asc",
+        ]
+
+        # Merge the controller's own email with any caller-supplied addresses;
+        # each one adds two entries: localpart shorthand then full address
+        # (full address has higher priority because it is more specific)
+        all_emails = [self.email, *emails] if self.email else list(emails)
+        for em in all_emails:
+            # Localpart shorthand (e.g. "chris-pub.asc")
+            fnames.insert(0, f"{em.split('@')[0].lower()}-pub.asc")
+            # Full lowercase email (e.g. "chris@nuxref.com-pub.asc")
+            fnames.insert(0, f"{em.lower()}-pub.asc")
+
+        return fnames
+
+    def _prv_key_candidates(self):
+        """Returns the ordered list of candidate private-key filenames to
+        search, highest priority first.
+
+        Shared by private_keyfile() and the diagnostic warning in private_key()
+        so both always reflect exactly the same search order.
+        """
+
+        # Base candidates, lowest priority first
+        fnames = [
+            "pgp-private.asc",
+            "pgp-prv.asc",
+            "private.asc",
+            "prv.asc",
+        ]
+
+        # Prefer keys named after the sender's email address when known
+        if self.email:
+            # Localpart shorthand (e.g. "chris-prv.asc")
+            fnames.insert(0, f"{self.email.split('@')[0].lower()}-prv.asc")
+            # Full lowercase email (e.g. "chris@nuxref.com-prv.asc")
+            fnames.insert(0, f"{self.email.lower()}-prv.asc")
+
+        return fnames
+
     def public_keyfile(self, *emails):
         """Returns the first match of a useable public key based emails
         provided."""
@@ -290,24 +350,9 @@ class ApprisePGPController:
             # No path
             return None
 
-        fnames = [
-            "pgp-public.asc",
-            "pgp-pub.asc",
-            "public.asc",
-            "pub.asc",
-        ]
-
-        if self.email:
-            # Include our email in the list
-            emails = [self.email, *emails]
-
-        for email in emails:
-            entry = email.split("@")[0].lower()
-            fnames.insert(0, f"{entry}-pub.asc")
-
-            # Lowercase email (Highest Priority)
-            entry = email.lower()
-            fnames.insert(0, f"{entry}-pub.asc")
+        # Use shared candidate list so the search order is always consistent
+        # with any diagnostic messages that reference the same list
+        fnames = self._pub_key_candidates(*emails)
 
         return next(
             (
@@ -344,23 +389,9 @@ class ApprisePGPController:
             # No storage path; cannot search for auto-generated keys
             return None
 
-        # Candidate filenames in ascending priority order (last wins in
-        # insert(0, ...) so the first insert ends up highest priority)
-        fnames = [
-            "pgp-private.asc",
-            "pgp-prv.asc",
-            "private.asc",
-            "prv.asc",
-        ]
-
-        # Prefer keys named after the sender email when we know it
-        if self.email:
-            entry = self.email.split("@")[0].lower()
-            fnames.insert(0, f"{entry}-prv.asc")
-
-            # Full lowercase email (highest priority)
-            entry = self.email.lower()
-            fnames.insert(0, f"{entry}-prv.asc")
+        # Use shared candidate list so the search order is always consistent
+        # with any diagnostic messages that reference the same list
+        fnames = self._prv_key_candidates()
 
         return next(
             (
@@ -383,10 +414,31 @@ class ApprisePGPController:
         # Locate the private key file
         path = self.private_keyfile()
         if not path:
-            # No private key available -- warn only when the caller expected
-            # one (False means an explicit file was unreachable)
             if path is False:
+                # An explicit pgpprv= file was given but could not be accessed;
+                # keep as WARNING because the user made an explicit choice that
+                # failed -- this is always actionable regardless of plugin
                 logger.warning("PGP Private Key could not be accessed")
+
+            elif self.path:
+                # path is None: storage was searched but nothing matched.
+                # Log at DEBUG so the caller's warning (with plugin-specific
+                # hints) is the only user-visible message.  Only the namespace
+                # hash + filename is shown -- never an absolute path.
+                ns = os.path.basename(self.path)
+                candidates = self._prv_key_candidates()
+                shown = ", ".join(f"'{ns}/{fn}'" for fn in candidates[:4])
+                extra = ", ..." if len(candidates) > 4 else ""
+                logger.debug(
+                    "No PGP private key found; searched: %s%s",
+                    shown,
+                    extra,
+                )
+
+            else:
+                # No storage path at all -- nothing was searched
+                logger.debug("No PGP private key found")
+
             return None
 
         # Build a cache key distinct from public-key entries for the same path
@@ -573,7 +625,25 @@ class ApprisePGPController:
                     # We should get a hit now
                     return self.public_key(*emails)
 
-            logger.warning("No PGP Public Key could be loaded")
+            # All discovery methods exhausted (local file, WKD, autogen).
+            # Log at DEBUG so the caller's warning (with plugin-specific hints)
+            # is the only user-visible message.  Only the namespace hash +
+            # filename is shown -- never an absolute path -- so no sensitive
+            # filesystem layout is revealed; the hash matches the
+            # url_identifier shown in the Apprise-API review tab.
+            if self.path:
+                ns = os.path.basename(self.path)
+                candidates = self._pub_key_candidates(*emails)
+                shown = ", ".join(f"'{ns}/{fn}'" for fn in candidates[:4])
+                extra = ", ..." if len(candidates) > 4 else ""
+                logger.debug(
+                    "No PGP public key found; searched: %s%s",
+                    shown,
+                    extra,
+                )
+            else:
+                logger.debug("No PGP public key found")
+
             return None
 
         # Persistent Storage Key

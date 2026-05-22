@@ -1121,8 +1121,11 @@ class NotifyEmail(NotifyBase):
         # ApprisePGPController if you wish to use it
         pgp=None,
         # PGP mode string (PGPMode.NONE / PGPMode.SIGN / PGPMode.ENCRYPT);
-        # controls whether to sign, encrypt, or both
-        pgp_mode=None,
+        # controls whether to sign, encrypt, or both.  Default to
+        # PGP_MODE_DEFAULT (PGPMode.NONE) so that callers that pass pgp= but
+        # omit pgp_mode= do not accidentally trigger the PGP-support guard or
+        # skip both SIGN/ENCRYPT branches unexpectedly.
+        pgp_mode=PGP_MODE_DEFAULT,
         # Define our timezone; if one isn't provided, then we use
         # the system time instead
         tzinfo=None,
@@ -1302,8 +1305,13 @@ class NotifyEmail(NotifyBase):
 
                 if not sig_result:
                     # Signing was requested but could not be performed;
-                    # this is a hard failure for the sign mode
-                    msg = "Unable to sign email via PGP"
+                    # this is a hard failure for the sign mode.  Include the
+                    # plugin-specific hint here (pgp.py logs only generic
+                    # debug detail so it stays reusable across plugins).
+                    msg = (
+                        "Unable to sign email via PGP; supply a private key"
+                        " via pgpprv= or place one in the cache directory"
+                    )
                     logger.warning(msg)
                     raise AppriseEmailException(msg)
 
@@ -1391,8 +1399,13 @@ class NotifyEmail(NotifyBase):
                 encrypted_content = pgp.encrypt(base.as_string(), to_addr)
 
                 if not encrypted_content:
-                    # Unable to send notification
-                    msg = "Unable to encrypt email via PGP"
+                    # Unable to send notification.  Include the plugin-specific
+                    # hint here (pgp.py logs only generic debug detail so it
+                    # stays reusable across plugins).
+                    msg = (
+                        "Unable to encrypt email via PGP; supply a public key"
+                        " via pgppub= or place one in the cache directory"
+                    )
                     logger.warning(msg)
                     raise AppriseEmailException(msg)
 

@@ -703,3 +703,147 @@ def test_sign_returns_none_when_pgpy_missing(tmpdir):
     with mock.patch.object(ctrl, "private_key", return_value=mock_key):
         result = ctrl.sign("test")
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# _pub_key_candidates() -- candidate filename ordering
+# ---------------------------------------------------------------------------
+
+
+def test_pub_key_candidates_no_email(tmpdir):
+    """_pub_key_candidates() returns the four generic fallbacks when no email
+    is known and no extra addresses are supplied."""
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    # No self.email and no caller-supplied email
+    candidates = ctrl._pub_key_candidates()
+    # Only the four generic names should appear
+    assert candidates == [
+        "pgp-public.asc",
+        "pgp-pub.asc",
+        "public.asc",
+        "pub.asc",
+    ]
+
+
+def test_pub_key_candidates_with_email(tmpdir):
+    """_pub_key_candidates() prepends email-specific names ahead of generics,
+    highest priority first (full-email before localpart)."""
+    ctrl = ApprisePGPController(path=str(tmpdir), email="Chris@Example.com")
+    candidates = ctrl._pub_key_candidates()
+    # Full lowercase email is highest priority (index 0)
+    assert candidates[0] == "chris@example.com-pub.asc"
+    # Localpart shorthand is next
+    assert candidates[1] == "chris-pub.asc"
+    # Generic fallbacks follow
+    assert "pgp-pub.asc" in candidates
+
+
+def test_pub_key_candidates_extra_email(tmpdir):
+    """_pub_key_candidates() gives caller-supplied addresses higher priority
+    than self.email because a per-recipient key lookup should prefer the
+    recipient-specific file over the controller's own identity key."""
+    ctrl = ApprisePGPController(path=str(tmpdir), email="sender@example.com")
+    # Simulate a lookup for a recipient address
+    candidates = ctrl._pub_key_candidates("recipient@example.com")
+    # Caller-supplied (recipient) address is processed last in the loop,
+    # so its entries end up at the front of the list (highest priority)
+    assert candidates[0] == "recipient@example.com-pub.asc"
+    assert candidates[1] == "recipient-pub.asc"
+    # self.email (sender) entries appear after
+    assert "sender@example.com-pub.asc" in candidates
+    assert "sender-pub.asc" in candidates
+
+
+# ---------------------------------------------------------------------------
+# _prv_key_candidates() -- candidate filename ordering
+# ---------------------------------------------------------------------------
+
+
+def test_prv_key_candidates_no_email(tmpdir):
+    """_prv_key_candidates() returns the four generic fallbacks when no sender
+    email is configured."""
+    ctrl = ApprisePGPController(path=str(tmpdir))
+    candidates = ctrl._prv_key_candidates()
+    assert candidates == [
+        "pgp-private.asc",
+        "pgp-prv.asc",
+        "private.asc",
+        "prv.asc",
+    ]
+
+
+def test_prv_key_candidates_with_email(tmpdir):
+    """_prv_key_candidates() prepends email-specific names ahead of generics,
+    highest priority first (full-email before localpart)."""
+    ctrl = ApprisePGPController(path=str(tmpdir), email="Sender@Nuxref.com")
+    candidates = ctrl._prv_key_candidates()
+    # Full lowercase email is highest priority
+    assert candidates[0] == "sender@nuxref.com-prv.asc"
+    # Localpart shorthand is next
+    assert candidates[1] == "sender-prv.asc"
+    # Generic fallbacks follow
+    assert "pgp-prv.asc" in candidates
+
+
+# ---------------------------------------------------------------------------
+# public_key() -- diagnostic warning when no key is found
+# ---------------------------------------------------------------------------
+
+
+def test_public_key_no_key_emits_path_debug(tmpdir):
+    """public_key() emits a DEBUG message listing relative cache paths when
+    no public key is found and autogen is disabled.  The message is debug-
+    level so the caller's warning remains the only user-visible line."""
+    ctrl = ApprisePGPController(path=str(tmpdir), email="user@example.com")
+    logging.disable(logging.NOTSET)
+    try:
+        with mock.patch.object(pgp_module, "PGP_SUPPORT", True):
+            result = ctrl.public_key("user@example.com", autogen=False)
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    # Key not found; result must be None
+    assert result is None
+
+
+def test_public_key_no_key_no_path_emits_generic_debug():
+    """public_key() emits a generic 'No PGP public key found' debug message
+    in memory-only mode (no path to search, so no filenames to list)."""
+    ctrl = ApprisePGPController(path=None)
+    logging.disable(logging.NOTSET)
+    try:
+        with mock.patch.object(pgp_module, "PGP_SUPPORT", True):
+            result = ctrl.public_key("user@example.com", autogen=False)
+    finally:
+        logging.disable(logging.CRITICAL)
+    assert result is None
+
+
+# ---------------------------------------------------------------------------
+# private_key() -- diagnostic debug message when no key is found
+# ---------------------------------------------------------------------------
+
+
+def test_private_key_not_found_emits_path_debug(tmpdir):
+    """private_key() emits a DEBUG message listing searched relative paths
+    when no private key file exists on disk.  The message is debug-level so
+    the caller's warning remains the only user-visible line."""
+    ctrl = ApprisePGPController(path=str(tmpdir), email="sender@example.com")
+    logging.disable(logging.NOTSET)
+    try:
+        result = ctrl.private_key()
+    finally:
+        logging.disable(logging.CRITICAL)
+    assert result is None
+
+
+def test_private_key_not_found_no_path_emits_generic_debug():
+    """private_key() emits a generic 'No PGP private key found' debug
+    message in memory-only mode (no storage path, nothing to search)."""
+    ctrl = ApprisePGPController(path=None)
+    logging.disable(logging.NOTSET)
+    try:
+        result = ctrl.private_key()
+    finally:
+        logging.disable(logging.CRITICAL)
+    assert result is None
