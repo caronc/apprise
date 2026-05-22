@@ -1294,10 +1294,11 @@ class NotifyEmail(NotifyBase):
 
             if pgp and pgp_mode == PGPMode.SIGN:
                 logger.debug("Securing Email with PGP Signature")
-
-                # Sign the raw MIME body before any outer headers are
-                # attached; the signature covers only the content part
-                sig_result = pgp.sign(base.as_string())
+                # RFC 3156 requires the signature to be computed over the CRLF
+                # to guarantee all recipients can verify against it.
+                sig_result = pgp.sign(
+                    re.sub(r"(?:\r\n|\n|\r(?!\n))", "\r\n", base.as_string())
+                )
 
                 if not sig_result:
                     # Signing was requested but could not be performed;

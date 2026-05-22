@@ -3308,6 +3308,122 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+def test_plugin_email_pgp_sign_crlf_roundtrip(tmpdir):
+    """PGP signature must verify against CRLF content, not bare LF.
+
+    This test verifies we are following RFC 3156's requirement
+    """
+    import pgpy as _pgpy
+
+    prv_path = os.path.join(TEST_VAR_DIR, "pgp", "valid-prv.asc")
+
+    # Build a controller that uses the test fixture private key
+    ctrl = utils.pgp.ApprisePGPController(
+        path=str(tmpdir), prv_keyfile=prv_path
+    )
+
+    # Obtain the corresponding public key so we can verify independently;
+    # the private key object exposes its own public sub-key via .pubkey
+    prv_key = ctrl.private_key()
+    assert prv_key is not None
+    pub_key = prv_key.pubkey
+
+    # Simulate a MIME body with bare LF endings (as Python produces on Linux)
+    raw_body = "Content-Type: text/plain\r\n\r\nHello RFC 3156\n"
+
+    # Build the CRLF form — exactly what the fixed code passes to sign()
+    crlf_body = re.sub(r"(?:\r\n|\n|\r(?!\n))", "\r\n", raw_body)
+
+    # Build the bare-LF form — what the unfixed code would have passed
+    lf_body = re.sub(r"\r\n", "\n", crlf_body)
+
+    # Sign the CRLF form (as the production code does)
+    result = ctrl.sign(crlf_body)
+    assert result is not None, "sign() must succeed with a valid private key"
+    sig_str, micalg = result
+    assert micalg.startswith("pgp-")
+
+    # Parse the returned armored signature back to a PGPSignature object
+    sig = _pgpy.PGPSignature.from_blob(sig_str)
+
+    # The CRLF body must verify -- this is what the recipient receives.
+    # pgpy.verify() returns a SignatureVerification object (truthy on
+    # success, falsy on failure) rather than raising PGPError for a bad
+    # signature; check the return value directly.
+    crlf_ok = bool(pub_key.verify(crlf_body, sig))
+    assert crlf_ok, (
+        "Signature did not verify against CRLF content -- "
+        "the signed body must use CRLF line endings (RFC 3156)"
+    )
+
+    # The bare-LF form must NOT verify (regression guard: CRLF
+    # normalisation before pgp.sign() must not be removed).
+    lf_ok = bool(pub_key.verify(lf_body, sig))
+    assert not lf_ok, (
+        "Signature verified against bare-LF content -- CRLF normalisation "
+        "before pgp.sign() may have been removed (regression)"
+    )
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_sign_wire_content_crlf(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Content passed to pgp.sign() must have no bare LF line endings.
+
+    Further verification ensureing RFC 3156 requirements are met
+    """
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(TEST_VAR_DIR, "pgp", "valid-prv.asc")
+
+    # Capture the exact content forwarded to pgp.sign() during send
+    signed_content = {}
+    original_sign = utils.pgp.ApprisePGPController.sign
+
+    def capturing_sign(self, message):
+        # Record the message that base.py passes to the signer
+        signed_content["message"] = message
+        return original_sign(self, message)
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}",
+        asset=asset,
+    )
+    assert obj is not None
+
+    # Send while intercepting sign() to record the input content
+    with mock.patch.object(
+        utils.pgp.ApprisePGPController, "sign", capturing_sign
+    ):
+        assert obj.notify("test body") is True
+
+    # Confirm send actually happened and our interceptor was triggered
+    assert mock_socket.sendmail.call_count == 1
+    assert "message" in signed_content, (
+        "pgp.sign() was not called during the send — "
+        "the interception wrapper was not reached"
+    )
+
+    # Verify every line ending in the signed content must be CRLF
+    assert not re.search(r"(?<!\r)\n", signed_content["message"]), (
+        "pgp.sign() received content with bare LF line endings — "
+        "CRLF normalisation (RFC 3156 compliance) may have been removed "
+        "from base.py"
+    )
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_pgp_sign_no_privkey_fails(
