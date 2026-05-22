@@ -422,9 +422,7 @@ class ApprisePGPController:
 
             elif self.path:
                 # path is None: storage was searched but nothing matched.
-                # Log at DEBUG so the caller's warning (with plugin-specific
-                # hints) is the only user-visible message.  Only the namespace
-                # hash + filename is shown -- never an absolute path.
+                # Only hash + filename is shown -- never an absolute path.
                 ns = os.path.basename(self.path)
                 candidates = self._prv_key_candidates()
                 shown = ", ".join(f"'{ns}/{fn}'" for fn in candidates[:4])
@@ -511,9 +509,7 @@ class ApprisePGPController:
         # Load our private key
         private_key = self.private_key()
         if not private_key:
-            logger.warning(
-                "PGP signing skipped: no usable private key available"
-            )
+            logger.debug("PGP signing skipped: no usable private key")
             return None
 
         try:
@@ -629,8 +625,7 @@ class ApprisePGPController:
             # Log at DEBUG so the caller's warning (with plugin-specific hints)
             # is the only user-visible message.  Only the namespace hash +
             # filename is shown -- never an absolute path -- so no sensitive
-            # filesystem layout is revealed; the hash matches the
-            # url_identifier shown in the Apprise-API review tab.
+            # filesystem layout is revealed.
             if self.path:
                 ns = os.path.basename(self.path)
                 candidates = self._pub_key_candidates(*emails)

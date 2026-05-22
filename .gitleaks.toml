@@ -1,0 +1,13 @@
+# Gitleaks configuration for the Apprise project.
+# Reference: https://github.com/gitleaks/gitleaks/blob/master/config/gitleaks.toml
+
+[allowlist]
+description = "Test fixture key files are intentional test data, not real credentials."
+paths = [
+    # PGP test fixtures under tests/var/pgp/ are synthetic keys generated
+    # for unit testing only.  They are not real private keys and carry no
+    # security risk.
+    '''tests/var/pgp/valid-prv\.asc''',
+    '''tests/var/pgp/valid-pub\.asc''',
+    '''tests/var/pgp/corrupt-pub\.asc''',
+]

@@ -1120,11 +1120,7 @@ class NotifyEmail(NotifyBase):
         # Pretty Good Privacy Support; Pass in an
         # ApprisePGPController if you wish to use it
         pgp=None,
-        # PGP mode string (PGPMode.NONE / PGPMode.SIGN / PGPMode.ENCRYPT);
-        # controls whether to sign, encrypt, or both.  Default to
-        # PGP_MODE_DEFAULT (PGPMode.NONE) so that callers that pass pgp= but
-        # omit pgp_mode= do not accidentally trigger the PGP-support guard or
-        # skip both SIGN/ENCRYPT branches unexpectedly.
+        # PGP mode string (PGPMode.NONE / PGPMode.SIGN / PGPMode.ENCRYPT)
         pgp_mode=PGP_MODE_DEFAULT,
         # Define our timezone; if one isn't provided, then we use
         # the system time instead

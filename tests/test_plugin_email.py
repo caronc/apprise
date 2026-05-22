@@ -3402,7 +3402,6 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
     assert "multipart/encrypted" not in raw
 
 
-@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_pgp_sign_no_pgp_support(mock_smtp, mock_smtpssl):
