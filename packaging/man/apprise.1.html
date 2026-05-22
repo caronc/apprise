@@ -84,7 +84,7 @@
 <h2 id="SYNOPSIS">SYNOPSIS</h2>
 
 <p><code>apprise</code> [<var>options</var>...] <var>service-url</var>...<br>
-<code>apprise</code> storage [<var>options</var>...] [<var>action</var>] <var>url-id</var>...<br></p>
+<code>apprise</code> storage [<var>options</var>...] [<var>action</var>] [<var>url-or-uid</var>...]<br></p>
 
 <h2 id="DESCRIPTION">DESCRIPTION</h2>
 
@@ -149,6 +149,17 @@ accept them).</li>
 <code>-g "all"</code>: Notify <strong>ALL</strong> services.</li>
   <li>
 <code>(Omitted)</code>: Notify <strong>untagged</strong> services only.</li>
+</ul>
+
+<p>Tag values may include an optional priority prefix and/or retry suffix:</p>
+
+<ul>
+  <li>
+<code>-g "2:tagA"</code>: Match <strong>only</strong> entries for tagA assigned priority 2.</li>
+  <li>
+<code>-g "tagA:3"</code>: Match all tagA entries, retrying each up to 3 times.</li>
+  <li>
+<code>-g "2:tagA:3"</code>: Priority-2 tagA entries only, with up to 3 retries.</li>
 </ul>
 
 <p><code>-Da</code>, <code>--disable-async</code>:
@@ -223,7 +234,11 @@ specify the keyword <strong>storage</strong></p>
 <p><code>list</code>:
   List all of the detected persistent storage elements and their state
   (<strong>stale</strong>, <strong>active</strong>, or <strong>unused</strong>).  This is the default action if
-  nothing further is identified.</p>
+  nothing further is identified.  Results may be filtered by passing one
+  or more 8-character UID prefix strings, or by passing full Apprise
+  service URLs — each URL is resolved to its storage namespace
+  automatically, making it easy to look up a specific plugin's cache
+  entry without knowing the hash in advance.</p>
 
 <p><code>prune</code>:
   Removes all persistent storage that has not been referenced for more than 30
@@ -308,6 +323,20 @@ notification service URLs and only notify the ones tagged as <em>devops</em>.</p
    -g devops,critical
 </code></pre>
 
+<p>Notify only priority-2 "alerts" services (exclusive priority filter):</p>
+
+<pre><code>$ apprise -vv -t "High Alert" \
+   --config=~/apprise.yml \
+   -g "2:alerts"
+</code></pre>
+
+<p>Notify all "alerts" services and retry each up to 3 times on failure:</p>
+
+<pre><code>$ apprise -vv -t "Critical Event" \
+   --config=~/apprise.yml \
+   -g "alerts:3"
+</code></pre>
+
 <p>Include an attachment:</p>
 
 <pre><code>$ apprise -vv -t "School Assignment" -b "See attached" \
@@ -322,6 +351,12 @@ notification service URLs and only notify the ones tagged as <em>devops</em>.</p
 <p>List all of the details around the current persistent storage setup:</p>
 
 <pre><code>$ apprise storage list
+</code></pre>
+
+<p>Look up the storage namespace for a specific notification URL (shows the
+UID even when no data has been written yet):</p>
+
+<pre><code>$ apprise storage list "mailtos://user:pass@example.com"
 </code></pre>
 
 <p>Prune all persistent storage that has not been referenced for at least 10 days or more</p>
@@ -446,7 +481,7 @@ configuration that you want and only specifically notify a subset of them:</p>
 
   <ol class='man-decor man-foot man foot'>
     <li class='tl'>Chris Caron &lt;lead2gold@gmail.com&gt;</li>
-    <li class='tc'>April 2026</li>
+    <li class='tc'>May 2026</li>
     <li class='tr'>apprise(1)</li>
   </ol>
 

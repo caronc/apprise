@@ -1338,6 +1338,29 @@ def test_apprise_cli_persistent_storage(tmpdir):
         re.MULTILINE,
     )
 
+    # Filter by URL directly — no config file required; the URL is loaded
+    # inline and its uid is used to match storage entries.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "storage",
+            "list",
+            # Pass the raw URL instead of an 8-char UID prefix
+            "test://",
+        ],
+    )
+    # Should produce output; entry exists on disk from earlier send
+    assert result.exit_code == 0
+
+    stdout = result.stdout.strip()
+    assert re.search(
+        r"^1\.\s+[a-z0-9_-]{8}\s+\d+(?:\.\d{2})?[KMGT]?B\s+active\b",
+        stdout,
+        re.MULTILINE,
+    )
+
     # Prune call but prune-days set incorrectly
     result = runner.invoke(
         cli.main,

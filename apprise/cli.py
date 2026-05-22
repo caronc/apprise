@@ -1017,6 +1017,19 @@ def main(
                 filter_uids = filter_uids[1:]
                 action = action_
 
+        # Any remaining filter_uids entries that look like URLs (contain
+        # "://") are loaded directly into our Apprise object so the user
+        # can look up a storage entry by its notification URL rather than
+        # having to know the 8-char namespace hash in advance.
+        url_filter_entries = [f for f in filter_uids if "://" in f]
+        if url_filter_entries:
+            for _url in url_filter_entries:
+                # Load the URL so its url_id() is computable
+                a.add(_url)
+
+            # Drop the URL entries; what remains are UID-prefix filters
+            filter_uids = [f for f in filter_uids if "://" not in f]
+
         # Get our detected URL IDs
         uids = {}
         for plugin in a if not tags else a.find(tag=tags):

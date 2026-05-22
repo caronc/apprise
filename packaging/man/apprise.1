@@ -1,12 +1,12 @@
 .\" generated with Ronn-NG/v0.10.1
 .\" http://github.com/apjanke/ronn-ng/tree/0.10.1
-.TH "APPRISE" "1" "April 2026" "Chris Caron <lead2gold@gmail.com>"
+.TH "APPRISE" "1" "May 2026" "Chris Caron <lead2gold@gmail.com>"
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
 .SH "SYNOPSIS"
 \fBapprise\fR [\fIoptions\fR\|\.\|\.\|\.] \fIservice\-url\fR\|\.\|\.\|\.
 .br
-\fBapprise\fR storage [\fIoptions\fR\|\.\|\.\|\.] [\fIaction\fR] \fIurl\-id\fR\|\.\|\.\|\.
+\fBapprise\fR storage [\fIoptions\fR\|\.\|\.\|\.] [\fIaction\fR] [\fIurl\-or\-uid\fR\|\.\|\.\|\.]
 .br
 .SH "DESCRIPTION"
 \fBApprise\fR allows you to send a notification to \fIalmost all\fR of the most popular notification services available to us today such as: Discord, Telegram, Pushbullet, Slack, Twitter, etc\.
@@ -53,6 +53,15 @@ You can optionally choose to specify more than one \fB\-\-plugin\-path\fR (\fB\-
 \fB(Omitted)\fR: Notify \fBuntagged\fR services only\.
 .IP "" 0
 .P
+Tag values may include an optional priority prefix and/or retry suffix:
+.IP "\(bu" 4
+\fB\-g "2:tagA"\fR: Match \fBonly\fR entries for tagA assigned priority 2\.
+.IP "\(bu" 4
+\fB\-g "tagA:3"\fR: Match all tagA entries, retrying each up to 3 times\.
+.IP "\(bu" 4
+\fB\-g "2:tagA:3"\fR: Priority\-2 tagA entries only, with up to 3 retries\.
+.IP "" 0
+.P
 \fB\-Da\fR, \fB\-\-disable\-async\fR: Send notifications synchronously (one after the other) instead of all at once\.
 .P
 \fB\-R\fR, \fB\-\-recursion\-depth\fR\fIINTEGER\fR: The number of recursive import entries that can be loaded from within Apprise configuration\. By default this is set to 1\. If this is set to zero, then import statements found in any configuration is ignored\.
@@ -97,7 +106,7 @@ $ apprise storage
 .P
 The \fBstorage\fR action has the following sub actions:
 .P
-\fBlist\fR: List all of the detected persistent storage elements and their state (\fBstale\fR, \fBactive\fR, or \fBunused\fR)\. This is the default action if nothing further is identified\.
+\fBlist\fR: List all of the detected persistent storage elements and their state (\fBstale\fR, \fBactive\fR, or \fBunused\fR)\. This is the default action if nothing further is identified\. Results may be filtered by passing one or more 8\-character UID prefix strings, or by passing full Apprise service URLs \(em each URL is resolved to its storage namespace automatically, making it easy to look up a specific plugin's cache entry without knowing the hash in advance\.
 .P
 \fBprune\fR: Removes all persistent storage that has not been referenced for more than 30 days\. You can optionally set the \fB\-\-storage\-prune\-days\fR to alter this default value\.
 .P
@@ -172,6 +181,24 @@ $ apprise \-vv \-t "Intersection Test" \e
 .fi
 .IP "" 0
 .P
+Notify only priority\-2 "alerts" services (exclusive priority filter):
+.IP "" 4
+.nf
+$ apprise \-vv \-t "High Alert" \e
+   \-\-config=~/apprise\.yml \e
+   \-g "2:alerts"
+.fi
+.IP "" 0
+.P
+Notify all "alerts" services and retry each up to 3 times on failure:
+.IP "" 4
+.nf
+$ apprise \-vv \-t "Critical Event" \e
+   \-\-config=~/apprise\.yml \e
+   \-g "alerts:3"
+.fi
+.IP "" 0
+.P
 Include an attachment:
 .IP "" 4
 .nf
@@ -191,6 +218,13 @@ List all of the details around the current persistent storage setup:
 .IP "" 4
 .nf
 $ apprise storage list
+.fi
+.IP "" 0
+.P
+Look up the storage namespace for a specific notification URL (shows the UID even when no data has been written yet):
+.IP "" 4
+.nf
+$ apprise storage list "mailtos://user:pass@example\.com"
 .fi
 .IP "" 0
 .P

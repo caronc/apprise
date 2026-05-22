@@ -4,7 +4,7 @@ apprise(1) -- Push Notifications that work with just about every platform!
 ## SYNOPSIS
 
 `apprise` [<options>...] <service-url>...<br>
-`apprise` storage [<options>...] [<action>] <url-id>...<br>
+`apprise` storage [<options>...] [<action>] [<url-or-uid>...]<br>
 
 ## DESCRIPTION
 
@@ -139,7 +139,11 @@ The **storage** action has the following sub actions:
   `list`:
   List all of the detected persistent storage elements and their state
   (**stale**, **active**, or **unused**).  This is the default action if
-  nothing further is identified.
+  nothing further is identified.  Results may be filtered by passing one
+  or more 8-character UID prefix strings, or by passing full Apprise
+  service URLs — each URL is resolved to its storage namespace
+  automatically, making it easy to look up a specific plugin's cache
+  entry without knowing the hash in advance.
 
   `prune`:
   Removes all persistent storage that has not been referenced for more than 30
@@ -239,6 +243,11 @@ List all of the notifications loaded:
 List all of the details around the current persistent storage setup:
 
     $ apprise storage list
+
+Look up the storage namespace for a specific notification URL (shows the
+UID even when no data has been written yet):
+
+    $ apprise storage list "mailtos://user:pass@example.com"
 
 Prune all persistent storage that has not been referenced for at least 10 days or more
 
