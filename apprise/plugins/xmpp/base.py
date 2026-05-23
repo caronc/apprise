@@ -37,7 +37,12 @@ from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_bool, parse_list, validate_regex
 from ..base import NotifyBase
-from .adapter import SLIXMPP_SUPPORT_AVAILABLE, SlixmppAdapter, XMPPConfig
+from .adapter import (
+    SLIXMPP_SUPPORT_AVAILABLE,
+    SlixmppAdapter,
+    XMPPChannelBindingError,
+    XMPPConfig,
+)
 from .common import SECURE_MODES, SecureXMPPMode
 
 # A pragmatic, "hardened" JID validator intended for Apprise URLs.
@@ -167,6 +172,11 @@ class NotifyXMPP(NotifyBase):
                 "name": _("MUC Nickname"),
                 "type": "string",
             },
+            "scramplus": {
+                "name": _("SCRAM-PLUS Channel Binding"),
+                "type": "bool",
+                "default": True,
+            },
         },
     )
 
@@ -179,6 +189,7 @@ class NotifyXMPP(NotifyBase):
         keepalive: Optional[bool] = None,
         name: Optional[str] = None,
         xmpp_host: Optional[str] = None,
+        scramplus: Optional[bool] = None,
         **kwargs: Any,
     ) -> None:
         super().__init__(**kwargs)
@@ -257,6 +268,15 @@ class NotifyXMPP(NotifyBase):
             else bool(keepalive)
         )
 
+        # SCRAM-PLUS: controls whether SASL SCRAM-PLUS mechanisms are
+        # attempted.  Set to False when the server returns "Invalid
+        # channel binding" during authentication; use ?scramplus=no.
+        self.scramplus = (
+            self.template_args["scramplus"]["default"]
+            if scramplus is None
+            else bool(scramplus)
+        )
+
         if self.secure and self.secure_mode == SecureXMPPMode.NONE:
             self.secure_mode = self.template_args["mode"]["default"]
             self.logger.warning(
@@ -313,6 +333,7 @@ class NotifyXMPP(NotifyBase):
             "roster": "yes" if self.roster else "no",
             "subject": "yes" if self.subject else "no",
             "keepalive": "yes" if self.keepalive else "no",
+            "scramplus": "yes" if self.scramplus else "no",
         }
 
         # Only include name when it differs from the default
@@ -379,6 +400,7 @@ class NotifyXMPP(NotifyBase):
             port=self.port if self.port else default_port,
             secure=self.secure_mode,
             verify_certificate=self.verify_certificate,
+            use_channel_binding=self.scramplus,
         )
 
         self.logger.debug(
@@ -398,32 +420,44 @@ class NotifyXMPP(NotifyBase):
 
         subject = title if self.subject else ""
 
-        if self.keepalive and self._adapter:
-            # Reuse existing adapter
-            return self._adapter.send_message(
-                targets=self.targets,
-                subject=subject,
-                body=body,
+        try:
+            if self.keepalive and self._adapter:
+                # Reuse existing adapter
+                return self._adapter.send_message(
+                    targets=self.targets,
+                    subject=subject,
+                    body=body,
+                )
+
+            adapter_kwargs = {
+                "config": config,
+                "targets": self.targets,
+                "subject": subject,
+                "body": body,
+                "timeout": self.socket_connect_timeout,
+                "roster": self.roster,
+                "keepalive": self.keepalive,
+                "want_muc": self.want_muc,
+                "default_nickname": self.name,
+            }
+            if not self.keepalive:
+                # One-shot mode: Create, process, and discard
+                return SlixmppAdapter(**adapter_kwargs).process()
+
+            # Keepalive mode, reuse a single adapter instance
+            self._adapter = SlixmppAdapter(**adapter_kwargs)
+            return self._adapter.send_message()
+
+        except XMPPChannelBindingError:
+            # The server rejected SASL SCRAM-PLUS channel binding.
+            # Log a targeted hint so the user knows what to fix.
+            self.logger.warning(
+                "XMPP authentication failed: the server rejected "
+                "SASL SCRAM-PLUS channel binding. Add "
+                "?scramplus=no to your Apprise URL to disable "
+                "SCRAM-PLUS mechanism negotiation."
             )
-
-        adapter_kwargs = {
-            "config": config,
-            "targets": self.targets,
-            "subject": subject,
-            "body": body,
-            "timeout": self.socket_connect_timeout,
-            "roster": self.roster,
-            "keepalive": self.keepalive,
-            "want_muc": self.want_muc,
-            "default_nickname": self.name,
-        }
-        if not self.keepalive:
-            # One-shot mode: Create, process, and discard
-            return SlixmppAdapter(**adapter_kwargs).process()
-
-        # Keepalive mode, reuse a single adapter instance
-        self._adapter = SlixmppAdapter(**adapter_kwargs)
-        return self._adapter.send_message()
+            return False
 
     @property
     def title_maxlen(self) -> Optional[int]:
@@ -501,6 +535,9 @@ class NotifyXMPP(NotifyBase):
 
         if "xmpp" in results["qsd"] and len(results["qsd"]["xmpp"]):
             results["xmpp_host"] = NotifyXMPP.unquote(results["qsd"]["xmpp"])
+
+        if "scramplus" in results["qsd"] and len(results["qsd"]["scramplus"]):
+            results["scramplus"] = parse_bool(results["qsd"]["scramplus"])
 
         return results
 
