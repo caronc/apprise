@@ -1185,9 +1185,12 @@ def main(
             #   - Plain uid-prefix or no filter: pass through directly.
             if _had_url_filters or tags:
                 # Scope to the uids that the filtered plugins resolved
-                # to.  If none resolved (e.g. unknown tag), _prune_ns
-                # evaluates to None which safely becomes a no-op.
-                _prune_ns = (list(uids.keys()) + uid_filter_list) or None
+                # to.  If none resolved (e.g. unknown tag), exit early
+                # -- disk_prune() with namespace=None targets ALL
+                # namespaces, so passing None here is not a no-op.
+                _prune_ns = list(uids.keys()) + uid_filter_list
+                if not _prune_ns:
+                    ctx.exit(0)
             else:
                 _prune_ns = uid_filter_list or None
 

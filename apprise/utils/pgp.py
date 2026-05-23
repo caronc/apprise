@@ -287,9 +287,11 @@ class ApprisePGPController:
             "pub.asc",
         ]
 
-        # Merge the controller's own email with any caller-supplied addresses;
-        # each one adds two entries: localpart shorthand then full address
-        # (full address has higher priority because it is more specific)
+        # Merge the controller's own email with any caller-supplied addresses.
+        # Two filenames are prepended per address: localpart shorthand is
+        # inserted at index 0 first, then the full address is also inserted
+        # at index 0 -- so the full address lands ahead of the localpart in
+        # the list (full address has higher priority as it is more specific).
         all_emails = [self.email, *emails] if self.email else list(emails)
         for em in all_emails:
             # Localpart shorthand (e.g. "chris-pub.asc")

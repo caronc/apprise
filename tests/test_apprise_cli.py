@@ -1546,6 +1546,80 @@ def test_apprise_cli_persistent_storage(tmpdir):
     # The stale 'aaaaaaaa' directory must survive — it was not in scope
     assert os.path.isdir(os.path.join(str(tmpdir), "aaaaaaaa"))
 
+    # When a tag or URL filter is specified but resolves to nothing,
+    # disk_prune() must NOT be called. The tests below confirm that ea482db7
+    # survives each no-match check.
+
+    # Tag-scoped PRUNE with a tag that matches no loaded plugin: nothing
+    # resolves so disk_prune() must be skipped entirely.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "--tag",
+            "no-such-tag",
+            "--storage-prune-days",
+            0,
+            "storage",
+            "prune",
+        ],
+    )
+    assert result.exit_code == 0
+    # ea482db7 must be intact -- the no-match prune must not wipe storage
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
+    # Tag-scoped CLEAR with the same unmatchable tag: same guard must fire.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "--tag",
+            "no-such-tag",
+            "storage",
+            "clear",
+        ],
+    )
+    assert result.exit_code == 0
+    # ea482db7 must survive -- a no-match clear must not erase everything
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
+    # URL filter that fails to load (unknown schema): _had_url_filters is
+    # True but no uid resolves, so disk_prune() must not be called.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--storage-prune-days",
+            0,
+            "storage",
+            "prune",
+            "nosuchschema://",
+        ],
+    )
+    assert result.exit_code == 0
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
+    # Same guard applies to clear when the URL filter resolves nothing.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "storage",
+            "clear",
+            "nosuchschema://",
+        ],
+    )
+    assert result.exit_code == 0
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
     # Prune call but prune-days set incorrectly
     result = runner.invoke(
         cli.main,
