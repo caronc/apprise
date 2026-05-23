@@ -58,7 +58,7 @@ from .common import (
 )
 from .logger import logger
 from .utils.disk import bytes_to_str, dir_size, path_decode
-from .utils.parse import parse_list
+from .utils.parse import GET_SCHEMA_RE, parse_list
 
 # By default we allow looking 1 level down recursively in Apprise configuration
 # files.
@@ -810,6 +810,27 @@ def main(
     # Track if we are performing a storage action
     storage_action = bool(urls and "storage".startswith(urls[0]))
 
+    # Save the original state; the storage block below always needs these.
+    _in_storage_mode = storage_action
+    _raw_urls = urls
+
+    if storage_action:
+        # Scan storage args for URL-filter entries.  If any are found,
+        # remap urls to only those entries and flip storage_action so the
+        # priority chain (rule #1 below) loads them into 'a' (our Apprise
+        # instance).  This mirrors the sending notification process.
+        _sfp = list(urls[1:])
+        if _sfp and any(
+            m.startswith(_sfp[0]) for m in PERSISTENT_STORAGE_MODES
+        ):
+            # Skip the action word ("list", "prune", "clear")
+            _sfp = _sfp[1:]
+        _url_filters = [_f for _f in _sfp if GET_SCHEMA_RE.match(_f)]
+        if _url_filters:
+            # Hand off to rule #1 by replacing urls and clearing the flag.
+            urls = _url_filters
+            storage_action = False
+
     if details:
         # Print details and exit
         results = a.details(show_requirements=True, show_disabled=True)
@@ -963,6 +984,10 @@ def main(
             )
         )
 
+    # Restore storage_action in case it was flipped above to allow URL-
+    # filter entries to be loaded via rule #1.
+    storage_action = _in_storage_mode
+
     if not dry_run and not (a or storage_action):
         click.echo(
             "You must specify at least one server URL or populated "
@@ -998,8 +1023,10 @@ def main(
         # 5 characters are already reserved for the counter on the left
         (columns, _) = shutil.get_terminal_size(fallback=(80, 24))
 
-        # Pop 'storage' off of the head of our list
-        filter_uids = urls[1:]
+        # Pop 'storage' off of the head of the original url list.
+        # _raw_urls always holds the unmodified list even when urls was
+        # remapped to URL-filter entries for the priority chain above.
+        filter_uids = _raw_urls[1:]
 
         action = PERSISTENT_STORAGE_MODES[0]
         if filter_uids:
@@ -1017,16 +1044,33 @@ def main(
                 filter_uids = filter_uids[1:]
                 action = action_
 
-        # Get our detected URL IDs
+        # True when URL-filter entries were present in the storage args;
+        # detected by whether urls was remapped to a new list object above.
+        _had_url_filters = _raw_urls is not urls
+
+        # Build the uid-prefix filter list from non-URL entries only.
+        # URL-filter entries were already loaded into 'a' by rule #1.
+        uid_filter_list = [
+            _f.lower() for _f in filter_uids if not GET_SCHEMA_RE.match(_f)
+        ]
+
+        # Single pass: collect plugin uids, applying the uid-prefix filter
         uids = {}
         for plugin in a if not tags else a.find(tag=tags):
             id_ = plugin.url_id()
             if not id_:
+                # No persistent storage uid; skip this plugin
                 continue
 
-            if filter_uids and next(
-                (False for n in filter_uids if id_.startswith(n)), True
+            if uid_filter_list and not next(
+                (u for u in uid_filter_list if id_.startswith(u)), None
             ):
+                # Plugin uid does not match any uid-prefix filter
+                logger.trace(
+                    "Storage: plugin uid '%s' excluded by filter %s",
+                    id_,
+                    uid_filter_list,
+                )
                 continue
 
             if id_ not in uids:
@@ -1042,12 +1086,31 @@ def main(
                 uids[id_]["plugins"].append(plugin)
 
         if action == PersistentStorageMode.LIST:
-            detected_uid = PersistentStore.disk_scan(
-                # Use our asset path as it has already been properly parsed
-                path=asset.storage_path,
-                # Provide filter if specified
-                namespace=filter_uids,
-            )
+            # Scope disk_scan based on what filters were provided:
+            #  - URL filters: scope to resolved plugin uids plus any
+            #    plain uid-prefix strings; skip scan if none resolved
+            #  - Plain-string or no filter: namespace=uid_filter_list
+            #    (empty list means return all on-disk directories)
+            if _had_url_filters:
+                # Derive namespace from the plugins resolved by URL filters
+                _disk_ns = list(uids.keys()) + uid_filter_list
+                if not _disk_ns:
+                    # URL filters yielded no plugins; skip the disk scan
+                    detected_uid = {}
+                else:
+                    detected_uid = PersistentStore.disk_scan(
+                        # Use our asset path as already properly parsed
+                        path=asset.storage_path,
+                        namespace=_disk_ns,
+                    )
+            else:
+                detected_uid = PersistentStore.disk_scan(
+                    # Use our asset path as it has already been properly
+                    # parsed
+                    path=asset.storage_path,
+                    # Provide filter if specified; empty = all directories
+                    namespace=uid_filter_list,
+                )
             for id_ in detected_uid:
                 size, _ = dir_size(os.path.join(asset.storage_path, id_))
                 if id_ in uids:
@@ -1113,12 +1176,30 @@ def main(
             if action == PersistentStorageMode.CLEAR:
                 storage_prune_days = 0
 
+            # Derive the namespace for disk_prune.  The scoping rules
+            # mirror those for disk_scan:
+            #   - URL filters: resolved plugin uids + any uid-prefix
+            #     strings; empty means no-op (nothing to prune).
+            #   - Tag filters: same scoping — resolved plugin uids + any
+            #     uid-prefix strings; empty means no-op.
+            #   - Plain uid-prefix or no filter: pass through directly.
+            if _had_url_filters or tags:
+                # Scope to the uids that the filtered plugins resolved
+                # to.  If none resolved (e.g. unknown tag), exit early
+                # -- disk_prune() with namespace=None targets ALL
+                # namespaces, so passing None here is not a no-op.
+                _prune_ns = list(uids.keys()) + uid_filter_list
+                if not _prune_ns:
+                    ctx.exit(0)
+            else:
+                _prune_ns = uid_filter_list or None
+
             # clean up storage
             results = PersistentStore.disk_prune(
                 # Use our asset path as it has already been properly parsed
                 path=asset.storage_path,
                 # Provide our namespaces if they exist
-                namespace=filter_uids if filter_uids else None,
+                namespace=_prune_ns,
                 # Convert expiry from days to seconds
                 expires=storage_prune_days * 60 * 60 * 24,
                 action=not dry_run,

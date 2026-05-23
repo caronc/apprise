@@ -1338,6 +1338,288 @@ def test_apprise_cli_persistent_storage(tmpdir):
         re.MULTILINE,
     )
 
+    # Create a stale 8-char namespace on disk that belongs to a different
+    # URL — it must NOT appear in the output when filtering by URL.
+    tmpdir.mkdir("aaaaaaaa")
+
+    # Filter by URL directly — no config file required; the URL is loaded
+    # inline and its uid is used to match storage entries.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "storage",
+            "list",
+            # Pass the raw URL instead of an 8-char UID prefix
+            "test://",
+        ],
+    )
+    # Should produce exactly one entry (the url's namespace); the
+    # unrelated stale directory 'aaaaaaaa' must not bleed into output.
+    assert result.exit_code == 0
+
+    stdout = result.stdout.strip()
+    assert re.search(
+        r"^1\.\s+[a-z0-9_-]{8}\s+\d+(?:\.\d{2})?[KMGT]?B\s+active\b",
+        stdout,
+        re.MULTILINE,
+    )
+    # Confirm only one entry — stale 'aaaaaaaa' must be absent
+    assert not re.search(r"aaaaaaaa", stdout)
+
+    # URL filter alongside --config: URL filters trump all other sources,
+    # including --config.  'a' is reset and only the URL-filter plugin
+    # is loaded.  Its storage was already created, so exactly one active
+    # entry should appear.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "storage",
+            "list",
+            "test://",
+        ],
+    )
+    assert result.exit_code == 0
+    stdout = result.stdout.strip()
+    assert re.search(
+        r"^1\.\s+[a-z0-9_-]{8}\s+\d+(?:\.\d{2})?[KMGT]?B\s+active\b",
+        stdout,
+        re.MULTILINE,
+    )
+
+    # Duplicate URL filter: the same URL specified twice.  Both entries
+    # are added to the fresh Apprise instance; the uids dict groups them
+    # under one uid key, so only a single storage entry should appear.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "storage",
+            "list",
+            "test://",
+            "test://",
+        ],
+    )
+    assert result.exit_code == 0
+    stdout = result.stdout.strip()
+    assert re.search(
+        r"^1\.\s+[a-z0-9_-]{8}\s+\d+(?:\.\d{2})?[KMGT]?B\s+active\b",
+        stdout,
+        re.MULTILINE,
+    )
+    # Only one numbered entry should appear despite two URL arguments
+    assert len(re.findall(r"^\d+\.", stdout, re.MULTILINE)) == 1
+
+    # URL filter with an unrecognised schema: a.add() silently rejects the
+    # URL, leaving the Apprise instance empty.  With no plugin uids resolved,
+    # disk_scan is skipped entirely and the output is empty.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "storage",
+            "list",
+            "nosuchschema://filter",
+        ],
+    )
+    assert result.exit_code == 0
+    assert not result.stdout.strip()
+
+    # URL filter with --tag: URL filter fires rule #1 which clears the tag
+    # (same as sending a notification — URLs trump all, including tags).
+    # The test:// plugin's storage is shown; the stale dirs are absent
+    # because disk_scan is scoped to the URL-filter plugin's uid.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--tag",
+            "test",
+            "storage",
+            "list",
+            "test://",
+        ],
+    )
+    assert result.exit_code == 0
+    stdout = result.stdout.strip()
+    assert re.search(
+        r"^1\.\s+[a-z0-9_-]{8}\s+\d+(?:\.\d{2})?[KMGT]?B\s+active\b",
+        stdout,
+        re.MULTILINE,
+    )
+    # Stale dirs must not bleed into output when URL filter is active
+    assert not re.search(r"aaaaaaaa", stdout)
+
+    # URL filter scopes PRUNE too: only the test:// plugin's storage
+    # directory is eligible; stale dirs like 'aaaaaaaa' are left alone.
+    # Use --dry-run so we exercise the _had_url_filters namespace-scoping
+    # branch without actually modifying disk (keeping ea482db7 active for
+    # the assertions that follow).
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--storage-prune-days",
+            0,
+            "--dry-run",
+            "storage",
+            "prune",
+            "test://",
+        ],
+    )
+    assert result.exit_code == 0
+    # The stale 'aaaaaaaa' directory must still exist after the URL-scoped
+    # prune because it was outside the test:// namespace.
+    assert os.path.isdir(os.path.join(str(tmpdir), "aaaaaaaa"))
+
+    # URL filter scopes CLEAR too: only the test:// plugin's namespace is
+    # cleared; unrelated stale directories are untouched.
+    # Use --dry-run so we exercise the _had_url_filters scoping path
+    # without wiping ea482db7 contents (subsequent tests expect it active).
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--dry-run",
+            "storage",
+            "clear",
+            "test://",
+        ],
+    )
+    assert result.exit_code == 0
+    # 'aaaaaaaa' must still be present — it was outside the cleared scope
+    assert os.path.isdir(os.path.join(str(tmpdir), "aaaaaaaa"))
+
+    # Tag-scoped PRUNE: --tag limits the prune namespace to only the uids
+    # that matched the tag filter.  The stale 'aaaaaaaa' directory is
+    # outside that namespace and must not be removed.
+    # Use --dry-run so the test is non-destructive and ea482db7 stays active.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "--tag",
+            "test",
+            "--storage-prune-days",
+            0,
+            "--dry-run",
+            "storage",
+            "prune",
+        ],
+    )
+    assert result.exit_code == 0
+    # The stale 'aaaaaaaa' directory must be untouched — it was outside the
+    # tag-scoped prune namespace.
+    assert os.path.isdir(os.path.join(str(tmpdir), "aaaaaaaa"))
+
+    # Tag-scoped CLEAR: same principle — only the tagged plugin's namespace
+    # is eligible for clearing; everything else is left alone.
+    # Use --dry-run to keep ea482db7 active for subsequent assertions.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "--tag",
+            "test",
+            "--dry-run",
+            "storage",
+            "clear",
+        ],
+    )
+    assert result.exit_code == 0
+    # The stale 'aaaaaaaa' directory must survive — it was not in scope
+    assert os.path.isdir(os.path.join(str(tmpdir), "aaaaaaaa"))
+
+    # When a tag or URL filter is specified but resolves to nothing,
+    # disk_prune() must NOT be called. The tests below confirm that ea482db7
+    # survives each no-match check.
+
+    # Tag-scoped PRUNE with a tag that matches no loaded plugin: nothing
+    # resolves so disk_prune() must be skipped entirely.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "--tag",
+            "no-such-tag",
+            "--storage-prune-days",
+            0,
+            "storage",
+            "prune",
+        ],
+    )
+    assert result.exit_code == 0
+    # ea482db7 must be intact -- the no-match prune must not wipe storage
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
+    # Tag-scoped CLEAR with the same unmatchable tag: same guard must fire.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--config",
+            str(config),
+            "--tag",
+            "no-such-tag",
+            "storage",
+            "clear",
+        ],
+    )
+    assert result.exit_code == 0
+    # ea482db7 must survive -- a no-match clear must not erase everything
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
+    # URL filter that fails to load (unknown schema): _had_url_filters is
+    # True but no uid resolves, so disk_prune() must not be called.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "--storage-prune-days",
+            0,
+            "storage",
+            "prune",
+            "nosuchschema://",
+        ],
+    )
+    assert result.exit_code == 0
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
+    # Same guard applies to clear when the URL filter resolves nothing.
+    result = runner.invoke(
+        cli.main,
+        [
+            "--storage-path",
+            str(tmpdir),
+            "storage",
+            "clear",
+            "nosuchschema://",
+        ],
+    )
+    assert result.exit_code == 0
+    assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
+
     # Prune call but prune-days set incorrectly
     result = runner.invoke(
         cli.main,
