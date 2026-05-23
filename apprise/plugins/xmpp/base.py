@@ -274,7 +274,9 @@ class NotifyXMPP(NotifyBase):
         self.scramplus = (
             self.template_args["scramplus"]["default"]
             if scramplus is None
-            else bool(scramplus)
+            else parse_bool(
+                scramplus, default=self.template_args["scramplus"]["default"]
+            )
         )
 
         if self.secure and self.secure_mode == SecureXMPPMode.NONE:
@@ -537,7 +539,10 @@ class NotifyXMPP(NotifyBase):
             results["xmpp_host"] = NotifyXMPP.unquote(results["qsd"]["xmpp"])
 
         if "scramplus" in results["qsd"] and len(results["qsd"]["scramplus"]):
-            results["scramplus"] = parse_bool(results["qsd"]["scramplus"])
+            results["scramplus"] = parse_bool(
+                results["qsd"]["scramplus"],
+                default=NotifyXMPP.template_args["scramplus"]["default"],
+            )
 
         return results
 
