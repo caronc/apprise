@@ -257,9 +257,16 @@ class NotifyThreema(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Verify our Gateway ID
+        # Normalize Gateway ID: prepend * if the user omitted it
+        if not self.user.startswith("*"):
+            self.user = "*" + self.user
+
+        # Verify our Gateway ID (must be * + 7 characters = 8 total)
         if len(self.user) != 8:
-            msg = "Threema Gateway ID must be 8 characters in length"
+            msg = (
+                "Threema Gateway ID must be 7 characters "
+                "(e.g. MYGWYID or *MYGWYID)"
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -740,7 +747,7 @@ class NotifyThreema(NotifyBase):
         schemaStr = "{schema}://{gatewayid}@{secret}/{targets}?{params}"
         return schemaStr.format(
             schema=self.secure_protocol,
-            gatewayid=NotifyThreema.quote(self.user),
+            gatewayid=NotifyThreema.quote(self.user, safe="*"),
             secret=self.pprint(
                 self.secret, privacy, mode=PrivacyMode.Secret, safe=""
             ),

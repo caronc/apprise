@@ -82,6 +82,16 @@ apprise_url_tests = (
         },
     ),
     (
+        "threema://THEGWID@secret/{targets}/".format(
+            targets="/".join(["16134442222"])
+        ),
+        {
+            # Valid - asterisk prepended automatically when omitted
+            "instance": NotifyThreema,
+            "privacy_url": "threema://*THEGWID@****/16134442222",
+        },
+    ),
+    (
         "threema://*THEGWID@secret/{targets}/".format(
             targets="/".join(["2222"])
         ),
@@ -89,7 +99,7 @@ apprise_url_tests = (
             # Invalid target phone number
             "instance": NotifyThreema,
             "notify_response": False,
-            "privacy_url": "threema://%2ATHEGWID@****/2222",
+            "privacy_url": "threema://*THEGWID@****/2222",
         },
     ),
     (
@@ -99,7 +109,7 @@ apprise_url_tests = (
         {
             # Valid
             "instance": NotifyThreema,
-            "privacy_url": "threema://%2ATHEGWID@****/16134442222",
+            "privacy_url": "threema://*THEGWID@****/16134442222",
         },
     ),
     (
@@ -109,7 +119,7 @@ apprise_url_tests = (
         {
             # Valid multiple targets
             "instance": NotifyThreema,
-            "privacy_url": "threema://%2ATHEGWID@****/16134442222/16134443333",
+            "privacy_url": "threema://*THEGWID@****/16134442222/16134443333",
         },
     ),
     (
