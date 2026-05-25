@@ -1290,6 +1290,13 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     # Gate used to block runner before it can assign shared["loop"].
     gate = threading.Event()
 
+    # Raised by new_event_loop_blocking as soon as the worker enters it --
+    # before any loop object is created and before shared["loop"] is set.
+    # This lets done.wait() synchronize on this checkpoint so we have a
+    # deterministic guarantee that shared["loop"] is still None when the
+    # main-thread timeout cleanup runs.
+    worker_entered_gate = threading.Event()
+
     # Patch asyncio.new_event_loop to block until we allow it, so
     # shared["loop"] remains None when the timeout clean-up executes.
     import asyncio as _real_asyncio
@@ -1297,7 +1304,10 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     orig_new_event_loop = _real_asyncio.new_event_loop
 
     def new_event_loop_blocking() -> _real_asyncio.AbstractEventLoop:
-        gate.wait(timeout=1.0)
+        # Signal the main thread: we are inside new_event_loop_blocking and
+        # shared["loop"] has not been set yet.
+        worker_entered_gate.set()
+        gate.wait(timeout=2.0)
         return orig_new_event_loop()
 
     monkeypatch.setattr(
@@ -1307,11 +1317,12 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
         raising=True,
     )
 
-    # Make done.wait deterministic without touching real threading.Event used
-    # by Thread internals.
+    # Make done.wait deterministic: wait until the worker has entered
+    # new_event_loop_blocking (guaranteeing shared["loop"] is still None)
+    # before forcing the timeout branch.
     _patch_threading(
         monkeypatch,
-        done_event_cls=_make_fake_done_event_cls(),
+        done_event_cls=_make_fake_done_event_cls(worker_entered_gate),
     )
 
     # Track whether any loop clean-up scheduling occurs.
@@ -1357,8 +1368,9 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
     )
 
     try:
-        # done.wait is forced False immediately, and runner is blocked at
-        # new_event_loop(), so shared['loop'] is None in the timeout clean-up.
+        # done.wait blocks until the worker signals worker_entered_gate
+        # (guaranteeing shared["loop"] is None), then returns False
+        # immediately, so the timeout clean-up sees loop_obj=None.
         assert a.process() is False
         assert "XMPP send timed out" in caplog.text
 
@@ -4870,3 +4882,607 @@ def test_xmpp_log_task_crash_regression(monkeypatch):
 
     # Triggers _log_task
     client._on_session_start()
+
+
+# ---------------------------------------------------------------------------
+# SCRAM-PLUS / Channel Binding Tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_default_true() -> None:
+    """scramplus defaults to True (SCRAM-PLUS enabled)."""
+    n = NotifyXMPP(host="example.com", user="me@example.com", password="x")
+    assert n.scramplus is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_explicit_false() -> None:
+    """scramplus=False is stored and reflected in url()."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="me@example.com",
+        password="x",
+        scramplus=False,
+    )
+    assert n.scramplus is False
+    u = n.url()
+    assert "scramplus=no" in u
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_url_round_trip() -> None:
+    """scramplus round-trips through url() and parse_url()."""
+    n = NotifyXMPP(
+        host="example.com",
+        user="me@example.com",
+        password="secret",
+        scramplus=False,
+    )
+    u = n.url()
+    r = NotifyXMPP.parse_url(u)
+    assert r is not None
+    assert r["scramplus"] is False
+
+    n2 = NotifyXMPP(**r)
+    assert n2.scramplus is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_parse_url_no() -> None:
+    """?scramplus=no is parsed and stored correctly."""
+    r = NotifyXMPP.parse_url(
+        "xmpps://me:pass@example.com/a@example.com?scramplus=no"
+    )
+    assert r is not None
+    assert r["scramplus"] is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_parse_url_yes() -> None:
+    """?scramplus=yes is parsed and stored correctly."""
+    r = NotifyXMPP.parse_url(
+        "xmpps://me:pass@example.com/a@example.com?scramplus=yes"
+    )
+    assert r is not None
+    assert r["scramplus"] is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_passes_to_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """scramplus=False propagates use_channel_binding=False to XMPPConfig."""
+    captured: dict = {}
+
+    class _Adapter:
+        def __init__(self, config: Any, **kwargs: Any) -> None:
+            captured["use_channel_binding"] = config.use_channel_binding
+
+        def process(self) -> bool:
+            return True
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _Adapter, raising=True)
+
+    apobj = Apprise()
+    apobj.add("xmpps://user:pass@example.com/joe?scramplus=no")
+    apobj.notify("hello")
+
+    assert captured["use_channel_binding"] is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_true_passes_to_config(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Default scramplus=True propagates use_channel_binding=True."""
+    captured: dict = {}
+
+    class _Adapter:
+        def __init__(self, config: Any, **kwargs: Any) -> None:
+            captured["use_channel_binding"] = config.use_channel_binding
+
+        def process(self) -> bool:
+            return True
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _Adapter, raising=True)
+
+    apobj = Apprise()
+    apobj.add("xmpps://user:pass@example.com/joe")
+    apobj.notify("hello")
+
+    assert captured["use_channel_binding"] is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_disable_channel_binding_filters_plus_mechs() -> None:
+    """_disable_channel_binding patches _send_auth to strip -PLUS mechs."""
+    from types import SimpleNamespace
+
+    captured: list[set] = []
+
+    plugin = SimpleNamespace(
+        mech_list={"SCRAM-SHA-256-PLUS", "SCRAM-SHA-256", "SCRAM-SHA-1"},
+    )
+
+    def orig_send_auth() -> None:
+        captured.append(set(plugin.mech_list))
+
+    plugin._send_auth = orig_send_auth
+
+    class _Client:
+        def __getitem__(self, key: str) -> Any:
+            if key == "feature_mechanisms":
+                return plugin
+            raise KeyError(key)
+
+    xmpp_adapter._disable_channel_binding(_Client())
+
+    # Trigger the patched _send_auth
+    plugin._send_auth()
+
+    assert len(captured) == 1
+    assert "SCRAM-SHA-256-PLUS" not in captured[0]
+    assert "SCRAM-SHA-256" in captured[0]
+    assert "SCRAM-SHA-1" in captured[0]
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_disable_channel_binding_safe_when_no_plugin() -> None:
+    """_disable_channel_binding no-ops when feature_mechanisms is absent."""
+
+    class _BadClient:
+        def __getitem__(self, key: str) -> Any:
+            raise KeyError(key)
+
+    # Must not raise
+    xmpp_adapter._disable_channel_binding(_BadClient())
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_disabled_process(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """process() calls _disable_channel_binding when binding disabled."""
+    install_fake_slixmpp(monkeypatch)
+
+    patched: list[bool] = []
+    orig_disable = xmpp_adapter._disable_channel_binding
+
+    def spy_disable(client: Any) -> None:
+        patched.append(True)
+        orig_disable(client)
+
+    monkeypatch.setattr(
+        xmpp_adapter, "_disable_channel_binding", spy_disable, raising=True
+    )
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+        use_channel_binding=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("chat", "a@example.com")],
+        subject="s",
+        body="b",
+        timeout=1.0,
+    )
+    assert a.process() is True
+    assert len(patched) == 1
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_enabled_no_patch(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """process() skips _disable_channel_binding when binding enabled."""
+    install_fake_slixmpp(monkeypatch)
+
+    patched: list[bool] = []
+    orig_disable = xmpp_adapter._disable_channel_binding
+
+    def spy_disable(client: Any) -> None:
+        patched.append(True)
+        orig_disable(client)
+
+    monkeypatch.setattr(
+        xmpp_adapter, "_disable_channel_binding", spy_disable, raising=True
+    )
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+        use_channel_binding=True,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("chat", "a@example.com")],
+        subject="s",
+        body="b",
+        timeout=1.0,
+    )
+    assert a.process() is True
+    # No patching when SCRAM-PLUS is enabled
+    assert len(patched) == 0
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_scramplus_disabled_keepalive_runner(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_keepalive_runner calls _disable_channel_binding when disabled."""
+    install_fake_slixmpp(monkeypatch)
+
+    patched: list[bool] = []
+    orig_disable = xmpp_adapter._disable_channel_binding
+
+    def spy_disable(client: Any) -> None:
+        patched.append(True)
+        orig_disable(client)
+
+    monkeypatch.setattr(
+        xmpp_adapter, "_disable_channel_binding", spy_disable, raising=True
+    )
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+        use_channel_binding=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("chat", "a@example.com")],
+        subject="s",
+        body="b",
+        timeout=1.0,
+        keepalive=True,
+    )
+
+    real_new_event_loop = xmpp_adapter.asyncio.new_event_loop
+
+    def new_event_loop_wrapped() -> asyncio.AbstractEventLoop:
+        loop = real_new_event_loop()
+
+        def run_forever_hook() -> None:
+            pass
+
+        monkeypatch.setattr(
+            loop, "run_forever", run_forever_hook, raising=True
+        )
+        return loop
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio,
+        "new_event_loop",
+        new_event_loop_wrapped,
+        raising=True,
+    )
+
+    a._keepalive_runner()
+
+    assert len(patched) == 1
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_failed_auth_stanza_sets_channel_binding_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_failed_auth sets _channel_binding_failed when phrase detected."""
+    install_fake_slixmpp(monkeypatch)
+
+    # Clear the subclass cache so we pick up the patched FakeClientXMPP.
+    xmpp_adapter._CLIENT_SUBCLASS_CACHE.clear()
+
+    # Build a _Client instance directly using the fake base class.
+    _ClientCls = xmpp_adapter._get_client_subclass(FakeClientXMPP)
+    client = _ClientCls(
+        jid="me@example.com",
+        password="x",
+        oneshot=True,
+        logger=logging.getLogger("test"),
+    )
+
+    # Verify initial state.
+    assert client._auth_failed is False
+    assert client._channel_binding_failed is False
+
+    # Simulate a failed_auth stanza containing the channel binding phrase.
+    fake_stanza = (
+        "<failure><not-authorized/>"
+        "<text>Invalid channel binding</text></failure>"
+    )
+    client._failed_auth(fake_stanza)
+
+    assert client._auth_failed is True
+    assert client._channel_binding_failed is True
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_failed_auth_plain_does_not_set_channel_binding_flag(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_failed_auth skips _channel_binding_failed for plain auth failures."""
+    install_fake_slixmpp(monkeypatch)
+
+    xmpp_adapter._CLIENT_SUBCLASS_CACHE.clear()
+
+    _ClientCls = xmpp_adapter._get_client_subclass(FakeClientXMPP)
+    client = _ClientCls(
+        jid="me@example.com",
+        password="x",
+        oneshot=True,
+        logger=logging.getLogger("test"),
+    )
+
+    # Stanza does not mention channel binding.
+    fake_stanza = "<failure><not-authorized/></failure>"
+    client._failed_auth(fake_stanza)
+
+    assert client._auth_failed is True
+    assert client._channel_binding_failed is False
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_process_raises_channel_binding_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """process() raises XMPPChannelBindingError when channel binding fails."""
+    install_fake_slixmpp(monkeypatch)
+
+    xmpp_adapter._CLIENT_SUBCLASS_CACHE.clear()
+
+    # Patch FakeClientXMPP.connect to fire failed_auth with a channel
+    # binding stanza so the adapter detects the failure.
+    orig_connect = FakeClientXMPP.connect
+
+    def connect_cb_fail(self, **kwargs: Any) -> asyncio.Future[bool]:
+        loop = self.loop or asyncio.get_running_loop()
+
+        if self.disconnected is None:
+            self.disconnected = loop.create_future()
+
+        fut: asyncio.Future[bool] = loop.create_future()
+        fut.set_result(True)
+
+        def _fire_failed_auth() -> None:
+            # Simulate slixmpp firing failed_auth with a channel binding
+            # stanza before setting up session_start.
+            failed_handler = self.handlers.get("failed_auth")
+            if failed_handler:
+                fake_stanza = (
+                    "<failure><not-authorized/>"
+                    "<text>Invalid channel binding</text></failure>"
+                )
+                failed_handler(fake_stanza)
+            # Complete disconnect so the adapter loop unblocks.
+            if self.disconnected is not None and not self.disconnected.done():
+                self.disconnected.set_result(True)
+
+        loop.call_soon(_fire_failed_auth)
+        return fut
+
+    monkeypatch.setattr(FakeClientXMPP, "connect", connect_cb_fail)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("chat", "joe@example.com")],
+        subject="s",
+        body="b",
+        timeout=5.0,
+    )
+
+    with pytest.raises(xmpp_adapter.XMPPChannelBindingError):
+        a.process()
+
+    monkeypatch.setattr(FakeClientXMPP, "connect", orig_connect)
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_send_catches_channel_binding_error_and_logs(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """base.py send() catches XMPPChannelBindingError and logs the hint."""
+
+    class _RaisingAdapter:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        def process(self) -> bool:
+            raise xmpp_adapter.XMPPChannelBindingError()
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _RaisingAdapter)
+    monkeypatch.setattr(
+        xmpp_base, "SLIXMPP_SUPPORT_AVAILABLE", True, raising=False
+    )
+    monkeypatch.setattr(xmpp_base.NotifyXMPP, "enabled", True, raising=False)
+
+    n = NotifyXMPP(host="example.com", user="me", password="x")
+
+    with caplog.at_level(logging.WARNING, logger="apprise"):
+        result = n.send(body="hi")
+
+    assert result is False
+    assert "scramplus=no" in caplog.text
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_connect_if_required_channel_binding_early_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_connect_if_required() raises early when _channel_binding_failed."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        a._loop = loop
+        # Client with channel binding already flagged before connect.
+        a._client = SimpleNamespace(
+            _channel_binding_failed=True, _auth_failed=False
+        )
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+
+        with pytest.raises(xmpp_adapter.XMPPChannelBindingError):
+            run_on_loop(loop, a._connect_if_required())
+    finally:
+        with contextlib.suppress(Exception):
+            asyncio.set_event_loop(None)
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_connect_if_required_channel_binding_bottom_raises(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """_connect_if_required() raises XMPPChannelBindingError check."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg, targets=[], subject="s", body="b", keepalive=True
+    )
+
+    loop = asyncio.new_event_loop()
+    try:
+        asyncio.set_event_loop(loop)
+        a._loop = loop
+        a._connect_lock = asyncio.Lock()
+        a._session_started = asyncio.Event()
+
+        fut = loop.create_future()
+        fut.set_result(True)
+
+        class _Client:
+            def __init__(self) -> None:
+                self._channel_binding_failed = False
+                self._auth_failed = False
+
+            def connect(self, **kwargs: Any) -> Any:
+                return fut
+
+        a._client = _Client()
+
+        # Patch wait_for to set channel-binding flag after session wait.
+        real_wait_for = xmpp_adapter.asyncio.wait_for
+        calls: dict[str, int] = {"n": 0}
+
+        async def wait_for_patched(
+            aw: Any, timeout: Optional[float] = None
+        ) -> Any:
+            calls["n"] += 1
+            if calls["n"] == 2:
+                assert a._session_started is not None
+                a._session_started.set()
+                assert isinstance(a._client, _Client)
+                a._client._channel_binding_failed = True
+            return await real_wait_for(aw, timeout=timeout)
+
+        monkeypatch.setattr(
+            xmpp_adapter.asyncio, "wait_for", wait_for_patched, raising=True
+        )
+
+        with pytest.raises(xmpp_adapter.XMPPChannelBindingError):
+            run_on_loop(loop, a._connect_if_required())
+
+    finally:
+        with contextlib.suppress(Exception):
+            asyncio.set_event_loop(None)
+        loop.close()
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_send_message_keepalive_reraises_channel_binding_error(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """send_message() keepalive path re-raises XMPPChannelBindingError."""
+    install_fake_slixmpp(monkeypatch)
+
+    cfg = xmpp_adapter.XMPPConfig(
+        jid="me@example.com",
+        password="x",
+        host="example.com",
+        port=5222,
+        secure=xmpp_adapter.SecureXMPPMode.STARTTLS,
+        verify_certificate=False,
+    )
+    a = xmpp_adapter.SlixmppAdapter(
+        config=cfg,
+        targets=[("chat", "t@example.com")],
+        subject="s",
+        body="b",
+        timeout=5.0,
+        keepalive=True,
+    )
+
+    monkeypatch.setattr(
+        a, "_ensure_keepalive_worker", lambda: True, raising=True
+    )
+
+    class _Loop:
+        pass
+
+    a._loop = _Loop()
+
+    def run_coroutine_threadsafe_cb_fail(coro: Any, loop: Any) -> Any:
+        # Close the coroutine to avoid RuntimeWarning about it not being run.
+        with contextlib.suppress(Exception):
+            coro.close()
+
+        class _Fut:
+            def result(self, timeout: Optional[float] = None) -> bool:
+                raise xmpp_adapter.XMPPChannelBindingError()
+
+        return _Fut()
+
+    monkeypatch.setattr(
+        xmpp_adapter.asyncio,
+        "run_coroutine_threadsafe",
+        run_coroutine_threadsafe_cb_fail,
+        raising=True,
+    )
+
+    with pytest.raises(xmpp_adapter.XMPPChannelBindingError):
+        a.send_message()
