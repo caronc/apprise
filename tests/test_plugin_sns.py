@@ -44,7 +44,7 @@ TEST_ACCESS_KEY_SECRET = "bu1dHSdO22pfaaVy/wmNsdljF4C07D3bndi9PQJ9"
 TEST_REGION = "us-east-2"
 
 # A realistic-looking (but fake) AWS session token
-TEST_SESSION_TOKEN = "FwoGZXIvYXdzSESSIONTOKENABCDEFGHIJKLMNOPQRS"
+TEST_SESSION_TOKEN = "FwoGZXIvYXdz+SESSION/TOKENABCDEFGHIJKLMNOPQRS="
 
 # Our Testing URLs
 apprise_url_tests = (
