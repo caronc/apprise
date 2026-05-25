@@ -706,10 +706,13 @@ class NotifySNS(NotifyBase):
         # Always include mode so the round-trip preserves the setting
         params["mode"] = self.mode
 
-        # Prepare session token prefix when using temporary credentials
+        # Prepare session token prefix when using temporary credentials;
+        # + and = are RFC 3986 sub-delimiters safe in the userinfo position
+        # and look nicer unencoded; / must stay encoded (%2F) because an
+        # unencoded slash terminates the URL authority and breaks parsing
         token_prefix = (
             "{token}@".format(
-                token=self.pprint(self.aws_session_token, privacy, safe=""),
+                token=self.pprint(self.aws_session_token, privacy, safe="+="),
             )
             if self.aws_session_token
             else ""

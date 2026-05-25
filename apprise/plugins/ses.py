@@ -152,8 +152,8 @@ class NotifySES(NotifyBase):
         **{
             "token": {
                 # Session token for temporary/IAM credentials (optional).
-                # SES uses sender@domain in the URL host slot, so the token
-                # is provided via ?token= rather than the userinfo position.
+                # May be supplied in the URL password field
+                # (ses://user:{token}@host/...) or via ?token=.
                 "name": _("Session Token"),
                 "type": "string",
                 "private": True,
@@ -896,25 +896,34 @@ class NotifySES(NotifyBase):
                 else self.reply_to[1]
             )
 
-        # Include session token in query params for temporary credentials
-        if self.aws_session_token:
-            params["token"] = (
-                self.pprint(self.aws_session_token, privacy, safe="")
-                if privacy
-                else self.aws_session_token
-            )
-
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = not (
             len(self.targets) == 1 and self.targets[0][1] == self.from_addr
         )
 
+        # Build the from-address URL segment; include the session token in
+        # the password position when present:
+        # ses://sender:{token}@example.com/...
+        if self.aws_session_token:
+            # Split from_addr into local and domain parts;
+            # from_addr always contains @ (enforced by __init__ validation)
+            fa_local, fa_domain = self.from_addr.split("@", 1)
+            from_url_part = "{}:{}@{}".format(
+                NotifySES.quote(fa_local, safe=""),
+                self.pprint(self.aws_session_token, privacy, safe="+=")
+                if privacy
+                else NotifySES.quote(self.aws_session_token, safe="+="),
+                NotifySES.quote(fa_domain, safe=""),
+            )
+        else:
+            from_url_part = NotifySES.quote(self.from_addr, safe="@")
+
         return (
             "{schema}://{from_addr}/{key_id}/{key_secret}/{region}/"
             "{targets}/?{params}".format(
                 schema=self.secure_protocol,
-                from_addr=NotifySES.quote(self.from_addr, safe="@"),
+                from_addr=from_url_part,
                 key_id=self.pprint(self.aws_access_key_id, privacy, safe=""),
                 key_secret=self.pprint(
                     self.aws_secret_access_key,
@@ -1060,9 +1069,12 @@ class NotifySES(NotifyBase):
         else:
             results["region_name"] = region_name
 
-        # Session token via ?token= (SES uses sender@domain in the URL host
-        # slot, so there is no userinfo position available for the token)
+        # Session token may come from the URL password field or the
+        # ?token= query parameter; ?token= takes priority when both
+        # are present.
         results["session_token"] = None
+        if results.get("password"):
+            results["session_token"] = NotifySES.unquote(results["password"])
         if "token" in results["qsd"] and len(results["qsd"]["token"]):
             results["session_token"] = NotifySES.unquote(
                 results["qsd"]["token"]

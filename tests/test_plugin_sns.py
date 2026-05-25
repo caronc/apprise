@@ -547,10 +547,11 @@ def test_plugin_sns_session_token(mock_post):
     auth = call_kwargs["headers"]["Authorization"]
     assert "x-amz-security-token" in auth
 
-    # URL round-trip via userinfo position
+    # URL round-trip via userinfo position; + and = stay unencoded
+    # (safe in userinfo); / is encoded since it terminates the netloc
     url = obj.url()
     assert "@" in url
-    assert TEST_SESSION_TOKEN in url
+    assert NotifySNS.quote(TEST_SESSION_TOKEN, safe="+=") in url
 
     results = NotifySNS.parse_url(url)
     assert results["session_token"] == TEST_SESSION_TOKEN
