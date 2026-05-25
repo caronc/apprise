@@ -34,7 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise
-from apprise.plugins.sns import NotifySNS
+from apprise.plugins.sns import NotifySNS, SNSMode
 
 logging.disable(logging.CRITICAL)
 
@@ -42,6 +42,9 @@ logging.disable(logging.CRITICAL)
 TEST_ACCESS_KEY_ID = "AHIAJGNT76XIMXDBIJYA"
 TEST_ACCESS_KEY_SECRET = "bu1dHSdO22pfaaVy/wmNsdljF4C07D3bndi9PQJ9"
 TEST_REGION = "us-east-2"
+
+# A realistic-looking (but fake) AWS session token
+TEST_SESSION_TOKEN = "FwoGZXIvYXdz+SESSION/TOKENABCDEFGHIJKLMNOPQRS="
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -123,6 +126,73 @@ apprise_url_tests = (
             # Throws a series of i/o exceptions with this flag
             # is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
+        },
+    ),
+    (
+        # Session token in userinfo position (temporary/IAM credentials)
+        "sns://SESSIONTOKEN@T1JJ3T3L2"
+        "/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Session token via ?token= query parameter
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?token=SESSIONTOKEN",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Access key via ?key= alias
+        "sns://?key=T1JJ3T3L2&secret=A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "&region=us-west-2&to=12223334444",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Session token + HTTP error
+        "sns://SESSIONTOKEN@T1JJ3T3L2"
+        "/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444",
+        {
+            "instance": NotifySNS,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        # Session token + request exceptions
+        "sns://SESSIONTOKEN@T1JJ3T3L2"
+        "/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/15556667777",
+        {
+            "instance": NotifySNS,
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        # Explicit SMS mode
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?mode=sms",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Forced topic mode on a phone target
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?mode=topic",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Invalid mode raises TypeError
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?mode=invalid",
+        {
+            "instance": TypeError,
         },
     ),
 )
@@ -447,6 +517,130 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     assert a.notify(title="", body="test") is True
 
 
+@mock.patch("requests.post")
+def test_plugin_sns_session_token(mock_post):
+    """NotifySNS() session token for temporary/IAM credentials."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.text = ""
+    mock_post.return_value = response
+
+    # Init with session token
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets="+18001234567",
+        session_token=TEST_SESSION_TOKEN,
+    )
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+
+    # send() must include X-Amz-Security-Token in request headers
+    assert obj.notify(body="test") is True
+    call_kwargs = mock_post.call_args[1]
+    assert "X-Amz-Security-Token" in call_kwargs["headers"]
+    assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
+
+    # x-amz-security-token must also appear in the Authorization header
+    # (it is listed in SignedHeaders)
+    auth = call_kwargs["headers"]["Authorization"]
+    assert "x-amz-security-token" in auth
+
+    # URL round-trip via userinfo position; + and = stay unencoded
+    # (safe in userinfo); / is encoded since it terminates the netloc
+    url = obj.url()
+    assert "@" in url
+    assert NotifySNS.quote(TEST_SESSION_TOKEN, safe="+=") in url
+
+    results = NotifySNS.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj2 = NotifySNS(**results)
+    assert obj2.aws_session_token == TEST_SESSION_TOKEN
+    assert obj2.url_identifier == obj.url_identifier
+
+    # Privacy URL must mask the token but keep the @ separator
+    priv_url = obj.url(privacy=True)
+    assert TEST_SESSION_TOKEN not in priv_url
+    assert "@" in priv_url
+
+    # Without a session token no X-Amz-Security-Token header is sent
+    mock_post.reset_mock()
+    obj_plain = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets="+18001234567",
+    )
+    assert obj_plain.aws_session_token is None
+    assert obj_plain.notify(body="test") is True
+    call_kwargs = mock_post.call_args[1]
+    assert "X-Amz-Security-Token" not in call_kwargs["headers"]
+
+    # url() without token has no @ separator
+    plain_url = obj_plain.url()
+    assert "@" not in plain_url
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_session_token_via_kwarg(mock_post):
+    """NotifySNS() session token parsed from ?token= kwarg."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.text = ""
+    mock_post.return_value = response
+
+    url = (
+        f"sns://{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/+18001234567?token={TEST_SESSION_TOKEN}"
+    )
+    results = NotifySNS.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+
+    obj = NotifySNS(**results)
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+    assert obj.notify(body="test") is True
+
+    call_kwargs = mock_post.call_args[1]
+    assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
+
+    # ?token= overrides userinfo when both are present
+    url_both = (
+        f"sns://OTHERTOKEN@{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/+18001234567?token={TEST_SESSION_TOKEN}"
+    )
+    results2 = NotifySNS.parse_url(url_both)
+    assert results2["session_token"] == TEST_SESSION_TOKEN
+
+
+def test_plugin_sns_key_alias():
+    """NotifySNS() ?key= alias for access_key_id."""
+
+    # ?key= resolves to access_key_id
+    url = (
+        f"sns://?key={TEST_ACCESS_KEY_ID}"
+        f"&secret={TEST_ACCESS_KEY_SECRET}"
+        f"&region={TEST_REGION}&to=+18001234567"
+    )
+    results = NotifySNS.parse_url(url)
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj = NotifySNS(**results)
+    assert obj.aws_access_key_id == TEST_ACCESS_KEY_ID
+
+    # ?key= takes priority over ?access= when both appear
+    url_both = (
+        f"sns://?key={TEST_ACCESS_KEY_ID}&access=OTHERID"
+        f"&secret={TEST_ACCESS_KEY_SECRET}"
+        f"&region={TEST_REGION}&to=+18001234567"
+    )
+    results2 = NotifySNS.parse_url(url_both)
+    assert results2["access_key_id"] == TEST_ACCESS_KEY_ID
+
+
 def test_plugin_sns_detailed_failures(mocker):
     """
     Test specific failure modes (HTTP 400) for SMS, Topic Creation,
@@ -519,3 +713,223 @@ def test_plugin_sns_detailed_failures(mocker):
 
     # Should return False because Publish failed
     assert obj_topic.notify(body="test") is False
+
+
+def test_plugin_sns_mode_detection():
+    """NotifySNS() auto-detects and validates operating mode."""
+
+    # Topic-only targets -> TOPIC mode auto-detected
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+    )
+    assert obj.mode == SNSMode.TOPIC
+    assert obj.title_maxlen == 100
+    assert obj.body_maxlen == 256000
+
+    # Phone targets -> SMS mode auto-detected
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+    )
+    assert obj.mode == SNSMode.SMS
+    assert obj.title_maxlen == 0
+    assert obj.body_maxlen == 160
+
+    # Mixed targets -> SMS mode (safe default)
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567", "#MyTopic"],
+    )
+    assert obj.mode == SNSMode.SMS
+
+    # No targets -> SMS mode (safe default)
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=[],
+    )
+    assert obj.mode == SNSMode.SMS
+
+    # Explicit mode=topic overrides auto-detection for phone-only URL
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+        mode=SNSMode.TOPIC,
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # Explicit mode=sms overrides auto-detection for topic-only URL
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+        mode=SNSMode.SMS,
+    )
+    assert obj.mode == SNSMode.SMS
+
+    # Prefix matching: "to" -> "topic"
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+        mode="to",
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # Invalid mode raises TypeError
+    with pytest.raises(TypeError):
+        NotifySNS(
+            access_key_id=TEST_ACCESS_KEY_ID,
+            secret_access_key=TEST_ACCESS_KEY_SECRET,
+            region_name=TEST_REGION,
+            targets=["#MyTopic"],
+            mode="invalid",
+        )
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_topic_mode_send(mock_post):
+    """NotifySNS() TOPIC mode sets Subject field on topic payloads."""
+
+    arn_response = (
+        "<CreateTopicResponse>"
+        "<CreateTopicResult>"
+        "<TopicArn>"
+        "arn:aws:sns:us-east-2:000000000000:MyTopic"
+        "</TopicArn>"
+        "</CreateTopicResult>"
+        "</CreateTopicResponse>"
+    )
+
+    # Capture the most recent Publish payload for inspection
+    publish_data = {}
+
+    def side_effect(url, data, **kwargs):
+        """Return ARN on CreateTopic; record payload on Publish."""
+        robj = mock.Mock()
+        robj.status_code = requests.codes.ok
+        if "Action=CreateTopic" in data:
+            robj.text = arn_response
+        elif "Action=Publish" in data:
+            publish_data["data"] = data
+            robj.text = ""
+        else:
+            robj.text = ""
+        return robj
+
+    mock_post.side_effect = side_effect
+
+    # Topic-only -> TOPIC mode auto-detected; title goes to Subject
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # With title: Subject must appear in the Publish payload
+    assert obj.notify(title="My Title", body="My Body") is True
+    # urlencode() uses %20 for spaces
+    assert "Subject=My%20Title" in publish_data["data"]
+    assert "Message=My%20Body" in publish_data["data"]
+
+    # With no title: Subject must not appear in the Publish payload
+    publish_data.clear()
+    assert obj.notify(title="", body="My Body") is True
+    assert "Subject=" not in publish_data.get("data", "")
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_topic_mode_phone_forced(mock_post):
+    """NotifySNS() TOPIC mode forced on phone target prepends title."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.text = ""
+    mock_post.return_value = response
+
+    # Force TOPIC mode on a phone target
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+        mode=SNSMode.TOPIC,
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # With a title: it must be prepended to the body in the SMS payload
+    assert obj.notify(title="My Title", body="My Body") is True
+    data = mock_post.call_args[1]["data"]
+    # urlencode() uses %20 for spaces; \r\n becomes %0D%0A
+    assert "My%20Title" in data
+    assert "My%20Body" in data
+
+    # With no title: body is sent as-is without modification
+    mock_post.reset_mock()
+    assert obj.notify(title="", body="My Body") is True
+    data = mock_post.call_args[1]["data"]
+    assert "My%20Body" in data
+
+
+def test_plugin_sns_mode_url_round_trip():
+    """NotifySNS() mode is preserved through url() and parse_url()."""
+
+    # TOPIC mode round-trip
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+        mode=SNSMode.TOPIC,
+    )
+    url = obj.url()
+    assert "mode=topic" in url
+
+    results = NotifySNS.parse_url(url)
+    assert results["mode"] == SNSMode.TOPIC
+
+    obj2 = NotifySNS(**results)
+    assert obj2.mode == SNSMode.TOPIC
+    assert obj2.url_identifier == obj.url_identifier
+
+    # SMS mode round-trip
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+        mode=SNSMode.SMS,
+    )
+    url = obj.url()
+    assert "mode=sms" in url
+
+    results = NotifySNS.parse_url(url)
+    assert results["mode"] == SNSMode.SMS
+
+    obj2 = NotifySNS(**results)
+    assert obj2.mode == SNSMode.SMS
+
+    # No mode in URL -> auto-detection runs on re-instantiation
+    url_no_mode = (
+        f"sns://{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/+18001234567"
+    )
+    results = NotifySNS.parse_url(url_no_mode)
+    assert results["mode"] is None
+    obj3 = NotifySNS(**results)
+    # Auto-detected from phone target
+    assert obj3.mode == SNSMode.SMS

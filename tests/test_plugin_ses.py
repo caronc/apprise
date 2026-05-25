@@ -66,6 +66,7 @@ AWS_SES_GOOD_RESPONSE = """
 TEST_ACCESS_KEY_ID = "AHIAJGNT76XIMXDBIJYA"
 TEST_ACCESS_KEY_SECRET = "bu1dHSdO22pfaaVy/wmNsdljF4C07D3bndi9PQJ9"
 TEST_REGION = "us-east-2"
+TEST_SESSION_TOKEN = "FwoGZXIvYXdzSESSIONTOKENABCDEFGHIJKLMNOPQRS"
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -241,6 +242,55 @@ apprise_url_tests = (
             # Throws a series of connection and transfer exceptions when this
             # flag is set and tests that we gracefully handle them
             "test_requests_exceptions": True,
+        },
+    ),
+    (
+        # Session token via ?token= query parameter
+        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2/"
+        "user2@example.com?token=SESSIONTOKEN",
+        {
+            "instance": NotifySES,
+            "requests_response_text": AWS_SES_GOOD_RESPONSE,
+        },
+    ),
+    (
+        # Access key via ?key= alias
+        "ses://user@example.com/?key=T1JJ3T3L2"
+        "&secret=A1BRTD4JD/TIiacevi7FQ&region=us-west-2"
+        "&to=user2@example.com",
+        {
+            "instance": NotifySES,
+            "requests_response_text": AWS_SES_GOOD_RESPONSE,
+        },
+    ),
+    (
+        # Session token + HTTP error
+        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2/"
+        "user2@example.com?token=SESSIONTOKEN",
+        {
+            "instance": NotifySES,
+            "requests_response_text": AWS_SES_GOOD_RESPONSE,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        # Session token + request exceptions
+        "ses://user@example.com/T1JJ3T3L2/A1BRTD4JD/TIiacevi7FQ/us-west-2/"
+        "user2@example.com?token=SESSIONTOKEN",
+        {
+            "instance": NotifySES,
+            "requests_response_text": AWS_SES_GOOD_RESPONSE,
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        # Session token in the URL password field
+        "ses://user:SESSIONTOKEN@example.com/T1JJ3T3L2/A1BRTD4JD/"
+        "TIiacevi7FQ/us-west-2/user2@example.com",
+        {
+            "instance": NotifySES,
+            "requests_response_text": AWS_SES_GOOD_RESPONSE,
         },
     ),
 )
@@ -471,3 +521,158 @@ def test_plugin_ses_attachments(mock_post):
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert obj.notify(body="test", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_ses_session_token(mock_post):
+    """NotifySES() session token for temporary/IAM credentials."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.content = AWS_SES_GOOD_RESPONSE
+    mock_post.return_value = response
+
+    # Init with session token
+    obj = NotifySES(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        from_addr="sender@example.com",
+        targets=["recipient@example.com"],
+        session_token=TEST_SESSION_TOKEN,
+    )
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+
+    # send() must include X-Amz-Security-Token in request headers
+    assert obj.notify(body="test") is True
+    call_kwargs = mock_post.call_args[1]
+    assert "X-Amz-Security-Token" in call_kwargs["headers"]
+    assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
+
+    # x-amz-security-token must appear in the Authorization SignedHeaders
+    auth = call_kwargs["headers"]["Authorization"]
+    assert "x-amz-security-token" in auth
+
+    # URL round-trip: token appears in the password field, not ?token=
+    url = obj.url()
+    assert f":{TEST_SESSION_TOKEN}@" in url
+    assert "token=" not in url
+
+    results = NotifySES.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj2 = NotifySES(**results)
+    assert obj2.aws_session_token == TEST_SESSION_TOKEN
+    assert obj2.url_identifier == obj.url_identifier
+
+    # Privacy URL must mask the token value (in the password position)
+    priv_url = obj.url(privacy=True)
+    assert TEST_SESSION_TOKEN not in priv_url
+    assert "token=" not in priv_url
+
+    # Without a session token no X-Amz-Security-Token header is sent
+    mock_post.reset_mock()
+    obj_plain = NotifySES(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        from_addr="sender@example.com",
+        targets=["recipient@example.com"],
+    )
+    assert obj_plain.aws_session_token is None
+    assert obj_plain.notify(body="test") is True
+    call_kwargs = mock_post.call_args[1]
+    assert "X-Amz-Security-Token" not in call_kwargs["headers"]
+
+    # url() without token has no token= param
+    plain_url = obj_plain.url()
+    assert "token=" not in plain_url
+
+
+def test_plugin_ses_session_token_via_kwarg():
+    """NotifySES() session token parsed from ?token= kwarg."""
+
+    url = (
+        f"ses://sender@example.com/{TEST_ACCESS_KEY_ID}"
+        f"/{TEST_ACCESS_KEY_SECRET}/{TEST_REGION}"
+        f"/recipient@example.com?token={TEST_SESSION_TOKEN}"
+    )
+    results = NotifySES.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj = NotifySES(**results)
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+
+
+def test_plugin_ses_key_alias():
+    """NotifySES() ?key= alias for access_key_id."""
+
+    url = (
+        "ses://sender@example.com/"
+        f"?key={TEST_ACCESS_KEY_ID}"
+        f"&secret={TEST_ACCESS_KEY_SECRET}"
+        f"&region={TEST_REGION}"
+        "&to=recipient@example.com"
+    )
+    results = NotifySES.parse_url(url)
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj = NotifySES(**results)
+    assert obj.aws_access_key_id == TEST_ACCESS_KEY_ID
+
+    # ?key= takes priority over ?access= when both appear
+    url_both = (
+        "ses://sender@example.com/"
+        f"?key={TEST_ACCESS_KEY_ID}&access=OTHERID"
+        f"&secret={TEST_ACCESS_KEY_SECRET}"
+        f"&region={TEST_REGION}"
+        "&to=recipient@example.com"
+    )
+    results2 = NotifySES.parse_url(url_both)
+    assert results2["access_key_id"] == TEST_ACCESS_KEY_ID
+
+
+def test_plugin_ses_session_token_via_password_field():
+    """NotifySES() session token parsed from URL password position."""
+
+    # Token in the password field:
+    # ses://sender:{token}@example.com/{access_key_id}/...
+    url = (
+        f"ses://sender:{TEST_SESSION_TOKEN}@example.com"
+        f"/{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/recipient@example.com"
+    )
+    results = NotifySES.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj = NotifySES(**results)
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+    assert obj.from_addr == "sender@example.com"
+
+    # Round-trip: url() emits password-field form, which re-parses correctly
+    regenerated = obj.url()
+    assert f":{TEST_SESSION_TOKEN}@" in regenerated
+    assert "token=" not in regenerated
+
+    results2 = NotifySES.parse_url(regenerated)
+    assert results2["session_token"] == TEST_SESSION_TOKEN
+
+    obj2 = NotifySES(**results2)
+    assert obj2.aws_session_token == TEST_SESSION_TOKEN
+    assert obj2.from_addr == obj.from_addr
+
+    # ?token= takes priority over the password field when both are present
+    url_both = (
+        f"ses://sender:WRONGTOKEN@example.com"
+        f"/{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/recipient@example.com"
+        f"?token={TEST_SESSION_TOKEN}"
+    )
+    results3 = NotifySES.parse_url(url_both)
+    assert results3["session_token"] == TEST_SESSION_TOKEN
+
+    obj3 = NotifySES(**results3)
+    assert obj3.aws_session_token == TEST_SESSION_TOKEN
