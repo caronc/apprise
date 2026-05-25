@@ -34,7 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise
-from apprise.plugins.sns import NotifySNS
+from apprise.plugins.sns import NotifySNS, SNSMode
 
 logging.disable(logging.CRITICAL)
 
@@ -169,6 +169,30 @@ apprise_url_tests = (
         {
             "instance": NotifySNS,
             "test_requests_exceptions": True,
+        },
+    ),
+    (
+        # Explicit SMS mode
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?mode=sms",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Forced topic mode on a phone target
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?mode=topic",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Invalid mode raises TypeError
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?mode=invalid",
+        {
+            "instance": TypeError,
         },
     ),
 )
@@ -688,3 +712,223 @@ def test_plugin_sns_detailed_failures(mocker):
 
     # Should return False because Publish failed
     assert obj_topic.notify(body="test") is False
+
+
+def test_plugin_sns_mode_detection():
+    """NotifySNS() auto-detects and validates operating mode."""
+
+    # Topic-only targets -> TOPIC mode auto-detected
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+    )
+    assert obj.mode == SNSMode.TOPIC
+    assert obj.title_maxlen == 100
+    assert obj.body_maxlen == 256000
+
+    # Phone targets -> SMS mode auto-detected
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+    )
+    assert obj.mode == SNSMode.SMS
+    assert obj.title_maxlen == 0
+    assert obj.body_maxlen == 160
+
+    # Mixed targets -> SMS mode (safe default)
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567", "#MyTopic"],
+    )
+    assert obj.mode == SNSMode.SMS
+
+    # No targets -> SMS mode (safe default)
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=[],
+    )
+    assert obj.mode == SNSMode.SMS
+
+    # Explicit mode=topic overrides auto-detection for phone-only URL
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+        mode=SNSMode.TOPIC,
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # Explicit mode=sms overrides auto-detection for topic-only URL
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+        mode=SNSMode.SMS,
+    )
+    assert obj.mode == SNSMode.SMS
+
+    # Prefix matching: "to" -> "topic"
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+        mode="to",
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # Invalid mode raises TypeError
+    with pytest.raises(TypeError):
+        NotifySNS(
+            access_key_id=TEST_ACCESS_KEY_ID,
+            secret_access_key=TEST_ACCESS_KEY_SECRET,
+            region_name=TEST_REGION,
+            targets=["#MyTopic"],
+            mode="invalid",
+        )
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_topic_mode_send(mock_post):
+    """NotifySNS() TOPIC mode sets Subject field on topic payloads."""
+
+    arn_response = (
+        "<CreateTopicResponse>"
+        "<CreateTopicResult>"
+        "<TopicArn>"
+        "arn:aws:sns:us-east-2:000000000000:MyTopic"
+        "</TopicArn>"
+        "</CreateTopicResult>"
+        "</CreateTopicResponse>"
+    )
+
+    # Capture the most recent Publish payload for inspection
+    publish_data = {}
+
+    def side_effect(url, data, **kwargs):
+        """Return ARN on CreateTopic; record payload on Publish."""
+        robj = mock.Mock()
+        robj.status_code = requests.codes.ok
+        if "Action=CreateTopic" in data:
+            robj.text = arn_response
+        elif "Action=Publish" in data:
+            publish_data["data"] = data
+            robj.text = ""
+        else:
+            robj.text = ""
+        return robj
+
+    mock_post.side_effect = side_effect
+
+    # Topic-only -> TOPIC mode auto-detected; title goes to Subject
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # With title: Subject must appear in the Publish payload
+    assert obj.notify(title="My Title", body="My Body") is True
+    # urlencode() uses %20 for spaces
+    assert "Subject=My%20Title" in publish_data["data"]
+    assert "Message=My%20Body" in publish_data["data"]
+
+    # With no title: Subject must not appear in the Publish payload
+    publish_data.clear()
+    assert obj.notify(title="", body="My Body") is True
+    assert "Subject=" not in publish_data.get("data", "")
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_topic_mode_phone_forced(mock_post):
+    """NotifySNS() TOPIC mode forced on phone target prepends title."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.text = ""
+    mock_post.return_value = response
+
+    # Force TOPIC mode on a phone target
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+        mode=SNSMode.TOPIC,
+    )
+    assert obj.mode == SNSMode.TOPIC
+
+    # With a title: it must be prepended to the body in the SMS payload
+    assert obj.notify(title="My Title", body="My Body") is True
+    data = mock_post.call_args[1]["data"]
+    # urlencode() uses %20 for spaces; \r\n becomes %0D%0A
+    assert "My%20Title" in data
+    assert "My%20Body" in data
+
+    # With no title: body is sent as-is without modification
+    mock_post.reset_mock()
+    assert obj.notify(title="", body="My Body") is True
+    data = mock_post.call_args[1]["data"]
+    assert "My%20Body" in data
+
+
+def test_plugin_sns_mode_url_round_trip():
+    """NotifySNS() mode is preserved through url() and parse_url()."""
+
+    # TOPIC mode round-trip
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["#MyTopic"],
+        mode=SNSMode.TOPIC,
+    )
+    url = obj.url()
+    assert "mode=topic" in url
+
+    results = NotifySNS.parse_url(url)
+    assert results["mode"] == SNSMode.TOPIC
+
+    obj2 = NotifySNS(**results)
+    assert obj2.mode == SNSMode.TOPIC
+    assert obj2.url_identifier == obj.url_identifier
+
+    # SMS mode round-trip
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets=["+18001234567"],
+        mode=SNSMode.SMS,
+    )
+    url = obj.url()
+    assert "mode=sms" in url
+
+    results = NotifySNS.parse_url(url)
+    assert results["mode"] == SNSMode.SMS
+
+    obj2 = NotifySNS(**results)
+    assert obj2.mode == SNSMode.SMS
+
+    # No mode in URL -> auto-detection runs on re-instantiation
+    url_no_mode = (
+        f"sns://{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/+18001234567"
+    )
+    results = NotifySNS.parse_url(url_no_mode)
+    assert results["mode"] is None
+    obj3 = NotifySNS(**results)
+    # Auto-detected from phone target
+    assert obj3.mode == SNSMode.SMS
