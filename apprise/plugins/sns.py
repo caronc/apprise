@@ -95,6 +95,10 @@ class NotifySNS(NotifyBase):
 
     # Define object templates
     templates = (
+        # With session token (for temporary/IAM credentials)
+        "{schema}://{token}@{access_key_id}"
+        "/{secret_access_key}/{region}/{targets}",
+        # Without session token (standard long-term credentials)
         "{schema}://{access_key_id}/{secret_access_key}/{region}/{targets}",
     )
 
@@ -102,6 +106,13 @@ class NotifySNS(NotifyBase):
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
+            "token": {
+                # Session token for temporary/IAM credentials (optional)
+                "name": _("Session Token"),
+                "type": "string",
+                "private": True,
+                "map_to": "session_token",
+            },
             "access_key_id": {
                 "name": _("Access Key ID"),
                 "type": "string",
@@ -146,7 +157,18 @@ class NotifySNS(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "to": {
+                "alias_of": "targets",
+            },
+            "token": {
+                # ?token= kwarg mirrors the {token} URL path entry
+                "alias_of": "token",
+            },
             "access": {
+                "alias_of": "access_key_id",
+            },
+            "key": {
+                # Intuitive alias for access_key_id
                 "alias_of": "access_key_id",
             },
             "secret": {
@@ -154,9 +176,6 @@ class NotifySNS(NotifyBase):
             },
             "region": {
                 "alias_of": "region",
-            },
-            "to": {
-                "alias_of": "targets",
             },
         },
     )
@@ -167,10 +186,14 @@ class NotifySNS(NotifyBase):
         secret_access_key,
         region_name,
         targets=None,
+        session_token=None,
         **kwargs,
     ):
         """Initialize Notify AWS SNS Object."""
         super().__init__(**kwargs)
+
+        # Store optional session token for temporary/IAM credentials
+        self.aws_session_token = session_token if session_token else None
 
         # Store our AWS API Access Key
         self.aws_access_key_id = validate_regex(access_key_id)
@@ -428,6 +451,13 @@ class NotifySNS(NotifyBase):
             ]
         )
 
+        # Include session token in signed headers for temporary credentials;
+        # x-amz-security-token sorts after x-amz-date alphabetically and
+        # must appear after it to keep the canonical request valid.
+        if self.aws_session_token:
+            headers["X-Amz-Security-Token"] = self.aws_session_token
+            signed_headers["x-amz-security-token"] = self.aws_session_token
+
         #
         # Build Canonical Request Object
         #
@@ -595,10 +625,20 @@ class NotifySNS(NotifyBase):
         # Our URL parameters
         params = self.url_parameters(privacy=privacy, *args, **kwargs)
 
+        # Prepare session token prefix when using temporary credentials
+        token_prefix = (
+            "{token}@".format(
+                token=self.pprint(self.aws_session_token, privacy, safe=""),
+            )
+            if self.aws_session_token
+            else ""
+        )
+
         return (
-            "{schema}://{key_id}/{key_secret}/{region}/{targets}/"
-            "?{params}".format(
+            "{schema}://{token_prefix}{key_id}/{key_secret}"
+            "/{region}/{targets}/?{params}".format(
                 schema=self.secure_protocol,
+                token_prefix=token_prefix,
                 key_id=self.pprint(self.aws_access_key_id, privacy, safe=""),
                 key_secret=self.pprint(
                     self.aws_secret_access_key,
@@ -696,8 +736,11 @@ class NotifySNS(NotifyBase):
         else:
             results["secret_access_key"] = secret_access_key
 
-        # Handle access key id over-ride
-        if "access" in results["qsd"] and len(results["qsd"]["access"]):
+        # Handle access key id override; ?key= is the preferred alias,
+        # ?access= is retained for backwards compatibility
+        if "key" in results["qsd"] and len(results["qsd"]["key"]):
+            results["access_key_id"] = NotifySNS.unquote(results["qsd"]["key"])
+        elif "access" in results["qsd"] and len(results["qsd"]["access"]):
             results["access_key_id"] = NotifySNS.unquote(
                 results["qsd"]["access"]
             )
@@ -711,6 +754,16 @@ class NotifySNS(NotifyBase):
             )
         else:
             results["region_name"] = region_name
+
+        # Session token: userinfo position ({token}@{host}) takes first pass;
+        # ?token= kwarg overrides it when both appear
+        results["session_token"] = None
+        if results.get("user"):
+            results["session_token"] = NotifySNS.unquote(results["user"])
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["session_token"] = NotifySNS.unquote(
+                results["qsd"]["token"]
+            )
 
         # Return our result set
         return results

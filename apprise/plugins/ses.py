@@ -150,6 +150,15 @@ class NotifySES(NotifyBase):
     template_tokens = dict(
         NotifyBase.template_tokens,
         **{
+            "token": {
+                # Session token for temporary/IAM credentials (optional).
+                # SES uses sender@domain in the URL host slot, so the token
+                # is provided via ?token= rather than the userinfo position.
+                "name": _("Session Token"),
+                "type": "string",
+                "private": True,
+                "map_to": "session_token",
+            },
             "from_email": {
                 "name": _("From Email"),
                 "type": "string",
@@ -186,6 +195,9 @@ class NotifySES(NotifyBase):
     template_args = dict(
         NotifyBase.template_args,
         **{
+            "to": {
+                "alias_of": "targets",
+            },
             "from": {
                 "alias_of": "from_email",
             },
@@ -199,7 +211,15 @@ class NotifySES(NotifyBase):
                 "type": "string",
                 "map_to": "from_name",
             },
+            "token": {
+                # ?token= kwarg mirrors the token template token
+                "alias_of": "token",
+            },
             "access": {
+                "alias_of": "access_key_id",
+            },
+            "key": {
+                # Intuitive alias for access_key_id
                 "alias_of": "access_key_id",
             },
             "secret": {
@@ -207,9 +227,6 @@ class NotifySES(NotifyBase):
             },
             "region": {
                 "alias_of": "region",
-            },
-            "to": {
-                "alias_of": "targets",
             },
             "cc": {
                 "name": _("Carbon Copy"),
@@ -233,10 +250,14 @@ class NotifySES(NotifyBase):
         targets=None,
         cc=None,
         bcc=None,
+        session_token=None,
         **kwargs,
     ):
         """Initialize Notify AWS SES Object."""
         super().__init__(**kwargs)
+
+        # Store optional session token for temporary/IAM credentials
+        self.aws_session_token = session_token if session_token else None
 
         # Store our AWS API Access Key
         self.aws_access_key_id = validate_regex(access_key_id)
@@ -668,6 +689,13 @@ class NotifySES(NotifyBase):
             ]
         )
 
+        # Include session token in signed headers for temporary credentials;
+        # x-amz-security-token sorts after x-amz-date alphabetically and
+        # must appear after it to keep the canonical request valid.
+        if self.aws_session_token:
+            headers["X-Amz-Security-Token"] = self.aws_session_token
+            signed_headers["x-amz-security-token"] = self.aws_session_token
+
         #
         # Build Canonical Request Object
         #
@@ -868,6 +896,14 @@ class NotifySES(NotifyBase):
                 else self.reply_to[1]
             )
 
+        # Include session token in query params for temporary credentials
+        if self.aws_session_token:
+            params["token"] = (
+                self.pprint(self.aws_session_token, privacy, safe="")
+                if privacy
+                else self.aws_session_token
+            )
+
         # a simple boolean check as to whether we display our target emails
         # or not
         has_targets = not (
@@ -1005,8 +1041,11 @@ class NotifySES(NotifyBase):
         else:
             results["secret_access_key"] = secret_access_key
 
-        # Handle access key id over-ride
-        if "access" in results["qsd"] and len(results["qsd"]["access"]):
+        # Handle access key id override; ?key= is the preferred alias,
+        # ?access= is retained for backwards compatibility
+        if "key" in results["qsd"] and len(results["qsd"]["key"]):
+            results["access_key_id"] = NotifySES.unquote(results["qsd"]["key"])
+        elif "access" in results["qsd"] and len(results["qsd"]["access"]):
             results["access_key_id"] = NotifySES.unquote(
                 results["qsd"]["access"]
             )
@@ -1020,6 +1059,14 @@ class NotifySES(NotifyBase):
             )
         else:
             results["region_name"] = region_name
+
+        # Session token via ?token= (SES uses sender@domain in the URL host
+        # slot, so there is no userinfo position available for the token)
+        results["session_token"] = None
+        if "token" in results["qsd"] and len(results["qsd"]["token"]):
+            results["session_token"] = NotifySES.unquote(
+                results["qsd"]["token"]
+            )
 
         # Return our result set
         return results

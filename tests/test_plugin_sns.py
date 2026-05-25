@@ -43,6 +43,9 @@ TEST_ACCESS_KEY_ID = "AHIAJGNT76XIMXDBIJYA"
 TEST_ACCESS_KEY_SECRET = "bu1dHSdO22pfaaVy/wmNsdljF4C07D3bndi9PQJ9"
 TEST_REGION = "us-east-2"
 
+# A realistic-looking (but fake) AWS session token
+TEST_SESSION_TOKEN = "FwoGZXIvYXdzSESSIONTOKENABCDEFGHIJKLMNOPQRS"
+
 # Our Testing URLs
 apprise_url_tests = (
     (
@@ -122,6 +125,49 @@ apprise_url_tests = (
             "instance": NotifySNS,
             # Throws a series of i/o exceptions with this flag
             # is set and tests that we gracefully handle them
+            "test_requests_exceptions": True,
+        },
+    ),
+    (
+        # Session token in userinfo position (temporary/IAM credentials)
+        "sns://SESSIONTOKEN@T1JJ3T3L2"
+        "/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Session token via ?token= query parameter
+        "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "/us-west-2/12223334444?token=SESSIONTOKEN",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Access key via ?key= alias
+        "sns://?key=T1JJ3T3L2&secret=A1BRTD4JD/TIiajkdnlazkcevi7FQ"
+        "&region=us-west-2&to=12223334444",
+        {
+            "instance": NotifySNS,
+        },
+    ),
+    (
+        # Session token + HTTP error
+        "sns://SESSIONTOKEN@T1JJ3T3L2"
+        "/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/12223334444",
+        {
+            "instance": NotifySNS,
+            "response": False,
+            "requests_response_code": 999,
+        },
+    ),
+    (
+        # Session token + request exceptions
+        "sns://SESSIONTOKEN@T1JJ3T3L2"
+        "/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2/15556667777",
+        {
+            "instance": NotifySNS,
             "test_requests_exceptions": True,
         },
     ),
@@ -445,6 +491,129 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     mock_post.return_value = robj
     # We would have failed to make Post
     assert a.notify(title="", body="test") is True
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_session_token(mock_post):
+    """NotifySNS() session token for temporary/IAM credentials."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.text = ""
+    mock_post.return_value = response
+
+    # Init with session token
+    obj = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets="+18001234567",
+        session_token=TEST_SESSION_TOKEN,
+    )
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+
+    # send() must include X-Amz-Security-Token in request headers
+    assert obj.notify(body="test") is True
+    call_kwargs = mock_post.call_args[1]
+    assert "X-Amz-Security-Token" in call_kwargs["headers"]
+    assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
+
+    # x-amz-security-token must also appear in the Authorization header
+    # (it is listed in SignedHeaders)
+    auth = call_kwargs["headers"]["Authorization"]
+    assert "x-amz-security-token" in auth
+
+    # URL round-trip via userinfo position
+    url = obj.url()
+    assert "@" in url
+    assert TEST_SESSION_TOKEN in url
+
+    results = NotifySNS.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj2 = NotifySNS(**results)
+    assert obj2.aws_session_token == TEST_SESSION_TOKEN
+    assert obj2.url_identifier == obj.url_identifier
+
+    # Privacy URL must mask the token but keep the @ separator
+    priv_url = obj.url(privacy=True)
+    assert TEST_SESSION_TOKEN not in priv_url
+    assert "@" in priv_url
+
+    # Without a session token no X-Amz-Security-Token header is sent
+    mock_post.reset_mock()
+    obj_plain = NotifySNS(
+        access_key_id=TEST_ACCESS_KEY_ID,
+        secret_access_key=TEST_ACCESS_KEY_SECRET,
+        region_name=TEST_REGION,
+        targets="+18001234567",
+    )
+    assert obj_plain.aws_session_token is None
+    assert obj_plain.notify(body="test") is True
+    call_kwargs = mock_post.call_args[1]
+    assert "X-Amz-Security-Token" not in call_kwargs["headers"]
+
+    # url() without token has no @ separator
+    plain_url = obj_plain.url()
+    assert "@" not in plain_url
+
+
+@mock.patch("requests.post")
+def test_plugin_sns_session_token_via_kwarg(mock_post):
+    """NotifySNS() session token parsed from ?token= kwarg."""
+
+    response = mock.MagicMock()
+    response.status_code = requests.codes.ok
+    response.text = ""
+    mock_post.return_value = response
+
+    url = (
+        f"sns://{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/+18001234567?token={TEST_SESSION_TOKEN}"
+    )
+    results = NotifySNS.parse_url(url)
+    assert results["session_token"] == TEST_SESSION_TOKEN
+
+    obj = NotifySNS(**results)
+    assert obj.aws_session_token == TEST_SESSION_TOKEN
+    assert obj.notify(body="test") is True
+
+    call_kwargs = mock_post.call_args[1]
+    assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
+
+    # ?token= overrides userinfo when both are present
+    url_both = (
+        f"sns://OTHERTOKEN@{TEST_ACCESS_KEY_ID}/{TEST_ACCESS_KEY_SECRET}"
+        f"/{TEST_REGION}/+18001234567?token={TEST_SESSION_TOKEN}"
+    )
+    results2 = NotifySNS.parse_url(url_both)
+    assert results2["session_token"] == TEST_SESSION_TOKEN
+
+
+def test_plugin_sns_key_alias():
+    """NotifySNS() ?key= alias for access_key_id."""
+
+    # ?key= resolves to access_key_id
+    url = (
+        f"sns://?key={TEST_ACCESS_KEY_ID}"
+        f"&secret={TEST_ACCESS_KEY_SECRET}"
+        f"&region={TEST_REGION}&to=+18001234567"
+    )
+    results = NotifySNS.parse_url(url)
+    assert results["access_key_id"] == TEST_ACCESS_KEY_ID
+
+    obj = NotifySNS(**results)
+    assert obj.aws_access_key_id == TEST_ACCESS_KEY_ID
+
+    # ?key= takes priority over ?access= when both appear
+    url_both = (
+        f"sns://?key={TEST_ACCESS_KEY_ID}&access=OTHERID"
+        f"&secret={TEST_ACCESS_KEY_SECRET}"
+        f"&region={TEST_REGION}&to=+18001234567"
+    )
+    results2 = NotifySNS.parse_url(url_both)
+    assert results2["access_key_id"] == TEST_ACCESS_KEY_ID
 
 
 def test_plugin_sns_detailed_failures(mocker):
