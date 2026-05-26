@@ -52,5 +52,7 @@ class NotificationManager(PluginManager):
 
     # For filtering our result set
     module_filter_re = re.compile(
-        r"^(?P<name>" + fname_prefix + r"(?!Base|ImageSize|Type)[A-Za-z0-9]+)$"
+        r"^(?P<name>"
+        + fname_prefix
+        + r"(?!Base|Format|ImageSize|Type)[A-Za-z0-9]+)$"
     )

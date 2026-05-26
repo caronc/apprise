@@ -40,6 +40,7 @@ from apprise import Apprise, AppriseAsset, AttachmentManager
 from apprise.apprise_attachment import AppriseAttachment
 from apprise.attachment import AttachBase
 from apprise.common import ContentLocation
+from apprise.logger import LogCapture
 
 logging.disable(logging.CRITICAL)
 
@@ -456,3 +457,37 @@ def test_attachment_matrix_dynamic_importing(tmpdir):
     )
 
     A_MGR.load_modules(path=str(base), name=module_name)
+
+
+def test_attachment_manager_no_import_failures():
+    """Verify all native attach plugins load without TRACE import errors."""
+
+    # Remove the global test-suite log suppression so TRACE records
+    # are visible during the scan below
+    logging.disable(logging.NOTSET)
+
+    # Force a clean reload of the native attachment plugin directory
+    A_MGR.unload_modules()
+
+    with LogCapture(level=logging.TRACE) as stream:
+        # Trigger load_modules() via the lazy-load path
+        len(A_MGR)
+
+        # Grab the captured log content before the handler is removed
+        content = stream.getvalue()
+
+    # Restore log suppression for the remainder of the test suite
+    logging.disable(logging.CRITICAL)
+
+    # Any "import failed" line means a plugin directory was found but
+    # contained no loadable Attach* class (e.g. a stale __pycache__
+    # directory left behind after a rename).
+    failures = [
+        line for line in content.splitlines() if "import failed" in line
+    ]
+    assert not failures, (
+        "Attachment plugin import failures detected:\n" + "\n".join(failures)
+    )
+
+    # Leave the manager in a clean state for subsequent tests
+    A_MGR.unload_modules()

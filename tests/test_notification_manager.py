@@ -37,6 +37,7 @@ import types
 import pytest
 
 from apprise import Apprise, NotificationManager
+from apprise.logger import LogCapture
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -1023,4 +1024,38 @@ def test_load_modules_schema_conflict(tmpdir):
     # fallback loads the file; NotifyConflict.schemas() = {"json"};
     # "json" already in _schema_map -> conflict logged, skipped
     N_MGR.load_modules(path=str(tmpdir))
+    N_MGR.unload_modules()
+
+
+def test_notification_manager_no_import_failures():
+    """Verify all native plugins load without TRACE import errors."""
+
+    # Remove the global test-suite log suppression so TRACE records
+    # are visible during the scan below
+    logging.disable(logging.NOTSET)
+
+    # Force a clean reload of the native plugin directory
+    N_MGR.unload_modules()
+
+    with LogCapture(level=logging.TRACE) as stream:
+        # Trigger load_modules() via the lazy-load path
+        len(N_MGR)
+
+        # Grab the captured log content before the handler is removed
+        content = stream.getvalue()
+
+    # Restore log suppression for the remainder of the test suite
+    logging.disable(logging.CRITICAL)
+
+    # Any "import failed" line means a plugin directory was found but
+    # contained no loadable Notify* class (e.g. a stale __pycache__
+    # directory left behind after a rename).
+    failures = [
+        line for line in content.splitlines() if "import failed" in line
+    ]
+    assert not failures, "Plugin import failures detected:\n" + "\n".join(
+        failures
+    )
+
+    # Leave the manager in a clean state for subsequent tests
     N_MGR.unload_modules()
