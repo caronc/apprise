@@ -211,7 +211,7 @@ def _escape_telegram_markdown_text(value, markdown_ver):
     if markdown_ver == TelegramMarkdownVersion.TWO:
         return re.sub(r"([\\_*[\]()~`>#+\-=|{}.!])", r"\\\1", value)
 
-    return re.sub(r"([\\*_`\[])", r"\\\1", value)
+    return re.sub(r"([\\*_`])", r"\\\1", value)
 
 
 class TelegramMarkdownHTMLConverter(HTMLParser):
