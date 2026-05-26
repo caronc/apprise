@@ -43,6 +43,7 @@ from apprise import (
     NotifyFormat,
     NotifyType,
 )
+from apprise.plugins import telegram as telegram_plugin
 from apprise.plugins.telegram import NotifyTelegram
 
 logging.disable(logging.CRITICAL)
@@ -1457,6 +1458,57 @@ def test_plugin_telegram_markdown_conversion(mock_post):
         "Date/Time: *Today*\n"
         "Uptime: *TESTER*\n\n"
         "_Beware of a tall blond man with one black shoe\\._"
+    )
+
+
+def test_plugin_telegram_markdown_converter_edges():
+    """NotifyTelegram() covers Telegram Markdown renderer edge cases."""
+
+    result = []
+    telegram_plugin._ensure_line_break(result)
+    assert result == []
+
+    result = []
+    telegram_plugin._ensure_paragraph_break(result)
+    assert result == []
+
+    result = ["line\n"]
+    telegram_plugin._ensure_paragraph_break(result)
+    assert result == ["line\n", "\n"]
+
+    assert (
+        telegram_plugin._telegram_markdown_from_html(
+            "<br>after", telegram_plugin.TelegramMarkdownVersion.TWO
+        )
+        == "after"
+    )
+
+    assert (
+        telegram_plugin._telegram_markdown_from_html(
+            "<li>Item</li>", telegram_plugin.TelegramMarkdownVersion.TWO
+        )
+        == "\\- Item"
+    )
+
+    assert (
+        telegram_plugin._telegram_markdown_from_html(
+            "<img />after", telegram_plugin.TelegramMarkdownVersion.TWO
+        )
+        == "after"
+    )
+
+    assert (
+        telegram_plugin._telegram_markdown_from_html(
+            "</i>after", telegram_plugin.TelegramMarkdownVersion.TWO
+        )
+        == "_after"
+    )
+
+    assert (
+        telegram_plugin._telegram_markdown_from_html(
+            "<b>bold</i></b>", telegram_plugin.TelegramMarkdownVersion.TWO
+        )
+        == "*bold_*"
     )
 
 
