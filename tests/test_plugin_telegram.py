@@ -1025,6 +1025,36 @@ def test_plugin_telegram_formatting(mock_post):
         '</i> had <a href="http://127.0.0.2">a change</a>\r\n'
     )
 
+    # Reset our values
+    mock_post.reset_mock()
+
+    # Markdown paragraphs converted to Telegram HTML should preserve paragraph
+    # spacing without turning hard line breaks into blank lines.
+    body = "\n".join((
+        "**--- Header ---**",
+        "",
+        "Hostname: **server**",
+        "Date/Time: **Today**",
+        "Uptime: **TESTER**",
+        "",
+        "_Beware of a tall blond man with one black shoe._",
+    ))
+
+    assert aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN)
+
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert (
+        payload["text"]
+        == "<b>--- Header ---</b>\r\n\r\n"
+        "Hostname: <b>server</b>\r\n"
+        "Date/Time: <b>Today</b>\r\n"
+        "Uptime: <b>TESTER</b>\r\n\r\n"
+        "<i>Beware of a tall blond man with one black shoe.</i>\r\n"
+    )
+
     # Now we'll test an edge case where a title was defined, but after
     # processing it, it was determiend there really wasn't anything there
     # at all at the end of the day.

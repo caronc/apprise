@@ -317,7 +317,26 @@ class NotifyTelegram(NotifyBase):
         ),
         (
             re.compile(
-                r"\s*<\s*/\s*(br|p|hr|li|div)([^a-z0-9>][^>]*)?>\s*",
+                r"\s*<\s*/\s*p([^a-z0-9>][^>]*)?>\s*(?=</b>)",
+                (re.I | re.M | re.S),
+            ),
+            "\r\n",
+            {},
+        ),
+        (
+            re.compile(
+                r"\s*<\s*/\s*p([^a-z0-9>][^>]*)?>\s*",
+                (re.I | re.M | re.S),
+            ),
+            "{}",
+            {
+                "markdown": "\r\n\r\n",
+                "default": "\r\n",
+            },
+        ),
+        (
+            re.compile(
+                r"\s*<\s*/\s*(br|hr|li|div)([^a-z0-9>][^>]*)?>\s*",
                 (re.I | re.M | re.S),
             ),
             "\r\n",
@@ -333,7 +352,14 @@ class NotifyTelegram(NotifyBase):
         (re.compile(r"\&apos;?", re.I), "'", {}),
         (re.compile(r"\&quot;?", re.I), '"', {}),
         # New line cleanup
-        (re.compile(r"\r*\n[\r\n]+", re.I), "\r\n", {}),
+        (
+            re.compile(r"(?:\r?\n){2,}", re.I),
+            "{}",
+            {
+                "markdown": "\r\n\r\n",
+                "default": "\r\n",
+            },
+        ),
     )
 
     # Define our template tokens
@@ -849,7 +875,18 @@ class NotifyTelegram(NotifyBase):
             # Use Telegram's HTML mode
             payload_["parse_mode"] = "HTML"
             for r, v, m in self.__telegram_escape_html_entries:
-                if "html" in m:
+                if "default" in m:
+                    # Handle format-sensitive line-break normalization. For
+                    # Markdown-origin content, preserve paragraph breaks while
+                    # keeping the legacy single-line cleanup for HTML/text.
+                    body_format_key = (
+                        body_format.value
+                        if isinstance(body_format, NotifyFormat)
+                        else body_format
+                    )
+                    v = v.format(m.get(body_format_key, m["default"]))
+
+                elif "html" in m:
                     # Handle special cases where we need to alter new lines
                     # for presentation purposes
                     v = v.format(
@@ -860,6 +897,11 @@ class NotifyTelegram(NotifyBase):
                     )
 
                 body = r.sub(v, body)
+
+            if body_format == NotifyFormat.MARKDOWN and body.endswith(
+                "\r\n\r\n"
+            ):
+                body = body[:-2]
 
             # Prepare our payload based on HTML or TEXT
             payload_["text"] = body
