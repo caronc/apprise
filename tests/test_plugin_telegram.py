@@ -936,9 +936,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
+    # Test that standard Markdown is converted to Telegram MarkdownV2.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "*🚨 Change detected for _Apprise Test Title_*\n\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -975,9 +975,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
+    # Test that standard Markdown is converted to Telegram Markdown v1.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "*🚨 Change detected for _Apprise Test Title_*\n\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -1220,9 +1220,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # No escaping in this circumstance
+    # Standard Markdown is converted to Telegram MarkdownV2.
     assert (
-        payload["text"] == "# A Great Title\r\n"
+        payload["text"] == "*A Great Title*\n\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.2)"
     )
@@ -1341,6 +1341,122 @@ def test_plugin_telegram_formatting(mock_post):
     assert (
         payload["text"]
         == "<b>Test Message Title</b>\r\nTest Message Body\r\nok\r\n"
+    )
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_markdown_conversion(mock_post):
+    """NotifyTelegram() converts standard Markdown to Telegram Markdown."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    def send_payload(url, body, body_format=NotifyFormat.MARKDOWN):
+        mock_post.reset_mock()
+
+        aobj = Apprise()
+        aobj.add(url)
+        assert aobj.notify(body=body, body_format=body_format)
+        assert mock_post.call_count == 1
+        return loads(mock_post.call_args_list[0][1]["data"])
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=1",
+        "~~Strike~~ **Bold** _Italics_ Text",
+    )
+    assert payload["parse_mode"] == "MARKDOWN"
+    assert payload["text"] == "Strike *Bold* _Italics_ Text"
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2",
+        "~~Strike~~ **Bold** _Italics_ Text",
+    )
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "~Strike~ *Bold* _Italics_ Text"
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=1",
+        "**Bold**\n_Italics_\n"
+        "```go\nif x > 0 { return `tick` }\\path\n```",
+    )
+    assert "````" not in payload["text"]
+    assert "```\nif x > 0 { return `tick` }\\path\n```" in payload["text"]
+    assert "\\`" not in payload["text"]
+    assert "\\\\path" not in payload["text"]
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2",
+        "```go\nif x > 0 { return `tick` }\\path\n```",
+    )
+    assert payload["text"] == (
+        "```\nif x > 0 { return \\`tick\\` }\\\\path\n```"
+    )
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2",
+        "`if x > 0 { return path\\name }`",
+    )
+    assert payload["text"] == "`if x > 0 { return path\\\\name }`"
+    assert "\\>" not in payload["text"]
+    assert "\\{" not in payload["text"]
+    assert "\\}" not in payload["text"]
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2",
+        '<a href="https://example.com/a)b\\c">Docs</a>',
+        body_format=NotifyFormat.HTML,
+    )
+    assert payload["text"] == "[Docs](https://example.com/a\\)b\\\\c)"
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2",
+        "<b>Bold</b> <i>Italics</i> Text",
+        body_format=NotifyFormat.HTML,
+    )
+    assert payload["text"] == "*Bold* _Italics_ Text"
+
+    body = "\n".join((
+        "**--- Header ---**",
+        "",
+        "Hostname: **server**",
+        "Date/Time: **Today**",
+        "Uptime: **TESTER**",
+        "",
+        "_Beware of a tall blond man with one black shoe._",
+    ))
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=1",
+        body,
+    )
+    assert payload["text"] == (
+        "*--- Header ---*\n\n"
+        "Hostname: *server*\n"
+        "Date/Time: *Today*\n"
+        "Uptime: *TESTER*\n\n"
+        "_Beware of a tall blond man with one black shoe._"
+    )
+
+    payload = send_payload(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2",
+        body,
+    )
+    assert payload["text"] == (
+        "*\\-\\-\\- Header \\-\\-\\-*\n\n"
+        "Hostname: *server*\n"
+        "Date/Time: *Today*\n"
+        "Uptime: *TESTER*\n\n"
+        "_Beware of a tall blond man with one black shoe\\._"
     )
 
 
@@ -1625,10 +1741,10 @@ def test_plugin_telegram_markdown_v2(mock_post):
     assert mock_post.call_count == 2
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Our content is escapped properly
+    # Our content is escaped properly, including literal backslashes.
     assert (
         payload["text"] == "\\# my message\r\n"
-        "\\#\\# more content\r\n\\# already escaped hashtag"
+        "\\#\\# more content\r\n\\\\\\# already escaped hashtag"
     )
 
     mock_post.reset_mock()
@@ -1663,10 +1779,10 @@ def test_plugin_telegram_markdown_v2(mock_post):
         assert mock_post.call_count == 1
         payload = loads(mock_post.call_args_list[0][1]["data"])
 
-        # Our content is escapped properly
+        # Our content is escaped properly, including literal backslashes.
         assert (
             payload["text"]
-            == f"bad character: \\{c}, and already escapped \\{c}"
+            == rf"bad character: \{c}, and already escapped \\\{c}"
         )
 
         mock_post.reset_mock()

@@ -51,10 +51,12 @@
 #
 # Development API Reference::
 #  - https://core.telegram.org/bots/api
+from html.parser import HTMLParser
 from json import dumps, loads
 import os
 import re
 
+from markdown import markdown
 import requests
 
 from ..attachment.base import AttachBase
@@ -64,6 +66,7 @@ from ..common import (
     NotifyType,
     PersistentStoreMode,
 )
+from ..conversion import convert_between
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -123,6 +126,246 @@ TELEGRAM_CONTENT_PLACEMENT = (
     TelegramContentPlacement.AFTER,
 )
 
+TELEGRAM_HTML_BLOCK_TAGS = frozenset((
+    "blockquote",
+    "div",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "li",
+    "p",
+    "pre",
+))
+
+TELEGRAM_HTML_PARAGRAPH_TAGS = frozenset((
+    "blockquote",
+    "div",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "h5",
+    "h6",
+    "p",
+))
+
+
+def _telegram_markdown_html(content):
+    """Convert standard Markdown to HTML suitable for Telegram rendering."""
+    content = re.sub(r"~~(.+?)~~", r"<del>\1</del>", content, flags=re.S)
+    return markdown(
+        content,
+        extensions=[
+            "markdown.extensions.fenced_code",
+            "markdown.extensions.nl2br",
+            "markdown.extensions.tables",
+        ],
+    )
+
+
+def _ensure_line_break(result):
+    """Ensure the token list ends in one newline."""
+    if not result:
+        return
+
+    value = "".join(result)
+    if not value.endswith("\n"):
+        result.append("\n")
+
+
+def _ensure_paragraph_break(result):
+    """Ensure the token list ends in one paragraph break."""
+    if not result:
+        return
+
+    value = "".join(result)
+    if value.endswith("\n\n"):
+        return
+    if value.endswith("\n"):
+        result.append("\n")
+    else:
+        result.append("\n\n")
+
+
+def _escape_telegram_markdown_code_text(value, markdown_ver):
+    """Escape text inside Telegram Markdown code/pre sections."""
+    if markdown_ver != TelegramMarkdownVersion.TWO:
+        return value
+
+    return value.replace("\\", "\\\\").replace("`", "\\`")
+
+
+def _escape_telegram_markdown_link(value, markdown_ver):
+    """Escape Telegram Markdown link destinations."""
+    if markdown_ver != TelegramMarkdownVersion.TWO:
+        return value
+
+    return value.replace("\\", "\\\\").replace(")", "\\)")
+
+
+def _escape_telegram_markdown_text(value, markdown_ver):
+    """Escape regular Telegram Markdown text."""
+    if markdown_ver == TelegramMarkdownVersion.TWO:
+        return re.sub(r"([\\_*[\]()~`>#+\-=|{}.!])", r"\\\1", value)
+
+    return re.sub(r"([\\*_`\[])", r"\\\1", value)
+
+
+class TelegramMarkdownHTMLConverter(HTMLParser):
+    """Render a small HTML subset into Telegram Markdown."""
+
+    def __init__(self, markdown_ver):
+        super().__init__(convert_charrefs=True)
+        self.markdown_ver = markdown_ver
+        self.result = []
+        self.stack = []
+        self.trim_leading_newline = False
+
+    @property
+    def converted(self):
+        return "".join(self.result).strip("\n")
+
+    @property
+    def in_code(self):
+        return any(entry["tag"] in ("code", "pre") for entry in self.stack)
+
+    def handle_starttag(self, tag, attrs):
+        tag = tag.lower()
+        attrs = dict(attrs)
+        parent_is_pre = self._current_is("pre")
+
+        if self.result:
+            if tag in TELEGRAM_HTML_PARAGRAPH_TAGS:
+                _ensure_paragraph_break(self.result)
+            elif tag in TELEGRAM_HTML_BLOCK_TAGS:
+                _ensure_line_break(self.result)
+
+        entry = {
+            "tag": tag,
+            "href": attrs.get("href"),
+            "parent_is_pre": parent_is_pre,
+        }
+        self.stack.append(entry)
+
+        if tag == "a" and entry["href"]:
+            self.result.append("[")
+
+        elif tag in ("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6"):
+            self.result.append("*")
+
+        elif tag in ("em", "i"):
+            self.result.append("_")
+
+        elif tag in ("del", "s", "strike"):
+            if self.markdown_ver == TelegramMarkdownVersion.TWO:
+                self.result.append("~")
+
+        elif tag == "br":
+            _ensure_line_break(self.result)
+            self.trim_leading_newline = True
+
+        elif tag == "code" and not parent_is_pre:
+            self.result.append("`")
+
+        elif tag == "li":
+            self.result.append(
+                "\\- " if self.markdown_ver == TelegramMarkdownVersion.TWO
+                else "- "
+            )
+
+        elif tag == "pre":
+            self.result.append("```\n")
+
+    def handle_startendtag(self, tag, attrs):
+        if tag.lower() == "br":
+            _ensure_line_break(self.result)
+            self.trim_leading_newline = True
+            return
+
+        self.handle_starttag(tag, attrs)
+        self.handle_endtag(tag)
+
+    def handle_endtag(self, tag):
+        tag = tag.lower()
+        entry = self._pop_tag(tag)
+
+        if tag == "a" and entry and entry["href"]:
+            self.result.append("](")
+            self.result.append(
+                _escape_telegram_markdown_link(
+                    entry["href"], self.markdown_ver
+                )
+            )
+            self.result.append(")")
+
+        elif tag in ("b", "strong", "h1", "h2", "h3", "h4", "h5", "h6"):
+            self.result.append("*")
+
+        elif tag in ("em", "i"):
+            self.result.append("_")
+
+        elif tag in ("del", "s", "strike"):
+            if self.markdown_ver == TelegramMarkdownVersion.TWO:
+                self.result.append("~")
+
+        elif tag == "code" and entry and not entry["parent_is_pre"]:
+            self.result.append("`")
+
+        elif tag == "pre":
+            self.result.append("```")
+
+        if tag in TELEGRAM_HTML_PARAGRAPH_TAGS:
+            _ensure_paragraph_break(self.result)
+        elif tag in TELEGRAM_HTML_BLOCK_TAGS:
+            _ensure_line_break(self.result)
+
+    def handle_data(self, data):
+        if self.trim_leading_newline:
+            data = data.lstrip("\r\n")
+            self.trim_leading_newline = False
+
+        if self.in_code:
+            self.result.append(
+                _escape_telegram_markdown_code_text(
+                    data, self.markdown_ver
+                )
+            )
+            return
+
+        if not data.strip() and "\n" in data:
+            return
+
+        self.result.append(
+            _escape_telegram_markdown_text(data, self.markdown_ver)
+        )
+
+    def _current_is(self, tag):
+        return bool(self.stack) and self.stack[-1]["tag"] == tag
+
+    def _pop_tag(self, tag):
+        for index in range(len(self.stack) - 1, -1, -1):
+            if self.stack[index]["tag"] == tag:
+                return self.stack.pop(index)
+        return None
+
+
+def _telegram_markdown_from_html(content, markdown_ver):
+    """Convert HTML content into Telegram Markdown."""
+    parser = TelegramMarkdownHTMLConverter(markdown_ver)
+    parser.feed(content)
+    parser.close()
+    return parser.converted
+
+
+def _telegram_markdown_from_standard_markdown(content, markdown_ver):
+    """Convert standard Markdown content into Telegram Markdown."""
+    return _telegram_markdown_from_html(
+        _telegram_markdown_html(content), markdown_ver
+    )
+
 
 class NotifyTelegram(NotifyBase):
     """A wrapper for Telegram Notifications."""
@@ -168,6 +411,13 @@ class NotifyTelegram(NotifyBase):
     # Our default is to no not use persistent storage beyond in-memory
     # reference
     storage_mode = PersistentStoreMode.AUTO
+
+    def convert_between(self, from_format, to_format, content):
+        """Let Telegram perform its own Markdown target conversion."""
+        if to_format == NotifyFormat.MARKDOWN:
+            return content
+
+        return convert_between(from_format, to_format, content)
 
     # Define object templates
     templates = (
@@ -857,16 +1107,21 @@ class NotifyTelegram(NotifyBase):
 
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
-            if (
-                body_format not in (None, NotifyFormat.MARKDOWN)
+            if body_format == NotifyFormat.MARKDOWN:
+                body = _telegram_markdown_from_standard_markdown(
+                    body, self.markdown_ver
+                )
+
+            elif body_format == NotifyFormat.HTML:
+                body = _telegram_markdown_from_html(body, self.markdown_ver)
+
+            elif (
+                body_format is not None
                 and self.markdown_ver == TelegramMarkdownVersion.TWO
             ):
-                # Telegram Markdown v2 is not very accomodating to some
-                # characters such as the hashtag (#) which is fine in v1.
-                # To try and be accomodating we escape them in advance
-                # See: https://stackoverflow.com/a/69892704/355584
-                # Also: https://core.telegram.org/bots/api#markdownv2-style
-                body = re.sub(r"(?<!\\)([_*[\]()~`>#+=|{}.!-])", r"\\\1", body)
+                body = _escape_telegram_markdown_text(
+                    body, self.markdown_ver
+                )
 
             payload_["parse_mode"] = self.markdown_ver
             payload_["text"] = body

@@ -1019,6 +1019,10 @@ class Apprise:
                 # pulled out of the notification
                 key += "-emojis"
 
+            conversion = getattr(server, "convert_between", convert_between)
+            if conversion != convert_between:
+                key += f"-{server.__class__.__name__}-convert"
+
             if key not in conversion_title_map:
                 # Prepare our title
                 conversion_title_map[key] = title if title else ""
@@ -1026,14 +1030,14 @@ class Apprise:
                 # Conversion of title only occurs for services where the title
                 # is blended with the body (title_maxlen <= 0)
                 if conversion_title_map[key] and server.title_maxlen <= 0:
-                    conversion_title_map[key] = convert_between(
+                    conversion_title_map[key] = conversion(
                         body_format,
                         server.notify_format,
                         content=conversion_title_map[key],
                     )
 
                 # Our body is always converted no matter what
-                conversion_body_map[key] = convert_between(
+                conversion_body_map[key] = conversion(
                     body_format, server.notify_format, content=body
                 )
 
