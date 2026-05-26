@@ -88,6 +88,7 @@ apprise_url_tests = (
         {
             "instance": NotifyHumHub,
             "privacy_url": "humhub://m...n@hostname/1/",
+            "requests_response_text": '{"id": 1}',
         },
     ),
     # Valid bearer token + container ID over HTTPS
@@ -96,6 +97,7 @@ apprise_url_tests = (
         {
             "instance": NotifyHumHub,
             "privacy_url": "humhubs://m...n@hostname/1/",
+            "requests_response_text": '{"id": 1}',
         },
     ),
     # Valid basic auth + container ID
@@ -104,6 +106,7 @@ apprise_url_tests = (
         {
             "instance": NotifyHumHub,
             "privacy_url": "humhubs://u...r:****@hostname/1/",
+            "requests_response_text": '{"id": 1}',
         },
     ),
     # Multiple container IDs in the path
@@ -111,6 +114,7 @@ apprise_url_tests = (
         "humhubs://mytoken@hostname/1/2/3",
         {
             "instance": NotifyHumHub,
+            "requests_response_text": '{"id": 1}',
         },
     ),
     # Container IDs via ?to= parameter
@@ -118,6 +122,7 @@ apprise_url_tests = (
         "humhubs://mytoken@hostname/?to=1,2,3",
         {
             "instance": NotifyHumHub,
+            "requests_response_text": '{"id": 1}',
         },
     ),
     # Custom port
@@ -125,6 +130,7 @@ apprise_url_tests = (
         "humhubs://mytoken@hostname:8443/1",
         {
             "instance": NotifyHumHub,
+            "requests_response_text": '{"id": 1}',
         },
     ),
     # HTTP 500 response -- bearer auth
@@ -240,6 +246,7 @@ def test_plugin_humhub_bearer_send(mock_post):
     # Successful response
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
 
     obj = NotifyHumHub(user="mytoken", host="localhost", targets=["1"])
     assert obj.notify(body="Test body") is True
@@ -259,6 +266,7 @@ def test_plugin_humhub_basic_send(mock_post):
     # Successful response
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
 
     obj = NotifyHumHub(
         user="admin", password="secret", host="localhost", targets=["1"]
@@ -278,6 +286,7 @@ def test_plugin_humhub_multi_container(mock_post):
 
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2", "3"])
     assert obj.notify(body="Hello") is True
@@ -299,6 +308,7 @@ def test_plugin_humhub_partial_failure(mock_post):
             return r
         r = requests.Request()
         r.status_code = requests.codes.ok
+        r.content = b""
         return r
 
     mock_post.side_effect = side_effect_fn
@@ -431,6 +441,7 @@ def test_plugin_humhub_apprise_integration(mock_post):
 
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
 
     aobj = Apprise()
     assert aobj.add("humhubs://mytoken@localhost/1")
@@ -439,3 +450,206 @@ def test_plugin_humhub_apprise_integration(mock_post):
     aobj2 = Apprise()
     assert aobj2.add("humhubs://user:pass@localhost/1")
     assert aobj2.notify(title="Title", body="Body") is True
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_success(mock_post):
+    """NotifyHumHub() attachment upload success."""
+    from io import BytesIO
+
+    # First response: post creation with a post ID
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 42}'
+
+    # Second response: attachment upload success
+    upload_resp = requests.Request()
+    upload_resp.status_code = requests.codes.ok
+    upload_resp.content = b"{}"
+
+    mock_post.side_effect = [create_resp, upload_resp]
+
+    # Build a mock accessible attachment
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+    attachment.name = "test.png"
+    attachment.open = mock.MagicMock(return_value=BytesIO(b"image data"))
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="Test body", attach=[attachment]) is True
+    # Post creation + file upload
+    assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_multiple(mock_post):
+    """NotifyHumHub() multiple attachments all uploaded."""
+    from io import BytesIO
+
+    # Post creation returns a post ID
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 10}'
+
+    # Three attachment upload responses
+    upload_resp = requests.Request()
+    upload_resp.status_code = requests.codes.ok
+    upload_resp.content = b"{}"
+
+    mock_post.side_effect = [
+        create_resp,
+        upload_resp,
+        upload_resp,
+        upload_resp,
+    ]
+
+    def make_attach(name):
+        """Build a mock accessible attachment."""
+        a = mock.MagicMock()
+        a.__bool__ = mock.MagicMock(return_value=True)
+        a.name = name
+        a.open = mock.MagicMock(return_value=BytesIO(b"data"))
+        return a
+
+    attachments = [
+        make_attach("a.png"),
+        make_attach("b.png"),
+        make_attach("c.png"),
+    ]
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=attachments) is True
+    # 1 creation + 3 uploads
+    assert mock_post.call_count == 4
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_inaccessible(mock_post):
+    """NotifyHumHub() inaccessible attachment marks failure."""
+
+    # Post creation succeeds with a post ID
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 7}'
+    mock_post.return_value = create_resp
+
+    # Build a mock inaccessible attachment (falsy)
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=False)
+    attachment.url = mock.MagicMock(return_value="file:///tmp/missing")
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=[attachment]) is False
+    # Only the post creation call was made; upload skipped
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_no_post_id(mock_post):
+    """NotifyHumHub() handles missing post ID in creation response."""
+
+    # Post creation returns 200 but no "id" field in the response body
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b"{}"
+    mock_post.return_value = create_resp
+
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=[attachment]) is False
+    # Only the post creation call was made; no upload attempted
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_bad_json_response(mock_post):
+    """NotifyHumHub() handles unparseable post creation response."""
+
+    # Post creation returns 200 but a non-JSON body
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b"not json"
+    mock_post.return_value = create_resp
+
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=[attachment]) is False
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_upload_failure(mock_post):
+    """NotifyHumHub() attachment upload HTTP failure."""
+    from io import BytesIO
+
+    # Post creation succeeds
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 3}'
+
+    # Attachment upload returns HTTP 500
+    upload_resp = requests.Request()
+    upload_resp.status_code = requests.codes.internal_server_error
+    upload_resp.content = b"error"
+
+    mock_post.side_effect = [create_resp, upload_resp]
+
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+    attachment.name = "report.pdf"
+    attachment.open = mock.MagicMock(return_value=BytesIO(b"pdf data"))
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=[attachment]) is False
+    assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_request_exception(mock_post):
+    """NotifyHumHub() RequestException during attachment upload."""
+    from io import BytesIO
+
+    # Post creation succeeds
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 5}'
+
+    # Upload raises RequestException
+    mock_post.side_effect = [
+        create_resp,
+        requests.RequestException("Connection refused"),
+    ]
+
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+    attachment.name = "file.txt"
+    attachment.open = mock.MagicMock(return_value=BytesIO(b"text data"))
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=[attachment]) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_oserror(mock_post):
+    """NotifyHumHub() OSError when opening attachment file."""
+
+    # Post creation succeeds
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 8}'
+    mock_post.return_value = create_resp
+
+    # Attachment open() raises OSError before requests.post is reached
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+    attachment.name = "secret.key"
+    attachment.open = mock.MagicMock(side_effect=OSError("Permission denied"))
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    assert obj.send(body="msg", attach=[attachment]) is False
+    # OSError fires inside _send() before requests.post; only creation hit
+    assert mock_post.call_count == 1

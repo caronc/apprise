@@ -65,7 +65,7 @@
 #   https://marketplace.humhub.com/module/rest/docs/html/post.html
 
 from itertools import chain
-from json import dumps
+from json import dumps, loads
 
 import requests
 
@@ -103,6 +103,11 @@ class NotifyHumHub(NotifyBase):
 
     # Self-hosted service; relax the default throttle slightly
     request_rate_per_sec = 0.02
+
+    # HumHub supports file attachments via a two-step API:
+    # POST /api/v1/post/container/{id} to create the post (returns post ID),
+    # then POST /api/v1/post/{post_id}/upload-files to attach each file
+    attachment_support = True
 
     # Define object URL templates
     templates = (
@@ -199,7 +204,14 @@ class NotifyHumHub(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
         """Perform HumHub Notification."""
 
         # Prepare our headers
@@ -228,67 +240,161 @@ class NotifyHumHub(NotifyBase):
 
         # Post to each container in turn
         for container_id in self.targets:
-            # Build the HumHub post API URL for this container
+            # Build the HumHub post creation URL for this container
             url = "{}://{}{}/api/v1/post/container/{}".format(
                 self.schema, self.host, port, container_id
             )
 
-            self.logger.debug(
-                "HumHub POST URL: %s (cert_verify=%r)",
-                url,
-                self.verify_certificate,
-            )
-            self.logger.debug("HumHub Payload: %s", str(payload))
-
-            # Always call throttle before any network request
-            self.throttle()
-
-            try:
-                r = requests.post(
-                    url,
-                    data=dumps(payload),
-                    headers=headers,
-                    auth=auth,
-                    verify=self.verify_certificate,
-                    timeout=self.request_timeout,
-                    allow_redirects=self.redirects,
-                )
-
-                if r.status_code != requests.codes.ok:
-                    # We had a failure
-                    status_str = NotifyHumHub.http_response_code_lookup(
-                        r.status_code
-                    )
-                    self.logger.warning(
-                        "Failed to send HumHub notification to"
-                        " container %s: %s%serror=%s.",
-                        container_id,
-                        status_str,
-                        ", " if status_str else "",
-                        r.status_code,
-                    )
-                    self.logger.debug("Response Details:\r\n%s", r.content)
-                    # Mark our failure
-                    has_error = True
-                    continue
-
-                self.logger.info(
-                    "Sent HumHub notification to container %s.",
-                    container_id,
-                )
-
-            except requests.RequestException as e:
-                self.logger.warning(
-                    "A Connection error occurred sending HumHub"
-                    " notification to container %s.",
-                    container_id,
-                )
-                self.logger.debug("Socket Exception: %s", str(e))
+            # Create the post
+            ok, content = self._send(url, dumps(payload), headers, auth)
+            if not ok:
                 # Mark our failure
                 has_error = True
                 continue
 
+            self.logger.info(
+                "Sent HumHub notification to container %s.",
+                container_id,
+            )
+
+            # Skip attachment handling if no attachments were provided
+            if not attach:
+                continue
+
+            # Parse the post ID from the creation response so we can
+            # attach files to the newly created post
+            try:
+                response = loads(content)
+                post_id = response.get("id")
+            except (AttributeError, TypeError, ValueError):
+                post_id = None
+
+            if not post_id:
+                self.logger.warning(
+                    "Failed to parse HumHub post ID from response;"
+                    " attachments will not be sent to container %s.",
+                    container_id,
+                )
+                # Mark our failure
+                has_error = True
+                continue
+
+            # Build the attachment upload URL for this post
+            attach_url = "{}://{}{}/api/v1/post/{}/upload-files".format(
+                self.schema, self.host, port, post_id
+            )
+
+            # Upload each attachment to the newly created post
+            for attachment in attach:
+                # Verify the attachment is accessible before uploading
+                if not attachment:
+                    self.logger.warning(
+                        "Could not access HumHub attachment %s.",
+                        attachment.url(privacy=True),
+                    )
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                # Upload the attachment
+                ok, _ = self._send(
+                    attach_url,
+                    None,
+                    headers,
+                    auth,
+                    attach=attachment,
+                )
+                if not ok:
+                    # Mark our failure
+                    has_error = True
+
         return not has_error
+
+    def _send(self, url, payload=None, headers=None, auth=None, attach=None):
+        """Wrapper to the requests (post) object.
+
+        Returns (ok, content) where content is the raw response bytes
+        on success, or None on failure.
+        """
+
+        # Track any open file handle for cleanup in finally
+        files = None
+
+        self.logger.debug(
+            "HumHub POST URL: %s (cert_verify=%r)",
+            url,
+            self.verify_certificate,
+        )
+        self.logger.debug("HumHub Payload: %s", str(payload))
+
+        # Always call throttle before any network request
+        self.throttle()
+
+        try:
+            # Open our attachment and build multipart payload if provided;
+            # strip Content-Type so requests sets multipart/form-data
+            if attach:
+                _headers = {
+                    k: v
+                    for k, v in (headers or {}).items()
+                    if k != "Content-Type"
+                }
+                files = {"files[]": (attach.name, attach.open())}
+            else:
+                _headers = headers or {}
+
+            r = requests.post(
+                url,
+                data=payload,
+                headers=_headers,
+                files=files,
+                auth=auth,
+                verify=self.verify_certificate,
+                timeout=self.request_timeout,
+                allow_redirects=self.redirects,
+            )
+
+            if r.status_code != requests.codes.ok:
+                # We had a failure
+                status_str = NotifyHumHub.http_response_code_lookup(
+                    r.status_code
+                )
+                self.logger.warning(
+                    "Failed to send HumHub %s: %s%serror=%s.",
+                    "attachment" if attach else "notification",
+                    status_str,
+                    ", " if status_str else "",
+                    r.status_code,
+                )
+                self.logger.debug("Response Details:\r\n%s", r.content)
+                # Return failure with no content
+                return (False, None)
+
+            # Return success with raw response content
+            return (True, r.content)
+
+        except requests.RequestException as e:
+            self.logger.warning(
+                "A Connection error occurred sending HumHub %s.",
+                "attachment" if attach else "notification",
+            )
+            self.logger.debug("Socket Exception: %s", str(e))
+            # Return failure with no content
+            return (False, None)
+
+        except OSError as e:
+            self.logger.warning(
+                "An I/O error occurred while reading %s.",
+                attach.name if attach else "attachment",
+            )
+            self.logger.debug("I/O Exception: %s", str(e))
+            # Return failure with no content
+            return (False, None)
+
+        finally:
+            # Close our file handle (if it was opened)
+            if files:
+                files["files[]"][1].close()
 
     @property
     def url_identifier(self):
