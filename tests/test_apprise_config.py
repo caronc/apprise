@@ -45,6 +45,7 @@ from apprise import (
 )
 from apprise.config import ConfigBase
 from apprise.config.file import ConfigFile
+from apprise.logger import LogCapture
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -1533,3 +1534,37 @@ def test_config_base_expired_with_int_cache(monkeypatch):
     # Beyond cache window
     monkeypatch.setattr(time, "time", lambda: 1031.0)
     assert cb.expired() is True
+
+
+def test_configuration_manager_no_import_failures():
+    """Verify all native config plugins load without TRACE import errors."""
+
+    # Remove the global test-suite log suppression so TRACE records
+    # are visible during the scan below
+    logging.disable(logging.NOTSET)
+
+    # Force a clean reload of the native config plugin directory
+    C_MGR.unload_modules()
+
+    with LogCapture(level=logging.TRACE) as stream:
+        # Trigger load_modules() via the lazy-load path
+        len(C_MGR)
+
+        # Grab the captured log content before the handler is removed
+        content = stream.getvalue()
+
+    # Restore log suppression for the remainder of the test suite
+    logging.disable(logging.CRITICAL)
+
+    # Any "import failed" line means a plugin directory was found but
+    # contained no loadable Config* class (e.g. a stale __pycache__
+    # directory left behind after a rename).
+    failures = [
+        line for line in content.splitlines() if "import failed" in line
+    ]
+    assert not failures, (
+        "Config plugin import failures detected:\n" + "\n".join(failures)
+    )
+
+    # Leave the manager in a clean state for subsequent tests
+    C_MGR.unload_modules()
