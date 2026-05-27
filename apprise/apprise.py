@@ -33,6 +33,7 @@ import concurrent.futures as cf
 from datetime import datetime, timezone
 from itertools import chain
 import json
+import logging
 import os
 import time
 from typing import Any, Optional, Union
@@ -47,7 +48,6 @@ from .conversion import convert_between
 from .emojis import apply_emojis
 from .locale import AppriseLocale
 from .logger import logger
-import logging
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase
 from .tag import AppriseTag
@@ -828,7 +828,9 @@ class Apprise:
 
         return all(st["succeeded"] for st in chain_states.values())
 
-    async def async_notify(self, *args: Any, **kwargs: Any) -> Union[Optional[bool], list[dict]]:
+    async def async_notify(
+        self, *args: Any, **kwargs: Any
+    ) -> Union[Optional[bool], list[dict]]:
         """Send a notification to all the plugins previously loaded, for
         asynchronous callers.
 
@@ -1450,12 +1452,13 @@ class Apprise:
 
         return all(results)
 
-    # ---------------------------------------------------------------------------
-    # _capture_server_logs:  context manager attaches a separate logger to the instance
-    # of each server before calling notify(). Because all plugins share
-    # class-level logger "apprise", the only way to isolate the log of each URL
-    # is to override server.logger at the instance level during that call.
-    # ---------------------------------------------------------------------------
+    # -----------------------------------------------------------------------
+    # _capture_server_logs: context manager attaches a separate logger to the
+    # instance of each server before calling notify(). Because all plugins
+    # share class-level logger "apprise", the only way to isolate the log of
+    # each URL is to override server.logger at the instance level during
+    # that call.
+    # -----------------------------------------------------------------------
     class _capture_server_logs(logging.Handler):
         """Context manager that temporarily gives a server its own isolated
         logger so that WARNING/ERROR messages can be attributed to exactly
@@ -1487,7 +1490,9 @@ class Apprise:
 
         @property
         def detail(self) -> str:
-            """Return the last captured WARNING/ERROR message, or empty string."""
+            """
+            Return the last captured WARNING/ERROR message, or empty string.
+            """
             return self._messages[-1] if self._messages else ""
 
         def __enter__(self):
@@ -1502,10 +1507,8 @@ class Apprise:
 
         def __exit__(self, *_):
             # Restore the class-level logger by removing the instance override.
-            try:
+            if "logger" in self._server.__dict__:
                 del self._server.logger
-            except AttributeError:
-                pass
             self._logger.removeHandler(self)
 
     @staticmethod
@@ -1571,12 +1574,14 @@ class Apprise:
                     server.service_name,
                 )
 
-            results.append({
-                "url": server.url(privacy=True),
-                "success": bool(result),
-                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                "detail": "" if result else last_error,
-            })
+            results.append(
+                {
+                    "url": server.url(privacy=True),
+                    "success": bool(result),
+                    "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                    "detail": "" if result else last_error,
+                }
+            )
 
         return results
 
@@ -1602,7 +1607,9 @@ class Apprise:
         )
 
         def _call_with_retry_detailed(server, kwargs):
-            """Worker thread: run notify() with log capture; return result dict."""
+            """
+            Worker thread: run notify() with log capture; return result dict.
+            """
             retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
             wait = getattr(server, "wait", 0.0)
 
@@ -1695,7 +1702,9 @@ class Apprise:
         )
 
         async def do_call_detailed(server, kwargs):
-            """Coroutine: run async_notify() with log capture; return result dict."""
+            """
+            Coroutine: run async_notify() with log capture; return result dict.
+            """
             retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
             wait = getattr(server, "wait", 0.0)
 
@@ -1759,12 +1768,14 @@ class Apprise:
             if isinstance(item, Exception):
                 logger.error("Unhandled Notification Exception: %s", item)
                 server = servers_kwargs[i][0]
-                results.append({
-                    "url": server.url(privacy=True),
-                    "success": False,
-                    "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                    "detail": str(item) if str(item) else repr(item),
-                })
+                results.append(
+                    {
+                        "url": server.url(privacy=True),
+                        "success": False,
+                        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                        "detail": str(item) if str(item) else repr(item),
+                    }
+                )
             else:
                 results.append(item)
 
