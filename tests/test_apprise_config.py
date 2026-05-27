@@ -1360,6 +1360,27 @@ def test_apprise_config_template_parse(tmpdir):
     assert "user2@abc.com" in result["targets"]
     assert "user3@abc.com" in result["targets"]
 
+    # Test the False branch of the isinstance guard in the template_kwargs
+    # loop -- where the kwarg key already holds a valid dict AND prefix
+    # matches exist (so we do NOT reset the existing dict to {}).  The
+    # slack schema has template_kwargs with a ':' prefix on the 'tokens'
+    # key, which mirrors the old msteams layout used to cover this path.
+    tokens = {
+        # Pre-populated dict; must be preserved, not reset
+        "tokens": {"existing": "value"},
+        # ':' prefix match -- keeps matches non-empty so the loop body runs
+        ":newkey": "newvalue",
+    }
+
+    result = ConfigBase._special_token_handler("slack", tokens)
+    # The prefixed entry must be stripped from the top-level result
+    assert ":newkey" not in result
+    # The pre-existing dict must survive (not be wiped to {})
+    assert isinstance(result.get("tokens"), dict)
+    assert result["tokens"].get("existing") == "value"
+    # The prefix match must be merged in alongside the existing entry
+    assert result["tokens"].get("newkey") == "newvalue"
+
     # Test providing a list
     t.write("""
     # A comment line over top of a URL
