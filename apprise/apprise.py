@@ -30,6 +30,7 @@ from __future__ import annotations
 import asyncio
 from collections.abc import Iterator
 import concurrent.futures as cf
+from datetime import datetime, timezone
 from itertools import chain
 import json
 import os
@@ -46,6 +47,7 @@ from .conversion import convert_between
 from .emojis import apply_emojis
 from .locale import AppriseLocale
 from .logger import logger
+import logging
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase
 from .tag import AppriseTag
@@ -623,7 +625,8 @@ class Apprise:
         match_always: bool = True,
         attach: Any = None,
         interpret_escapes: Optional[bool] = None,
-    ) -> Optional[bool]:
+        detailed: bool = False,
+    ) -> Union[Optional[bool], list[dict]]:
         """Send a notification to all the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will be
@@ -637,6 +640,16 @@ class Apprise:
         This function returns True if all notifications were successfully sent,
         False if even just one of them fails, and None if no notifications were
         sent at all as a result of tag filtering and/or simply having empty
+        configuration files that were read.
+
+        When detailed=True, returns a list of dicts (one per matched URL)
+        instead of a single bool.  Every matched URL is always attempted
+        (escalation chains are bypassed) so the caller receives a complete
+        status report.  Each dict contains:
+          - "url":       Obfuscated target endpoint string.
+          - "success":   Boolean — True if delivery ultimately succeeded.
+          - "timestamp": ISO-8601 UTC string of when the attempt completed.
+          - "detail":    Empty string on success; error message on failure.
         configuration files that were read.
 
         A filter tag may carry an optional priority prefix and/or retry suffix:
@@ -679,16 +692,34 @@ class Apprise:
             )
 
         except TypeError:
-            return False
+            return [] if detailed else False
 
         if not all_calls:
-            return None
+            return [] if detailed else None
 
         # Inject the per-service call-time retry override.  Each matched
         # service gets the retry from the first filter token that both matches
         # it and carries a retry suffix (e.g. "devops:3" applies retry=3 only
         # to devops-tagged services, not to management-tagged services).
         all_calls = Apprise._inject_per_service_retries(all_calls, tag)
+
+        if detailed:
+            # detailed=True: bypass escalation chains and run every matched
+            # URL exactly once, collecting a per-URL status report.
+            sequential = [
+                (s, k) for s, k in all_calls if not s.asset.async_mode
+            ]
+            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
+            results: list[dict] = []
+            if sequential:
+                results.extend(
+                    Apprise._notify_sequential_detailed(*sequential)
+                )
+            if parallel:
+                results.extend(
+                    Apprise._notify_parallel_threadpool_detailed(*parallel)
+                )
+            return results
 
         if Apprise._filter_has_explicit_priority(tag):
             # Tag filter carries an explicit priority prefix (e.g. "2:alerts").
@@ -797,25 +828,43 @@ class Apprise:
 
         return all(st["succeeded"] for st in chain_states.values())
 
-    async def async_notify(self, *args: Any, **kwargs: Any) -> Optional[bool]:
+    async def async_notify(self, *args: Any, **kwargs: Any) -> Union[Optional[bool], list[dict]]:
         """Send a notification to all the plugins previously loaded, for
         asynchronous callers.
 
         The arguments are identical to those of Apprise.notify().
         """
         tag = kwargs.get("tag", common.MATCH_ALL_TAG)
+        detailed = kwargs.pop("detailed", False)
 
         try:
             all_calls = list(self._create_notify_gen(*args, **kwargs))
 
         except TypeError:
-            return False
+            return [] if detailed else False
 
         if not all_calls:
-            return None
+            return [] if detailed else None
 
         # Inject per-service call-time retry overrides (same logic as notify).
         all_calls = Apprise._inject_per_service_retries(all_calls, tag)
+
+        if detailed:
+            # detailed=True: bypass escalation chains, report every URL.
+            sequential = [
+                (s, k) for s, k in all_calls if not s.asset.async_mode
+            ]
+            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
+            results: list[dict] = []
+            if sequential:
+                results.extend(
+                    Apprise._notify_sequential_detailed(*sequential)
+                )
+            if parallel:
+                results.extend(
+                    await Apprise._notify_parallel_asyncio_detailed(*parallel)
+                )
+            return results
 
         if Apprise._filter_has_explicit_priority(tag):
             # Explicit priority prefix: flat dispatch, no escalation.
@@ -1400,6 +1449,326 @@ class Apprise:
             return False
 
         return all(results)
+
+    # ---------------------------------------------------------------------------
+    # _capture_server_logs:  context manager attaches a separate logger to the instance
+    # of each server before calling notify(). Because all plugins share
+    # class-level logger "apprise", the only way to isolate the log of each URL
+    # is to override server.logger at the instance level during that call.
+    # ---------------------------------------------------------------------------
+    class _capture_server_logs(logging.Handler):
+        """Context manager that temporarily gives a server its own isolated
+        logger so that WARNING/ERROR messages can be attributed to exactly
+        that URL, even when multiple servers run in parallel.
+
+        On enter, a fresh Logger (non-propagating) is created and set as an
+        instance attribute on *server*, shadowing the shared class-level
+        logger.  On exit the instance attribute is deleted, restoring the
+        original class-level logger.
+
+        Usage::
+
+            with Apprise._capture_server_logs(server) as cap:
+                result = server.notify(...)
+            detail = cap.detail   # last WARNING/ERROR message, or ""
+        """
+
+        def __init__(self, server):
+            super().__init__(level=logging.WARNING)
+            self._server = server
+            self._messages: list[str] = []
+            # Use a unique name so parallel calls never share a Logger object.
+            self._logger = logging.getLogger(
+                "apprise._detail.{}".format(id(server))
+            )
+
+        def emit(self, record: logging.LogRecord) -> None:
+            self._messages.append(record.getMessage())
+
+        @property
+        def detail(self) -> str:
+            """Return the last captured WARNING/ERROR message, or empty string."""
+            return self._messages[-1] if self._messages else ""
+
+        def __enter__(self):
+            self._logger.handlers.clear()
+            self._logger.addHandler(self)
+            self._logger.setLevel(logging.DEBUG)
+            # Do NOT propagate — we want only this server's messages here.
+            self._logger.propagate = False
+            # Shadow the class-level shared logger with a per-instance one.
+            self._server.logger = self._logger
+            return self
+
+        def __exit__(self, *_):
+            # Restore the class-level logger by removing the instance override.
+            try:
+                del self._server.logger
+            except AttributeError:
+                pass
+            self._logger.removeHandler(self)
+
+    @staticmethod
+    def _notify_sequential_detailed(*servers_kwargs) -> list[dict]:
+        """Variant of _notify_sequential() that returns a per-URL result list.
+
+        Unlike _notify_sequential(), every server is always attempted — there
+        is no early exit on success — so the caller receives a complete status
+        report for every matched URL.
+
+        Each element of the returned list is a dict with:
+          - "url":       Obfuscated URL string (privacy=True).
+          - "success":   True if delivery ultimately succeeded, else False.
+          - "timestamp": ISO-8601 UTC string of when the attempt finished.
+          - "detail":    Empty string on success; last WARNING/ERROR message
+                         logged by the plugin, or exception message on failure.
+        """
+        results = []
+
+        for server, kwargs in servers_kwargs:
+            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
+            wait = getattr(server, "wait", 0.0)
+
+            result = False
+            last_error: str = ""
+
+            for attempt in range(retry + 1):
+                with Apprise._capture_server_logs(server) as cap:
+                    try:
+                        result = server.notify(**kwargs)
+                    except TypeError as exc:
+                        result = False
+                        last_error = cap.detail or (
+                            "Invalid notification arguments: {}".format(exc)
+                        )
+                    except Exception as exc:
+                        logger.exception("Unhandled Notification Exception")
+                        result = False
+                        last_error = "{}: {}".format(type(exc).__name__, exc)
+                    else:
+                        if not result:
+                            last_error = cap.detail or (
+                                "Notification service returned failure."
+                            )
+
+                if result:
+                    last_error = ""
+                    break
+
+                if attempt < retry:
+                    logger.warning(
+                        "Retry %d/%d for %s",
+                        attempt + 1,
+                        retry,
+                        server.service_name,
+                    )
+                    if wait > 0:
+                        time.sleep(wait)
+
+            if not result and getattr(server, "optional", False):
+                logger.info(
+                    "Optional service '%s' failed; ignoring failure.",
+                    server.service_name,
+                )
+
+            results.append({
+                "url": server.url(privacy=True),
+                "success": bool(result),
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "detail": "" if result else last_error,
+            })
+
+        return results
+
+    @staticmethod
+    def _notify_parallel_threadpool_detailed(*servers_kwargs) -> list[dict]:
+        """Variant of _notify_parallel_threadpool() returning per-URL results.
+
+        Each server runs in its own thread (same as the non-detailed version).
+        Falls back to _notify_sequential_detailed() for a single server.
+
+        Return value: same structure as _notify_sequential_detailed().
+        """
+        n_calls = len(servers_kwargs)
+
+        if n_calls == 0:
+            return []
+
+        if n_calls == 1:
+            return Apprise._notify_sequential_detailed(servers_kwargs[0])
+
+        logger.info(
+            "Notifying %d service(s) with threads (detailed).", n_calls
+        )
+
+        def _call_with_retry_detailed(server, kwargs):
+            """Worker thread: run notify() with log capture; return result dict."""
+            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
+            wait = getattr(server, "wait", 0.0)
+
+            result = False
+            last_error: str = ""
+
+            for attempt in range(retry + 1):
+                with Apprise._capture_server_logs(server) as cap:
+                    try:
+                        result = server.notify(**kwargs)
+                    except TypeError as exc:
+                        result = False
+                        last_error = cap.detail or (
+                            "Invalid notification arguments: {}".format(exc)
+                        )
+                    except Exception as exc:
+                        logger.exception("Unhandled Notification Exception")
+                        result = False
+                        last_error = "{}: {}".format(type(exc).__name__, exc)
+                    else:
+                        if not result:
+                            last_error = cap.detail or (
+                                "Notification service returned failure."
+                            )
+
+                if result:
+                    last_error = ""
+                    break
+
+                if attempt < retry:
+                    logger.warning(
+                        "Retry %d/%d for %s",
+                        attempt + 1,
+                        retry,
+                        server.service_name,
+                    )
+                    if wait > 0:
+                        time.sleep(wait)
+
+            if not result and getattr(server, "optional", False):
+                logger.info(
+                    "Optional service '%s' failed; ignoring failure.",
+                    server.service_name,
+                )
+
+            return {
+                "url": server.url(privacy=True),
+                "success": bool(result),
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "detail": "" if result else last_error,
+            }
+
+        # Preserve insertion order by keying futures to their original index.
+        with cf.ThreadPoolExecutor() as executor:
+            future_to_idx = {
+                executor.submit(_call_with_retry_detailed, server, kwargs): i
+                for i, (server, kwargs) in enumerate(servers_kwargs)
+            }
+            idx_results: dict[int, dict] = {}
+            for future in cf.as_completed(future_to_idx):
+                idx = future_to_idx[future]
+                try:
+                    idx_results[idx] = future.result()
+                except Exception as exc:
+                    logger.exception("Unhandled Notification Exception")
+                    server = servers_kwargs[idx][0]
+                    idx_results[idx] = {
+                        "url": server.url(privacy=True),
+                        "success": False,
+                        "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                        "detail": "{}: {}".format(type(exc).__name__, exc),
+                    }
+
+        return [idx_results[i] for i in range(n_calls)]
+
+    @staticmethod
+    async def _notify_parallel_asyncio_detailed(*servers_kwargs) -> list[dict]:
+        """Variant of _notify_parallel_asyncio() returning per-URL results.
+
+        All coroutines run concurrently via asyncio.gather().
+
+        Return value: same structure as _notify_sequential_detailed().
+        """
+        if not servers_kwargs:
+            return []
+
+        logger.info(
+            "Notifying %d service(s) asynchronously (detailed).",
+            len(servers_kwargs),
+        )
+
+        async def do_call_detailed(server, kwargs):
+            """Coroutine: run async_notify() with log capture; return result dict."""
+            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
+            wait = getattr(server, "wait", 0.0)
+
+            result = False
+            last_error: str = ""
+
+            for attempt in range(retry + 1):
+                with Apprise._capture_server_logs(server) as cap:
+                    try:
+                        result = await server.async_notify(**kwargs)
+                    except TypeError as exc:
+                        result = False
+                        last_error = cap.detail or (
+                            "Invalid notification arguments: {}".format(exc)
+                        )
+                    except Exception as exc:
+                        logger.exception("Unhandled Notification Exception")
+                        result = False
+                        last_error = "{}: {}".format(type(exc).__name__, exc)
+                    else:
+                        if not result:
+                            last_error = cap.detail or (
+                                "Notification service returned failure."
+                            )
+
+                if result:
+                    last_error = ""
+                    break
+
+                if attempt < retry:
+                    logger.warning(
+                        "Retry %d/%d for %s",
+                        attempt + 1,
+                        retry,
+                        server.service_name,
+                    )
+                    if wait > 0:
+                        await asyncio.sleep(wait)
+
+            if not result and getattr(server, "optional", False):
+                logger.info(
+                    "Optional service '%s' failed; ignoring failure.",
+                    server.service_name,
+                )
+
+            return {
+                "url": server.url(privacy=True),
+                "success": bool(result),
+                "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                "detail": "" if result else last_error,
+            }
+
+        cors = [
+            do_call_detailed(server, kwargs)
+            for server, kwargs in servers_kwargs
+        ]
+        gathered = await asyncio.gather(*cors, return_exceptions=True)
+
+        results = []
+        for i, item in enumerate(gathered):
+            if isinstance(item, Exception):
+                logger.error("Unhandled Notification Exception: %s", item)
+                server = servers_kwargs[i][0]
+                results.append({
+                    "url": server.url(privacy=True),
+                    "success": False,
+                    "timestamp": datetime.now(tz=timezone.utc).isoformat(),
+                    "detail": str(item) if str(item) else repr(item),
+                })
+            else:
+                results.append(item)
+
+        return results
 
     def json(
         self,
