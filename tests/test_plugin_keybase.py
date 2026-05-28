@@ -197,8 +197,8 @@ def test_plugin_keybase_mode_socket_path_default():
 
 def test_plugin_keybase_mode_socket_path_custom():
     """A custom socket_path overrides the platform default."""
-    obj = NotifyKeybase(targets=["@alice"], socket_path="/tmp/kb.sock")
-    assert obj.socket_path == "/tmp/kb.sock"
+    obj = NotifyKeybase(targets=["@alice"], socket_path="/tmp/keybase.sock")
+    assert obj.socket_path == "/tmp/keybase.sock"
 
 
 # ---------------------------------------------------------------------------
@@ -304,12 +304,14 @@ def test_plugin_keybase_url_socket_mode_contains_mode_param():
 
 def test_plugin_keybase_url_custom_socket_path_included():
     """Custom socket path is included in the URL."""
-    obj = NotifyKeybase(targets=["@alice"], socket_path="/tmp/custom.sock")
+    obj = NotifyKeybase(
+        targets=["@alice"], socket_path="/tmp/custom-keybase.sock"
+    )
     url = obj.url()
     assert "socket=" in url
     r = NotifyKeybase.parse_url(url)
     obj2 = NotifyKeybase(**r)
-    assert obj2.socket_path == "/tmp/custom.sock"
+    assert obj2.socket_path == "/tmp/custom-keybase.sock"
 
 
 def test_plugin_keybase_url_default_socket_path_omitted():
@@ -439,10 +441,10 @@ def test_plugin_keybase_parse_url_tcp_authority():
 
 def test_plugin_keybase_parse_url_custom_socket():
     """?socket= is mapped to socket_path."""
-    url = "keybase://_/@alice?socket=/tmp/kb.sock"
+    url = "keybase://_/@alice?socket=/tmp/keybase.sock"
     r = NotifyKeybase.parse_url(url)
     obj = NotifyKeybase(**r)
-    assert obj.socket_path == "/tmp/kb.sock"
+    assert obj.socket_path == "/tmp/keybase.sock"
 
 
 def test_plugin_keybase_parse_url_hash_channel_literal():
@@ -872,6 +874,15 @@ def test_plugin_keybase_apprise_integration(mock_sock_cls, mock_stat_sp):
 # ---------------------------------------------------------------------------
 
 
+def test_plugin_keybase_socket_path_no_keybase_in_path_raises():
+    """socket= without 'keybase' in the path is rejected at init."""
+    with pytest.raises(TypeError, match=r"[Kk]eybase"):
+        NotifyKeybase(
+            targets=["@alice"],
+            socket_path="/var/run/docker.sock",
+        )
+
+
 def test_plugin_keybase_socket_path_non_socket_file_raises():
     """socket_path pointing at a regular file raises TypeError at init."""
     with mock.patch("os.stat") as mock_stat:
@@ -880,7 +891,7 @@ def test_plugin_keybase_socket_path_non_socket_file_raises():
         with pytest.raises(TypeError, match=r"not.*socket"):
             NotifyKeybase(
                 targets=["@alice"],
-                socket_path="/etc/shadow",
+                socket_path="/run/keybase/not-a-socket",
             )
 
 
@@ -890,9 +901,9 @@ def test_plugin_keybase_socket_path_nonexistent_accepted_at_init():
         # Should not raise -- service is just not running yet
         obj = NotifyKeybase(
             targets=["@alice"],
-            socket_path="/tmp/not_there.sock",
+            socket_path="/tmp/not_there-keybase.sock",
         )
-    assert obj.socket_path == "/tmp/not_there.sock"
+    assert obj.socket_path == "/tmp/not_there-keybase.sock"
 
 
 @mock.patch.object(

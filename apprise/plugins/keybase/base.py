@@ -38,6 +38,11 @@
 #     The socket path is auto-detected for the current platform; you may
 #     override it with the ?socket= query parameter.
 #
+#     Security: any custom socket path must contain the word "keybase"
+#     (case-insensitive).  This guards against ?socket= being aimed at
+#     unrelated system sockets (e.g. /var/run/docker.sock).  The default
+#     auto-detected paths always satisfy this requirement.
+#
 #     Linux default:  $XDG_RUNTIME_DIR/keybase/keybased.sock
 #     macOS default:  ~/Library/Group Containers/keybase/Library/keybased.sock
 #     Windows:        \\.\pipe\keybase.service
@@ -94,6 +99,7 @@ from ...utils.saltpack import (
 )
 from ..base import NotifyBase
 from .common import (
+    IS_KEYBASE_SOCKET_PATH,
     IS_TEAM_TARGET,
     IS_USER_TARGET,
     IS_VALID_SIGKEY,
@@ -211,7 +217,9 @@ class NotifyKeybase(NotifyBase):
                 "values": KEYBASE_MODES,
                 "default": KEYBASE_DEFAULT_MODE,
             },
-            # Override socket path for socket mode
+            # Override socket path for socket mode.
+            # The path must contain the word "keybase" (case-insensitive)
+            # to prevent accidental use of unrelated system sockets.
             "socket": {
                 "name": _("Socket Path"),
                 "type": "string",
@@ -298,11 +306,26 @@ class NotifyKeybase(NotifyBase):
         )
 
         # Validate the socket path when it refers to a user-provided value
-        # and the path already exists on disk.  Reject anything that is not
-        # a Unix domain socket -- this prevents socket= from being pointed
-        # at regular files (/etc/shadow, /dev/sda, ...) or other non-socket
-        # filesystem objects.
+        # and the path already exists on disk.
         if socket_path and self.mode == KeybaseMode.SOCKET:
+            # Security guard: reject paths that do not reference keybase.
+            # This prevents ?socket= from being aimed at unrelated system
+            # sockets (e.g. /var/run/docker.sock,
+            # /run/containerd/containerd.sock).  Every legitimate Keybase
+            # socket path -- platform defaults and custom installs alike --
+            # contains the word "keybase".
+            if not IS_KEYBASE_SOCKET_PATH.search(socket_path):
+                msg = (
+                    "Keybase socket path must contain 'keybase' to"
+                    " prevent misuse of unrelated system"
+                    " sockets: {}".format(socket_path)
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # Reject anything that is not a Unix domain socket -- this
+            # prevents socket= from being pointed at regular files
+            # (/etc/shadow, /dev/sda, ...) or other non-socket objects.
             try:
                 path_stat = os.stat(self.socket_path)
 

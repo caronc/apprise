@@ -76,6 +76,14 @@ IS_TEAM_TARGET = re.compile(
 # Ed25519 signing key seed: exactly 64 lowercase or uppercase hex characters
 IS_VALID_SIGKEY = re.compile(r"^[0-9a-fA-F]{64}$")
 
+# Socket path safety guard: the path must contain the word "keybase"
+# (case-insensitive).  This prevents ?socket= from being aimed at
+# unrelated system sockets such as /var/run/docker.sock or
+# /run/containerd/containerd.sock.  All legitimate Keybase socket
+# paths -- platform defaults and custom installs alike -- contain
+# the word "keybase".
+IS_KEYBASE_SOCKET_PATH = re.compile(r"(?i)keybase")
+
 
 def keybase_default_socket():
     """Return the platform-default keybase service socket path."""
