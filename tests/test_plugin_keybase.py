@@ -27,6 +27,7 @@
 
 import json
 import logging
+import os
 import socket as _real_socket
 from unittest import mock
 
@@ -34,6 +35,7 @@ import pytest
 import requests as _requests
 
 import apprise
+from apprise import AppriseAttachment
 from apprise.plugins.keybase import (
     KEYBASE_DEFAULT_CHANNEL,
     KEYBASE_DEFAULT_HOST,
@@ -48,6 +50,9 @@ from apprise.utils.saltpack import (
 )
 
 logging.disable(logging.CRITICAL)
+
+# Directory containing test fixture files (GIF, PNG, etc.)
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 
 # ---------------------------------------------------------------------------
@@ -449,9 +454,7 @@ def test_plugin_keybase_parse_url_hash_channel_literal():
 
 def test_plugin_keybase_parse_url_hash_channel_multiple_targets():
     """Multiple targets with literal '#' all parse correctly."""
-    r = NotifyKeybase.parse_url(
-        "keybase://_/@alice/@bob/myteam#general"
-    )
+    r = NotifyKeybase.parse_url("keybase://_/@alice/@bob/myteam#general")
     obj = NotifyKeybase(**r)
     assert ("user", "alice") in obj.targets
     assert ("user", "bob") in obj.targets
@@ -1013,3 +1016,126 @@ def test_stat_socket_path_missing_raises():
         pytest.raises(OSError, match="socket not found"),
     ):
         obj._stat_socket_path()
+
+
+# ---------------------------------------------------------------------------
+# send() -- attachment paths
+# ---------------------------------------------------------------------------
+
+
+@mock.patch.object(NotifyKeybase, "_stat_socket_path")
+@mock.patch("apprise.plugins.keybase.base._socket.socket")
+def test_plugin_keybase_send_attachment_socket_success(
+    mock_sock_cls, mock_stat_sp
+):
+    """Attachment is dispatched after the text message via socket."""
+    mock_sock_cls.return_value = _socket_ok()
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    obj = NotifyKeybase(targets=["@alice"])
+    assert obj.notify(body="Hello", attach=attach) is True
+
+    conn = mock_sock_cls.return_value
+    # One send for text, one for the attachment
+    assert conn.sendall.call_count == 2
+
+    # Verify the attach payload structure
+    raw = conn.sendall.call_args_list[1][0][0]
+    payload = json.loads(raw.rstrip(b"\n"))
+    assert payload["method"] == "attach"
+    opts = payload["params"]["options"]
+    assert opts["channel"]["name"] == "alice"
+    assert opts["filename"] == path
+    assert opts["title"] == "apprise-test.gif"
+
+
+@mock.patch("apprise.plugins.keybase.base.requests.post")
+def test_plugin_keybase_send_attachment_tcp_success(mock_post):
+    """Attachment is dispatched after the text message via TCP."""
+    mock_post.return_value = _http_ok()
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    obj = NotifyKeybase(targets=["@alice"], host="localhost", port=3000)
+    assert obj.notify(body="Hello", attach=attach) is True
+
+    # One HTTP POST for text, one for the attachment
+    assert mock_post.call_count == 2
+
+    attach_payload = mock_post.call_args_list[1][1]["json"]
+    assert attach_payload["method"] == "attach"
+    opts = attach_payload["params"]["options"]
+    assert opts["channel"]["name"] == "alice"
+    assert opts["filename"] == path
+
+
+@mock.patch.object(NotifyKeybase, "_stat_socket_path")
+@mock.patch("apprise.plugins.keybase.base._socket.socket")
+def test_plugin_keybase_send_attachment_multiple(mock_sock_cls, mock_stat_sp):
+    """Multiple attachments are each dispatched in order."""
+    mock_sock_cls.return_value = _socket_ok()
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment((path, path, path))
+
+    obj = NotifyKeybase(targets=["@alice"])
+    assert obj.notify(body="Hello", attach=attach) is True
+
+    # 1 text + 3 attachments = 4 total sendall calls
+    assert mock_sock_cls.return_value.sendall.call_count == 4
+
+
+@mock.patch.object(NotifyKeybase, "_stat_socket_path")
+@mock.patch("apprise.plugins.keybase.base._socket.socket")
+def test_plugin_keybase_send_attachment_inaccessible(
+    mock_sock_cls, mock_stat_sp
+):
+    """Inaccessible attachment is skipped and send() returns False."""
+    mock_sock_cls.return_value = _socket_ok()
+
+    # Non-existent file -> attachment is inaccessible
+    attach = AppriseAttachment("/path/does/not/exist/apprise-test.gif")
+
+    obj = NotifyKeybase(targets=["@alice"])
+    assert obj.notify(body="Hello", attach=attach) is False
+
+    # Text message was still sent; no attachment sendall
+    assert mock_sock_cls.return_value.sendall.call_count == 1
+
+
+@mock.patch.object(NotifyKeybase, "_stat_socket_path")
+@mock.patch("apprise.plugins.keybase.base._socket.socket")
+def test_plugin_keybase_send_attachment_api_error(mock_sock_cls, mock_stat_sp):
+    """API error during attachment dispatch causes send() to return False."""
+    # First socket (text) succeeds; second (attach) returns an API error
+    mock_sock_cls.side_effect = [
+        _socket_ok(),
+        _socket_api_error("attachment failed"),
+    ]
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    obj = NotifyKeybase(targets=["@alice"])
+    assert obj.notify(body="Hello", attach=attach) is False
+
+
+@mock.patch.object(NotifyKeybase, "_stat_socket_path")
+@mock.patch("apprise.plugins.keybase.base._socket.socket")
+def test_plugin_keybase_send_attachment_connection_error(
+    mock_sock_cls, mock_stat_sp
+):
+    """OSError during attachment socket connect is handled gracefully."""
+    err_conn = mock.MagicMock()
+    err_conn.connect.side_effect = OSError("connection refused")
+    # First socket (text) succeeds; second (attach) raises on connect
+    mock_sock_cls.side_effect = [_socket_ok(), err_conn]
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    obj = NotifyKeybase(targets=["@alice"])
+    assert obj.notify(body="Hello", attach=attach) is False

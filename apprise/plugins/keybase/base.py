@@ -133,6 +133,9 @@ class NotifyKeybase(NotifyBase):
     # No title concept in Keybase chat
     title_maxlen = 0
 
+    # Keybase supports file attachments via the 'attach' API method
+    attachment_support = True
+
     # No remote rate limit; local service call
     request_rate_per_sec = 0
 
@@ -437,6 +440,7 @@ class NotifyKeybase(NotifyBase):
         body,
         title="",
         notify_type=NotifyType.INFO,
+        attach=None,
         **kwargs,
     ):
         """Perform Keybase Chat Notification."""
@@ -532,6 +536,75 @@ class NotifyKeybase(NotifyBase):
                 "Sent Keybase notification to %s.",
                 channel.get("name"),
             )
+
+            # Send any file attachments to the same target
+            if attach and self.attachment_support:
+                for attachment in attach:
+                    # Verify the attachment file is accessible
+                    if not attachment:
+                        self.logger.warning(
+                            "Could not access Keybase attachment: %s.",
+                            attachment.url(privacy=True),
+                        )
+                        has_error = True
+                        continue
+
+                    # Build the keybase file attach API payload
+                    attach_payload = {
+                        "method": "attach",
+                        "params": {
+                            "options": {
+                                "channel": channel,
+                                "filename": attachment.path,
+                                "title": attachment.name,
+                            },
+                        },
+                    }
+
+                    self.logger.debug(
+                        "Keybase attachment: %s",
+                        attachment.url(privacy=True),
+                    )
+
+                    # Throttle before each service call
+                    self.throttle()
+
+                    # Dispatch to the appropriate transport
+                    try:
+                        response = (
+                            self._send_socket(attach_payload)
+                            if self.mode == KeybaseMode.SOCKET
+                            else self._send_tcp(attach_payload)
+                        )
+
+                    except OSError as exc:
+                        self.logger.warning(
+                            "Keybase %s attachment error for %s: %s",
+                            self.mode,
+                            channel.get("name"),
+                            exc,
+                        )
+                        has_error = True
+                        continue
+
+                    # Check for API-level errors in the response
+                    if "error" in response:
+                        err = response["error"]
+                        self.logger.warning(
+                            "Keybase API attachment error for %s: %s",
+                            channel.get("name"),
+                            err.get("message", "unknown")
+                            if isinstance(err, dict)
+                            else str(err),
+                        )
+                        has_error = True
+                        continue
+
+                    self.logger.info(
+                        "Sent Keybase attachment (%s) to %s.",
+                        attachment.name,
+                        channel.get("name"),
+                    )
 
         return not has_error
 
