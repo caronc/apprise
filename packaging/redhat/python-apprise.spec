@@ -65,7 +65,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
 `FCM`, `Feishu`, `Flock`, `Fluxer`, `Free Mobile`, `Google Chat`, \
 `Gotify`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, `HumHub`, \
-`IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, \
+`IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `Keybase`, `KODI`, \
 `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
 `Microsoft Teams`, `Misskey`, \

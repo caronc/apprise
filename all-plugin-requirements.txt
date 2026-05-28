@@ -24,3 +24,7 @@ smpplib
 
 # For xmpp:// support
 slixmpp >= 1.10.0
+
+# Provides Saltpack v2.0 signing and NaCl box encryption for keybase://
+# and the apprise.utils.saltpack utility (Threema E2EE also uses this)
+PyNaCl
