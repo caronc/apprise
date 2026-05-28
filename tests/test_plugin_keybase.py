@@ -192,13 +192,13 @@ def test_plugin_keybase_mode_tcp_defaults_host_and_port():
 def test_plugin_keybase_mode_socket_path_default():
     """Socket mode uses the platform default socket path."""
     obj = NotifyKeybase(targets=["@alice"])
-    assert obj.socket_path == keybase_default_socket()
+    assert obj.socket == keybase_default_socket()
 
 
 def test_plugin_keybase_mode_socket_path_custom():
-    """A custom socket_path overrides the platform default."""
-    obj = NotifyKeybase(targets=["@alice"], socket_path="/tmp/keybase.sock")
-    assert obj.socket_path == "/tmp/keybase.sock"
+    """A custom socket overrides the platform default."""
+    obj = NotifyKeybase(targets=["@alice"], socket="/tmp/keybase.sock")
+    assert obj.socket == "/tmp/keybase.sock"
 
 
 # ---------------------------------------------------------------------------
@@ -304,14 +304,12 @@ def test_plugin_keybase_url_socket_mode_contains_mode_param():
 
 def test_plugin_keybase_url_custom_socket_path_included():
     """Custom socket path is included in the URL."""
-    obj = NotifyKeybase(
-        targets=["@alice"], socket_path="/tmp/custom-keybase.sock"
-    )
+    obj = NotifyKeybase(targets=["@alice"], socket="/tmp/custom-keybase.sock")
     url = obj.url()
     assert "socket=" in url
     r = NotifyKeybase.parse_url(url)
     obj2 = NotifyKeybase(**r)
-    assert obj2.socket_path == "/tmp/custom-keybase.sock"
+    assert obj2.socket == "/tmp/custom-keybase.sock"
 
 
 def test_plugin_keybase_url_default_socket_path_omitted():
@@ -376,22 +374,22 @@ def test_plugin_keybase_url_sigkey_hidden_in_privacy_mode():
 
 
 def test_plugin_keybase_parse_url_at_in_authority():
-    """keybase://@alice is parsed as a user DM."""
-    r = NotifyKeybase.parse_url("keybase://@alice")
+    """keybase://_/@alice is parsed as a user DM (canonical form)."""
+    r = NotifyKeybase.parse_url("keybase://_/@alice")
     obj = NotifyKeybase(**r)
     assert obj.targets == [("user", "alice")]
 
 
 def test_plugin_keybase_parse_url_team_host():
-    """keybase://myteam is parsed as a team message."""
-    r = NotifyKeybase.parse_url("keybase://myteam")
+    """keybase://_/myteam is parsed as a team message (canonical form)."""
+    r = NotifyKeybase.parse_url("keybase://_/myteam")
     obj = NotifyKeybase(**r)
     assert obj.targets == [("team", "myteam", KEYBASE_DEFAULT_CHANNEL)]
 
 
 def test_plugin_keybase_parse_url_team_channel_host():
-    """keybase://myteam%23dev is parsed as team + channel."""
-    r = NotifyKeybase.parse_url("keybase://myteam%23dev")
+    """keybase://_/myteam%23dev is parsed as team + channel."""
+    r = NotifyKeybase.parse_url("keybase://_/myteam%23dev")
     obj = NotifyKeybase(**r)
     assert obj.targets == [("team", "myteam", "dev")]
 
@@ -439,12 +437,44 @@ def test_plugin_keybase_parse_url_tcp_authority():
     assert obj.targets == [("user", "alice")]
 
 
+def test_plugin_keybase_parse_url_tcp_localhost_no_port():
+    """keybase://localhost/@alice auto-detects TCP mode without a port."""
+    r = NotifyKeybase.parse_url("keybase://localhost/@alice")
+    obj = NotifyKeybase(**r)
+    assert obj.mode == KeybaseMode.TCP
+    assert obj.host == "localhost"
+    assert obj.port == KEYBASE_DEFAULT_PORT
+    # "localhost" must NOT be treated as a target
+    assert obj.targets == [("user", "alice")]
+
+
+def test_plugin_keybase_parse_url_tcp_ipv4_no_port():
+    """keybase://192.168.1.5/@alice auto-detects TCP mode without a port."""
+    r = NotifyKeybase.parse_url("keybase://192.168.1.5/@alice")
+    obj = NotifyKeybase(**r)
+    assert obj.mode == KeybaseMode.TCP
+    assert obj.host == "192.168.1.5"
+    assert obj.port == KEYBASE_DEFAULT_PORT
+    # IPv4 address must NOT be treated as a target
+    assert obj.targets == [("user", "alice")]
+
+
+def test_plugin_keybase_parse_url_tcp_fqdn_no_port():
+    """keybase://keybase.home.lan/@alice auto-detects TCP via is_hostname."""
+    r = NotifyKeybase.parse_url("keybase://keybase.home.lan/@alice")
+    obj = NotifyKeybase(**r)
+    assert obj.mode == KeybaseMode.TCP
+    assert obj.host == "keybase.home.lan"
+    assert obj.port == KEYBASE_DEFAULT_PORT
+    assert obj.targets == [("user", "alice")]
+
+
 def test_plugin_keybase_parse_url_custom_socket():
-    """?socket= is mapped to socket_path."""
+    """?socket= is mapped to the socket attribute."""
     url = "keybase://_/@alice?socket=/tmp/keybase.sock"
     r = NotifyKeybase.parse_url(url)
     obj = NotifyKeybase(**r)
-    assert obj.socket_path == "/tmp/keybase.sock"
+    assert obj.socket == "/tmp/keybase.sock"
 
 
 def test_plugin_keybase_parse_url_hash_channel_literal():
@@ -492,7 +522,7 @@ def test_plugin_keybase_send_user_dm_socket(mock_sock_cls, mock_stat_sp):
 
     # Verify the socket was connected to the expected path
     conn = mock_sock_cls.return_value
-    conn.connect.assert_called_once_with(obj.socket_path)
+    conn.connect.assert_called_once_with(obj.socket)
 
     # Verify the payload structure
     sent_raw = conn.sendall.call_args[0][0]
@@ -879,31 +909,31 @@ def test_plugin_keybase_socket_path_no_keybase_in_path_raises():
     with pytest.raises(TypeError, match=r"[Kk]eybase"):
         NotifyKeybase(
             targets=["@alice"],
-            socket_path="/var/run/docker.sock",
+            socket="/var/run/docker.sock",
         )
 
 
 def test_plugin_keybase_socket_path_non_socket_file_raises():
-    """socket_path pointing at a regular file raises TypeError at init."""
+    """socket= pointing at a regular file raises TypeError at init."""
     with mock.patch("os.stat") as mock_stat:
         # Simulate a regular file (S_IFREG, mode 0o100644)
         mock_stat.return_value.st_mode = 0o100644
         with pytest.raises(TypeError, match=r"not.*socket"):
             NotifyKeybase(
                 targets=["@alice"],
-                socket_path="/run/keybase/not-a-socket",
+                socket="/run/keybase/not-a-socket",
             )
 
 
 def test_plugin_keybase_socket_path_nonexistent_accepted_at_init():
-    """Non-existent socket_path is accepted at init (service may be down)."""
+    """Non-existent socket= is accepted at init (service may be down)."""
     with mock.patch("os.stat", side_effect=OSError("no such file")):
         # Should not raise -- service is just not running yet
         obj = NotifyKeybase(
             targets=["@alice"],
-            socket_path="/tmp/not_there-keybase.sock",
+            socket="/tmp/not_there-keybase.sock",
         )
-    assert obj.socket_path == "/tmp/not_there-keybase.sock"
+    assert obj.socket == "/tmp/not_there-keybase.sock"
 
 
 @mock.patch.object(
@@ -999,6 +1029,7 @@ def test_plugin_keybase_send_socket_chunked_response(
 # ---------------------------------------------------------------------------
 
 
+@mock.patch("apprise.plugins.keybase.base._AF_UNIX", new=1)
 def test_stat_socket_path_valid_socket():
     """_stat_socket_path does not raise for a genuine socket file."""
     obj = NotifyKeybase(targets=["@alice"])
@@ -1009,6 +1040,7 @@ def test_stat_socket_path_valid_socket():
         obj._stat_socket_path()
 
 
+@mock.patch("apprise.plugins.keybase.base._AF_UNIX", new=1)
 def test_stat_socket_path_regular_file_raises():
     """_stat_socket_path raises OSError when path is a regular file."""
     obj = NotifyKeybase(targets=["@alice"])
@@ -1019,12 +1051,26 @@ def test_stat_socket_path_regular_file_raises():
             obj._stat_socket_path()
 
 
+@mock.patch("apprise.plugins.keybase.base._AF_UNIX", new=1)
 def test_stat_socket_path_missing_raises():
     """_stat_socket_path raises OSError when path does not exist."""
     obj = NotifyKeybase(targets=["@alice"])
     with (
         mock.patch("os.stat", side_effect=FileNotFoundError("no such file")),
         pytest.raises(OSError, match="socket not found"),
+    ):
+        obj._stat_socket_path()
+
+
+@mock.patch("apprise.plugins.keybase.base._AF_UNIX", new=1)
+def test_stat_socket_path_permission_error_raises():
+    """_stat_socket_path raises OSError for PermissionError from os.stat."""
+    obj = NotifyKeybase(targets=["@alice"])
+    with (
+        mock.patch(
+            "os.stat", side_effect=PermissionError("permission denied")
+        ),
+        pytest.raises(OSError, match="inaccessible"),
     ):
         obj._stat_socket_path()
 

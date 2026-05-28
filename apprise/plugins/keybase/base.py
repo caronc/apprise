@@ -91,7 +91,7 @@ import requests
 from ...common import NotifyType
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
-from ...utils.parse import parse_list
+from ...utils.parse import is_hostname, parse_list
 from ...utils.saltpack import (
     NACL_SUPPORT,
     AppriseSaltpackController,
@@ -111,6 +111,11 @@ from .common import (
     KeybaseMode,
     keybase_default_socket,
 )
+
+# AF_UNIX is absent on some Windows Python builds.  Store it at module
+# level so both _stat_socket_path and _send_socket reference the same
+# patchable name rather than reaching into the live socket module.
+_AF_UNIX = getattr(_socket, "AF_UNIX", None)
 
 
 class NotifyKeybase(NotifyBase):
@@ -232,7 +237,7 @@ class NotifyKeybase(NotifyBase):
         targets=None,
         sigkey=None,
         mode=None,
-        socket_path=None,
+        socket=None,
         **kwargs,
     ):
         """Initialize Keybase Object."""
@@ -288,7 +293,8 @@ class NotifyKeybase(NotifyBase):
         # Determine connection mode:
         #   1. Explicit mode= kwarg (highest priority)
         #   2. Port present in URL -> implies TCP
-        #   3. Default to socket
+        #   3. Host is localhost or an IPv4 address -> implies TCP
+        #   4. Default to socket
         if mode and mode.lower() in KEYBASE_MODES:
             self.mode = mode.lower()
 
@@ -296,29 +302,32 @@ class NotifyKeybase(NotifyBase):
             # A port in the URL authority always signals TCP mode
             self.mode = KeybaseMode.TCP
 
+        elif self.host and is_hostname(self.host):
+            # Any valid hostname or IP address (v4/v6) in the URL
+            # authority signals TCP mode even without a port
+            self.mode = KeybaseMode.TCP
+
         else:
             # No port, no explicit mode -> use Unix socket
             self.mode = KEYBASE_DEFAULT_MODE
 
         # Store the socket path (socket mode only); auto-detect if absent
-        self.socket_path = (
-            socket_path if socket_path else keybase_default_socket()
-        )
+        self.socket = socket if socket else keybase_default_socket()
 
         # Validate the socket path when it refers to a user-provided value
         # and the path already exists on disk.
-        if socket_path and self.mode == KeybaseMode.SOCKET:
+        if socket and self.mode == KeybaseMode.SOCKET:
             # Security guard: reject paths that do not reference keybase.
             # This prevents ?socket= from being aimed at unrelated system
             # sockets (e.g. /var/run/docker.sock,
             # /run/containerd/containerd.sock).  Every legitimate Keybase
             # socket path -- platform defaults and custom installs alike --
             # contains the word "keybase".
-            if not IS_KEYBASE_SOCKET_PATH.search(socket_path):
+            if not IS_KEYBASE_SOCKET_PATH.search(socket):
                 msg = (
                     "Keybase socket path must contain 'keybase' to"
                     " prevent misuse of unrelated system"
-                    " sockets: {}".format(socket_path)
+                    " sockets: {}".format(socket)
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)
@@ -327,7 +336,7 @@ class NotifyKeybase(NotifyBase):
             # prevents socket= from being pointed at regular files
             # (/etc/shadow, /dev/sda, ...) or other non-socket objects.
             try:
-                path_stat = os.stat(self.socket_path)
+                path_stat = os.stat(self.socket)
 
             except OSError:
                 # Path does not exist yet; the service may not be running.
@@ -337,7 +346,7 @@ class NotifyKeybase(NotifyBase):
             if path_stat is not None and not stat.S_ISSOCK(path_stat.st_mode):
                 msg = (
                     "Keybase socket path does not point to a"
-                    " socket: {}".format(self.socket_path)
+                    " socket: {}".format(self.socket)
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)
@@ -353,44 +362,57 @@ class NotifyKeybase(NotifyBase):
                 self.port = KEYBASE_DEFAULT_PORT
 
     def _stat_socket_path(self):
-        """Raise OSError if socket_path does not point to a Unix socket."""
+        """Raise OSError if AF_UNIX is unavailable or socket path is invalid.
 
-        # Check whether the path exists and is actually a socket file
-        try:
-            path_stat = os.stat(self.socket_path)
-            if not stat.S_ISSOCK(path_stat.st_mode):
-                # Path exists but is not a socket (e.g. a regular file)
-                raise OSError(
-                    "Path is not a Unix socket: {}".format(self.socket_path)
-                )
+        This method is the single preflight gate for socket mode.  All
+        platform capability and path validity checks live here so that
+        tests can mock this one method and bypass the whole preflight.
+        """
 
-        except FileNotFoundError as exc:
-            # Socket file missing -- service is likely not running
-            raise OSError(
-                "Keybase socket not found: {}. "
-                "Is the Keybase service running?".format(self.socket_path)
-            ) from exc
-
-    def _send_socket(self, payload):
-        """Send payload over a Unix domain socket; return response dict."""
-
-        # AF_UNIX is required for socket mode
-        if not hasattr(_socket, "AF_UNIX"):
+        # AF_UNIX is required for socket mode; not present on all platforms
+        if _AF_UNIX is None:
             raise OSError(
                 "Unix domain sockets are unavailable on this "
                 "platform; configure mode=tcp instead."
             )
 
-        # Safety: verify the path is a Unix socket before connecting.
+        # Probe the socket path -- keep stat() in its own try block so
+        # the handlers below do not accidentally catch the OSError we
+        # raise for the S_ISSOCK check immediately after.
+        try:
+            path_stat = os.stat(self.socket)
+
+        except FileNotFoundError as exc:
+            # Socket file missing -- service is likely not running
+            raise OSError(
+                "Keybase socket not found: {}. "
+                "Is the Keybase service running?".format(self.socket)
+            ) from exc
+
+        except OSError as exc:
+            # Permission denied, not-a-directory, or other stat failure
+            raise OSError(
+                "Keybase socket inaccessible {}: {}".format(self.socket, exc)
+            ) from exc
+
+        # Verify the path points to an actual socket, not a regular file
+        if not stat.S_ISSOCK(path_stat.st_mode):
+            raise OSError("Path is not a Unix socket: {}".format(self.socket))
+
+    def _send_socket(self, payload):
+        """Send payload over a Unix domain socket; return response dict."""
+
+        # Preflight: verify AF_UNIX is available and the path is valid.
+        # Raises OSError on any failure; also mocked in unit tests.
         self._stat_socket_path()
 
         # Open a stream socket for the Unix domain transport
-        sock = _socket.socket(_socket.AF_UNIX, _socket.SOCK_STREAM)
+        sock = _socket.socket(_AF_UNIX, _socket.SOCK_STREAM)
         sock.settimeout(self.socket_read_timeout)
 
         try:
             # Connect to the keybase service socket file
-            sock.connect(self.socket_path)
+            sock.connect(self.socket)
 
             # Encode and send the JSON payload terminated by a newline
             data = json.dumps(payload).encode("utf-8") + b"\n"
@@ -653,9 +675,9 @@ class NotifyKeybase(NotifyBase):
         # auto-detected platform default (socket mode only)
         if (
             self.mode == KeybaseMode.SOCKET
-            and self.socket_path != keybase_default_socket()
+            and self.socket != keybase_default_socket()
         ):
-            params["socket"] = self.socket_path
+            params["socket"] = self.socket
 
         # Build the ordered target path segments
         parts = []
@@ -729,10 +751,13 @@ class NotifyKeybase(NotifyBase):
         host = NotifyKeybase.unquote(results.get("host") or "")
         port = results.get("port")
 
-        # The host is a notification target only when no port is present.
-        # A port in the authority signals TCP mode; the host is then a
-        # connection endpoint, not a chat target.
-        if host and host != "_" and port is None:
+        # The host is a notification target only when:
+        #   - it is not the "_" placeholder, AND
+        #   - no port is present (port implies TCP mode), AND
+        #   - it is not a valid hostname or IP address.
+        # Any valid hostname/IP in the URL authority is a TCP endpoint;
+        # is_hostname() covers IPv4, IPv6, and named hosts.
+        if host and host != "_" and port is None and not is_hostname(host):
             if results.get("user") == "":
                 # @ prefix was present -> direct-message target
                 targets.append("@" + host)
@@ -762,9 +787,7 @@ class NotifyKeybase(NotifyBase):
 
         # Extract an optional custom socket path
         if "socket" in results["qsd"] and results["qsd"]["socket"]:
-            results["socket_path"] = NotifyKeybase.unquote(
-                results["qsd"]["socket"]
-            )
+            results["socket"] = NotifyKeybase.unquote(results["qsd"]["socket"])
 
         return results
 

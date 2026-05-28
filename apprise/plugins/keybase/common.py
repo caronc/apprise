@@ -28,6 +28,7 @@
 """Shared constants and validation patterns for the Keybase plugin."""
 
 import os
+import posixpath
 import re
 import sys
 
@@ -103,10 +104,12 @@ def keybase_default_socket():
             "keybased.sock",
         )
 
-    # Linux / other Unix: honour XDG_RUNTIME_DIR; fall back to /run/user
+    # Linux / other Unix: honour XDG_RUNTIME_DIR; fall back to /run/user.
+    # posixpath.join is used so that cross-platform test runs (e.g. Windows
+    # CI testing the Linux branch) always produce forward-slash paths.
     uid = os.getuid() if hasattr(os, "getuid") else 1000
     runtime_dir = os.environ.get(
         "XDG_RUNTIME_DIR",
         "/run/user/{}".format(uid),
     )
-    return os.path.join(runtime_dir, "keybase", "keybased.sock")
+    return posixpath.join(runtime_dir, "keybase", "keybased.sock")
