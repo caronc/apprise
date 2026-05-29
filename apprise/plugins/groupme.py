@@ -52,7 +52,6 @@
 #   https://dev.groupme.com/docs/image_service
 
 from json import dumps, loads
-import re
 
 import requests
 
@@ -74,9 +73,6 @@ GROUPME_HTTP_ERROR_MAP = {
     404: "Not Found - The specified bot_id does not exist.",
     429: "Too many requests; rate-limit exceeded.",
 }
-
-# Validates a GroupMe bot ID (hexadecimal string, case-insensitive)
-IS_BOT_ID = re.compile(r"^[a-z0-9]+$", re.I)
 
 
 class NotifyGroupMe(NotifyBase):
@@ -198,13 +194,27 @@ class NotifyGroupMe(NotifyBase):
             if not self.token:
                 # Warn but do not abort -- text still gets sent
                 self.logger.warning(
-                    "GroupMe image attachments require an access"
-                    " token (?token=); skipping attachments."
+                    "GroupMe image attachments require an access token;"
+                    " skipping attachments."
                 )
 
             else:
                 # Upload each attachment and collect image URLs
                 for attachment in attach:
+                    # Only image MIME types are accepted by GroupMe's image
+                    # service; skip non-image files with a warning.
+                    # Note: mimetype is None for inaccessible files, so we
+                    # fall through to _upload_image() which handles that.
+                    mimetype = attachment.mimetype or ""
+                    if mimetype and not mimetype.startswith("image/"):
+                        self.logger.warning(
+                            "GroupMe image service only supports images;"
+                            " skipping %s (%s).",
+                            attachment.name or "attachment",
+                            mimetype,
+                        )
+                        continue
+
                     image_url = self._upload_image(attachment)
                     if image_url is None:
                         # Upload failed -- abort the entire send

@@ -79,7 +79,7 @@ The table below identifies the services this tool supports and some example serv
 | [Flock](https://appriseit.com/services/flock/) | flock://    | (TCP) 443    | flock://token<br/>flock://botname@token<br/>flock://app_token/u:userid<br/>flock://app_token/g:channel_id<br/>flock://app_token/u:userid/g:channel_id
 | [Google Chat](https://appriseit.com/services/googlechat/) | gchat://    | (TCP) 443    | gchat://workspace/key/token
 | [Gotify](https://appriseit.com/services/gotify/) | gotify:// or gotifys://   | (TCP) 80 or 443    | gotify://hostname/token<br />gotifys://hostname/token?priority=high
-| [GroupMe](https://appriseit.com/services/groupme/) | groupme://   | (TCP) 443   | groupme://bot_id<br />groupme://bot_id?token=access_token
+| [GroupMe](https://appriseit.com/services/groupme/) | groupme://   | (TCP) 443   | groupme://bot_id<br />groupme://bot_id/access_token
 | [Growl](https://appriseit.com/services/growl/)  | growl://   | (UDP) 23053   | growl://hostname<br />growl://hostname:portno<br />growl://password@hostname<br />growl://password@hostname:port</br>**Note**: you can also use the get parameter _version_ which can allow the growl request to behave using the older v1.x protocol. An example would look like: growl://hostname?version=1
 | [Guilded](https://appriseit.com/services/guilded/)  | guilded://   | (TCP) 443   | guilded://webhook_id/webhook_token<br />guilded://avatar@webhook_id/webhook_token
 | [Home Assistant](https://appriseit.com/services/homeassistant/)       | hassio:// or hassios://   | (TCP) 8123 or 443 | hassio://hostname/accesstoken<br />hassio://user@hostname/accesstoken<br />hassio://user:password@hostname:port/accesstoken<br />hassio://hostname/optional/path/accesstoken

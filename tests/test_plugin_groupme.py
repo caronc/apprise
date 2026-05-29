@@ -430,6 +430,33 @@ def test_plugin_groupme_attach_bad_response(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_groupme_attach_non_image(mock_post):
+    """NotifyGroupMe() skips non-image attachments with a warning."""
+
+    def _mk_resp(code, content=b""):
+        """Build a mock response."""
+        resp = requests.Request()
+        resp.status_code = code
+        resp.content = content
+        return resp
+
+    mock_post.return_value = _mk_resp(requests.codes.accepted)
+
+    obj = NotifyGroupMe(bot_id=TEST_BOT_ID, token=TEST_TOKEN)
+
+    # apprise-archive.zip has MIME type application/zip (not an image)
+    attach = AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
+    )
+
+    # Non-image attachment is skipped; text message still succeeds
+    assert obj.notify(body="Test", attach=attach) is True
+
+    # Only the bot POST is made (no upload attempted for non-image file)
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
 def test_plugin_groupme_attach_multi(mock_post):
     """NotifyGroupMe() sends multiple attachments in one bot post."""
 
