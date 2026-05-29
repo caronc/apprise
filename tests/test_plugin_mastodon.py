@@ -459,7 +459,7 @@ def test_plugin_mastodon_pings(mock_post):
         targets="#Apprise,#apprise",
         ping="#Media,#media",
     )
-    assert obj.tags == ["#Apprise"]
+    assert obj.hashtags == ["#Apprise"]
     assert obj.ping == ["#Media"]
 
     mock_post.reset_mock()
@@ -1130,3 +1130,56 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     assert (
         mock_post.call_args_list[1][0][0] == "https://nuxref.com/api/v1/media"
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_mastodon_apprise_tags(mock_post):
+    """NotifyMastodon() - Apprise tag filter must not corrupt URLBase.tags.
+
+    Regression test for a bug where self.hashtags = [] in __init__ was
+    mistakenly named self.tags, overwriting the set() that URLBase stores for
+    Apprise's own notification-tag system.  Any call to Apprise.find() or a
+    tag-filtered Apprise.notify() would crash with:
+        AttributeError: 'list' object has no attribute 'union'
+    """
+    akey = "access_key"
+    host = "mastodon.social"
+
+    # Prepare a good response
+    good_response = mock.Mock()
+    good_response.content = b"{}"
+    good_response.status_code = requests.codes.ok
+
+    mock_post.return_value = good_response
+
+    # Load a Mastodon URL that carries Mastodon hashtag targets into an Apprise
+    # instance that also has Apprise notification tags assigned.  The Mastodon
+    # #hashtag and the Apprise tag are distinct concepts and must not collide.
+    a = Apprise()
+    assert (
+        a.add(
+            f"mastodon://{akey}@{host}/%23apprise",
+            tag="prod",
+        )
+        is True
+    )
+
+    # Confirm the plugin loaded and its Apprise tag set is a proper set (not a
+    # list), which is what caused the AttributeError before the fix.
+    plugins = list(a)
+    assert len(plugins) == 1
+    assert isinstance(plugins[0].tags, set)
+    assert "prod" in plugins[0].tags
+
+    # Confirm the Mastodon hashtag target was stored under hashtags, not tags
+    assert plugins[0].hashtags == ["#apprise"]
+
+    # Exercising Apprise.find() is the exact path that crashed before the fix;
+    # it calls is_exclusive_match(data=notification.tags, ...) which requires
+    # notification.tags to support .union().
+    found = list(a.find("prod"))
+    assert len(found) == 1
+
+    # A tag-filtered notify() follows the same code path
+    assert a.notify(body="test", tag="prod") is True
+    assert mock_post.call_count == 1
