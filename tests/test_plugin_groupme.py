@@ -29,6 +29,7 @@
 import logging
 import os
 from unittest import mock
+from urllib.parse import urlparse
 
 from helpers import AppriseURLTester
 import pytest
@@ -199,9 +200,9 @@ def test_plugin_groupme_send(mock_post):
     assert obj.notify(body="Test message") is True
     assert mock_post.call_count == 1
 
-    # Verify the correct URL was used
+    # Verify the correct URL host was used
     call_url = mock_post.call_args[0][0]
-    assert "api.groupme.com" in call_url
+    assert urlparse(call_url).hostname == "api.groupme.com"
 
     mock_post.reset_mock()
 
@@ -304,13 +305,13 @@ def test_plugin_groupme_attach_success(mock_post):
     # Two requests: upload + bot post
     assert mock_post.call_count == 2
 
-    # Verify the image service URL was called first
+    # Verify the image service URL host was called first
     upload_url = mock_post.call_args_list[0][0][0]
-    assert "image.groupme.com" in upload_url
+    assert urlparse(upload_url).hostname == "image.groupme.com"
 
-    # Verify the bot post URL was called second
+    # Verify the bot post URL host was called second
     post_url = mock_post.call_args_list[1][0][0]
-    assert "api.groupme.com" in post_url
+    assert urlparse(post_url).hostname == "api.groupme.com"
 
 
 @mock.patch("requests.post")
