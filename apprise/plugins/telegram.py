@@ -126,31 +126,35 @@ TELEGRAM_CONTENT_PLACEMENT = (
     TelegramContentPlacement.AFTER,
 )
 
-TELEGRAM_HTML_BLOCK_TAGS = frozenset((
-    "blockquote",
-    "div",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "li",
-    "p",
-    "pre",
-))
+TELEGRAM_HTML_BLOCK_TAGS = frozenset(
+    (
+        "blockquote",
+        "div",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "li",
+        "p",
+        "pre",
+    )
+)
 
-TELEGRAM_HTML_PARAGRAPH_TAGS = frozenset((
-    "blockquote",
-    "div",
-    "h1",
-    "h2",
-    "h3",
-    "h4",
-    "h5",
-    "h6",
-    "p",
-))
+TELEGRAM_HTML_PARAGRAPH_TAGS = frozenset(
+    (
+        "blockquote",
+        "div",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "p",
+    )
+)
 
 
 def _telegram_markdown_html(content):
@@ -215,7 +219,12 @@ def _escape_telegram_markdown_text(value, markdown_ver):
 
 
 class TelegramMarkdownHTMLConverter(HTMLParser):
-    """Render a small HTML subset into Telegram Markdown."""
+    """Render a small HTML subset into Telegram Markdown.
+
+    This is intentionally scoped to Telegram's restrictive Markdown parse
+    modes. It is not a general HTML-to-Markdown converter; it preserves only
+    the tags and escaping rules Telegram accepts before sending the payload.
+    """
 
     def __init__(self, markdown_ver):
         super().__init__(convert_charrefs=True)
@@ -272,7 +281,8 @@ class TelegramMarkdownHTMLConverter(HTMLParser):
 
         elif tag == "li":
             self.result.append(
-                "\\- " if self.markdown_ver == TelegramMarkdownVersion.TWO
+                "\\- "
+                if self.markdown_ver == TelegramMarkdownVersion.TWO
                 else "- "
             )
 
@@ -329,9 +339,7 @@ class TelegramMarkdownHTMLConverter(HTMLParser):
 
         if self.in_code:
             self.result.append(
-                _escape_telegram_markdown_code_text(
-                    data, self.markdown_ver
-                )
+                _escape_telegram_markdown_code_text(data, self.markdown_ver)
             )
             return
 
@@ -413,7 +421,12 @@ class NotifyTelegram(NotifyBase):
     storage_mode = PersistentStoreMode.AUTO
 
     def convert_between(self, from_format, to_format, content):
-        """Let Telegram perform its own Markdown target conversion."""
+        """Keep Markdown target conversion inside the Telegram plugin.
+
+        Apprise's global HTML-to-Markdown path currently falls back to plain
+        text. Telegram needs the original body plus the original body_format
+        so send() can apply Telegram-specific parse-mode escaping.
+        """
         if to_format == NotifyFormat.MARKDOWN:
             return content
 
@@ -1119,9 +1132,7 @@ class NotifyTelegram(NotifyBase):
                 body_format is not None
                 and self.markdown_ver == TelegramMarkdownVersion.TWO
             ):
-                body = _escape_telegram_markdown_text(
-                    body, self.markdown_ver
-                )
+                body = _escape_telegram_markdown_text(body, self.markdown_ver)
 
             payload_["parse_mode"] = self.markdown_ver
             payload_["text"] = body

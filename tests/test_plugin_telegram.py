@@ -1031,15 +1031,17 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Markdown paragraphs converted to Telegram HTML should preserve paragraph
     # spacing without turning hard line breaks into blank lines.
-    body = "\n".join((
-        "**--- Header ---**",
-        "",
-        "Hostname: **server**",
-        "Date/Time: **Today**",
-        "Uptime: **TESTER**",
-        "",
-        "_Beware of a tall blond man with one black shoe._",
-    ))
+    body = "\n".join(
+        (
+            "**--- Header ---**",
+            "",
+            "Hostname: **server**",
+            "Date/Time: **Today**",
+            "Uptime: **TESTER**",
+            "",
+            "_Beware of a tall blond man with one black shoe._",
+        )
+    )
 
     assert aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN)
 
@@ -1048,8 +1050,7 @@ def test_plugin_telegram_formatting(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert (
-        payload["text"]
-        == "<b>--- Header ---</b>\r\n\r\n"
+        payload["text"] == "<b>--- Header ---</b>\r\n\r\n"
         "Hostname: <b>server</b>\r\n"
         "Date/Time: <b>Today</b>\r\n"
         "Uptime: <b>TESTER</b>\r\n\r\n"
@@ -1363,26 +1364,22 @@ def test_plugin_telegram_markdown_conversion(mock_post):
         return loads(mock_post.call_args_list[0][1]["data"])
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=1",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1",
         "~~Strike~~ **Bold** _Italics_ Text",
     )
     assert payload["parse_mode"] == "MARKDOWN"
     assert payload["text"] == "Strike *Bold* _Italics_ Text"
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=2",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2",
         "~~Strike~~ **Bold** _Italics_ Text",
     )
     assert payload["parse_mode"] == "MarkdownV2"
     assert payload["text"] == "~Strike~ *Bold* _Italics_ Text"
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=1",
-        "**Bold**\n_Italics_\n"
-        "```go\nif x > 0 { return `tick` }\\path\n```",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1",
+        "**Bold**\n_Italics_\n```go\nif x > 0 { return `tick` }\\path\n```",
     )
     assert "````" not in payload["text"]
     assert "```\nif x > 0 { return `tick` }\\path\n```" in payload["text"]
@@ -1390,8 +1387,7 @@ def test_plugin_telegram_markdown_conversion(mock_post):
     assert "\\\\path" not in payload["text"]
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=2",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2",
         "```go\nif x > 0 { return `tick` }\\path\n```",
     )
     assert payload["text"] == (
@@ -1399,8 +1395,7 @@ def test_plugin_telegram_markdown_conversion(mock_post):
     )
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=2",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2",
         "`if x > 0 { return path\\name }`",
     )
     assert payload["text"] == "`if x > 0 { return path\\\\name }`"
@@ -1409,34 +1404,33 @@ def test_plugin_telegram_markdown_conversion(mock_post):
     assert "\\}" not in payload["text"]
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=2",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2",
         '<a href="https://example.com/a)b\\c">Docs</a>',
         body_format=NotifyFormat.HTML,
     )
     assert payload["text"] == "[Docs](https://example.com/a\\)b\\\\c)"
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=2",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2",
         "<b>Bold</b> <i>Italics</i> Text",
         body_format=NotifyFormat.HTML,
     )
     assert payload["text"] == "*Bold* _Italics_ Text"
 
-    body = "\n".join((
-        "**--- Header ---**",
-        "",
-        "Hostname: **server**",
-        "Date/Time: **Today**",
-        "Uptime: **TESTER**",
-        "",
-        "_Beware of a tall blond man with one black shoe._",
-    ))
+    body = "\n".join(
+        (
+            "**--- Header ---**",
+            "",
+            "Hostname: **server**",
+            "Date/Time: **Today**",
+            "Uptime: **TESTER**",
+            "",
+            "_Beware of a tall blond man with one black shoe._",
+        )
+    )
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=1",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1",
         body,
     )
     assert payload["text"] == (
@@ -1448,8 +1442,7 @@ def test_plugin_telegram_markdown_conversion(mock_post):
     )
 
     payload = send_payload(
-        "tgram://123456789:abcdefg_hijklmnop/12345"
-        "?format=markdown&mdv=2",
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2",
         body,
     )
     assert payload["text"] == (
