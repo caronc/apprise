@@ -88,6 +88,7 @@ The table below identifies the services this tool supports and some example serv
 | [Jellyfin](https://appriseit.com/services/jellyfin/)  | jellyfin:// or jellyfins:// | (TCP) 8096 | jellyfin://user@hostname/<br />jellyfins://user:password@hostname
 | [Jira](https://appriseit.com/services/jira/) | jira:// | (TCP) 443 | jira://APIKey<br/>jira://APIKey/@UserID<br/>jira://APIKey/#Team<br/>jira://APIKey/\*Schedule<br/>jira://APIKey/^Escalation
 | [Join](https://appriseit.com/services/join/) | join://   | (TCP) 443    | join://apikey/device<br />join://apikey/device1/device2/deviceN/<br />join://apikey/group<br />join://apikey/groupA/groupB/groupN<br />join://apikey/DeviceA/groupA/groupN/DeviceN/
+| [Keybase](https://appriseit.com/services/keybase/) | keybase:// | n/a | keybase://_/@username<br />keybase://_/teamname<br />keybase://_/teamname#channel
 | [KODI](https://appriseit.com/services/kodi/) | kodi:// or kodis://    | (TCP) 8080 or 443   | kodi://hostname<br />kodi://user@hostname<br />kodi://user:password@hostname:port
 | [Kumulos](https://appriseit.com/services/kumulos/) | kumulos:// | (TCP) 443 | kumulos://apikey/serverkey
 | [LaMetric Time](https://appriseit.com/services/lametric/) | lametric:// | (TCP) 443 | lametric://apikey@device_ipaddr<br/>lametric://apikey@hostname:port<br/>lametric://client_id@client_secret

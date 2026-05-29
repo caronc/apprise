@@ -65,7 +65,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
 `FCM`, `Feishu`, `Flock`, `Fluxer`, `Free Mobile`, `Google Chat`, \
 `Gotify`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, `HumHub`, \
-`IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, \
+`IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `Keybase`, `KODI`, \
 `Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
 `Microsoft Teams`, `Misskey`, \
@@ -149,6 +149,7 @@ Requires: python3dist(pyyaml)
 
 Recommends: python3dist(hidapi)
 Recommends: python3dist(paho-mqtt) >= 2.1.0
+Recommends: python3dist(pynacl)
 Recommends: python3dist(slixmpp)
 
 %if 0%{?legacy_python_build} == 0
