@@ -351,7 +351,7 @@ class NotifyMastodon(NotifyBase):
 
         # Our target users
         self.targets = []
-        self.tags = []
+        self.hashtags = []
         tag_seen = set()
 
         # Track any errors
@@ -369,7 +369,7 @@ class NotifyMastodon(NotifyBase):
                 key = normalized.casefold()
                 if key not in tag_seen:
                     tag_seen.add(key)
-                    self.tags.append(normalized)
+                    self.hashtags.append(normalized)
                 continue
 
             has_error = True
@@ -377,7 +377,7 @@ class NotifyMastodon(NotifyBase):
                 f"Dropped invalid Mastodon target ({target}) specified.",
             )
 
-        if has_error and not (self.targets or self.tags):
+        if has_error and not (self.targets or self.hashtags):
             # We have specified that we want to notify one or more individual
             # and we failed to load any of them.  Since it's also valid to
             # notify no one at all (which means we notify ourselves), it's
@@ -420,7 +420,7 @@ class NotifyMastodon(NotifyBase):
         """Return the body space available after configured status tokens."""
 
         tokens = self.ping_tokens(
-            " ".join(self.targets + self.tags + self.ping),
+            " ".join(self.targets + self.hashtags + self.ping),
             normalize=True,
         )
         return max(
@@ -473,7 +473,7 @@ class NotifyMastodon(NotifyBase):
             targets="/".join(
                 [
                     NotifyMastodon.quote(x, safe="@")
-                    for x in self.targets + self.tags
+                    for x in self.targets + self.hashtags
                 ]
             ),
             params=NotifyMastodon.urlencode(params),
@@ -631,20 +631,20 @@ class NotifyMastodon(NotifyBase):
         # Other formats only append explicitly configured ping values.
         if self.notify_format == NotifyFormat.MARKDOWN:
             ping_tokens.extend(self.ping_tokens(body, seen=seen))
-            if self.targets or self.tags or self.ping:
+            if self.targets or self.hashtags or self.ping:
                 ping_tokens.extend(
                     self.ping_tokens(
-                        " ".join(self.targets + self.tags + self.ping),
+                        " ".join(self.targets + self.hashtags + self.ping),
                         normalize=True,
                         seen=seen,
                     )
                 )
 
         # Non-markdown content is not scanned for mention or hashtag tokens.
-        elif self.targets or self.tags or self.ping:
+        elif self.targets or self.hashtags or self.ping:
             ping_tokens.extend(
                 self.ping_tokens(
-                    " ".join(self.targets + self.tags + self.ping),
+                    " ".join(self.targets + self.hashtags + self.ping),
                     normalize=True,
                     seen=seen,
                 )

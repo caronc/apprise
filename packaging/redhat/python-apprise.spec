@@ -58,15 +58,18 @@
 Apprise is a Python package that simplifies access to many popular \
 notification services. It supports sending alerts to platforms such as: \
 \
-`46elks`, `AfricasTalking`, `Apprise API`, `APRS`, `AWS SES`, `AWS SNS`, \
-`Bark`, `Blink(1)`, `BlueSky`, `Brevo`, `Burst SMS`, `BulkSMS`, `BulkVS`, \
+`46elks`, `AfricasTalking`, `Amazon Chime`, `Apprise API`, `APRS`, \
+`AWS SES`, `AWS SNS`, `Bark`, `Blink(1)`, `BlueSky`, `Brevo`, \
+`Burst SMS`, `BulkSMS`, `BulkVS`, \
 `Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
 `FCM`, `Feishu`, `Flock`, `Fluxer`, `Free Mobile`, `Google Chat`, \
-`Gotify`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, `IFTTT`, \
-`IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kumulos`, \
-`LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, `Mattermost`, \
-`Matrix`, `MessageBird`, `Microsoft Windows`, `Microsoft Teams`, `Misskey`, \
+`Gotify`, `GroupMe`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, \
+`HumHub`, \
+`IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, \
+`Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `Mastodon`, \
+`Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
+`Microsoft Teams`, `Misskey`, \
 `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, `Nextcloud`, \
 `NextcloudTalk`, `Notica`, `NotificationAPI`, `Notifiarr`, `Notifico`, \
 `ntfy`, `Octopush`, `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, \
@@ -85,7 +88,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Webex Teams`, `Workflows`, `WxPusher`, `XBMC`, `XMPP`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
-Version:        1.10.0
+Version:        1.11.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -238,6 +241,9 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Fri May 29 2026 Chris Caron <lead2gold@gmail.com> - 1.11.0-1
+- Updated to v1.11.0
+
 * Sun Apr 26 2026 Chris Caron <lead2gold@gmail.com> - 1.10.0-1
 - Updated to v1.10.0
 
