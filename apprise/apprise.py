@@ -650,7 +650,6 @@ class Apprise:
           - "success":   Boolean — True if delivery ultimately succeeded.
           - "timestamp": ISO-8601 UTC string of when the attempt completed.
           - "detail":    Empty string on success; error message on failure.
-        configuration files that were read.
 
         A filter tag may carry an optional priority prefix and/or retry suffix:
 
@@ -1499,8 +1498,7 @@ class Apprise:
             self._logger.handlers.clear()
             self._logger.addHandler(self)
             self._logger.setLevel(logging.DEBUG)
-            # Do NOT propagate — we want only this server's messages here.
-            self._logger.propagate = False
+            self._logger.propagate = True
             # Shadow the class-level shared logger with a per-instance one.
             self._server.logger = self._logger
             return self
