@@ -397,6 +397,10 @@ def test_detailed_sequential_optional_failure():
 # Parallel threadpool path
 # (async_mode=True servers via sync notify() →
 #  _notify_parallel_threadpool_detailed)
+# NOTE: tests that exercise the *worker* code (retry/wait/optional) must use
+# at least 2 servers so n_calls > 1 and the real threadpool path is taken.
+# With n_calls == 1 the implementation delegates to _notify_sequential_detailed
+# (fast-path at the top of _notify_parallel_threadpool_detailed).
 # ---------------------------------------------------------------------------
 
 
@@ -461,44 +465,60 @@ def test_detailed_threadpool_unhandled_exception_in_worker():
 
 
 def test_detailed_threadpool_retry_on_failure_then_success():
-    """Threadpool worker retries on failure and succeeds on second attempt."""
+    """Threadpool worker retries on failure and succeeds on second attempt.
+
+    Two servers are used so n_calls > 1 and the real threadpool worker runs
+    (single-server calls are delegated to _notify_sequential_detailed).
+    """
     call_count = {"n": 0}
 
     def flaky_notify(**kw):
         call_count["n"] += 1
         return call_count["n"] >= 2
 
-    p = _make_plugin("x", "slack://retry/ch", True, async_mode=True)
-    p.notify.side_effect = flaky_notify
-    p.retry = 1
+    p1 = _make_plugin("x", "slack://retry/ch", True, async_mode=True)
+    p1.notify.side_effect = flaky_notify
+    p1.retry = 1
+    p2 = _make_plugin("x", "discord://other/ch", True, async_mode=True)
 
-    a = _apprise_with(p)
+    a = _apprise_with(p1, p2)
     results = a.notify("body", tag="x", detailed=True)
-    assert results[0]["success"] is True
+    result_map = {r["url"]: r for r in results}
+    assert result_map["slack://retry/ch"]["success"] is True
     assert call_count["n"] == 2
 
 
 def test_detailed_threadpool_retry_with_wait():
-    """Threadpool worker calls time.sleep when wait > 0 between retries."""
-    p = _make_plugin("x", "slack://wait/ch", False, async_mode=True)
-    p.notify.return_value = False
-    p.retry = 1
-    p.wait = 0.5
+    """Threadpool worker calls time.sleep when wait > 0 between retries.
 
-    a = _apprise_with(p)
+    Two servers are used so n_calls > 1 and the real threadpool worker runs.
+    """
+    p1 = _make_plugin("x", "slack://wait/ch", False, async_mode=True)
+    p1.notify.return_value = False
+    p1.retry = 1
+    p1.wait = 0.5
+    p2 = _make_plugin("x", "discord://other/ch", True, async_mode=True)
+
+    a = _apprise_with(p1, p2)
     with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
         a.notify("body", tag="x", detailed=True)
     mock_sleep.assert_called_once_with(0.5)
 
 
 def test_detailed_threadpool_optional_failure_is_silenced():
-    """Optional server failure in threadpool path does not raise."""
-    p = _make_plugin("x", "slack://opt/ch", False, async_mode=True)
-    p.optional = True
-    a = _apprise_with(p)
+    """Optional server failure in threadpool path does not raise.
+
+    Two servers are used so n_calls > 1 and the real threadpool worker runs.
+    """
+    p1 = _make_plugin("x", "slack://opt/ch", False, async_mode=True)
+    p1.optional = True
+    p2 = _make_plugin("x", "discord://other/ch", True, async_mode=True)
+
+    a = _apprise_with(p1, p2)
     results = a.notify("body", tag="x", detailed=True)
-    assert results[0]["success"] is False
-    assert isinstance(results[0]["detail"], str)
+    result_map = {r["url"]: r for r in results}
+    assert result_map["slack://opt/ch"]["success"] is False
+    assert isinstance(result_map["slack://opt/ch"]["detail"], str)
 
 
 def test_detailed_threadpool_future_raises():
@@ -788,6 +808,22 @@ def test_detailed_async_gather_exception():
         )
     assert results[0]["success"] is False
     assert "gather exploded" in results[0]["detail"]
+
+
+def test_detailed_async_sequential_retry_with_wait():
+    """async_notify sequential path calls time.sleep when wait > 0."""
+    p = _make_plugin("x", "slack://wait/async-seq", False, async_mode=False)
+    p.notify.return_value = False
+    p.retry = 1
+    p.wait = 0.5
+
+    a = _apprise_with(p)
+    with (
+        OuterEventLoop() as loop,
+        mock.patch("apprise.apprise.time.sleep") as mock_sleep,
+    ):
+        loop.run_until_complete(a.async_notify("body", tag="x", detailed=True))
+    mock_sleep.assert_called_once_with(0.5)
 
 
 # ---------------------------------------------------------------------------
