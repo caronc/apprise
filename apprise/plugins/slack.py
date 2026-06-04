@@ -739,6 +739,12 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
+        # Incoming webhooks should use the identity configured in Slack
+        # unless a botname was explicitly supplied.
+        username = self.user
+        if not username and self.mode is SlackMode.BOT:
+            username = self.app_id
+
         #
         # Workflow Builder mode: fixed endpoint, no channel iteration
         #
@@ -783,9 +789,10 @@ class NotifySlack(NotifyBase):
 
                 # Wrap the template attachment content in a full payload
                 payload = {
-                    "username": self.user if self.user else self.app_id,
                     "attachments": [template_content],
                 }
+                if username:
+                    payload["username"] = username
 
             else:
                 # Our slack format
@@ -796,7 +803,6 @@ class NotifySlack(NotifyBase):
                 )
 
                 payload = {
-                    "username": self.user if self.user else self.app_id,
                     "attachments": [
                         {
                             "blocks": [
@@ -812,6 +818,8 @@ class NotifySlack(NotifyBase):
                         }
                     ],
                 }
+                if username:
+                    payload["username"] = username
 
                 # Slack only accepts non-empty header sections
                 if title:
@@ -919,7 +927,6 @@ class NotifySlack(NotifyBase):
 
             # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
             payload = {
-                "username": self.user if self.user else self.app_id,
                 # Use Markdown language
                 "mrkdwn": self.notify_format == NotifyFormat.MARKDOWN,
                 "attachments": [
@@ -930,6 +937,8 @@ class NotifySlack(NotifyBase):
                     }
                 ],
             }
+            if username:
+                payload["username"] = username
 
             # Acquire our to-be footer icon if configured to do so
             image_url = (

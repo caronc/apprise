@@ -803,8 +803,6 @@ def test_plugin_slack_webhook_mode(mock_request):
     token_a = "A" * 9
     token_b = "B" * 9
     token_c = "c" * 24
-
-    # Support strings
     channels = "chan1,#chan2,+BAK4K23G5,@user,,,"
 
     obj = NotifySlack(
@@ -839,6 +837,48 @@ def test_plugin_slack_webhook_mode(mock_request):
         is True
     )
 
+
+@mock.patch("requests.request")
+def test_plugin_slack_username_payload_by_mode(mock_request):
+    """NotifySlack() Username payload behavior by mode."""
+
+    # Prepare Mock
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"ok"
+    response.text = "ok"
+    mock_request.return_value = response
+
+    token_a = "A" * 9
+    token_b = "B" * 9
+    token_c = "c" * 24
+
+    # Webhook mode without botname should not force username,
+    # allowing Slack's configured webhook identity to be used.
+    obj = NotifySlack(token_a=token_a, token_b=token_b, token_c=token_c)
+    assert obj.notify(body="body", title="title") is True
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert "username" not in payload
+
+    # Explicit botname in webhook mode should be honored.
+    mock_request.reset_mock()
+    obj = NotifySlack(
+        token_a=token_a,
+        token_b=token_b,
+        token_c=token_c,
+        user="CustomWebhookName",
+    )
+    assert obj.notify(body="body", title="title") is True
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert payload.get("username") == "CustomWebhookName"
+
+    # Bot mode keeps existing fallback behavior to self.app_id.
+    mock_request.reset_mock()
+    response.content = dumps({"ok": True, "channel": "C123456"})
+    obj = NotifySlack(access_token="xoxb-1234-1234-abc124", targets="#test")
+    assert obj.notify(body="body", title="title") is True
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert payload.get("username") == obj.app_id
 
 @mock.patch("requests.request")
 @mock.patch("requests.get")
