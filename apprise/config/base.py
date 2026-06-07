@@ -1195,9 +1195,8 @@ class ConfigBase(URLBase):
 
                 if isinstance(tokens, (list, tuple, set)):
                     # Pre-process sibling tokens once before the loop
-                    # so each per-entry copy already has mappings
-                    # resolved (smtp -> smtp_host, from -> from_addr,
-                    # pass -> password, etc.)
+                    # so each per-entry copy already has template
+                    # mappings resolved (smtp -> smtp_host, etc.)
                     if sibling_tokens and schema in N_MGR:
                         sibling_tokens = ConfigBase._special_token_handler(
                             schema, sibling_tokens

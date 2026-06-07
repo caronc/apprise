@@ -2034,38 +2034,132 @@ urls:
     assert result[0].smtp_host == "child.smtp.example.com"
 
 
-def test_yaml_sibling_token_with_list_children():
+def test_yaml_sibling_token_with_multiple_targets():
     """
-    API: ConfigBase - sibling tokens apply to every list-child entry.
+    API: ConfigBase - multiple targets via sibling 'to:' token.
 
-    When a URL key has a LIST value (expanding to N plugin instances)
-    AND sibling tokens at the same indent level, the sibling tokens
-    are applied as a shared base to each expanded instance.
+    'to:' in YAML tokens is a kwarg equivalent to ?to= in a URL.
+    Multiple recipients must be expressed as a comma-separated string
+    or as a YAML list under the 'to:' key -- NOT as multiple YAML
+    entries each containing a separate 'to:' (that would create
+    multiple plugin instances rather than one plugin with many targets).
 
-    Note: if both the sibling dict and a per-entry dict define the
-    same key (e.g. 'tag'), the per-entry value takes precedence
-    (per-entry > sibling priority within the list case).
+    Both the comma-separated and YAML-list forms should resolve to a
+    single plugin instance whose 'targets' list contains all recipients.
+    """
+    # Comma-separated form: equivalent to ?to=user1,user2 in the URL
+    result_csv, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+    smtp: smtp.example.com
+    to: user1@example.com, user2@example.com
+    tag: shared
+""")
+
+    # YAML list form: same semantics, different syntax
+    result_list, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+    smtp: smtp.example.com
+    to:
+      - user1@example.com
+      - user2@example.com
+    tag: shared
+""")
+
+    # Each form must load exactly one plugin instance
+    assert len(result_csv) == 1
+    assert len(result_list) == 1
+
+    for obj in (result_csv[0], result_list[0]):
+        assert isinstance(obj, NotifyEmail)
+
+        # Sibling smtp: applies to the single instance
+        assert obj.smtp_host == "smtp.example.com"
+
+        # Both recipients must appear in targets
+        assert any(t[1] == "user1@example.com" for t in obj.targets)
+        assert any(t[1] == "user2@example.com" for t in obj.targets)
+
+        # Sibling tag: applies correctly
+        assert "shared" in obj.tags
+
+
+def test_yaml_sibling_token_shared_across_list_expansion():
+    """
+    API: ConfigBase - sibling tokens propagate to every list-expansion entry.
+
+    When the URL key has a YAML list as its child value (each list item
+    becomes a separate plugin instance) AND sibling keys supply shared
+    settings, the sibling tokens are applied as a base to every instance
+    before per-entry overrides are merged.
+
+    This is distinct from 'to: email1, email2' (multiple targets for one
+    instance) -- here each list entry is an independent plugin instance
+    with its own per-entry settings, all sharing the sibling tokens.
     """
     result, _ = ConfigBase.config_parse_yaml("""
 urls:
   - mailtos://sender@example.com:
-    - to: user1@example.com
-    - to: user2@example.com
+      - to: manager@example.com
+        tag: boss
+      - to: coworker@example.com
+        tag: team
     smtp: smtp.example.com
-    tag: shared
 """)
 
-    # One list entry per to: recipient
+    # One plugin instance per list entry
     assert len(result) == 2
     assert all(isinstance(r, NotifyEmail) for r in result)
 
-    # The sibling smtp: must be applied to both instances
+    # Sibling smtp: must be applied to every instance
     assert result[0].smtp_host == "smtp.example.com"
     assert result[1].smtp_host == "smtp.example.com"
 
-    # Sibling tag: applies to both instances (no per-entry tag conflict)
-    assert "shared" in result[0].tags
-    assert "shared" in result[1].tags
+    # Per-entry tags must be respected
+    assert "boss" in result[0].tags
+    assert "team" in result[1].tags
+
+
+def test_yaml_sibling_token_per_entry_overrides_sibling():
+    """
+    API: ConfigBase - per-entry tokens override sibling tokens for same key.
+
+    When a list-expansion entry defines the same key as a sibling token,
+    the per-entry value wins for that instance only.  Other instances with
+    no per-entry value for that key still receive the sibling fallback.
+
+    Scenario:
+      - sibling smtp: smtp1.example.com   (shared fallback for all entries)
+      - entry 1: to=manager, tag=boss     (no per-entry smtp -> uses sibling)
+      - entry 2: to=coworker, smtp=smtp2, tag=team  (overrides sibling smtp)
+
+    Expected result: 2 instances, each with correct smtp and tags.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      - to: manager@example.com
+        tag: boss
+      - to: coworker@example.com
+        smtp: smtp2.example.com
+        tag: team
+    smtp: smtp1.example.com
+""")
+
+    # One instance per list entry
+    assert len(result) == 2
+    assert all(isinstance(r, NotifyEmail) for r in result)
+
+    # Instance 0: no per-entry smtp, so sibling smtp1 is used
+    assert any(t[1] == "manager@example.com" for t in result[0].targets)
+    assert result[0].smtp_host == "smtp1.example.com"
+    assert "boss" in result[0].tags
+
+    # Instance 1: per-entry smtp2 overrides the sibling smtp1
+    assert any(t[1] == "coworker@example.com" for t in result[1].targets)
+    assert result[1].smtp_host == "smtp2.example.com"
+    assert "team" in result[1].tags
 
 
 def test_yaml_sibling_password_token():
@@ -2137,3 +2231,27 @@ urls:
     assert any(t[1] == "recipient@example.com" for t in obj.targets)
     assert "dev" in obj.tags
     assert "prod" in obj.tags
+
+
+def test_yaml_sibling_token_unknown_schema():
+    """
+    API: ConfigBase - sibling tokens with an unregistered schema.
+
+    When the schema is not in N_MGR the _special_token_handler call
+    inside the 'elif sibling_tokens' branch is skipped (the False arm
+    of 'if schema in N_MGR').  The branch still executes fully; it
+    just applies sibling tokens as-is.  Because the schema is unknown
+    no plugin is instantiated and the result list is empty.
+    """
+    # 'xyzunknown' is not a registered Apprise plugin, so the
+    # 'if schema in N_MGR' guard evaluates to False.
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - xyzunknown://placeholder:
+    mytoken: value
+    otherkey: data
+""")
+
+    # The sibling branch ran (no exception), but no plugin loaded
+    assert isinstance(result, list)
+    assert len(result) == 0
