@@ -2162,15 +2162,54 @@ urls:
     assert "team" in result[1].tags
 
 
+def test_yaml_sibling_token_order_independent():
+    """
+    API: ConfigBase - sibling tokens are captured regardless of YAML key order.
+
+    YAML does not guarantee mapping key order.  If a sibling token appears
+    before the URL key in the mapping dict (e.g. due to editor or template
+    quirks), it must still be captured.  The old dict(it) approach only
+    captured items *after* the URL key in the iterator; the fix uses the
+    full url.items() dict so all non-URL-key items are included.
+    """
+    # Construct a dict that places the sibling key BEFORE the URL key.
+    # We cannot express this reliably in YAML (PyYAML preserves input order)
+    # so we call config_parse_yaml with a hand-crafted dict equivalent.
+    import yaml as _yaml
+
+    from apprise.config.base import ConfigBase as _CB
+
+    # Build the raw YAML structure directly: smtp appears before the URL key
+    raw = {
+        "urls": [
+            {
+                "smtp": "smtp.example.com",
+                "mailtos://sender@example.com": None,
+                "to": "recipient@example.com",
+            }
+        ]
+    }
+    content = _yaml.dump(raw)
+
+    result, _ = _CB.config_parse_yaml(content)
+
+    # Both pre-URL (smtp) and post-URL (to) siblings must be applied
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+    assert result[0].smtp_host == "smtp.example.com"
+    assert any(t[1] == "recipient@example.com" for t in result[0].targets)
+
+
 def test_yaml_sibling_password_token():
     """
-    API: ConfigBase - 'password' key in sibling/child tokens sets password.
+    API: ConfigBase - 'password' and 'pass' keys both set plugin password.
 
-    In YAML tokens use 'password:' (the actual plugin kwarg name).  The
-    URL-path shorthand 'pass' is handled by parse_url() when processing
-    the URL string itself, not by the YAML token layer.
+    YAML tokens bypass parse_url(), so the URL-path shorthand 'pass' must
+    be normalized to 'password' by YAML_TOKEN_ALIASES inside
+    _special_token_handler.  Verify that both spellings work in sibling
+    and child indentation forms.
     """
-    # Sibling form
+    # --- 'password:' sibling form ---
     result_sibling, _ = ConfigBase.config_parse_yaml("""
 urls:
   - json://testhost:
@@ -2179,7 +2218,7 @@ urls:
     tag: pw-test
 """)
 
-    # Child form
+    # --- 'password:' child form ---
     result_child, _ = ConfigBase.config_parse_yaml("""
 urls:
   - json://testhost:
@@ -2188,13 +2227,52 @@ urls:
       tag: pw-test
 """)
 
-    assert len(result_sibling) == 1
-    assert len(result_child) == 1
+    # --- 'pass:' sibling form (alias normalization) ---
+    result_pass_sibling, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+    user: alice
+    pass: s3cr3t
+    tag: pw-test
+""")
 
-    for obj in (result_sibling[0], result_child[0]):
+    # --- 'pass:' child form (alias normalization) ---
+    result_pass_child, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+      user: alice
+      pass: s3cr3t
+      tag: pw-test
+""")
+
+    for result in (
+        result_sibling,
+        result_child,
+        result_pass_sibling,
+        result_pass_child,
+    ):
+        assert len(result) == 1
+
+    for obj in (
+        result_sibling[0],
+        result_child[0],
+        result_pass_sibling[0],
+        result_pass_child[0],
+    ):
         assert obj.user == "alice"
         assert obj.password == "s3cr3t"
         assert "pw-test" in obj.tags
+
+    # When both 'pass:' and 'password:' appear, 'password:' (canonical) wins
+    result_both, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+      user: alice
+      password: canonical
+      pass: shorthand
+""")
+    assert len(result_both) == 1
+    assert result_both[0].password == "canonical"
 
 
 def test_yaml_sibling_no_silent_drop_on_null_child():

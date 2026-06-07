@@ -994,6 +994,20 @@ def test_apprise_urlbase_object():
     URLBase.post_process_parse_url_results(results)
     assert results.get("redirect") is True
 
+    # URL_TOKEN_ALIASES: 'pass' in top-level results is normalized to
+    # 'password' by post_process_parse_url_results (covers the YAML config
+    # path where a flat dict is passed rather than a parsed URL string)
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    results["pass"] = "secret"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "secret"
+    assert "pass" not in results
+
+    # URL_TOKEN_ALIASES: 'pass' in qsd is also normalized to 'password'
+    results = URLBase.parse_url("http://user@127.0.0.1/path/?pass=qsecret")
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "qsecret"
+
     # Generic initialization
     base = URLBase(**{"schema": ""})
     assert base.request_timeout == (4.0, 4.0)

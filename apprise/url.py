@@ -48,6 +48,15 @@ from .utils.parse import (
 # Used to break a path list into parts
 PATHSPLIT_LIST_DELIM = re.compile(r"[ \t\r\n,\\/]+")
 
+# Maps shorthand token keys to their canonical kwarg names.  Applied by
+# post_process_parse_url_results() for URL-parsed results, and imported by
+# the YAML config layer (config/base.py) to normalize YAML tokens that
+# bypass parse_url() entirely.  Add new aliases here to extend support.
+URL_TOKEN_ALIASES = {
+    # 'pass' is the conventional URL shorthand for 'password'
+    "pass": "password",
+}
+
 
 class PrivacyMode:
     # Defines different privacy modes strings can be printed as
@@ -903,16 +912,21 @@ class URLBase:
         # When redirect= is not specified, leave it absent so that URLBase
         # __init__ falls back to asset.http_redirects as the global default.
 
-        # Password overrides
-        if "pass" in results:
-            results["password"] = results["pass"]
-            del results["pass"]
+        # Apply URL token aliases (e.g. 'pass' -> 'password') to the
+        # top-level results dict (covers values from URL path segments
+        # as well as flat YAML-style token dicts passed directly).
+        for alias, canonical in URL_TOKEN_ALIASES.items():
+            if alias in results:
+                results[canonical] = results.pop(alias)
 
         if qsd_exists:
             if "password" in results["qsd"]:
                 results["password"] = results["qsd"]["password"]
-            if "pass" in results["qsd"]:
-                results["password"] = results["qsd"]["pass"]
+
+            # Apply URL token aliases from query-string parameters
+            for alias, canonical in URL_TOKEN_ALIASES.items():
+                if alias in results["qsd"]:
+                    results[canonical] = results["qsd"][alias]
 
             # User overrides
             if "user" in results["qsd"]:

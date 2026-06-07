@@ -39,7 +39,7 @@ from ..logger import logging
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..tag import AppriseTag
-from ..url import URLBase
+from ..url import URL_TOKEN_ALIASES, URLBase
 from ..utils.cwe312 import cwe312_url
 from ..utils.parse import GET_SCHEMA_RE, parse_bool, parse_list, parse_urls
 from ..utils.time import zoneinfo
@@ -1162,7 +1162,14 @@ class ConfigBase(URLBase):
                     )
                     continue
 
-                # Collect any remaining items from the iterator.
+                # Collect sibling tokens from the entire mapping,
+                # excluding only the URL key itself.  Using the full
+                # url.items() dict (rather than the remaining iterator)
+                # ensures siblings that appear *before* the URL key in
+                # the YAML mapping are captured too.  YAML does not
+                # guarantee key order within a mapping, so order must
+                # not matter here.
+                #
                 # In YAML, keys at the same indentation level as
                 # the schema URL key become siblings in the same
                 # mapping dict rather than children of the URL key.
@@ -1181,7 +1188,7 @@ class ConfigBase(URLBase):
                 #   - mailtos://_:
                 #       smtp: smtp.example.com
                 #       from: no-reply@example.com
-                sibling_tokens = dict(it)
+                sibling_tokens = {k: v for k, v in url.items() if k != url_}
 
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging
@@ -1484,6 +1491,20 @@ class ConfigBase(URLBase):
         """
         # Create a copy of our dictionary
         tokens = tokens.copy()
+
+        # Apply URL_TOKEN_ALIASES so shorthand keys (e.g. 'pass') are
+        # normalized to the canonical kwarg name ('password') before any
+        # plugin-specific template_args mapping runs.  YAML tokens bypass
+        # parse_url() / post_process_parse_url_results() entirely, so the
+        # same alias table must be applied here too.
+        for alias, canonical in URL_TOKEN_ALIASES.items():
+            if alias in tokens and canonical not in tokens:
+                tokens[canonical] = tokens.pop(alias)
+
+            elif alias in tokens:
+                # canonical key already set -- silently discard the alias so
+                # the explicitly-provided canonical value is not overwritten
+                del tokens[alias]
 
         for kw, meta in N_MGR[schema].template_kwargs.items():
             # Determine our prefix:
