@@ -1003,6 +1003,24 @@ def test_apprise_urlbase_object():
     assert results.get("password") == "secret"
     assert "pass" not in results
 
+    # URL_TOKEN_ALIASES: canonical 'password' wins when already set to a
+    # real value -- 'pass' in top-level results must not overwrite an
+    # explicitly provided URL-path password
+    results = URLBase.parse_url("http://user:realpass@127.0.0.1/path/")
+    results["pass"] = "shouldnotwin"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "realpass"
+    assert "pass" not in results
+
+    # URL_TOKEN_ALIASES: qsd 'pass=' overrides the URL-path password because
+    # query-string parameters always take the highest priority
+    results = URLBase.parse_url(
+        "http://user:shouldnotwin@127.0.0.1/path/?pass=realpass"
+    )
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "realpass"
+    assert "pass" not in results
+
     # URL_TOKEN_ALIASES: 'pass' in qsd is also normalized to 'password'
     results = URLBase.parse_url("http://user@127.0.0.1/path/?pass=qsecret")
     URLBase.post_process_parse_url_results(results)

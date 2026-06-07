@@ -917,7 +917,15 @@ class URLBase:
         # as well as flat YAML-style token dicts passed directly).
         for alias, canonical in URL_TOKEN_ALIASES.items():
             if alias in results:
-                results[canonical] = results.pop(alias)
+                # Only populate the canonical key when it has not already
+                # been set to a real value (parse_url() always initialises
+                # 'password' to None, so a None value means it was not
+                # explicitly provided).  This avoids clobbering an actual
+                # password extracted from the URL path with a 'pass=' alias.
+                if results.get(canonical) is None:
+                    results[canonical] = results[alias]
+
+                del results[alias]
 
         if qsd_exists:
             if "password" in results["qsd"]:

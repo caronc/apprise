@@ -1223,8 +1223,6 @@ class ConfigBase(URLBase):
 
                         # We are a url string with additional options
                         if isinstance(entries, dict):
-                            url_, tokens = next(iter(url.items()))
-
                             # Tags you just can't over-ride
                             if "schema" in entries:
                                 del entries["schema"]

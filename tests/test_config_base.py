@@ -2189,7 +2189,7 @@ def test_yaml_sibling_token_order_independent():
             }
         ]
     }
-    content = _yaml.dump(raw)
+    content = _yaml.dump(raw, sort_keys=False)
 
     result, _ = _CB.config_parse_yaml(content)
 
@@ -2284,8 +2284,7 @@ def test_yaml_sibling_no_silent_drop_on_null_child():
     were silently ignored and the URL failed to instantiate.  Confirm
     that the failure mode described in issue #1635 no longer occurs.
     """
-    # Mirrors the bug-report YAML (correcting 'rom' typo to 'from'
-    # and using 'password' -- the YAML token layer kwarg name)
+    # Mirrors the bug-report YAML (correcting 'rom' typo to 'from')
     result, _ = ConfigBase.config_parse_yaml("""
 urls:
   - mailtos://_:
