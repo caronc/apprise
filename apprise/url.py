@@ -925,6 +925,19 @@ class URLBase:
                 if results.get(canonical) is None:
                     results[canonical] = results[alias]
 
+                else:
+                    # canonical already holds a value from the URL path or
+                    # a prior assignment; the alias is redundant and is
+                    # dropped.  Log at WARNING so the operator knows an
+                    # alias key was present but ignored.  No values are
+                    # logged to avoid leaking credentials.
+                    logger.warning(
+                        "URL token alias '%s' ignored; '%s' is already"
+                        " set -- alias was dropped",
+                        alias,
+                        canonical,
+                    )
+
                 del results[alias]
 
         if qsd_exists:

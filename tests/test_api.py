@@ -1005,10 +1005,17 @@ def test_apprise_urlbase_object():
 
     # URL_TOKEN_ALIASES: canonical 'password' wins when already set to a
     # real value -- 'pass' in top-level results must not overwrite an
-    # explicitly provided URL-path password
+    # explicitly provided URL-path password; a WARNING is logged so the
+    # operator knows the alias was present but dropped (no values logged)
     results = URLBase.parse_url("http://user:realpass@127.0.0.1/path/")
     results["pass"] = "shouldnotwin"
-    URLBase.post_process_parse_url_results(results)
+    with mock.patch("apprise.url.logger") as mock_log:
+        URLBase.post_process_parse_url_results(results)
+        mock_log.warning.assert_called_once()
+        call_args = mock_log.warning.call_args[0]
+        # alias and canonical key names appear; actual values must not
+        assert "pass" in call_args[1]
+        assert "password" in call_args[2]
     assert results.get("password") == "realpass"
     assert "pass" not in results
 
