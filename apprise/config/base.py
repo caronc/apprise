@@ -1162,6 +1162,27 @@ class ConfigBase(URLBase):
                     )
                     continue
 
+                # Collect any remaining items from the iterator.
+                # In YAML, keys at the same indentation level as
+                # the schema URL key become siblings in the same
+                # mapping dict rather than children of the URL key.
+                # We treat these sibling keys as token overrides
+                # that sit above URL-parsed values (priority 3) and
+                # below explicitly-nested child tokens (priority 1).
+                #
+                # This means both YAML forms produce the same result:
+                #
+                #   # sibling form (same indentation)
+                #   - mailtos://_:
+                #     smtp: smtp.example.com
+                #     from: no-reply@example.com
+                #
+                #   # child form (indented one level deeper)
+                #   - mailtos://_:
+                #       smtp: smtp.example.com
+                #       from: no-reply@example.com
+                sibling_tokens = dict(it)
+
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging
                 )
@@ -1173,14 +1194,28 @@ class ConfigBase(URLBase):
                     }
 
                 if isinstance(tokens, (list, tuple, set)):
-                    # populate and/or override any results populated by
-                    # parse_url()
+                    # Pre-process sibling tokens once before the loop
+                    # so each per-entry copy already has mappings
+                    # resolved (smtp -> smtp_host, from -> from_addr,
+                    # pass -> password, etc.)
+                    if sibling_tokens and schema in N_MGR:
+                        sibling_tokens = ConfigBase._special_token_handler(
+                            schema, sibling_tokens
+                        )
+
+                    # populate and/or override any results populated
+                    # by parse_url()
                     for entries in tokens:
-                        # Copy ourselves a template of our parsed URL as a base
-                        # to work with
+                        # Copy ourselves a template of our parsed URL
+                        # as a base to work with
                         r = results_.copy()
 
-                        # We are a url string with additional unescaped options
+                        # Apply sibling tokens as a shared base before
+                        # per-entry tokens (sibling < per-entry)
+                        if sibling_tokens:
+                            r.update(sibling_tokens)
+
+                        # We are a url string with additional options
                         if isinstance(entries, dict):
                             url_, tokens = next(iter(url.items()))
 
@@ -1188,7 +1223,7 @@ class ConfigBase(URLBase):
                             if "schema" in entries:
                                 del entries["schema"]
 
-                            # support our special tokens (if they're present)
+                            # support our special tokens
                             if schema in N_MGR:
                                 entries = ConfigBase._special_token_handler(
                                     schema, entries
@@ -1201,18 +1236,45 @@ class ConfigBase(URLBase):
                             results.append(r)
 
                 elif isinstance(tokens, dict):
+                    # Merge sibling tokens as the lower-priority base
+                    # and let the child token dict (the indented value
+                    # of the URL key) override on a per-key basis.
+                    if sibling_tokens:
+                        merged = sibling_tokens.copy()
+                        merged.update(tokens)
+                        tokens = merged
+
                     # support our special tokens (if they're present)
                     if schema in N_MGR:
                         tokens = ConfigBase._special_token_handler(
                             schema, tokens
                         )
 
-                    # Copy ourselves a template of our parsed URL as a base to
-                    # work with
+                    # Copy ourselves a template of our parsed URL as
+                    # a base to work with
                     r = results_.copy()
 
                     # add our result set
                     r.update(tokens)
+
+                    # add our results to our global set
+                    results.append(r)
+
+                elif sibling_tokens:
+                    # The URL key had a null child value, but sibling
+                    # keys supply token overrides. Process them the
+                    # same way as a child token dict.
+                    if schema in N_MGR:
+                        sibling_tokens = ConfigBase._special_token_handler(
+                            schema, sibling_tokens
+                        )
+
+                    # Copy ourselves a template of our parsed URL as
+                    # a base to work with
+                    r = results_.copy()
+
+                    # Apply the sibling token overrides
+                    r.update(sibling_tokens)
 
                     # add our results to our global set
                     results.append(r)

@@ -1917,3 +1917,223 @@ def test_config_base_parse_yaml_file07_tag_priority_over_tags(tmpdir):
     # Tag priority check
     assert sum(1 for _ in a.find("primary")) == 1
     assert sum(1 for _ in a.find("secondary")) == 0
+
+
+def test_yaml_sibling_token_overrides_basic():
+    """
+    API: ConfigBase - YAML sibling-key token overrides (basic cases).
+
+    Keys at the same indentation level as the schema URL key
+    (sibling form) must behave identically to child-indented tokens.
+    Both of these forms must load the same plugin with the same attrs:
+
+      # sibling form (same indentation)
+      - mailtos://_:
+        smtp: smtp.example.com
+        from: sender@example.com
+
+      # child form (one level deeper)
+      - mailtos://_:
+          smtp: smtp.example.com
+          from: sender@example.com
+    """
+    # --- sibling form (the historically broken form) ---
+    result_sibling, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://_:
+    user: sender@example.com
+    password: secret
+    smtp: smtp.example.com
+    from: sender@example.com
+    to: recipient@example.com
+    tag: myteam
+""")
+
+    # --- child form (always worked) ---
+    result_child, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://_:
+      user: sender@example.com
+      password: secret
+      smtp: smtp.example.com
+      from: sender@example.com
+      to: recipient@example.com
+      tag: myteam
+""")
+
+    # Both forms must load exactly one plugin instance
+    assert len(result_sibling) == 1
+    assert len(result_child) == 1
+
+    # Both results must be NotifyEmail instances
+    assert isinstance(result_sibling[0], NotifyEmail)
+    assert isinstance(result_child[0], NotifyEmail)
+
+    for obj in (result_sibling[0], result_child[0]):
+        # SMTP server from sibling/child token
+        assert obj.smtp_host == "smtp.example.com"
+
+        # from: maps to from_addr via template_args
+        assert obj.from_addr[1] == "sender@example.com"
+
+        # to: maps to targets
+        assert any(t[1] == "recipient@example.com" for t in obj.targets)
+
+        # password: sets the credential directly
+        assert obj.password == "secret"
+
+        # tag: applies correctly
+        assert "myteam" in obj.tags
+
+
+def test_yaml_sibling_token_priority_over_url():
+    """
+    API: ConfigBase - sibling tokens override URL-embedded values.
+
+    Priority order (lowest to highest):
+      3 - URL path (user:pass@host:port)
+      2 - URL query string (?smtp=...)
+      1 - YAML sibling/child tokens (highest)
+    """
+    # URL embeds one smtp server; sibling token overrides it
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com?smtp=old.smtp.example.com:
+    smtp: new.smtp.example.com
+    to: recipient@example.com
+    tag: priority-test
+""")
+
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    # Sibling token must win over the URL query-string value
+    assert result[0].smtp_host == "new.smtp.example.com"
+    assert "priority-test" in result[0].tags
+
+
+def test_yaml_child_token_priority_over_sibling():
+    """
+    API: ConfigBase - child tokens (indented) override sibling tokens.
+
+    When a URL entry has BOTH a child value (indented under the key)
+    AND sibling keys, child tokens take priority on a per-key basis.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      smtp: child.smtp.example.com
+    smtp: sibling.smtp.example.com
+    to: recipient@example.com
+""")
+
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    # Child token (child.smtp.example.com) must beat sibling token
+    assert result[0].smtp_host == "child.smtp.example.com"
+
+
+def test_yaml_sibling_token_with_list_children():
+    """
+    API: ConfigBase - sibling tokens apply to every list-child entry.
+
+    When a URL key has a LIST value (expanding to N plugin instances)
+    AND sibling tokens at the same indent level, the sibling tokens
+    are applied as a shared base to each expanded instance.
+
+    Note: if both the sibling dict and a per-entry dict define the
+    same key (e.g. 'tag'), the per-entry value takes precedence
+    (per-entry > sibling priority within the list case).
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+    - to: user1@example.com
+    - to: user2@example.com
+    smtp: smtp.example.com
+    tag: shared
+""")
+
+    # One list entry per to: recipient
+    assert len(result) == 2
+    assert all(isinstance(r, NotifyEmail) for r in result)
+
+    # The sibling smtp: must be applied to both instances
+    assert result[0].smtp_host == "smtp.example.com"
+    assert result[1].smtp_host == "smtp.example.com"
+
+    # Sibling tag: applies to both instances (no per-entry tag conflict)
+    assert "shared" in result[0].tags
+    assert "shared" in result[1].tags
+
+
+def test_yaml_sibling_password_token():
+    """
+    API: ConfigBase - 'password' key in sibling/child tokens sets password.
+
+    In YAML tokens use 'password:' (the actual plugin kwarg name).  The
+    URL-path shorthand 'pass' is handled by parse_url() when processing
+    the URL string itself, not by the YAML token layer.
+    """
+    # Sibling form
+    result_sibling, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+    user: alice
+    password: s3cr3t
+    tag: pw-test
+""")
+
+    # Child form
+    result_child, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+      user: alice
+      password: s3cr3t
+      tag: pw-test
+""")
+
+    assert len(result_sibling) == 1
+    assert len(result_child) == 1
+
+    for obj in (result_sibling[0], result_child[0]):
+        assert obj.user == "alice"
+        assert obj.password == "s3cr3t"
+        assert "pw-test" in obj.tags
+
+
+def test_yaml_sibling_no_silent_drop_on_null_child():
+    """
+    API: ConfigBase - sibling tokens are never silently discarded.
+
+    Previously, when the URL key had a null child value (the common
+    case when users used same-level indentation), all sibling keys
+    were silently ignored and the URL failed to instantiate.  Confirm
+    that the failure mode described in issue #1635 no longer occurs.
+    """
+    # Mirrors the bug-report YAML (correcting 'rom' typo to 'from'
+    # and using 'password' -- the YAML token layer kwarg name)
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://_:
+    user: sender@example.com
+    password: secret
+    smtp: smtp.example.com
+    from: sender@example.com
+    to: recipient@example.com
+    tag:
+      - dev
+      - prod
+""")
+
+    # Must load successfully (previously raised TypeError and returned [])
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    obj = result[0]
+    assert obj.smtp_host == "smtp.example.com"
+    assert obj.from_addr[1] == "sender@example.com"
+    assert any(t[1] == "recipient@example.com" for t in obj.targets)
+    assert "dev" in obj.tags
+    assert "prod" in obj.tags
