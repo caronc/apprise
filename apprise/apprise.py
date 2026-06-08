@@ -59,6 +59,10 @@ from .utils.parse import parse_list, parse_urls
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
+# Sentinel used by _capture_server_logs to distinguish "no prior instance
+# logger" from "prior instance logger was explicitly set to None".
+_MISSING = object()
+
 
 class Apprise:
     """Our Notification Manager."""
@@ -647,9 +651,14 @@ class Apprise:
         (escalation chains are bypassed) so the caller receives a complete
         status report.  Each dict contains:
           - "url":       Obfuscated target endpoint string.
-          - "success":   Boolean — True if delivery ultimately succeeded.
+          - "success":   Boolean — True if delivery ultimately succeeded
+                         (after any configured retries).
           - "timestamp": ISO-8601 UTC string of when the attempt completed.
           - "detail":    Empty string on success; error message on failure.
+
+        The returned list preserves the same order as the matched servers
+        (i.e. the order in which servers were added / matched by the tag
+        filter).
 
         A filter tag may carry an optional priority prefix and/or retry suffix:
 
@@ -704,21 +713,48 @@ class Apprise:
 
         if detailed:
             # detailed=True: bypass escalation chains and run every matched
-            # URL exactly once, collecting a per-URL status report.
-            sequential = [
-                (s, k) for s, k in all_calls if not s.asset.async_mode
+            # URL, collecting a per-URL status report ordered to match
+            # all_calls
+            #
+            # We must NOT simply split into sequential/parallel buckets and
+            # extend() the two result lists: doing so would reorder the output
+            # because all sequential entries would precede all parallel entries
+            # regardless of their original interleaving in all_calls.
+            #
+            # Strategy: tag each call with its all_calls index, dispatch the
+            # sequential and parallel subsets independently, then reassemble
+            # by index to restore the original order.
+            seq_calls = [
+                (i, s, k)
+                for i, (s, k) in enumerate(all_calls)
+                if not s.asset.async_mode
             ]
-            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
-            results: list[dict] = []
-            if sequential:
-                results.extend(
-                    Apprise._notify_sequential_detailed(*sequential)
+            par_calls = [
+                (i, s, k)
+                for i, (s, k) in enumerate(all_calls)
+                if s.asset.async_mode
+            ]
+
+            idx_results: list[tuple[int, dict]] = []
+
+            if seq_calls:
+                seq_results = Apprise._notify_sequential_detailed(
+                    *[(s, k) for _, s, k in seq_calls]
                 )
-            if parallel:
-                results.extend(
-                    Apprise._notify_parallel_threadpool_detailed(*parallel)
+                idx_results.extend(
+                    (i, r) for (i, _, _), r in zip(seq_calls, seq_results)
                 )
-            return results
+
+            if par_calls:
+                par_results = Apprise._notify_parallel_threadpool_detailed(
+                    *[(s, k) for _, s, k in par_calls]
+                )
+                idx_results.extend(
+                    (i, r) for (i, _, _), r in zip(par_calls, par_results)
+                )
+
+            idx_results.sort(key=lambda t: t[0])
+            return [r for _, r in idx_results]
 
         if Apprise._filter_has_explicit_priority(tag):
             # Tag filter carries an explicit priority prefix (e.g. "2:alerts").
@@ -852,20 +888,40 @@ class Apprise:
 
         if detailed:
             # detailed=True: bypass escalation chains, report every URL.
-            sequential = [
-                (s, k) for s, k in all_calls if not s.asset.async_mode
+            # Preserve all_calls ordering in the returned list (same fix as
+            # notify()); tag each call with its original index, dispatch the
+            # sequential and async subsets independently, then sort by index.
+            seq_calls = [
+                (i, s, k)
+                for i, (s, k) in enumerate(all_calls)
+                if not s.asset.async_mode
             ]
-            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
-            results: list[dict] = []
-            if sequential:
-                results.extend(
-                    Apprise._notify_sequential_detailed(*sequential)
+            par_calls = [
+                (i, s, k)
+                for i, (s, k) in enumerate(all_calls)
+                if s.asset.async_mode
+            ]
+
+            idx_results: list[tuple[int, dict]] = []
+
+            if seq_calls:
+                seq_results = Apprise._notify_sequential_detailed(
+                    *[(s, k) for _, s, k in seq_calls]
                 )
-            if parallel:
-                results.extend(
-                    await Apprise._notify_parallel_asyncio_detailed(*parallel)
+                idx_results.extend(
+                    (i, r) for (i, _, _), r in zip(seq_calls, seq_results)
                 )
-            return results
+
+            if par_calls:
+                par_results = await Apprise._notify_parallel_asyncio_detailed(
+                    *[(s, k) for _, s, k in par_calls]
+                )
+                idx_results.extend(
+                    (i, r) for (i, _, _), r in zip(par_calls, par_results)
+                )
+
+            idx_results.sort(key=lambda t: t[0])
+            return [r for _, r in idx_results]
 
         if Apprise._filter_has_explicit_priority(tag):
             # Explicit priority prefix: flat dispatch, no escalation.
@@ -1459,14 +1515,17 @@ class Apprise:
     # that call.
     # -----------------------------------------------------------------------
     class _capture_server_logs(logging.Handler):
-        """Context manager that temporarily gives a server its own isolated
-        logger so that WARNING/ERROR messages can be attributed to exactly
-        that URL, even when multiple servers run in parallel.
+        """Context manager that temporarily gives a server its own isolated,
+        non-propagating logger so that WARNING/ERROR messages can be attributed
+        to exactly that URL, even when multiple servers run in parallel,
+        without leaking records into the shared ``apprise`` logger.
 
         On enter, a fresh Logger (non-propagating) is created and set as an
         instance attribute on *server*, shadowing the shared class-level
-        logger.  On exit the instance attribute is deleted, restoring the
-        original class-level logger.
+        logger.  On exit the original state is restored: if the server had no
+        instance-level ``logger`` attribute before we entered, the attribute we
+        added is removed; if it already had one, the original value is
+        put back.
 
         Usage::
 
@@ -1483,30 +1542,39 @@ class Apprise:
             self._logger = logging.getLogger(
                 "apprise._detail.{}".format(id(server))
             )
+            # Snapshot any pre-existing instance-level logger so __exit__ can
+            # restore it rather than unconditionally removing the attribute.
+            # _MISSING distinguishes "was absent" from "was set to None".
+            self._saved_logger = server.__dict__.get("logger", _MISSING)
 
         def emit(self, record: logging.LogRecord) -> None:
             self._messages.append(record.getMessage())
 
         @property
         def detail(self) -> str:
-            """
-            Return the last captured WARNING/ERROR message, or empty string.
-            """
+            """Return the last captured WARNING/ERROR message, or ''."""
             return self._messages[-1] if self._messages else ""
 
         def __enter__(self):
             self._logger.handlers.clear()
             self._logger.addHandler(self)
             self._logger.setLevel(logging.DEBUG)
-            self._logger.propagate = True
+            # Keep records out of the shared 'apprise' logger so parallel
+            # detailed calls do not pollute each other's output.
+            self._logger.propagate = False
             # Shadow the class-level shared logger with a per-instance one.
             self._server.logger = self._logger
             return self
 
         def __exit__(self, *_):
-            # Restore the class-level logger by removing the instance override.
-            if "logger" in self._server.__dict__:
-                del self._server.logger
+            # Restore the server's logger to exactly the state it was in
+            # before __enter__: remove the attribute we added, or put back
+            # the original value if one was already present.
+            if self._saved_logger is _MISSING:
+                self._server.__dict__.pop("logger", None)
+            else:
+                self._server.logger = self._saved_logger
+
             self._logger.removeHandler(self)
 
     @staticmethod
@@ -1519,7 +1587,8 @@ class Apprise:
 
         Each element of the returned list is a dict with:
           - "url":       Obfuscated URL string (privacy=True).
-          - "success":   True if delivery ultimately succeeded, else False.
+          - "success":   True if delivery ultimately succeeded (after any
+                         configured retries), else False.
           - "timestamp": ISO-8601 UTC string of when the attempt finished.
           - "detail":    Empty string on success; last WARNING/ERROR message
                          logged by the plugin, or exception message on failure.
@@ -1771,7 +1840,10 @@ class Apprise:
                         "url": server.url(privacy=True),
                         "success": False,
                         "timestamp": datetime.now(tz=timezone.utc).isoformat(),
-                        "detail": str(item) if str(item) else repr(item),
+                        # Format as "<Type>: <message>" to match the sequential
+                        # and threadpool detailed paths for a consistent detail
+                        # field across all dispatch modes.
+                        "detail": "{}: {}".format(type(item).__name__, item),
                     }
                 )
             else:
