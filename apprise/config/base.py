@@ -1188,7 +1188,9 @@ class ConfigBase(URLBase):
                 #   - mailtos://_:
                 #       smtp: smtp.example.com
                 #       from: no-reply@example.com
-                sibling_tokens = {k: v for k, v in url.items() if k != url_}
+                sibling_tokens = {
+                    k: v for k, v in url.items() if k not in (url_, "schema")
+                }
 
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging
@@ -1240,6 +1242,21 @@ class ConfigBase(URLBase):
                             results.append(r)
 
                 elif isinstance(tokens, dict):
+                    # Normalize sibling and child token dicts
+                    # independently before merging, so that an alias key
+                    # in sibling tokens (e.g. 'smtp' -> 'smtp_host') can
+                    # never overwrite a canonical key already set in the
+                    # higher-priority child tokens.
+                    if schema in N_MGR:
+                        if sibling_tokens:
+                            sibling_tokens = ConfigBase._special_token_handler(
+                                schema, sibling_tokens
+                            )
+
+                        tokens = ConfigBase._special_token_handler(
+                            schema, tokens
+                        )
+
                     # Merge sibling tokens as the lower-priority base
                     # and let the child token dict (the indented value
                     # of the URL key) override on a per-key basis.
@@ -1247,12 +1264,6 @@ class ConfigBase(URLBase):
                         merged = sibling_tokens.copy()
                         merged.update(tokens)
                         tokens = merged
-
-                    # support our special tokens (if they're present)
-                    if schema in N_MGR:
-                        tokens = ConfigBase._special_token_handler(
-                            schema, tokens
-                        )
 
                     # Copy ourselves a template of our parsed URL as
                     # a base to work with
@@ -1388,6 +1399,14 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 results_["asset"] = asset
 
+                # Strip qsd before the second post_process_parse_url_results
+                # call.  YAML tokens were already merged into results_ at a
+                # higher priority than qsd.  Leaving qsd in place would cause
+                # post_process_parse_url_results to re-apply URL query-string
+                # parameters (e.g. ?pass=, ?user=) and silently overwrite the
+                # YAML-token values, breaking the documented 1>2>3 priority.
+                results_.pop("qsd", None)
+
                 # Handle post processing of result set
                 results_ = URLBase.post_process_parse_url_results(results_)
 
@@ -1493,8 +1512,8 @@ class ConfigBase(URLBase):
         # Apply URL_TOKEN_ALIASES so shorthand keys (e.g. 'pass') are
         # normalized to the canonical kwarg name ('password') before any
         # plugin-specific template_args mapping runs.  YAML tokens bypass
-        # parse_url() / post_process_parse_url_results() entirely, so the
-        # same alias table must be applied here too.
+        # parse_url() and its initial post_process_parse_url_results() call
+        # inside url_to_dict(), so the same alias table must be applied here.
         for alias, canonical in URL_TOKEN_ALIASES.items():
             if alias in tokens and canonical not in tokens:
                 tokens[canonical] = tokens.pop(alias)

@@ -2162,6 +2162,40 @@ urls:
     assert "team" in result[1].tags
 
 
+def test_yaml_sibling_alias_does_not_overwrite_child_canonical():
+    """
+    API: ConfigBase - child alias key wins over sibling canonical key.
+
+    When a sibling provides a canonical key ('password') and the child dict
+    provides the URL_TOKEN_ALIASES shorthand for the same key ('pass'), the
+    child value must win.
+
+    Before the fix, both dicts were merged raw before _special_token_handler()
+    ran the URL_TOKEN_ALIASES step.  The combined dict contained both 'pass'
+    and 'password', so the alias-conflict branch discarded 'pass' and kept
+    the sibling's 'password' -- the wrong winner.
+
+    The fix normalizes sibling and child token dicts separately first, so
+    each alias is resolved in the context of its own dict only.  After
+    normalization both dicts carry 'password', and the priority merge
+    (sibling as base, child overrides) produces the correct winner.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      pass: child_pass
+      to: recipient@example.com
+    password: sibling_pass
+""")
+
+    # One instance created
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    # Child 'pass' (alias) must win over sibling 'password' (canonical)
+    assert result[0].password == "child_pass"
+
+
 def test_yaml_sibling_token_order_independent():
     """
     API: ConfigBase - sibling tokens are captured regardless of YAML key order.
@@ -2172,26 +2206,17 @@ def test_yaml_sibling_token_order_independent():
     captured items *after* the URL key in the iterator; the fix uses the
     full url.items() dict so all non-URL-key items are included.
     """
-    # Construct a dict that places the sibling key BEFORE the URL key.
-    # We cannot express this reliably in YAML (PyYAML preserves input order)
-    # so we call config_parse_yaml with a hand-crafted dict equivalent.
-    import yaml as _yaml
+    # Write the YAML directly so the key order is explicit and no
+    # yaml.dump call is required.  smtp appears BEFORE the URL key,
+    # to appears AFTER -- both must be captured as sibling tokens.
+    content = """
+urls:
+  - smtp: smtp.example.com
+    mailtos://sender@example.com:
+    to: recipient@example.com
+"""
 
-    from apprise.config.base import ConfigBase as _CB
-
-    # Build the raw YAML structure directly: smtp appears before the URL key
-    raw = {
-        "urls": [
-            {
-                "smtp": "smtp.example.com",
-                "mailtos://sender@example.com": None,
-                "to": "recipient@example.com",
-            }
-        ]
-    }
-    content = _yaml.dump(raw, sort_keys=False)
-
-    result, _ = _CB.config_parse_yaml(content)
+    result, _ = ConfigBase.config_parse_yaml(content)
 
     # Both pre-URL (smtp) and post-URL (to) siblings must be applied
     assert len(result) == 1
@@ -2332,3 +2357,25 @@ urls:
     # The sibling branch ran (no exception), but no plugin loaded
     assert isinstance(result, list)
     assert len(result) == 0
+
+
+def test_yaml_token_priority_over_qsd():
+    """
+    API: ConfigBase - YAML tokens take priority over URL query-string params.
+
+    The documented priority is: YAML tokens > ?key=value qsd > URL path.
+    A second call to post_process_parse_url_results() runs after YAML tokens
+    are merged.  Without stripping qsd first, that call would re-apply qsd
+    overrides and silently overwrite YAML-token values, breaking the
+    documented priority.
+    """
+    # The URL embeds ?pass= in the query string; the YAML sibling token
+    # 'password:' should take priority and survive to the plugin.
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user:urlpass@localhost?pass=qsdpass:
+    password: yamlpass
+""")
+    assert len(result) == 1
+    # YAML token must win over qsd ?pass= and URL-path password
+    assert result[0].password == "yamlpass"
