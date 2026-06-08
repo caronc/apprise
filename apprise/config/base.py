@@ -41,7 +41,13 @@ from ..manager_plugins import NotificationManager
 from ..tag import AppriseTag
 from ..url import URL_TOKEN_ALIASES, URLBase
 from ..utils.cwe312 import cwe312_url
-from ..utils.parse import GET_SCHEMA_RE, parse_bool, parse_list, parse_urls
+from ..utils.parse import (
+    GET_SCHEMA_RE,
+    QSD_FULL_MODE_KEYS,
+    parse_bool,
+    parse_list,
+    parse_urls,
+)
 from ..utils.time import zoneinfo
 
 # Test whether token is valid or not
@@ -1134,13 +1140,10 @@ class ConfigBase(URLBase):
                     # Test our schema
                     schema_ = GET_SCHEMA_RE.match(key)
                     if schema_ is None:
-                        # Log invalid entries so that maintainer of config
-                        # config file at least has something to take action
-                        # with.
-                        ConfigBase.logger.warning(
-                            f"Ignored entry {key} found under urls, entry"
-                            f" #{no + 1}"
-                        )
+                        # Non-schema key -- may be a sibling token sitting
+                        # before the URL key in the YAML mapping.  Sibling
+                        # tokens are collected later via url.items(), so
+                        # nothing is "ignored" here.  Skip silently.
                         continue
 
                     # Store our schema
@@ -1242,6 +1245,12 @@ class ConfigBase(URLBase):
                             results.append(r)
 
                 elif isinstance(tokens, dict):
+                    # Strip 'schema' from child tokens -- it is determined
+                    # by the URL key's own schema and must not be overridden
+                    # by a child dict value (matching the list-expansion
+                    # branch that does the same via del entries["schema"]).
+                    tokens.pop("schema", None)
+
                     # Normalize sibling and child token dicts
                     # independently before merging, so that an alias key
                     # in sibling tokens (e.g. 'smtp' -> 'smtp_host') can
@@ -1399,16 +1408,58 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 results_["asset"] = asset
 
-                # Strip qsd before the second post_process_parse_url_results
-                # call.  YAML tokens were already merged into results_ at a
-                # higher priority than qsd.  Leaving qsd in place would cause
-                # post_process_parse_url_results to re-apply URL query-string
-                # parameters (e.g. ?pass=, ?user=) and silently overwrite the
-                # YAML-token values, breaking the documented 1>2>3 priority.
-                results_.pop("qsd", None)
+                # For the second post_process_parse_url_results call we
+                # need to distinguish two plugin families:
+                #
+                # URLBase-based plugins run post_process inside parse_url,
+                # which sets 'verify' (at minimum to its default True)
+                # before YAML tokens are merged.  The presence of 'verify'
+                # in results_ is therefore a reliable indicator that qsd
+                # was already applied once -- every field that
+                # post_process reads from qsd (verify, redirect, rto, cto,
+                # port, user, password, URL_TOKEN_ALIASES aliases, ...) is
+                # already reflected in results_.  YAML tokens then overrode
+                # those values at higher priority.  Strip qsd entirely so
+                # the second call cannot re-apply any qsd field and undo
+                # the YAML-token values.  The second call will still
+                # normalise types (e.g. string -> bool for 'verify') from
+                # the already-merged results_.  There is intentionally no
+                # hardcoded list of fields to skip here; stripping the whole
+                # qsd is sufficient and avoids coupling this code to the
+                # internals of post_process_parse_url_results().
+                #
+                # @notify-style plugins use a minimal parse_url that does
+                # NOT call post_process, so 'verify' is absent.  Keep qsd
+                # intact for those so verify, redirect, and other fields
+                # still get processed on this second call.
+                #
+                # The original qsd is always restored after the call so
+                # that callers (e.g. the @notify meta dict) can still
+                # inspect the raw query-string values.
+                orig_qsd = results_.get("qsd")
+                if QSD_FULL_MODE_KEYS.issubset(results_) and isinstance(
+                    orig_qsd, dict
+                ):
+                    # Full-mode parse_url() always creates all three extended
+                    # qsd dicts (qsd+, qsd-, qsd:), even when the URL has no
+                    # query params.  Simple-mode @notify parse_url() creates
+                    # only qsd.  YAML sibling tokens never inject any of these
+                    # keys.  QSD_FULL_MODE_KEYS is the authoritative list from
+                    # utils/parse.py -- no duplication.
+                    # Strip the full qsd so it cannot overwrite YAML tokens
+                    # on this second post_process call.
+                    del results_["qsd"]
 
                 # Handle post processing of result set
                 results_ = URLBase.post_process_parse_url_results(results_)
+
+                # Restore the original qsd so the full meta dict is
+                # available downstream regardless of which branch above ran.
+                # post_process_parse_url_results() never adds a 'qsd' key, so
+                # the elif branch (orig_qsd is None but qsd appeared) cannot
+                # occur and is omitted intentionally.
+                if orig_qsd is not None:
+                    results_["qsd"] = orig_qsd
 
                 # Store our preloaded entries
                 preloaded.append(
@@ -1515,12 +1566,18 @@ class ConfigBase(URLBase):
         # parse_url() and its initial post_process_parse_url_results() call
         # inside url_to_dict(), so the same alias table must be applied here.
         for alias, canonical in URL_TOKEN_ALIASES.items():
-            if alias in tokens and canonical not in tokens:
+            if alias in tokens and (
+                canonical not in tokens or tokens[canonical] is None
+            ):
+                # Canonical absent or explicitly null -- promote alias.
+                # A null canonical (e.g. password: with no value) is treated
+                # as "not provided", consistent with how
+                # post_process_parse_url_results() handles None credentials.
                 tokens[canonical] = tokens.pop(alias)
 
             elif alias in tokens:
-                # canonical key already set -- silently discard the alias so
-                # the explicitly-provided canonical value is not overwritten
+                # canonical key already set to a non-None value -- discard
+                # the alias so the explicit canonical is not overwritten
                 del tokens[alias]
 
         for kw, meta in N_MGR[schema].template_kwargs.items():

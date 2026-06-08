@@ -2196,6 +2196,33 @@ urls:
     assert result[0].password == "child_pass"
 
 
+def test_yaml_alias_populates_null_canonical():
+    """
+    API: ConfigBase - alias populates canonical when canonical is null.
+
+    """
+    # canonical 'password:' is null (no value) + alias 'pass: secret'
+    # alias must win because null == not provided
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user@localhost:
+      pass: secret
+      password:
+""")
+    assert len(result) == 1
+    assert result[0].password == "secret"
+
+    # Canonical with a real value still wins over the alias
+    result2, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user@localhost:
+      pass: alias_val
+      password: real_val
+""")
+    assert len(result2) == 1
+    assert result2[0].password == "real_val"
+
+
 def test_yaml_sibling_token_order_independent():
     """
     API: ConfigBase - sibling tokens are captured regardless of YAML key order.
@@ -2230,7 +2257,7 @@ def test_yaml_sibling_password_token():
     API: ConfigBase - 'password' and 'pass' keys both set plugin password.
 
     YAML tokens bypass parse_url(), so the URL-path shorthand 'pass' must
-    be normalized to 'password' by YAML_TOKEN_ALIASES inside
+    be normalized to 'password' by URL_TOKEN_ALIASES inside
     _special_token_handler.  Verify that both spellings work in sibling
     and child indentation forms.
     """
@@ -2359,6 +2386,61 @@ urls:
     assert len(result) == 0
 
 
+def test_yaml_child_dict_schema_key_ignored():
+    """
+    API: ConfigBase - 'schema' key in a child dict token is stripped.
+
+    The schema that determines which plugin is instantiated comes from the
+    URL key itself.  Allowing a child dict to override 'schema' via a
+    token would cause the wrong plugin constructor to be called with
+    fields parsed for a different URL type, leading to silent failures.
+
+    The list-expansion branch explicitly strips 'schema' from each entry.
+    This test verifies the single-child-dict branch does the same.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      schema: json
+      to: recipient@example.com
+""")
+
+    # The email plugin must load; the child 'schema: json' must be ignored
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+
+def test_yaml_sibling_before_url_no_spurious_warning():
+    """
+    API: ConfigBase - sibling tokens before the URL key emit no warning.
+
+    YAML mappings do not guarantee key order.  A sibling token (e.g.
+    'smtp:') may appear before the URL key in the serialised YAML.  The
+    scan loop that finds the URL key must skip non-schema keys silently;
+    it must NOT emit an 'Ignored entry' warning because those keys are
+    collected later as valid sibling tokens.
+    """
+    from unittest import mock as _mock
+
+    with _mock.patch("apprise.config.base.ConfigBase.logger") as mock_log:
+        result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - smtp: smtp.example.com
+    mailtos://sender@example.com:
+    to: recipient@example.com
+""")
+
+    # Both siblings are applied; no spurious "Ignored entry" warning fired
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+    assert result[0].smtp_host == "smtp.example.com"
+    assert any(t[1] == "recipient@example.com" for t in result[0].targets)
+
+    # Confirm no "Ignored entry" warning was logged
+    for call_args in mock_log.warning.call_args_list:
+        assert "Ignored entry" not in str(call_args)
+
+
 def test_yaml_token_priority_over_qsd():
     """
     API: ConfigBase - YAML tokens take priority over URL query-string params.
@@ -2379,3 +2461,110 @@ urls:
     assert len(result) == 1
     # YAML token must win over qsd ?pass= and URL-path password
     assert result[0].password == "yamlpass"
+
+
+def test_yaml_token_priority_over_qsd_non_credential_fields():
+    """
+    API: ConfigBase - YAML tokens take priority over qsd for non-credential
+    fields (verify, redirect, etc.).
+
+    post_process_parse_url_results() processes not only user/password but
+    also verify, redirect, rto, cto, and port from qsd.  All of these
+    must honour the same YAML > qsd > URL-path priority rule.
+
+    The fix strips ALL qsd (not just credential keys) before the second
+    post_process call for URLBase-based plugins, so qsd can never
+    overwrite any YAML-token value regardless of which field it sets.
+    """
+    # URL has ?verify=no but the YAML sibling says verify: yes --
+    # YAML token must win; the plugin should have verify_certificate=True
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user:pass@localhost?verify=no:
+    verify: yes
+""")
+    assert len(result) == 1
+    assert result[0].verify_certificate is True
+
+
+def test_yaml_priority_all_urlbase_globals_via_plugin_details():
+    """
+    API: ConfigBase - YAML priority verified dynamically for every
+    URLBase-level global arg via plugin.details().
+
+    Verify that the priority sequence (YAML > qsd > URL path)
+    is respected for every global arg defined.
+    """
+    from apprise import plugins
+    from apprise.config.base import N_MGR
+    from apprise.url import URLBase
+
+    # Discover args via plugin.details() for a minimal URLBase plugin.
+    # json:// has no required service credentials and is always available.
+    details = plugins.details(N_MGR["json"])
+
+    # Type-driven conflict pairs: (qsd_str, yaml_str).
+    # YAML should win -- expected value is derived from yaml_str.
+    type_conflict = {
+        "bool": ("no", "yes"),
+        "float": ("5.0", "10.0"),
+        "int": ("5", "10"),
+    }
+
+    # Intersect plugin.details() args with URLBase.template_args to
+    # isolate the globals shared by every URLBase plugin.
+    # _lookup_default is the URLBase instance attribute name for the arg.
+    urlbase_meta = URLBase.template_args
+    test_cases = []
+    for name, arg_meta in details["args"].items():
+        if name not in urlbase_meta:
+            continue
+        arg_type = arg_meta.get("type", "string")
+        if arg_type not in type_conflict:
+            continue
+        attr_name = urlbase_meta[name].get("_lookup_default")
+        if not attr_name:
+            continue
+        qsd_val, yaml_val = type_conflict[arg_type]
+        test_cases.append((name, attr_name, arg_type, qsd_val, yaml_val))
+
+    # Guard: the 4 known URLBase globals must always be discovered.
+    # If URLBase.template_args loses an entry this fires immediately.
+    found = {t[0] for t in test_cases}
+    assert found >= {"cto", "redirect", "rto", "verify"}, (
+        "Expected URLBase globals cto/redirect/rto/verify in "
+        "plugin.details(); got: {}".format(sorted(found))
+    )
+
+    # Build a YAML config that sets every global in both qsd AND as a
+    # YAML sibling token with a conflicting value so the winner is
+    # unambiguous.
+    qsd_str = "&".join("{}={}".format(n, qv) for n, _, _, qv, _ in test_cases)
+    siblings = "\n    ".join(
+        "{}: {}".format(n, yv) for n, _, _, _, yv in test_cases
+    )
+    yaml_cfg = (
+        "urls:\n  - json://user:pass@localhost?{qsd}:\n    {siblings}\n"
+    ).format(qsd=qsd_str, siblings=siblings)
+
+    result, _ = ConfigBase.config_parse_yaml(yaml_cfg)
+    assert len(result) == 1
+    inst = result[0]
+
+    # Verify YAML wins for every global.
+    for name, attr_name, arg_type, qsd_val, yaml_val in test_cases:
+        actual = getattr(inst, attr_name)
+        if arg_type == "bool":
+            expected = True  # yaml_val is always "yes"
+        elif arg_type == "float":
+            expected = float(yaml_val)
+        elif arg_type == "int":
+            expected = int(yaml_val)
+        else:
+            expected = yaml_val
+        assert actual == expected, (
+            "YAML token '{}' should override qsd "
+            "(YAML={!r}, qsd={!r}) but got {!r} for '{}'".format(
+                name, yaml_val, qsd_val, actual, attr_name
+            )
+        )

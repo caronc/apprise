@@ -156,6 +156,12 @@ UUID4_RE = re.compile(
 # Validate if we're a loadable Python file or not
 VALID_PYTHON_FILE_RE = re.compile(r".+\.py(o|c)?$", re.IGNORECASE)
 
+# Keys created exclusively by full-mode (simple=False) parse_qsd() calls.
+# Simple-mode calls produce only 'qsd'; full-mode adds all three of these.
+# Used both internally by parse_qsd() and externally to detect whether a
+# result dict came from a full-mode parse without re-enumerating the names.
+QSD_FULL_MODE_KEYS = frozenset(("qsd+", "qsd-", "qsd:"))
+
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions
 REGEX_VALIDATE_LOOKUP = {}
@@ -517,19 +523,10 @@ def parse_qsd(qs, simple=False, plus_to_space=False, sanitize=True):
 
     # Our return result set:
     result = (
-        {
-            # The arguments passed in (the parsed query). This is in a
-            # dictionary of {'key': 'val', etc }.  Keys are all made lowercase
-            # before storing to simplify access to them.
-            "qsd": {},
-            # Detected Entries that start with + or - are additionally stored
-            # in these values (un-touched).  The :,+,- however are stripped
-            # from their name before they are stored here.
-            "qsd+": {},
-            "qsd-": {},
-            "qsd:": {},
-        }
+        # Full mode: create the base qsd dict plus all extended qsd dicts.
+        {"qsd": {}, **{k: {} for k in QSD_FULL_MODE_KEYS}}
         if not simple
+        # Simple mode: only the base qsd dict.
         else {"qsd": {}}
     )
 

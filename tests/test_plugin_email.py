@@ -2221,7 +2221,7 @@ def test_plugin_email_variables_1087():
     result, _ = ConfigBase.config_parse(
         cleandoc("""
     #
-    # Test Email Parsing where qsd over-rides all
+    # Test Email Parsing where YAML tokens over-ride qsd
     #
     urls:
       - mailtos://alt.lan/?pass=abcd&user=joe@alt.lan:
@@ -2236,12 +2236,14 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
+    # YAML child tokens are higher priority than URL query-string
+    # parameters -- testuser and xxxxXXXxxx win over joe and abcd.
     email_ = result[0]
-    assert email_.from_addr == ["Apprise", "joe@alt.lan"]
-    assert email_.user == "joe@alt.lan"
+    assert email_.from_addr == ["Apprise", "testuser@alt.lan"]
+    assert email_.user == "testuser@alt.lan"
     assert email_.smtp_host == "smtp.alt.lan"
     assert email_.targets == [(False, "alteriks@alt.lan")]
-    assert email_.password == "abcd"
+    assert email_.password == "xxxxXXXxxx"
 
 
 @mock.patch("smtplib.SMTP_SSL")

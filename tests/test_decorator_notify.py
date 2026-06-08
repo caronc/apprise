@@ -678,6 +678,45 @@ def test_notify_multi_instance_decoration(tmpdir):
     N_MGR.remove("multi")
 
 
+def test_notify_yaml_verify_sibling_does_not_strip_qsd():
+    """
+    decorators: YAML sibling 'verify' must not strip qsd for @notify.
+    """
+    from apprise.config import ConfigBase
+
+    assert "notifyverify" not in N_MGR
+
+    @notify(on="notifyverify", name="Test verify sibling @notify")
+    def _handler(body, title, notify_type, attach, meta, *args, **kwargs):
+        pass
+
+    assert "notifyverify" in N_MGR
+
+    # URL has ?verify=no in qsd; YAML sibling says verify: yes.
+    # For a @notify plugin qsd must survive to the second post_process
+    # call -- it must NOT be stripped by a spurious 'verify in results_'
+    # hit from the YAML merge.
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - notifyverify://user:pass@hostname?verify=no:
+    verify: yes
+""")
+
+    assert len(result) == 1
+    meta = result[0]._default_args
+
+    # qsd must be intact -- not stripped by the wrong discriminator
+    assert isinstance(meta.get("qsd"), dict)
+    assert meta["qsd"].get("verify") == "no"
+
+    # post_process_parse_url_results() processed verify from qsd;
+    # qsd must win over the YAML sibling for @notify plugins
+    assert meta["verify"] is False
+
+    # Tidy
+    N_MGR.remove("notifyverify")
+
+
 def test_custom_notify_plugin_decoration():
     """decorators: CustomNotifyPlugin testing"""
 
