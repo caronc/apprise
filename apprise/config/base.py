@@ -1411,11 +1411,11 @@ class ConfigBase(URLBase):
                 # For the second post_process_parse_url_results call we
                 # need to distinguish two plugin families:
                 #
-                # URLBase-based plugins run post_process inside parse_url,
-                # which sets 'verify' (at minimum to its default True)
-                # before YAML tokens are merged.  The presence of 'verify'
-                # in results_ is therefore a reliable indicator that qsd
-                # was already applied once -- every field that
+                # URLBase-based plugins use the full-mode utils.parse.parse_url()
+                # (simple=False), which always creates qsd plus the extended qsd
+                # dicts (qsd+, qsd-, qsd:).  The presence of these keys is a
+                # reliable indicator that qsd was already applied once before
+                # YAML tokens were merged.
                 # post_process reads from qsd (verify, redirect, rto, cto,
                 # port, user, password, URL_TOKEN_ALIASES aliases, ...) is
                 # already reflected in results_.  YAML tokens then overrode
