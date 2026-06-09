@@ -39,13 +39,32 @@ from ..logger import logging
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..tag import AppriseTag
-from ..url import URLBase
+from ..url import URL_TOKEN_ALIASES, URLBase
 from ..utils.cwe312 import cwe312_url
-from ..utils.parse import GET_SCHEMA_RE, parse_bool, parse_list, parse_urls
+from ..utils.parse import (
+    GET_SCHEMA_RE,
+    QSD_FULL_MODE_KEYS,
+    parse_bool,
+    parse_list,
+    parse_urls,
+)
 from ..utils.time import zoneinfo
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
+
+# Keys excluded from the YAML-token re-apply that happens after
+# post_process_parse_url_results() inside config_parse_yaml().
+#
+# 'tag'/'tags': assembled as a merged set (YAML tags + global_tags) by the
+# while loop before post_process runs; re-applying the raw YAML string would
+# replace the set with a string.  YAML accepts both spellings ('tag:' and
+# 'tags:'); both are excluded so neither overwrites the assembled set.
+#
+# 'asset': written programmatically from the Python asset parameter at
+# that point in the while loop; VALID_TOKEN does not strip it, so a
+# user-written YAML 'asset:' key would otherwise overwrite the object.
+_YAML_REAPPLY_SKIP = frozenset(("tag", "tags", "asset"))
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -1114,7 +1133,7 @@ class ConfigBase(URLBase):
                     continue
 
                 # add our results to our global set
-                results.append(results_)
+                results.append((results_, {}))
 
             elif isinstance(url, dict):
                 # We are a url string with additional unescaped options. In
@@ -1134,13 +1153,10 @@ class ConfigBase(URLBase):
                     # Test our schema
                     schema_ = GET_SCHEMA_RE.match(key)
                     if schema_ is None:
-                        # Log invalid entries so that maintainer of config
-                        # config file at least has something to take action
-                        # with.
-                        ConfigBase.logger.warning(
-                            f"Ignored entry {key} found under urls, entry"
-                            f" #{no + 1}"
-                        )
+                        # Non-schema key -- may be a sibling token sitting
+                        # before the URL key in the YAML mapping.  Sibling
+                        # tokens are collected later via url.items(), so
+                        # nothing is "ignored" here.  Skip silently.
                         continue
 
                     # Store our schema
@@ -1162,6 +1178,36 @@ class ConfigBase(URLBase):
                     )
                     continue
 
+                # Collect sibling tokens from the entire mapping,
+                # excluding only the URL key itself.  Using the full
+                # url.items() dict (rather than the remaining iterator)
+                # ensures siblings that appear *before* the URL key in
+                # the YAML mapping are captured too.  YAML does not
+                # guarantee key order within a mapping, so order must
+                # not matter here.
+                #
+                # In YAML, keys at the same indentation level as
+                # the schema URL key become siblings in the same
+                # mapping dict rather than children of the URL key.
+                # We treat these sibling keys as token overrides
+                # that sit above URL-parsed values (priority 3) and
+                # below explicitly-nested child tokens (priority 1).
+                #
+                # This means both YAML forms produce the same result:
+                #
+                #   # sibling form (same indentation)
+                #   - mailtos://_:
+                #     smtp: smtp.example.com
+                #     from: no-reply@example.com
+                #
+                #   # child form (indented one level deeper)
+                #   - mailtos://_:
+                #       smtp: smtp.example.com
+                #       from: no-reply@example.com
+                sibling_tokens = {
+                    k: v for k, v in url.items() if k not in (url_, "schema")
+                }
+
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging
                 )
@@ -1173,22 +1219,33 @@ class ConfigBase(URLBase):
                     }
 
                 if isinstance(tokens, (list, tuple, set)):
-                    # populate and/or override any results populated by
-                    # parse_url()
+                    # Pre-process sibling tokens once before the loop
+                    # so each per-entry copy already has template
+                    # mappings resolved (smtp -> smtp_host, etc.)
+                    if sibling_tokens and schema in N_MGR:
+                        sibling_tokens = ConfigBase._special_token_handler(
+                            schema, sibling_tokens
+                        )
+
+                    # populate and/or override any results populated
+                    # by parse_url()
                     for entries in tokens:
-                        # Copy ourselves a template of our parsed URL as a base
-                        # to work with
+                        # Copy ourselves a template of our parsed URL
+                        # as a base to work with
                         r = results_.copy()
 
-                        # We are a url string with additional unescaped options
-                        if isinstance(entries, dict):
-                            url_, tokens = next(iter(url.items()))
+                        # Apply sibling tokens as a shared base before
+                        # per-entry tokens (sibling < per-entry)
+                        if sibling_tokens:
+                            r.update(sibling_tokens)
 
+                        # We are a url string with additional options
+                        if isinstance(entries, dict):
                             # Tags you just can't over-ride
                             if "schema" in entries:
                                 del entries["schema"]
 
-                            # support our special tokens (if they're present)
+                            # support our special tokens
                             if schema in N_MGR:
                                 entries = ConfigBase._special_token_handler(
                                     schema, entries
@@ -1197,29 +1254,79 @@ class ConfigBase(URLBase):
                             # Extend our dictionary with our new entries
                             r.update(entries)
 
+                            # Record the YAML contributions for this entry
+                            # so post_process_parse_url_results() cannot
+                            # overwrite them (enforces YAML > qsd priority).
+                            yaml_ = {}
+                            if sibling_tokens:
+                                yaml_.update(sibling_tokens)
+                            yaml_.update(entries)
+
                             # add our results to our global set
-                            results.append(r)
+                            results.append((r, yaml_))
 
                 elif isinstance(tokens, dict):
-                    # support our special tokens (if they're present)
+                    # Strip 'schema' from child tokens -- it is determined
+                    # by the URL key's own schema and must not be overridden
+                    # by a child dict value (matching the list-expansion
+                    # branch that does the same via del entries["schema"]).
+                    tokens.pop("schema", None)
+
+                    # Normalize sibling and child token dicts
+                    # independently before merging, so that an alias key
+                    # in sibling tokens (e.g. 'smtp' -> 'smtp_host') can
+                    # never overwrite a canonical key already set in the
+                    # higher-priority child tokens.
                     if schema in N_MGR:
+                        if sibling_tokens:
+                            sibling_tokens = ConfigBase._special_token_handler(
+                                schema, sibling_tokens
+                            )
+
                         tokens = ConfigBase._special_token_handler(
                             schema, tokens
                         )
 
-                    # Copy ourselves a template of our parsed URL as a base to
-                    # work with
+                    # Merge sibling tokens as the lower-priority base
+                    # and let the child token dict (the indented value
+                    # of the URL key) override on a per-key basis.
+                    if sibling_tokens:
+                        merged = sibling_tokens.copy()
+                        merged.update(tokens)
+                        tokens = merged
+
+                    # Copy ourselves a template of our parsed URL as
+                    # a base to work with
                     r = results_.copy()
 
                     # add our result set
                     r.update(tokens)
 
                     # add our results to our global set
-                    results.append(r)
+                    results.append((r, dict(tokens)))
+
+                elif sibling_tokens:
+                    # The URL key had a null child value, but sibling
+                    # keys supply token overrides. Process them the
+                    # same way as a child token dict.
+                    if schema in N_MGR:
+                        sibling_tokens = ConfigBase._special_token_handler(
+                            schema, sibling_tokens
+                        )
+
+                    # Copy ourselves a template of our parsed URL as
+                    # a base to work with
+                    r = results_.copy()
+
+                    # Apply the sibling token overrides
+                    r.update(sibling_tokens)
+
+                    # add our results to our global set
+                    results.append((r, dict(sibling_tokens)))
 
                 else:
                     # add our results to our global set
-                    results.append(results_)
+                    results.append((results_, {}))
 
             else:
                 # Unsupported
@@ -1239,7 +1346,7 @@ class ConfigBase(URLBase):
                 entry += 1
 
                 # Grab our first item
-                results_ = results.popleft()
+                results_, yaml_tokens_ = results.popleft()
 
                 if results_["schema"] not in N_MGR:
                     # the arguments are invalid or can not be used.
@@ -1322,8 +1429,77 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 results_["asset"] = asset
 
+                # For the second post_process_parse_url_results call we
+                # need to distinguish two plugin families:
+                #
+                # URLBase-based plugins use the full-mode
+                # utils.parse.parse_url() (simple=False), which always creates
+                # qsd plus the extended qsd dicts (qsd+, qsd-, qsd:).  The
+                # presence of these keys is a reliable indicator that qsd was
+                # already applied once before YAML tokens were merged.
+                #
+                # post_process reads from qsd (verify, redirect, rto, cto,
+                # port, user, password, URL_TOKEN_ALIASES aliases, ...) is
+                # already reflected in results_.  YAML tokens then overrode
+                # those values at higher priority.  Strip qsd entirely so
+                # the second call cannot re-apply any qsd field and undo
+                # the YAML-token values.  The second call will still
+                # normalise types (e.g. string -> bool for 'verify') from
+                # the already-merged results_.  There is intentionally no
+                # hardcoded list of fields to skip here; stripping the whole
+                # qsd is sufficient and avoids coupling this code to the
+                # internals of post_process_parse_url_results().
+                #
+                # @notify-style plugins use a minimal parse_url that does
+                # NOT call post_process, so 'verify' is absent.  Keep qsd
+                # intact for those so verify, redirect, and other fields
+                # still get processed on this second call.
+                #
+                # The original qsd is always restored after the call so
+                # that callers (e.g. the @notify meta dict) can still
+                # inspect the raw query-string values.
+                orig_qsd = results_.get("qsd")
+                if all(
+                    k in results_ for k in QSD_FULL_MODE_KEYS
+                ) and isinstance(orig_qsd, dict):
+                    # Full-mode parse_url() always creates all three extended
+                    # qsd dicts (qsd+, qsd-, qsd:), even when the URL has no
+                    # query params.  Simple-mode @notify parse_url() creates
+                    # only qsd.  YAML sibling tokens never inject any of these
+                    # keys.  QSD_FULL_MODE_KEYS is the authoritative list from
+                    # utils/parse.py -- no duplication.
+                    # Strip the full qsd so it cannot overwrite YAML tokens
+                    # on this second post_process call.
+                    del results_["qsd"]
+
                 # Handle post processing of result set
                 results_ = URLBase.post_process_parse_url_results(results_)
+
+                # Re-apply YAML tokens on top of post_process results.
+                # For URLBase plugins qsd was stripped above so this is
+                # idempotent.  For @notify plugins qsd was kept intact and
+                # post_process_parse_url_results() will have overwritten any
+                # YAML-token values with qsd values; re-applying here restores
+                # the correct YAML > qsd priority for those plugins too.
+                #
+                # Keys in _YAML_REAPPLY_SKIP are handled specially by the
+                # while loop above and must not be overwritten here.
+                if yaml_tokens_:
+                    results_.update(
+                        {
+                            k: v
+                            for k, v in yaml_tokens_.items()
+                            if k not in _YAML_REAPPLY_SKIP
+                        }
+                    )
+
+                # Restore the original qsd so the full meta dict is
+                # available downstream regardless of which branch above ran.
+                # post_process_parse_url_results() never adds a 'qsd' key, so
+                # the elif branch (orig_qsd is None but qsd appeared) cannot
+                # occur and is omitted intentionally.
+                if orig_qsd is not None:
+                    results_["qsd"] = orig_qsd
 
                 # Store our preloaded entries
                 preloaded.append(
@@ -1423,6 +1599,26 @@ class ConfigBase(URLBase):
         """
         # Create a copy of our dictionary
         tokens = tokens.copy()
+
+        # Apply URL_TOKEN_ALIASES so shorthand keys (e.g. 'pass') are
+        # normalized to the canonical kwarg name ('password') before any
+        # plugin-specific template_args mapping runs.  YAML tokens bypass
+        # parse_url() and its initial post_process_parse_url_results() call
+        # inside url_to_dict(), so the same alias table must be applied here.
+        for alias, canonical in URL_TOKEN_ALIASES.items():
+            if alias in tokens and (
+                canonical not in tokens or tokens[canonical] is None
+            ):
+                # Canonical absent or explicitly null -- promote alias.
+                # A null canonical (e.g. password: with no value) is treated
+                # as "not provided", consistent with how
+                # post_process_parse_url_results() handles None credentials.
+                tokens[canonical] = tokens.pop(alias)
+
+            elif alias in tokens:
+                # canonical key already set to a non-None value -- discard
+                # the alias so the explicit canonical is not overwritten
+                del tokens[alias]
 
         for kw, meta in N_MGR[schema].template_kwargs.items():
             # Determine our prefix:

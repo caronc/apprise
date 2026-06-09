@@ -1917,3 +1917,654 @@ def test_config_base_parse_yaml_file07_tag_priority_over_tags(tmpdir):
     # Tag priority check
     assert sum(1 for _ in a.find("primary")) == 1
     assert sum(1 for _ in a.find("secondary")) == 0
+
+
+def test_yaml_sibling_token_overrides_basic():
+    """
+    API: ConfigBase - YAML sibling-key token overrides (basic cases).
+
+    Keys at the same indentation level as the schema URL key
+    (sibling form) must behave identically to child-indented tokens.
+    Both of these forms must load the same plugin with the same attrs:
+
+      # sibling form (same indentation)
+      - mailtos://_:
+        smtp: smtp.example.com
+        from: sender@example.com
+
+      # child form (one level deeper)
+      - mailtos://_:
+          smtp: smtp.example.com
+          from: sender@example.com
+    """
+    # --- sibling form (the historically broken form) ---
+    result_sibling, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://_:
+    user: sender@example.com
+    password: secret
+    smtp: smtp.example.com
+    from: sender@example.com
+    to: recipient@example.com
+    tag: myteam
+""")
+
+    # --- child form (always worked) ---
+    result_child, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://_:
+      user: sender@example.com
+      password: secret
+      smtp: smtp.example.com
+      from: sender@example.com
+      to: recipient@example.com
+      tag: myteam
+""")
+
+    # Both forms must load exactly one plugin instance
+    assert len(result_sibling) == 1
+    assert len(result_child) == 1
+
+    # Both results must be NotifyEmail instances
+    assert isinstance(result_sibling[0], NotifyEmail)
+    assert isinstance(result_child[0], NotifyEmail)
+
+    for obj in (result_sibling[0], result_child[0]):
+        # SMTP server from sibling/child token
+        assert obj.smtp_host == "smtp.example.com"
+
+        # from: maps to from_addr via template_args
+        assert obj.from_addr[1] == "sender@example.com"
+
+        # to: maps to targets
+        assert any(t[1] == "recipient@example.com" for t in obj.targets)
+
+        # password: sets the credential directly
+        assert obj.password == "secret"
+
+        # tag: applies correctly
+        assert "myteam" in obj.tags
+
+
+def test_yaml_sibling_token_priority_over_url():
+    """
+    API: ConfigBase - sibling tokens override URL-embedded values.
+
+    Priority order (lowest to highest):
+      3 - URL path (user:pass@host:port)
+      2 - URL query string (?smtp=...)
+      1 - YAML sibling/child tokens (highest)
+    """
+    # URL embeds one smtp server; sibling token overrides it
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com?smtp=old.smtp.example.com:
+    smtp: new.smtp.example.com
+    to: recipient@example.com
+    tag: priority-test
+""")
+
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    # Sibling token must win over the URL query-string value
+    assert result[0].smtp_host == "new.smtp.example.com"
+    assert "priority-test" in result[0].tags
+
+
+def test_yaml_child_token_priority_over_sibling():
+    """
+    API: ConfigBase - child tokens (indented) override sibling tokens.
+
+    When a URL entry has BOTH a child value (indented under the key)
+    AND sibling keys, child tokens take priority on a per-key basis.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      smtp: child.smtp.example.com
+    smtp: sibling.smtp.example.com
+    to: recipient@example.com
+""")
+
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    # Child token (child.smtp.example.com) must beat sibling token
+    assert result[0].smtp_host == "child.smtp.example.com"
+
+
+def test_yaml_sibling_token_with_multiple_targets():
+    """
+    API: ConfigBase - multiple targets via sibling 'to:' token.
+
+    'to:' in YAML tokens is a kwarg equivalent to ?to= in a URL.
+    Multiple recipients must be expressed as a comma-separated string
+    or as a YAML list under the 'to:' key -- NOT as multiple YAML
+    entries each containing a separate 'to:' (that would create
+    multiple plugin instances rather than one plugin with many targets).
+
+    Both the comma-separated and YAML-list forms should resolve to a
+    single plugin instance whose 'targets' list contains all recipients.
+    """
+    # Comma-separated form: equivalent to ?to=user1,user2 in the URL
+    result_csv, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+    smtp: smtp.example.com
+    to: user1@example.com, user2@example.com
+    tag: shared
+""")
+
+    # YAML list form: same semantics, different syntax
+    result_list, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+    smtp: smtp.example.com
+    to:
+      - user1@example.com
+      - user2@example.com
+    tag: shared
+""")
+
+    # Each form must load exactly one plugin instance
+    assert len(result_csv) == 1
+    assert len(result_list) == 1
+
+    for obj in (result_csv[0], result_list[0]):
+        assert isinstance(obj, NotifyEmail)
+
+        # Sibling smtp: applies to the single instance
+        assert obj.smtp_host == "smtp.example.com"
+
+        # Both recipients must appear in targets
+        assert any(t[1] == "user1@example.com" for t in obj.targets)
+        assert any(t[1] == "user2@example.com" for t in obj.targets)
+
+        # Sibling tag: applies correctly
+        assert "shared" in obj.tags
+
+
+def test_yaml_sibling_token_shared_across_list_expansion():
+    """
+    API: ConfigBase - sibling tokens propagate to every list-expansion entry.
+
+    When the URL key has a YAML list as its child value (each list item
+    becomes a separate plugin instance) AND sibling keys supply shared
+    settings, the sibling tokens are applied as a base to every instance
+    before per-entry overrides are merged.
+
+    This is distinct from 'to: email1, email2' (multiple targets for one
+    instance) -- here each list entry is an independent plugin instance
+    with its own per-entry settings, all sharing the sibling tokens.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      - to: manager@example.com
+        tag: boss
+      - to: coworker@example.com
+        tag: team
+    smtp: smtp.example.com
+""")
+
+    # One plugin instance per list entry
+    assert len(result) == 2
+    assert all(isinstance(r, NotifyEmail) for r in result)
+
+    # Sibling smtp: must be applied to every instance
+    assert result[0].smtp_host == "smtp.example.com"
+    assert result[1].smtp_host == "smtp.example.com"
+
+    # Per-entry tags must be respected
+    assert "boss" in result[0].tags
+    assert "team" in result[1].tags
+
+
+def test_yaml_sibling_token_per_entry_overrides_sibling():
+    """
+    API: ConfigBase - per-entry tokens override sibling tokens for same key.
+
+    When a list-expansion entry defines the same key as a sibling token,
+    the per-entry value wins for that instance only.  Other instances with
+    no per-entry value for that key still receive the sibling fallback.
+
+    Scenario:
+      - sibling smtp: smtp1.example.com   (shared fallback for all entries)
+      - entry 1: to=manager, tag=boss     (no per-entry smtp -> uses sibling)
+      - entry 2: to=coworker, smtp=smtp2, tag=team  (overrides sibling smtp)
+
+    Expected result: 2 instances, each with correct smtp and tags.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      - to: manager@example.com
+        tag: boss
+      - to: coworker@example.com
+        smtp: smtp2.example.com
+        tag: team
+    smtp: smtp1.example.com
+""")
+
+    # One instance per list entry
+    assert len(result) == 2
+    assert all(isinstance(r, NotifyEmail) for r in result)
+
+    # Instance 0: no per-entry smtp, so sibling smtp1 is used
+    assert any(t[1] == "manager@example.com" for t in result[0].targets)
+    assert result[0].smtp_host == "smtp1.example.com"
+    assert "boss" in result[0].tags
+
+    # Instance 1: per-entry smtp2 overrides the sibling smtp1
+    assert any(t[1] == "coworker@example.com" for t in result[1].targets)
+    assert result[1].smtp_host == "smtp2.example.com"
+    assert "team" in result[1].tags
+
+
+def test_yaml_sibling_alias_does_not_overwrite_child_canonical():
+    """
+    API: ConfigBase - child alias key wins over sibling canonical key.
+
+    When a sibling provides a canonical key ('password') and the child dict
+    provides the URL_TOKEN_ALIASES shorthand for the same key ('pass'), the
+    child value must win.
+
+    Before the fix, both dicts were merged raw before _special_token_handler()
+    ran the URL_TOKEN_ALIASES step.  The combined dict contained both 'pass'
+    and 'password', so the alias-conflict branch discarded 'pass' and kept
+    the sibling's 'password' -- the wrong winner.
+
+    The fix normalizes sibling and child token dicts separately first, so
+    each alias is resolved in the context of its own dict only.  After
+    normalization both dicts carry 'password', and the priority merge
+    (sibling as base, child overrides) produces the correct winner.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      pass: child_pass
+      to: recipient@example.com
+    password: sibling_pass
+""")
+
+    # One instance created
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    # Child 'pass' (alias) must win over sibling 'password' (canonical)
+    assert result[0].password == "child_pass"
+
+
+def test_yaml_alias_populates_null_canonical():
+    """
+    API: ConfigBase - alias populates canonical when canonical is null.
+
+    """
+    # canonical 'password:' is null (no value) + alias 'pass: secret'
+    # alias must win because null == not provided
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user@localhost:
+      pass: secret
+      password:
+""")
+    assert len(result) == 1
+    assert result[0].password == "secret"
+
+    # Canonical with a real value still wins over the alias
+    result2, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user@localhost:
+      pass: alias_val
+      password: real_val
+""")
+    assert len(result2) == 1
+    assert result2[0].password == "real_val"
+
+
+def test_yaml_sibling_token_order_independent():
+    """
+    API: ConfigBase - sibling tokens are captured regardless of YAML key order.
+
+    YAML does not guarantee mapping key order.  If a sibling token appears
+    before the URL key in the mapping dict (e.g. due to editor or template
+    quirks), it must still be captured.  The old dict(it) approach only
+    captured items *after* the URL key in the iterator; the fix uses the
+    full url.items() dict so all non-URL-key items are included.
+    """
+    # Write the YAML directly so the key order is explicit and no
+    # yaml.dump call is required.  smtp appears BEFORE the URL key,
+    # to appears AFTER -- both must be captured as sibling tokens.
+    content = """
+urls:
+  - smtp: smtp.example.com
+    mailtos://sender@example.com:
+    to: recipient@example.com
+"""
+
+    result, _ = ConfigBase.config_parse_yaml(content)
+
+    # Both pre-URL (smtp) and post-URL (to) siblings must be applied
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+    assert result[0].smtp_host == "smtp.example.com"
+    assert any(t[1] == "recipient@example.com" for t in result[0].targets)
+
+
+def test_yaml_sibling_password_token():
+    """
+    API: ConfigBase - 'password' and 'pass' keys both set plugin password.
+
+    YAML tokens bypass parse_url(), so the URL-path shorthand 'pass' must
+    be normalized to 'password' by URL_TOKEN_ALIASES inside
+    _special_token_handler.  Verify that both spellings work in sibling
+    and child indentation forms.
+    """
+    # --- 'password:' sibling form ---
+    result_sibling, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+    user: alice
+    password: s3cr3t
+    tag: pw-test
+""")
+
+    # --- 'password:' child form ---
+    result_child, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+      user: alice
+      password: s3cr3t
+      tag: pw-test
+""")
+
+    # --- 'pass:' sibling form (alias normalization) ---
+    result_pass_sibling, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+    user: alice
+    pass: s3cr3t
+    tag: pw-test
+""")
+
+    # --- 'pass:' child form (alias normalization) ---
+    result_pass_child, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+      user: alice
+      pass: s3cr3t
+      tag: pw-test
+""")
+
+    for result in (
+        result_sibling,
+        result_child,
+        result_pass_sibling,
+        result_pass_child,
+    ):
+        assert len(result) == 1
+
+    for obj in (
+        result_sibling[0],
+        result_child[0],
+        result_pass_sibling[0],
+        result_pass_child[0],
+    ):
+        assert obj.user == "alice"
+        assert obj.password == "s3cr3t"
+        assert "pw-test" in obj.tags
+
+    # When both 'pass:' and 'password:' appear, 'password:' (canonical) wins
+    result_both, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://testhost:
+      user: alice
+      password: canonical
+      pass: shorthand
+""")
+    assert len(result_both) == 1
+    assert result_both[0].password == "canonical"
+
+
+def test_yaml_sibling_no_silent_drop_on_null_child():
+    """
+    API: ConfigBase - sibling tokens are never silently discarded.
+
+    Previously, when the URL key had a null child value (the common
+    case when users used same-level indentation), all sibling keys
+    were silently ignored and the URL failed to instantiate.  Confirm
+    that the failure mode described in issue #1635 no longer occurs.
+    """
+    # Mirrors the bug-report YAML (correcting 'rom' typo to 'from')
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://_:
+    user: sender@example.com
+    password: secret
+    smtp: smtp.example.com
+    from: sender@example.com
+    to: recipient@example.com
+    tag:
+      - dev
+      - prod
+""")
+
+    # Must load successfully (previously raised TypeError and returned [])
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+    obj = result[0]
+    assert obj.smtp_host == "smtp.example.com"
+    assert obj.from_addr[1] == "sender@example.com"
+    assert any(t[1] == "recipient@example.com" for t in obj.targets)
+    assert "dev" in obj.tags
+    assert "prod" in obj.tags
+
+
+def test_yaml_sibling_token_unknown_schema():
+    """
+    API: ConfigBase - sibling tokens with an unregistered schema.
+
+    When the schema is not in N_MGR the _special_token_handler call
+    inside the 'elif sibling_tokens' branch is skipped (the False arm
+    of 'if schema in N_MGR').  The branch still executes fully; it
+    just applies sibling tokens as-is.  Because the schema is unknown
+    no plugin is instantiated and the result list is empty.
+    """
+    # 'xyzunknown' is not a registered Apprise plugin, so the
+    # 'if schema in N_MGR' guard evaluates to False.
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - xyzunknown://placeholder:
+    mytoken: value
+    otherkey: data
+""")
+
+    # The sibling branch ran (no exception), but no plugin loaded
+    assert isinstance(result, list)
+    assert len(result) == 0
+
+
+def test_yaml_child_dict_schema_key_ignored():
+    """
+    API: ConfigBase - 'schema' key in a child dict token is stripped.
+
+    The schema that determines which plugin is instantiated comes from the
+    URL key itself.  Allowing a child dict to override 'schema' via a
+    token would cause the wrong plugin constructor to be called with
+    fields parsed for a different URL type, leading to silent failures.
+
+    The list-expansion branch explicitly strips 'schema' from each entry.
+    This test verifies the single-child-dict branch does the same.
+    """
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - mailtos://sender@example.com:
+      schema: json
+      to: recipient@example.com
+""")
+
+    # The email plugin must load; the child 'schema: json' must be ignored
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+
+
+def test_yaml_sibling_before_url_no_spurious_warning():
+    """
+    API: ConfigBase - sibling tokens before the URL key emit no warning.
+
+    YAML mappings do not guarantee key order.  A sibling token (e.g.
+    'smtp:') may appear before the URL key in the serialised YAML.  The
+    scan loop that finds the URL key must skip non-schema keys silently;
+    it must NOT emit an 'Ignored entry' warning because those keys are
+    collected later as valid sibling tokens.
+    """
+    from unittest import mock as _mock
+
+    with _mock.patch("apprise.config.base.ConfigBase.logger") as mock_log:
+        result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - smtp: smtp.example.com
+    mailtos://sender@example.com:
+    to: recipient@example.com
+""")
+
+    # Both siblings are applied; no spurious "Ignored entry" warning fired
+    assert len(result) == 1
+    assert isinstance(result[0], NotifyEmail)
+    assert result[0].smtp_host == "smtp.example.com"
+    assert any(t[1] == "recipient@example.com" for t in result[0].targets)
+
+    # Confirm no "Ignored entry" warning was logged
+    for call_args in mock_log.warning.call_args_list:
+        assert "Ignored entry" not in str(call_args)
+
+
+def test_yaml_token_priority_over_qsd():
+    """
+    API: ConfigBase - YAML tokens take priority over URL query-string params.
+
+    The documented priority is: YAML tokens > ?key=value qsd > URL path.
+    A second call to post_process_parse_url_results() runs after YAML tokens
+    are merged.  Without stripping qsd first, that call would re-apply qsd
+    overrides and silently overwrite YAML-token values, breaking the
+    documented priority.
+    """
+    # The URL embeds ?pass= in the query string; the YAML sibling token
+    # 'password:' should take priority and survive to the plugin.
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user:urlpass@localhost?pass=qsdpass:
+    password: yamlpass
+""")
+    assert len(result) == 1
+    # YAML token must win over qsd ?pass= and URL-path password
+    assert result[0].password == "yamlpass"
+
+
+def test_yaml_token_priority_over_qsd_non_credential_fields():
+    """
+    API: ConfigBase - YAML tokens take priority over qsd for non-credential
+    fields (verify, redirect, etc.).
+
+    post_process_parse_url_results() processes not only user/password but
+    also verify, redirect, rto, cto, and port from qsd.  All of these
+    must honour the same YAML > qsd > URL-path priority rule.
+
+    The fix strips ALL qsd (not just credential keys) before the second
+    post_process call for URLBase-based plugins, so qsd can never
+    overwrite any YAML-token value regardless of which field it sets.
+    """
+    # URL has ?verify=no but the YAML sibling says verify: yes --
+    # YAML token must win; the plugin should have verify_certificate=True
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - json://user:pass@localhost?verify=no:
+    verify: yes
+""")
+    assert len(result) == 1
+    assert result[0].verify_certificate is True
+
+
+def test_yaml_priority_all_urlbase_globals_via_plugin_details():
+    """
+    API: ConfigBase - YAML priority verified dynamically for every
+    URLBase-level global arg via plugin.details().
+
+    Verify that the priority sequence (YAML > qsd > URL path)
+    is respected for every global arg defined.
+    """
+    from apprise import plugins
+    from apprise.config.base import N_MGR
+    from apprise.url import URLBase
+
+    # Discover args via plugin.details() for a minimal URLBase plugin.
+    # json:// has no required service credentials and is always available.
+    details = plugins.details(N_MGR["json"])
+
+    # Type-driven conflict pairs: (qsd_str, yaml_str).
+    # YAML should win -- expected value is derived from yaml_str.
+    type_conflict = {
+        "bool": ("no", "yes"),
+        "float": ("5.0", "10.0"),
+        "int": ("5", "10"),
+    }
+
+    # Intersect plugin.details() args with URLBase.template_args to
+    # isolate the globals shared by every URLBase plugin.
+    # _lookup_default is the URLBase instance attribute name for the arg.
+    urlbase_meta = URLBase.template_args
+    test_cases = []
+    for name, arg_meta in details["args"].items():
+        if name not in urlbase_meta:
+            continue
+        arg_type = arg_meta.get("type", "string")
+        if arg_type not in type_conflict:
+            continue
+        attr_name = urlbase_meta[name].get("_lookup_default")
+        if not attr_name:
+            continue
+        qsd_val, yaml_val = type_conflict[arg_type]
+        test_cases.append((name, attr_name, arg_type, qsd_val, yaml_val))
+
+    # Guard: the 4 known URLBase globals must always be discovered.
+    # If URLBase.template_args loses an entry this fires immediately.
+    found = {t[0] for t in test_cases}
+    assert found >= {"cto", "redirect", "rto", "verify"}, (
+        "Expected URLBase globals cto/redirect/rto/verify in "
+        "plugin.details(); got: {}".format(sorted(found))
+    )
+
+    # Build a YAML config that sets every global in both qsd AND as a
+    # YAML sibling token with a conflicting value so the winner is
+    # unambiguous.
+    qsd_str = "&".join("{}={}".format(n, qv) for n, _, _, qv, _ in test_cases)
+    siblings = "\n    ".join(
+        "{}: {}".format(n, yv) for n, _, _, _, yv in test_cases
+    )
+    yaml_cfg = (
+        "urls:\n  - json://user:pass@localhost?{qsd}:\n    {siblings}\n"
+    ).format(qsd=qsd_str, siblings=siblings)
+
+    result, _ = ConfigBase.config_parse_yaml(yaml_cfg)
+    assert len(result) == 1
+    inst = result[0]
+
+    # Verify YAML wins for every global.
+    for name, attr_name, arg_type, qsd_val, yaml_val in test_cases:
+        actual = getattr(inst, attr_name)
+        if arg_type == "bool":
+            expected = True  # yaml_val is always "yes"
+        elif arg_type == "float":
+            expected = float(yaml_val)
+        elif arg_type == "int":
+            expected = int(yaml_val)
+        else:
+            expected = yaml_val
+        assert actual == expected, (
+            "YAML token '{}' should override qsd "
+            "(YAML={!r}, qsd={!r}) but got {!r} for '{}'".format(
+                name, yaml_val, qsd_val, actual, attr_name
+            )
+        )

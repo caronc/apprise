@@ -994,6 +994,45 @@ def test_apprise_urlbase_object():
     URLBase.post_process_parse_url_results(results)
     assert results.get("redirect") is True
 
+    # URL_TOKEN_ALIASES: 'pass' in top-level results is normalized to
+    # 'password' by post_process_parse_url_results (covers the YAML config
+    # path where a flat dict is passed rather than a parsed URL string)
+    results = URLBase.parse_url("http://user@127.0.0.1/path/")
+    results["pass"] = "secret"
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "secret"
+    assert "pass" not in results
+
+    # URL_TOKEN_ALIASES: canonical 'password' wins when already set to a
+    # real value -- 'pass' in top-level results must not overwrite an
+    # explicitly provided URL-path password; a WARNING is logged so the
+    # operator knows the alias was present but dropped (no values logged)
+    results = URLBase.parse_url("http://user:realpass@127.0.0.1/path/")
+    results["pass"] = "shouldnotwin"
+    with mock.patch("apprise.url.logger") as mock_log:
+        URLBase.post_process_parse_url_results(results)
+        mock_log.warning.assert_called_once()
+        call_args = mock_log.warning.call_args[0]
+        # alias and canonical key names appear; actual values must not
+        assert "pass" in call_args[1]
+        assert "password" in call_args[2]
+    assert results.get("password") == "realpass"
+    assert "pass" not in results
+
+    # URL_TOKEN_ALIASES: qsd 'pass=' overrides the URL-path password because
+    # query-string parameters always take the highest priority
+    results = URLBase.parse_url(
+        "http://user:shouldnotwin@127.0.0.1/path/?pass=realpass"
+    )
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "realpass"
+    assert "pass" not in results
+
+    # URL_TOKEN_ALIASES: 'pass' in qsd is also normalized to 'password'
+    results = URLBase.parse_url("http://user@127.0.0.1/path/?pass=qsecret")
+    URLBase.post_process_parse_url_results(results)
+    assert results.get("password") == "qsecret"
+
     # Generic initialization
     base = URLBase(**{"schema": ""})
     assert base.request_timeout == (4.0, 4.0)
@@ -1010,6 +1049,18 @@ def test_apprise_urlbase_object():
     # URLBase.__len__ defaults to 1; subclasses that support multiple
     # targets override this to return the actual count.
     assert len(base) == 1
+
+    # Invalid asset type -- a non-AppriseAsset value must be silently ignored
+    # and a debug log must tell the caller what happened.  The instance must
+    # still receive a valid default AppriseAsset so nothing downstream breaks.
+    with mock.patch("apprise.url.logger") as mock_log:
+        base = URLBase(asset="not-an-asset")
+        mock_log.debug.assert_called_once()
+        call_args = mock_log.debug.call_args[0]
+        # The type name appears in the message so the caller can identify it
+        assert "str" in call_args[1]
+
+    assert isinstance(base.asset, AppriseAsset)
 
 
 def test_apprise_unique_id():

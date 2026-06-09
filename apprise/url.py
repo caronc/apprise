@@ -48,6 +48,15 @@ from .utils.parse import (
 # Used to break a path list into parts
 PATHSPLIT_LIST_DELIM = re.compile(r"[ \t\r\n,\\/]+")
 
+# Maps shorthand token keys to their canonical kwarg names.  Applied by
+# post_process_parse_url_results() for URL-parsed results, and imported by
+# the YAML config layer (config/base.py) to normalize YAML tokens that
+# bypass parse_url() entirely.  Add new aliases here to extend support.
+URL_TOKEN_ALIASES = {
+    # 'pass' is the conventional URL shorthand for 'password'
+    "pass": "password",
+}
+
 
 class PrivacyMode:
     # Defines different privacy modes strings can be printed as
@@ -218,6 +227,14 @@ class URLBase:
         will keep things consistent when working with the children that inherit
         this class."""
         # Prepare our Asset Object
+        if asset is not None and not isinstance(asset, AppriseAsset):
+            # A non-None value that is not an AppriseAsset object was passed;
+            # log at debug level so the caller knows the value was not used.
+            logger.debug(
+                "Invalid asset type (%s) ignored; using default AppriseAsset",
+                type(asset).__name__,
+            )
+
         self.asset = (
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
         )
@@ -903,16 +920,42 @@ class URLBase:
         # When redirect= is not specified, leave it absent so that URLBase
         # __init__ falls back to asset.http_redirects as the global default.
 
-        # Password overrides
-        if "pass" in results:
-            results["password"] = results["pass"]
-            del results["pass"]
+        # Apply URL token aliases (e.g. 'pass' -> 'password') to the
+        # top-level results dict (covers values from URL path segments
+        # as well as flat YAML-style token dicts passed directly).
+        for alias, canonical in URL_TOKEN_ALIASES.items():
+            if alias in results:
+                # Only populate the canonical key when it has not already
+                # been set to a real value (parse_url() always initialises
+                # 'password' to None, so a None value means it was not
+                # explicitly provided).  This avoids clobbering an actual
+                # password extracted from the URL path with a 'pass=' alias.
+                if results.get(canonical) is None:
+                    results[canonical] = results[alias]
+
+                else:
+                    # canonical already holds a value from the URL path or
+                    # a prior assignment; the alias is redundant and is
+                    # dropped.  Log at WARNING so the operator knows an
+                    # alias key was present but ignored.  No values are
+                    # logged to avoid leaking credentials.
+                    logger.warning(
+                        "URL token alias '%s' ignored; '%s' is already"
+                        " set -- alias was dropped",
+                        alias,
+                        canonical,
+                    )
+
+                del results[alias]
 
         if qsd_exists:
             if "password" in results["qsd"]:
                 results["password"] = results["qsd"]["password"]
-            if "pass" in results["qsd"]:
-                results["password"] = results["qsd"]["pass"]
+
+            # Apply URL token aliases from query-string parameters
+            for alias, canonical in URL_TOKEN_ALIASES.items():
+                if alias in results["qsd"]:
+                    results[canonical] = results["qsd"][alias]
 
             # User overrides
             if "user" in results["qsd"]:
