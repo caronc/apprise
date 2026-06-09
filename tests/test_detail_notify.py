@@ -851,3 +851,37 @@ def test_capture_server_logs_restores_class_logger():
     a = _apprise_with(p)
     a.notify("body", tag="x", detailed=True)
     assert "logger" not in p.__dict__
+
+
+# ---------------------------------------------------------------------------
+# _capture_server_logs: restore a pre-existing instance logger
+# ---------------------------------------------------------------------------
+def test_capture_server_logs_restores_preexisting_instance_logger():
+    """When the server already has an instance-level logger before a
+    detailed notify, __exit__ must put that original logger back, not
+    delete the attribute (covers the ``else`` branch on line 1576).
+    """
+    p = _make_plugin("x", "json://host/", True)
+    original_logger = logging.getLogger("some.custom.logger")
+    p.logger = original_logger
+
+    a = _apprise_with(p)
+    a.notify("body", tag="x", detailed=True)
+
+    # The instance attribute must survive and point back to the original.
+    assert "logger" in p.__dict__, "instance logger attribute was removed"
+    assert p.__dict__["logger"] is original_logger
+
+
+def test_capture_server_logs_restores_preexisting_none_logger():
+    """Edge case: pre-existing instance logger is explicitly ``None``.
+    __exit__ must restore it to None rather than popping the attribute.
+    """
+    p = _make_plugin("x", "json://host/", True)
+    p.logger = None
+
+    a = _apprise_with(p)
+    a.notify("body", tag="x", detailed=True)
+
+    assert "logger" in p.__dict__, "instance logger attribute was removed"
+    assert p.__dict__["logger"] is None
