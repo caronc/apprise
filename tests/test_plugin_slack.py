@@ -880,6 +880,7 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
     payload = loads(mock_request.call_args.kwargs["data"])
     assert payload.get("username") == obj.app_id
 
+
 @mock.patch("requests.request")
 @mock.patch("requests.get")
 def test_plugin_slack_send_by_email(mock_get, mock_request):
@@ -1573,6 +1574,62 @@ def test_plugin_slack_template_blocks_implied(mock_request, tmpdir):
 
 
 @mock.patch("requests.request")
+def test_plugin_slack_blocks_payload_uses_username(mock_request):
+    """NotifySlack() - blocks payload includes explicit username."""
+    mock_request.return_value = mock.Mock(
+        **{"content": b"ok", "status_code": requests.codes.ok}
+    )
+
+    obj = NotifySlack(
+        token_a="T1JJ3T3L2",
+        token_b="A1BRTD4JD",
+        token_c="TIiajkdnlazkcOXrIdevi7FQ",
+        use_blocks=True,
+        user="BlockBot",
+    )
+
+    assert obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert payload["username"] == "BlockBot"
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_template_blocks_payload_uses_username(
+    mock_request, tmpdir
+):
+    """NotifySlack() - template blocks payload includes explicit username."""
+    mock_request.return_value = mock.Mock(
+        **{"content": b"ok", "status_code": requests.codes.ok}
+    )
+
+    template = tmpdir.join("username_blocks.json")
+    template.write(
+        cleandoc("""
+        {
+          "blocks": [
+            {
+              "type": "section",
+              "text": {"type": "mrkdwn", "text": "{{app_body}}"}
+            }
+          ]
+        }
+        """)
+    )
+
+    obj = NotifySlack(
+        token_a="T1JJ3T3L2",
+        token_b="A1BRTD4JD",
+        token_c="TIiajkdnlazkcOXrIdevi7FQ",
+        template=str(template),
+        user="TemplateBot",
+    )
+
+    assert obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert payload["username"] == "TemplateBot"
+
+
+@mock.patch("requests.request")
 def test_plugin_slack_template_invalid_json(mock_request, tmpdir):
     """NotifySlack() - blocks template with invalid JSON fails gracefully."""
     mock_request.return_value = mock.Mock(
@@ -1966,6 +2023,16 @@ def test_plugin_slack_workflow_native_url(mock_request):
     )
     call_url2 = mock_request.call_args_list[0][0][1]
     assert "hooks.slack.com/triggers/T1JJ3T3L2" in call_url2
+
+
+def test_plugin_slack_parse_native_url_invalid():
+    """NotifySlack() - parse_native_url() returns None for non-Slack URLs."""
+    assert (
+        NotifySlack.parse_native_url(
+            "https://hooks.slack.com/not-a-supported-path/T1JJ3T3L2"
+        )
+        is None
+    )
 
 
 @mock.patch("requests.request")
