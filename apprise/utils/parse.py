@@ -160,7 +160,9 @@ VALID_PYTHON_FILE_RE = re.compile(r".+\.py(o|c)?$", re.IGNORECASE)
 # Simple-mode calls produce only 'qsd'; full-mode adds all three of these.
 # Used both internally by parse_qsd() and externally to detect whether a
 # result dict came from a full-mode parse without re-enumerating the names.
-QSD_FULL_MODE_KEYS = frozenset(("qsd+", "qsd-", "qsd:"))
+# Stored as a tuple (not frozenset) so that dict construction order is
+# deterministic across Python runs regardless of PYTHONHASHSEED.
+QSD_FULL_MODE_KEYS = ("qsd+", "qsd-", "qsd:")
 
 # validate_regex() utilizes this mapping to track and re-use pre-complied
 # regular expressions

@@ -227,6 +227,14 @@ class URLBase:
         will keep things consistent when working with the children that inherit
         this class."""
         # Prepare our Asset Object
+        if asset is not None and not isinstance(asset, AppriseAsset):
+            # A non-None value that is not an AppriseAsset object was passed;
+            # log at debug level so the caller knows the value was not used.
+            logger.debug(
+                "Invalid asset type (%s) ignored; using default AppriseAsset",
+                type(asset).__name__,
+            )
+
         self.asset = (
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
         )

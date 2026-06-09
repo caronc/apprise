@@ -53,6 +53,19 @@ from ..utils.time import zoneinfo
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
 
+# Keys excluded from the YAML-token re-apply that happens after
+# post_process_parse_url_results() inside config_parse_yaml().
+#
+# 'tag'/'tags': assembled as a merged set (YAML tags + global_tags) by the
+# while loop before post_process runs; re-applying the raw YAML string would
+# replace the set with a string.  YAML accepts both spellings ('tag:' and
+# 'tags:'); both are excluded so neither overwrites the assembled set.
+#
+# 'asset': written programmatically from the Python asset parameter at
+# that point in the while loop; VALID_TOKEN does not strip it, so a
+# user-written YAML 'asset:' key would otherwise overwrite the object.
+_YAML_REAPPLY_SKIP = frozenset(("tag", "tags", "asset"))
+
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
@@ -1120,7 +1133,7 @@ class ConfigBase(URLBase):
                     continue
 
                 # add our results to our global set
-                results.append(results_)
+                results.append((results_, {}))
 
             elif isinstance(url, dict):
                 # We are a url string with additional unescaped options. In
@@ -1241,8 +1254,16 @@ class ConfigBase(URLBase):
                             # Extend our dictionary with our new entries
                             r.update(entries)
 
+                            # Record the YAML contributions for this entry
+                            # so post_process_parse_url_results() cannot
+                            # overwrite them (enforces YAML > qsd priority).
+                            yaml_ = {}
+                            if sibling_tokens:
+                                yaml_.update(sibling_tokens)
+                            yaml_.update(entries)
+
                             # add our results to our global set
-                            results.append(r)
+                            results.append((r, yaml_))
 
                 elif isinstance(tokens, dict):
                     # Strip 'schema' from child tokens -- it is determined
@@ -1282,7 +1303,7 @@ class ConfigBase(URLBase):
                     r.update(tokens)
 
                     # add our results to our global set
-                    results.append(r)
+                    results.append((r, dict(tokens)))
 
                 elif sibling_tokens:
                     # The URL key had a null child value, but sibling
@@ -1301,11 +1322,11 @@ class ConfigBase(URLBase):
                     r.update(sibling_tokens)
 
                     # add our results to our global set
-                    results.append(r)
+                    results.append((r, dict(sibling_tokens)))
 
                 else:
                     # add our results to our global set
-                    results.append(results_)
+                    results.append((results_, {}))
 
             else:
                 # Unsupported
@@ -1325,7 +1346,7 @@ class ConfigBase(URLBase):
                 entry += 1
 
                 # Grab our first item
-                results_ = results.popleft()
+                results_, yaml_tokens_ = results.popleft()
 
                 if results_["schema"] not in N_MGR:
                     # the arguments are invalid or can not be used.
@@ -1438,9 +1459,9 @@ class ConfigBase(URLBase):
                 # that callers (e.g. the @notify meta dict) can still
                 # inspect the raw query-string values.
                 orig_qsd = results_.get("qsd")
-                if QSD_FULL_MODE_KEYS.issubset(results_) and isinstance(
-                    orig_qsd, dict
-                ):
+                if all(
+                    k in results_ for k in QSD_FULL_MODE_KEYS
+                ) and isinstance(orig_qsd, dict):
                     # Full-mode parse_url() always creates all three extended
                     # qsd dicts (qsd+, qsd-, qsd:), even when the URL has no
                     # query params.  Simple-mode @notify parse_url() creates
@@ -1453,6 +1474,24 @@ class ConfigBase(URLBase):
 
                 # Handle post processing of result set
                 results_ = URLBase.post_process_parse_url_results(results_)
+
+                # Re-apply YAML tokens on top of post_process results.
+                # For URLBase plugins qsd was stripped above so this is
+                # idempotent.  For @notify plugins qsd was kept intact and
+                # post_process_parse_url_results() will have overwritten any
+                # YAML-token values with qsd values; re-applying here restores
+                # the correct YAML > qsd priority for those plugins too.
+                #
+                # Keys in _YAML_REAPPLY_SKIP are handled specially by the
+                # while loop above and must not be overwritten here.
+                if yaml_tokens_:
+                    results_.update(
+                        {
+                            k: v
+                            for k, v in yaml_tokens_.items()
+                            if k not in _YAML_REAPPLY_SKIP
+                        }
+                    )
 
                 # Restore the original qsd so the full meta dict is
                 # available downstream regardless of which branch above ran.

@@ -1050,6 +1050,18 @@ def test_apprise_urlbase_object():
     # targets override this to return the actual count.
     assert len(base) == 1
 
+    # Invalid asset type -- a non-AppriseAsset value must be silently ignored
+    # and a debug log must tell the caller what happened.  The instance must
+    # still receive a valid default AppriseAsset so nothing downstream breaks.
+    with mock.patch("apprise.url.logger") as mock_log:
+        base = URLBase(asset="not-an-asset")
+        mock_log.debug.assert_called_once()
+        call_args = mock_log.debug.call_args[0]
+        # The type name appears in the message so the caller can identify it
+        assert "str" in call_args[1]
+
+    assert isinstance(base.asset, AppriseAsset)
+
 
 def test_apprise_unique_id():
     """

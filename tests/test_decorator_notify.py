@@ -678,40 +678,61 @@ def test_notify_multi_instance_decoration(tmpdir):
     N_MGR.remove("multi")
 
 
-def test_notify_yaml_verify_sibling_does_not_strip_qsd():
+def test_notify_yaml_priority_over_qsd():
     """
-    decorators: YAML sibling 'verify' must not strip qsd for @notify.
+    decorators: YAML tokens take priority over qsd for @notify plugins.
+
+    YAML > qsd > URL path must hold for ALL plugin types, including
+    @notify decorator plugins.  Previously, @notify plugins kept qsd
+    intact for the second post_process_parse_url_results() call, which
+    allowed qsd to silently overwrite YAML-token values.  The fix
+    re-applies YAML tokens after post_process to restore priority.
+
+    Also verifies qsd is still preserved in the meta dict (for raw
+    inspection) and that qsd still wins over URL-path when no YAML
+    token is present for a field.
     """
     from apprise.config import ConfigBase
 
     assert "notifyverify" not in N_MGR
 
-    @notify(on="notifyverify", name="Test verify sibling @notify")
+    @notify(on="notifyverify", name="Test YAML priority @notify")
     def _handler(body, title, notify_type, attach, meta, *args, **kwargs):
         pass
 
     assert "notifyverify" in N_MGR
 
-    # URL has ?verify=no in qsd; YAML sibling says verify: yes.
-    # For a @notify plugin qsd must survive to the second post_process
-    # call -- it must NOT be stripped by a spurious 'verify in results_'
-    # hit from the YAML merge.
+    # URL has ?verify=no&user=qsduser; YAML sibling says verify: yes
+    # and user: yamluser.  YAML must win for both.
     result, _ = ConfigBase.config_parse_yaml("""
 urls:
-  - notifyverify://user:pass@hostname?verify=no:
+  - notifyverify://urluser:urlpass@hostname?verify=no&user=qsduser:
     verify: yes
+    user: yamluser
 """)
 
     assert len(result) == 1
     meta = result[0]._default_args
 
-    # qsd must be intact -- not stripped by the wrong discriminator
+    # qsd must be preserved intact for downstream meta inspection
     assert isinstance(meta.get("qsd"), dict)
     assert meta["qsd"].get("verify") == "no"
+    assert meta["qsd"].get("user") == "qsduser"
 
-    # post_process_parse_url_results() processed verify from qsd;
-    # qsd must win over the YAML sibling for @notify plugins
-    assert meta["verify"] is False
+    # YAML tokens must win over qsd
+    assert meta["verify"] is True
+    assert meta["user"] == "yamluser"
+
+    # When no YAML token is present for a field, qsd still wins over
+    # the URL-path value (qsd > URL path).
+    result2, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - notifyverify://urluser:urlpass@hostname?verify=no:
+""")
+    assert len(result2) == 1
+    meta2 = result2[0]._default_args
+    assert meta2["verify"] is False  # qsd wins over URLBase default
+    assert meta2["user"] == "urluser"  # URL-path value (no qsd for user)
 
     # Tidy
     N_MGR.remove("notifyverify")
