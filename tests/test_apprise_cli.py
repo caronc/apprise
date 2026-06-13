@@ -2675,7 +2675,7 @@ def test_apprise_cli_windows_env(mock_system):
 
 
 @mock.patch("apprise.cli.NotificationManager")
-@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.packages_distributions", create=True)
 @mock.patch("importlib.metadata.version")
 @mock.patch("apprise.cli.logger")
 def test_apprise_cli_runtime_env_skip_when_not_debug(
@@ -2697,7 +2697,7 @@ def test_apprise_cli_runtime_env_skip_when_not_debug(
 
 
 @mock.patch("apprise.cli.NotificationManager")
-@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.packages_distributions", create=True)
 @mock.patch("importlib.metadata.version")
 @mock.patch("apprise.cli.logger")
 def test_apprise_cli_runtime_env_logging(
@@ -2763,7 +2763,7 @@ def test_apprise_cli_runtime_env_logging(
 
 
 @mock.patch("apprise.cli.NotificationManager")
-@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.packages_distributions", create=True)
 @mock.patch("importlib.metadata.version")
 @mock.patch("apprise.cli.logger")
 def test_apprise_cli_runtime_env_no_runtime_deps(
@@ -2799,7 +2799,7 @@ def test_apprise_cli_runtime_env_no_runtime_deps(
 
 
 @mock.patch("apprise.cli.NotificationManager")
-@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.packages_distributions", create=True)
 @mock.patch("importlib.metadata.version")
 @mock.patch("apprise.cli.logger")
 def test_apprise_cli_runtime_env_dist_map_exception(
@@ -2832,7 +2832,7 @@ def test_apprise_cli_runtime_env_dist_map_exception(
 
 
 @mock.patch("apprise.cli.NotificationManager")
-@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.packages_distributions", create=True)
 @mock.patch("importlib.metadata.version")
 @mock.patch("apprise.cli.logger")
 def test_apprise_cli_runtime_env_lookup_errors(
@@ -2886,4 +2886,84 @@ def test_apprise_cli_runtime_env_lookup_errors(
 
     # None of the error paths should produce a "  pkg: ver" line
     calls = [a for a, _ in mock_logger.debug.call_args_list]
+    assert not any(a[0] == "Runtime deps: %s" for a in calls)
+
+
+@pytest.mark.skipif(
+    sys.version_info < (3, 11),
+    reason="packages_distributions requires Python 3.11+",
+)
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_no_packages_distributions(
+    mock_logger, mock_mgr
+):
+    """
+    CLI: _log_runtime_env() gracefully skips dep listing when
+    packages_distributions() is missing (ImportError path).
+    Simulates the Python < 3.11 scenario on Python 3.11+ by temporarily
+    removing packages_distributions from importlib.metadata.
+    """
+    import importlib.metadata as _meta
+
+    mock_logger.isEnabledFor.return_value = True
+
+    class DepPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ("somepkg",)
+
+    mock_mgr.return_value = [{"plugin": {DepPlugin}}]
+
+    # Temporarily hide packages_distributions to trigger the ImportError
+    _pd = _meta.packages_distributions
+    del _meta.packages_distributions
+    try:
+        cli._log_runtime_env()
+    finally:
+        _meta.packages_distributions = _pd
+
+    # Env summary was still logged despite the missing function
+    calls = [a for a, _ in mock_logger.debug.call_args_list]
+    assert any(a[0] == "Apprise: %s" for a in calls)
+
+    # No dep listing -- packages_distributions was unavailable
+    assert not any(a[0] == "Runtime deps: %s" for a in calls)
+
+
+# Remove this test when Python 3.9 support is dropped.
+@pytest.mark.skipif(
+    sys.version_info >= (3, 11),
+    reason="packages_distributions exists on Python 3.11+",
+)
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_py39_no_packages_distributions(
+    mock_logger, mock_mgr
+):
+    """
+    CLI: _log_runtime_env() gracefully skips dep listing on Python < 3.11
+    where packages_distributions() is genuinely absent.
+    """
+    mock_logger.isEnabledFor.return_value = True
+
+    class DepPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ("somepkg",)
+
+    mock_mgr.return_value = [{"plugin": {DepPlugin}}]
+
+    # packages_distributions() absent natively -- no manipulation needed
+    cli._log_runtime_env()
+
+    # Env summary was still logged despite the missing function
+    calls = [a for a, _ in mock_logger.debug.call_args_list]
+    assert any(a[0] == "Apprise: %s" for a in calls)
+
+    # No dep listing -- packages_distributions unavailable on Python < 3.11
     assert not any(a[0] == "Runtime deps: %s" for a in calls)
