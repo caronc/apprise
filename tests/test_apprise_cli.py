@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from importlib import reload
+from importlib.metadata import PackageNotFoundError
 from inspect import cleandoc
 import json
 
@@ -2671,3 +2672,218 @@ def test_apprise_cli_windows_env(mock_system):
 
     # Reload our module
     reload(cli)
+
+
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.version")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_skip_when_not_debug(
+    mock_logger, mock_ver, mock_dist, mock_mgr
+):
+    """
+    CLI: _log_runtime_env() exits immediately when not at DEBUG level.
+    """
+    # Simulate a logger that is not at DEBUG level
+    mock_logger.isEnabledFor.return_value = False
+
+    cli._log_runtime_env()
+
+    # Nothing should be computed or logged
+    mock_logger.debug.assert_not_called()
+    mock_mgr.assert_not_called()
+    mock_dist.assert_not_called()
+    mock_ver.assert_not_called()
+
+
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.version")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_logging(
+    mock_logger, mock_ver, mock_dist, mock_mgr
+):
+    """
+    CLI: _log_runtime_env() summary
+    """
+    # Simulate a DEBUG-level logger
+    mock_logger.isEnabledFor.return_value = True
+
+    # Plugin whose dep should appear in output
+    class EnabledPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ("testpkg",)
+
+    # Disabled plugin -- its dep must NOT appear in output
+    class DisabledPlugin:
+        enabled = False
+
+        @staticmethod
+        def runtime_deps():
+            return ("disabled-dep",)
+
+    # Plugin with no runtime_deps attribute -- silently skipped
+    class NoRuntimeDepsPlugin:
+        enabled = True
+
+    mock_mgr.return_value = [
+        {
+            "plugin": {
+                EnabledPlugin,
+                DisabledPlugin,
+                NoRuntimeDepsPlugin,
+            },
+        },
+    ]
+    mock_dist.return_value = {"testpkg": ["test-package"]}
+    mock_ver.return_value = "9.9.9"
+
+    cli._log_runtime_env()
+
+    # Collect positional-arg tuples from each debug() call
+    calls = [a for a, _ in mock_logger.debug.call_args_list]
+
+    # Environment summary lines must be present
+    assert any(a[0] == "Apprise: %s" for a in calls)
+    assert any(a[0] == "Python: %s" for a in calls)
+    assert any(a[0] == "Platform: %s" for a in calls)
+    assert any(a[0] == "Encoding: %s" for a in calls)
+
+    # Resolved deps emitted as a single inline line
+    assert any(
+        a[0] == "Runtime deps: %s" and a[1] == "test-package=9.9.9"
+        for a in calls
+    )
+
+    # Disabled plugin dep must not be logged
+    assert not any("disabled-dep" in str(a) for a in calls)
+
+
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.version")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_no_runtime_deps(
+    mock_logger, mock_ver, mock_dist, mock_mgr
+):
+    """
+    CLI: _log_runtime_env()
+    """
+    mock_logger.isEnabledFor.return_value = True
+
+    # Plugin that declares no deps
+    class NoDepsPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ()
+
+    mock_mgr.return_value = [{"plugin": {NoDepsPlugin}}]
+
+    cli._log_runtime_env()
+
+    # Environment header was still logged
+    calls = [a for a, _ in mock_logger.debug.call_args_list]
+    assert any(a[0] == "Apprise: %s" for a in calls)
+
+    # Package-metadata scan must not have been attempted
+    mock_dist.assert_not_called()
+    mock_ver.assert_not_called()
+
+    # No "  pkg: ver" lines
+    assert not any(a[0] == "Runtime deps: %s" for a in calls)
+
+
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.version")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_dist_map_exception(
+    mock_logger, mock_ver, mock_dist, mock_mgr
+):
+    """
+    CLI: _log_runtime_env() handles packages_distributions() failures.
+    """
+    mock_logger.isEnabledFor.return_value = True
+
+    class DepPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ("somepkg",)
+
+    mock_mgr.return_value = [{"plugin": {DepPlugin}}]
+    mock_dist.side_effect = Exception("metadata unavailable")
+
+    # Must not raise
+    cli._log_runtime_env()
+
+    # pkg_version should never be reached
+    mock_ver.assert_not_called()
+
+    # No "  pkg: ver" lines
+    calls = [a for a, _ in mock_logger.debug.call_args_list]
+    assert not any(a[0] == "Runtime deps: %s" for a in calls)
+
+
+@mock.patch("apprise.cli.NotificationManager")
+@mock.patch("importlib.metadata.packages_distributions")
+@mock.patch("importlib.metadata.version")
+@mock.patch("apprise.cli.logger")
+def test_apprise_cli_runtime_env_lookup_errors(
+    mock_logger, mock_ver, mock_dist, mock_mgr
+):
+    """
+    CLI: _log_runtime_env() silently skips packages exception raised.
+    """
+    mock_logger.isEnabledFor.return_value = True
+
+    # Plugin whose runtime_deps() raises
+    class BrokenPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            raise RuntimeError("plugin error")
+
+    # Plugin whose dep import name is not in the dist map
+    class UnmappedPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ("notmapped",)
+
+    # Plugin whose dep maps to a dist but the version lookup fails
+    class VersionlessPlugin:
+        enabled = True
+
+        @staticmethod
+        def runtime_deps():
+            return ("verpkg",)
+
+    mock_mgr.return_value = [
+        {
+            "plugin": {
+                BrokenPlugin,
+                UnmappedPlugin,
+                VersionlessPlugin,
+            },
+        },
+    ]
+
+    # "notmapped" absent from map; "verpkg" present but ver raises
+    mock_dist.return_value = {"verpkg": ["ver-package"]}
+    mock_ver.side_effect = PackageNotFoundError("ver-package")
+
+    # Must not raise
+    cli._log_runtime_env()
+
+    # None of the error paths should produce a "  pkg: ver" line
+    calls = [a for a, _ in mock_logger.debug.call_args_list]
+    assert not any(a[0] == "Runtime deps: %s" for a in calls)

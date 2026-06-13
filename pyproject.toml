@@ -244,7 +244,7 @@ all-plugins = [
     "smpplib",
 
     # For xmpp:// support
-    "slixmpp >= 1.10.0",
+    "slixmpp >= 1.16.0",
 ]
 windows = [
     "pywin32",
