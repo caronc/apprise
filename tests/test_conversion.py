@@ -231,6 +231,185 @@ def test_conversion_html_to_text():
         assert to_html(object)
 
 
+def test_conversion_html_to_markdown():
+    """conversion: Test HTML to Markdown."""
+
+    def to_md(body):
+        """Wrapper to simplify html-to-markdown conversion tests."""
+        return convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, body)
+
+    # Plain text with no HTML passes through unchanged
+    assert to_md("No HTML code here.") == "No HTML code here."
+
+    # Empty string in, empty string out
+    assert to_md("") == ""
+
+    # Paragraphs collapse to newline-separated text
+    assert (
+        to_md("<p>line 1</p><p>line 2</p><p>line 3</p>")
+        == "line 1\nline 2\nline 3"
+    )
+
+    # Case sensitivity -- tag names are case-insensitive in HTML
+    assert (
+        to_md("<p>line 1</P><P>line 2</P><P>line 3</P>")
+        == "line 1\nline 2\nline 3"
+    )
+
+    # <br> and self-closing <br/> both emit a literal newline
+    assert (
+        to_md("some information<br/><br>and more information")
+        == "some information\n\nand more information"
+    )
+
+    # Each heading level maps to the correct number of # characters
+    assert to_md("<h1>Heading 1</h1>") == "# Heading 1"
+    assert to_md("<h2>Heading 2</h2>") == "## Heading 2"
+    assert to_md("<h3>Heading 3</h3>") == "### Heading 3"
+    assert to_md("<h4>Heading 4</h4>") == "#### Heading 4"
+    assert to_md("<h5>Heading 5</h5>") == "##### Heading 5"
+    assert to_md("<h6>Heading 6</h6>") == "###### Heading 6"
+
+    # Multiple headings and paragraphs together
+    assert to_md(
+        "<h1>Heading 1</h1>"
+        "<h2>Heading 2</h2>"
+        "<h3>Heading 3</h3>"
+        "<h4>Heading 4</h4>"
+        "<h5>Heading 5</h5>"
+        "<h6>Heading 6</h6>"
+        "<p>line 1</>"
+        "<p><em>line 2</em></gar>"
+        "<p>line 3>"
+    ) == (
+        "# Heading 1\n## Heading 2\n### Heading 3\n"
+        "#### Heading 4\n##### Heading 5\n###### Heading 6\n"
+        "line 1\n*line 2*\nline 3>"
+    )
+
+    # <b> and <strong> both produce bold markers
+    assert to_md("<b>bold text</b>") == "**bold text**"
+    assert to_md("<strong>bold text</strong>") == "**bold text**"
+
+    # <i> and <em> both produce italic markers
+    assert to_md("<i>italic</i>") == "*italic*"
+    assert to_md("<em>italic</em>") == "*italic*"
+
+    # Inline bold wrapping a paragraph
+    assert (
+        to_md(
+            "<body><div>line 1 <b>bold</b></div> "
+            " <a href='/link'>my link</a>"
+            "<p>3rd line</body>"
+        )
+        == "line 1 **bold**\n[my link](/link)\n3rd line"
+    )
+
+    # <a href="..."> produces Markdown link syntax
+    assert (
+        to_md("<span></span<<span>test</span> <a href='#'>my link</a>")
+        == "test [my link](#)"
+    )
+
+    # <a> with no href attribute -- content rendered as plain text
+    assert to_md("<span>test</span> <a>no link</a>") == "test no link"
+
+    # Inline <code> wraps in backticks without a block boundary
+    assert to_md("<code>func()</code>") == "`func()`"
+
+    # Markdown special characters inside <code> are NOT escaped --
+    # backtick delimiters already make content literal
+    assert to_md("<code>x*2 and #tag</code>") == "`x*2 and #tag`"
+
+    # <pre> produces a fenced code block
+    assert to_md("<pre>line a\nline b</pre>") == "```\nline a\nline b\n```"
+
+    # <samp> is treated the same as <pre> (fenced block)
+    assert to_md("<samp>output\nhere</samp>") == "```\noutput\nhere\n```"
+
+    # Inline code followed immediately by a pre block
+    assert to_md(
+        "<code>multi-line 1\nmulti-line 2</code>more content"
+        "<pre>multi-line 1\nmulti-line 2</pre>more content"
+    ) == (
+        "`multi-line 1\nmulti-line 2`more content"
+        "\n```\nmulti-line 1\nmulti-line 2\n```\nmore content"
+    )
+
+    # Unordered lists produce "- " prefixed items
+    result = to_md("<ul><li>Lots and lots</li><li>of lists.</li></ul>")
+    assert "- Lots and lots" in result
+    assert "- of lists." in result
+
+    assert (
+        to_md("<blockquote>To be or not to be.</blockquote>")
+        == "> To be or not to be."
+    )
+
+    # Standalone <hr/> produces just "---"
+    assert to_md("<hr/>") == "---"
+    assert to_md("<hr>") == "---"
+
+    # <style> content is suppressed
+    assert (
+        to_md(
+            "<style>body { font: 200%; }</style>"
+            "<p>Some obnoxious text here.</p>"
+        )
+        == "Some obnoxious text here."
+    )
+
+    # <script> content is suppressed
+    assert (
+        to_md(
+            "<script>ignore this</script>"
+            "<p>line 1</p>"
+            "Another line without being enclosed"
+        )
+        == "line 1\nAnother line without being enclosed"
+    )
+
+    # '*' outside code is escaped so it does not trigger emphasis
+    assert to_md("<p>price: 5 * 3</p>") == r"price: 5 \* 3"
+
+    # '#' outside code is escaped so it does not trigger a heading
+    assert to_md("<p>Tag #1</p>") == r"Tag \#1"
+
+    # Backtick outside code is escaped
+    assert to_md("<p>Use `func`</p>") == r"Use \`func\`"
+
+    assert (
+        to_md(
+            """
+        <html>
+            <title>ignore this entry</title>
+        <body>
+          Let&apos;s handle&nbsp;special html encoding
+          <hr/>
+        </body>
+        """
+        )
+        == "Let's handle special html encoding\n---"
+    )
+
+    # Missing </p> is handled gracefully
+    assert (
+        to_md(
+            "<h2>Heading</h2><p>And a paragraph too.<br>Plus line break.</p>"
+        )
+        == "## Heading\nAnd a paragraph too.\nPlus line break."
+    )
+
+    with pytest.raises(TypeError):
+        to_md(None)
+
+    with pytest.raises(TypeError):
+        to_md(42)
+
+    with pytest.raises(TypeError):
+        to_md(object)
+
+
 def test_conversion_text_to():
     """conversion: Test Text to all types"""
 

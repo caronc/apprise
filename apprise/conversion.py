@@ -45,8 +45,7 @@ def convert_between(from_format, to_format, content):
         (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
         (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
         (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
-        # For now; use same converter for Markdown support
-        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_text,
+        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
     }
 
     convert = converters.get((from_format, to_format))
@@ -72,6 +71,15 @@ def html_to_text(content):
     """Converts a content from HTML to plain text."""
 
     parser = HTMLConverter()
+    parser.feed(content)
+    parser.close()
+    return parser.converted
+
+
+def html_to_markdown(content):
+    """Converts a content from HTML to Markdown."""
+
+    parser = HTMLMarkdownConverter()
     parser.feed(content)
     parser.close()
     return parser.converted
@@ -209,3 +217,162 @@ class HTMLConverter(HTMLParser):
 
         if tag in self.BLOCK_TAGS:
             self._result.append(self.BLOCK_END)
+
+
+class HTMLMarkdownConverter(HTMLConverter):
+    """An HTML to Markdown converter tuned for email messages."""
+
+    # Override BLOCK_TAGS to exclude 'code' (handled inline with backticks)
+    # and include 'samp' (treated as a fenced pre block like 'pre').
+    BLOCK_TAGS = (
+        "p",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "h5",
+        "h6",
+        "div",
+        "td",
+        "th",
+        "pre",
+        "samp",
+        "label",
+        "li",
+    )
+
+    # Escape content characters that carry special meaning in Markdown
+    MARKDOWN_ESCAPE = re.compile(r"([`*#])", re.DOTALL | re.MULTILINE)
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+        # href value of the current <a> tag; empty string means no link
+        self._link = ""
+
+        # True while inside a <code>, <pre>, or <samp> block so that
+        # carriage returns in the content are preserved rather than
+        # collapsed by WS_TRIM
+        self._preserve_cr = False
+
+    def handle_data(self, data, *args, **kwargs):
+        """Store data, escaping Markdown special characters."""
+
+        if not self._do_store:
+            return
+
+        # Preserve whitespace literally inside code/pre blocks;
+        # collapse whitespace runs to a single space everywhere else
+        content = data if self._preserve_cr else self.WS_TRIM.sub(" ", data)
+
+        # Escape Markdown special characters only outside code/pre blocks --
+        # content inside backtick/fence delimiters is already treated as
+        # literal by all Markdown parsers; escaping there produces wrong output
+        if not self._preserve_cr:
+            content = self.MARKDOWN_ESCAPE.sub(r"\\\1", content)
+
+        # Wrap in link syntax when we are inside an <a href="..."> tag
+        if self._link:
+            self._result.append("[" + content + "]" + self._link)
+
+        else:
+            self._result.append(content)
+
+    def handle_starttag(self, tag, attrs):
+        """Process a starting HTML tag."""
+
+        # Determine whether text content inside this tag should be kept
+        self._do_store = tag not in self.IGNORE_TAGS
+        self._link = ""
+
+        # Block-level elements force a line break before their content
+        if tag in self.BLOCK_TAGS:
+            self._result.append(self.BLOCK_END)
+
+        if tag == "li":
+            self._result.append("- ")
+
+        elif tag == "br":
+            self._result.append("\n")
+
+        elif tag == "hr":
+            if self._result and isinstance(self._result[-1], str):
+                self._result[-1] = self._result[-1].rstrip(" ")
+
+            self._result.append("\n---\n")
+
+        elif tag == "blockquote":
+            self._result.append("> ")
+
+        elif tag == "h1":
+            self._result.append("# ")
+
+        elif tag == "h2":
+            self._result.append("## ")
+
+        elif tag == "h3":
+            self._result.append("### ")
+
+        elif tag == "h4":
+            self._result.append("#### ")
+
+        elif tag == "h5":
+            self._result.append("##### ")
+
+        elif tag == "h6":
+            self._result.append("###### ")
+
+        elif tag in ("strong", "b"):
+            self._result.append("**")
+
+        elif tag in ("em", "i"):
+            self._result.append("*")
+
+        elif tag == "code":
+            # Inline code -- no block boundary, just wrap in backticks
+            self._result.append("`")
+            self._preserve_cr = True
+
+        elif tag in ("pre", "samp"):
+            # Fenced code block -- the BLOCK_END above separates it from
+            # preceding content; a second BLOCK_END after the fence
+            # marker ensures the content starts on its own line
+            self._result.append("```")
+            self._result.append(self.BLOCK_END)
+            self._preserve_cr = True
+
+        elif tag == "a":
+            # Build the link target from the href attribute
+            href = next(
+                (v for k, v in attrs if k == "href"),
+                None,
+            )
+            if href is not None:
+                self._link = "(" + href + ")"
+
+    def handle_endtag(self, tag):
+        """Edge case handling of close tags."""
+
+        self._do_store = True
+        self._link = ""
+
+        # Block-level elements force a line break after their content
+        if tag in self.BLOCK_TAGS:
+            self._result.append(self.BLOCK_END)
+
+        if tag in ("strong", "b"):
+            self._result.append("**")
+
+        elif tag in ("em", "i"):
+            self._result.append("*")
+
+        elif tag == "code":
+            self._result.append("`")
+            self._preserve_cr = False
+
+        elif tag in ("pre", "samp"):
+            # The BLOCK_END from BLOCK_TAGS above ends the content line;
+            # the closing fence and a second BLOCK_END close the block
+            self._result.append("```")
+            self._result.append(self.BLOCK_END)
+            self._preserve_cr = False
