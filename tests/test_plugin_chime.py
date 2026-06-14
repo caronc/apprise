@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 from unittest import mock
 
@@ -33,7 +34,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, NotifyFormat
 from apprise.plugins.chime import NotifyChime
 
 logging.disable(logging.CRITICAL)
@@ -443,3 +444,31 @@ def test_plugin_chime_url_identifier(mock_post):
     assert obj1.url_identifier[0] == NotifyChime.secure_protocol
     assert obj1.url_identifier[1] == TEST_WEBHOOK_ID
     assert obj1.url_identifier[2] == TEST_TOKEN
+
+
+@mock.patch("requests.post")
+def test_plugin_chime_html_to_markdown_format(mock_post):
+    """NotifyChime(): HTML body is converted to Markdown."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Chime's notify_format is MARKDOWN by default
+    aobj = Apprise()
+    assert aobj.add("chime://{}/{}".format(TEST_WEBHOOK_ID, TEST_TOKEN))
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Chime
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    # The body must arrive as Markdown, not as stripped plain text
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["Content"] == "**hello** *world*"

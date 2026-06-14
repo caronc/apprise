@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 import os
 from unittest import mock
@@ -34,7 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.webexteams import (
     NotifyWebexTeams,
     WebexTeamsMode,
@@ -703,3 +704,32 @@ def test_plugin_webex_teams_apprise_integration(mock_post):
     app2 = Apprise()
     assert app2.add("wxteams://{}/{}".format(BOT_TOKEN, ROOM_ID))
     assert app2.notify(body="bot test") is True
+
+
+@mock.patch("requests.post")
+def test_plugin_webex_teams_html_to_markdown_format(mock_post):
+    """NotifyWebexTeams(): HTML body is converted to Markdown."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Use a webhook URL (80-char token, webhook mode)
+    aobj = Apprise()
+    assert aobj.add("wxteams://{}".format("a" * 80))
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Webex Teams
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    # The body must arrive as Markdown (not plain text) in the
+    # "markdown" key, since notify_format is MARKDOWN by default
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["markdown"] == "**hello** *world*"

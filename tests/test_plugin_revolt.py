@@ -26,7 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from datetime import datetime, timedelta
-from json import dumps
+from json import dumps, loads
 
 # Disable logging for a cleaner testing output
 import logging
@@ -568,3 +568,35 @@ def test_plugin_revolt_markdown_extra(mock_post):
         a.notify(body="body", title="title", notify_type=NotifyType.INFO)
         is True
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_revolt_html_to_markdown_format(mock_post):
+    """NotifyRevolt(): HTML body is converted to Markdown."""
+
+    # Initialize some generic (but valid) tokens
+    bot_token = "A" * 24
+    channel_id = "B" * 64
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = REVOLT_GOOD_RESPONSE
+
+    # Instantiate a Revolt plugin in Markdown mode
+    aobj = Apprise()
+    assert aobj.add(f"revolt://{bot_token}/{channel_id}/?format=markdown")
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Revolt
+    result = aobj.notify(
+        body="<b>hello</b> <i>world</i>",
+        body_format=NotifyFormat.HTML,
+    )
+    assert result is True
+    assert mock_post.call_count == 1
+
+    # The body must arrive inside the Markdown embed, not as
+    # stripped plain text in "content"
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["embeds"][0]["description"] == "**hello** *world*"

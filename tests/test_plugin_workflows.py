@@ -37,7 +37,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseConfig, NotifyType
+from apprise import Apprise, AppriseConfig, NotifyFormat, NotifyType
 from apprise.plugins.workflows import NotifyWorkflows
 
 logging.disable(logging.CRITICAL)
@@ -873,3 +873,34 @@ def test_plugin_workflows_azure_webhooks(request_mock):
     assert obj.workflow == "3XXX5"
     assert obj.signature == "iXXXU"
     assert obj.api_version == "2016-06-01"
+
+
+@mock.patch("requests.post")
+def test_plugin_workflows_html_to_markdown_format(mock_post):
+    """NotifyWorkflows(): HTML body is converted to Markdown."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Workflows' notify_format is MARKDOWN by default
+    aobj = Apprise()
+    assert aobj.add("workflow://hostname/workflow1/signature1/?image=no")
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Workflows
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    # The body must arrive as Markdown inside the adaptive card body block,
+    # not as stripped plain text
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    body_blocks = payload["attachments"][0]["content"]["body"]
+    body_text = next(b["text"] for b in body_blocks if b.get("id") == "body")
+    assert body_text == "**hello** *world*"

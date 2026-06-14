@@ -37,7 +37,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
@@ -2213,3 +2213,38 @@ def test_plugin_slack_workflow_template(mock_request, tmpdir):
         obj2.notify(body="x", title="", notify_type=NotifyType.INFO) is False
     )
     assert mock_request.call_count == 1  # no new request made
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_html_to_markdown_format(mock_request):
+    """NotifySlack(): HTML body is converted to Markdown."""
+
+    # Use the classic incoming webhook token format
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    # Slack's _send() uses requests.request(), not requests.post();
+    # webhook mode confirms success via content == b"ok"
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    # Instantiate a Slack plugin (notify_format is MARKDOWN by default)
+    aobj = Apprise()
+    assert aobj.add("slack://{}/#general".format(slack_token))
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Slack
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_request.call_count == 1
+
+    # The body must arrive as Markdown in the legacy attachment text,
+    # not as stripped plain text
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["attachments"][0]["text"] == "**hello** *world*"

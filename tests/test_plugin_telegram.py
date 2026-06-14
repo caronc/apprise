@@ -1429,6 +1429,60 @@ def test_plugin_telegram_html_formatting(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_telegram_html_to_markdown_format(mock_post):
+    """NotifyTelegram() HTML body delivered to a Markdown-mode target."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    # Simple HTML that our html_to_markdown converter handles
+    body = "<b>hello</b> <i>world</i>"
+
+    # --- Markdown v1 target ---
+    # convert_between(HTML, MARKDOWN) now produces generic Markdown via
+    # html_to_markdown().  For v1, the blunt re.sub escaping is gated on
+    # markdown_ver == TWO, so the converted body passes through unchanged.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1")
+    assert len(aobj) == 1
+
+    assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    # html_to_markdown produced "**hello** *world*"; v1 has no further
+    # escaping for non-Markdown input, so it arrives in the payload intact
+    assert payload["parse_mode"] == "MARKDOWN"
+    assert payload["text"] == "**hello** *world*"
+
+    mock_post.reset_mock()
+
+    # --- Markdown v2 target ---
+    # For v2, Telegram's existing blunt re.sub fires on the already-converted
+    # Markdown body (body_format=HTML triggers the condition).  The result is
+    # double-escaped: each '*' becomes '\*', making formatting markers
+    # visible as literal text.  This is a known limitation of the current
+    # Telegram plugin when receiving HTML for a Markdown-mode target; it is
+    # documented here so that any future fix must consciously update this
+    # assertion rather than changing the behaviour silently.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    # "**hello** *world*" after v2 re.sub escaping
+    assert payload["text"] == r"\*\*hello\*\* \*world\*"
+
+
+@mock.patch("requests.post")
 def test_plugin_telegram_threads(mock_post):
     """NotifyTelegram() Threads/Topics."""
     # Prepare Mock

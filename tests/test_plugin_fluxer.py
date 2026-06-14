@@ -1369,3 +1369,40 @@ def test_plugin_fluxer_attach_memory(mock_post: mock.MagicMock) -> None:
 
     assert obj.notify(body="Test", attach=mem) is True
     assert mock_post.call_count >= 1
+
+
+@mock.patch("requests.post")
+def test_plugin_fluxer_html_to_markdown_format(mock_post):
+    """NotifyFluxer(): HTML body is converted to Markdown."""
+
+    webhook_id, webhook_token = _tokens()
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = ""
+    mock_post.return_value.headers = {}
+
+    # Instantiate a Fluxer plugin in Markdown mode with fields
+    # disabled so the body lands in embeds[0]["description"] directly
+    obj = Apprise.instantiate(
+        f"fluxer://{webhook_id}/{webhook_token}/?format=markdown&fields=no"
+    )
+
+    aobj = Apprise()
+    aobj.add(obj)
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Fluxer
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    # The body must arrive in the embed description as Markdown,
+    # not as stripped plain text
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["embeds"][0]["description"] == "**hello** *world*"
