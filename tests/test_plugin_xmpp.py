@@ -88,7 +88,7 @@ class FakeClientXMPP:
         self.handlers: dict[str, Any] = {}
         self.auto_reconnect = True
 
-        # Slixmpp >= 1.10.0: adapter waits on this Future
+        # Slixmpp >= 1.16.0: adapter waits on this Future
         self.disconnected: Optional[asyncio.Future[bool]] = None
 
         # Slixmpp toggles used by adapter
@@ -123,7 +123,7 @@ class FakeClientXMPP:
 
     def connect(self, **kwargs: Any) -> asyncio.Future[bool]:
         """
-        Slixmpp >= 1.10.0 connect() returns a Future. Our adapter awaits it.
+        Slixmpp >= 1.16.0 connect() returns a Future. Our adapter awaits it.
 
         This fake schedules session_start on the assigned loop so the adapter's
         loop.run_until_complete() drives it, and ensures disconnected resolves.
@@ -1538,15 +1538,19 @@ def test_xmpp_slixmpp_versioning(monkeypatch: pytest.MonkeyPatch) -> None:
     """
     # Garbage in... garbage out
     assert xmpp_adapter.SlixmppAdapter.supported_version("garbage") is False
-    # This version is too old
+    # These versions are too old
     assert xmpp_adapter.SlixmppAdapter.supported_version("1.0.0") is False
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.10.0") is False
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.14.1") is False
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.15.0") is False
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.15.1") is False
 
     # Good version checks
-    assert xmpp_adapter.SlixmppAdapter.supported_version("1.10.0") is True
-    assert xmpp_adapter.SlixmppAdapter.supported_version("1.10") is True
-    assert xmpp_adapter.SlixmppAdapter.supported_version("1.10.1") is True
-    assert xmpp_adapter.SlixmppAdapter.supported_version("1.10.100") is True
-    assert xmpp_adapter.SlixmppAdapter.supported_version("1.11.0") is True
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.16.0") is True
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.16") is True
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.16.1") is True
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.16.100") is True
+    assert xmpp_adapter.SlixmppAdapter.supported_version("1.17.0") is True
 
     # This version is too old
     assert xmpp_adapter.SlixmppAdapter.supported_version("1") is False
@@ -5326,6 +5330,41 @@ def test_xmpp_send_catches_channel_binding_error_and_logs(
 
     assert result is False
     assert "scramplus=no" in caplog.text
+
+
+@pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
+def test_xmpp_send_channel_binding_error_scramplus_already_disabled(
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """No ?scramplus=no hint when scramplus is already False."""
+
+    class _RaisingAdapter:
+        def __init__(self, **kwargs: Any) -> None:
+            pass
+
+        def process(self) -> bool:
+            raise xmpp_adapter.XMPPChannelBindingError()
+
+    monkeypatch.setattr(xmpp_base, "SlixmppAdapter", _RaisingAdapter)
+    monkeypatch.setattr(
+        xmpp_base, "SLIXMPP_SUPPORT_AVAILABLE", True, raising=False
+    )
+    monkeypatch.setattr(xmpp_base.NotifyXMPP, "enabled", True, raising=False)
+
+    # scramplus explicitly disabled -- the hint must NOT repeat the advice
+    n = NotifyXMPP(
+        host="example.com", user="me", password="x", scramplus=False
+    )
+
+    with caplog.at_level(logging.WARNING, logger="apprise"):
+        result = n.send(body="hi")
+
+    assert result is False
+    # The "Add ?scramplus=no" suggestion must not appear when already set
+    assert "Add ?scramplus=no" not in caplog.text
+    # A compatibility-oriented message must appear instead
+    assert "compatibility" in caplog.text
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")

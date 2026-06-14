@@ -40,6 +40,7 @@ from . import (
     Apprise,
     AppriseAsset,
     AppriseConfig,
+    NotificationManager,
     PersistentStore,
     __copyright__,
     __license__,
@@ -243,6 +244,86 @@ PERSISTENT_STORAGE_MODES = (
 if os.environ.get("APPRISE_STORAGE_PATH", "").strip():
     # Override Default Storage Path
     DEFAULT_STORAGE_PATH = os.environ.get("APPRISE_STORAGE_PATH")
+
+
+def _log_runtime_env():
+    """Log Python, OS, encoding, and optional-dependency versions.
+
+    Only runs when the logger is at DEBUG level or below.
+    """
+    # Skip all work when DEBUG output is not enabled
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+
+    import contextlib
+    import locale
+
+    # One-line environment summary
+    logger.debug("Apprise: %s", __version__)
+    logger.debug("Python: %s", platform.python_version())
+    logger.debug("Platform: %s", platform.platform())
+    logger.debug("Encoding: %s", locale.getpreferredencoding(False))
+
+    # Collect unique runtime-dep import names from all enabled plugins
+    dep_names = set()
+    for module in NotificationManager():
+        for plugin in module.get("plugin", ()):
+            # Skip disabled plugins
+            if not getattr(plugin, "enabled", True):
+                continue
+
+            fn = getattr(plugin, "runtime_deps", None)
+            if not callable(fn):
+                continue
+
+            with contextlib.suppress(Exception):
+                dep_names.update(fn())
+
+    # Nothing to report
+    if not dep_names:
+        return
+
+    # packages_distributions() was added in Python 3.11; on older
+    # Python we skip the dep listing but the env summary above is
+    # still emitted.
+    try:
+        from importlib.metadata import (
+            PackageNotFoundError,
+            packages_distributions,
+            version as pkg_version,
+        )
+
+    except ImportError:
+        return
+
+    # Resolve import names -> pip distribution names, then fetch
+    # versions.  packages_distributions() returns:
+    #   {import_name: [dist_name, ...]}
+    try:
+        dist_map = packages_distributions()
+
+    except Exception:
+        return
+
+    # Build a sorted list of "name=version" pairs for resolved packages
+    resolved = []
+    for name in sorted(dep_names):
+        dist_names = dist_map.get(name, [])
+        if not dist_names:
+            # Import name not mapped to any installed distribution
+            continue
+
+        try:
+            ver = pkg_version(dist_names[0])
+
+        except (PackageNotFoundError, Exception):
+            # Package listed but not actually installed; skip silently
+            continue
+
+        resolved.append("{}={}".format(dist_names[0], ver))
+
+    if resolved:
+        logger.debug("Runtime deps: %s", ", ".join(resolved))
 
 
 def print_version_msg():
@@ -674,6 +755,9 @@ def main(
     for handler in logger.handlers:
         asyncio_logger.addHandler(handler)
     asyncio_logger.setLevel(logger.level)
+
+    # Log environment and runtime-dependency versions when debugging
+    _log_runtime_env()
 
     if version:
         print_version_msg()

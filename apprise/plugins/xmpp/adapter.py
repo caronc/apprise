@@ -390,7 +390,7 @@ class SlixmppAdapter:
 
     # Define a Slixmpp reference version to prevent this tool from working
     # under non-supported versions
-    _supported_version = (1, 10, 0)
+    _supported_version = (1, 16, 0)
 
     # Flag to control if we are enabled or not
     # effectively.. .is the dependent slixmpp library available to us

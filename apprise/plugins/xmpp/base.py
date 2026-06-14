@@ -452,13 +452,23 @@ class NotifyXMPP(NotifyBase):
 
         except XMPPChannelBindingError:
             # The server rejected SASL SCRAM-PLUS channel binding.
-            # Log a targeted hint so the user knows what to fix.
-            self.logger.warning(
-                "XMPP authentication failed: the server rejected "
-                "SASL SCRAM-PLUS channel binding. Add "
-                "?scramplus=no to your Apprise URL to disable "
-                "SCRAM-PLUS mechanism negotiation."
-            )
+            # Only suggest ?scramplus=no when it has not already been set.
+            if self.scramplus:
+                self.logger.warning(
+                    "XMPP authentication failed: the server rejected "
+                    "SASL SCRAM-PLUS channel binding. Add "
+                    "?scramplus=no to your Apprise URL to disable "
+                    "SCRAM-PLUS mechanism negotiation."
+                )
+
+            else:
+                self.logger.warning(
+                    "XMPP authentication failed: the server rejected "
+                    "channel binding despite ?scramplus=no being set. "
+                    "This may be a Slixmpp or server compatibility "
+                    "issue."
+                )
+
             return False
 
     @property
