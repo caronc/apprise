@@ -1460,14 +1460,7 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
 
     mock_post.reset_mock()
 
-    # --- Markdown v2 target ---
-    # For v2, Telegram's existing blunt re.sub fires on the already-converted
-    # Markdown body (body_format=HTML triggers the condition).  The result is
-    # double-escaped: each '*' becomes '\*', making formatting markers
-    # visible as literal text.  This is a known limitation of the current
-    # Telegram plugin when receiving HTML for a Markdown-mode target; it is
-    # documented here so that any future fix must consciously update this
-    # assertion rather than changing the behaviour silently.
+    # Markdown v2 target
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
     assert len(aobj) == 1
@@ -1478,8 +1471,39 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert payload["parse_mode"] == "MarkdownV2"
-    # "**hello** *world*" after v2 re.sub escaping
-    assert payload["text"] == r"\*\*hello\*\* \*world\*"
+    assert payload["text"] == "**hello** *world*"
+
+    mock_post.reset_mock()
+
+    # Markdown v2 target, plain TEXT body
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body="Tag #1 and *not* bold", body_format=NotifyFormat.TEXT
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == r"Tag \#1 and \*not\* bold"
+
+    mock_post.reset_mock()
+
+    # Markdown v2 target, no body_format specified
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(body="**already** markdown #tag")
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "**already** markdown #tag"
 
 
 @mock.patch("requests.post")

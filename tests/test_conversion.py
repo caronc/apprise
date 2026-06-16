@@ -33,7 +33,7 @@ import logging
 import pytest
 
 from apprise import NotifyFormat
-from apprise.conversion import convert_between
+from apprise.conversion import HTMLMarkdownConverter, convert_between
 
 logging.disable(logging.CRITICAL)
 
@@ -256,6 +256,16 @@ def test_conversion_html_to_markdown():
         == "line 1\nline 2\nline 3"
     )
 
+    # HTMLParser lowercases ALL tag names -- inline tags included
+    assert to_md("<B>bold text</B>") == "**bold text**"
+    assert to_md("<I>italic</I>") == "*italic*"
+
+    # Uppercase and mixed-case self-closing <BR/> also produce newlines
+    assert (
+        to_md("line one<BR/>line two<BR />line three")
+        == "line one\nline two\nline three"
+    )
+
     # <br> and self-closing <br/> both emit a literal newline
     assert (
         to_md("some information<br/><br>and more information")
@@ -311,8 +321,42 @@ def test_conversion_html_to_markdown():
         == "test [my link](#)"
     )
 
+    # <a> with nested inline markup -- the href must survive the child tags
+    assert (
+        to_md("<a href='/x'><b>hello</b> world</a>") == "[**hello** world](/x)"
+    )
+    assert (
+        to_md("<a href='/x'><strong>label</strong></a>") == "[**label**](/x)"
+    )
+    assert (
+        to_md("<a href='/x'><em>italic</em> and plain</a>")
+        == "[*italic* and plain](/x)"
+    )
+
+    # Nested <a> -- inner href wins for its own span; outer wraps the rest
+    assert (
+        to_md("<a href='/outer'>text <a href='/inner'>link</a></a>")
+        == "[text [link](/inner)](/outer)"
+    )
+
     # <a> with no href attribute -- content rendered as plain text
     assert to_md("<span>test</span> <a>no link</a>") == "test no link"
+
+    # Bare <a name="..."> anchor (no href) -- text passes through unchanged
+    assert to_md("<a name='top'>jump target</a>") == "jump target"
+
+    # <span> is inline -- it passes text through without a newline;
+    # <div> is block-level and always produces a newline around its content
+    assert to_md("<div>block</div><span>inline</span>") == "block\ninline"
+
+    # HTML comments are stripped entirely; surrounding text is preserved
+    assert to_md("<!-- comment --> text") == "text"
+    assert to_md("a<!-- c1 -->b<!-- c2 -->c") == "abc"
+
+    # <![CDATA[...]]> sections are gracefully ignored (content is dropped,
+    # text outside the CDATA boundary is kept)
+    assert to_md("text<![CDATA[data]]> here") == "text here"
+    assert to_md("<![CDATA[data]]>text") == "text"
 
     # Inline <code> wraps in backticks without a block boundary
     assert to_md("<code>func()</code>") == "`func()`"
@@ -408,6 +452,298 @@ def test_conversion_html_to_markdown():
 
     with pytest.raises(TypeError):
         to_md(object)
+
+
+def test_conversion_html_to_markdown_lists():
+    """conversion: Test HTML list nesting and numbering in Markdown."""
+
+    def to_md(body):
+        """Wrapper to simplify html-to-markdown conversion tests."""
+        return convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, body)
+
+    # Flat unordered list
+
+    assert (
+        to_md("<ul><li>alpha</li><li>beta</li><li>gamma</li></ul>")
+        == "- alpha\n- beta\n- gamma"
+    )
+
+    # Flat ordered list with auto-incrementing counter
+
+    assert (
+        to_md("<ol><li>first</li><li>second</li><li>third</li></ol>")
+        == "1. first\n2. second\n3. third"
+    )
+
+    # Nested unordered lists (2 levels)
+
+    assert (
+        to_md(
+            "<ul><li>top A<ul><li>nested A</li></ul></li><li>top B</li></ul>"
+        )
+        == "- top A\n  - nested A\n- top B"
+    )
+
+    # Nested unordered lists (3 levels)
+
+    assert (
+        to_md("<ul><li>L1<ul><li>L2<ul><li>L3</li></ul></li></ul></li></ul>")
+        == "- L1\n  - L2\n    - L3"
+    )
+
+    # Mixed nesting: ol inside ul
+
+    assert (
+        to_md(
+            "<ul>"
+            "<li>intro<ol>"
+            "<li>step one</li>"
+            "<li>step two</li>"
+            "</ol></li>"
+            "</ul>"
+        )
+        == "- intro\n  1. step one\n  2. step two"
+    )
+
+    # Mixed nesting: ul inside ol
+
+    assert (
+        to_md(
+            "<ol>"
+            "<li>first<ul>"
+            "<li>sub A</li>"
+            "<li>sub B</li>"
+            "</ul></li>"
+            "<li>second</li>"
+            "</ol>"
+        )
+        == "1. first\n  - sub A\n  - sub B\n2. second"
+    )
+
+    # Malformed HTML: missing </li> in a <ul>
+    # HTMLParser does not synthesize implicit close events; each missing
+    # </li> is simply absent, but the next <li> still starts a new item
+    assert (
+        to_md("<ul><li>item A<li>item B<li>item C</ul>")
+        == "- item A\n- item B\n- item C"
+    )
+
+    # Malformed HTML: missing </li> in a <ol>
+    # Without </li> the counter is never incremented, so all items
+    # render as "1." -- this is expected garbage-in/garbage-out behaviour
+    assert (
+        to_md("<ol><li>one<li>two<li>three</ol>") == "1. one\n1. two\n1. three"
+    )
+
+    # Malformed HTML: missing closing </ul>
+
+    assert to_md("<ul><li>item A</li><li>item B</li>") == "- item A\n- item B"
+
+    # Malformed HTML: missing </li> AND missing </ul>
+
+    assert to_md("<ul><li>item A<li>item B") == "- item A\n- item B"
+
+    # Malformed HTML: bare text inside <ul> (no <li> wrapper)
+    # <ul> is in IGNORE_TAGS so unwrapped text is suppressed entirely
+    assert to_md("<ul>bare text</ul>") == ""
+
+    # <code> inside <li>: inline code preserved with backticks
+
+    assert (
+        to_md("<ul><li>run <code>cmd --flag</code> now</li></ul>")
+        == "- run `cmd --flag` now"
+    )
+
+    # Markdown special characters inside <code> are NOT escaped
+    assert (
+        to_md("<ul><li>see <code>x*2 #tag</code></li></ul>")
+        == "- see `x*2 #tag`"
+    )
+
+    # <pre> inside <li>: fenced block with indentation preserved
+
+    assert (
+        to_md("<ul><li>code:<pre>  indented\n  here</pre></li></ul>")
+        == "- code:\n```\n  indented\n  here\n```"
+    )
+
+    # <pre> inside a nested <li>: indentation inside the fence is
+    # preserved regardless of the surrounding list nesting depth
+    assert (
+        to_md(
+            "<ul><li>outer<ul><li>inner:<pre>  x = 1</pre></li></ul></li></ul>"
+        )
+        == "- outer\n  - inner:\n```\n  x = 1\n```"
+    )
+
+    # A block element as the first child of <li> used to emit a spurious
+    # BLOCK_END that orphaned the marker on its own line.  The fix detects
+    # a list marker as _result[-1] and suppresses the redundant BLOCK_END.
+
+    # Single item with a <p> first child
+    assert to_md("<ul><li><p>alpha</p></li></ul>") == "- alpha"
+
+    # Multiple items each with a <p> first child
+    assert (
+        to_md("<ul><li><p>alpha</p></li><li><p>beta</p></li></ul>")
+        == "- alpha\n- beta"
+    )
+
+    # Multiple <p> children inside one <li>: first is joined to marker,
+    # subsequent ones start on new lines
+    assert to_md("<ul><li><p>one</p><p>two</p></li></ul>") == "- one\ntwo"
+
+    # Mixed: direct text for first item, <p> for second
+    assert (
+        to_md("<ul><li>direct</li><li><p>wrapped</p></li></ul>")
+        == "- direct\n- wrapped"
+    )
+
+    # Numbered list with <p> children
+    assert (
+        to_md("<ol><li><p>first</p></li><li><p>second</p></li></ol>")
+        == "1. first\n2. second"
+    )
+
+    # <a> link as first child of <li> -- the marker must share the line
+    assert to_md("<ul><li><a href='/x'>link</a></li></ul>") == "- [link](/x)"
+
+    # <a> with nested markup as first (and only) child of <li>
+    assert (
+        to_md("<ul><li><a href='/x'><b>bold link</b></a></li></ul>")
+        == "- [**bold link**](/x)"
+    )
+
+    # <a> link followed by a <p> sibling inside the same <li>
+    assert (
+        to_md("<ul><li><a href='/x'>link</a><p>more</p></li></ul>")
+        == "- [link](/x)\nmore"
+    )
+
+
+def test_conversion_html_to_markdown_escaping():
+    """conversion: HTMLMarkdownConverter avoids generating broken
+    Markdown when content collides with its own delimiters, or when
+    ignored containers would otherwise leak Markdown syntax."""
+
+    def to_md(body):
+        """Wrapper to simplify html-to-markdown conversion tests."""
+        return convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, body)
+
+    # Code/pre delimiter collision
+    # A backtick inside <code> widens the inline delimiter so it can't
+    # be closed early by a backtick already present in the content
+    assert to_md("<code>a`b</code>") == "``a`b``"
+
+    # Content starting or ending with a backtick gets a padding space,
+    # per CommonMark's code-span disambiguation rule
+    assert to_md("<code>`x</code>") == "`` `x ``"
+    assert to_md("<code>x`</code>") == "`` x` ``"
+
+    # A run of 3 backticks inside <pre> widens the fence past 3
+    assert to_md("<pre>boom```</pre>") == "````\nboom```\n````"
+
+    # Plain content with no backticks still uses the minimal delimiter
+    assert to_md("<pre>x</pre>") == "```\nx\n```"
+
+    # Ignored containers must not leak Markdown markers
+    # Only the suppressed text is dropped in the original report --
+    # here the "**" markers from <b> must not leak either
+    assert (
+        to_md(
+            "<html><head><b>ignore</b></head><body><p>keep</p></body></html>"
+        )
+        == "keep"
+    )
+
+    # A heading marker ("# ") must not leak from a suppressed container
+    assert (
+        to_md("<head><h1>hidden heading</h1></head><body>text</body>")
+        == "text"
+    )
+
+    # A list marker ("- ") must not leak from a <li> nested inside a
+    # suppressed container, even though <li> normally re-enables storage
+    assert (
+        to_md("<head><ul><li>hidden item</li></ul></head><body>text</body>")
+        == "text"
+    )
+
+    # <script> content (already suppressed) must not leak nested markers
+    assert to_md("<script>ignore <b>this</b></script><p>keep</p>") == "keep"
+
+    # A <pre> block fully inside a suppressed container emits nothing,
+    # not even an empty fence
+    assert to_md("<script>ignore<pre>code</pre></script><p>keep</p>") == "keep"
+
+    # --- Link destinations with whitespace ---
+    # A bare Markdown link destination cannot contain a space; wrap it
+    # in angle brackets so the link target isn't silently truncated
+    assert to_md("<a href='/my page'>link</a>") == "[link](</my page>)"
+
+    # --- Nested tags inside code/pre are inert ---
+    # Their own markup carries no meaning, but their literal text still
+    # joins the buffered content (no out-of-order marker leakage)
+    assert (
+        to_md("<pre>before <a href='/x'>link</a> after</pre>")
+        == "```\nbefore link after\n```"
+    )
+    assert (
+        to_md("<code>before <b>bold</b> after</code>") == "`before bold after`"
+    )
+
+    # --- Stray code/pre/samp close tags ---
+    # _pop_to() finds no matching frame; the early-return path in
+    # handle_endtag must not crash or emit a spurious delimiter
+    assert to_md("</code>text") == "text"
+    assert to_md("</pre>text") == "text"
+    assert to_md("</samp>text") == "text"
+
+
+def test_conversion_html_to_markdown_hardening():
+    """conversion: HTMLMarkdownConverter is robust against stack edge cases."""
+
+    def to_md(body):
+        """Wrapper to simplify html-to-markdown conversion tests."""
+        return convert_between(NotifyFormat.HTML, NotifyFormat.MARKDOWN, body)
+
+    # Stray close tags before any matching open tag
+    # _pop_to() must find no matching frame and silently do nothing;
+    # the root sentinel frame must remain untouched throughout.
+
+    # </ul> and </ol> take the early-return path in handle_endtag
+    assert to_md("</ul>text") == "text"
+    assert to_md("</ol>text") == "text"
+
+    # </li> emits a BLOCK_END but _pop_to still finds nothing -- the
+    # text that follows is unindented and stored normally
+    assert to_md("</li>text") == "text"
+
+    # Multiple stray close tags in a row must not crash or corrupt state
+    assert to_md("</ul></ol></li>preamble") == "preamble"
+
+    # A valid list after a stray close must still render correctly
+    assert to_md("</ul><ul><li>A</li><li>B</li></ul>") == "- A\n- B"
+
+    # _make_frame() empty-stack guard
+    # The root sentinel makes this path unreachable through normal
+    # parsing; we force it by clearing _stack directly to verify the
+    # fallback produces safe root-equivalent defaults.
+
+    conv = HTMLMarkdownConverter()
+
+    # Force the stack empty -- this can only happen via direct attribute
+    # manipulation, never through the public parsing API
+    conv._stack = []
+    frame = conv._make_frame("div")
+
+    # The fallback defaults must match the root sentinel values
+    assert frame["tag"] == "div"
+    assert frame["do_store"] is True
+    assert frame["preserve_cr"] is False
+    assert frame["list_type"] is None
+    assert frame["depth"] == 0
+    assert frame["counter"] is None
 
 
 def test_conversion_text_to():

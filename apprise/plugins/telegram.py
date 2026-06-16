@@ -832,7 +832,12 @@ class NotifyTelegram(NotifyBase):
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
             if (
-                body_format not in (None, NotifyFormat.MARKDOWN)
+                body_format
+                not in (
+                    None,
+                    NotifyFormat.MARKDOWN,
+                    NotifyFormat.HTML,
+                )
                 and self.markdown_ver == TelegramMarkdownVersion.TWO
             ):
                 # Telegram Markdown v2 is not very accomodating to some
@@ -840,6 +845,7 @@ class NotifyTelegram(NotifyBase):
                 # To try and be accomodating we escape them in advance
                 # See: https://stackoverflow.com/a/69892704/355584
                 # Also: https://core.telegram.org/bots/api#markdownv2-style
+                # Note: We only escape characters that are not already escaped.
                 body = re.sub(r"(?<!\\)([_*[\]()~`>#+=|{}.!-])", r"\\\1", body)
 
             payload_["parse_mode"] = self.markdown_ver
