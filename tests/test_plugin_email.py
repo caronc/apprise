@@ -33,6 +33,7 @@ import os
 import re
 import shutil
 import smtplib
+import ssl
 import sys
 from unittest import mock
 
@@ -3747,3 +3748,86 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
 
         # GMX should authenticate with full email, not just the local part
         assert login_user == f"user@{domain}"
+
+
+@mock.patch("smtplib.SMTP")
+@mock.patch("smtplib.SMTP_SSL")
+def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
+    """Verify that SMTPS and STARTTLS honour the verify_certificate setting by
+    passing a validating SSL context to smtplib."""
+
+    response = mock.Mock()
+    response.starttls.return_value = True
+    response.login.return_value = True
+    response.sendmail.return_value = True
+    response.quit.return_value = True
+    mock_smtp.return_value = response
+    mock_smtpssl.return_value = response
+
+    # 1. SMTPS (mode=ssl) with the default verify_certificate=True should
+    #    pass a context that validates the certificate and hostname.
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@example.com?mode=ssl",
+        suppress_exceptions=False,
+    )
+    assert isinstance(obj, email.NotifyEmail)
+    assert obj.verify_certificate is True
+    assert obj.notify(body="body", title="title") is True
+
+    assert mock_smtpssl.call_count == 1
+    context = mock_smtpssl.call_args.kwargs.get("context")
+    assert isinstance(context, ssl.SSLContext)
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+
+    mock_smtp.reset_mock()
+    mock_smtpssl.reset_mock()
+
+    # 2. SMTPS (mode=ssl) with verify=no should pass a context that does not
+    #    validate the certificate.
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@example.com?mode=ssl&verify=no",
+        suppress_exceptions=False,
+    )
+    assert obj.verify_certificate is False
+    assert obj.notify(body="body", title="title") is True
+
+    assert mock_smtpssl.call_count == 1
+    context = mock_smtpssl.call_args.kwargs.get("context")
+    assert isinstance(context, ssl.SSLContext)
+    assert context.verify_mode == ssl.CERT_NONE
+    assert context.check_hostname is False
+
+    mock_smtp.reset_mock()
+    mock_smtpssl.reset_mock()
+
+    # 3. STARTTLS with the default verify_certificate=True should pass a
+    #    validating context to starttls().
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@example.com?mode=starttls",
+        suppress_exceptions=False,
+    )
+    assert obj.verify_certificate is True
+    assert obj.notify(body="body", title="title") is True
+
+    assert response.starttls.call_count == 1
+    context = response.starttls.call_args.kwargs.get("context")
+    assert isinstance(context, ssl.SSLContext)
+    assert context.verify_mode == ssl.CERT_REQUIRED
+    assert context.check_hostname is True
+
+    response.starttls.reset_mock()
+
+    # 4. STARTTLS with verify=no should pass a non-validating context.
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@example.com?mode=starttls&verify=no",
+        suppress_exceptions=False,
+    )
+    assert obj.verify_certificate is False
+    assert obj.notify(body="body", title="title") is True
+
+    assert response.starttls.call_count == 1
+    context = response.starttls.call_args.kwargs.get("context")
+    assert isinstance(context, ssl.SSLContext)
+    assert context.verify_mode == ssl.CERT_NONE
+    assert context.check_hostname is False
