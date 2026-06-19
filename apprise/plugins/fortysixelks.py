@@ -28,9 +28,9 @@
 46elks SMS Notification Service.
 
 Minimal URL formats (source ends up being target):
-  - 46elks://user:pass@/+15551234567
-  - 46elks://user:pass@/+15551234567/+46701234567
-  - 46elks://user:pass@/+15551234567?from=Acme
+  - 46elks://user:pass@+15551234567
+  - 46elks://user:pass@+15551234567/+46701234567
+  - 46elks://user:pass@+15551234567?from=Acme
 """
 
 from __future__ import annotations
@@ -77,8 +77,8 @@ class Notify46Elks(NotifyBase):
 
     # Define object templates
     templates = (
-        "{schema}://{user}:{password}@/{from_phone}",
-        "{schema}://{user}:{password}@/{from_phone}/{targets}",
+        "{schema}://{user}:{password}@{from_phone}",
+        "{schema}://{user}:{password}@{from_phone}/{targets}",
     )
 
     # Define our template tokens
