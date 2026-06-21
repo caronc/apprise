@@ -1430,7 +1430,7 @@ def test_plugin_telegram_html_formatting(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_telegram_html_to_markdown_format(mock_post):
-    """NotifyTelegram() HTML body delivered to a Markdown-mode target."""
+    """Test HTML delivery to Telegram Markdown targets."""
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -1440,10 +1440,7 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     # Simple HTML that our html_to_markdown converter handles
     body = "<b>hello</b> <i>world</i>"
 
-    # --- Markdown v1 target ---
-    # convert_between(HTML, MARKDOWN) now produces generic Markdown via
-    # html_to_markdown().  For v1, the blunt re.sub escaping is gated on
-    # markdown_ver == TWO, so the converted body passes through unchanged.
+    # Markdown v1 keeps the converted generic Markdown unchanged.
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1")
     assert len(aobj) == 1
@@ -1453,14 +1450,13 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     assert mock_post.call_count == 1
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # html_to_markdown produced "**hello** *world*"; v1 has no further
-    # escaping for non-Markdown input, so it arrives in the payload intact
+    # The converted formatting reaches the v1 payload intact.
     assert payload["parse_mode"] == "MARKDOWN"
     assert payload["text"] == "**hello** *world*"
 
     mock_post.reset_mock()
 
-    # Markdown v2 target
+    # Markdown v2 applies its own escaping to converted HTML.
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
     assert len(aobj) == 1
@@ -1471,7 +1467,27 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert payload["parse_mode"] == "MarkdownV2"
-    assert payload["text"] == "**hello** *world*"
+    assert payload["text"] == r"\*\*hello\*\* \*world\*"
+
+    mock_post.reset_mock()
+
+    # Telegram escapes v2-only punctuation not covered by generic Markdown.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body="<p>3:00 p.m. (sharp)! Don't be late - see you there.</p>",
+        body_format=NotifyFormat.HTML,
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == (
+        r"3:00 p\.m\. \(sharp\)\! Don't be late \- see you there\."
+    )
 
     mock_post.reset_mock()
 

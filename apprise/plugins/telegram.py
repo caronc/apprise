@@ -832,20 +832,17 @@ class NotifyTelegram(NotifyBase):
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
             if (
-                body_format
-                not in (
-                    None,
-                    NotifyFormat.MARKDOWN,
-                    NotifyFormat.HTML,
-                )
+                body_format not in (None, NotifyFormat.MARKDOWN)
                 and self.markdown_ver == TelegramMarkdownVersion.TWO
             ):
                 # Telegram Markdown v2 is not very accomodating to some
-                # characters such as the hashtag (#) which is fine in v1.
-                # To try and be accomodating we escape them in advance
-                # See: https://stackoverflow.com/a/69892704/355584
-                # Also: https://core.telegram.org/bots/api#markdownv2-style
-                # Note: We only escape characters that are not already escaped.
+                # characters such as the hashtag (#) which is fine in v1. To
+                # try and be accomodating we escape them in advance See:
+                # https://stackoverflow.com/a/69892704/355584 Also:
+                # https://core.telegram.org/bots/api#markdownv2-style Note: We
+                # only escape characters that are not already escaped.
+                #
+                # Telegram v2 needs its own escaping for converted HTML.
                 body = re.sub(r"(?<!\\)([_*[\]()~`>#+=|{}.!-])", r"\\\1", body)
 
             payload_["parse_mode"] = self.markdown_ver
@@ -856,8 +853,8 @@ class NotifyTelegram(NotifyBase):
             payload_["parse_mode"] = "HTML"
             for r, v, m in self.__telegram_escape_html_entries:
                 if "html" in m:
-                    # Handle special cases where we need to alter new lines
-                    # for presentation purposes
+                    # Handle special cases where we need to alter new lines for
+                    # presentation purposes
                     v = v.format(
                         m["html"]
                         if body_format
