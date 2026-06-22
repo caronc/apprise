@@ -635,7 +635,7 @@ There are 3 Persistent Storage operational states Apprise can operate using:
    * Developers who choose to use this operational mode can also force cached information manually if they choose.
    * The CLI will use this operational mode by default.
 1. `flush`: Flushes any cache information to the filesystem during every transaction.
-1. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before peristent storage was available. This setting ensures no content is every written to disk.
+1. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before peristent storage was available. This setting ensures no content is ever written to disk.
    * By default this is the mode Apprise will operate under for those developing with it unless they configure it to otherwise operate as `auto` or `flush`.  This is done through the `AppriseAsset()` object and is explained further on in this documentation.
 
 ## CLI Persistent Storage Commands
