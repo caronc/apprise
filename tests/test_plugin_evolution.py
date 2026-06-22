@@ -33,7 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, NotifyFormat
 from apprise.plugins.evolution import NotifyEvolution
 
 logging.disable(logging.CRITICAL)
@@ -316,3 +316,110 @@ def test_plugin_evolution_https(mock_post):
     assert obj.notify(body="secure msg") is True
     url = mock_post.call_args[0][0]
     assert url.startswith("https://")
+
+
+@mock.patch("requests.post")
+def test_plugin_evolution_html_to_markdown_hardening(mock_post):
+    """Test edge cases in the CommonMark-to-WhatsApp dialect
+    adaptation."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+    mock_post.return_value.text = "{}"
+
+    def notify(body):
+        aobj = Apprise()
+        assert aobj.add("evolutions://key@host/inst/5511999999999")
+        assert aobj.notify(body=body, body_format=NotifyFormat.HTML) is True
+        payload = loads(mock_post.call_args_list[-1][1]["data"])
+        mock_post.reset_mock()
+        return payload["text"]
+
+    # Convert CommonMark emphasis to WhatsApp delimiters.
+    assert notify("<b>hello</b> <i>world</i>") == "*hello* _world_"
+
+    # Preserve adjacent nested emphasis.
+    assert notify("<b><i>x</i></b>") == "*_x_*"
+
+    # Non-adjacent nesting and sibling spans are unaffected.
+    assert notify("<b>bold <i>italic</i> still bold</b>") == (
+        "*bold _italic_ still bold*"
+    )
+    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+
+    # Map inline and fenced code to WhatsApp's monospace syntax.
+    assert notify("<code>inline</code>") == "```inline```"
+    assert notify("<pre><code>block code</code></pre>") == (
+        "```\nblock code\n```"
+    )
+
+    # Preserve link labels beside WhatsApp's auto-linked URL.
+    assert (
+        notify('<a href="https://example.com/x">click here</a>')
+        == "click here (https://example.com/x)"
+    )
+
+    # Direct WhatsApp Markdown remains unchanged.
+    aobj = Apprise()
+    assert aobj.add("evolutions://key@host/inst/5511999999999")
+    assert aobj.notify(body="*already* whatsapp-bound markdown") is True
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "*already* whatsapp-bound markdown"
+    mock_post.reset_mock()
+
+    # Drop CommonMark escapes unsupported by WhatsApp.
+    assert notify("<p>literal * asterisk</p>") == "literal * asterisk"
+
+    f = NotifyEvolution._commonmark_to_whatsapp
+
+    # Preserve unmatched backticks as literal text.
+    assert f("text ``unterminated") == "text ``unterminated"
+
+    # Collapse empty entities without affecting following content.
+    assert f("****x") == "x"
+
+    # Close nonempty unterminated emphasis and drop empty spans.
+    assert f("**unterminated") == "*unterminated*"
+    assert f("**") == ""
+
+    # Preserve an incomplete link as literal text.
+    assert f("[text](<https://example.com/unterminated") == (
+        "[text](<https://example.com/unterminated"
+    )
+
+    # Resolve CommonMark escapes inside WhatsApp link destinations.
+    assert f("[click](<https://e/x\\>y>)") == "click (https://e/x>y)"
+
+    # A link with no text at all -- the bare URL is kept on its own
+    # rather than emitting a dangling " (url)".
+    assert f("[](<https://example.com/x>)") == "https://example.com/x"
+
+    # Indexed lookup skips escapes and requires an exact run width.
+    assert (
+        NotifyEvolution._find_unescaped_run(
+            NotifyEvolution._build_backtick_run_index("\\` `"), 0, 1
+        )
+        == 3
+    )
+    assert (
+        NotifyEvolution._find_unescaped_run(
+            NotifyEvolution._build_backtick_run_index("no backticks"), 0, 1
+        )
+        is None
+    )
+    assert (
+        NotifyEvolution._find_unescaped_run(
+            NotifyEvolution._build_backtick_run_index("`` `"), 0, 1
+        )
+        == 3
+    )
+
+    # Indexed lookup has no distance cutoff.
+    far = "a" * 200_000 + "`"
+    assert (
+        NotifyEvolution._find_unescaped_run(
+            NotifyEvolution._build_backtick_run_index(far), 0, 1
+        )
+        == 200_000
+    )

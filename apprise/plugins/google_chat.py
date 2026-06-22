@@ -53,6 +53,7 @@
 #         incoming-bot-python
 #    - https://developers.google.com/hangouts/chat/reference/rest
 #
+from bisect import bisect_left
 from json import dumps
 import re
 
@@ -197,8 +198,220 @@ class NotifyGoogleChat(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    # Adapt HTML-derived CommonMark to Google Chat's Markdown subset.
+    # Direct Google Chat Markdown is left unchanged.
+    # Syntax: https://developers.google.com/workspace/chat/format-messages
+
+    @classmethod
+    def _build_backtick_run_index(cls, text):
+        """Index unescaped backtick runs by width in one pass."""
+
+        index = {}
+        i = 0
+        n = len(text)
+
+        while i < n:
+            ch = text[i]
+
+            if ch == "\\" and i + 1 < n:
+                i += 2
+                continue
+
+            if ch == "`":
+                j = i
+                while j < n and text[j] == "`":
+                    j += 1
+                index.setdefault(j - i, []).append(i)
+                i = j
+                continue
+
+            i += 1
+
+        return index
+
+    @staticmethod
+    def _find_unescaped_run(index, start, run):
+        """Find the next indexed backtick run of the requested width."""
+
+        positions = index.get(run)
+        if not positions:
+            return None
+
+        pos = bisect_left(positions, start)
+        return positions[pos] if pos < len(positions) else None
+
+    @classmethod
+    def _escape_link_url(cls, url):
+        """Adapt a CommonMark destination for Chat's ``<url|text>`` form."""
+
+        # Resolve CommonMark escapes before applying Chat escaping.
+        out = []
+        i = 0
+        n = len(url)
+        while i < n:
+            ch = url[i]
+            if ch == "\\" and i + 1 < n:
+                out.append(url[i + 1])
+                i += 2
+                continue
+            out.append(ch)
+            i += 1
+        url = "".join(out)
+
+        # Entity-escape Chat controls and encode its URL-label separator.
+        url = url.replace("&", "&amp;").replace("<", "&lt;")
+        url = url.replace(">", "&gt;")
+        return url.replace("|", "%7C")
+
+    @classmethod
+    def _commonmark_to_google_chat(cls, body):
+        """Adapt html_to_markdown()'s CommonMark output to Google Chat's
+        own text formatting dialect."""
+
+        out = []
+        # Open emphasis spans as (delimiter, output index), innermost last.
+        stack = []
+        # Index in `out` of each currently-open link's "[", innermost last.
+        link_stack = []
+        i = 0
+        n = len(body)
+        backtick_runs = cls._build_backtick_run_index(body)
+
+        while i < n:
+            ch = body[i]
+
+            # Translate CommonMark escapes into Chat's supported forms.
+            if ch == "\\" and i + 1 < n:
+                nxt = body[i + 1]
+                if nxt == "<":
+                    out.append("&lt;")
+                elif nxt == ">":
+                    out.append("&gt;")
+                else:
+                    out.append(nxt)
+                i += 2
+                continue
+
+            # Chat requires literal ampersands to be entity-escaped.
+            if ch == "&":
+                out.append("&amp;")
+                i += 1
+                continue
+
+            # Chat still requires entity escaping inside code spans.
+            if ch == "`":
+                j = i
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                close = cls._find_unescaped_run(backtick_runs, j, run)
+
+                if close is not None:
+                    content = body[j:close]
+                    content = (
+                        content.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                    )
+                    delim = body[i:j]
+                    out.append(delim + content + delim)
+                    i = close + run
+                    continue
+
+                # No matching close -- not a real code span; just literal
+                # backticks.
+                out.append(body[i:j])
+                i = j
+                continue
+
+            # Track CommonMark labels for conversion to <url|text>.
+            if ch == "[":
+                link_stack.append(len(out))
+                out.append("[")
+                i += 1
+                continue
+
+            if body.startswith("](<", i) and link_stack:
+                # Find the destination's next unescaped closing `>)`.
+                close = None
+                k = i + 3
+                while k < n - 1:
+                    if body[k] == "\\" and k + 1 < n:
+                        k += 2
+                        continue
+                    if body[k] == ">" and body[k + 1] == ")":
+                        close = k
+                        break
+                    k += 1
+
+                if close is not None:
+                    url = cls._escape_link_url(body[i + 3 : close])
+                    open_index = link_stack.pop()
+                    text = "".join(out[open_index + 1 :])
+                    del out[open_index:]
+                    out.append(f"<{url}|{text}>")
+                    i = close + 2
+                    continue
+
+            # Convert CommonMark emphasis while preserving LIFO nesting.
+            if ch == "*":
+                j = i
+                while j < n and body[j] == "*":
+                    j += 1
+                run = j - i
+
+                while run > 0:
+                    if stack and (
+                        (stack[-1][0] == "*" and run >= 2)
+                        or (stack[-1][0] == "_" and run >= 1)
+                    ):
+                        delim, open_index = stack.pop()
+                        if open_index == len(out) - 1:
+                            out.pop()
+                        else:
+                            out.append(delim)
+                        run -= 2 if delim == "*" else 1
+                    elif run >= 2:
+                        out.append("*")
+                        stack.append(("*", len(out) - 1))
+                        run -= 2
+                    else:
+                        out.append("_")
+                        stack.append(("_", len(out) - 1))
+                        run -= 1
+
+                i = j
+                continue
+
+            out.append(ch)
+            i += 1
+
+        # Close out anything still open so the result is valid on its own.
+        while stack:
+            delim, open_index = stack.pop()
+            if open_index == len(out) - 1:
+                out.pop()
+            else:
+                out.append(delim)
+
+        return "".join(out)
+
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Google Chat Notification."""
+
+        if (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            # Adapt converted CommonMark; direct Chat Markdown is unchanged.
+            body = self._commonmark_to_google_chat(body)
 
         # Our headers
         headers = {

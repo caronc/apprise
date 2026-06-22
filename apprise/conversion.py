@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from bisect import bisect_left
 import contextlib
 from html.parser import HTMLParser
 import re
@@ -315,9 +316,7 @@ class HTMLMarkdownConverter(HTMLConverter):
         r"([\\`*_~#\[\]()!<>])", re.DOTALL | re.MULTILINE
     )
 
-    # Escape block syntax only when it appears at the start of a line.
-    #
-    # Match ordered-list markers at the start of a line.
+    # Block syntax only needs escaping at the start of a line.
     _ORDERED_MARKER_RE = re.compile(r"^\d+\.(?=[ \t]|$)")
 
     # Match bullet markers at the start of a line.
@@ -570,24 +569,24 @@ class HTMLMarkdownConverter(HTMLConverter):
         self._tag_open_counts[tag] = self._tag_open_counts.get(tag, 0) + 1
 
     def _pop_to(self, tag):
-        """Pop through the nearest matching frame."""
+        """Pop through the nearest match and report whether one existed."""
 
         # Reject unmatched closing tags without scanning the stack
         if not self._tag_open_counts.get(tag):
-            return
+            return False
 
         # Search backward for the nearest matching frame
         for i in range(len(self._stack) - 1, 0, -1):
             if self._stack[i]["tag"] == tag:
-                # Remove the matched frame and everything above it, discounting
-                # each one from _tag_open_counts so it stays accurate for
-                # whatever's left on the stack
+                # Keep tag counts synchronized with removed frames.
                 for frame in self._stack[i:]:
                     self._tag_open_counts[frame["tag"]] -= 1
 
                 # Remove the matching frame and its descendants
                 del self._stack[i:]
-                return
+                return True
+
+        return False
 
     def _close_emphasis_frame(self, frame):
         """Close an emphasis frame with content."""
@@ -630,6 +629,51 @@ class HTMLMarkdownConverter(HTMLConverter):
         if trailing:
             self._result.append(trailing)
 
+    @classmethod
+    def _escape_cell_pipes(cls, text):
+        """Escape cell delimiters outside CommonMark code spans."""
+
+        out = []
+        i = 0
+        n = len(text)
+        backtick_runs = cls._build_backtick_run_index(text)
+
+        while i < n:
+            ch = text[i]
+
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i : i + 2])
+                i += 2
+                continue
+
+            if ch == "`":
+                j = i
+                while j < n and text[j] == "`":
+                    j += 1
+                run = j - i
+
+                close = cls._find_unescaped_run(backtick_runs, j, run)
+                if close is not None:
+                    # Pipes are already literal inside code spans.
+                    out.append(text[i : close + run])
+                    i = close + run
+                    continue
+
+                # Preserve unmatched backticks as literal text.
+                out.append(text[i:j])
+                i = j
+                continue
+
+            if ch == "|":
+                out.append("\\|")
+                i += 1
+                continue
+
+            out.append(ch)
+            i += 1
+
+        return "".join(out)
+
     def _close_cell_frame(self, frame):
         """Capture a completed table cell."""
 
@@ -645,22 +689,77 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Finalize the cell into a single Markdown fragment
         text = "".join(self._finalize(chunk)).strip(self._ASCII_WHITESPACE)
 
-        # A Markdown table row is exactly one line -- any newline the cell's
-        # own content produced (a <br>, a nested block) is flattened to a
-        # single space rather than corrupting the row.
+        # Table cells must remain on one Markdown source line.
         if "\n" in text:
             text = " ".join(text.split("\n"))
             text = self._CELL_WHITESPACE_RUN.sub(" ", text).strip(
                 self._ASCII_WHITESPACE
             )
 
-        # '|' is the cell delimiter itself; escape any literal one in the
-        # content so it can't be misread as starting a new column.
+        # Escape cell delimiters except where code spans make them literal.
         if "|" in text:
-            text = text.replace("|", "\\|")
+            text = self._escape_cell_pipes(text)
 
         # Add the completed cell to its row
         self._stack[-1]["cells"].append(text)
+
+    def _close_pre_frame(self, ctx, tag):
+        """Render a completed code/pre/samp frame's buffered content."""
+
+        # Join the buffered literal content
+        content = "".join(ctx.get("buffer", ()))
+
+        # Size the delimiter beyond any embedded backtick run
+        run = self._longest_backtick_run(content)
+
+        if tag == "code":
+            # CommonMark requires padding around edge backticks.
+            delim = "`" * (run + 1)
+            pad = (
+                " "
+                if not content or content[0] == "`" or content[-1] == "`"
+                else ""
+            )
+
+            # Emit the complete inline code span
+            self._emit(delim + pad + content + pad + delim)
+            return
+
+        # Fenced block -- widen the fence past the longest run of
+        # backticks already present in the content
+        fence = "`" * max(3, run + 1)
+
+        # Restate list and quote prefixes on every fenced-block line.
+        prefix = self._continuation_prefix(ctx)
+
+        # Prefix every fenced line inside a list or quote
+        if prefix:
+            marker = (
+                _QuoteMarker(prefix)
+                if ctx["quote_depth"]
+                else _ListIndent(prefix)
+            )
+            content = ("\n" + prefix).join(content.split("\n"))
+
+        # Emit the opening fence
+        self._emit(fence)
+        self._result.append(self.BLOCK_END)
+
+        # Restate nesting before the code content
+        if prefix:
+            self._result.append(marker)
+
+        # Emit the literal block content
+        self._emit(content)
+        self._result.append(self.BLOCK_END)
+
+        # Restate nesting before the closing fence
+        if prefix:
+            self._result.append(marker)
+
+        # Emit the closing fence and boundary
+        self._emit(fence)
+        self._result.append(self.BLOCK_END)
 
     def _close_row_frame(self, frame):
         """Render a completed table row."""
@@ -687,12 +786,13 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         # Add the required separator after the header row
         if is_header:
-            # _write_boundary() (not a bare BLOCK_END) so a list item's
-            # indentation or an enclosing blockquote's "> " is restated in
-            # front of the separator line too, the same as it would be for any
-            # other continuation line of this table.
+            # Preserve list or quote prefixes on the separator line.
             self._write_boundary(ctx, strong=False)
             self._emit("| " + " | ".join(["---"] * len(cells)) + " |")
+
+        if table is None:
+            # A standalone row needs the same trailing boundary as a table.
+            self._write_boundary(ctx, strong=True)
 
     def _close_table_frame(self):
         """Finish a table boundary."""
@@ -743,12 +843,18 @@ class HTMLMarkdownConverter(HTMLConverter):
             # Finalize content captured by special frames
             if top.get("emphasis_delim"):
                 self._close_emphasis_frame(top)
+
             elif tag in ("td", "th"):
                 self._close_cell_frame(top)
+
             elif tag == "tr":
                 self._close_row_frame(top)
+
             elif tag == "table":
                 self._close_table_frame()
+
+            elif tag in ("code", "pre", "samp") and top["do_store"]:
+                self._close_pre_frame(top, tag)
 
         # Let the base converter assemble the final output
         super().close()
@@ -773,6 +879,45 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Return the delimiter width already present in the content
         return longest
 
+    @classmethod
+    def _build_backtick_run_index(cls, text):
+        """Index unescaped backtick runs by width in one pass."""
+
+        index = {}
+        i = 0
+        n = len(text)
+
+        while i < n:
+            ch = text[i]
+
+            # Consume escapes as pairs so escaped delimiters cannot match.
+            if ch == "\\" and i + 1 < n:
+                i += 2
+                continue
+
+            if ch == "`":
+                j = i
+                while j < n and text[j] == "`":
+                    j += 1
+                index.setdefault(j - i, []).append(i)
+                i = j
+                continue
+
+            i += 1
+
+        return index
+
+    @staticmethod
+    def _find_unescaped_run(index, start, run):
+        """Find the next indexed backtick run of the requested width."""
+
+        positions = index.get(run)
+        if not positions:
+            return None
+
+        pos = bisect_left(positions, start)
+        return positions[pos] if pos < len(positions) else None
+
     def _finalize(self, result):
         """Combine tokens into normalized Markdown lines."""
 
@@ -782,26 +927,20 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Whether accum, so far, is composed only of marker fragments
         accum_is_marker = False
 
-        # Set when a boundary was absorbed while accum was marker-only -- see
-        # the docstring above
+        # True when a marker absorbed a boundary without content.
         marker_boundary_passed = False
 
-        # Set once accum holds real content and at least one boundary has been
-        # seen since -- the line is done, but not yet flushed (see the
-        # docstring above)
+        # True when a complete line is waiting to be flushed.
         terminated = False
 
         # Set when a plain (no prefix at all) _ParaBreak has been seen since
         # accum was last extended with real content
         para_break_seen = False
 
-        # The prefix of a _ParaBreak seen since accum was last extended with
-        # real content, if it had one (list indent and/or a blockquote's "> ")
-        # -- takes priority over para_break_seen when both are set
+        # Active list or quote prefix for the next paragraph line.
         para_break_prefix = None
 
-        # Whether para_break_prefix came from a _ParaBreak with in_quote set --
-        # see _ParaBreak
+        # Whether the active paragraph prefix belongs to a quote.
         para_break_in_quote = False
 
         # Set when a boundary arrives *after* the line was already terminated
@@ -814,10 +953,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             if item == self.BLOCK_END or isinstance(item, _ParaBreak):
                 # Record the strongest paragraph boundary in this run
                 if isinstance(item, _ParaBreak):
-                    # The most recent _ParaBreak in a run reflects the current
-                    # context (e.g. a blockquote that closed partway through
-                    # the run) -- always overwrite rather than keeping an
-                    # earlier, now-stale prefix from before that exit.
+                    # The latest break carries the current nesting context.
                     if item.prefix:
                         # Keep the prefix required by the next line
                         para_break_prefix = item.prefix
@@ -964,16 +1100,11 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         # Preserve literal whitespace inside code blocks
         if ctx["preserve_cr"]:
-            # Buffer raw text instead of writing straight to _result -- the
-            # matching close tag needs the full content up front to size a
-            # delimiter that cannot collide with backticks already present in
-            # the text.
+            # Buffer raw text so the closing delimiter can be sized safely.
             ctx["buffer"].append(data)
             return
 
-        # A &nbsp; (decoded by the parser to U+00A0) on its own, with nothing
-        # but ordinary whitespace around it, is a deliberate space -- unlike
-        # plain whitespace it's kept no matter where it falls.
+        # Preserve deliberate non-breaking spaces even at block boundaries.
         if not data.strip() and "\xa0" in data:
             self._emit("\xa0")
             return
@@ -1007,9 +1138,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             # Prevent plain text from becoming a Markdown block
             content = self._escape_line_start(content)
 
-        # The first real content directly inside an <em>/<i>/<strong>/ <b>
-        # span: relocate any leading whitespace to sit before the opening
-        # delimiter instead of after it.
+        # Keep leading whitespace outside an emphasis delimiter.
         if ctx.get("emphasis_delim") and not ctx["emphasis_started"]:
             # Separate leading whitespace from the emphasized content
             stripped = content.lstrip(self._ASCII_WHITESPACE)
@@ -1024,10 +1153,7 @@ class HTMLMarkdownConverter(HTMLConverter):
 
             # Drop an emphasis span that still has no real content
             if not content:
-                # Nothing real left after trimming -- handle_endtag() (or
-                # close(), for a span left open at end of document) will see
-                # the delimiter is still the last thing written and drop it as
-                # an empty span.
+                # The close handler removes an empty span.
                 return
 
             # Mark the emphasis span as started
@@ -1049,9 +1175,7 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Track list type, depth, and numbering.
 
         if tag in ("ul", "ol"):
-            # Honor a "start" attribute on <ol> -- defaults to 1, same as the
-            # value CommonMark itself assumes when an ordered list's Markdown
-            # source has no leading number override.
+            # CommonMark ordered lists default to one.
             counter = 1
 
             # Read an explicit starting number for ordered lists
@@ -1080,9 +1204,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             if ctx["depth"] == 0:
                 overrides["list_indent_base"] = ctx["list_indent"]
 
-            # A boundary before the list -- strong, unless it's a sublist
-            # directly continuing a <li>'s own content, in which case no
-            # boundary is added here at all.
+            # A direct child list continues its parent item without a break.
             if ctx["do_store"] and ctx["tag"] != "li":
                 self._open_line_boundary(ctx, strong=True)
 
@@ -1093,15 +1215,13 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Emit a list marker and enable item content.
 
         if tag == "li":
-            # A "value" attribute resets the ordered-list counter for this item
-            # (and, since ctx is the live parent ul/ol frame, every sibling
-            # after it too) -- same as it would in an actual rendered <ol>.
+            # An item value resets numbering for it and following siblings.
             if ctx["list_type"] == "ol" and ctx["counter"] is not None:
                 # Read an item-specific number override
                 value_attr = next((v for k, v in attrs if k == "value"), None)
                 if value_attr is not None:
                     with contextlib.suppress(TypeError, ValueError):
-                        # Same clamp as <ol start=> -- see its comment
+                        # Match the non-negative <ol start> constraint.
                         ctx["counter"] = max(0, int(value_attr))
 
             # Indent scales with nesting depth (depth 1 = no indent), capped at
@@ -1122,9 +1242,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             # <head>) is suppressing content
             do_store = ctx["list_do_store"]
 
-            # Snapshot _content_seq so the closing tag can tell in O(1) whether
-            # anything real was written for this item -- see _emit() and
-            # handle_endtag("li").
+            # Snapshot content state for constant-time empty-item detection.
             self._push_frame(
                 self._make_frame(
                     tag,
@@ -1137,10 +1255,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             )
 
             if do_store:
-                # Glue directly onto whatever marker is already pending on this
-                # same line (e.g. an enclosing <blockquote>'s "> ", when this
-                # <li> is its first child) instead of forcing a fresh boundary
-                # that would lose it.
+                # Reuse a pending quote or list marker on this line.
                 if not (
                     self._result and isinstance(self._result[-1], _Marker)
                 ):
@@ -1164,7 +1279,8 @@ class HTMLMarkdownConverter(HTMLConverter):
             depth = min(ctx["quote_depth"] + 1, BLOCKQUOTE_DEPTH_MAX)
 
             # Activate the new quote context
-            self._push_frame(self._make_frame(tag, quote_depth=depth))
+            new_frame = self._make_frame(tag, quote_depth=depth)
+            self._push_frame(new_frame)
 
             # Emit a prefix only when this context stores content
             if ctx["do_store"]:
@@ -1182,14 +1298,16 @@ class HTMLMarkdownConverter(HTMLConverter):
                 elif isinstance(last, _Marker):
                     self._result.append(self._quote_prefix(depth))
 
-                # Start a new quoted line
+                # Separate a quote from preceding text.
+                elif isinstance(last, str):
+                    # Write the boundary using ctx's own (pre-nesting) depth.
+                    self._write_boundary(ctx, strong=True)
+
+                    if depth > ctx["quote_depth"]:
+                        self._result.append(_QuoteMarker("> "))
+
+                # Emit the prefix directly at the start of a context.
                 else:
-                    if isinstance(last, str):
-                        # Real text content (not a marker, not a boundary --
-                        # the elif/if above already ruled those out) is
-                        # directly preceding this blockquote with nothing
-                        # separating them yet.
-                        self._write_boundary(ctx, strong=True)
                     self._result.append(
                         _QuoteMarker(
                             ctx["list_indent"] + self._quote_prefix(depth)
@@ -1197,13 +1315,17 @@ class HTMLMarkdownConverter(HTMLConverter):
                     )
             return
 
-        # Tables: <thead>/<tbody>/<tfoot> are intentionally not handled here at
-        # all -- they push no frame of their own and so are fully transparent
-        # to everything below.
+        # Table section tags are transparent.
 
         if tag == "table":
+            # Markdown cannot represent a table nested inside a cell.
+            nested_in_cell = bool(
+                self._tag_open_counts.get("td")
+                or self._tag_open_counts.get("th")
+            )
+
             # Separate the table from preceding content
-            if ctx["do_store"]:
+            if ctx["do_store"] and not nested_in_cell:
                 self._open_line_boundary(ctx, strong=True)
 
             # Activate a table context and suppress formatting whitespace
@@ -1211,17 +1333,17 @@ class HTMLMarkdownConverter(HTMLConverter):
                 self._make_frame(
                     tag,
                     do_store=False,
-                    # Cells restore the table parent's storage state.
-                    table_do_store=ctx["do_store"],
+                    # Nested table cells remain suppressed.
+                    table_do_store=(
+                        False if nested_in_cell else ctx["do_store"]
+                    ),
                     table_rows=0,
                 )
             )
             return
 
         if tag == "tr":
-            # A previous row (and/or its own last cell) left open with no
-            # closing tag at all is finalized first -- same reasoning as <li>
-            # below, just one level up.
+            # Finalize a malformed, unterminated previous row first.
             self._close_stale_row()
 
             # Inspect the context containing this row
@@ -1236,9 +1358,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                     tag,
                     do_store=False,
                     cells=[],
-                    # None when there's no enclosing <table> (a stray <tr>) --
-                    # _close_row_frame() then treats this row as a one-row
-                    # table of its own.
+                    # A stray row becomes a standalone one-row table.
                     table_frame=(row_ctx if is_table else None),
                     table_do_store=(
                         row_ctx["table_do_store"]
@@ -1250,8 +1370,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             return
 
         if tag in ("td", "th"):
-            # A previous cell in this same row left open with no closing tag at
-            # all is finalized first.
+            # Finalize an unterminated previous cell first.
             self._close_stale_cell()
 
             # Inspect the context containing this cell
@@ -1303,12 +1422,8 @@ class HTMLMarkdownConverter(HTMLConverter):
             self._emit("  \n" + self._continuation_prefix(ctx))
 
         elif tag == "hr":
-            # <hr> is a void element, so unlike other block tags it can't lean
-            # on handle_endtag for its closing boundary -- that may never fire
-            # (a bare "<hr>" has no closing tag for the parser to call it on).
-            #
-            # Keep a blank line before "---" so it cannot become a setext
-            # heading.
+            # A void <hr> supplies its own boundaries; the leading blank line
+            # prevents it from becoming a setext heading.
             self._open_line_boundary(ctx, strong=True)
             self._emit("---")
             self._result.append(self.BLOCK_END)
@@ -1334,10 +1449,7 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         # Open an emphasis frame for bold or italic content
         elif tag in ("strong", "b", "em", "i"):
-            # Pushed as a frame (rather than just emitting the delimiter
-            # outright, as every other inline tag here does) so handle_endtag()
-            # can tell a genuine close from a stray one with no matching open,
-            # and handle_data() can relocate leading whitespace.
+            # A frame validates closing tags and relocates edge whitespace.
             delim = "**" if tag in ("strong", "b") else "*"
 
             # Track the delimiter and output position for this span
@@ -1347,10 +1459,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                     emphasis_delim=delim,
                     emphasis_started=False,
                     content_seq_at_open=self._content_seq,
-                    # Index of the delim about to be appended below -- see
-                    # _close_emphasis_frame()'s "not has_content" case for why
-                    # this needs to be the exact index rather than just
-                    # checking self._result[-1].
+                    # Exact delimiter index used when removing an empty span.
                     emphasis_result_start=len(self._result),
                 )
             )
@@ -1360,9 +1469,7 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         # Open a Markdown link when an href is available
         elif tag == "a":
-            # Push a frame that carries the href so ALL content between <a> and
-            # </a> -- including nested bold/italic -- is wrapped in Markdown
-            # link syntax by handle_endtag("a")
+            # Keep the target on a frame so nested label markup is included.
             href = next(
                 (v for k, v in attrs if k == "href"),
                 None,
@@ -1373,10 +1480,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                 # Remove controls that invalidate angle-bracket destinations
                 href = self._HREF_CONTROL_CHARS.sub("", href)
 
-                # Browsers trim leading/trailing space before parsing a
-                # URL's scheme, so an unstripped href (e.g. "  javascript:
-                # ...") would otherwise slip past the scheme check below
-                # while still executing once rendered.
+                # Match browser URL parsing by trimming ASCII whitespace.
                 href = href.strip(self._ASCII_WHITESPACE)
 
                 # Identify any explicit URI scheme
@@ -1387,16 +1491,11 @@ class HTMLMarkdownConverter(HTMLConverter):
                     scheme
                     and scheme.group(1).lower() in self._UNSAFE_HREF_SCHEMES
                 ):
-                    # Neutralize rather than drop -- this keeps the link link-
-                    # shaped (matching whatever surrounding text described it)
-                    # instead of silently losing the fact that a link was even
-                    # there.
+                    # Preserve link shape while neutralizing unsafe targets.
                     href = "#"
 
             if href is not None:
-                # Always use the angle-bracket destination form so the href
-                # cannot break out of the link early via an unescaped ')';
-                # escape the characters that are meaningful within that form.
+                # Angle destinations safely contain parentheses.
                 safe_href = self.HREF_ESCAPE.sub(r"\\\1", href)
                 target = "<{}>".format(safe_href)
 
@@ -1427,9 +1526,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             # Remove the anchor and any malformed child frames
             self._pop_to(tag)
 
-            # Only emit the closing if there was an href; a bare <a> without
-            # href, or one suppressed entirely by an ignored ancestor, never
-            # pushed a frame -- this is then a no-op
+            # Bare or suppressed anchors do not create link frames.
             if href is not None:
                 # Complete the Markdown link
                 self._emit("](" + href + ")")
@@ -1439,8 +1536,9 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Track list type, depth, and numbering.
 
         if tag in ("ul", "ol"):
-            # Restore the list's parent context
-            self._pop_to(tag)
+            # Restore the list's parent context.
+            if not self._pop_to(tag):
+                return
             parent = self._stack[-1]
 
             # Separate following content when storage is active
@@ -1451,6 +1549,11 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Emit a list marker and enable item content.
 
         if tag == "li":
+            # A stray closing tag with no open <li> anywhere on the stack is
+            # a no-op -- nothing below should run against an unrelated frame.
+            if not self._tag_open_counts.get(tag):
+                return
+
             # Empty items are dropped and do not advance ordered-list
             # numbering.
             has_content = ctx["do_store"] and self._content_seq != ctx.get(
@@ -1476,8 +1579,10 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         # Track blockquote depth and emit its prefix.
         if tag == "blockquote":
-            # Restore the quote's parent context
-            self._pop_to(tag)
+            # Restore the quote's parent context -- a stray closing tag with
+            # no open <blockquote> anywhere on the stack is a no-op.
+            if not self._pop_to(tag):
+                return
             parent = self._stack[-1]
 
             # Separate following content from the completed quote
@@ -1488,12 +1593,11 @@ class HTMLMarkdownConverter(HTMLConverter):
         # Close only matching table frames; ignore stray closing tags.
 
         if tag in ("td", "th"):
-            # Finalize only the matching active cell
+            # Ignore stray cell closers instead of emitting a block boundary.
             if ctx["tag"] == tag:
                 self._pop_to(tag)
                 self._close_cell_frame(ctx)
-                return
-            # else: falls through to BLOCK_TAGS treatment below
+            return
 
         elif tag == "tr":
             # Recover any cell left open by malformed HTML
@@ -1522,68 +1626,7 @@ class HTMLMarkdownConverter(HTMLConverter):
         if tag in ("code", "pre", "samp"):
             # Render only the matching preformatted frame
             if ctx["do_store"] and ctx["tag"] == tag:
-                # Join the buffered literal content
-                content = "".join(ctx.get("buffer", ()))
-
-                # Size the delimiter beyond any embedded backtick run
-                run = self._longest_backtick_run(content)
-
-                if tag == "code":
-                    # Inline code -- pad with a space when the content starts
-                    # or ends with a backtick (CommonMark's code span
-                    # disambiguation rule)
-                    delim = "`" * (run + 1)
-                    pad = (
-                        " "
-                        if not content
-                        or content[0] == "`"
-                        or content[-1] == "`"
-                        else ""
-                    )
-
-                    # Emit the complete inline code span
-                    self._emit(delim + pad + content + pad + delim)
-
-                else:
-                    # Fenced block -- widen the fence past the longest run of
-                    # backticks already present in the content
-                    fence = "`" * max(3, run + 1)
-
-                    # Every line of the block -- both fences and every line of
-                    # the content between them -- needs a list item's
-                    # indentation and/or an enclosing blockquote's "> "
-                    # restated to stay part of it, the same as any other
-                    # continuation line would.
-                    prefix = self._continuation_prefix(ctx)
-
-                    # Prefix every fenced line inside a list or quote
-                    if prefix:
-                        marker = (
-                            _QuoteMarker(prefix)
-                            if ctx["quote_depth"]
-                            else _ListIndent(prefix)
-                        )
-                        content = ("\n" + prefix).join(content.split("\n"))
-
-                    # Emit the opening fence
-                    self._emit(fence)
-                    self._result.append(self.BLOCK_END)
-
-                    # Restate nesting before the code content
-                    if prefix:
-                        self._result.append(marker)
-
-                    # Emit the literal block content
-                    self._emit(content)
-                    self._result.append(self.BLOCK_END)
-
-                    # Restate nesting before the closing fence
-                    if prefix:
-                        self._result.append(marker)
-
-                    # Emit the closing fence and boundary
-                    self._emit(fence)
-                    self._result.append(self.BLOCK_END)
+                self._close_pre_frame(ctx, tag)
 
             # Restore the context surrounding the code block
             self._pop_to(tag)
@@ -1596,9 +1639,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                 self._pop_to(tag)
             return
 
-        # Close block-level content on the correct boundary.
-        #
-        # Paragraph-like tags use strong boundaries for following bare text.
+        # Paragraph-like tags strongly separate following bare text.
         if tag in self.BLOCK_TAGS:
             self._write_boundary(ctx, strong=tag in self._PARA_LIKE_TAGS)
 

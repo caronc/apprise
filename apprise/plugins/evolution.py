@@ -47,6 +47,7 @@
 # Phone numbers must be in international format without the leading '+',
 # e.g. 5511999999999 for a Brazilian mobile number.
 
+from bisect import bisect_left
 from json import dumps
 
 import requests
@@ -191,8 +192,191 @@ class NotifyEvolution(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    # Adapt HTML-derived CommonMark to WhatsApp formatting.
+    # Direct WhatsApp Markdown is left unchanged.
+    # Syntax: https://faq.whatsapp.com/539178204879377/
+
+    @classmethod
+    def _build_backtick_run_index(cls, text):
+        """Index unescaped backtick runs by width in one pass."""
+
+        index = {}
+        i = 0
+        n = len(text)
+
+        while i < n:
+            ch = text[i]
+
+            if ch == "\\" and i + 1 < n:
+                i += 2
+                continue
+
+            if ch == "`":
+                j = i
+                while j < n and text[j] == "`":
+                    j += 1
+                index.setdefault(j - i, []).append(i)
+                i = j
+                continue
+
+            i += 1
+
+        return index
+
+    @staticmethod
+    def _find_unescaped_run(index, start, run):
+        """Find the next indexed backtick run of the requested width."""
+
+        positions = index.get(run)
+        if not positions:
+            return None
+
+        pos = bisect_left(positions, start)
+        return positions[pos] if pos < len(positions) else None
+
+    @classmethod
+    def _commonmark_to_whatsapp(cls, body):
+        """Adapt html_to_markdown()'s CommonMark output to WhatsApp's own
+        text formatting dialect."""
+
+        out = []
+        # Open emphasis spans as (delimiter, output index), innermost last.
+        stack = []
+        # Index in `out` of each currently-open link's "[", innermost last.
+        link_stack = []
+        i = 0
+        n = len(body)
+        backtick_runs = cls._build_backtick_run_index(body)
+
+        while i < n:
+            ch = body[i]
+
+            # WhatsApp needs the literal character, not CommonMark's escape.
+            if ch == "\\" and i + 1 < n:
+                out.append(body[i + 1])
+                i += 2
+                continue
+
+            # WhatsApp uses triple backticks for all monospace content.
+            if ch == "`":
+                j = i
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                close = cls._find_unescaped_run(backtick_runs, j, run)
+
+                if close is not None:
+                    out.append("```" + body[j:close] + "```")
+                    i = close + run
+                    continue
+
+                # No matching close -- not a real code span; just literal
+                # backticks.
+                out.append(body[i:j])
+                i = j
+                continue
+
+            # Track CommonMark labels for conversion to plain labeled URLs.
+            if ch == "[":
+                link_stack.append(len(out))
+                out.append("[")
+                i += 1
+                continue
+
+            if body.startswith("](<", i) and link_stack:
+                # Find the destination's next unescaped closing `>)`.
+                close = None
+                k = i + 3
+                while k < n - 1:
+                    if body[k] == "\\" and k + 1 < n:
+                        k += 2
+                        continue
+                    if body[k] == ">" and body[k + 1] == ")":
+                        close = k
+                        break
+                    k += 1
+
+                if close is not None:
+                    # Preserve the label beside WhatsApp's auto-linked URL.
+                    raw_url = body[i + 3 : close]
+                    url = []
+                    j2 = 0
+                    while j2 < len(raw_url):
+                        c2 = raw_url[j2]
+                        if c2 == "\\" and j2 + 1 < len(raw_url):
+                            url.append(raw_url[j2 + 1])
+                            j2 += 2
+                            continue
+                        url.append(c2)
+                        j2 += 1
+                    url = "".join(url)
+
+                    open_index = link_stack.pop()
+                    text = "".join(out[open_index + 1 :])
+                    del out[open_index:]
+                    out.append(f"{text} ({url})" if text else url)
+                    i = close + 2
+                    continue
+
+            # Convert CommonMark emphasis while preserving LIFO nesting.
+            if ch == "*":
+                j = i
+                while j < n and body[j] == "*":
+                    j += 1
+                run = j - i
+
+                while run > 0:
+                    if stack and (
+                        (stack[-1][0] == "*" and run >= 2)
+                        or (stack[-1][0] == "_" and run >= 1)
+                    ):
+                        delim, open_index = stack.pop()
+                        if open_index == len(out) - 1:
+                            out.pop()
+                        else:
+                            out.append(delim)
+                        run -= 2 if delim == "*" else 1
+                    elif run >= 2:
+                        out.append("*")
+                        stack.append(("*", len(out) - 1))
+                        run -= 2
+                    else:
+                        out.append("_")
+                        stack.append(("_", len(out) - 1))
+                        run -= 1
+
+                i = j
+                continue
+
+            out.append(ch)
+            i += 1
+
+        # Close out anything still open so the result is valid on its own.
+        while stack:
+            delim, open_index = stack.pop()
+            if open_index == len(out) - 1:
+                out.pop()
+            else:
+                out.append(delim)
+
+        return "".join(out)
+
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Evolution API Notification."""
+
+        if (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            # Adapt converted CommonMark; direct WhatsApp input is unchanged.
+            body = self._commonmark_to_whatsapp(body)
 
         # Build the base URL
         schema = "https" if self.secure else "http"

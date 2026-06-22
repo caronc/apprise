@@ -30,6 +30,7 @@ from json import dumps, loads
 # Disable logging for a cleaner testing output
 import logging
 import os
+import re
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -1440,7 +1441,8 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     # Simple HTML that our html_to_markdown converter handles
     body = "<b>hello</b> <i>world</i>"
 
-    # Markdown v1 keeps the converted generic Markdown unchanged.
+    # Markdown v1 gets the converted body in Telegram's own Markdown dialect
+    # (single-asterisk bold, single-underscore italic).
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1")
     assert len(aobj) == 1
@@ -1450,13 +1452,13 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     assert mock_post.call_count == 1
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # The converted formatting reaches the v1 payload intact.
     assert payload["parse_mode"] == "MARKDOWN"
-    assert payload["text"] == "**hello** *world*"
+    assert payload["text"] == "*hello* _world_"
 
     mock_post.reset_mock()
 
-    # Markdown v2 applies its own escaping to converted HTML.
+    # Markdown v2 gets the same dialect-correct delimiters, left unescaped so
+    # Telegram still parses them as real formatting.
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
     assert len(aobj) == 1
@@ -1467,7 +1469,7 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert payload["parse_mode"] == "MarkdownV2"
-    assert payload["text"] == r"\*\*hello\*\* \*world\*"
+    assert payload["text"] == "*hello* _world_"
 
     mock_post.reset_mock()
 
@@ -1520,6 +1522,309 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
 
     assert payload["parse_mode"] == "MarkdownV2"
     assert payload["text"] == "**already** markdown #tag"
+
+    mock_post.reset_mock()
+
+    # A heading has no MarkdownV2 entity -- its '#' must be escaped (not left
+    # bare), or Telegram rejects the entire message outright rather than just.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body="<h1>Title</h1><p>body text</p>", body_format=NotifyFormat.HTML
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "\\# Title\n\nbody text"
+
+    mock_post.reset_mock()
+
+    # Convert CommonMark links to Telegram's bare-destination syntax.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body='<a href="https://example.com/x">click</a>',
+        body_format=NotifyFormat.HTML,
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "[click](https://example.com/x)"
+
+    mock_post.reset_mock()
+
+    # Lists and tables have no MarkdownV2 entity either -- their markers
+    # need the same escaping as a heading's, for the same reason.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body="<ul><li>one</li><li>two</li></ul>",
+        body_format=NotifyFormat.HTML,
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "\\- one\n\\- two"
+
+    mock_post.reset_mock()
+
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body="<table><tr><td>A</td><td>B</td></tr></table>",
+        body_format=NotifyFormat.HTML,
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == (
+        "\\| A \\| B \\|\n\\| \\-\\-\\- \\| \\-\\-\\- \\|"
+    )
+
+    mock_post.reset_mock()
+
+    # A code span's content is just as literal to Telegram as it is to
+    # CommonMark -- the strict escape pass must not touch it.
+    aobj = Apprise()
+    aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
+    assert len(aobj) == 1
+
+    assert aobj.notify(
+        body="<code>a.b-c|d</code>", body_format=NotifyFormat.HTML
+    )
+
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+
+    assert payload["parse_mode"] == "MarkdownV2"
+    assert payload["text"] == "`a.b-c|d`"
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_html_to_markdown_hardening(mock_post):
+    """Test edge cases in the CommonMark-to-Telegram dialect adaptation."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    def notify(body, mdv="2"):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            f"?format=markdown&mdv={mdv}"
+        )
+        assert len(aobj) == 1
+        assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+        payload = loads(mock_post.call_args_list[-1][1]["data"])
+        mock_post.reset_mock()
+        return payload["text"]
+
+    # A link destination containing a literal ')' or '\' must have those
+    # escaped.
+    assert notify('<a href="https://example.com/a(b)c">x</a>') == (
+        "[x](https://example.com/a(b\\)c)"
+    )
+
+    # A code span's content needs every '`'/'\' inside it escaped.
+    assert notify("<code>a\\b</code>") == "`a\\\\b`"
+    assert notify("<code>a`b</code>") == "`a\\`b`"
+
+    # Immediately-adjacent nested emphasis (no text between the outer and inner
+    # tag's open) must stay correctly nested ("*_x_*"), not cross ("*_x*_").
+    assert notify("<b><i>x</i></b>") == "*_x_*"
+    assert notify("<i><b>x</b></i>") == "*_x_*"
+
+    # Legacy Markdown (v1) doesn't support nested entities at all.
+    assert notify("<b>a <i>b</i> c</b>", mdv="1") == "*a b c*"
+    assert notify("<b><i>x</i></b>", mdv="1") == "*x*"
+
+    # <i><b>x</b></i> and <b><i>x</i></b> both flatten to the identical
+    # CommonMark "***x***" (html_to_markdown has no separating text to anchor
+    assert notify("<i><b>x</b></i>", mdv="1") == "*x*"
+
+    # Legacy Markdown only recognizes a backslash escape in front of
+    # '`'/'*'/'_'/'['.
+    assert (
+        notify("<p>#tag (test)! &lt;x&gt; ~wave~</p>", mdv="1")
+        == "#tag (test)! <x> ~wave~"
+    )
+    assert (
+        notify("<p>a[b]c *lit* _lit_ `lit`</p>", mdv="1")
+        == "a\\[b]c \\*lit\\* \\_lit\\_ \\`lit\\`"
+    )
+
+    # Non-adjacent nesting and sibling spans are unaffected.
+    assert notify("<b>bold <i>italic</i> still bold</b>") == (
+        "*bold _italic_ still bold*"
+    )
+    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+
+    # A nested bold opening *while italic is already open, with real text in
+    # between* (so the two opening delimiters aren't touching) is a completely.
+    assert notify("<i>a <b>b</b> c</i>") == "_a *b* c_"
+    assert notify("<i>a <b>b</b> c</i>", mdv="1") == "_a b c_"
+
+    # The reverse nesting (bold containing italic, separated by text) was
+    # already correct, and must stay that way.
+    assert notify("<b>a <i>b</i> c</b>") == "*a _b_ c*"
+
+    # A literal "\x01<digits>\x01"-shaped sequence in ordinary text must pass
+    # through completely unaltered.
+    assert notify("literal \x010\x01 text, no code or links at all") == (
+        "literal \x010\x01 text, no code or links at all"
+    )
+
+    # overflow=split can hand this method just one chunk of a longer body, with
+    # a span that doesn't open or close until a different chunk entirely.
+    aobj = Apprise()
+    aobj.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345"
+        "?format=markdown&mdv=2&overflow=split"
+    )
+    assert len(aobj) == 1
+    assert aobj.notify(
+        body="<b>" + ("x" * 4990) + "</b>", body_format=NotifyFormat.HTML
+    )
+    assert mock_post.call_count == 2
+    texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+
+    # Each half is independently balanced -- an odd number of un-escaped
+    # '*'/'_' in either one would mean Telegram still rejects it.
+    for text in texts:
+        assert text.count("*") % 2 == 0
+        assert text.count("_") % 2 == 0
+
+    # A split at a bold close must not leave an empty entity.
+    assert texts[1] == "x" * (len(texts[1]))
+
+    # The same overflow split can also land mid-code-span or mid-link.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "text ``unterminated", strict=True
+        )
+        == "text \\`\\`unterminated"
+    )
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "a](<https://incomplete no close", strict=True
+        )
+        == "a](\\<https://incomplete no close"
+    )
+
+    # Empty adjacent entities collapse without affecting following text.
+    assert NotifyTelegram._commonmark_to_telegram("****x") == "x"
+
+    # _build_backtick_run_index() / _find_unescaped_run() -- the lookup
+    # returns None outright when the requested run never appears at all.
+    assert (
+        NotifyTelegram._find_unescaped_run(
+            NotifyTelegram._build_backtick_run_index("no match here"), 0, 2
+        )
+        is None
+    )
+
+    # A genuine match arbitrarily far from `start` is still found.
+    far = "a" * 200_000 + "`"
+    assert (
+        NotifyTelegram._find_unescaped_run(
+            NotifyTelegram._build_backtick_run_index(far), 0, 1
+        )
+        == 200_000
+    )
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_overflow_split_repair(mock_post):
+    """Test that overflow=split can't break entity boundaries across
+    messages: _build_send_calls() adapts the whole body to Telegram's
+    dialect before splitting (not per-chunk after), and
+    _repair_split_chunk() patches up whatever the split itself still cuts
+    in half across two messages."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    def notify_split(body):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            "?format=markdown&mdv=2&overflow=split"
+        )
+        assert len(aobj) == 1
+        assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+        texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+        mock_post.reset_mock()
+        return texts
+
+    # A bold span long enough to force a split, immediately followed by plain
+    # text that was never part of it.
+    texts = notify_split(
+        "<b>" + ("x" * 4990) + "</b>" + "TAIL_SHOULD_NOT_BE_BOLD"
+    )
+    assert len(texts) == 2
+    # The part that fit keeps its formatting...
+    assert texts[0].startswith("*x")
+    assert texts[0].endswith("x*")
+    # ...but the unrelated trailing text does not become bold.
+    assert "TAIL" in texts[1]
+    assert not texts[1].startswith("*")
+    for text in texts:
+        assert text.count("*") % 2 == 0
+        assert text.count("_") % 2 == 0
+
+    # A link long enough that its URL alone forces a split.
+    url = "https://example.com/" + ("a" * 4990)
+    texts = notify_split(f'<a href="{url}">click here</a>')
+    assert len(texts) >= 2
+    for text in texts:
+        assert not re.search(r"(?<!\\)[_*\[\]()~`>#+=|{}.!<-]", text)
+
+    # A <pre> block long enough to force a split.
+    content = "line.with.dots-and-dashes_under " * 200
+    texts = notify_split(f"<pre>{content}</pre>")
+    assert len(texts) >= 2
+    for text in texts:
+        assert not re.search(r"(?<!\\)[_*\[\]()~`>#+=|{}.!<-]", text)
+
+    # A short message that never triggers a split at all is unaffected.
+    texts = notify_split("<b>short</b> <i>text</i>")
+    assert texts == ["*short* _text_"]
+
+    # A continuation chunk where the carried-over destination *does* close
+    # within this same chunk (not needing yet another one), even with an.
+    assert NotifyTelegram._repair_split_chunk(
+        "a\\)b)more text\\.", True, {"in_link_dest": True}
+    ) == ("a\\)b\\)more text\\.", {})
+
+    # A carried-over code span closing within this chunk, same idea.
+    assert NotifyTelegram._repair_split_chunk(
+        "code```more text\\.", True, {"in_code": 3}
+    ) == ("codemore text\\.", {})
+
+    # A carried-over destination that doesn't end in *this* chunk either.
+    assert NotifyTelegram._repair_split_chunk(
+        "still no close here", True, {"in_link_dest": True}
+    ) == ("still no close here", {"in_link_dest": True})
 
 
 @mock.patch("requests.post")

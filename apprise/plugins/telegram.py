@@ -51,6 +51,7 @@
 #
 # Development API Reference::
 #  - https://core.telegram.org/bots/api
+from bisect import bisect_left
 from json import dumps, loads
 import os
 import re
@@ -787,6 +788,419 @@ class NotifyTelegram(NotifyBase):
         )
         return 0
 
+    @classmethod
+    def _build_backtick_run_index(cls, text):
+        """Index unescaped backtick runs by width in one pass."""
+
+        index = {}
+        i = 0
+        n = len(text)
+
+        while i < n:
+            ch = text[i]
+
+            if ch == "\\" and i + 1 < n:
+                i += 2
+                continue
+
+            if ch == "`":
+                j = i
+                while j < n and text[j] == "`":
+                    j += 1
+                index.setdefault(j - i, []).append(i)
+                i = j
+                continue
+
+            i += 1
+
+        return index
+
+    @staticmethod
+    def _find_unescaped_run(index, start, run):
+        """Find the next indexed backtick run of the requested width."""
+
+        positions = index.get(run)
+        if not positions:
+            return None
+
+        pos = bisect_left(positions, start)
+        return positions[pos] if pos < len(positions) else None
+
+    # Convert HTML-derived CommonMark to Telegram Markdown in one pass while
+    # preserving nested entities and independently valid message chunks.
+    _TELEGRAM_STRICT_CHARS = "~#+=|{}.!<>-"
+
+    # Legacy Markdown recognizes escapes only for these characters.
+    _TELEGRAM_V1_ESCAPABLE = "`*_["
+
+    # Full MarkdownV2 reserved set for previously unescaped fragments.
+    _TELEGRAM_RESERVED_FULL = "_*[]()~`>#+=|{}.!<>-"
+
+    @classmethod
+    def _strict_escape(cls, text):
+        """Escape an unescaped MarkdownV2 fragment without double-escaping."""
+
+        out = []
+        i = 0
+        n = len(text)
+        while i < n:
+            ch = text[i]
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i : i + 2])
+                i += 2
+                continue
+            if ch in cls._TELEGRAM_RESERVED_FULL:
+                out.append("\\" + ch)
+            else:
+                out.append(ch)
+            i += 1
+        return "".join(out)
+
+    @classmethod
+    def _commonmark_to_telegram(cls, body, strict=False):
+        """Adapt html_to_markdown()'s CommonMark output to Telegram's own
+        Markdown dialect ("Markdown"/v1, or strictly for "MarkdownV2"/v2)."""
+
+        out = []
+        # Open spans as (delimiter, output index), innermost last. A None index
+        # marks nesting suppressed for legacy Markdown.
+        stack = []
+        i = 0
+        n = len(body)
+        backtick_runs = cls._build_backtick_run_index(body)
+
+        while i < n:
+            ch = body[i]
+
+            # Keep valid escapes and drop unsupported legacy backslashes.
+            if ch == "\\" and i + 1 < n:
+                nxt = body[i + 1]
+                if strict or nxt in cls._TELEGRAM_V1_ESCAPABLE:
+                    out.append(body[i : i + 2])
+                else:
+                    out.append(nxt)
+                i += 2
+                continue
+
+            # Telegram uses fixed code delimiters and escapes their contents.
+            if ch == "`":
+                j = i
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                close = cls._find_unescaped_run(backtick_runs, j, run)
+
+                if close is not None:
+                    content = body[j:close]
+                    content = content.replace("\\", "\\\\").replace("`", "\\`")
+                    delim = "```" if run >= 3 or "\n" in content else "`"
+                    out.append(delim + content + delim)
+                    i = close + run
+                    continue
+
+                # Treat unmatched backticks as reserved literal text.
+                out.append(("\\`" if strict else "`") * run)
+                i = j
+                continue
+
+            # Convert angle-bracket destinations to Telegram's bare form.
+            if body.startswith("](<", i):
+                close = body.find(">)", i + 3)
+                if close != -1:
+                    url = body[i + 3 : close]
+                    url = url.replace("\\", "\\\\").replace(")", "\\)")
+                    out.append("](" + url + ")")
+                    i = close + 2
+                    continue
+
+            # Convert emphasis in LIFO order; legacy mode suppresses nesting.
+            if ch == "*":
+                j = i
+                while j < n and body[j] == "*":
+                    j += 1
+                run = j - i
+
+                # Wide runs close nested spans only on an exact width match.
+                cascade_levels = 0
+                cascade_width = 0
+                for delim, _ in reversed(stack):
+                    need = 2 if delim == "*" else 1
+                    if cascade_width + need > run:
+                        break
+                    cascade_width += need
+                    cascade_levels += 1
+                    if cascade_width == run:
+                        break
+
+                if cascade_levels and cascade_width == run:
+                    for _ in range(cascade_levels):
+                        delim, open_index = stack.pop()
+                        if open_index is None:
+                            # Suppressed legacy nesting emits no close.
+                            pass
+                        elif open_index == len(out) - 1:
+                            # Drop empty entities.
+                            out.pop()
+                        else:
+                            out.append(delim)
+                    i = j
+                    continue
+
+                while run > 0:
+                    # Extra bold pairs may begin the next sibling span.
+                    if stack and stack[-1][0] == "*" and run >= 2:
+                        delim, open_index = stack.pop()
+                        if open_index is None:
+                            pass
+                        elif open_index == len(out) - 1:
+                            out.pop()
+                        else:
+                            out.append(delim)
+                        run -= 2
+                    elif stack and stack[-1][0] == "_" and run == 1:
+                        delim, open_index = stack.pop()
+                        if open_index is None:
+                            pass
+                        elif open_index == len(out) - 1:
+                            out.pop()
+                        else:
+                            out.append(delim)
+                        run -= 1
+                    elif run >= 2:
+                        if strict or not stack:
+                            out.append("*")
+                            stack.append(("*", len(out) - 1))
+                        else:
+                            stack.append(("*", None))
+                        run -= 2
+                    else:
+                        if strict or not stack:
+                            out.append("_")
+                            stack.append(("_", len(out) - 1))
+                        else:
+                            stack.append(("_", None))
+                        run -= 1
+
+                i = j
+                continue
+
+            if strict and ch in cls._TELEGRAM_STRICT_CHARS:
+                out.append("\\" + ch)
+                i += 1
+                continue
+
+            out.append(ch)
+            i += 1
+
+        # Close spans left open by malformed source.
+        while stack:
+            delim, open_index = stack.pop()
+            if open_index is None:
+                pass
+            elif open_index == len(out) - 1:
+                out.pop()
+            else:
+                out.append(delim)
+
+        return "".join(out)
+
+    @classmethod
+    def _repair_split_chunk(cls, text, strict, pending):
+        """Repair entities split across Telegram messages.
+
+        Pending state identifies closing delimiters or opaque content that
+        continues from the previous chunk. Returns text and updated state.
+        """
+
+        out = []
+        open_state = {"*": False, "_": False}
+        open_pos = {"*": None, "_": None}
+        pending = dict(pending)
+        link_stack = []
+        i = 0
+        n = len(text)
+        backtick_runs = cls._build_backtick_run_index(text)
+
+        in_code_width = pending.pop("in_code", None)
+        if in_code_width and strict:
+            close = cls._find_unescaped_run(backtick_runs, 0, in_code_width)
+            if close is not None:
+                out.append(cls._strict_escape(text[:close]))
+                i = close + in_code_width
+            else:
+                out.append(cls._strict_escape(text))
+                pending["in_code"] = in_code_width
+                i = n
+
+        elif pending.pop("in_link_dest", False) and strict:
+            close = None
+            k = 0
+            while k < n:
+                if text[k] == "\\" and k + 1 < n:
+                    k += 2
+                    continue
+                if text[k] == ")":
+                    close = k
+                    break
+                k += 1
+
+            if close is not None:
+                out.append(cls._strict_escape(text[:close]))
+                out.append("\\)")
+                i = close + 1
+            else:
+                # Carry an unterminated destination into the next chunk.
+                out.append(cls._strict_escape(text))
+                pending["in_link_dest"] = True
+                i = n
+
+        while i < n:
+            ch = text[i]
+
+            if ch == "\\" and i + 1 < n:
+                out.append(text[i : i + 2])
+                i += 2
+                continue
+
+            # Preserve complete code entities unchanged.
+            if ch == "`":
+                j = i
+                while j < n and text[j] == "`":
+                    j += 1
+                run = j - i
+                close = cls._find_unescaped_run(backtick_runs, j, run)
+                if close is not None:
+                    out.append(text[i : close + run])
+                    i = close + run
+                    continue
+
+                if strict:
+                    # Drop a split fence and carry its escaped content forward.
+                    pending["in_code"] = run
+                    out.append(cls._strict_escape(text[j:]))
+                    i = n
+                    continue
+
+            if ch in "*_":
+                if pending.get(ch, 0) > 0:
+                    # Discard a close whose open was dropped earlier.
+                    pending[ch] -= 1
+                    i += 1
+                    continue
+
+                if open_state[ch]:
+                    if open_pos[ch] == len(out) - 1:
+                        out.pop()
+                    else:
+                        out.append(ch)
+                    open_state[ch] = False
+                    open_pos[ch] = None
+                else:
+                    out.append(ch)
+                    open_pos[ch] = len(out) - 1
+                    open_state[ch] = True
+                i += 1
+                continue
+
+            if strict and ch == "[":
+                link_stack.append(len(out))
+                out.append(ch)
+                i += 1
+                continue
+
+            if strict and text.startswith("](", i):
+                # Find the destination's next unescaped closing parenthesis.
+                close = None
+                k = i + 2
+                while k < n:
+                    if text[k] == "\\" and k + 1 < n:
+                        k += 2
+                        continue
+                    if text[k] == ")":
+                        close = k
+                        break
+                    k += 1
+
+                if close is not None:
+                    if link_stack:
+                        link_stack.pop()
+                        out.append(text[i : close + 1])
+                    else:
+                        out.append("\\]\\(")
+                        out.append(cls._strict_escape(text[i + 2 : close]))
+                        out.append("\\)")
+                    i = close + 1
+                    continue
+
+                # Escape and carry an incomplete destination forward.
+                out.append("\\]\\(")
+                out.append(cls._strict_escape(text[i + 2 :]))
+                pending["in_link_dest"] = True
+                i = n
+                continue
+
+            if strict and ch in "[]()":
+                # Escape link punctuation outside a complete entity.
+                out.append("\\" + ch)
+                i += 1
+                continue
+
+            out.append(ch)
+            i += 1
+
+        # Escape unmatched labels before later index-changing cleanup.
+        if strict:
+            for idx in link_stack:
+                out[idx] = "\\" + out[idx]
+
+        # Drop empty spans and force-close nonempty spans at the chunk edge.
+        # Classify first because deletions shift recorded output indexes.
+        empty, nonempty = [], []
+        for d in ("*", "_"):
+            if not open_state[d]:
+                continue
+            (empty if open_pos[d] == len(out) - 1 else nonempty).append(d)
+
+        for d in sorted(empty, key=lambda d: open_pos[d], reverse=True):
+            del out[open_pos[d]]
+
+        new_pending = dict(pending)
+        for d in nonempty:
+            out.append(d)
+            new_pending[d] = new_pending.get(d, 0) + 1
+
+        return "".join(out), new_pending
+
+    def _build_send_calls(
+        self, body=None, title=None, body_format=None, **kwargs
+    ):
+        """Adapt CommonMark before splitting, then repair split entities."""
+
+        if not (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            yield from super()._build_send_calls(
+                body=body, title=title, body_format=body_format, **kwargs
+            )
+            return
+
+        strict = self.markdown_ver == TelegramMarkdownVersion.TWO
+
+        if body:
+            body = self._commonmark_to_telegram(body, strict=strict)
+        if title:
+            title = self._commonmark_to_telegram(title, strict=strict)
+
+        pending = {}
+        for kwargs2 in super()._build_send_calls(
+            body=body, title=title, body_format=body_format, **kwargs
+        ):
+            kwargs2["body"], pending = self._repair_split_chunk(
+                kwargs2["body"], strict, pending
+            )
+            yield kwargs2
+
     def send(
         self,
         body,
@@ -832,18 +1246,14 @@ class NotifyTelegram(NotifyBase):
         # Prepare Message Body
         if self.notify_format == NotifyFormat.MARKDOWN:
             if (
-                body_format not in (None, NotifyFormat.MARKDOWN)
+                body_format == NotifyFormat.TEXT
                 and self.markdown_ver == TelegramMarkdownVersion.TWO
             ):
-                # Telegram Markdown v2 is not very accomodating to some
-                # characters such as the hashtag (#) which is fine in v1. To
-                # try and be accomodating we escape them in advance See:
-                # https://stackoverflow.com/a/69892704/355584 Also:
-                # https://core.telegram.org/bots/api#markdownv2-style Note: We
-                # only escape characters that are not already escaped.
-                #
-                # Telegram v2 needs its own escaping for converted HTML.
+                # Escape reserved characters in plain MarkdownV2 input.
                 body = re.sub(r"(?<!\\)([_*[\]()~`>#+=|{}.!-])", r"\\\1", body)
+
+            # HTML was adapted before splitting; direct Telegram Markdown is
+            # left unchanged.
 
             payload_["parse_mode"] = self.markdown_ver
             payload_["text"] = body
