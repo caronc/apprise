@@ -36,7 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAsset, NotifyType
-from apprise.plugins.pushward import NotifyPushWard
+from apprise.plugins.pushward import NotifyPushWard, pushward_level
 
 logging.disable(logging.CRITICAL)
 
@@ -79,6 +79,21 @@ apprise_url_tests = (
             # critical level with a volume
             "instance": NotifyPushWard,
             "privacy_url": "pushward://h...3/",
+        },
+    ),
+    (
+        "pushward://hlk_abc123?info=passive&failure=critical",
+        {
+            # per-notification-type level overrides
+            "instance": NotifyPushWard,
+            "privacy_url": "pushward://h...3/",
+        },
+    ),
+    (
+        "pushward://hlk_abc123?info=bogus",
+        {
+            # An invalid per-type level
+            "instance": TypeError,
         },
     ),
     (
@@ -372,3 +387,54 @@ def test_plugin_pushward_parse_url():
     # Case is preserved on the key (hlk_ keys are case-sensitive)
     results = NotifyPushWard.parse_url("pushward://hlk_AbC123")
     assert results["apikey"] == "hlk_AbC123"
+
+
+def test_plugin_pushward_level_resolution():
+    """NotifyPushWard() level short-form resolution."""
+
+    # Full names, short-forms, and unique single-letter prefixes
+    assert pushward_level("passive") == "passive"
+    assert pushward_level("crit") == "critical"
+    assert pushward_level("c") == "critical"
+    assert pushward_level("t") == "time-sensitive"
+    assert pushward_level("ACTIVE") == "active"
+
+    # Empty or non-matching input resolves to None
+    assert pushward_level("") is None
+    assert pushward_level("   ") is None
+    assert pushward_level("bogus") is None
+
+
+@mock.patch("requests.post")
+def test_plugin_pushward_per_type_levels(mock_post):
+    """NotifyPushWard() per-notification-type level overrides."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "pushward://hlk_abc123?info=passive&failure=crit"
+    )
+    assert isinstance(obj, NotifyPushWard)
+    assert obj.level_map[NotifyType.INFO] == "passive"
+    # Short-form resolves to the canonical level
+    assert obj.level_map[NotifyType.FAILURE] == "critical"
+    # Untouched types keep their defaults
+    assert obj.level_map[NotifyType.WARNING] == "time-sensitive"
+
+    assert obj.notify(title="t", body="b", notify_type=NotifyType.INFO) is True
+    assert loads(mock_post.call_args[1]["data"])["level"] == "passive"
+
+    assert (
+        obj.notify(title="t", body="b", notify_type=NotifyType.FAILURE) is True
+    )
+    assert loads(mock_post.call_args[1]["data"])["level"] == "critical"
+
+    # A global ?level= still forces every type
+    obj = Apprise.instantiate(
+        "pushward://hlk_abc123?level=passive&info=critical"
+    )
+    assert obj.notify(title="t", body="b", notify_type=NotifyType.INFO) is True
+    assert loads(mock_post.call_args[1]["data"])["level"] == "passive"

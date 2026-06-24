@@ -68,15 +68,28 @@ PUSHWARD_LEVELS = (
     "critical",
 )
 
-# Maps an Apprise notification type to a default PushWard level. Only used when
-# the URL does not specify an explicit level=; "critical" is never selected
-# automatically as it must be requested on purpose.
-PUSHWARD_LEVEL_MAP = {
+# The default PushWard level mapped to each Apprise notification type. Each is
+# overridable from the URL (e.g. ?info=passive&failure=critical) so the mapping
+# can match a user's own PushWard setup. "critical" is never a default; it must
+# be opted into as it bypasses the device's silent mode / Focus.
+PUSHWARD_DEFAULT_LEVELS = {
     NotifyType.INFO: "active",
     NotifyType.SUCCESS: "active",
     NotifyType.WARNING: "time-sensitive",
     NotifyType.FAILURE: "time-sensitive",
 }
+
+
+def pushward_level(value):
+    """Resolve a full or short-form level (e.g. 'crit', 'c') to a canonical
+    PushWard level, or None if it does not match one."""
+    value = str(value).strip().lower()
+    if not value:
+        return None
+    return next(
+        (level for level in PUSHWARD_LEVELS if level.startswith(value)),
+        None,
+    )
 
 
 class NotifyPushWard(NotifyBase):
@@ -139,10 +152,36 @@ class NotifyPushWard(NotifyBase):
             "apikey": {
                 "alias_of": "apikey",
             },
+            # Force the level for every notification regardless of its type
             "level": {
                 "name": _("Level"),
                 "type": "choice:string",
                 "values": PUSHWARD_LEVELS,
+            },
+            # Per-type level overrides; default to PUSHWARD_DEFAULT_LEVELS
+            "info": {
+                "name": _("Info Level"),
+                "type": "choice:string",
+                "values": PUSHWARD_LEVELS,
+                "default": PUSHWARD_DEFAULT_LEVELS[NotifyType.INFO],
+            },
+            "success": {
+                "name": _("Success Level"),
+                "type": "choice:string",
+                "values": PUSHWARD_LEVELS,
+                "default": PUSHWARD_DEFAULT_LEVELS[NotifyType.SUCCESS],
+            },
+            "warning": {
+                "name": _("Warning Level"),
+                "type": "choice:string",
+                "values": PUSHWARD_LEVELS,
+                "default": PUSHWARD_DEFAULT_LEVELS[NotifyType.WARNING],
+            },
+            "failure": {
+                "name": _("Failure Level"),
+                "type": "choice:string",
+                "values": PUSHWARD_LEVELS,
+                "default": PUSHWARD_DEFAULT_LEVELS[NotifyType.FAILURE],
             },
             "volume": {
                 "name": _("Volume"),
@@ -153,7 +192,17 @@ class NotifyPushWard(NotifyBase):
         },
     )
 
-    def __init__(self, apikey, level=None, volume=None, **kwargs):
+    def __init__(
+        self,
+        apikey,
+        level=None,
+        info=None,
+        success=None,
+        warning=None,
+        failure=None,
+        volume=None,
+        **kwargs,
+    ):
         """Initialize PushWard Object."""
         super().__init__(**kwargs)
 
@@ -169,15 +218,34 @@ class NotifyPushWard(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Acquire our level (if one was explicitly provided)
+        # An explicit level forces every notification to that level
+        self.level = None
         if level:
-            self.level = level.strip().lower()
-            if self.level not in PUSHWARD_LEVELS:
+            self.level = pushward_level(level)
+            if self.level is None:
                 msg = f"An invalid PushWard level ({level}) was specified."
                 self.logger.warning(msg)
                 raise TypeError(msg)
-        else:
-            self.level = None
+
+        # Per-notification-type level mapping; each type may be overridden from
+        # the URL, otherwise it falls back to the default
+        self.level_map = {}
+        for ntype, value in (
+            (NotifyType.INFO, info),
+            (NotifyType.SUCCESS, success),
+            (NotifyType.WARNING, warning),
+            (NotifyType.FAILURE, failure),
+        ):
+            if not value:
+                self.level_map[ntype] = PUSHWARD_DEFAULT_LEVELS[ntype]
+                continue
+
+            resolved = pushward_level(value)
+            if resolved is None:
+                msg = f"An invalid PushWard level ({value}) was specified."
+                self.logger.warning(msg)
+                raise TypeError(msg)
+            self.level_map[ntype] = resolved
 
         # Acquire our volume (only applied to critical notifications)
         if volume is not None:
@@ -208,12 +276,9 @@ class NotifyPushWard(NotifyBase):
             "Authorization": f"Bearer {self.apikey}",
         }
 
-        # Resolve the level: an explicit override, otherwise derived
-        level = (
-            self.level
-            if self.level
-            else PUSHWARD_LEVEL_MAP.get(notify_type, "active")
-        )
+        # Resolve the level: an explicit override wins, otherwise the
+        # per-notification-type mapping applies
+        level = self.level if self.level else self.level_map[notify_type]
 
         # PushWard requires a non-empty title; the body is guaranteed by the
         # framework, but the title can be empty so we fall back to our
@@ -305,8 +370,6 @@ class NotifyPushWard(NotifyBase):
         return (
             self.secure_protocol,
             self.apikey,
-            self.level,
-            self.volume,
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -316,6 +379,16 @@ class NotifyPushWard(NotifyBase):
         params = {}
         if self.level:
             params["level"] = self.level
+
+        # Include any per-type level that differs from the default
+        for ntype, key in (
+            (NotifyType.INFO, "info"),
+            (NotifyType.SUCCESS, "success"),
+            (NotifyType.WARNING, "warning"),
+            (NotifyType.FAILURE, "failure"),
+        ):
+            if self.level_map[ntype] != PUSHWARD_DEFAULT_LEVELS[ntype]:
+                params[key] = self.level_map[ntype]
 
         if self.volume is not None:
             params["volume"] = str(self.volume)
@@ -348,9 +421,14 @@ class NotifyPushWard(NotifyBase):
                 results["qsd"]["apikey"]
             )
 
-        # Allow the level to be set
+        # Allow the level to be set (forces every notification type)
         if "level" in results["qsd"] and results["qsd"]["level"]:
             results["level"] = NotifyPushWard.unquote(results["qsd"]["level"])
+
+        # Allow per-notification-type level overrides
+        for key in ("info", "success", "warning", "failure"):
+            if key in results["qsd"] and results["qsd"][key]:
+                results[key] = NotifyPushWard.unquote(results["qsd"][key])
 
         # Allow the volume to be set
         if "volume" in results["qsd"] and results["qsd"]["volume"]:
