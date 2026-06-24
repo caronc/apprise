@@ -1134,7 +1134,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a MARKDOWN mode
     assert (
-        payload["text"] == "# A Great Title\r\n"
+        payload["text"] == "# A Great Title\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.2)"
     )
@@ -1167,7 +1167,7 @@ def test_plugin_telegram_formatting(mock_post):
 
     # Test that everything is escaped properly in a MARKDOWN mode
     assert (
-        payload["text"] == "\\# A Great Title\r\n"
+        payload["text"] == "\\# A Great Title\n"
         "\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had "
         "\\[a change\\]\\(http://127\\.0\\.0\\.2\\)"
     )
@@ -1732,11 +1732,54 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     # Empty adjacent entities collapse without affecting following text.
     assert NotifyTelegram._commonmark_to_telegram("****x") == "x"
 
-    # _build_backtick_run_index() / _find_unescaped_run() -- the lookup
+    # Cascade close that pops an open span whose delimiter was the LAST item
+    # in the output buffer (empty entity) -- the delimiter is dropped.
+    assert NotifyTelegram._commonmark_to_telegram("******") == ""
+
+    # Unclosed spans at the end of the V1 input are force-closed by the
+    # cleanup loop.  A suppressed nesting (open_index None) is silently
+    # skipped; a real one appends the closing delimiter.
+    f1 = NotifyTelegram._commonmark_to_telegram
+    assert f1("***italic text") == "*italic text*"
+    assert f1("**text") == "*text*"
+    # An unterminated open with no content at all collapses to nothing.
+    assert f1("**") == ""
+
+    # A link destination containing a backslash-escaped '>' in V1 mode:
+    # the scan skips escaped characters and still finds the '>)' terminator.
+    assert (
+        notify('<a href="https://example.com/x>y">click</a>', mdv="1")
+        == r"[click](https://example.com/x\\>y)"
+    )
+
+    # HTML body with a title in V1 mode: _build_send_calls merges the title
+    # as a heading before dialect conversion (covers the title-merge branch).
+    aobj_v1 = Apprise()
+    aobj_v1.add(
+        "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1"
+    )
+    assert aobj_v1.notify(
+        body="<b>hello</b>", title="My Title", body_format=NotifyFormat.HTML
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "# My Title\n*hello*"
+    mock_post.reset_mock()
+
+    # Title that reduces to an empty string after stripping leading heading
+    # and list characters (html_to_markdown converts "  - " to "-").
+    # The heading is skipped and the title field is cleared regardless.
+    assert aobj_v1.notify(
+        body="<b>hello</b>", title="  - ", body_format=NotifyFormat.HTML
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "*hello*"
+    mock_post.reset_mock()
+
+    # build_backtick_run_index() / find_unescaped_run() -- the lookup
     # returns None outright when the requested run never appears at all.
     assert (
-        NotifyTelegram._find_unescaped_run(
-            NotifyTelegram._build_backtick_run_index("no match here"), 0, 2
+        NotifyTelegram.find_unescaped_run(
+            NotifyTelegram.build_backtick_run_index("no match here"), 0, 2
         )
         is None
     )
@@ -1744,8 +1787,8 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     # A genuine match arbitrarily far from `start` is still found.
     far = "a" * 200_000 + "`"
     assert (
-        NotifyTelegram._find_unescaped_run(
-            NotifyTelegram._build_backtick_run_index(far), 0, 1
+        NotifyTelegram.find_unescaped_run(
+            NotifyTelegram.build_backtick_run_index(far), 0, 1
         )
         == 200_000
     )
@@ -1825,6 +1868,46 @@ def test_plugin_telegram_overflow_split_repair(mock_post):
     assert NotifyTelegram._repair_split_chunk(
         "still no close here", True, {"in_link_dest": True}
     ) == ("still no close here", {"in_link_dest": True})
+
+    repair = NotifyTelegram._repair_split_chunk
+
+    # V1 (non-strict) with an unmatched backtick: the backtick run has no
+    # closing partner, so the `if strict:` branch is NOT taken -- the
+    # backtick passes through as plain text.
+    assert repair("`code no close", False, {}) == ("`code no close", {})
+
+    # A pending close count for '*' in strict mode: the matching close
+    # delimiter in this chunk is discarded (the open was already dropped).
+    assert repair("*text", True, {"*": 1}) == ("text", {"*": 0})
+
+    # Same for '_'.
+    assert repair("_text", True, {"_": 1}) == ("text", {"_": 0})
+
+    # Strict mode: '](url)' with NO matching '[' on the link stack escapes
+    # the construct rather than emitting it verbatim.
+    assert repair("](https://e.com)", True, {}) == (
+        "\\]\\(https://e\\.com\\)",
+        {},
+    )
+
+    # Strict mode: '](url' with no closing ')' sets in_link_dest pending.
+    assert repair("](https://e.com no-close", True, {}) == (
+        "\\]\\(https://e\\.com no\\-close",
+        {"in_link_dest": True},
+    )
+
+    # Strict mode: opening and immediately closing the same delimiter with no
+    # content in between -- the empty span is dropped from the output.
+    assert repair("**", True, {}) == ("", {})
+
+    # Strict mode: a stray ']', '(', or ')' outside any complete link entity
+    # is backslash-escaped rather than passed through verbatim.
+    assert repair("]text", True, {}) == ("\\]text", {})
+    assert repair("(text)", True, {}) == ("\\(text\\)", {})
+
+    # Strict mode: a dangling open at the end of the chunk with no content
+    # after it is removed as an empty span (not propagated as pending).
+    assert repair("text*", True, {}) == ("text", {})
 
 
 @mock.patch("requests.post")

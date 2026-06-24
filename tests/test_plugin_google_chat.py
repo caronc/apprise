@@ -308,14 +308,14 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
 
     # Indexed lookup skips escapes and requires an exact run width.
     assert (
-        NotifyGoogleChat._find_unescaped_run(
-            NotifyGoogleChat._build_backtick_run_index("\\` `"), 0, 1
+        NotifyGoogleChat.find_unescaped_run(
+            NotifyGoogleChat.build_backtick_run_index("\\` `"), 0, 1
         )
         == 3
     )
     assert (
-        NotifyGoogleChat._find_unescaped_run(
-            NotifyGoogleChat._build_backtick_run_index("no backticks"), 0, 1
+        NotifyGoogleChat.find_unescaped_run(
+            NotifyGoogleChat.build_backtick_run_index("no backticks"), 0, 1
         )
         is None
     )
@@ -323,8 +323,8 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # A run that's longer than requested doesn't match either -- it's
     # indexed under its own (different) length group.
     assert (
-        NotifyGoogleChat._find_unescaped_run(
-            NotifyGoogleChat._build_backtick_run_index("`` `"), 0, 1
+        NotifyGoogleChat.find_unescaped_run(
+            NotifyGoogleChat.build_backtick_run_index("`` `"), 0, 1
         )
         == 3
     )
@@ -332,8 +332,8 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # Indexed lookup has no distance cutoff.
     far = "a" * 200_000 + "`"
     assert (
-        NotifyGoogleChat._find_unescaped_run(
-            NotifyGoogleChat._build_backtick_run_index(far), 0, 1
+        NotifyGoogleChat.find_unescaped_run(
+            NotifyGoogleChat.build_backtick_run_index(far), 0, 1
         )
         == 200_000
     )
@@ -357,3 +357,35 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
 
     # Collapse an empty, unterminated emphasis span.
     assert f("**") == ""
+
+    # HTML body with a title: title is merged into the body as a heading
+    # before the Chat dialect conversion runs (covers _build_send_calls
+    # title-merge branch).
+    aobj = Apprise()
+    assert aobj.add("gchat://workspace/key/token")
+    assert (
+        aobj.notify(
+            body="<b>hello</b>",
+            title="My Title",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "# My Title\n*hello*"
+    mock_post.reset_mock()
+
+    # Title that reduces to an empty string after stripping leading heading
+    # and list characters (html_to_markdown converts "  - " to "-").
+    # The heading is skipped and the title field is cleared regardless.
+    assert (
+        aobj.notify(
+            body="<b>hello</b>",
+            title="  - ",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "*hello*"
+    mock_post.reset_mock()

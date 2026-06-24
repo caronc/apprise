@@ -71,7 +71,6 @@
 #        - You will be able to select the Bot App you previously created
 #        - Your bot will join your channel.
 
-from bisect import bisect_left
 import contextlib
 from json import dumps, loads
 from json.decoder import JSONDecodeError
@@ -82,6 +81,11 @@ import requests
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..conversion import (
+    build_backtick_run_index,
+    commonmark_escape_link_url,
+    find_unescaped_run,
+)
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_bool, parse_list, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -383,134 +387,98 @@ class NotifySlack(NotifyBase):
         re.IGNORECASE,
     )
 
-    # HTML bodies arrive as CommonMark and require a single-pass conversion
-    # to Slack mrkdwn. Caller-supplied mrkdwn is left unchanged.
-
-    @classmethod
-    def _build_backtick_run_index(cls, text):
-        """Index unescaped backtick runs by width in one pass."""
-
-        index = {}
-        i = 0
-        n = len(text)
-
-        while i < n:
-            ch = text[i]
-
-            if ch == "\\" and i + 1 < n:
-                i += 2
-                continue
-
-            if ch == "`":
-                j = i
-                while j < n and text[j] == "`":
-                    j += 1
-                index.setdefault(j - i, []).append(i)
-                i = j
-                continue
-
-            i += 1
-
-        return index
-
-    @staticmethod
-    def _find_unescaped_run(index, start, run):
-        """Find the next indexed backtick run of the requested width."""
-
-        positions = index.get(run)
-        if not positions:
-            return None
-
-        pos = bisect_left(positions, start)
-        return positions[pos] if pos < len(positions) else None
-
-    @classmethod
-    def _escape_link_url(cls, url):
-        """Adapt a CommonMark destination for Slack's ``<url|text>`` form."""
-
-        # Resolve CommonMark escapes before applying Slack escaping.
-        out = []
-        i = 0
-        n = len(url)
-        while i < n:
-            ch = url[i]
-            if ch == "\\" and i + 1 < n:
-                out.append(url[i + 1])
-                i += 2
-                continue
-            out.append(ch)
-            i += 1
-        url = "".join(out)
-
-        # Entity-escape Slack controls and encode its URL-label separator.
-        url = url.replace("&", "&amp;").replace("<", "&lt;")
-        url = url.replace(">", "&gt;")
-        return url.replace("|", "%7C")
+    # Expose shared delimiter helpers for classmethods, tests, and subclasses.
+    build_backtick_run_index = staticmethod(build_backtick_run_index)
+    find_unescaped_run = staticmethod(find_unescaped_run)
 
     @classmethod
     def _commonmark_to_slack(cls, body):
         """Adapt html_to_markdown()'s CommonMark output to Slack's own
         mrkdwn dialect."""
 
+        # Accumulate translated characters one item at a time.
         out = []
-        # Open emphasis spans as (delimiter, output index), innermost last.
+        # Each entry is (delimiter, index-in-out) for an open emphasis span,
+        # innermost last, so we can close spans in LIFO order.
         stack = []
-        # Index in `out` of each currently-open link's "[", innermost last.
+        # Each entry is the out-index of the opening "[" for a pending link,
+        # innermost last; used to splice the label text out when we find "]".
         link_stack = []
         i = 0
         n = len(body)
-        backtick_runs = cls._build_backtick_run_index(body)
+        # Pre-scan all unescaped backtick run positions indexed by run length
+        # so code-span open/close matching is O(log n) rather than O(n^2).
+        backtick_runs = build_backtick_run_index(body)
 
         while i < n:
             ch = body[i]
 
-            # Translate CommonMark escapes into Slack's supported forms.
+            # CommonMark uses backslash escapes for literal punctuation.
+            # Translate them into the forms Slack's mrkdwn parser expects.
             if ch == "\\" and i + 1 < n:
                 nxt = body[i + 1]
                 if nxt == "<":
+                    # "<" must be entity-escaped so Slack does not treat it as
+                    # the start of a <url|label> anchor.
                     out.append("&lt;")
                 elif nxt == ">":
+                    # Symmetric: ">" closes Slack anchors and must be escaped.
                     out.append("&gt;")
                 elif nxt in "()[]!#":
+                    # CommonMark escapes these for Markdown disambiguation;
+                    # Slack treats them as plain characters -- emit as-is.
                     out.append(nxt)
                 else:
+                    # All other escape pairs are valid Slack mrkdwn escapes
+                    # (e.g. \* or \_), so keep the backslash.
                     out.append(body[i : i + 2])
                 i += 2
                 continue
 
-            # Slack requires literal ampersands to be entity-escaped.
+            # Slack requires literal ampersands to be entity-escaped so they
+            # are not confused with HTML entity sequences in the payload.
             if ch == "&":
                 out.append("&amp;")
                 i += 1
                 continue
 
-            # Slack still requires entity escaping inside code spans.
+            # Code spans: locate the matching closing run of the same length
+            # and entity-escape HTML controls inside the span content.
             if ch == "`":
                 j = i
+                # Measure the run length by counting consecutive backticks.
                 while j < n and body[j] == "`":
                     j += 1
                 run = j - i
-                close = cls._find_unescaped_run(backtick_runs, j, run)
+                # Search the pre-built index for the next run of the same
+                # length after the opening run ends.
+                close = find_unescaped_run(backtick_runs, j, run)
 
                 if close is not None:
+                    # Matched code span: entity-escape its content so Slack
+                    # does not interpret HTML inside monospace runs.
                     content = body[j:close]
                     content = (
                         content.replace("&", "&amp;")
                         .replace("<", "&lt;")
                         .replace(">", "&gt;")
                     )
+                    # Preserve the original delimiter width (1, 2, or 3+).
                     delim = body[i:j]
                     out.append(delim + content + delim)
+                    # Advance past the closing run.
                     i = close + run
                     continue
 
-                # No matching close -- not a real code span; just literal
-                # backticks (Slack has no escaping mechanism for these).
+                # No matching close -- not a real code span; emit the
+                # backticks as literal text (Slack has no escape for them).
                 out.append(body[i:j])
                 i = j
                 continue
 
-            # Track CommonMark labels for conversion to <url|text>.
+            # CommonMark inline links look like [label](<url>).
+            # Push the current out-index so we can retrieve the label text
+            # once we encounter the matching "](<".
             if ch == "[":
                 link_stack.append(len(out))
                 out.append("[")
@@ -518,11 +486,15 @@ class NotifySlack(NotifyBase):
                 continue
 
             if body.startswith("](<", i) and link_stack:
-                # Find the destination's next unescaped closing `>)`.
+                # We are at the "](<" that closes a pending link label.
+                # Scan forward with escape awareness to find ">)" which marks
+                # the end of the angle-bracketed destination.
                 close = None
                 k = i + 3
                 while k < n - 1:
                     if body[k] == "\\" and k + 1 < n:
+                        # Skip escaped characters inside the destination so a
+                        # literal ">)" in the URL does not falsely terminate.
                         k += 2
                         continue
                     if body[k] == ">" and body[k + 1] == ")":
@@ -531,52 +503,73 @@ class NotifySlack(NotifyBase):
                     k += 1
 
                 if close is not None:
-                    url = cls._escape_link_url(body[i + 3 : close])
+                    # Decode CommonMark escapes in the URL and re-encode
+                    # characters that would break the <url|label> syntax.
+                    url = commonmark_escape_link_url(body[i + 3 : close])
+                    # Retrieve the label text that was buffered after "[".
                     open_index = link_stack.pop()
                     text = "".join(out[open_index + 1 :])
+                    # Splice out everything from "[" onward and replace with
+                    # the Slack-native anchor format.
                     del out[open_index:]
                     out.append(f"<{url}|{text}>")
+                    # Skip past the closing ">)".
                     i = close + 2
                     continue
 
-            # Convert CommonMark emphasis while preserving LIFO nesting.
+            # Emphasis: CommonMark uses * for bold (**) and italic (*).
+            # Convert to Slack mrkdwn while preserving LIFO nesting order.
             if ch == "*":
                 j = i
+                # Measure how many consecutive "*" characters are here.
                 while j < n and body[j] == "*":
                     j += 1
                 run = j - i
 
+                # Consume the run one span at a time.  "**" maps to Slack bold
+                # (*) and "*" maps to Slack italic (_).  LIFO: close the most
+                # recently opened span if this run width can satisfy it.
                 while run > 0:
                     if stack and (
                         (stack[-1][0] == "*" and run >= 2)
                         or (stack[-1][0] == "_" and run >= 1)
                     ):
+                        # Close the innermost open span.
                         delim, open_index = stack.pop()
                         if open_index == len(out) - 1:
-                            # Drop empty entities.
+                            # The span opened but collected no content --
+                            # drop the empty opening delimiter too.
                             out.pop()
                         else:
+                            # Emit the matching close delimiter.
                             out.append(delim)
+                        # Bold consumes 2 asterisks; italic consumes 1.
                         run -= 2 if delim == "*" else 1
                     elif run >= 2:
+                        # Open a new bold (*) span.
                         out.append("*")
                         stack.append(("*", len(out) - 1))
                         run -= 2
                     else:
+                        # Open a new italic (_) span.
                         out.append("_")
                         stack.append(("_", len(out) - 1))
                         run -= 1
 
+                # Advance past the entire asterisk run.
                 i = j
                 continue
 
+            # All other characters pass through unchanged.
             out.append(ch)
             i += 1
 
-        # Close dangling spans so the output remains independently valid.
+        # Force-close any spans still open so each chunk of output is
+        # independently valid Slack mrkdwn even if the input was malformed.
         while stack:
             delim, open_index = stack.pop()
             if open_index == len(out) - 1:
+                # Opened but empty -- drop the dangling delimiter.
                 out.pop()
             else:
                 out.append(delim)
@@ -921,6 +914,38 @@ class NotifySlack(NotifyBase):
 
         # Return the validated attachment content dict
         return content
+
+    def _build_send_calls(
+        self, body=None, title=None, body_format=None, **kwargs
+    ):
+        """Convert CommonMark to mrkdwn before splitting into chunks."""
+
+        # Only adapt HTML-derived Markdown; pass other formats through.
+        if not (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            yield from super()._build_send_calls(
+                body=body,
+                title=title,
+                body_format=body_format,
+                **kwargs,
+            )
+            return
+
+        # Split on the CommonMark body so markdown_adjust can protect
+        # [label](<url>) constructs from being severed across chunk
+        # boundaries (body_format=MARKDOWN activates that path in
+        # smart_split).  Restore body_format=HTML in each yielded chunk
+        # so send() still applies _commonmark_to_slack() and the correct
+        # entity-escape pass on every chunk independently.
+        for chunk in super()._build_send_calls(
+            body=body,
+            title=title,
+            body_format=NotifyFormat.MARKDOWN,
+            **kwargs,
+        ):
+            yield {**chunk, "body_format": NotifyFormat.HTML}
 
     def send(
         self,
@@ -1781,7 +1806,10 @@ class NotifySlack(NotifyBase):
         # Get unquoted path entries
         entries = NotifySlack.split_path(results["fullpath"])
 
-        # Resolve abbreviated modes before parsing path segments.
+        # Peek at mode early to guide path parsing.
+        # Resolve via the same prefix-matching used in __init__ so that
+        # abbreviated inputs (e.g. mode=tri or mode=work) are handled
+        # identically in both places.
         _mode_raw = results["qsd"].get("mode", "")
         _mode = (
             next(

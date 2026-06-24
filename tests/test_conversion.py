@@ -1529,6 +1529,15 @@ def test_conversion_html_to_markdown_tables_hardening():
         "| A |\n| --- |\n| B |\n| C |"
     )
 
+    # An unclosed inline element (<em>) inside a <td> is silently discarded
+    # when a sibling <td> opens; the cell's text is still captured.
+    assert (
+        to_md(
+            "<table><tr><td><em>unclosed text<td>second cell</td></tr></table>"
+        )
+        == "| *unclosed text | second cell |\n| --- | --- |"
+    )
+
     # Performance: many rows, each with unclosed <td>/<tr> tags (the legacy-
     # markup shape), large enough to expose quadratic recovery.
     n = 20000
@@ -1628,21 +1637,21 @@ def test_conversion_html_to_markdown_table_code_pipe():
     conv = HTMLMarkdownConverter()
     assert conv._escape_cell_pipes("a`b|c") == "a`b\\|c"
 
-    # _build_backtick_run_index() / _find_unescaped_run() skip escape pairs
+    # build_backtick_run_index() / find_unescaped_run() skip escape pairs
     # while indexing, and the lookup returns None when no run of the exact.
     assert (
-        conv._find_unescaped_run(conv._build_backtick_run_index("\\` `"), 0, 1)
+        conv.find_unescaped_run(conv.build_backtick_run_index("\\` `"), 0, 1)
         == 3
     )
     assert (
-        conv._find_unescaped_run(
-            conv._build_backtick_run_index("no backticks here"), 0, 1
+        conv.find_unescaped_run(
+            conv.build_backtick_run_index("no backticks here"), 0, 1
         )
         is None
     )
     assert (
-        conv._find_unescaped_run(
-            conv._build_backtick_run_index("``too short"), 0, 3
+        conv.find_unescaped_run(
+            conv.build_backtick_run_index("``too short"), 0, 3
         )
         is None
     )
@@ -1650,7 +1659,7 @@ def test_conversion_html_to_markdown_table_code_pipe():
     # A genuine match arbitrarily far from `start` is still found.
     far = "a" * 200_000 + "`"
     assert (
-        conv._find_unescaped_run(conv._build_backtick_run_index(far), 0, 1)
+        conv.find_unescaped_run(conv.build_backtick_run_index(far), 0, 1)
         == 200_000
     )
 

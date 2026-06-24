@@ -2378,11 +2378,11 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         assert text.count("*") % 2 == 0
         assert text.count("_") % 2 == 0
 
-    # _build_backtick_run_index() / _find_unescaped_run() -- the lookup
+    # build_backtick_run_index() / find_unescaped_run() -- the lookup
     # returns None outright when the requested run never appears at all.
     assert (
-        NotifySlack._find_unescaped_run(
-            NotifySlack._build_backtick_run_index("no match here"), 0, 2
+        NotifySlack.find_unescaped_run(
+            NotifySlack.build_backtick_run_index("no match here"), 0, 2
         )
         is None
     )
@@ -2390,14 +2390,14 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
     # It also skips an escape pair while indexing, and a run of the wrong
     # length doesn't match the real one's length group.
     assert (
-        NotifySlack._find_unescaped_run(
-            NotifySlack._build_backtick_run_index("\\` ``x"), 0, 2
+        NotifySlack.find_unescaped_run(
+            NotifySlack.build_backtick_run_index("\\` ``x"), 0, 2
         )
         == 3
     )
     assert (
-        NotifySlack._find_unescaped_run(
-            NotifySlack._build_backtick_run_index("` ``x"), 0, 2
+        NotifySlack.find_unescaped_run(
+            NotifySlack.build_backtick_run_index("` ``x"), 0, 2
         )
         == 2
     )
@@ -2405,8 +2405,8 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
     # A genuine match arbitrarily far from `start` is still found.
     far = "a" * 200_000 + "`"
     assert (
-        NotifySlack._find_unescaped_run(
-            NotifySlack._build_backtick_run_index(far), 0, 1
+        NotifySlack.find_unescaped_run(
+            NotifySlack.build_backtick_run_index(far), 0, 1
         )
         == 200_000
     )
@@ -2425,4 +2425,16 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
     assert (
         NotifySlack._commonmark_to_slack("[text](<https://incomplete")
         == "[text](<https://incomplete"
+    )
+
+
+def test_plugin_slack_parse_native_url_fallthrough():
+    """parse_native_url() returns None for unrecognized URLs."""
+
+    # A URL that doesn't match any known Slack pattern should yield None.
+    assert (
+        NotifySlack.parse_native_url(
+            "https://not-slack.com/services/ABC/DEF/GHI"
+        )
+        is None
     )

@@ -89,32 +89,44 @@ def markdown_adjust(
 ) -> int:
     """
     Adjust the split point to avoid splitting inside simple Markdown
-    link / image constructs like [Text](URL) or ![Alt](URL).
+    link / image constructs like [Text](URL) or ![Alt](URL), and also
+    angle-bracket link constructs like <URL|label> used by Slack and
+    Google Chat dialects.
 
     This is a best-effort heuristic and does not attempt full Markdown
-    parsing. If the boundary falls between '['/'!' and the closing ')'
-    of a nearby link/image, move the split back to that start.
+    parsing. If the boundary falls inside a nearby link/image, move the
+    split back to the start of that construct.
     """
     if split_at <= window_start or split_at > len(text):
         return split_at
 
     search_start = max(window_start, split_at - MARKDOWN_CONSTRUCT_LOOKBACK)
+    forward_end = min(len(text), split_at + MARKDOWN_CONSTRUCT_LOOKBACK)
 
-    # Prefer '[' as the starting marker for links/images.
+    # Protect [Text](URL) and ![Alt](URL) CommonMark constructs.
     link_start_idx = text.rfind("[", search_start, split_at)
     if link_start_idx == -1:
         # As a fallback, consider '!' as a possible start, e.g. '![Alt](...)'.
         link_start_idx = text.rfind("!", search_start, split_at)
 
-    if link_start_idx == -1:
-        return split_at
+    if link_start_idx != -1:
+        # Look ahead for a closing ')' to bound the construct.
+        link_end_idx = text.find(")", link_start_idx, forward_end)
+        if link_end_idx != -1 and link_start_idx < split_at < link_end_idx:
+            return link_start_idx
 
-    # Look ahead for a closing ')' to bound the construct.
-    forward_end = min(len(text), split_at + MARKDOWN_CONSTRUCT_LOOKBACK)
-    link_end_idx = text.find(")", link_start_idx, forward_end)
-
-    if link_end_idx != -1 and link_start_idx < split_at < link_end_idx:
-        return link_start_idx
+    # Protect <URL|label> angle-bracket constructs (Slack mrkdwn, Chat).
+    # Require a '|' inside the brackets to avoid matching bare '<...>' tags.
+    angle_start_idx = text.rfind("<", search_start, split_at)
+    if angle_start_idx != -1:
+        pipe_idx = text.find("|", angle_start_idx + 1, split_at)
+        if pipe_idx != -1:
+            angle_end_idx = text.find(">", pipe_idx, forward_end)
+            if (
+                angle_end_idx != -1
+                and angle_start_idx < split_at <= angle_end_idx
+            ):
+                return angle_start_idx
 
     return split_at
 
