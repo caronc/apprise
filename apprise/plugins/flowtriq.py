@@ -27,14 +27,21 @@
 
 # Flowtriq is a DDoS detection and mitigation platform.
 # This plugin enables any Apprise-connected tool to forward alerts
-# to Flowtriq for network security correlation.
+# to a Flowtriq webhook channel.
+#
+# Users create a webhook channel in the Flowtriq dashboard, which provides
+# a webhook URL and API key. The webhook URL path is used directly.
 #
 # URL format:
-#   flowtriq://apikey@hostname/workspace_id/
-#   flowtriq://apikey@hostname:port/workspace_id/
+#   flowtriq://apikey@hostname/webhook/path/
+#   flowtriq://apikey@hostname:port/webhook/path/
 #
-# The webhook endpoint is:
-#   https://hostname/api/v1/workspaces/{workspace_id}/webhooks/apprise
+# For example, if the dashboard gives you:
+#   URL:  https://flowtriq.com/hooks/abc123
+#   Key:  ft_key_xxxx
+#
+# Then the Apprise URL is:
+#   flowtriq://ft_key_xxxx@flowtriq.com/hooks/abc123/
 #
 # The API key is passed via the X-API-Key header.
 
@@ -74,16 +81,13 @@ class NotifyFlowtriq(NotifyBase):
     # Disable throttle rate
     request_rate_per_sec = 0
 
-    # The default hostname to use if none is specified
-    default_host = "app.flowtriq.com"
-
     # Title is not used for Flowtriq
     title_maxlen = 250
 
     # Define object templates
     templates = (
-        "{schema}://{apikey}@{host}/{workspace_id}/",
-        "{schema}://{apikey}@{host}:{port}/{workspace_id}/",
+        "{schema}://{apikey}@{host}/{webhook_path}/",
+        "{schema}://{apikey}@{host}:{port}/{webhook_path}/",
     )
 
     # Define our template tokens
@@ -107,11 +111,10 @@ class NotifyFlowtriq(NotifyBase):
                 "min": 1,
                 "max": 65535,
             },
-            "workspace_id": {
-                "name": _("Workspace ID"),
+            "webhook_path": {
+                "name": _("Webhook Path"),
                 "type": "string",
                 "required": True,
-                "regex": (r"^[A-Za-z0-9_-]+$", "i"),
             },
         },
     )
@@ -122,7 +125,7 @@ class NotifyFlowtriq(NotifyBase):
         **{},
     )
 
-    def __init__(self, apikey, workspace_id, **kwargs):
+    def __init__(self, apikey, webhook_path, **kwargs):
         """Initialize Flowtriq Object."""
         super().__init__(**kwargs)
 
@@ -133,21 +136,23 @@ class NotifyFlowtriq(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # Workspace ID
-        self.workspace_id = validate_regex(
-            workspace_id,
-            *self.template_tokens["workspace_id"]["regex"],
-        )
-        if not self.workspace_id:
-            msg = (
-                "An invalid Flowtriq Workspace ID "
-                f"({workspace_id}) was specified."
-            )
+        # Webhook Path (the full path portion of the webhook URL provided
+        # by the Flowtriq dashboard)
+        if not webhook_path:
+            msg = "A Flowtriq Webhook Path must be specified."
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        self.webhook_path = webhook_path.strip("/")
+        if not self.webhook_path:
+            msg = "A Flowtriq Webhook Path must be specified."
             self.logger.warning(msg)
             raise TypeError(msg)
 
         if not self.host:
-            self.host = self.default_host
+            msg = "A Flowtriq hostname must be specified."
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
         return
 
@@ -159,7 +164,7 @@ class NotifyFlowtriq(NotifyBase):
         url = f"{schema}://{self.host}"
         if self.port:
             url += f":{self.port}"
-        url += f"/api/v1/workspaces/{self.workspace_id}/webhooks/apprise"
+        url += f"/{self.webhook_path}"
 
         # Prepare our payload
         payload = {
@@ -248,7 +253,7 @@ class NotifyFlowtriq(NotifyBase):
             self.secure_protocol,
             self.host,
             self.port if self.port else (443 if self.secure else 80),
-            self.workspace_id,
+            self.webhook_path,
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -264,7 +269,7 @@ class NotifyFlowtriq(NotifyBase):
         default_port = 443 if self.secure else 80
         return (
             "{schema}://{apikey}@{hostname}{port}/"
-            "{workspace_id}/?{params}".format(
+            "{webhook_path}/?{params}".format(
                 schema=self.secure_protocol,
                 apikey=self.pprint(self.apikey, privacy, safe=""),
                 hostname=self.host,
@@ -273,7 +278,8 @@ class NotifyFlowtriq(NotifyBase):
                     if self.port is None or self.port == default_port
                     else f":{self.port}"
                 ),
-                workspace_id=NotifyFlowtriq.quote(self.workspace_id, safe=""),
+                webhook_path=NotifyFlowtriq.quote(
+                    self.webhook_path, safe="/"),
                 params=NotifyFlowtriq.urlencode(params),
             )
         )
@@ -294,13 +300,11 @@ class NotifyFlowtriq(NotifyBase):
             else None
         )
 
-        # Retrieve our escaped entries found on the fullpath
-        entries = NotifyFlowtriq.split_path(results["fullpath"])
-
-        # The first path entry is our workspace ID
-        try:
-            results["workspace_id"] = entries.pop(0)
-        except IndexError:
-            results["workspace_id"] = None
+        # The full path (minus leading/trailing slashes) is the webhook path
+        fullpath = results.get("fullpath", "")
+        if fullpath:
+            results["webhook_path"] = fullpath.strip("/")
+        else:
+            results["webhook_path"] = None
 
         return results

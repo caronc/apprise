@@ -44,7 +44,7 @@ apprise_url_tests = (
             "instance": None,
         },
     ),
-    # No workspace ID specified
+    # No webhook path specified
     (
         "flowtriq://apikey@hostname",
         {
@@ -53,23 +53,30 @@ apprise_url_tests = (
     ),
     # No API key specified
     (
-        "flowtriq://hostname/workspace123",
+        "flowtriq://hostname/hooks/abc123",
         {
             "instance": TypeError,
         },
     ),
-    # Provide a hostname, apikey, and workspace_id
+    # Provide a hostname, apikey, and webhook path
     (
-        "flowtriq://myapikey@hostname/workspace123/",
+        "flowtriq://myapikey@hostname/hooks/abc123/",
         {
             "instance": NotifyFlowtriq,
             # Our expected url(privacy=True) startswith() response:
-            "privacy_url": "flowtriq://m...y@hostname/workspace123/",
+            "privacy_url": "flowtriq://m...y@hostname/hooks/abc123/",
         },
     ),
     # Provide a hostname with port
     (
-        "flowtriq://myapikey@hostname:8443/workspace123/",
+        "flowtriq://myapikey@hostname:8443/hooks/abc123/",
+        {
+            "instance": NotifyFlowtriq,
+        },
+    ),
+    # Multi-segment webhook path
+    (
+        "flowtriq://myapikey@flowtriq.com/api/v1/webhook/xyz/",
         {
             "instance": NotifyFlowtriq,
         },
@@ -83,7 +90,7 @@ apprise_url_tests = (
     ),
     # Test failure cases
     (
-        "flowtriq://myapikey@hostname/workspace123/",
+        "flowtriq://myapikey@hostname/hooks/abc123/",
         {
             "instance": NotifyFlowtriq,
             # force a failure
@@ -92,7 +99,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "flowtriq://myapikey@hostname/workspace123/",
+        "flowtriq://myapikey@hostname/hooks/abc123/",
         {
             "instance": NotifyFlowtriq,
             # throw a bizarre code forcing us to fail to look it up
@@ -101,7 +108,7 @@ apprise_url_tests = (
         },
     ),
     (
-        "flowtriq://myapikey@hostname/workspace123/",
+        "flowtriq://myapikey@hostname/hooks/abc123/",
         {
             "instance": NotifyFlowtriq,
             # Throws a series of i/o exceptions with this flag
@@ -123,13 +130,13 @@ def test_plugin_flowtriq_edge_cases():
     """NotifyFlowtriq() Edge Cases."""
     # Initializes the plugin with an invalid API key
     with pytest.raises(TypeError):
-        NotifyFlowtriq(apikey=None, workspace_id="ws123")
+        NotifyFlowtriq(apikey=None, webhook_path="hooks/abc123")
     # Whitespace also acts as an invalid API key
     with pytest.raises(TypeError):
-        NotifyFlowtriq(apikey="   ", workspace_id="ws123")
+        NotifyFlowtriq(apikey="   ", webhook_path="hooks/abc123")
 
-    # Invalid workspace ID
+    # Missing webhook path
     with pytest.raises(TypeError):
-        NotifyFlowtriq(apikey="validkey", workspace_id=None)
+        NotifyFlowtriq(apikey="validkey", webhook_path=None)
     with pytest.raises(TypeError):
-        NotifyFlowtriq(apikey="validkey", workspace_id="   ")
+        NotifyFlowtriq(apikey="validkey", webhook_path="   ")
