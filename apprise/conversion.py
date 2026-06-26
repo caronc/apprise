@@ -669,12 +669,24 @@ class HTMLMarkdownConverter(HTMLConverter):
         self._content_seq += 1
 
     def _push_frame(self, frame):
-        """Push a new context frame and update the open-tag counter."""
+        """Push a new context frame and update the open-tag counter.
+
+        Returns True when the frame was accepted, False when it was
+        silently discarded because MAX_FRAME_DEPTH was reached.
+
+        Callers that emit Markdown delimiters (emphasis, anchor) MUST
+        check this return value before appending the opening delimiter.
+        Emitting a delimiter without a matching frame leaves it unclosed
+        and produces malformed Markdown when the input is adversarially
+        deep.
+        """
 
         # Silently discard frames beyond the depth cap so adversarially
-        # nested HTML cannot exhaust memory.
+        # nested HTML cannot exhaust memory.  Return False so callers that
+        # emit inline Markdown delimiters can gate that emission on the
+        # result and avoid producing unmatched delimiters in the output.
         if len(self._stack) >= MAX_FRAME_DEPTH:
-            return
+            return False
 
         # Add the frame to the context stack.
         self._stack.append(frame)
@@ -683,6 +695,8 @@ class HTMLMarkdownConverter(HTMLConverter):
         # _pop_to() can reject unmatched closing tags in O(1).
         tag = frame["tag"]
         self._tag_open_counts[tag] = self._tag_open_counts.get(tag, 0) + 1
+
+        return True
 
     def _pop_to(self, tag):
         """Pop through the nearest match and report whether one existed."""
@@ -1378,7 +1392,10 @@ class HTMLMarkdownConverter(HTMLConverter):
             do_store = ctx["list_do_store"]
 
             # Snapshot content state for constant-time empty-item detection.
-            self._push_frame(
+            # Gate marker emission on the return value: at MAX_FRAME_DEPTH
+            # the frame is discarded and we must not append the marker,
+            # otherwise there is nothing to pop it on </li>.
+            if not self._push_frame(
                 self._make_frame(
                     tag,
                     do_store=do_store,
@@ -1387,7 +1404,8 @@ class HTMLMarkdownConverter(HTMLConverter):
                         ctx["list_indent_base"] + " " * len(marker_text)
                     ),
                 )
-            )
+            ):
+                return
 
             if do_store:
                 # Reuse a pending quote or list marker on this line.
@@ -1412,8 +1430,12 @@ class HTMLMarkdownConverter(HTMLConverter):
             depth = min(ctx["quote_depth"] + 1, BLOCKQUOTE_DEPTH_MAX)
 
             # Open a frame carrying the increased quote depth.
+            # Gate marker emission on the return value: at MAX_FRAME_DEPTH
+            # the frame is discarded and we must not append a _QuoteMarker,
+            # otherwise there is nothing to pop it on </blockquote>.
             new_frame = self._make_frame(tag, quote_depth=depth)
-            self._push_frame(new_frame)
+            if not self._push_frame(new_frame):
+                return
 
             if ctx["do_store"]:
                 last = self._result[-1] if self._result else None
@@ -1587,7 +1609,12 @@ class HTMLMarkdownConverter(HTMLConverter):
             # A frame validates closing tags and relocates edge whitespace.
             delim = "**" if tag in ("strong", "b") else "*"
 
-            self._push_frame(
+            # Only emit the opening delimiter when the frame was accepted.
+            # If the depth cap was hit, _push_frame returns False and we
+            # skip both the frame and its delimiter -- an unmatched "**"
+            # or "*" in the output would be worse than silently dropping
+            # the emphasis on text that is already deeply nested.
+            if self._push_frame(
                 self._make_frame(
                     tag,
                     emphasis_delim=delim,
@@ -1596,10 +1623,10 @@ class HTMLMarkdownConverter(HTMLConverter):
                     # Exact delimiter index used when removing an empty span.
                     emphasis_result_start=len(self._result),
                 )
-            )
-
-            # Buffer the opening emphasis delimiter immediately.
-            self._result.append(delim)
+            ):
+                # Frame accepted: buffer the opening delimiter immediately
+                # so the matching closing tag can emit the close delimiter.
+                self._result.append(delim)
 
         # Open a Markdown link when an href is available
         elif tag == "a":
@@ -1635,10 +1662,14 @@ class HTMLMarkdownConverter(HTMLConverter):
                 target = "<{}>".format(safe_href)
 
                 # Store the destination until all nested label text closes.
-                self._push_frame(self._make_frame(tag, href=target))
-
-                # Begin the CommonMark link label.
-                self._emit("[")
+                # Only emit "[" when the frame was accepted -- skipping it
+                # when the depth cap is hit prevents an unmatched "[" from
+                # reaching the output (which would produce "[label" with no
+                # closing "](url)" when the closing </a> fires and finds no
+                # frame to pop).
+                if self._push_frame(self._make_frame(tag, href=target)):
+                    # Frame accepted: begin the CommonMark link label.
+                    self._emit("[")
 
     def handle_endtag(self, tag):
         """Handle a closing HTML tag."""

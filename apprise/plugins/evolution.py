@@ -203,152 +203,220 @@ class NotifyEvolution(NotifyBase):
     @classmethod
     def _commonmark_to_whatsapp(cls, body):
         """Adapt html_to_markdown()'s CommonMark output to WhatsApp's own
-        text formatting dialect."""
+        text formatting dialect.
+
+        Overview
+        --------
+        html_to_markdown() produces CommonMark.  WhatsApp uses a different
+        dialect with these key differences:
+
+          CommonMark            WhatsApp
+          ----------            --------
+          **bold**              *bold*
+          *italic*              _italic_
+          `code`                ```code```  (always triple backtick)
+          [label](<url>)        label (url)  (no hyperlink syntax; WhatsApp
+                                             auto-links bare URLs)
+          \\*                   *  (backslash escapes dropped; WhatsApp
+                                   does not support them)
+
+        Links are rendered as "label (url)" because WhatsApp has no rich
+        anchor syntax -- it auto-links URLs that appear inline.  When the
+        label and the URL are the same, the label is omitted and only the
+        bare URL is emitted.
+
+        Data structures
+        ---------------
+        out        -- list of str fragments accumulated during the scan;
+                      joined once at the end to form the result string.
+                      Using a list avoids O(n^2) string concatenation.
+        stack      -- list of (delimiter, open_index) pairs, innermost
+                      frame last (LIFO order).  "delimiter" is "*" (bold)
+                      or "_" (italic).  "open_index" is the index in `out`
+                      where the opening delimiter was placed; used to drop
+                      empty spans at the force-close step.
+        link_stack -- list of out-indices for unmatched "[" characters that
+                      may start a CommonMark link label.  When we reach the
+                      matching "](<url>)", we splice in the "label (url)"
+                      form and discard the buffered "[".  Stray "[" chars
+                      that never match stay as plain text.
+        i          -- current position in the input string body[i].
+        n          -- len(body); cached to avoid repeated attribute lookup.
+        backtick_runs -- pre-built index of all unescaped backtick run
+                      positions indexed by run length so code-span matching
+                      is O(log n) instead of O(n^2).
+        """
 
         # Accumulate translated characters one item at a time.
         out = []
-        # Each entry is (delimiter, index-in-out) for an open emphasis span,
-        # innermost last, so we can close spans in LIFO order.
+        # Open emphasis spans in LIFO order.  Each entry is
+        # (delimiter, out_index) where out_index is where the opening
+        # delimiter sits in `out`.
         stack = []
-        # Each entry is the out-index of the opening "[" for a pending link,
-        # innermost last; used to splice the label text out when we find "]".
+        # Stack of out-indices for "[" chars that may open a link label.
+        # Innermost "[" is last so we match "](<url>)" LIFO.
         link_stack = []
         i = 0
         n = len(body)
-        # Pre-scan all unescaped backtick run positions indexed by run length
-        # so code-span open/close matching is O(log n) rather than O(n^2).
+        # Pre-scan all unescaped backtick run positions indexed by run
+        # length so code-span open/close matching is O(log n) not O(n^2).
         backtick_runs = build_backtick_run_index(body)
 
         while i < n:
             ch = body[i]
 
-            # WhatsApp does not use backslash escaping; emit the escaped
-            # character as a plain literal and discard the backslash.
+            # ----------------------------------------------------------------
+            # Backslash escapes
+            # ----------------------------------------------------------------
+            # WhatsApp does not recognise backslash escaping.  We discard
+            # the backslash and emit just the following literal character
+            # so it appears in the output without any escape prefix.
             if ch == "\\" and i + 1 < n:
                 out.append(body[i + 1])
                 i += 2
                 continue
 
-            # WhatsApp normalises all code spans to triple backticks
-            # regardless of how wide the original CommonMark delimiter was.
+            # ----------------------------------------------------------------
+            # Code spans  (` ... ` or ``` ... ```)
+            # ----------------------------------------------------------------
+            # Locate the matching close run of the same backtick width.
+            # WhatsApp only renders triple-backtick code spans, so we
+            # normalise all matched code spans to "```content```" form.
             if ch == "`":
                 j = i
                 # Measure the run length by counting consecutive backticks.
                 while j < n and body[j] == "`":
                     j += 1
                 run = j - i
-                # Search the pre-built index for the next run of the same
-                # length after the opening run ends.
+                # Search the pre-built index for the next matching close run.
                 close = find_unescaped_run(backtick_runs, j, run)
 
                 if close is not None:
-                    # Matched code span: collapse to triple-backtick form.
-                    # WhatsApp does not support single or double backtick code.
+                    # Matched code span: emit as triple backtick regardless
+                    # of the original delimiter width (single, double, etc.).
                     out.append("```" + body[j:close] + "```")
-                    # Advance past the closing run.
+                    # Skip past the closing backtick run.
                     i = close + run
                     continue
 
-                # No matching close -- not a real code span; emit the
-                # backticks as literal text.
+                # No matching close found -- not a real code span.
+                # Emit the raw backticks as literal text.
                 out.append(body[i:j])
                 i = j
                 continue
 
-            # CommonMark inline links look like [label](<url>).
+            # ----------------------------------------------------------------
+            # Link labels  [  (start of [label](<url>) construct)
+            # ----------------------------------------------------------------
             # Push the current out-index so we can retrieve the label text
-            # once we encounter the matching "](<".
+            # once we encounter the matching "](<url>)" further in the body.
+            # If no matching destination follows, the "[" stays as plain text.
             if ch == "[":
                 link_stack.append(len(out))
                 out.append("[")
                 i += 1
                 continue
 
+            # ----------------------------------------------------------------
+            # Link destination  ](<url>)  -->  label (url)
+            # ----------------------------------------------------------------
+            # When we see "](<" and there is an open "[" on link_stack,
+            # we have a complete CommonMark link.  Convert it to WhatsApp's
+            # plain "label (url)" form by scanning for the ">)" terminator,
+            # decoding the URL, and splicing the result back into `out`.
             if body.startswith("](<", i) and link_stack:
-                # We are at the "](<" that closes a pending link label.
-                # Scan forward with escape awareness to find ">)" which marks
-                # the end of the angle-bracketed destination.
+                # Scan forward with escape awareness so a literal ">)" inside
+                # the URL (e.g. a ">" in a query string) does not terminate
+                # the scan prematurely.
                 close = None
                 k = i + 3
                 while k < n - 1:
                     if body[k] == "\\" and k + 1 < n:
-                        # Skip escaped characters inside the destination so a
-                        # literal ">)" in the URL does not falsely terminate.
+                        # Skip escape sequences -- cannot be the terminator.
                         k += 2
                         continue
                     if body[k] == ">" and body[k + 1] == ")":
+                        # Found the closing ">)" of the destination.
                         close = k
                         break
                     k += 1
 
                 if close is not None:
-                    # Preserve the label beside the URL using WhatsApp's plain
-                    # "label (url)" convention -- WhatsApp auto-links the URL.
+                    # Decode CommonMark backslash escapes in the raw URL
+                    # fragment (body[i+3 : close]) to get the actual URL.
                     raw_url = body[i + 3 : close]
-                    # Decode CommonMark backslash escapes in the URL so we
-                    # work with the actual URL characters before re-encoding.
                     url = []
                     j2 = 0
                     while j2 < len(raw_url):
                         c2 = raw_url[j2]
                         if c2 == "\\" and j2 + 1 < len(raw_url):
-                            # Consume the backslash; keep only the next char.
+                            # Discard the backslash; keep only the next char.
                             url.append(raw_url[j2 + 1])
                             j2 += 2
                             continue
+                        # Plain character: pass through unchanged.
                         url.append(c2)
                         j2 += 1
                     url = "".join(url)
 
-                    # Retrieve the label text that was buffered after "[".
+                    # Retrieve the index of the matching "[" in out.
                     open_index = link_stack.pop()
+                    # Collect the label text buffered between "[" and "]".
                     text = "".join(out[open_index + 1 :])
-                    # Splice out everything from "[" onward.
+                    # Remove everything from "[" onward -- we will replace
+                    # it with the WhatsApp-native "label (url)" form.
                     del out[open_index:]
-                    # Percent-encode ")" so WhatsApp's auto-link parser does
-                    # not mistake a closing paren in the URL for the end of
-                    # the surrounding "label (url)" wrapper.
+                    # Percent-encode ")" inside the URL so WhatsApp's
+                    # auto-link parser does not mistake a paren in the URL
+                    # for the end of the "label (url)" wrapper parentheses.
                     safe_url = url.replace(")", "%29")
+                    # Emit "label (url)" when a label exists;
+                    # bare URL when no label text was present.
                     out.append(f"{text} ({safe_url})" if text else safe_url)
-                    # Skip past the closing ">)".
+                    # Skip past the closing ">)" of the destination.
                     i = close + 2
                     continue
 
-            # Emphasis: CommonMark uses * for bold (**) and italic (*).
-            # Convert to WhatsApp's dialect while preserving LIFO nesting.
+            # ----------------------------------------------------------------
+            # Emphasis runs  (* or **)
+            # ----------------------------------------------------------------
+            # CommonMark uses "*" (italic) and "**" (bold).  WhatsApp uses
+            # "_" (italic) and "*" (bold) -- the same mapping as Google Chat
+            # and Telegram.  Process the run one span at a time using the
+            # LIFO stack to always close the most recently opened span first.
             if ch == "*":
                 j = i
-                # Measure how many consecutive "*" characters are here.
+                # Measure the full asterisk run.
                 while j < n and body[j] == "*":
                     j += 1
                 run = j - i
 
-                # Consume the run one span at a time.  "**" maps to WhatsApp
-                # bold (*) and "*" maps to WhatsApp italic (_).  LIFO: close
-                # the most recently opened span if this run can satisfy it.
+                # Consume the run width one span at a time.
+                # Each iteration either closes the top-of-stack span (if the
+                # remaining run width satisfies it) or opens a new span.
                 while run > 0:
                     if stack and (
                         (stack[-1][0] == "*" and run >= 2)
                         or (stack[-1][0] == "_" and run >= 1)
                     ):
-                        # Close the innermost open span.
+                        # The top-of-stack span can be closed.  Pop it and
+                        # emit the close delimiter (or drop it if empty).
                         delim, open_index = stack.pop()
                         if open_index == len(out) - 1:
-                            # The span opened but collected no content --
-                            # drop the empty opening delimiter too.
+                            # Span collected no content -- drop the orphan.
                             out.pop()
                         else:
-                            # Emit the matching close delimiter.
+                            # Emit the close delimiter for this span.
                             out.append(delim)
-                        # Bold consumes 2 asterisks; italic consumes 1.
+                        # Bold ("*") consumes 2 asterisks; italic ("_") 1.
                         run -= 2 if delim == "*" else 1
                     elif run >= 2:
-                        # Open a new bold (*) span.
+                        # No closeable bold on stack; open a new bold span.
                         out.append("*")
                         stack.append(("*", len(out) - 1))
                         run -= 2
                     else:
-                        # Open a new italic (_) span.
+                        # run == 1: open a new italic span.
                         out.append("_")
                         stack.append(("_", len(out) - 1))
                         run -= 1
@@ -357,18 +425,25 @@ class NotifyEvolution(NotifyBase):
                 i = j
                 continue
 
+            # ----------------------------------------------------------------
             # All other characters pass through unchanged.
+            # ----------------------------------------------------------------
             out.append(ch)
             i += 1
 
-        # Force-close any spans still open so each chunk of output is
-        # independently valid WhatsApp markup even if the input was malformed.
+        # --------------------------------------------------------------------
+        # Force-close spans left open by malformed or truncated source.
+        # --------------------------------------------------------------------
+        # Pop innermost-first (LIFO) so the emitted close delimiters are in
+        # the right order.  Empty spans (open_index == last item) are dropped
+        # so the output contains no empty delimiter pairs.
         while stack:
             delim, open_index = stack.pop()
             if open_index == len(out) - 1:
-                # Opened but empty -- drop the dangling delimiter.
+                # Span opened but collected no content -- remove the orphan.
                 out.pop()
             else:
+                # Emit the close delimiter to produce valid WhatsApp markup.
                 out.append(delim)
 
         return "".join(out)

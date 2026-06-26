@@ -1736,9 +1736,8 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     # in the output buffer (empty entity) -- the delimiter is dropped.
     assert NotifyTelegram._commonmark_to_telegram("******") == ""
 
-    # Unclosed spans at the end of the V1 input are force-closed by the
-    # cleanup loop.  A suppressed nesting (open_index None) is silently
-    # skipped; a real one appends the closing delimiter.
+    # Unclosed spans at the end of the V1 input are force-closed by the cleanup
+    # loop.
     f1 = NotifyTelegram._commonmark_to_telegram
     assert f1("***italic text") == "*italic text*"
     assert f1("**text") == "*text*"
@@ -1765,9 +1764,8 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     assert payload["text"] == "# My Title\n*hello*"
     mock_post.reset_mock()
 
-    # Title that reduces to an empty string after stripping leading heading
-    # and list characters (html_to_markdown converts "  - " to "-").
-    # The heading is skipped and the title field is cleared regardless.
+    # Title that reduces to an empty string after stripping leading heading and
+    # list characters (html_to_markdown converts " - " to "-").
     assert aobj_v1.notify(
         body="<b>hello</b>", title="  - ", body_format=NotifyFormat.HTML
     )
@@ -1840,6 +1838,7 @@ def test_plugin_telegram_overflow_split_repair(mock_post):
     texts = notify_split(f'<a href="{url}">click here</a>')
     assert len(texts) >= 2
     for text in texts:
+        # Every chunk must be valid MarkdownV2: no unescaped reserved chars.
         assert not re.search(r"(?<!\\)[_*\[\]()~`>#+=|{}.!<-]", text)
 
     # A <pre> block long enough to force a split.
@@ -1872,8 +1871,7 @@ def test_plugin_telegram_overflow_split_repair(mock_post):
     repair = NotifyTelegram._repair_split_chunk
 
     # V1 (non-strict) with an unmatched backtick: the backtick run has no
-    # closing partner, so the `if strict:` branch is NOT taken -- the
-    # backtick passes through as plain text.
+    # closing partner, so the `if strict:` branch is NOT taken.
     assert repair("`code no close", False, {}) == ("`code no close", {})
 
     # A pending close count for '*' in strict mode: the matching close

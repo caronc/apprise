@@ -326,34 +326,138 @@ def test_markdown_adjust_inside_construct_moves_to_start() -> None:
     Exercise the positive path in markdown_adjust where the split lands
     inside a [text](url) construct and the function moves the split
     back to the start of the construct.
+
+    The forward scan is capped at split_at + (split_at - window_start) + 1
+    to prevent O(n^2) work on adversarial input (see
+    test_markdown_adjust_dos_cap). This means split_at must be at least half
+    the link length so the cap reaches the closing ')'.  Realistic splits from
+    smart_split() always satisfy this because the following applies for any
+    link that fits in a single chunk:
+        split_at - window_start >= limit >= link_length // 2
     """
     link = "[link](https://example.com)"
-    # Choose a split point inside the URL
-    split_at = link.index("(") + 3  # somewhere inside "(https..."
+    # Choose a split point in the latter half of the link so the symmetric
+    # forward-scan cap (split_at + window_size) reaches the closing ')'.
+    split_at = len(link) // 2  # index 13, inside "ps://example.com"
     adjusted = markdown_adjust(link, window_start=0, split_at=split_at)
 
     # Should move back to the '[' at index 0
     assert adjusted == 0
 
 
-def test_smart_split_markdown_guard_split_at_start_is_reset() -> None:
-    """
-    Cover the smart_split guard 'if split_at <= start: split_at = orig_split'.
+def test_markdown_adjust_inside_angle_bracket_construct() -> None:
+    """Exercise the <URL|label> angle-bracket path in markdown_adjust.
 
-    We force markdown_adjust to move the split back to the window start,
-    then verify smart_split resets to the original split so progress is
-    still made and chunks join back to the original text.
+    When a split point lands ANYWHERE inside a '<url|label>' construct (as
+    used by Slack mrkdwn and Google Chat), the function must move it back to
+    the opening '<'.  This covers three sub-cases:
+
+      (a) Split in the label portion (after the pipe).
+      (b) Split exactly on the pipe character.
+      (c) Split in the URL portion (before the pipe) -- previously the pipe
+          search stopped at split_at so no pipe was found; the fix extends
+          the search to forward_end so this case is now also protected.
     """
-    text = "[link](https://example.com)"
-    limit = 5  # will cause the first soft split to land inside the link
+    # A Slack/Google Chat anchor -- '<' at 0, '|' at 21, '>' at 31.
+    text = "<https://example.com|click here>"
+    pipe_pos = text.index("|")  # == 20
+
+    # (a) Split a few characters after the pipe, inside the label portion.
+    split_at = pipe_pos + 3
+    adjusted = markdown_adjust(text, window_start=0, split_at=split_at)
+    # Should move back to the '<' at index 0.
+    assert adjusted == 0
+
+    # Split right at the closing '>' -- still inside the construct.
+    split_at2 = text.index(">")
+    adjusted2 = markdown_adjust(text, window_start=0, split_at=split_at2)
+    # Also moves back to '<'.
+    assert adjusted2 == 0
+
+    # (b) Split exactly ON the '|' separator.
+    split_on_pipe = pipe_pos
+    assert markdown_adjust(text, 0, split_on_pipe) == 0
+
+    # (c) Split inside the URL portion (before '|').
+    # The pipe search now extends to forward_end, not just to split_at.
+    # forward_end = min(32, 17 + 17 + 1) = 32, which covers '>' at 31.
+    # Both pipe (20) and '>' (31) are within range; the construct is detected
+    # and the split moves to '<' at 0.
+    split_in_url = pipe_pos - 3  # index 17, inside "example.com"
+    assert markdown_adjust(text, 0, split_in_url) == 0
+
+    # Same scenario with a preamble before '<' so the move is actually
+    # useful -- '<' is no longer at window_start so smart_split would
+    # keep the adjusted position (not reset it).
+    # "<" at 4, "|" at 24, ">" at 35 in the prefixed string.
+    prefixed = "pre " + text
+    split_in_url2 = 20  # index 20, inside "example.com", before '|' at 24
+    # forward_end = min(36, 20+20+1) = 36 > 35 ('>').
+    assert markdown_adjust(prefixed, 0, split_in_url2) == 4  # '<' position
+
+    # When split_at is so small that forward_end doesn't reach the pipe,
+    # the construct is undetectable and the split falls through unchanged.
+    # forward_end = min(32, 5 + 5 + 1) = 11 < pipe_pos(20), so no pipe found.
+    # Even if we detected the '<' at 0, moving the split there would equal
+    # window_start so smart_split() would reset it anyway -- no net change.
+    split_too_small = 5
+    assert markdown_adjust(text, 0, split_too_small) == split_too_small
+
+    # '<' and '|' are both found, but split_at is past the closing '>'
+    # so the condition angle_start_idx < split_at <= angle_end_idx is
+    # False -- the function returns the split point unchanged.
+    split_past_end = len(text)
+    assert markdown_adjust(text, 0, split_past_end) == split_past_end
+
+
+def test_markdown_adjust_dos_cap() -> None:
+    """markdown_adjust forward scan is capped to O(window_size).
+
+    An adversarial body of repeated unterminated '[' openers must not
+    cause O(n^2) work.  We verify the cap by checking that a large body
+    produces the same split position as a small one (the cap does not
+    change the output for well-formed constructs within the window).
+    """
+    from timeit import default_timer
+
+    # 1 MB of repeated '[broken ' with no closing ')'.
+    body = "[broken " * 128_000
+    limit = 80
+    start = default_timer()
+    chunks = smart_split(body, limit, body_format=NotifyFormat.MARKDOWN)
+    elapsed = default_timer() - start
+
+    # Must complete well under 1 second (the DoS took ~14 s before the cap).
+    assert elapsed < 1.0
+    # All chunks must be non-empty and re-join to the original.
+    assert all(chunks)
+    assert "".join(chunks) == body
+
+
+def test_smart_split_markdown_guard_split_at_start_is_reset() -> None:
+    """Cover smart_split guard 'if split_at <= start: split_at = orig_split'.
+
+    We force markdown_adjust to move the split back to the window start
+    (link_start_idx == start == 0), then verify smart_split resets to the
+    original split so progress is still made and chunks join back to the
+    original text.
+
+    The link "[link](url)" is 11 chars.  With limit=7 the first hard split
+    lands at index 7 (inside the URL).  The forward-scan cap is
+    7 + (7 - 0) + 1 = 15, which is > 10 (position of ")"), so markdown_adjust
+    finds the closer and moves split to link_start_idx=0.  Since 0 == start,
+    smart_split resets to orig_split=7 and emits the next chunk from there.
+    """
+    text = "[link](url)"  # 12 chars; ")" at index 11
+    limit = 7  # hard split at 7 (inside url); cap = 15 > 11 so ")" is found
 
     chunks = smart_split(text, limit, body_format=NotifyFormat.MARKDOWN)
 
-    # We should never get stuck; all chunks must be non-empty
+    # We should never get stuck; all chunks must be non-empty.
     assert len(chunks) >= 2
     assert all(chunks)
 
-    # Re-joining all chunks must restore the original text
+    # Re-joining all chunks must restore the original text.
     assert "".join(chunks) == text
 
 

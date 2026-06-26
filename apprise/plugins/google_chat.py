@@ -213,64 +213,114 @@ class NotifyGoogleChat(NotifyBase):
     @classmethod
     def _commonmark_to_google_chat(cls, body):
         """Adapt html_to_markdown()'s CommonMark output to Google Chat's
-        own text formatting dialect."""
+        own text formatting dialect.
+
+        Overview
+        --------
+        html_to_markdown() produces CommonMark.  Google Chat uses a
+        different dialect with these key differences:
+
+          CommonMark            Google Chat
+          ----------            -----------
+          **bold**              *bold*
+          *italic*              _italic_
+          `code`                `code`  (same delimiter, but content must
+                                         be HTML-entity-escaped)
+          [label](<url>)        <url|label>  (Chat anchor syntax)
+          & < > in text         &amp; &lt; &gt;  (Chat renders HTML)
+          \\< or \\>            &lt; / &gt;  (prevent Chat anchor parsing)
+
+        Data structures
+        ---------------
+        out        -- list of str fragments accumulated during the scan;
+                      joined once at the end to form the result string.
+                      Using a list avoids O(n^2) string concatenation.
+        stack      -- list of (delimiter, open_index) pairs, innermost
+                      frame last (LIFO order).  "delimiter" is "*" (bold)
+                      or "_" (italic).  "open_index" is the index in `out`
+                      where the opening delimiter was placed; used to drop
+                      empty spans (open_index == last item) at cleanup.
+        link_stack -- list of out-indices for unmatched "[" characters that
+                      may start a CommonMark link label.  When we reach the
+                      matching "](<url>)", we retrieve the buffered label
+                      text and rewrite the construct as <url|label>.  Stray
+                      "[" characters that never find a destination are kept
+                      as plain text (they were already appended to `out`).
+        i          -- current position in the input string body[i].
+        n          -- len(body); cached to avoid repeated attribute lookup.
+        backtick_runs -- pre-built index of all unescaped backtick run
+                      positions indexed by run length so code-span matching
+                      is O(log n) instead of O(n^2).
+        """
 
         # Accumulate translated characters one item at a time.
         out = []
-        # Each entry is (delimiter, index-in-out) for an open emphasis span,
-        # innermost last, so we can close spans in LIFO order.
+        # Open emphasis spans in LIFO order.  Each entry is
+        # (delimiter, out_index) where out_index is where the opening
+        # delimiter sits in `out`.
         stack = []
-        # Each entry is the out-index of the opening "[" for a pending link,
-        # innermost last; used to splice the label text out when we find "]".
+        # Stack of out-indices for "[" chars that may open a link label.
+        # Innermost "[" is last so we match "](<url>)" LIFO.
         link_stack = []
         i = 0
         n = len(body)
-        # Pre-scan all unescaped backtick run positions indexed by run length
-        # so code-span open/close matching is O(log n) rather than O(n^2).
+        # Pre-scan all unescaped backtick run positions indexed by run
+        # length so code-span open/close matching is O(log n) not O(n^2).
         backtick_runs = build_backtick_run_index(body)
 
         while i < n:
             ch = body[i]
 
-            # CommonMark backslash escapes: translate into Chat-safe forms.
+            # ----------------------------------------------------------------
+            # Backslash escapes
+            # ----------------------------------------------------------------
+            # CommonMark escapes look like "\*" or "\[".  We strip the
+            # backslash and emit just the literal character, but we must
+            # also HTML-entity-escape "<" and ">" because Google Chat's
+            # renderer will otherwise interpret them as anchor delimiters.
             if ch == "\\" and i + 1 < n:
                 nxt = body[i + 1]
                 if nxt == "<":
-                    # "<" must be entity-escaped so Chat does not treat it as
-                    # the start of a <url|label> anchor.
+                    # "<" starts a Chat anchor; escape it to prevent that.
                     out.append("&lt;")
                 elif nxt == ">":
-                    # Symmetric: ">" closes Chat anchors and must be escaped.
+                    # ">" closes a Chat anchor; escape it symmetrically.
                     out.append("&gt;")
                 else:
-                    # All other escapes: emit just the escaped character so
-                    # the backslash is not passed through to the Chat renderer.
+                    # All other escapes: emit just the escaped character.
+                    # The backslash itself is not sent to Chat's renderer.
                     out.append(nxt)
                 i += 2
                 continue
 
-            # Chat requires literal ampersands to be entity-escaped so they
-            # are not confused with HTML entity sequences in the payload.
+            # ----------------------------------------------------------------
+            # Literal ampersands
+            # ----------------------------------------------------------------
+            # Chat's renderer interprets "&" as the start of an HTML entity.
+            # Escape every bare "&" so it renders as a literal ampersand.
             if ch == "&":
                 out.append("&amp;")
                 i += 1
                 continue
 
-            # Code spans: locate the matching closing run of the same length
-            # and entity-escape HTML controls inside the span content.
+            # ----------------------------------------------------------------
+            # Code spans  (` ... ` or ``` ... ```)
+            # ----------------------------------------------------------------
+            # Locate the matching closing run of the same backtick width.
+            # Inside code spans, HTML control characters must be entity-escaped
+            # so Chat does not interpret them as markup.
             if ch == "`":
                 j = i
                 # Measure the run length by counting consecutive backticks.
                 while j < n and body[j] == "`":
                     j += 1
                 run = j - i
-                # Search the pre-built index for the next run of the same
-                # length after the opening run ends.
+                # Search the pre-built index for the matching close run.
                 close = find_unescaped_run(backtick_runs, j, run)
 
                 if close is not None:
-                    # Matched code span: entity-escape its content so Chat
-                    # does not interpret HTML inside monospace runs.
+                    # Matched code span: entity-escape HTML controls inside
+                    # so Chat does not interpret them as markup.
                     content = body[j:close]
                     content = (
                         content.replace("&", "&amp;")
@@ -280,92 +330,111 @@ class NotifyGoogleChat(NotifyBase):
                     # Preserve the original delimiter width (1, 2, or 3+).
                     delim = body[i:j]
                     out.append(delim + content + delim)
-                    # Advance past the closing run.
+                    # Skip past the closing backtick run.
                     i = close + run
                     continue
 
-                # No matching close -- not a real code span; emit the
-                # backticks as literal text.
+                # No matching close found -- not a real code span.
+                # Emit the raw backticks as literal text.
                 out.append(body[i:j])
                 i = j
                 continue
 
-            # CommonMark inline links look like [label](<url>).
+            # ----------------------------------------------------------------
+            # Link labels  [  (start of [label](<url>) construct)
+            # ----------------------------------------------------------------
             # Push the current out-index so we can retrieve the label text
-            # once we encounter the matching "](<".
+            # once we encounter the matching "](<url>)" further in the body.
+            # If no matching destination follows, the "[" stays as plain text.
             if ch == "[":
                 link_stack.append(len(out))
                 out.append("[")
                 i += 1
                 continue
 
+            # ----------------------------------------------------------------
+            # Link destination  ](<url>)  -->  <url|label>
+            # ----------------------------------------------------------------
+            # When we see "](<" and there is an open "[" on link_stack,
+            # we have a complete CommonMark link.  Rewrite it as a Chat
+            # anchor by: scanning forward for ">)" (the destination end),
+            # decoding the URL, and splicing the label+destination back
+            # into `out` as "<url|label>".
             if body.startswith("](<", i) and link_stack:
-                # We are at the "](<" that closes a pending link label.
-                # Scan forward with escape awareness to find ">)" which marks
-                # the end of the angle-bracketed destination.
+                # Scan forward with escape awareness so a literal ">)" inside
+                # the URL does not falsely terminate the destination scan.
                 close = None
                 k = i + 3
                 while k < n - 1:
                     if body[k] == "\\" and k + 1 < n:
-                        # Skip escaped characters inside the destination so a
-                        # literal ">)" in the URL does not falsely terminate.
+                        # Skip escape sequences -- cannot be the terminator.
                         k += 2
                         continue
                     if body[k] == ">" and body[k + 1] == ")":
+                        # Found the closing ">)" of the destination.
                         close = k
                         break
                     k += 1
 
                 if close is not None:
-                    # Decode CommonMark escapes in the URL and re-encode
-                    # characters that would break the <url|label> syntax.
+                    # Decode CommonMark backslash escapes in the URL and
+                    # re-encode characters that would break Chat's anchor
+                    # syntax (e.g. a literal "<", ">", or "|" in the URL).
                     url = commonmark_escape_link_url(body[i + 3 : close])
-                    # Retrieve the label text that was buffered after "[".
+                    # Retrieve the index of the matching "[" in out.
                     open_index = link_stack.pop()
+                    # Collect the label text that was buffered after "[".
                     text = "".join(out[open_index + 1 :])
-                    # Splice out everything from "[" onward and replace with
-                    # the Chat-native anchor format.
+                    # Remove everything from "[" onward from out and replace
+                    # it with the Chat-native anchor in one splice.
                     del out[open_index:]
                     out.append(f"<{url}|{text}>")
-                    # Skip past the closing ">)".
+                    # Skip past the closing ">)" of the destination.
                     i = close + 2
                     continue
 
-            # Emphasis: CommonMark uses * for bold (**) and italic (*).
-            # Convert to Chat Markdown while preserving LIFO nesting order.
+            # ----------------------------------------------------------------
+            # Emphasis runs  (* or **)
+            # ----------------------------------------------------------------
+            # CommonMark uses "*" (italic) and "**" (bold).  Google Chat
+            # uses "_" (italic) and "*" (bold).  We process each asterisk
+            # run one span at a time using the LIFO stack to match the most
+            # recently opened span first, preserving correct nesting order.
             if ch == "*":
                 j = i
-                # Measure how many consecutive "*" characters are here.
+                # Measure the full asterisk run.
                 while j < n and body[j] == "*":
                     j += 1
                 run = j - i
 
-                # Consume the run one span at a time.  "**" maps to Chat bold
-                # (*) and "*" maps to Chat italic (_).  LIFO: close the most
-                # recently opened span if this run width can satisfy it.
+                # Consume the run width one span at a time.
+                # Each iteration either closes the top-of-stack span (if the
+                # remaining run width satisfies it) or opens a new span.
                 while run > 0:
                     if stack and (
                         (stack[-1][0] == "*" and run >= 2)
                         or (stack[-1][0] == "_" and run >= 1)
                     ):
-                        # Close the innermost open span.
+                        # The top-of-stack span can be closed by the
+                        # current run width.  Pop and emit the close
+                        # delimiter (or drop it if the span is empty).
                         delim, open_index = stack.pop()
                         if open_index == len(out) - 1:
                             # The span opened but collected no content --
-                            # drop the empty opening delimiter too.
+                            # remove the orphan opening delimiter entirely.
                             out.pop()
                         else:
-                            # Emit the matching close delimiter.
+                            # Emit the close delimiter for this span.
                             out.append(delim)
-                        # Bold consumes 2 asterisks; italic consumes 1.
+                        # Bold ("*") consumes 2 asterisks; italic ("_") 1 each.
                         run -= 2 if delim == "*" else 1
                     elif run >= 2:
-                        # Open a new bold (*) span.
+                        # No closeable bold on stack; open a new bold span.
                         out.append("*")
                         stack.append(("*", len(out) - 1))
                         run -= 2
                     else:
-                        # Open a new italic (_) span.
+                        # run == 1: open a new italic span.
                         out.append("_")
                         stack.append(("_", len(out) - 1))
                         run -= 1
@@ -374,18 +443,25 @@ class NotifyGoogleChat(NotifyBase):
                 i = j
                 continue
 
+            # ----------------------------------------------------------------
             # All other characters pass through unchanged.
+            # ----------------------------------------------------------------
             out.append(ch)
             i += 1
 
-        # Force-close any spans still open so each chunk of output is
-        # independently valid Chat Markdown even if the input was malformed.
+        # --------------------------------------------------------------------
+        # Force-close spans left open by malformed or truncated source.
+        # --------------------------------------------------------------------
+        # Pop innermost-first (LIFO) so the emitted close delimiters are in
+        # the right order.  Empty spans (open_index == last item) are dropped
+        # so the output contains no empty delimiter pairs.
         while stack:
             delim, open_index = stack.pop()
             if open_index == len(out) - 1:
-                # Opened but empty -- drop the dangling delimiter.
+                # Span opened but collected no content -- remove the orphan.
                 out.pop()
             else:
+                # Emit the close delimiter to produce valid Chat Markdown.
                 out.append(delim)
 
         text = "".join(out)

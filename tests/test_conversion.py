@@ -37,6 +37,7 @@ from apprise import NotifyFormat
 from apprise.conversion import (
     BLOCKQUOTE_DEPTH_MAX,
     LIST_DEPTH_MAX,
+    MAX_FRAME_DEPTH,
     HTMLMarkdownConverter,
     convert_between,
 )
@@ -999,6 +1000,42 @@ def test_conversion_html_to_markdown_hardening():
     elapsed = default_timer() - start
     assert len(out) < 20 * n
     assert elapsed < 3.0
+
+    # When emphasis or anchor tags are nested past MAX_FRAME_DEPTH, _push_frame
+    # returns False and the opening delimiter must NOT be emitted.
+    depth = MAX_FRAME_DEPTH + 1
+    em_open = "<em>" * depth
+    em_close = "</em>" * depth
+    out_em = to_md(f"{em_open}text{em_close}")
+    # The text must appear; no unmatched bare asterisk may leak through.
+    assert "text" in out_em
+    assert out_em.replace("*", "").strip() == "text"
+
+    # Same guard for <a> -- no unmatched "[" in the output.
+    a_open = '<a href="https://example.com">' * depth
+    a_close = "</a>" * depth
+    out_a = to_md(f"{a_open}text{a_close}")
+    assert "text" in out_a
+    # Count "[" and "](" -- every "[" must have a matching "](".
+    assert out_a.count("[") == out_a.count("](")
+
+    # At MAX_FRAME_DEPTH the <blockquote> frame is discarded and _push_frame
+    # returns False.
+    bq_open = "<blockquote>" * depth
+    bq_close = "</blockquote>" * depth
+    out_bq = to_md(f"{bq_open}text{bq_close}")
+    assert "text" in out_bq
+    # Every ">" line-prefix must correspond to a real nested blockquote level.
+    first_line = out_bq.splitlines()[0] if out_bq else ""
+    gt_count = len(first_line) - len(first_line.lstrip("> "))
+    assert gt_count <= BLOCKQUOTE_DEPTH_MAX * 2  # ">" + " " per level
+
+    # At MAX_FRAME_DEPTH the <li> frame is discarded and _push_frame returns
+    # False.  No _ListMarker must be appended without a backing frame.
+    li_open = "<ul>" + "<li>" * depth
+    li_close = "</li>" * depth + "</ul>"
+    out_li = to_md(f"{li_open}text{li_close}")
+    assert "text" in out_li
 
 
 def test_conversion_html_to_markdown_blockquotes():
