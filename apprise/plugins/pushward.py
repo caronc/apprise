@@ -47,7 +47,7 @@ from json import dumps
 
 import requests
 
-from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -110,18 +110,13 @@ class NotifyPushWard(NotifyBase):
     # PushWard notification endpoint (used in send())
     notify_url = "https://api.pushward.app/notifications"
 
-    # PushWard delivers the body as plain text
-    notify_format = NotifyFormat.TEXT
-
     # Allow an image to be referenced as the notification icon
     image_size = NotifyImageSize.XY_128
 
-    # The API accepts a title up to 256 characters and a body up to 4096.  A
-    # notification is delivered as a single APNs alert though, which Apple caps
-    # at a 4KB total payload shared by the title, body, and icon, so the body
-    # is capped lower to keep real pushes within budget (otherwise the API
-    # accepts the request but the oversized push is silently dropped).
+    # Defines the maximum allowable characters in the title
     title_maxlen = 256
+
+    # Body limit
     body_maxlen = 3000
 
     # PushWard supports media attachments by URL only (not file uploads), so
