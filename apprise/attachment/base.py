@@ -429,7 +429,13 @@ class AttachBase(URLBase):
 
         # Allow overriding the default file name
         if "name" in results["qsd"]:
-            results["name"] = results["qsd"].get("name", "").strip().lower()
+            # Strip any directory components to prevent path traversal
+            # (e.g. ?name=/etc/passwd yields "passwd").  If the result is
+            # empty after stripping, treat it as though ?name= was not
+            # specified so the caller falls through to the next name source.
+            _fname = os.path.basename(results["qsd"].get("name", "")).strip()
+            if _fname:
+                results["name"] = _fname
 
         # Our cache value
         if "cache" in results["qsd"]:
