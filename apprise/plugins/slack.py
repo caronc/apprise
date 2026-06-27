@@ -785,8 +785,6 @@ class NotifySlack(NotifyBase):
                 payload = {
                     "attachments": [template_content],
                 }
-                if self.user:
-                    payload["username"] = self.user
 
             else:
                 # Our slack format
@@ -812,8 +810,6 @@ class NotifySlack(NotifyBase):
                         }
                     ],
                 }
-                if self.user:
-                    payload["username"] = self.user
 
                 # Slack only accepts non-empty header sections
                 if title:
@@ -931,8 +927,6 @@ class NotifySlack(NotifyBase):
                     }
                 ],
             }
-            if self.user:
-                payload["username"] = self.user
 
             # Acquire our to-be footer icon if configured to do so
             image_url = (
@@ -961,6 +955,9 @@ class NotifySlack(NotifyBase):
             # Be friendly; let the user know why they can't send their
             # attachments if using the Webhook mode
             self.logger.warning("Slack Webhooks do not support attachments.")
+
+        if self.user:
+            payload["username"] = self.user
 
         # Prepare our Slack URL (depends on mode)
         if self.mode is SlackMode.WEBHOOK:
