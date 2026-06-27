@@ -3831,3 +3831,27 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
     assert isinstance(context, ssl.SSLContext)
     assert context.verify_mode == ssl.CERT_NONE
     assert context.check_hostname is False
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_starttls_certificate_failure_handling(mock_smtp):
+    """A rejected STARTTLS certificate must be a normal send failure."""
+    response = mock.Mock()
+    response.starttls.side_effect = ssl.SSLCertVerificationError(
+        "certificate verify failed"
+    )
+    # A real socket is no longer connected after the failed TLS handshake.
+    response.quit.side_effect = smtplib.SMTPServerDisconnected(
+        "Server not connected"
+    )
+    mock_smtp.return_value = response
+
+    obj = Apprise.instantiate(
+        "mailtos://user:pass@example.com?mode=starttls",
+        suppress_exceptions=False,
+    )
+    assert isinstance(obj, email.NotifyEmail)
+
+    assert obj.notify(body="body", title="title") is False
+    response.login.assert_not_called()
+    response.sendmail.assert_not_called()

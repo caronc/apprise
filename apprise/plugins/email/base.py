@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from datetime import datetime
 from email.header import Header
 from email.mime.application import MIMEApplication
@@ -748,7 +749,13 @@ class NotifyEmail(NotifyBase):
         finally:
             # Gracefully terminate the connection with the server
             if socket is not None:
-                socket.quit()
+                with contextlib.suppress(
+                    OSError, smtplib.SMTPException, RuntimeError
+                ):
+                    # Handles a failed TLS handshake that may have already
+                    # invalidated the socket.
+                    socket.quit()
+                    pass
 
         # Reduce our dictionary (eliminate expired keys if any)
         self.pgp.prune()
