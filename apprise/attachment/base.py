@@ -433,10 +433,9 @@ class AttachBase(URLBase):
             # (e.g. ?name=/etc/passwd yields "passwd").  If the result is
             # empty after stripping, treat it as though ?name= was not
             # specified so the caller falls through to the next name source.
-            _raw = results["qsd"].get("name", "").strip()
-            _fname = os.path.basename(_raw).strip()
+            _fname = os.path.basename(results["qsd"].get("name", "")).strip()
             if _fname:
-                results["name"] = _fname.lower()
+                results["name"] = _fname
 
         # Our cache value
         if "cache" in results["qsd"]:
