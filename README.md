@@ -127,6 +127,7 @@ The table below identifies the services this tool supports and some example serv
 | [Pushover](https://appriseit.com/services/pushover/)  | pover://   | (TCP) 443   | pover://user@token<br />pover://user@token/DEVICE<br />pover://user@token/DEVICE1/DEVICE2/DEVICEN<br />**Note**: you must specify both your user_id and token
 | [Pushplus](https://appriseit.com/services/pushplus/) | pushplus://  | (TCP) 443   | pushplus://Token
 | [PushSafer](https://appriseit.com/services/pushsafer/)  | psafer:// or psafers://  | (TCP) 80 or 443  | psafer://privatekey<br />psafers://privatekey/DEVICE<br />psafer://privatekey/DEVICE1/DEVICE2/DEVICEN
+| [PushWard](https://appriseit.com/services/pushward/)  | pushward://  | (TCP) 443  | pushward://hlk_apikey<br />pushward://hlk_apikey?level=critical&volume=0.8
 | [Pushy](https://appriseit.com/services/pushy/)  | pushy://  | (TCP) 443  | pushy://apikey/DEVICE<br />pushy://apikey/DEVICE1/DEVICE2/DEVICEN<br />pushy://apikey/TOPIC<br />pushy://apikey/TOPIC1/TOPIC2/TOPICN
 | [PushDeer](https://appriseit.com/services/pushdeer/) | pushdeer:// or pushdeers:// | (TCP) 80 or 443 | pushdeer://pushKey<br />pushdeer://hostname/pushKey<br />pushdeer://hostname:port/pushKey
 | [QQ Push](https://appriseit.com/services/qq/) | qq://  | (TCP) 443   | qq://Token

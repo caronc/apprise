@@ -75,7 +75,8 @@ notification services. It supports sending alerts to platforms such as: \
 `ntfy`, `Octopush`, `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, \
 `PagerTree`, `ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, \
 `Postmark`, `Pushalot`, `PushBullet`, \
-`Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, `Pushy`, `PushDeer`, \
+`Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, `PushWard`, \
+`Pushy`, `PushDeer`, \
 `QQ Push`, `Revolt`, `Reddit`, `Resend`, `RingCentral`, `Rocket.Chat`, \
 `RSyslog`, `SendGrid`, \
 `SendPulse`, `ServerChan`, `Session Open Group Server`, `Seven`, `SFR`, \
