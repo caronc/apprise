@@ -57,11 +57,10 @@
 # The API key is passed via the X-API-Key header.
 
 from json import dumps
-import re
 
 import requests
 
-from ..common import NotifyFormat, NotifyType
+from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -93,17 +92,11 @@ class NotifyFlowtriq(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/flowtriq/"
 
-    # The plugin can connect to a self-hosted Flowtriq instance
-    has_selfhosted = True
-
     # Disable throttle rate
     request_rate_per_sec = 0
 
     # Title is not used for Flowtriq
     title_maxlen = 250
-
-    # Default to plain text since the payload body is plain text
-    notify_format = NotifyFormat.TEXT
 
     # Define object templates
     templates = (
@@ -319,44 +312,3 @@ class NotifyFlowtriq(NotifyBase):
             results["webhook_path"] = None
 
         return results
-
-    @staticmethod
-    def parse_native_url(url):
-        """Support http(s)://apikey@hostname/webhook/path"""
-        result = re.match(
-            r"^http(?P<secure>s?)://(?:(?P<apikey>[^@\s]+)@)?"
-            r"(?P<hostname>[A-Z0-9._-]+)"
-            r"(?::(?P<port>[0-9]+))?"
-            r"(?P<path>/[^?]*)?"
-            r"(?P<params>\?.+)?$",
-            url,
-            re.I,
-        )
-        if result:
-            return NotifyFlowtriq.parse_url(
-                "{schema}://{apikey}{hostname}{port}{path}{params}".format(
-                    schema=(
-                        NotifyFlowtriq.secure_protocol
-                        if result.group("secure")
-                        else NotifyFlowtriq.protocol
-                    ),
-                    apikey=(
-                        "{}@".format(
-                            NotifyFlowtriq.quote(
-                                result.group("apikey"), safe=""
-                            )
-                        )
-                        if result.group("apikey")
-                        else ""
-                    ),
-                    hostname=result.group("hostname"),
-                    port=(
-                        ""
-                        if not result.group("port")
-                        else ":{}".format(result.group("port"))
-                    ),
-                    path=result.group("path") or "",
-                    params=result.group("params") or "",
-                )
-            )
-        return None

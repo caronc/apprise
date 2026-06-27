@@ -352,52 +352,6 @@ def test_plugin_flowtriq_url_parsing(mock_post):
     assert "m...y" in priv
 
 
-def test_plugin_flowtriq_native_url():
-    """NotifyFlowtriq() parse_native_url."""
-
-    # https:// maps to flowtriqs:// (secure)
-    result = NotifyFlowtriq.parse_native_url(
-        "https://ft_key_xxxx@flowtriq.com/hooks/abc123"
-    )
-    assert result is not None
-    assert result["apikey"] == "ft_key_xxxx"
-    assert result["webhook_path"] == "hooks/abc123"
-    # round-trips to the secure schema
-    obj = NotifyFlowtriq(**result)
-    assert obj.secure is True
-    assert obj.url_identifier[0] == "flowtriqs"
-
-    # http:// maps to flowtriq:// (insecure)
-    result = NotifyFlowtriq.parse_native_url(
-        "http://mykey@myhost.example.com/hooks/abc123"
-    )
-    assert result is not None
-    assert result["apikey"] == "mykey"
-    obj_ins = NotifyFlowtriq(**result)
-    assert obj_ins.secure is False
-    assert obj_ins.url_identifier[0] == "flowtriq"
-
-    # Native URL with port
-    result = NotifyFlowtriq.parse_native_url(
-        "https://mykey@myhost.example.com:8443/api/v1/wh"
-    )
-    assert result is not None
-    assert result["apikey"] == "mykey"
-    assert result["port"] == 8443
-    assert result["webhook_path"] == "api/v1/wh"
-
-    # Native URL without API key → apikey is None (will TypeError on init)
-    result = NotifyFlowtriq.parse_native_url(
-        "https://flowtriq.com/hooks/abc123"
-    )
-    assert result is not None
-    assert result.get("apikey") is None
-
-    # Non-matching URL returns None
-    result = NotifyFlowtriq.parse_native_url("not-a-url")
-    assert result is None
-
-
 @mock.patch("requests.post")
 def test_plugin_flowtriq_apprise_integration(mock_post):
     """NotifyFlowtriq() Apprise integration."""
