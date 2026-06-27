@@ -32,24 +32,36 @@
 # Users create a webhook channel in the Flowtriq dashboard, which provides
 # a webhook URL and API key. The webhook URL path is used directly.
 #
-# URL format:
+# URL format (HTTP):
 #   flowtriq://apikey@hostname/webhook/path/
 #   flowtriq://apikey@hostname:port/webhook/path/
+#
+# URL format (HTTPS):
+#   flowtriqs://apikey@hostname/webhook/path/
+#   flowtriqs://apikey@hostname:port/webhook/path/
 #
 # For example, if the dashboard gives you:
 #   URL:  https://flowtriq.com/hooks/abc123
 #   Key:  ft_key_xxxx
 #
-# Then the Apprise URL is:
-#   flowtriq://ft_key_xxxx@flowtriq.com/hooks/abc123/
+# Then the Apprise URL is (secure):
+#   flowtriqs://ft_key_xxxx@flowtriq.com/hooks/abc123/
+#
+# Or for a self-hosted instance over plain HTTP:
+#   flowtriq://ft_key_xxxx@myhost/hooks/abc123/
+#
+# Alternatively, the native HTTP/HTTPS URL with the API key in the user
+# field is also accepted by parse_native_url():
+#   https://ft_key_xxxx@flowtriq.com/hooks/abc123
 #
 # The API key is passed via the X-API-Key header.
 
 from json import dumps
+import re
 
 import requests
 
-from ..common import NotifyType
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -72,11 +84,17 @@ class NotifyFlowtriq(NotifyBase):
     # The services URL
     service_url = "https://flowtriq.com"
 
-    # The default secure protocol
-    secure_protocol = "flowtriq"
+    # The default protocol (plain HTTP for self-hosted instances)
+    protocol = "flowtriq"
+
+    # The default secure protocol (HTTPS)
+    secure_protocol = "flowtriqs"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://github.com/caronc/apprise/wiki/Notify_flowtriq"
+    setup_url = "https://appriseit.com/services/flowtriq/"
+
+    # The plugin can connect to a self-hosted Flowtriq instance
+    has_selfhosted = True
 
     # Disable throttle rate
     request_rate_per_sec = 0
@@ -84,10 +102,13 @@ class NotifyFlowtriq(NotifyBase):
     # Title is not used for Flowtriq
     title_maxlen = 250
 
+    # Default to plain text since the payload body is plain text
+    notify_format = NotifyFormat.TEXT
+
     # Define object templates
     templates = (
-        "{schema}://{apikey}@{host}/{webhook_path}/",
-        "{schema}://{apikey}@{host}:{port}/{webhook_path}/",
+        "{schema}://{apikey}@{host}/{path}/",
+        "{schema}://{apikey}@{host}:{port}/{path}/",
     )
 
     # Define our template tokens
@@ -111,18 +132,13 @@ class NotifyFlowtriq(NotifyBase):
                 "min": 1,
                 "max": 65535,
             },
-            "webhook_path": {
+            "path": {
                 "name": _("Webhook Path"),
                 "type": "string",
                 "required": True,
+                "map_to": "webhook_path",
             },
         },
-    )
-
-    # Define our template arguments
-    template_args = dict(
-        NotifyBase.template_args,
-        **{},
     )
 
     def __init__(self, apikey, webhook_path, **kwargs):
@@ -132,7 +148,9 @@ class NotifyFlowtriq(NotifyBase):
         # API Key
         self.apikey = validate_regex(apikey)
         if not self.apikey:
-            msg = f"An invalid Flowtriq API Key ({apikey}) was specified."
+            msg = "An invalid Flowtriq API Key ({}) was specified.".format(
+                apikey
+            )
             self.logger.warning(msg)
             raise TypeError(msg)
 
@@ -154,17 +172,15 @@ class NotifyFlowtriq(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        return
-
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Flowtriq Notification."""
 
         # Build our URL
         schema = "https" if self.secure else "http"
-        url = f"{schema}://{self.host}"
-        if self.port:
-            url += f":{self.port}"
-        url += f"/{self.webhook_path}"
+        url = "{}://{}".format(schema, self.host)
+        if self.port is not None:
+            url += ":{}".format(self.port)
+        url += "/{}".format(self.webhook_path)
 
         # Prepare our payload
         payload = {
@@ -183,10 +199,11 @@ class NotifyFlowtriq(NotifyBase):
         }
 
         self.logger.debug(
-            "Flowtriq POST URL: "
-            f"{url} (cert_verify={self.verify_certificate!r})"
+            "Flowtriq POST URL: %s (cert_verify=%s)",
+            url,
+            self.verify_certificate,
         )
-        self.logger.debug(f"Flowtriq Payload: {payload!s}")
+        self.logger.debug("Flowtriq Payload: %s", str(payload))
 
         # Always call throttle before any remote server i/o is made
         self.throttle()
@@ -220,22 +237,20 @@ class NotifyFlowtriq(NotifyBase):
                     )
                 )
 
-                self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000]
-                )
+                self.logger.debug("Response Details:\r\n%s", r.content)
 
                 # Mark our failure
                 return False
 
-            else:
-                self.logger.info("Sent Flowtriq notification.")
+            self.logger.info("Sent Flowtriq notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
                 "A Connection error occurred sending Flowtriq "
-                f"notification to {self.host}."
+                "notification to %s.",
+                self.host,
             )
-            self.logger.debug(f"Socket Exception: {e!s}")
+            self.logger.debug("Socket Exception: %s", str(e))
 
             # Mark our failure
             return False
@@ -250,7 +265,7 @@ class NotifyFlowtriq(NotifyBase):
         Targets or end points should never be identified here.
         """
         return (
-            self.secure_protocol,
+            self.secure_protocol if self.secure else self.protocol,
             self.host,
             self.port if self.port else (443 if self.secure else 80),
             self.webhook_path,
@@ -267,21 +282,17 @@ class NotifyFlowtriq(NotifyBase):
 
         # Our default port
         default_port = 443 if self.secure else 80
-        return (
-            "{schema}://{apikey}@{hostname}{port}/"
-            "{webhook_path}/?{params}".format(
-                schema=self.secure_protocol,
-                apikey=self.pprint(self.apikey, privacy, safe=""),
-                hostname=self.host,
-                port=(
-                    ""
-                    if self.port is None or self.port == default_port
-                    else f":{self.port}"
-                ),
-                webhook_path=NotifyFlowtriq.quote(
-                    self.webhook_path, safe="/"),
-                params=NotifyFlowtriq.urlencode(params),
-            )
+        return "{schema}://{apikey}@{hostname}{port}/{path}/?{params}".format(
+            schema=(self.secure_protocol if self.secure else self.protocol),
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            hostname=self.host,
+            port=(
+                ""
+                if self.port is None or self.port == default_port
+                else ":{}".format(self.port)
+            ),
+            path=NotifyFlowtriq.quote(self.webhook_path, safe="/"),
+            params=NotifyFlowtriq.urlencode(params),
         )
 
     @staticmethod
@@ -308,3 +319,44 @@ class NotifyFlowtriq(NotifyBase):
             results["webhook_path"] = None
 
         return results
+
+    @staticmethod
+    def parse_native_url(url):
+        """Support http(s)://apikey@hostname/webhook/path"""
+        result = re.match(
+            r"^http(?P<secure>s?)://(?:(?P<apikey>[^@\s]+)@)?"
+            r"(?P<hostname>[A-Z0-9._-]+)"
+            r"(?::(?P<port>[0-9]+))?"
+            r"(?P<path>/[^?]*)?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
+        if result:
+            return NotifyFlowtriq.parse_url(
+                "{schema}://{apikey}{hostname}{port}{path}{params}".format(
+                    schema=(
+                        NotifyFlowtriq.secure_protocol
+                        if result.group("secure")
+                        else NotifyFlowtriq.protocol
+                    ),
+                    apikey=(
+                        "{}@".format(
+                            NotifyFlowtriq.quote(
+                                result.group("apikey"), safe=""
+                            )
+                        )
+                        if result.group("apikey")
+                        else ""
+                    ),
+                    hostname=result.group("hostname"),
+                    port=(
+                        ""
+                        if not result.group("port")
+                        else ":{}".format(result.group("port"))
+                    ),
+                    path=result.group("path") or "",
+                    params=result.group("params") or "",
+                )
+            )
+        return None

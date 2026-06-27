@@ -26,12 +26,16 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+import json
 import logging
+from unittest import mock
+from urllib.parse import urlparse
 
 from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise import Apprise, NotifyType
 from apprise.plugins.flowtriq import NotifyFlowtriq
 
 logging.disable(logging.CRITICAL)
@@ -58,7 +62,7 @@ apprise_url_tests = (
             "instance": TypeError,
         },
     ),
-    # Provide a hostname, apikey, and webhook path
+    # Provide a hostname, apikey, and webhook path (insecure)
     (
         "flowtriq://myapikey@hostname/hooks/abc123/",
         {
@@ -67,16 +71,33 @@ apprise_url_tests = (
             "privacy_url": "flowtriq://m...y@hostname/hooks/abc123/",
         },
     ),
-    # Provide a hostname with port
+    # Secure variant (flowtriqs://)
     (
-        "flowtriq://myapikey@hostname:8443/hooks/abc123/",
+        "flowtriqs://myapikey@hostname/hooks/abc123/",
         {
             "instance": NotifyFlowtriq,
+            "privacy_url": "flowtriqs://m...y@hostname/hooks/abc123/",
+        },
+    ),
+    # Provide a hostname with port (insecure)
+    (
+        "flowtriq://myapikey@hostname:8080/hooks/abc123/",
+        {
+            "instance": NotifyFlowtriq,
+            "privacy_url": "flowtriq://m...y@hostname:8080/hooks/abc123/",
+        },
+    ),
+    # Secure with non-default port
+    (
+        "flowtriqs://myapikey@hostname:8443/hooks/abc123/",
+        {
+            "instance": NotifyFlowtriq,
+            "privacy_url": "flowtriqs://m...y@hostname:8443/hooks/abc123/",
         },
     ),
     # Multi-segment webhook path
     (
-        "flowtriq://myapikey@flowtriq.com/api/v1/webhook/xyz/",
+        "flowtriqs://myapikey@flowtriq.com/api/v1/webhook/xyz/",
         {
             "instance": NotifyFlowtriq,
         },
@@ -140,3 +161,252 @@ def test_plugin_flowtriq_edge_cases():
         NotifyFlowtriq(apikey="validkey", webhook_path=None)
     with pytest.raises(TypeError):
         NotifyFlowtriq(apikey="validkey", webhook_path="   ")
+
+    # A webhook path consisting only of slashes strips to empty
+    with pytest.raises(TypeError):
+        NotifyFlowtriq(apikey="validkey", webhook_path="///")
+
+    # Missing host is caught after super().__init__()
+    with pytest.raises(TypeError):
+        NotifyFlowtriq(
+            apikey="validkey", webhook_path="hooks/abc123", host=None
+        )
+
+
+@mock.patch("requests.post")
+def test_plugin_flowtriq_send(mock_post):
+    """NotifyFlowtriq() send path coverage."""
+
+    def _mk_resp(code=requests.codes.ok):
+        r = mock.Mock()
+        r.status_code = code
+        r.content = b"{}"
+        return r
+
+    # ------------------------------------------------------------------
+    # Successful send — 200
+    # ------------------------------------------------------------------
+    mock_post.return_value = _mk_resp(requests.codes.ok)
+    obj = NotifyFlowtriq(
+        apikey="ft_key_xxxx",
+        webhook_path="hooks/abc123",
+        host="flowtriq.com",
+    )
+    assert obj.send(body="Test body", title="Test title") is True
+    assert mock_post.call_count == 1
+
+    # Verify the POST landed at the right hostname
+    call_url = mock_post.call_args[0][0]
+    assert urlparse(call_url).hostname == "flowtriq.com"
+
+    # Verify payload structure and severity mapping for INFO
+    payload = json.loads(mock_post.call_args[1]["data"])
+    assert payload["body"] == "Test body"
+    assert payload["title"] == "Test title"
+    assert payload["severity"] == "info"
+    assert payload["source"] == "apprise"
+
+    # Verify the API key header
+    headers = mock_post.call_args[1]["headers"]
+    assert headers["X-API-Key"] == "ft_key_xxxx"
+    assert headers["Content-Type"] == "application/json"
+
+    mock_post.reset_mock()
+
+    # ------------------------------------------------------------------
+    # 201, 202, 204 are also accepted
+    # ------------------------------------------------------------------
+    for code in (
+        requests.codes.created,
+        requests.codes.accepted,
+        requests.codes.no_content,
+    ):
+        mock_post.return_value = _mk_resp(code)
+        assert obj.send(body="body") is True
+
+    mock_post.reset_mock()
+
+    # ------------------------------------------------------------------
+    # Severity mapping for all notify types
+    # ------------------------------------------------------------------
+    severity_cases = [
+        (NotifyType.INFO, "info"),
+        (NotifyType.SUCCESS, "success"),
+        (NotifyType.WARNING, "warning"),
+        (NotifyType.FAILURE, "critical"),
+    ]
+    mock_post.return_value = _mk_resp()
+    for notify_type, expected_severity in severity_cases:
+        obj.send(body="body", notify_type=notify_type)
+        payload = json.loads(mock_post.call_args[1]["data"])
+        assert payload["severity"] == expected_severity
+
+    mock_post.reset_mock()
+
+    # ------------------------------------------------------------------
+    # Port is included in the request URL when set
+    # ------------------------------------------------------------------
+    obj_port = NotifyFlowtriq(
+        apikey="key",
+        webhook_path="hooks/test",
+        host="myhost.example.com",
+        port=8443,
+    )
+    mock_post.return_value = _mk_resp()
+    assert obj_port.send(body="body") is True
+    call_url = mock_post.call_args[0][0]
+    parsed = urlparse(call_url)
+    assert parsed.hostname == "myhost.example.com"
+    assert parsed.port == 8443
+
+    mock_post.reset_mock()
+
+    # ------------------------------------------------------------------
+    # HTTP error response returns False
+    # ------------------------------------------------------------------
+    mock_post.return_value = _mk_resp(requests.codes.internal_server_error)
+    assert obj.send(body="body") is False
+
+    mock_post.reset_mock()
+
+    # ------------------------------------------------------------------
+    # Unknown HTTP error code (no entry in lookup table) returns False
+    # ------------------------------------------------------------------
+    mock_post.return_value = _mk_resp(999)
+    assert obj.send(body="body") is False
+
+    mock_post.reset_mock()
+
+    # ------------------------------------------------------------------
+    # requests.RequestException returns False
+    # ------------------------------------------------------------------
+    mock_post.side_effect = requests.RequestException("boom")
+    assert obj.send(body="body") is False
+
+
+@mock.patch("requests.post")
+def test_plugin_flowtriq_url_parsing(mock_post):
+    """NotifyFlowtriq() URL round-trip and parse_url edge cases."""
+
+    # Round-trip: parse_url(url()) must recover the same object
+    obj = NotifyFlowtriq(
+        apikey="mykey",
+        webhook_path="hooks/abc123",
+        host="flowtriq.com",
+    )
+    result = NotifyFlowtriq.parse_url(obj.url())
+    assert result is not None
+    obj2 = NotifyFlowtriq(**result)
+    assert obj.url_identifier == obj2.url_identifier
+
+    # Round-trip with non-default port
+    obj_port = NotifyFlowtriq(
+        apikey="mykey",
+        webhook_path="api/v1/wh",
+        host="myhost",
+        port=9000,
+    )
+    result = NotifyFlowtriq.parse_url(obj_port.url())
+    assert result is not None
+    obj_port2 = NotifyFlowtriq(**result)
+    assert obj_port.url_identifier == obj_port2.url_identifier
+
+    # url_identifier via URL parse: flowtriq:// is insecure → port fallback 80
+    obj_insecure = NotifyFlowtriq.parse_url("flowtriq://key@h/hooks/x")
+    assert obj_insecure is not None
+    uid_ins = NotifyFlowtriq(**obj_insecure).url_identifier
+    assert uid_ins[0] == "flowtriq"
+    assert uid_ins[1] == "h"
+    assert uid_ins[2] == 80
+
+    # flowtriqs:// is secure → port fallback 443
+    obj_secure = NotifyFlowtriq.parse_url("flowtriqs://key@h/hooks/x")
+    assert obj_secure is not None
+    uid_sec = NotifyFlowtriq(**obj_secure).url_identifier
+    assert uid_sec[0] == "flowtriqs"
+    assert uid_sec[1] == "h"
+    assert uid_sec[2] == 443
+
+    # parse_url with no user field → apikey is None
+    result = NotifyFlowtriq.parse_url("flowtriq://hostname/hooks/abc123")
+    assert result is not None
+    assert result["apikey"] is None
+
+    # parse_url with empty path → webhook_path is None
+    result = NotifyFlowtriq.parse_url("flowtriq://key@hostname")
+    assert result is not None
+    assert not result.get("webhook_path")
+
+    # parse_url returns None for an unparseable URL
+    result = NotifyFlowtriq.parse_url("flowtriq://:@/")
+    assert result is None
+
+    # privacy_url hides the API key
+    obj = NotifyFlowtriq(
+        apikey="myapikey",
+        webhook_path="hooks/abc123",
+        host="hostname",
+    )
+    priv = obj.url(privacy=True)
+    assert "myapikey" not in priv
+    assert "m...y" in priv
+
+
+def test_plugin_flowtriq_native_url():
+    """NotifyFlowtriq() parse_native_url."""
+
+    # https:// maps to flowtriqs:// (secure)
+    result = NotifyFlowtriq.parse_native_url(
+        "https://ft_key_xxxx@flowtriq.com/hooks/abc123"
+    )
+    assert result is not None
+    assert result["apikey"] == "ft_key_xxxx"
+    assert result["webhook_path"] == "hooks/abc123"
+    # round-trips to the secure schema
+    obj = NotifyFlowtriq(**result)
+    assert obj.secure is True
+    assert obj.url_identifier[0] == "flowtriqs"
+
+    # http:// maps to flowtriq:// (insecure)
+    result = NotifyFlowtriq.parse_native_url(
+        "http://mykey@myhost.example.com/hooks/abc123"
+    )
+    assert result is not None
+    assert result["apikey"] == "mykey"
+    obj_ins = NotifyFlowtriq(**result)
+    assert obj_ins.secure is False
+    assert obj_ins.url_identifier[0] == "flowtriq"
+
+    # Native URL with port
+    result = NotifyFlowtriq.parse_native_url(
+        "https://mykey@myhost.example.com:8443/api/v1/wh"
+    )
+    assert result is not None
+    assert result["apikey"] == "mykey"
+    assert result["port"] == 8443
+    assert result["webhook_path"] == "api/v1/wh"
+
+    # Native URL without API key → apikey is None (will TypeError on init)
+    result = NotifyFlowtriq.parse_native_url(
+        "https://flowtriq.com/hooks/abc123"
+    )
+    assert result is not None
+    assert result.get("apikey") is None
+
+    # Non-matching URL returns None
+    result = NotifyFlowtriq.parse_native_url("not-a-url")
+    assert result is None
+
+
+@mock.patch("requests.post")
+def test_plugin_flowtriq_apprise_integration(mock_post):
+    """NotifyFlowtriq() Apprise integration."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+
+    app = Apprise()
+    assert app.add("flowtriq://mykey@flowtriq.com/hooks/abc123") is True
+    assert app.notify(title="Title", body="Body") is True
+    assert mock_post.call_count == 1
