@@ -739,12 +739,6 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # Incoming webhooks should use the identity configured in Slack
-        # unless a botname was explicitly supplied.
-        username = self.user
-        if not username and self.mode is SlackMode.BOT:
-            username = self.app_id
-
         #
         # Workflow Builder mode: fixed endpoint, no channel iteration
         #
@@ -791,8 +785,8 @@ class NotifySlack(NotifyBase):
                 payload = {
                     "attachments": [template_content],
                 }
-                if username:
-                    payload["username"] = username
+                if self.user:
+                    payload["username"] = self.user
 
             else:
                 # Our slack format
@@ -818,8 +812,8 @@ class NotifySlack(NotifyBase):
                         }
                     ],
                 }
-                if username:
-                    payload["username"] = username
+                if self.user:
+                    payload["username"] = self.user
 
                 # Slack only accepts non-empty header sections
                 if title:
@@ -937,8 +931,8 @@ class NotifySlack(NotifyBase):
                     }
                 ],
             }
-            if username:
-                payload["username"] = username
+            if self.user:
+                payload["username"] = self.user
 
             # Acquire our to-be footer icon if configured to do so
             image_url = (

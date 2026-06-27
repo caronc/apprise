@@ -38,7 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
-from apprise.plugins.slack import NotifySlack
+from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
 
@@ -872,13 +872,42 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
     payload = loads(mock_request.call_args.kwargs["data"])
     assert payload.get("username") == "CustomWebhookName"
 
-    # Bot mode keeps existing fallback behavior to self.app_id.
+    # Bot mode without botname should also omit username, allowing Slack
+    # to use the app's configured display name.
     mock_request.reset_mock()
     response.content = dumps({"ok": True, "channel": "C123456"})
     obj = NotifySlack(access_token="xoxb-1234-1234-abc124", targets="#test")
     assert obj.notify(body="body", title="title") is True
     payload = loads(mock_request.call_args.kwargs["data"])
-    assert payload.get("username") == obj.app_id
+    assert "username" not in payload
+
+    # WEBHOOK_GOV mode without botname should also omit username,
+    # deferring to the government webhook's configured identity.
+    mock_request.reset_mock()
+    response.content = b"ok"
+    obj = NotifySlack(
+        token_a=token_a,
+        token_b=token_b,
+        token_c=token_c,
+        mode=SlackMode.WEBHOOK_GOV,
+    )
+    assert obj.notify(body="body", title="title") is True
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert "username" not in payload
+
+    # Webhook mode with blocks enabled and no botname should also omit
+    # username, so Slack's webhook identity is used.
+    mock_request.reset_mock()
+    response.content = b"ok"
+    obj = NotifySlack(
+        token_a=token_a,
+        token_b=token_b,
+        token_c=token_c,
+        use_blocks=True,
+    )
+    assert obj.notify(body="body", title="title") is True
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert "username" not in payload
 
 
 @mock.patch("requests.request")
@@ -1627,6 +1656,41 @@ def test_plugin_slack_template_blocks_payload_uses_username(
     assert obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
     payload = loads(mock_request.call_args.kwargs["data"])
     assert payload["username"] == "TemplateBot"
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_template_blocks_no_username(mock_request, tmpdir):
+    """NotifySlack() - template blocks omit username when no botname set."""
+    mock_request.return_value = mock.Mock(
+        **{"content": b"ok", "status_code": requests.codes.ok}
+    )
+
+    template = tmpdir.join("no_username_blocks.json")
+    template.write(
+        cleandoc("""
+        {
+          "blocks": [
+            {
+              "type": "section",
+              "text": {"type": "mrkdwn", "text": "{{app_body}}"}
+            }
+          ]
+        }
+        """)
+    )
+
+    # Webhook mode with template and no botname should not force username,
+    # allowing Slack's configured webhook identity to be used.
+    obj = NotifySlack(
+        token_a="T1JJ3T3L2",
+        token_b="A1BRTD4JD",
+        token_c="TIiajkdnlazkcOXrIdevi7FQ",
+        template=str(template),
+    )
+
+    assert obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+    payload = loads(mock_request.call_args.kwargs["data"])
+    assert "username" not in payload
 
 
 @mock.patch("requests.request")
