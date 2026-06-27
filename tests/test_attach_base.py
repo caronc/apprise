@@ -94,3 +94,43 @@ def test_attach_base():
     assert results.get("mimetype") == "image/jpeg"
     # We can retrieve our url
     assert str(results)
+
+
+def test_attach_base_parse_url_name_sanitization():
+    """
+    API: AttachBase.parse_url() ?name= sanitization
+
+    """
+    # Normal name -- returned as-is (lowercased)
+    results = AttachBase.parse_url(
+        url="file://path/to/file?name=thumbnail.jpg"
+    )
+    assert isinstance(results, dict)
+    assert results.get("name") == "thumbnail.jpg"
+
+    # Path traversal stripped; only the basename is kept
+    results = AttachBase.parse_url(url="file://path/to/file?name=/etc/passwd")
+    assert isinstance(results, dict)
+    assert results.get("name") == "passwd"
+
+    # Deep traversal -- same rule applies
+    results = AttachBase.parse_url(
+        url="file://path/to/file?name=../../secret.jpg"
+    )
+    assert isinstance(results, dict)
+    assert results.get("name") == "secret.jpg"
+
+    # Empty ?name= -- treated as not specified; key must be absent
+    results = AttachBase.parse_url(url="file://path/to/file?name=")
+    assert isinstance(results, dict)
+    assert "name" not in results
+
+    # Whitespace-only ?name= (URL-encoded spaces) -- treated as not specified
+    results = AttachBase.parse_url(url="file://path/to/file?name=%20%20%20")
+    assert isinstance(results, dict)
+    assert "name" not in results
+
+    # Directory-only path (no filename component) -- treated as not specified
+    results = AttachBase.parse_url(url="file://path/to/file?name=/")
+    assert isinstance(results, dict)
+    assert "name" not in results
