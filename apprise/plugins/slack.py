@@ -783,7 +783,6 @@ class NotifySlack(NotifyBase):
 
                 # Wrap the template attachment content in a full payload
                 payload = {
-                    "username": self.user if self.user else self.app_id,
                     "attachments": [template_content],
                 }
 
@@ -796,7 +795,6 @@ class NotifySlack(NotifyBase):
                 )
 
                 payload = {
-                    "username": self.user if self.user else self.app_id,
                     "attachments": [
                         {
                             "blocks": [
@@ -919,7 +917,6 @@ class NotifySlack(NotifyBase):
 
             # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
             payload = {
-                "username": self.user if self.user else self.app_id,
                 # Use Markdown language
                 "mrkdwn": self.notify_format == NotifyFormat.MARKDOWN,
                 "attachments": [
@@ -958,6 +955,9 @@ class NotifySlack(NotifyBase):
             # Be friendly; let the user know why they can't send their
             # attachments if using the Webhook mode
             self.logger.warning("Slack Webhooks do not support attachments.")
+
+        if self.user:
+            payload["username"] = self.user
 
         # Prepare our Slack URL (depends on mode)
         if self.mode is SlackMode.WEBHOOK:
