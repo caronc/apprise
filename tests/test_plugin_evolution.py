@@ -376,6 +376,12 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # Preserve unmatched backticks as literal text.
     assert f("text ``unterminated") == "text ``unterminated"
 
+    # Collapse runs of three or more backticks without dropping spaces.
+    # Three backticks collapse to two.
+    assert f("`` code```here ``") == "``` code``here ```"
+    # Longer backtick runs also collapse to two in one substitution.
+    assert f("````` content```` end `````") == "``` content`` end ```"
+
     # Collapse empty entities without affecting following content.
     assert f("****x") == "x"
 
@@ -395,35 +401,6 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # rather than emitting a dangling " (url)".
     assert f("[](<https://example.com/x>)") == "https://example.com/x"
 
-    # Indexed lookup skips escapes and requires an exact run width.
-    assert (
-        NotifyEvolution.find_unescaped_run(
-            NotifyEvolution.build_backtick_run_index("\\` `"), 0, 1
-        )
-        == 3
-    )
-    assert (
-        NotifyEvolution.find_unescaped_run(
-            NotifyEvolution.build_backtick_run_index("no backticks"), 0, 1
-        )
-        is None
-    )
-    assert (
-        NotifyEvolution.find_unescaped_run(
-            NotifyEvolution.build_backtick_run_index("`` `"), 0, 1
-        )
-        == 3
-    )
-
-    # Indexed lookup has no distance cutoff.
-    far = "a" * 200_000 + "`"
-    assert (
-        NotifyEvolution.find_unescaped_run(
-            NotifyEvolution.build_backtick_run_index(far), 0, 1
-        )
-        == 200_000
-    )
-
     # HTML body with a title: title is merged into the body as a heading
     # before the WhatsApp dialect conversion runs (covers _build_send_calls
     # title-merge branch).
@@ -438,7 +415,7 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
         is True
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
-    assert payload["text"] == "# My Title\n*hello*"
+    assert payload["text"] == "*My Title*\n*hello*"
     mock_post.reset_mock()
 
     # Title that reduces to an empty string after stripping leading heading

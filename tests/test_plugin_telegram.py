@@ -1668,7 +1668,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     )
     assert (
         notify("<p>a[b]c *lit* _lit_ `lit`</p>", mdv="1")
-        == "a\\[b]c \\*lit\\* \\_lit\\_ \\`lit\\`"
+        == "a\\[b\\]c \\*lit\\* \\_lit\\_ \\`lit\\`"
     )
 
     # Non-adjacent nesting and sibling spans are unaffected.
@@ -1772,24 +1772,6 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*hello*"
     mock_post.reset_mock()
-
-    # build_backtick_run_index() / find_unescaped_run() -- the lookup
-    # returns None outright when the requested run never appears at all.
-    assert (
-        NotifyTelegram.find_unescaped_run(
-            NotifyTelegram.build_backtick_run_index("no match here"), 0, 2
-        )
-        is None
-    )
-
-    # A genuine match arbitrarily far from `start` is still found.
-    far = "a" * 200_000 + "`"
-    assert (
-        NotifyTelegram.find_unescaped_run(
-            NotifyTelegram.build_backtick_run_index(far), 0, 1
-        )
-        == 200_000
-    )
 
 
 @mock.patch("requests.post")

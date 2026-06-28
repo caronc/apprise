@@ -83,73 +83,48 @@ def markdown_adjust(
     window_start: int,
     split_at: int,
 ) -> int:
-    """Adjust split_at to avoid cutting inside a Markdown link construct.
+    """Move a split left when it cuts a Markdown or Chat link.
 
-    Protects two construct shapes:
-      - CommonMark links/images: [Text](URL) and ![Alt](URL)
-      - Angle-bracket links:     <URL|label>  (Slack mrkdwn, Google Chat)
+    Protected forms are ``[label](url)``, ``![alt](url)``, and
+    ``<url|label>``. The scan looks backward for an opener and at most one
+    window forward for its closer, keeping adjustment work linear.
 
-    Backward scan: from window_start to split_at, so that a long URL
-    whose opening "[" or "<" sits anywhere in the current chunk window
-    is still detected correctly.
-
-    Forward scan: capped at split_at + (split_at - window_start) + 1.
-    The cap is symmetric with the backward scan distance and keeps the
-    total work per call O(window_size) rather than O(body_length).
-    Without the cap, an adversarial body of many unterminated "[" openers
-    would cause O(n^2) work as each split point scans to len(text) finding
-    no ")".  Any construct whose closing delimiter lies beyond the cap is
-    also so long that moving the split back to its opener would land at or
-    before window_start, which smart_split() would reset anyway.
-
-    Returns the (possibly moved-left) split position.
+    Returns the original split or the construct's opening position.
     """
     if split_at <= window_start or split_at > len(text):
         return split_at
 
-    # Scan backward through the entire current chunk window so that any
-    # construct opener within the window is detected regardless of distance.
+    # Search the entire current chunk for a construct opener.
     search_start = window_start
 
-    # Cap the forward scan symmetrically with the backward window size.
-    # This bounds the per-call cost to O(window_size) and still covers
-    # every construct whose closing delimiter fits within one chunk-length
-    # past the split point (the only ones where moving the split is useful).
+    # Cap the forward scan to one window to avoid quadratic work.
     forward_end = min(
         len(text),
         split_at + (split_at - window_start) + 1,
     )
 
-    # Protect [Text](URL) and ![Alt](URL) CommonMark link/image constructs.
-    # rfind searches backward from split_at; if the split falls inside a
-    # link the "[" (or "!" for images) will be found somewhere to the left.
+    # Find a possible CommonMark link or image opener.
     link_start_idx = text.rfind("[", search_start, split_at)
     if link_start_idx == -1:
-        # Fallback: check for an image opener "!" immediately before "[".
-        link_start_idx = text.rfind("!", search_start, split_at)
+        # Accept ``!`` only when it begins an image label.
+        bang = text.rfind("!", search_start, split_at)
+        if bang != -1 and bang + 1 < len(text) and text[bang + 1] == "[":
+            link_start_idx = bang
 
     if link_start_idx != -1:
-        # The construct is only active when split_at lands inside the
-        # URL / destination parentheses; verify a closing ")" lies ahead.
+        # Confirm that the split lands before the closing parenthesis.
         link_end_idx = text.find(")", link_start_idx, forward_end)
         if link_end_idx != -1 and link_start_idx < split_at < link_end_idx:
             # Move the split back to before the opening "[" or "!".
             return link_start_idx
 
-    # Protect <URL|label> angle-bracket constructs (Slack mrkdwn, Chat).
-    # The "|" requirement distinguishes these from bare HTML tags like <br>.
+    # Find a possible Slack or Chat ``<URL|label>`` opener.
     angle_start_idx = text.rfind("<", search_start, split_at)
     if angle_start_idx != -1:
-        # Search for the "|" separator across the full forward scan range,
-        # not just up to split_at.  This is necessary because the split
-        # can land INSIDE the URL portion (between "<" and "|"), in which
-        # case the pipe is ahead of split_at.  Both cases -- split in the
-        # URL part and split in the label part -- reduce to the same check:
-        # angle_start_idx < split_at <= angle_end_idx.
+        # Locate the separator even when the split falls inside the URL.
         pipe_idx = text.find("|", angle_start_idx + 1, forward_end)
         if pipe_idx != -1:
-            # The construct closes at ">" after the pipe; if split_at
-            # lands anywhere inside "<URL|label>" move it to before "<".
+            # Move splits inside the complete construct before ``<``.
             angle_end_idx = text.find(">", pipe_idx, forward_end)
             if (
                 angle_end_idx != -1
@@ -165,20 +140,17 @@ def smart_split(
     limit: int,
     body_format: NotifyFormat,
 ) -> list[str]:
-    """
-    Split `text` into chunks of at most `limit` characters.
+    """Split text within ``limit``, preferring natural boundaries.
 
-    Soft split priority:
-      1. Last newline before `limit` (\\n or \\r)
-      2. Last space or tab before `limit`
-      3. Last punctuation+whitespace (.,!?:; followed by space/tab/newline)
-      4. Hard split at `limit`
+    Priority             Boundary
+    -------------------  ---------------------------------------
+    1                    Newline
+    2                    Space or tab
+    3                    Punctuation followed by whitespace
+    4                    Hard character limit
 
-    `body_format` controls additional safety rules:
-      - NotifyFormat.TEXT: generic splitting only
-      - NotifyFormat.HTML: avoid splitting inside '&...;' entities
-      - NotifyFormat.MARKDOWN: same as HTML, plus a best-effort check to
-        avoid splitting inside [Text](URL) / ![Alt](URL) patterns.
+    HTML avoids splitting entities. Markdown additionally protects common
+    link constructs when they can fit within a chunk.
     """
 
     if not text or limit <= 0:

@@ -83,7 +83,10 @@ from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..conversion import (
     build_backtick_run_index,
+    commonmark_emphasis_run,
     commonmark_escape_link_url,
+    commonmark_force_close_spans,
+    commonmark_scan_angle_dest,
     find_unescaped_run,
 )
 from ..locale import gettext_lazy as _
@@ -387,14 +390,21 @@ class NotifySlack(NotifyBase):
         re.IGNORECASE,
     )
 
-    # Expose shared delimiter helpers for classmethods, tests, and subclasses.
-    build_backtick_run_index = staticmethod(build_backtick_run_index)
-    find_unescaped_run = staticmethod(find_unescaped_run)
-
     @classmethod
     def _commonmark_to_slack(cls, body):
-        """Adapt html_to_markdown()'s CommonMark output to Slack's own
-        mrkdwn dialect."""
+        """Translate CommonMark to Slack ``mrkdwn``.
+
+        CommonMark          Slack mrkdwn
+        ------------------  -----------------
+        **bold**            *bold*
+        *italic*            _italic_
+        `code`              `code`
+        [label](<url>)      <url|label>
+        &, <, >             HTML entities
+
+        Slack retains supported backslash escapes and uses its native anchor
+        syntax for labeled links.
+        """
 
         # Accumulate translated characters one item at a time.
         out = []
@@ -487,20 +497,8 @@ class NotifySlack(NotifyBase):
 
             if body.startswith("](<", i) and link_stack:
                 # We are at the "](<" that closes a pending link label.
-                # Scan forward with escape awareness to find ">)" which marks
-                # the end of the angle-bracketed destination.
-                close = None
-                k = i + 3
-                while k < n - 1:
-                    if body[k] == "\\" and k + 1 < n:
-                        # Skip escaped characters inside the destination so a
-                        # literal ">)" in the URL does not falsely terminate.
-                        k += 2
-                        continue
-                    if body[k] == ">" and body[k + 1] == ")":
-                        close = k
-                        break
-                    k += 1
+                # Scan forward with escape awareness for the ">)" terminator.
+                close = commonmark_scan_angle_dest(body, i, n)
 
                 if close is not None:
                     # Decode CommonMark escapes in the URL and re-encode
@@ -518,46 +516,9 @@ class NotifySlack(NotifyBase):
                     continue
 
             # Emphasis: CommonMark uses * for bold (**) and italic (*).
-            # Convert to Slack mrkdwn while preserving LIFO nesting order.
+            # Convert to Slack mrkdwn using the shared LIFO helper.
             if ch == "*":
-                j = i
-                # Measure how many consecutive "*" characters are here.
-                while j < n and body[j] == "*":
-                    j += 1
-                run = j - i
-
-                # Consume the run one span at a time.  "**" maps to Slack bold
-                # (*) and "*" maps to Slack italic (_).  LIFO: close the most
-                # recently opened span if this run width can satisfy it.
-                while run > 0:
-                    if stack and (
-                        (stack[-1][0] == "*" and run >= 2)
-                        or (stack[-1][0] == "_" and run >= 1)
-                    ):
-                        # Close the innermost open span.
-                        delim, open_index = stack.pop()
-                        if open_index == len(out) - 1:
-                            # The span opened but collected no content --
-                            # drop the empty opening delimiter too.
-                            out.pop()
-                        else:
-                            # Emit the matching close delimiter.
-                            out.append(delim)
-                        # Bold consumes 2 asterisks; italic consumes 1.
-                        run -= 2 if delim == "*" else 1
-                    elif run >= 2:
-                        # Open a new bold (*) span.
-                        out.append("*")
-                        stack.append(("*", len(out) - 1))
-                        run -= 2
-                    else:
-                        # Open a new italic (_) span.
-                        out.append("_")
-                        stack.append(("_", len(out) - 1))
-                        run -= 1
-
-                # Advance past the entire asterisk run.
-                i = j
+                i = commonmark_emphasis_run(body, i, n, stack, out)
                 continue
 
             # All other characters pass through unchanged.
@@ -566,13 +527,7 @@ class NotifySlack(NotifyBase):
 
         # Force-close any spans still open so each chunk of output is
         # independently valid Slack mrkdwn even if the input was malformed.
-        while stack:
-            delim, open_index = stack.pop()
-            if open_index == len(out) - 1:
-                # Opened but empty -- drop the dangling delimiter.
-                out.pop()
-            else:
-                out.append(delim)
+        commonmark_force_close_spans(out, stack)
 
         return "".join(out)
 
@@ -596,10 +551,7 @@ class NotifySlack(NotifyBase):
         """Initialize Slack Object."""
         super().__init__(**kwargs)
 
-        # Store our webhook mode
-        # Track whether the caller supplied an explicit mode so we can
-        # decide later whether to validate exact segment count or
-        # auto-detect the workflow sub-mode from segment count.
+        # Track explicit modes; otherwise workflow segments select the mode.
         _mode_explicit = bool(mode and isinstance(mode, str))
         if _mode_explicit:
             self.mode = next(
@@ -636,9 +588,7 @@ class NotifySlack(NotifyBase):
             else:
                 self.workflow_path = []
 
-            # Segment counts are fixed by Slack:
-            #   /workflows/ URLs have exactly 4 segments
-            #   /triggers/  URLs have exactly 3 segments
+            # Slack workflows use four segments and triggers use three.
             seg_count = len(self.workflow_path)
             if _mode_explicit:
                 # Validate exact count for the declared mode
@@ -841,12 +791,7 @@ class NotifySlack(NotifyBase):
         # Templates are always Block Kit JSON; enforce JSON escaping
         tokens["app_mode"] = TemplateType.JSON
 
-        # Coerce all substitution values to str before JSON-escaping.
-        # apply_template's _escape_json() calls json.dumps(v)[1:-1] which
-        # is only correct for strings; None produces "ul" and other non-
-        # string types produce similarly corrupted output.  app_mode is a
-        # TemplateType sentinel passed as a named parameter, not a
-        # substitution value, so it is left as-is.
+        # Stringify substitutions before JSON escaping; preserve app_mode.
         safe_tokens = {
             k: (
                 v
@@ -918,7 +863,11 @@ class NotifySlack(NotifyBase):
     def _build_send_calls(
         self, body=None, title=None, body_format=None, **kwargs
     ):
-        """Convert CommonMark to mrkdwn before splitting into chunks."""
+        """Split HTML-derived CommonMark before Slack conversion.
+
+        Markdown-aware splitting protects links; ``send()`` then converts each
+        chunk to independently valid ``mrkdwn``.
+        """
 
         # Only adapt HTML-derived Markdown; pass other formats through.
         if not (
@@ -933,12 +882,8 @@ class NotifySlack(NotifyBase):
             )
             return
 
-        # Split on the CommonMark body so markdown_adjust can protect
-        # [label](<url>) constructs from being severed across chunk
-        # boundaries (body_format=MARKDOWN activates that path in
-        # smart_split).  Restore body_format=HTML in each yielded chunk
-        # so send() still applies _commonmark_to_slack() and the correct
-        # entity-escape pass on every chunk independently.
+        # Split as Markdown to protect links, then restore HTML provenance.
+        # Each resulting chunk is converted independently by ``send()``.
         for chunk in super()._build_send_calls(
             body=body,
             title=title,

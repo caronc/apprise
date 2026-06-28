@@ -306,38 +306,6 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # Collapse empty entities without affecting following content.
     assert NotifyGoogleChat._commonmark_to_google_chat("****x") == "x"
 
-    # Indexed lookup skips escapes and requires an exact run width.
-    assert (
-        NotifyGoogleChat.find_unescaped_run(
-            NotifyGoogleChat.build_backtick_run_index("\\` `"), 0, 1
-        )
-        == 3
-    )
-    assert (
-        NotifyGoogleChat.find_unescaped_run(
-            NotifyGoogleChat.build_backtick_run_index("no backticks"), 0, 1
-        )
-        is None
-    )
-
-    # A run that's longer than requested doesn't match either -- it's
-    # indexed under its own (different) length group.
-    assert (
-        NotifyGoogleChat.find_unescaped_run(
-            NotifyGoogleChat.build_backtick_run_index("`` `"), 0, 1
-        )
-        == 3
-    )
-
-    # Indexed lookup has no distance cutoff.
-    far = "a" * 200_000 + "`"
-    assert (
-        NotifyGoogleChat.find_unescaped_run(
-            NotifyGoogleChat.build_backtick_run_index(far), 0, 1
-        )
-        == 200_000
-    )
-
     # A backslash-escaped '>' outside of link syntax still needs entity
     # escaping, the same as a bare one.
     f = NotifyGoogleChat._commonmark_to_google_chat
@@ -345,6 +313,18 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
 
     # Drop CommonMark escapes that Google Chat does not use.
     assert f("\\!text") == "!text"
+
+    # A three-backtick content line cannot close a four-backtick fence.
+    # Preserve indentation until the matching four-backtick closing fence.
+    assert f("````\n``` nested\n  indented\nlast\n````") == (
+        "````\n``` nested\n  indented\nlast\n````"
+    )
+
+    # Preserve escapes so Chat formatting characters remain literal.
+    assert f("\\*text\\*") == "\\*text\\*"
+    assert f("\\_text\\_") == "\\_text\\_"
+    assert f("\\~text\\~") == "\\~text\\~"
+    assert f("\\`text\\`") == "\\`text\\`"
 
     # Preserve an incomplete link as literal text.
     assert f("[text](<https://example.com/unterminated") == (

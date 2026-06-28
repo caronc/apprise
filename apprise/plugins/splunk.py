@@ -137,7 +137,7 @@ class NotifySplunk(NotifyBase):
         "{schema}://{routing_key}@{apikey}/{entity_id}",
     )
 
-    # The title is not used
+    # Maximum allowable title length
     title_maxlen = 60
 
     # body limit

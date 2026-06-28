@@ -64,7 +64,12 @@ from ..common import (
     NotifyType,
     PersistentStoreMode,
 )
-from ..conversion import build_backtick_run_index, find_unescaped_run
+from ..conversion import (
+    build_backtick_run_index,
+    commonmark_prepend_title,
+    commonmark_scan_angle_dest,
+    find_unescaped_run,
+)
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -788,16 +793,12 @@ class NotifyTelegram(NotifyBase):
         )
         return 0
 
-    # Expose shared delimiter helpers for classmethods and tests.
-    build_backtick_run_index = staticmethod(build_backtick_run_index)
-    find_unescaped_run = staticmethod(find_unescaped_run)
-
     # Convert HTML-derived CommonMark to Telegram Markdown in one pass while
     # preserving nested entities and independently valid message chunks.
     _TELEGRAM_STRICT_CHARS = "~#+=|{}.!<>-"
 
     # Legacy Markdown recognizes escapes only for these characters.
-    _TELEGRAM_V1_ESCAPABLE = "`*_["
+    _TELEGRAM_V1_ESCAPABLE = "`*_[]"
 
     # Full MarkdownV2 reserved set for previously unescaped fragments.
     _TELEGRAM_RESERVED_FULL = "_*[]()~`>#+=|{}.!<>-"
@@ -824,62 +825,36 @@ class NotifyTelegram(NotifyBase):
 
     @classmethod
     def _commonmark_to_telegram(cls, body, strict=False):
-        """Adapt html_to_markdown()'s CommonMark output to Telegram's own
-        Markdown dialect ("Markdown"/v1, or strictly for "MarkdownV2"/v2).
+        """Translate CommonMark to Telegram Markdown v1 or v2.
 
-        Overview
-        --------
-        html_to_markdown() produces CommonMark: emphasis with * and **,
-        links as [label](<url>), code spans with backticks, and backslash
-        escapes.  Telegram uses a different dialect:
+        CommonMark     Markdown v1     MarkdownV2
+        -------------  --------------  --------------------
+        **bold**       *bold*          *bold*
+        *italic*       _italic_        _italic_
+        `code`         `code`          `code`
+        [l](<u>)       [l](u)          [l](u)
+        \\*            known escapes   all reserved escapes
 
-          CommonMark   V1 ("Markdown")   V2 ("MarkdownV2")
-          ----------   ---------------   -----------------
-          **bold**     *bold*            *bold*
-          *italic*     _italic_          _italic_
-          `code`       `code`            `code`
-          [l](<u>)     [l](u)            [l](u)   -- angle brackets stripped
-          \\*          * (literal)       \\*       -- only some escapes kept
-
-        Both dialects share the same emphasis mapping; strict=True adds
-        per-character escaping of all MarkdownV2 reserved characters.
-
-        Data structures
-        ---------------
-        out   -- list of str fragments; joined at the end to form the result.
-                 Using a list avoids O(n^2) string concatenation.
-        stack -- list of (delimiter, open_index) pairs, innermost frame last
-                 (LIFO order).  "delimiter" is "*" (bold) or "_" (italic).
-                 "open_index" is the index in `out` where the opening
-                 delimiter was placed; None marks a span that was suppressed
-                 (V1 only -- legacy Markdown forbids nesting emphasis).
-        i     -- byte position in the input string body[i].
-        n     -- len(body); cached to avoid repeated calls in the hot loop.
-        backtick_runs -- pre-built index of all unescaped backtick run
-                 positions so code-span matching is O(log n) not O(n^2).
+        Both versions strip angle brackets from link destinations. Strict
+        mode additionally escapes every MarkdownV2-reserved character.
         """
 
         # Accumulate output fragments; joined once at the end.
         out = []
-        # Open emphasis spans tracked in LIFO order.  Each entry is
-        # (delimiter, open_index_in_out) where open_index is None when
-        # V1 nesting suppression is in effect for that span.
+        # Track emphasis spans; ``None`` marks nesting suppressed by v1.
         stack = []
+
+        # Initialize the single-pass scanner.
         i = 0
         n = len(body)
+
         # Pre-compute backtick run positions once; reused for every "`" hit.
-        backtick_runs = cls.build_backtick_run_index(body)
+        backtick_runs = build_backtick_run_index(body)
 
         while i < n:
             ch = body[i]
 
-            # ----------------------------------------------------------------
-            # Backslash escapes
-            # ----------------------------------------------------------------
-            # CommonMark escapes look like "\*" or "\[".  V2 (strict) keeps
-            # ALL of them because MarkdownV2 requires many chars to be escaped.
-            # V1 only keeps the small set of characters that Telegram's legacy
-            # Markdown actually reserves; others are emitted as plain chars.
+            # Preserve escapes required by v2 or recognized by legacy v1.
             if ch == "\\" and i + 1 < n:
                 nxt = body[i + 1]
                 if strict or nxt in cls._TELEGRAM_V1_ESCAPABLE:
@@ -891,13 +866,7 @@ class NotifyTelegram(NotifyBase):
                 i += 2
                 continue
 
-            # ----------------------------------------------------------------
-            # Code spans  (` ... ` or ``` ... ```)
-            # ----------------------------------------------------------------
-            # Measure the backtick run length (1, 2, or 3+) then use the
-            # pre-built index to find the matching closing run at exactly
-            # the same width.  CommonMark allows any run width as long as
-            # the open and close widths match exactly.
+            # Convert matched CommonMark code runs to Telegram delimiters.
             if ch == "`":
                 j = i
                 # Count consecutive backticks to get the run length.
@@ -905,53 +874,29 @@ class NotifyTelegram(NotifyBase):
                     j += 1
                 run = j - i
                 # Find the next unescaped run of the same length.
-                close = cls.find_unescaped_run(backtick_runs, j, run)
+                close = find_unescaped_run(backtick_runs, j, run)
 
                 if close is not None:
                     # Extract the code span content between the delimiters.
                     content = body[j:close]
-                    # Telegram requires literal backslashes and backticks
-                    # inside code spans to be escaped so the renderer does
-                    # not mistake them for control characters.
+                    # Escape Telegram control characters inside code.
                     content = content.replace("\\", "\\\\").replace("`", "\\`")
-                    # Normalise the delimiter: Telegram only recognises single
-                    # or triple backtick code spans, so choose the narrowest
-                    # form that is valid (triple when multiline or 3+ chars).
+
+                    # Use fences for multiline or wide CommonMark spans.
                     delim = "```" if run >= 3 or "\n" in content else "`"
                     out.append(delim + content + delim)
                     # Skip past the closing backtick run.
                     i = close + run
                     continue
 
-                # No matching close found -- not a real code span.
-                # Emit the backticks as literal text (escaped in V2).
+                # Preserve unmatched backticks, escaping them only in v2.
                 out.append(("\\`" if strict else "`") * run)
                 i = j
                 continue
 
-            # ----------------------------------------------------------------
-            # Inline link destination  ](<url>)  -->  ](url)
-            # ----------------------------------------------------------------
-            # html_to_markdown() wraps URLs in angle brackets for safety
-            # (CommonMark angle-bracket destinations allow any URL character).
-            # Telegram's link format does not use angle brackets, so we strip
-            # them and re-escape the URL for Telegram's reserved characters.
+            # Strip CommonMark angle brackets from Telegram link destinations.
             if body.startswith("](<", i):
-                # Scan forward with escape awareness so a literal ">)" inside
-                # the URL (e.g. a query string with ">" encoded as itself)
-                # does not falsely terminate the destination scan.
-                close = None
-                k = i + 3
-                while k < n - 1:
-                    if body[k] == "\\" and k + 1 < n:
-                        # Skip escaped characters; they cannot be terminators.
-                        k += 2
-                        continue
-                    if body[k] == ">" and body[k + 1] == ")":
-                        # Found the closing ">)" -- mark and stop.
-                        close = k
-                        break
-                    k += 1
+                close = commonmark_scan_angle_dest(body, i, n)
 
                 if close is not None:
                     # Extract the URL content between "(" and ">".
@@ -964,27 +909,7 @@ class NotifyTelegram(NotifyBase):
                     i = close + 2
                     continue
 
-            # ----------------------------------------------------------------
-            # Emphasis runs  (* or **)
-            # ----------------------------------------------------------------
-            # CommonMark uses "*" for italic and "**" for bold.  Telegram V1
-            # uses "_" for italic and "*" for bold; V2 uses the same chars but
-            # with strict escaping everywhere else.
-            #
-            # A single "*" run in the input can carry multiple emphasis levels
-            # at once: "***" is bold+italic opened or closed simultaneously.
-            # We handle this with two strategies:
-            #
-            #   CASCADE  -- when the run width matches the exact total width
-            #               of one or more consecutive frames on the stack,
-            #               close all of them in one step.  Example:
-            #               "***text***" opens bold+italic; the closing "***"
-            #               pops both frames and emits both close delimiters.
-            #
-            #   WHILE RUN -- otherwise, consume the run width one span at a
-            #               time, either closing the top-of-stack span if it
-            #               satisfies the remaining width, or opening a new
-            #               span.
+            # Map CommonMark emphasis, including combined ``***`` runs.
             if ch == "*":
                 j = i
                 # Measure the full asterisk run.
@@ -992,12 +917,7 @@ class NotifyTelegram(NotifyBase):
                     j += 1
                 run = j - i
 
-                # ---- Cascade detection ----
-                # Walk the stack from the top (innermost frame) accumulating
-                # the width each frame would need for its close delimiter.
-                # Bold ("*") needs 2 asterisks; italic ("_") needs 1.
-                # Stop as soon as the accumulated width matches the run, or
-                # would exceed it (no exact match is possible past that point).
+                # Detect runs that exactly close multiple nested spans.
                 cascade_levels = 0
                 cascade_width = 0
                 for delim, _ in reversed(stack):
@@ -1028,11 +948,7 @@ class NotifyTelegram(NotifyBase):
                     i = j
                     continue
 
-                # ---- Consume run width one span at a time ----
-                # No exact cascade match; process the run piecemeal.
-                # Each iteration either closes the top-of-stack span (if it
-                # can be satisfied by the remaining run width) or opens a
-                # new span.  Loop until the entire run has been consumed.
+                # Otherwise consume the run one span at a time.
                 while run > 0:
                     if stack and stack[-1][0] == "*" and run >= 2:
                         # Top of stack is a bold span; 2 asterisks close it.
@@ -1050,16 +966,12 @@ class NotifyTelegram(NotifyBase):
                         run -= 2
                     elif run >= 2:
                         # No closeable bold on stack; open a new bold span.
-                        # In strict (V2) mode or when the stack is empty,
-                        # emit the delimiter immediately.  In V1 with an
-                        # existing open span, suppress the nested delimiter
-                        # (V1 Markdown does not support nesting emphasis).
+                        # Legacy v1 suppresses nested emphasis delimiters.
                         if strict or not stack:
                             out.append("*")
                             stack.append(("*", len(out) - 1))
                         else:
-                            # Suppressed: record None so the cascade close
-                            # knows not to emit a closing delimiter either.
+                            # Record suppression for the matching close.
                             stack.append(("*", None))
                         run -= 2
                     else:
@@ -1075,29 +987,17 @@ class NotifyTelegram(NotifyBase):
                 i = j
                 continue
 
-            # ----------------------------------------------------------------
-            # MarkdownV2 reserved characters
-            # ----------------------------------------------------------------
-            # In strict mode every character that MarkdownV2 reserves must be
-            # backslash-escaped so Telegram's parser does not misinterpret it.
+            # Escape remaining MarkdownV2-reserved characters.
             if strict and ch in cls._TELEGRAM_STRICT_CHARS:
                 out.append("\\" + ch)
                 i += 1
                 continue
 
-            # ----------------------------------------------------------------
-            # All other characters pass through unchanged.
-            # ----------------------------------------------------------------
+            # Preserve ordinary characters.
             out.append(ch)
             i += 1
 
-        # --------------------------------------------------------------------
-        # Force-close spans left open by malformed or truncated source.
-        # --------------------------------------------------------------------
-        # Any span still on the stack was not closed by a matching "*" run.
-        # Pop innermost-first (LIFO) so the emitted delimiters are correctly
-        # ordered.  An empty span (open_index == len(out) - 1) is dropped
-        # entirely rather than left as a dangling delimiter in the output.
+        # Close nonempty spans left open by malformed or truncated input.
         while stack:
             delim, open_index = stack.pop()
             if open_index is None:
@@ -1111,99 +1011,59 @@ class NotifyTelegram(NotifyBase):
                 # Emit the close delimiter to produce valid Telegram Markdown.
                 out.append(delim)
 
+        # Join the translated fragments once.
         return "".join(out)
 
     @classmethod
     def _repair_split_chunk(cls, text, strict, pending):
-        """Repair Telegram Markdown entities split across message chunks.
+        """Repair one Telegram Markdown chunk and return its pending state.
 
-        Overview
-        --------
-        The base splitter cuts the body into body_maxlen-sized pieces
-        without awareness of Markdown structure.  A cut can land:
-          - Inside a code span  (` ... ` or ``` ... ```)
-          - Inside a link destination  [label]( ... )
-          - Inside an emphasis span  *word* or _word_
+        Each returned chunk is independently valid. ``pending`` carries only
+        the state needed to interpret delimiters appearing in later chunks:
 
-        This method processes one already-split chunk and:
-          1. Handles any open entity that was carried over from the
-             previous chunk via the `pending` state dict.
-          2. Walks the chunk character by character, tracking emphasis
-             spans that open or close within this chunk.
-          3. Forces every open span closed at the chunk edge (so each
-             message is independently valid Telegram Markdown).
-          4. Returns the repaired text and an updated `pending` dict for
-             the next chunk to consume.
+        Key             Meaning
+        --------------  ----------------------------------------------
+        ``in_code``     Width of a code fence continued from this chunk
+        ``in_link_dest`` Link destination continues into the next chunk
+        ``*`` / ``_``   Emphasis closes to discard in a later chunk
 
-        `pending` keys
-        --------------
-        "in_code" : int   -- The backtick run width of an open code span
-                            that started in the previous chunk.  The chunk
-                            begins inside the code span's content; we scan
-                            for the matching close run and strict-escape
-                            everything up to it.
-        "in_link_dest" : bool -- True when the previous chunk ended inside
-                            a link destination "...](url..." with no closing
-                            ")".  We scan for the unescaped ")" and
-                            strict-escape the URL fragment.
-        "*" / "_" : int  -- Count of emphasis spans opened in a previous
-                            chunk whose CLOSE delimiter will appear in this
-                            or a later chunk.  When we encounter that close
-                            delimiter we discard it (the open was already
-                            dropped) rather than emitting an unmatched close.
-
-        Data structures
-        ---------------
-        out        -- list of str fragments accumulated for this chunk.
-        open_state -- {"*": bool, "_": bool}  True while the delimiter is
-                      open inside this chunk (not carried over).
-        open_pos   -- {"*": int|None, "_": int|None}  Index in `out` where
-                      the opening delimiter was placed; used to drop empty
-                      spans at the chunk edge.
-        link_stack -- list of out-indices for unmatched "[" characters seen
-                      in this chunk; escaped if no matching "](" follows.
+        Returns ``(repaired_text, next_pending)``.
         """
 
         # Output fragment list; joined once at the end.
         out = []
-        # Track which emphasis delimiters are currently open in this chunk.
+        # Track emphasis opened within this chunk.
         open_state = {"*": False, "_": False}
         # Record the out-index of each open delimiter for empty-span cleanup.
         open_pos = {"*": None, "_": None}
         # Work on a mutable copy so we do not mutate the caller's dict.
         pending = dict(pending)
-        # Stack of out-indices for "[" characters that may start a link.
+        # Track possible link-label openings in this chunk.
         link_stack = []
+
+        # Initialize the single-pass scanner.
         i = 0
         n = len(text)
         # Pre-compute backtick run positions once for O(log n) code matching.
-        backtick_runs = cls.build_backtick_run_index(text)
+        backtick_runs = build_backtick_run_index(text)
 
-        # --------------------------------------------------------------------
-        # Resume any entity that was still open at the end of the last chunk.
-        # --------------------------------------------------------------------
-
+        # Resume an entity left open by the previous chunk.
         in_code_width = pending.pop("in_code", None)
         if in_code_width and strict:
-            # The previous chunk ended inside a code span whose opening fence
-            # had `in_code_width` backticks.  Scan from the start of this
-            # chunk for the matching closing fence.
-            close = cls.find_unescaped_run(backtick_runs, 0, in_code_width)
+            # Search this chunk for the carried code span's closing fence.
+            close = find_unescaped_run(backtick_runs, 0, in_code_width)
             if close is not None:
-                # Found the close fence in this chunk: strict-escape the code
-                # content up to the fence, then skip past the fence itself.
+                # Escape carried code content and consume its closing fence.
                 out.append(cls._strict_escape(text[:close]))
                 i = close + in_code_width
             else:
-                # The code span has not closed yet: escape the entire chunk
-                # and carry "in_code" into the next pending state.
+                # Escape this chunk and carry the code state forward.
                 out.append(cls._strict_escape(text))
                 pending["in_code"] = in_code_width
                 i = n
 
         elif pending.pop("in_link_dest", False) and strict:
-            # The previous chunk ended inside a link destination "](url..."
-            # with no closing ")".  Scan from the start for the unescaped ")".
+            # Search for a carried link destination's closing parenthesis.
             close = None
             k = 0
             while k < n:
@@ -1228,26 +1088,17 @@ class NotifyTelegram(NotifyBase):
                 pending["in_link_dest"] = True
                 i = n
 
-        # --------------------------------------------------------------------
-        # Main character loop: scan the remainder of this chunk.
-        # --------------------------------------------------------------------
-
+        # Scan the remainder of this chunk.
         while i < n:
             ch = text[i]
 
-            # Backslash escape: pass through verbatim so we do not disturb
-            # escaping that _commonmark_to_telegram already applied.
+            # Preserve escapes already applied by the dialect adapter.
             if ch == "\\" and i + 1 < n:
                 out.append(text[i : i + 2])
                 i += 2
                 continue
 
-            # ----------------------------------------------------------------
-            # Code spans
-            # ----------------------------------------------------------------
-            # A complete code span passes through unchanged.  If the span is
-            # not closed within this chunk, its content must be strict-escaped
-            # and the open fence width recorded in pending for the next chunk.
+            # Preserve complete code spans or carry split spans forward.
             if ch == "`":
                 j = i
                 # Measure the opening backtick run.
@@ -1255,7 +1106,7 @@ class NotifyTelegram(NotifyBase):
                     j += 1
                 run = j - i
                 # Look for the matching close run in the pre-built index.
-                close = cls.find_unescaped_run(backtick_runs, j, run)
+                close = find_unescaped_run(backtick_runs, j, run)
                 if close is not None:
                     # Complete span in this chunk: copy verbatim.
                     out.append(text[i : close + run])
@@ -1270,28 +1121,16 @@ class NotifyTelegram(NotifyBase):
                     i = n
                     continue
 
-            # ----------------------------------------------------------------
-            # Emphasis delimiters  (* and _)
-            # ----------------------------------------------------------------
-            # Each delimiter is either:
-            #   a) A close for a span opened in a previous chunk (discard it
-            #      because the open was dropped at the prior chunk edge), or
-            #   b) A toggle within this chunk (open if not yet open, else
-            #      close).
+            # Reconcile carried or local emphasis delimiters.
             if ch in "*_":
                 if pending.get(ch, 0) > 0:
-                    # This close matches an open that was dropped when the
-                    # previous chunk ended.  Discard the close and decrement
-                    # the pending count so we stop discarding when balanced.
+                    # Discard the close for an opening dropped previously.
                     pending[ch] -= 1
                     i += 1
                     continue
 
                 if open_state[ch]:
-                    # This delimiter closes a span opened earlier in this
-                    # chunk.  If the span collected no content (open_pos is
-                    # the last item in out), drop the orphan opening delimiter
-                    # rather than emitting an empty span pair.
+                    # Close the local span, dropping an empty opening.
                     if open_pos[ch] == len(out) - 1:
                         out.pop()
                     else:
@@ -1307,9 +1146,7 @@ class NotifyTelegram(NotifyBase):
                 i += 1
                 continue
 
-            # ----------------------------------------------------------------
-            # Link labels  [  and  ](dest)  -- strict (V2) mode only
-            # ----------------------------------------------------------------
+            # Track link labels only in strict MarkdownV2 mode.
             if strict and ch == "[":
                 # Record the position of this "[" in out so we can escape it
                 # later if we never find a matching "](dest)" in this chunk.
@@ -1351,9 +1188,7 @@ class NotifyTelegram(NotifyBase):
                     i = close + 1
                     continue
 
-                # Destination has no closing ")" in this chunk.  Escape the
-                # "](" we have so far, escape the partial URL, and carry the
-                # "in_link_dest" state so the next chunk knows to continue.
+                # Escape the partial destination and carry it forward.
                 out.append("\\]\\(")
                 out.append(cls._strict_escape(text[i + 2 :]))
                 pending["in_link_dest"] = True
@@ -1371,45 +1206,38 @@ class NotifyTelegram(NotifyBase):
             out.append(ch)
             i += 1
 
-        # --------------------------------------------------------------------
-        # Post-loop cleanup: unmatched labels, empty spans, open-span closes
-        # --------------------------------------------------------------------
-
-        # Any "[" that never found its "](" must be escaped in-place before
-        # any deletions happen (deletions shift indexes, so we fix first).
+        # Escape unmatched labels before index-changing cleanup.
         if strict:
             for idx in link_stack:
                 out[idx] = "\\" + out[idx]
 
-        # Classify each delimiter that is still open at the chunk edge:
-        # empty (open_pos is the last item -- span has no content yet) or
-        # nonempty (span has content and must be force-closed).
-        # Classify before deleting because deletions shift recorded indexes.
+        # Classify open spans before deletions shift their indexes.
         empty, nonempty = [], []
         for d in ("*", "_"):
             if not open_state[d]:
                 continue
             (empty if open_pos[d] == len(out) - 1 else nonempty).append(d)
 
-        # Delete empty-span delimiters from highest index to lowest so that
-        # earlier indexes remain valid as we delete.
+        # Delete empty spans from right to left to preserve earlier indexes.
         for d in sorted(empty, key=lambda d: open_pos[d], reverse=True):
             del out[open_pos[d]]
 
-        # Force-close nonempty spans by appending the close delimiter and
-        # recording each one in pending so the next chunk can discard the
-        # matching close when it appears there.
+        # Close nonempty spans and carry their unmatched closes forward.
         new_pending = dict(pending)
         for d in nonempty:
             out.append(d)
             new_pending[d] = new_pending.get(d, 0) + 1
 
+        # Return the repaired chunk and state for its successor.
         return "".join(out), new_pending
 
     def _build_send_calls(
         self, body=None, title=None, body_format=None, **kwargs
     ):
-        """Adapt CommonMark before splitting, then repair split entities."""
+        """Convert HTML-derived CommonMark and repair each split chunk.
+
+        Pending Telegram entity state is carried between generated calls.
+        """
 
         if not (
             self.notify_format == NotifyFormat.MARKDOWN
@@ -1422,13 +1250,9 @@ class NotifyTelegram(NotifyBase):
 
         strict = self.markdown_ver == TelegramMarkdownVersion.TWO
 
-        # Merge the title into the CommonMark body before dialect conversion
-        # so the heading syntax is translated to Telegram markup correctly.
+        # Merge the title before translating its heading syntax.
         if self.title_maxlen <= 0 and title:
-            title_text = title.lstrip("\r\n \t\v\f#-")
-            if title_text:
-                body = f"# {title_text}\n{body}" if body else f"# {title_text}"
-            title = ""
+            body, title = commonmark_prepend_title(body, title)
 
         body = self._commonmark_to_telegram(body, strict=strict)
 
@@ -1436,9 +1260,7 @@ class NotifyTelegram(NotifyBase):
         for kwargs2 in super()._build_send_calls(
             body=body,
             title=title,
-            # The body is now Telegram Markdown, not raw HTML.  Pass
-            # MARKDOWN so smart_split uses markdown_adjust (link-construct
-            # protection) rather than html_adjust (entity-only protection).
+            # Use Markdown-aware splitting on the translated body.
             body_format=NotifyFormat.MARKDOWN,
             **kwargs,
         ):

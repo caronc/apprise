@@ -131,7 +131,7 @@ def html_to_text(content):
 
 
 def html_to_markdown(content):
-    """Converts a content from HTML to Markdown."""
+    """Convert HTML content to CommonMark."""
 
     # Initialize the Markdown parser.
     parser = HTMLMarkdownConverter()
@@ -195,7 +195,7 @@ class HTMLConverter(HTMLParser):
         # Initialize the standard-library HTML parser.
         super().__init__(**kwargs)
 
-        # Shoudl we store the text content or not?
+        # Should we store the text content or not?
         self._do_store = True
 
         # Initialize internal result list
@@ -381,8 +381,112 @@ def commonmark_escape_link_url(url):
     return url.replace("|", "%7C")
 
 
+def commonmark_scan_angle_dest(body, i, n):
+    """Find the closing ``>`` of a ``](<url>)`` destination.
+
+    ``i`` points at ``](<`` and ``n`` bounds the scan. Escaped ``>)`` pairs
+    are skipped; the closing index or ``None`` is returned.
+    """
+
+    # Start immediately after the opening ``](<`` sequence.
+    k = i + 3
+
+    # Scan until a complete two-character terminator can no longer fit.
+    while k < n - 1:
+        if body[k] == "\\" and k + 1 < n:
+            # Skip escape sequences -- they cannot be the terminator.
+            k += 2
+            continue
+        if body[k] == ">" and body[k + 1] == ")":
+            return k
+        k += 1
+    return None
+
+
+def commonmark_emphasis_run(body, i, n, stack, out):
+    """Map one CommonMark asterisk run to target emphasis delimiters.
+
+    ``stack`` tracks nested bold/italic spans while ``out`` receives their
+    delimiters. The returned index points immediately after the run.
+    """
+    # Measure the full asterisk run starting at i.
+    j = i
+    while j < n and body[j] == "*":
+        j += 1
+    run = j - i
+
+    # Consume the run one span at a time.  Each iteration either closes
+    # the top-of-stack span (if the remaining run width satisfies it) or
+    # opens a new span.
+    while run > 0:
+        if stack and (
+            (stack[-1][0] == "*" and run >= 2)
+            or (stack[-1][0] == "_" and run >= 1)
+        ):
+            # Close the innermost open span.
+            delim, open_index = stack.pop()
+            if open_index == len(out) - 1:
+                # Span opened but collected no content -- drop the orphan.
+                out.pop()
+            else:
+                # Emit the matching close delimiter.
+                out.append(delim)
+            # Bold ("*") consumes 2 asterisks; italic ("_") consumes 1.
+            run -= 2 if delim == "*" else 1
+
+        elif run >= 2:
+            # No closeable bold on stack; open a new bold span.
+            out.append("*")
+            stack.append(("*", len(out) - 1))
+            run -= 2
+
+        else:
+            # run == 1: open a new italic span.
+            out.append("_")
+            stack.append(("_", len(out) - 1))
+            run -= 1
+
+    # Return the position after the full asterisk run.
+    return j
+
+
+def commonmark_force_close_spans(out, stack):
+    """Close remaining LIFO emphasis spans and discard empty ones.
+
+    Both ``out`` and ``stack`` are updated in place.
+    """
+
+    # Close innermost spans first to preserve valid nesting.
+    while stack:
+        delim, open_index = stack.pop()
+        if open_index == len(out) - 1:
+            # Span opened but collected no content -- remove the orphan.
+            out.pop()
+        else:
+            # Emit the close delimiter.
+            out.append(delim)
+
+
+def commonmark_prepend_title(body, title):
+    """Prepend a clean CommonMark H1 title above the body.
+
+    Returns ``(body, "")`` so callers can clear their separate title field.
+    """
+
+    # Remove whitespace and structural prefixes before adding our heading.
+    title_text = title.lstrip("\r\n \t\v\f#-")
+
+    # Add the heading only when meaningful title text remains.
+    if title_text:
+        body = f"# {title_text}\n{body}" if body else f"# {title_text}"
+    return body, ""
+
+
 class HTMLMarkdownConverter(HTMLConverter):
-    """An HTML to Markdown converter tuned for notification messages."""
+    """Convert HTML to notification-friendly CommonMark.
+
+    Plugins may adapt this output to their own Markdown dialects.
+    """
 
     # Define tags that create Markdown block boundaries.
     BLOCK_TAGS = frozenset(
@@ -432,11 +536,14 @@ class HTMLMarkdownConverter(HTMLConverter):
     # Escape angle-bracket link destinations.
     HREF_ESCAPE = re.compile(r"([\\<>])")
 
-    # Remove ASCII controls and Unicode format/zero-width characters that
-    # browsers silently strip during URL parsing but that would bypass the
-    # scheme check (e.g. U+200B zero-width space prepended to "javascript:").
+    # Remove ASCII controls, Unicode format/zero-width characters, and
+    # BiDi override/embedding controls that browsers silently discard during
+    # URL parsing.  These characters can be prepended to a dangerous scheme
+    # (e.g. U+200B before "javascript:") or used to visually reverse a URL
+    # (e.g. U+202E before "javascript:") so they appear safe on screen while
+    # containing an exploitable scheme once the override is decoded.
     _HREF_CONTROL_CHARS = re.compile(
-        "[\x00-\x1f\x7f\u00ad\u200b-\u200f\u2028\u2029\ufeff]"
+        "[\x00-\x1f\x7f\u00ad\u200b-\u200f\u2028-\u202e\u2066-\u2069\ufeff]"
     )
 
     # Detect URI schemes before sanitizing links.
@@ -669,22 +776,14 @@ class HTMLMarkdownConverter(HTMLConverter):
         self._content_seq += 1
 
     def _push_frame(self, frame):
-        """Push a new context frame and update the open-tag counter.
+        """Push a frame, returning whether the depth limit accepted it.
 
-        Returns True when the frame was accepted, False when it was
-        silently discarded because MAX_FRAME_DEPTH was reached.
-
-        Callers that emit Markdown delimiters (emphasis, anchor) MUST
-        check this return value before appending the opening delimiter.
-        Emitting a delimiter without a matching frame leaves it unclosed
-        and produces malformed Markdown when the input is adversarially
-        deep.
+        ``True`` means the frame and tag counter were stored. ``False`` means
+        the depth cap rejected it. Delimiter-producing callers must emit only
+        after a successful push or their Markdown would remain unmatched.
         """
 
-        # Silently discard frames beyond the depth cap so adversarially
-        # nested HTML cannot exhaust memory.  Return False so callers that
-        # emit inline Markdown delimiters can gate that emission on the
-        # result and avoid producing unmatched delimiters in the output.
+        # Reject excessive nesting without emitting unmatched delimiters.
         if len(self._stack) >= MAX_FRAME_DEPTH:
             return False
 
@@ -955,13 +1054,8 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         parent = self._stack[-1]
 
-        # Skip the trailing boundary only for visible top-level tables that
-        # emitted no rows.  The leading paragraph break added before the
-        # table is sufficient; adding a trailing one too would produce a
-        # spurious blank line with no table content in between.
-        # Nested tables (table_do_store=False) are exempt: their boundary
-        # is absorbed into the enclosing cell and provides the whitespace
-        # that separates surrounding inline content from the table's slot.
+        # Empty visible tables already received their only needed boundary.
+        # Suppressed nested tables still need spacing inside their cell.
         if (
             table_frame is not None
             and not table_frame.get("table_rows")
@@ -1070,10 +1164,6 @@ class HTMLMarkdownConverter(HTMLConverter):
 
         # Use the maximum to size a collision-free delimiter.
         return longest
-
-    # Expose shared helpers without binding them as instance methods.
-    build_backtick_run_index = staticmethod(build_backtick_run_index)
-    find_unescaped_run = staticmethod(find_unescaped_run)
 
     def _finalize(self, result):
         """Combine tokens into normalized Markdown lines."""
@@ -1609,11 +1699,7 @@ class HTMLMarkdownConverter(HTMLConverter):
             # A frame validates closing tags and relocates edge whitespace.
             delim = "**" if tag in ("strong", "b") else "*"
 
-            # Only emit the opening delimiter when the frame was accepted.
-            # If the depth cap was hit, _push_frame returns False and we
-            # skip both the frame and its delimiter -- an unmatched "**"
-            # or "*" in the output would be worse than silently dropping
-            # the emphasis on text that is already deeply nested.
+            # Emit a delimiter only when its frame passed the depth limit.
             if self._push_frame(
                 self._make_frame(
                     tag,
@@ -1624,8 +1710,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                     emphasis_result_start=len(self._result),
                 )
             ):
-                # Frame accepted: buffer the opening delimiter immediately
-                # so the matching closing tag can emit the close delimiter.
+                # Buffer the opening delimiter for the matching close tag.
                 self._result.append(delim)
 
         # Open a Markdown link when an href is available
@@ -1661,12 +1746,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                 safe_href = self.HREF_ESCAPE.sub(r"\\\1", href)
                 target = "<{}>".format(safe_href)
 
-                # Store the destination until all nested label text closes.
-                # Only emit "[" when the frame was accepted -- skipping it
-                # when the depth cap is hit prevents an unmatched "[" from
-                # reaching the output (which would produce "[label" with no
-                # closing "](url)" when the closing </a> fires and finds no
-                # frame to pop).
+                # Store the target only when its frame passes the depth limit.
                 if self._push_frame(self._make_frame(tag, href=target)):
                     # Frame accepted: begin the CommonMark link label.
                     self._emit("[")

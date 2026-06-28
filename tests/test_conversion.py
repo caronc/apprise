@@ -39,7 +39,9 @@ from apprise.conversion import (
     LIST_DEPTH_MAX,
     MAX_FRAME_DEPTH,
     HTMLMarkdownConverter,
+    build_backtick_run_index,
     convert_between,
+    find_unescaped_run,
 )
 
 logging.disable(logging.CRITICAL)
@@ -772,6 +774,18 @@ def test_conversion_html_to_markdown_escaping():
         "[click](<#>)"
     )
     assert to_md('<a href="javascript:alert(1)  ">click</a>') == (
+        "[click](<#>)"
+    )
+
+    # BiDi override/embedding characters must not defeat scheme detection.
+    assert to_md('<a href="‮javascript:alert(1)">click</a>') == (
+        "[click](<#>)"
+    )
+    assert to_md('<a href="‪javascript:alert(1)">click</a>') == (
+        "[click](<#>)"
+    )
+    # U+2066 (LEFT-TO-RIGHT ISOLATE) must also be stripped.
+    assert to_md('<a href="⁦javascript:alert(1)">click</a>') == (
         "[click](<#>)"
     )
 
@@ -1674,31 +1688,30 @@ def test_conversion_html_to_markdown_table_code_pipe():
     conv = HTMLMarkdownConverter()
     assert conv._escape_cell_pipes("a`b|c") == "a`b\\|c"
 
-    # build_backtick_run_index() / find_unescaped_run() skip escape pairs
-    # while indexing, and the lookup returns None when no run of the exact.
+    # The shared index skips escape pairs and groups runs by exact width.
+    # A lookup returns None when the requested width does not exist.
+    assert find_unescaped_run(build_backtick_run_index("\\` `"), 0, 1) == 3
     assert (
-        conv.find_unescaped_run(conv.build_backtick_run_index("\\` `"), 0, 1)
-        == 3
-    )
-    assert (
-        conv.find_unescaped_run(
-            conv.build_backtick_run_index("no backticks here"), 0, 1
-        )
+        find_unescaped_run(build_backtick_run_index("no backticks here"), 0, 1)
         is None
     )
     assert (
-        conv.find_unescaped_run(
-            conv.build_backtick_run_index("``too short"), 0, 3
-        )
+        find_unescaped_run(build_backtick_run_index("``too short"), 0, 3)
         is None
     )
 
+    # Runs of different widths are indexed separately.
+    assert find_unescaped_run(build_backtick_run_index("`` `"), 0, 1) == 3
+
+    # Skip an escaped single backtick before matching a width-two run.
+    assert find_unescaped_run(build_backtick_run_index("\\` ``x"), 0, 2) == 3
+
+    # Skip an unescaped run of the wrong width before matching width two.
+    assert find_unescaped_run(build_backtick_run_index("` ``x"), 0, 2) == 2
+
     # A genuine match arbitrarily far from `start` is still found.
     far = "a" * 200_000 + "`"
-    assert (
-        conv.find_unescaped_run(conv.build_backtick_run_index(far), 0, 1)
-        == 200_000
-    )
+    assert find_unescaped_run(build_backtick_run_index(far), 0, 1) == 200_000
 
     # A cell containing many distinct, non-matching backtick-run lengths must
     # still resolve in roughly linear time, not quadratic.
@@ -1718,8 +1731,7 @@ def test_conversion_html_to_markdown_table_code_pipe():
     conv._escape_cell_pipes(large)
     large_time = default_timer() - start
 
-    # Doubling the adversarial width count should roughly double the (tiny)
-    # runtime, not quadruple it.
+    # Double the adversarial width count.
     assert large_time < small_time * 6 + 0.05
 
 

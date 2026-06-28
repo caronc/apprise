@@ -48,11 +48,18 @@
 # e.g. 5511999999999 for a Brazilian mobile number.
 
 from json import dumps
+import re
 
 import requests
 
 from ..common import NotifyFormat, NotifyType
-from ..conversion import build_backtick_run_index, find_unescaped_run
+from ..conversion import (
+    build_backtick_run_index,
+    commonmark_emphasis_run,
+    commonmark_force_close_spans,
+    commonmark_scan_angle_dest,
+    find_unescaped_run,
+)
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -196,92 +203,46 @@ class NotifyEvolution(NotifyBase):
     # Direct WhatsApp Markdown is left unchanged.
     # Syntax: https://faq.whatsapp.com/539178204879377/
 
-    # Expose shared delimiter helpers for classmethods, tests, and subclasses.
-    build_backtick_run_index = staticmethod(build_backtick_run_index)
-    find_unescaped_run = staticmethod(find_unescaped_run)
-
     @classmethod
     def _commonmark_to_whatsapp(cls, body):
-        """Adapt html_to_markdown()'s CommonMark output to WhatsApp's own
-        text formatting dialect.
+        """Translate CommonMark to WhatsApp formatting.
 
-        Overview
-        --------
-        html_to_markdown() produces CommonMark.  WhatsApp uses a different
-        dialect with these key differences:
+        CommonMark          WhatsApp
+        ------------------  ---------------------------
+        **bold**            *bold*
+        *italic*            _italic_
+        `code`              ```code``` (triple backticks)
+        [label](<url>)      label (url)
+        \\*                 *
 
-          CommonMark            WhatsApp
-          ----------            --------
-          **bold**              *bold*
-          *italic*              _italic_
-          `code`                ```code```  (always triple backtick)
-          [label](<url>)        label (url)  (no hyperlink syntax; WhatsApp
-                                             auto-links bare URLs)
-          \\*                   *  (backslash escapes dropped; WhatsApp
-                                   does not support them)
-
-        Links are rendered as "label (url)" because WhatsApp has no rich
-        anchor syntax -- it auto-links URLs that appear inline.  When the
-        label and the URL are the same, the label is omitted and only the
-        bare URL is emitted.
-
-        Data structures
-        ---------------
-        out        -- list of str fragments accumulated during the scan;
-                      joined once at the end to form the result string.
-                      Using a list avoids O(n^2) string concatenation.
-        stack      -- list of (delimiter, open_index) pairs, innermost
-                      frame last (LIFO order).  "delimiter" is "*" (bold)
-                      or "_" (italic).  "open_index" is the index in `out`
-                      where the opening delimiter was placed; used to drop
-                      empty spans at the force-close step.
-        link_stack -- list of out-indices for unmatched "[" characters that
-                      may start a CommonMark link label.  When we reach the
-                      matching "](<url>)", we splice in the "label (url)"
-                      form and discard the buffered "[".  Stray "[" chars
-                      that never match stay as plain text.
-        i          -- current position in the input string body[i].
-        n          -- len(body); cached to avoid repeated attribute lookup.
-        backtick_runs -- pre-built index of all unescaped backtick run
-                      positions indexed by run length so code-span matching
-                      is O(log n) instead of O(n^2).
+        WhatsApp auto-links bare URLs but has no custom-label link syntax.
+        Backslash escapes are removed because WhatsApp does not use them.
         """
 
         # Accumulate translated characters one item at a time.
         out = []
-        # Open emphasis spans in LIFO order.  Each entry is
-        # (delimiter, out_index) where out_index is where the opening
-        # delimiter sits in `out`.
+        # Track open emphasis as ``(delimiter, output index)`` pairs.
         stack = []
-        # Stack of out-indices for "[" chars that may open a link label.
-        # Innermost "[" is last so we match "](<url>)" LIFO.
+        # Track possible link-label openings in LIFO order.
         link_stack = []
+
+        # Initialize the single-pass scanner.
         i = 0
         n = len(body)
-        # Pre-scan all unescaped backtick run positions indexed by run
-        # length so code-span open/close matching is O(log n) not O(n^2).
+
+        # Index backtick runs for efficient closing-delimiter lookups.
         backtick_runs = build_backtick_run_index(body)
 
         while i < n:
             ch = body[i]
 
-            # ----------------------------------------------------------------
-            # Backslash escapes
-            # ----------------------------------------------------------------
-            # WhatsApp does not recognise backslash escaping.  We discard
-            # the backslash and emit just the following literal character
-            # so it appears in the output without any escape prefix.
+            # Drop CommonMark escapes because WhatsApp does not use them.
             if ch == "\\" and i + 1 < n:
                 out.append(body[i + 1])
                 i += 2
                 continue
 
-            # ----------------------------------------------------------------
-            # Code spans  (` ... ` or ``` ... ```)
-            # ----------------------------------------------------------------
-            # Locate the matching close run of the same backtick width.
-            # WhatsApp only renders triple-backtick code spans, so we
-            # normalise all matched code spans to "```content```" form.
+            # Normalize matched CommonMark code spans to triple backticks.
             if ch == "`":
                 j = i
                 # Measure the run length by counting consecutive backticks.
@@ -292,58 +253,34 @@ class NotifyEvolution(NotifyBase):
                 close = find_unescaped_run(backtick_runs, j, run)
 
                 if close is not None:
-                    # Matched code span: emit as triple backtick regardless
-                    # of the original delimiter width (single, double, etc.).
-                    out.append("```" + body[j:close] + "```")
+                    # WhatsApp uses triple backticks for monospace text.
+                    # Collapse runs of three or more backticks to two so
+                    # embedded content cannot close the WhatsApp span early.
+                    content = re.sub(r"`{3,}", "``", body[j:close])
+                    out.append("```" + content + "```")
                     # Skip past the closing backtick run.
                     i = close + run
                     continue
 
-                # No matching close found -- not a real code span.
-                # Emit the raw backticks as literal text.
+                # Preserve unmatched backticks as literal text.
                 out.append(body[i:j])
                 i = j
                 continue
 
-            # ----------------------------------------------------------------
-            # Link labels  [  (start of [label](<url>) construct)
-            # ----------------------------------------------------------------
-            # Push the current out-index so we can retrieve the label text
-            # once we encounter the matching "](<url>)" further in the body.
-            # If no matching destination follows, the "[" stays as plain text.
+            # Record a possible CommonMark link-label opening.
             if ch == "[":
                 link_stack.append(len(out))
                 out.append("[")
                 i += 1
                 continue
 
-            # ----------------------------------------------------------------
-            # Link destination  ](<url>)  -->  label (url)
-            # ----------------------------------------------------------------
-            # When we see "](<" and there is an open "[" on link_stack,
-            # we have a complete CommonMark link.  Convert it to WhatsApp's
-            # plain "label (url)" form by scanning for the ">)" terminator,
-            # decoding the URL, and splicing the result back into `out`.
+            # Convert a complete CommonMark link to ``label (url)``.
             if body.startswith("](<", i) and link_stack:
-                # Scan forward with escape awareness so a literal ">)" inside
-                # the URL (e.g. a ">" in a query string) does not terminate
-                # the scan prematurely.
-                close = None
-                k = i + 3
-                while k < n - 1:
-                    if body[k] == "\\" and k + 1 < n:
-                        # Skip escape sequences -- cannot be the terminator.
-                        k += 2
-                        continue
-                    if body[k] == ">" and body[k + 1] == ")":
-                        # Found the closing ">)" of the destination.
-                        close = k
-                        break
-                    k += 1
+                # Scan forward with escape awareness for the ">)" terminator.
+                close = commonmark_scan_angle_dest(body, i, n)
 
                 if close is not None:
-                    # Decode CommonMark backslash escapes in the raw URL
-                    # fragment (body[i+3 : close]) to get the actual URL.
+                    # Decode CommonMark escapes from the raw destination.
                     raw_url = body[i + 3 : close]
                     url = []
                     j2 = 0
@@ -359,99 +296,42 @@ class NotifyEvolution(NotifyBase):
                         j2 += 1
                     url = "".join(url)
 
-                    # Retrieve the index of the matching "[" in out.
+                    # Recover the buffered label and remove its opening ``[``.
                     open_index = link_stack.pop()
-                    # Collect the label text buffered between "[" and "]".
                     text = "".join(out[open_index + 1 :])
-                    # Remove everything from "[" onward -- we will replace
-                    # it with the WhatsApp-native "label (url)" form.
                     del out[open_index:]
-                    # Percent-encode ")" inside the URL so WhatsApp's
-                    # auto-link parser does not mistake a paren in the URL
-                    # for the end of the "label (url)" wrapper parentheses.
+
+                    # Protect wrapper parentheses from URL content.
                     safe_url = url.replace(")", "%29")
-                    # Emit "label (url)" when a label exists;
-                    # bare URL when no label text was present.
+
+                    # Omit the label when only a bare URL is available.
                     out.append(f"{text} ({safe_url})" if text else safe_url)
                     # Skip past the closing ">)" of the destination.
                     i = close + 2
                     continue
 
-            # ----------------------------------------------------------------
-            # Emphasis runs  (* or **)
-            # ----------------------------------------------------------------
-            # CommonMark uses "*" (italic) and "**" (bold).  WhatsApp uses
-            # "_" (italic) and "*" (bold) -- the same mapping as Google Chat
-            # and Telegram.  Process the run one span at a time using the
-            # LIFO stack to always close the most recently opened span first.
+            # Map CommonMark emphasis to WhatsApp's ``*``/``_`` syntax.
             if ch == "*":
-                j = i
-                # Measure the full asterisk run.
-                while j < n and body[j] == "*":
-                    j += 1
-                run = j - i
-
-                # Consume the run width one span at a time.
-                # Each iteration either closes the top-of-stack span (if the
-                # remaining run width satisfies it) or opens a new span.
-                while run > 0:
-                    if stack and (
-                        (stack[-1][0] == "*" and run >= 2)
-                        or (stack[-1][0] == "_" and run >= 1)
-                    ):
-                        # The top-of-stack span can be closed.  Pop it and
-                        # emit the close delimiter (or drop it if empty).
-                        delim, open_index = stack.pop()
-                        if open_index == len(out) - 1:
-                            # Span collected no content -- drop the orphan.
-                            out.pop()
-                        else:
-                            # Emit the close delimiter for this span.
-                            out.append(delim)
-                        # Bold ("*") consumes 2 asterisks; italic ("_") 1.
-                        run -= 2 if delim == "*" else 1
-                    elif run >= 2:
-                        # No closeable bold on stack; open a new bold span.
-                        out.append("*")
-                        stack.append(("*", len(out) - 1))
-                        run -= 2
-                    else:
-                        # run == 1: open a new italic span.
-                        out.append("_")
-                        stack.append(("_", len(out) - 1))
-                        run -= 1
-
-                # Advance past the entire asterisk run.
-                i = j
+                i = commonmark_emphasis_run(body, i, n, stack, out)
                 continue
 
-            # ----------------------------------------------------------------
-            # All other characters pass through unchanged.
-            # ----------------------------------------------------------------
+            # Preserve ordinary characters.
             out.append(ch)
             i += 1
 
-        # --------------------------------------------------------------------
-        # Force-close spans left open by malformed or truncated source.
-        # --------------------------------------------------------------------
-        # Pop innermost-first (LIFO) so the emitted close delimiters are in
-        # the right order.  Empty spans (open_index == last item) are dropped
-        # so the output contains no empty delimiter pairs.
-        while stack:
-            delim, open_index = stack.pop()
-            if open_index == len(out) - 1:
-                # Span opened but collected no content -- remove the orphan.
-                out.pop()
-            else:
-                # Emit the close delimiter to produce valid WhatsApp markup.
-                out.append(delim)
+        # Close spans left open by malformed or truncated input.
+        commonmark_force_close_spans(out, stack)
 
+        # Join the translated fragments once.
         return "".join(out)
 
     def _build_send_calls(
         self, body=None, title=None, body_format=None, **kwargs
     ):
-        """Convert CommonMark to WhatsApp before splitting it into chunks."""
+        """Convert HTML-derived CommonMark before splitting for WhatsApp.
+
+        Direct Markdown and other source formats pass through unchanged.
+        """
 
         # Only adapt HTML-derived Markdown; pass other formats through.
         if not (
@@ -466,16 +346,15 @@ class NotifyEvolution(NotifyBase):
             )
             return
 
-        # Merge the title before conversion; WhatsApp has no title field.
+        # WhatsApp has no title field or heading syntax, so use bold text.
         if self.title_maxlen <= 0 and title:
-            # Strip leading whitespace and Markdown heading / list chars that
-            # would otherwise produce a malformed "# # Title" heading.
+            # Strip leading whitespace and Markdown heading / list chars.
             title_text = title.lstrip("\r\n \t\v\f#-")
             if title_text:
-                # Prepend the title as a level-1 heading above the body.
-                body = f"# {title_text}\n{body}" if body else f"# {title_text}"
-            # Clear the title so the base class does not try to send it
-            # separately as a second field.
+                # Prepend the title as a bold line above the body.
+                heading = f"**{title_text}**"
+                body = f"{heading}\n{body}" if body else heading
+            # Clear the title so the base class does not send it separately.
             title = ""
 
         # Apply the WhatsApp dialect adapter to convert CommonMark constructs
