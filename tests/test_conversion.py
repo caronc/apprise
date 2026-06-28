@@ -778,16 +778,10 @@ def test_conversion_html_to_markdown_escaping():
     )
 
     # BiDi override/embedding characters must not defeat scheme detection.
-    assert to_md('<a href="‮javascript:alert(1)">click</a>') == (
-        "[click](<#>)"
-    )
-    assert to_md('<a href="‪javascript:alert(1)">click</a>') == (
-        "[click](<#>)"
-    )
+    assert to_md('<a href="‮javascript:alert(1)">click</a>') == ("[click](<#>)")
+    assert to_md('<a href="‪javascript:alert(1)">click</a>') == ("[click](<#>)")
     # U+2066 (LEFT-TO-RIGHT ISOLATE) must also be stripped.
-    assert to_md('<a href="⁦javascript:alert(1)">click</a>') == (
-        "[click](<#>)"
-    )
+    assert to_md('<a href="⁦javascript:alert(1)">click</a>') == ("[click](<#>)")
 
     # Keep legitimate app-specific schemes that are not explicitly unsafe.
     assert to_md('<a href="https://example.com">x</a>') == (
