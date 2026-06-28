@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 from datetime import datetime
 from email.header import Header
 from email.mime.application import MIMEApplication
@@ -34,6 +35,7 @@ from email.mime.text import MIMEText
 from email.utils import format_datetime, formataddr, make_msgid
 import re
 import smtplib
+import ssl
 from typing import Optional
 
 from ...common import NotifyFormat, NotifyType, PersistentStoreMode
@@ -652,24 +654,36 @@ class NotifyEmail(NotifyBase):
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
+        # Build an SSL context that honours our verify_certificate setting so
+        # that SMTPS/STARTTLS connections actually validate the remote server's
+        # certificate (and hostname) instead of silently accepting any
+        # certificate presented to us.
+        context = ssl.create_default_context()
+        if not self.verify_certificate:
+            context.check_hostname = False
+            context.verify_mode = ssl.CERT_NONE
+
         try:
             self.logger.debug("Connecting to remote SMTP server...")
             socket_func = smtplib.SMTP
+            socket_args = {}
             if self.secure_mode == SecureMailMode.SSL:
                 self.logger.debug("Securing connection with SSL...")
                 socket_func = smtplib.SMTP_SSL
+                socket_args["context"] = context
 
             socket = socket_func(
                 self.smtp_host,
                 self.port,
                 None,
                 timeout=self.socket_connect_timeout,
+                **socket_args,
             )
 
             if self.secure_mode == SecureMailMode.STARTTLS:
                 # Handle Secure Connections
                 self.logger.debug("Securing connection with STARTTLS...")
-                socket.starttls()
+                socket.starttls(context=context)
 
             self.logger.trace("Login ID: {}".format(self.user))
             if self.user and self.password:
@@ -737,7 +751,13 @@ class NotifyEmail(NotifyBase):
         finally:
             # Gracefully terminate the connection with the server
             if socket is not None:
-                socket.quit()
+                with contextlib.suppress(
+                    OSError, smtplib.SMTPException, RuntimeError
+                ):
+                    # Handles a failed TLS handshake that may have already
+                    # invalidated the socket.
+                    socket.quit()
+                    pass
 
         # Reduce our dictionary (eliminate expired keys if any)
         self.pgp.prune()
