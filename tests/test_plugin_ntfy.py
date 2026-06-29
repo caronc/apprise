@@ -37,6 +37,7 @@ from helpers import AppriseURLTester
 import requests
 
 import apprise
+from apprise import NotifyFormat
 from apprise.plugins.ntfy import NotifyNtfy, NtfyPriority
 
 logging.disable(logging.CRITICAL)
@@ -852,3 +853,32 @@ def test_plugin_ntfy_xtags_no_apprise_tag_collision():
     assert not s.tags, (
         "tags= in a YAML ntfy URL must not create an Apprise routing tag"
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_ntfy_html_to_markdown_format(mock_post):
+    """NotifyNtfy(): HTML body is converted to Markdown."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+
+    # Instantiate an ntfy plugin in Markdown mode using a private server
+    aobj = apprise.Apprise()
+    assert aobj.add("ntfy://localhost/topic?format=markdown")
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to ntfy
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    # The body must arrive as Markdown, not as stripped plain text
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["message"] == "**hello** *world*"

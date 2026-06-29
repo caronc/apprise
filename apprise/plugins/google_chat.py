@@ -59,6 +59,15 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..conversion import (
+    build_backtick_run_index,
+    commonmark_emphasis_run,
+    commonmark_escape_link_url,
+    commonmark_force_close_spans,
+    commonmark_prepend_title,
+    commonmark_scan_angle_dest,
+    find_unescaped_run,
+)
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -197,7 +206,221 @@ class NotifyGoogleChat(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    # Adapt HTML-derived CommonMark to Google Chat's Markdown subset.
+    # Direct Google Chat Markdown is left unchanged.
+    # Syntax: https://developers.google.com/workspace/chat/format-messages
+
+    @classmethod
+    def _commonmark_to_google_chat(cls, body):
+        """Translate CommonMark to Google Chat formatting.
+
+        CommonMark          Google Chat
+        ------------------  -----------------
+        **bold**            *bold*
+        *italic*            _italic_
+        `code`              `code`
+        [label](<url>)      <url|label>
+        &, <, >             HTML entities
+
+        Chat uses HTML-like anchors, so text and code escape ``&``, ``<``,
+        and ``>`` before delivery.
+        """
+
+        # Accumulate translated characters one item at a time.
+        out = []
+        # Track open emphasis as ``(delimiter, output index)`` pairs.
+        stack = []
+        # Track possible link-label openings in LIFO order.
+        link_stack = []
+
+        # Initialize the single-pass scanner.
+        i = 0
+        n = len(body)
+
+        # Index backtick runs for efficient closing-delimiter lookups.
+        backtick_runs = build_backtick_run_index(body)
+
+        while i < n:
+            ch = body[i]
+
+            # Decode CommonMark escapes and protect Chat anchor delimiters.
+            if ch == "\\" and i + 1 < n:
+                nxt = body[i + 1]
+                if nxt == "<":
+                    # "<" starts a Chat anchor; escape it to prevent that.
+                    out.append("&lt;")
+                elif nxt == ">":
+                    # ">" closes a Chat anchor; escape it symmetrically.
+                    out.append("&gt;")
+                elif nxt in ("*", "_", "~", "`"):
+                    # Preserve escapes for Chat formatting characters.
+                    out.append("\\" + nxt)
+                else:
+                    # Other escapes become their literal character.
+                    out.append(nxt)
+                i += 2
+                continue
+
+            # Escape ampersands before Chat interprets them as entities.
+            if ch == "&":
+                out.append("&amp;")
+                i += 1
+                continue
+
+            # Preserve code spans while escaping HTML-sensitive content.
+            if ch == "`":
+                j = i
+                # Measure the run length by counting consecutive backticks.
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                # Search the pre-built index for the matching close run.
+                close = find_unescaped_run(backtick_runs, j, run)
+
+                if close is not None:
+                    # Escape HTML controls inside the matched span.
+                    content = body[j:close]
+                    content = (
+                        content.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                    )
+                    # Preserve the original delimiter width (1, 2, or 3+).
+                    delim = body[i:j]
+                    out.append(delim + content + delim)
+                    # Skip past the closing backtick run.
+                    i = close + run
+                    continue
+
+                # Preserve unmatched backticks as literal text.
+                out.append(body[i:j])
+                i = j
+                continue
+
+            # Record a possible CommonMark link-label opening.
+            if ch == "[":
+                link_stack.append(len(out))
+                out.append("[")
+                i += 1
+                continue
+
+            # Convert a complete CommonMark link to ``<url|label>``.
+            if body.startswith("](<", i) and link_stack:
+                # Scan forward with escape awareness for the ">)" terminator.
+                close = commonmark_scan_angle_dest(body, i, n)
+
+                if close is not None:
+                    # Re-encode characters reserved by Chat anchors.
+                    url = commonmark_escape_link_url(body[i + 3 : close])
+
+                    # Recover the buffered label and replace its opening.
+                    open_index = link_stack.pop()
+                    text = "".join(out[open_index + 1 :])
+                    del out[open_index:]
+                    out.append(f"<{url}|{text}>")
+                    # Skip past the closing ">)" of the destination.
+                    i = close + 2
+                    continue
+
+            # Map CommonMark emphasis to Chat's ``*``/``_`` syntax.
+            if ch == "*":
+                i = commonmark_emphasis_run(body, i, n, stack, out)
+                continue
+
+            # Preserve ordinary characters.
+            out.append(ch)
+            i += 1
+
+        # Close spans left open by malformed or truncated input.
+        commonmark_force_close_spans(out, stack)
+
+        # Join the translated fragments once before adjusting indentation.
+        text = "".join(out)
+
+        # Google Chat requires four spaces per nested-list level, versus two
+        # in the generated CommonMark, so double leading indentation.
+        # Track fence boundaries so code-block indentation remains unchanged.
+        lines = text.split("\n")
+        result = []
+        # Track the opening fence width; zero means no fence is active.
+        # Shorter backtick runs inside the block remain ordinary content.
+        fence_run = 0
+        for line in lines:
+            # Count leading backticks on the stripped line.
+            stripped_line = line.lstrip(" ")
+            run = len(stripped_line) - len(stripped_line.lstrip("`"))
+
+            # Assume ordinary content until a fence boundary is recognized.
+            is_boundary = False
+            if fence_run == 0:
+                # Outside a fence, three or more backticks open one.
+                if run >= 3:
+                    fence_run = run
+                    is_boundary = True
+            else:
+                # A close needs the opening width or more and no other text.
+                if run >= fence_run and stripped_line[run:].strip() == "":
+                    fence_run = 0
+                    is_boundary = True
+
+            if is_boundary or fence_run != 0:
+                # Fence boundary lines and lines inside a fence are kept as-is.
+                result.append(line)
+            else:
+                # Outside a code block: double leading spaces so CommonMark
+                # 2-space list indentation maps to Chat's 4-space indent.
+                stripped = line.lstrip(" ")
+                spaces = len(line) - len(stripped)
+                result.append("  " * spaces + stripped)
+
+        return "\n".join(result)
+
+    def _build_send_calls(
+        self, body=None, title=None, body_format=None, **kwargs
+    ):
+        """Convert HTML-derived CommonMark before splitting for Chat.
+
+        Direct Markdown and other source formats pass through unchanged.
+        """
+
+        # Only adapt HTML-derived Markdown; pass other formats through.
+        if not (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            yield from super()._build_send_calls(
+                body=body,
+                title=title,
+                body_format=body_format,
+                **kwargs,
+            )
+            return
+
+        # Merge the title before conversion because Chat has no title field.
+        if self.title_maxlen <= 0 and title:
+            body, title = commonmark_prepend_title(body, title)
+
+        # Apply the Chat dialect adapter to convert CommonMark constructs
+        # (backslash escapes, links, emphasis) into Chat-native syntax.
+        body = self._commonmark_to_google_chat(body)
+
+        # Tell the base splitter that the body is now Chat Markdown so that
+        # the split heuristics protect link and code-span constructs.
+        yield from super()._build_send_calls(
+            body=body,
+            title=title,
+            body_format=NotifyFormat.MARKDOWN,
+            **kwargs,
+        )
+
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Google Chat Notification."""
 
         # Our headers

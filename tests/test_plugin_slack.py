@@ -37,7 +37,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
@@ -2213,3 +2213,195 @@ def test_plugin_slack_workflow_template(mock_request, tmpdir):
         obj2.notify(body="x", title="", notify_type=NotifyType.INFO) is False
     )
     assert mock_request.call_count == 1  # no new request made
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_html_to_markdown_format(mock_request):
+    """NotifySlack(): HTML body is converted to Markdown."""
+
+    # Use the classic incoming webhook token format
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    # Slack's _send() uses requests.request(), not requests.post();
+    # webhook mode confirms success via content == b"ok"
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    # Instantiate a Slack plugin (notify_format is MARKDOWN by default)
+    aobj = Apprise()
+    assert aobj.add("slack://{}/#general".format(slack_token))
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Slack
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_request.call_count == 1
+
+    # The body must arrive as Markdown in the legacy attachment text, not as
+    # stripped plain text.
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["attachments"][0]["text"] == "*hello* _world_"
+
+    mock_request.reset_mock()
+
+    # Convert CommonMark links to Slack's ``<url|text>`` syntax.
+    assert (
+        aobj.notify(
+            body='<a href="https://example.com/x">click here</a>',
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert (
+        payload["attachments"][0]["text"]
+        == "<https://example.com/x|click here>"
+    )
+
+    mock_request.reset_mock()
+
+    # '&'/'<'/'>' need Slack's HTML-entity escaping, not CommonMark's backslash
+    # escaping (which Slack doesn't support for these and would otherwise.
+    assert (
+        aobj.notify(
+            body="<p>2 &lt; 3 &amp; 4</p>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["attachments"][0]["text"] == "2 &lt; 3 &amp; 4"
+
+    mock_request.reset_mock()
+
+    # Direct Slack mrkdwn input remains unchanged.
+    assert aobj.notify(body="**already** slack-bound markdown #tag") is True
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert (
+        payload["attachments"][0]["text"]
+        == "**already** slack-bound markdown #tag"
+    )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_html_to_markdown_hardening(mock_request):
+    """Test edge cases in the CommonMark-to-Slack dialect adaptation."""
+
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    def notify(body):
+        aobj = Apprise()
+        assert aobj.add("slack://{}/#general".format(slack_token))
+        assert aobj.notify(body=body, body_format=NotifyFormat.HTML) is True
+        payload = loads(mock_request.call_args_list[-1][1]["data"])
+        mock_request.reset_mock()
+        return payload["attachments"][0]["text"]
+
+    # <code>/<pre> content is buffered raw by html_to_markdown.
+    assert notify("<code>a &lt; b &amp; c</code>") == "`a &lt; b &amp; c`"
+
+    # Immediately-adjacent nested emphasis (no text between the outer and inner
+    # tag's open) must stay correctly nested ("*_x_*"), not cross ("*_x*_").
+    assert notify("<b><i>x</i></b>") == "*_x_*"
+
+    # Bold/italic text nested inside a link is preserved in Slack's own
+    # "<url|text>" form.
+    assert (
+        notify('<a href="https://example.com/x"><b>click</b></a>')
+        == "<https://example.com/x|*click*>"
+    )
+
+    # Sibling (non-nested) bold spans stay separate, not merged.
+    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+
+    # Entity-escape Slack control characters in link destinations.
+    assert (
+        notify('<a href="https://e/x>TAIL">click</a>')
+        == "<https://e/x&gt;TAIL|click>"
+    )
+    assert (
+        notify('<a href="https://e/x?a=1&b=2">click</a>')
+        == "<https://e/x?a=1&amp;b=2|click>"
+    )
+
+    # '|' has no entity form and is what separates the URL from its label in
+    # Slack's own syntax.
+    assert (
+        notify('<a href="https://e/x|evil">click</a>')
+        == "<https://e/x%7Cevil|click>"
+    )
+
+    # A literal "\x02<digits>\x02"-shaped sequence in ordinary text must pass
+    # through completely unaltered.
+    assert notify("literal \x020\x02 text, no code or links at all") == (
+        "literal \x020\x02 text, no code or links at all"
+    )
+
+    # An unmatched (unbalanced) bare backtick run.
+    assert NotifySlack._commonmark_to_slack("text ``unterminated") == (
+        "text ``unterminated"
+    )
+
+    # An empty entity collapse mid-string (not just a final one at the end of
+    # the scan).
+    assert NotifySlack._commonmark_to_slack("****x") == "x"
+
+    # overflow=split can hand this method just one chunk of a longer body, with
+    # a span that doesn't open or close until a different chunk entirely.
+    aobj = Apprise()
+    assert aobj.add("slack://{}/#general?overflow=split".format(slack_token))
+    assert (
+        aobj.notify(
+            body="<b>" + ("x" * 39990) + "</b>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_request.call_count == 2
+    texts = [
+        loads(c[1]["data"])["attachments"][0]["text"]
+        for c in mock_request.call_args_list
+    ]
+    for text in texts:
+        assert text.count("*") % 2 == 0
+        assert text.count("_") % 2 == 0
+
+    # Every backslash-escape branch of the main scan: '>' becomes an HTML
+    # entity, '(', ')', '[', ']', '!', '#' have their backslash dropped (none
+    assert (
+        NotifySlack._commonmark_to_slack(
+            "a\\>b\\(c\\)d\\[e\\]f\\!g\\#h\\*i\\_j\\~k\\\\l"
+        )
+        == "a&gt;b(c)d[e]f!g#h\\*i\\_j\\~k\\\\l"
+    )
+
+    # A '[' with no matching "](<url>)" close at all by the time the scan ends
+    # (e.g.
+    assert (
+        NotifySlack._commonmark_to_slack("[text](<https://incomplete")
+        == "[text](<https://incomplete"
+    )
+
+
+def test_plugin_slack_parse_native_url_fallthrough():
+    """parse_native_url() returns None for unrecognized URLs."""
+
+    # A URL that doesn't match any known Slack pattern should yield None.
+    assert (
+        NotifySlack.parse_native_url(
+            "https://not-slack.com/services/ABC/DEF/GHI"
+        )
+        is None
+    )

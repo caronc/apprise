@@ -871,12 +871,17 @@ class NotifyBase(URLBase):
 
             elif (
                 self.notify_format == NotifyFormat.MARKDOWN
-                and body_format == NotifyFormat.TEXT
+                and body_format
+                in (
+                    NotifyFormat.TEXT,
+                    NotifyFormat.HTML,
+                )
             ):
-                # Content is appended to body as markdown
+                # Body was plain text or HTML converted to CommonMark;
+                # render the title as a Markdown heading.
                 title = title.lstrip("\r\n \t\v\f#-")
                 if title:
-                    body = f"# {title}\r\n{body}"
+                    body = f"# {title}\n{body}"
 
             else:
                 body = f"{title}\r\n{body}"

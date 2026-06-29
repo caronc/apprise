@@ -48,10 +48,18 @@
 # e.g. 5511999999999 for a Brazilian mobile number.
 
 from json import dumps
+import re
 
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..conversion import (
+    build_backtick_run_index,
+    commonmark_emphasis_run,
+    commonmark_force_close_spans,
+    commonmark_scan_angle_dest,
+    find_unescaped_run,
+)
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -191,7 +199,185 @@ class NotifyEvolution(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    # Adapt HTML-derived CommonMark to WhatsApp formatting.
+    # Direct WhatsApp Markdown is left unchanged.
+    # Syntax: https://faq.whatsapp.com/539178204879377/
+
+    @classmethod
+    def _commonmark_to_whatsapp(cls, body):
+        """Translate CommonMark to WhatsApp formatting.
+
+        CommonMark          WhatsApp
+        ------------------  ---------------------------
+        **bold**            *bold*
+        *italic*            _italic_
+        `code`              ```code``` (triple backticks)
+        [label](<url>)      label (url)
+        \\*                 *
+
+        WhatsApp auto-links bare URLs but has no custom-label link syntax.
+        Backslash escapes are removed because WhatsApp does not use them.
+        """
+
+        # Accumulate translated characters one item at a time.
+        out = []
+        # Track open emphasis as ``(delimiter, output index)`` pairs.
+        stack = []
+        # Track possible link-label openings in LIFO order.
+        link_stack = []
+
+        # Initialize the single-pass scanner.
+        i = 0
+        n = len(body)
+
+        # Index backtick runs for efficient closing-delimiter lookups.
+        backtick_runs = build_backtick_run_index(body)
+
+        while i < n:
+            ch = body[i]
+
+            # Drop CommonMark escapes because WhatsApp does not use them.
+            if ch == "\\" and i + 1 < n:
+                out.append(body[i + 1])
+                i += 2
+                continue
+
+            # Normalize matched CommonMark code spans to triple backticks.
+            if ch == "`":
+                j = i
+                # Measure the run length by counting consecutive backticks.
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                # Search the pre-built index for the next matching close run.
+                close = find_unescaped_run(backtick_runs, j, run)
+
+                if close is not None:
+                    # WhatsApp uses triple backticks for monospace text.
+                    # Collapse runs of three or more backticks to two so
+                    # embedded content cannot close the WhatsApp span early.
+                    content = re.sub(r"`{3,}", "``", body[j:close])
+                    out.append("```" + content + "```")
+                    # Skip past the closing backtick run.
+                    i = close + run
+                    continue
+
+                # Preserve unmatched backticks as literal text.
+                out.append(body[i:j])
+                i = j
+                continue
+
+            # Record a possible CommonMark link-label opening.
+            if ch == "[":
+                link_stack.append(len(out))
+                out.append("[")
+                i += 1
+                continue
+
+            # Convert a complete CommonMark link to ``label (url)``.
+            if body.startswith("](<", i) and link_stack:
+                # Scan forward with escape awareness for the ">)" terminator.
+                close = commonmark_scan_angle_dest(body, i, n)
+
+                if close is not None:
+                    # Decode CommonMark escapes from the raw destination.
+                    raw_url = body[i + 3 : close]
+                    url = []
+                    j2 = 0
+                    while j2 < len(raw_url):
+                        c2 = raw_url[j2]
+                        if c2 == "\\" and j2 + 1 < len(raw_url):
+                            # Discard the backslash; keep only the next char.
+                            url.append(raw_url[j2 + 1])
+                            j2 += 2
+                            continue
+                        # Plain character: pass through unchanged.
+                        url.append(c2)
+                        j2 += 1
+                    url = "".join(url)
+
+                    # Recover the buffered label and remove its opening ``[``.
+                    open_index = link_stack.pop()
+                    text = "".join(out[open_index + 1 :])
+                    del out[open_index:]
+
+                    # Protect wrapper parentheses from URL content.
+                    safe_url = url.replace(")", "%29")
+
+                    # Omit the label when only a bare URL is available.
+                    out.append(f"{text} ({safe_url})" if text else safe_url)
+                    # Skip past the closing ">)" of the destination.
+                    i = close + 2
+                    continue
+
+            # Map CommonMark emphasis to WhatsApp's ``*``/``_`` syntax.
+            if ch == "*":
+                i = commonmark_emphasis_run(body, i, n, stack, out)
+                continue
+
+            # Preserve ordinary characters.
+            out.append(ch)
+            i += 1
+
+        # Close spans left open by malformed or truncated input.
+        commonmark_force_close_spans(out, stack)
+
+        # Join the translated fragments once.
+        return "".join(out)
+
+    def _build_send_calls(
+        self, body=None, title=None, body_format=None, **kwargs
+    ):
+        """Convert HTML-derived CommonMark before splitting for WhatsApp.
+
+        Direct Markdown and other source formats pass through unchanged.
+        """
+
+        # Only adapt HTML-derived Markdown; pass other formats through.
+        if not (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            yield from super()._build_send_calls(
+                body=body,
+                title=title,
+                body_format=body_format,
+                **kwargs,
+            )
+            return
+
+        # WhatsApp has no title field or heading syntax, so use bold text.
+        if self.title_maxlen <= 0 and title:
+            # Strip leading whitespace and Markdown heading / list chars.
+            title_text = title.lstrip("\r\n \t\v\f#-")
+            if title_text:
+                # Prepend the title as a bold line above the body.
+                heading = f"**{title_text}**"
+                body = f"{heading}\n{body}" if body else heading
+            # Clear the title so the base class does not send it separately.
+            title = ""
+
+        # Apply the WhatsApp dialect adapter to convert CommonMark constructs
+        # (backslash escapes, links, emphasis, code spans) to WhatsApp syntax.
+        body = self._commonmark_to_whatsapp(body)
+
+        # Tell the base splitter that the body is now WhatsApp Markdown so
+        # that split heuristics protect link and code-span constructs.
+        yield from super()._build_send_calls(
+            body=body,
+            title=title,
+            body_format=NotifyFormat.MARKDOWN,
+            **kwargs,
+        )
+
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Evolution API Notification."""
 
         # Build the base URL

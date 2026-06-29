@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import loads
 import logging
 from unittest import mock
 
@@ -34,6 +35,7 @@ import pytest
 import requests
 
 import apprise
+from apprise import NotifyFormat
 from apprise.plugins.gotify import GotifyPriority, NotifyGotify
 
 logging.disable(logging.CRITICAL)
@@ -221,3 +223,31 @@ def test_plugin_gotify_config_files(mock_post):
     assert (
         next(aobj.find(tag="gotify_invalid")).priority == GotifyPriority.NORMAL
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_gotify_html_to_markdown_format(mock_post):
+    """NotifyGotify(): HTML body is converted to Markdown."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Instantiate a Gotify plugin in Markdown mode
+    aobj = apprise.Apprise()
+    assert aobj.add("gotify://hostname/{}?format=markdown".format("t" * 16))
+
+    # Notify with an HTML body; the framework should convert it
+    # to Markdown before dispatching to Gotify
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    # The body must arrive as Markdown, not as stripped plain text
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["message"] == "**hello** *world*"

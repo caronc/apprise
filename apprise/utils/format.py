@@ -41,10 +41,6 @@ PUNCT_SPLIT_PATTERN = re.compile(
 HTML_ENTITY_LOOKBACK = 16
 HTML_ENTITY_LOOKAHEAD = 16
 
-# Support Markdown constructs (e.g., links, formatting)
-# Longer lookback for links [text](url)
-MARKDOWN_CONSTRUCT_LOOKBACK = 32
-
 
 def html_adjust(
     text: str,
@@ -87,34 +83,54 @@ def markdown_adjust(
     window_start: int,
     split_at: int,
 ) -> int:
-    """
-    Adjust the split point to avoid splitting inside simple Markdown
-    link / image constructs like [Text](URL) or ![Alt](URL).
+    """Move a split left when it cuts a Markdown or Chat link.
 
-    This is a best-effort heuristic and does not attempt full Markdown
-    parsing. If the boundary falls between '['/'!' and the closing ')'
-    of a nearby link/image, move the split back to that start.
+    Protected forms are ``[label](url)``, ``![alt](url)``, and
+    ``<url|label>``. The scan looks backward for an opener and at most one
+    window forward for its closer, keeping adjustment work linear.
+
+    Returns the original split or the construct's opening position.
     """
     if split_at <= window_start or split_at > len(text):
         return split_at
 
-    search_start = max(window_start, split_at - MARKDOWN_CONSTRUCT_LOOKBACK)
+    # Search the entire current chunk for a construct opener.
+    search_start = window_start
 
-    # Prefer '[' as the starting marker for links/images.
+    # Cap the forward scan to one window to avoid quadratic work.
+    forward_end = min(
+        len(text),
+        split_at + (split_at - window_start) + 1,
+    )
+
+    # Find a possible CommonMark link or image opener.
     link_start_idx = text.rfind("[", search_start, split_at)
     if link_start_idx == -1:
-        # As a fallback, consider '!' as a possible start, e.g. '![Alt](...)'.
-        link_start_idx = text.rfind("!", search_start, split_at)
+        # Accept ``!`` only when it begins an image label.
+        bang = text.rfind("!", search_start, split_at)
+        if bang != -1 and bang + 1 < len(text) and text[bang + 1] == "[":
+            link_start_idx = bang
 
-    if link_start_idx == -1:
-        return split_at
+    if link_start_idx != -1:
+        # Confirm that the split lands before the closing parenthesis.
+        link_end_idx = text.find(")", link_start_idx, forward_end)
+        if link_end_idx != -1 and link_start_idx < split_at < link_end_idx:
+            # Move the split back to before the opening "[" or "!".
+            return link_start_idx
 
-    # Look ahead for a closing ')' to bound the construct.
-    forward_end = min(len(text), split_at + MARKDOWN_CONSTRUCT_LOOKBACK)
-    link_end_idx = text.find(")", link_start_idx, forward_end)
-
-    if link_end_idx != -1 and link_start_idx < split_at < link_end_idx:
-        return link_start_idx
+    # Find a possible Slack or Chat ``<URL|label>`` opener.
+    angle_start_idx = text.rfind("<", search_start, split_at)
+    if angle_start_idx != -1:
+        # Locate the separator even when the split falls inside the URL.
+        pipe_idx = text.find("|", angle_start_idx + 1, forward_end)
+        if pipe_idx != -1:
+            # Move splits inside the complete construct before ``<``.
+            angle_end_idx = text.find(">", pipe_idx, forward_end)
+            if (
+                angle_end_idx != -1
+                and angle_start_idx < split_at <= angle_end_idx
+            ):
+                return angle_start_idx
 
     return split_at
 
@@ -124,20 +140,17 @@ def smart_split(
     limit: int,
     body_format: NotifyFormat,
 ) -> list[str]:
-    """
-    Split `text` into chunks of at most `limit` characters.
+    """Split text within ``limit``, preferring natural boundaries.
 
-    Soft split priority:
-      1. Last newline before `limit` (\\n or \\r)
-      2. Last space or tab before `limit`
-      3. Last punctuation+whitespace (.,!?:; followed by space/tab/newline)
-      4. Hard split at `limit`
+    Priority             Boundary
+    -------------------  ---------------------------------------
+    1                    Newline
+    2                    Space or tab
+    3                    Punctuation followed by whitespace
+    4                    Hard character limit
 
-    `body_format` controls additional safety rules:
-      - NotifyFormat.TEXT: generic splitting only
-      - NotifyFormat.HTML: avoid splitting inside '&...;' entities
-      - NotifyFormat.MARKDOWN: same as HTML, plus a best-effort check to
-        avoid splitting inside [Text](URL) / ![Alt](URL) patterns.
+    HTML avoids splitting entities. Markdown additionally protects common
+    link constructs when they can fit within a chunk.
     """
 
     if not text or limit <= 0:

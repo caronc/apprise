@@ -35,7 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise
+from apprise import Apprise, NotifyFormat
 from apprise.plugins.twist import NotifyTwist
 
 logging.disable(logging.CRITICAL)
@@ -558,3 +558,54 @@ def test_plugin_twist_fetch(mock_post, mock_get):
     # When we can't parse the content, we still default to an empty
     # dictionary
     assert response == {}
+
+
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_twist_html_to_markdown_format(mock_post, mock_get):
+    """NotifyTwist(): HTML body is converted to Markdown."""
+
+    def _response(url, *args, **kwargs):
+        # Default configuration
+        request = mock.Mock()
+        request.status_code = requests.codes.ok
+
+        if url.endswith("/login"):
+            # Simulate a successful login
+            request.content = dumps(
+                {
+                    "token": "2e82c1e4e8b0091fdaa34ff3972351821406f796",
+                    "default_workspace": 1,
+                }
+            )
+
+        else:
+            # All other endpoints return an empty JSON object
+            request.content = "{}"
+
+        return request
+
+    mock_get.side_effect = _response
+    mock_post.side_effect = _response
+
+    # Twist has class-level notify_format = MARKDOWN, so no ?format=
+    # is needed; incoming HTML bodies are converted before dispatch
+    aobj = Apprise()
+    assert aobj.add("twist://password:user@example.com/1:1")
+
+    # Notify with an HTML body; the framework converts it to Markdown
+    # before dispatching to the Twist plugin
+    assert (
+        aobj.notify(
+            body="<b>hello</b> <i>world</i>",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+
+    # Two POST calls are expected: login then threads/add
+    assert mock_post.call_count == 2
+
+    # The body must arrive as Markdown in the threads/add payload
+    data = mock_post.call_args_list[1][1]["data"]
+    assert data["content"] == "**hello** *world*"

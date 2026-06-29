@@ -81,6 +81,14 @@ import requests
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..conversion import (
+    build_backtick_run_index,
+    commonmark_emphasis_run,
+    commonmark_escape_link_url,
+    commonmark_force_close_spans,
+    commonmark_scan_angle_dest,
+    find_unescaped_run,
+)
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_bool, parse_list, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -382,6 +390,147 @@ class NotifySlack(NotifyBase):
         re.IGNORECASE,
     )
 
+    @classmethod
+    def _commonmark_to_slack(cls, body):
+        """Translate CommonMark to Slack ``mrkdwn``.
+
+        CommonMark          Slack mrkdwn
+        ------------------  -----------------
+        **bold**            *bold*
+        *italic*            _italic_
+        `code`              `code`
+        [label](<url>)      <url|label>
+        &, <, >             HTML entities
+
+        Slack retains supported backslash escapes and uses its native anchor
+        syntax for labeled links.
+        """
+
+        # Accumulate translated characters one item at a time.
+        out = []
+        # Each entry is (delimiter, index-in-out) for an open emphasis span,
+        # innermost last, so we can close spans in LIFO order.
+        stack = []
+        # Each entry is the out-index of the opening "[" for a pending link,
+        # innermost last; used to splice the label text out when we find "]".
+        link_stack = []
+        i = 0
+        n = len(body)
+        # Pre-scan all unescaped backtick run positions indexed by run length
+        # so code-span open/close matching is O(log n) rather than O(n^2).
+        backtick_runs = build_backtick_run_index(body)
+
+        while i < n:
+            ch = body[i]
+
+            # CommonMark uses backslash escapes for literal punctuation.
+            # Translate them into the forms Slack's mrkdwn parser expects.
+            if ch == "\\" and i + 1 < n:
+                nxt = body[i + 1]
+                if nxt == "<":
+                    # "<" must be entity-escaped so Slack does not treat it as
+                    # the start of a <url|label> anchor.
+                    out.append("&lt;")
+                elif nxt == ">":
+                    # Symmetric: ">" closes Slack anchors and must be escaped.
+                    out.append("&gt;")
+                elif nxt in "()[]!#":
+                    # CommonMark escapes these for Markdown disambiguation;
+                    # Slack treats them as plain characters -- emit as-is.
+                    out.append(nxt)
+                else:
+                    # All other escape pairs are valid Slack mrkdwn escapes
+                    # (e.g. \* or \_), so keep the backslash.
+                    out.append(body[i : i + 2])
+                i += 2
+                continue
+
+            # Slack requires literal ampersands to be entity-escaped so they
+            # are not confused with HTML entity sequences in the payload.
+            if ch == "&":
+                out.append("&amp;")
+                i += 1
+                continue
+
+            # Code spans: locate the matching closing run of the same length
+            # and entity-escape HTML controls inside the span content.
+            if ch == "`":
+                j = i
+                # Measure the run length by counting consecutive backticks.
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                # Search the pre-built index for the next run of the same
+                # length after the opening run ends.
+                close = find_unescaped_run(backtick_runs, j, run)
+
+                if close is not None:
+                    # Matched code span: entity-escape its content so Slack
+                    # does not interpret HTML inside monospace runs.
+                    content = body[j:close]
+                    content = (
+                        content.replace("&", "&amp;")
+                        .replace("<", "&lt;")
+                        .replace(">", "&gt;")
+                    )
+                    # Preserve the original delimiter width (1, 2, or 3+).
+                    delim = body[i:j]
+                    out.append(delim + content + delim)
+                    # Advance past the closing run.
+                    i = close + run
+                    continue
+
+                # No matching close -- not a real code span; emit the
+                # backticks as literal text (Slack has no escape for them).
+                out.append(body[i:j])
+                i = j
+                continue
+
+            # CommonMark inline links look like [label](<url>).
+            # Push the current out-index so we can retrieve the label text
+            # once we encounter the matching "](<".
+            if ch == "[":
+                link_stack.append(len(out))
+                out.append("[")
+                i += 1
+                continue
+
+            if body.startswith("](<", i) and link_stack:
+                # We are at the "](<" that closes a pending link label.
+                # Scan forward with escape awareness for the ">)" terminator.
+                close = commonmark_scan_angle_dest(body, i, n)
+
+                if close is not None:
+                    # Decode CommonMark escapes in the URL and re-encode
+                    # characters that would break the <url|label> syntax.
+                    url = commonmark_escape_link_url(body[i + 3 : close])
+                    # Retrieve the label text that was buffered after "[".
+                    open_index = link_stack.pop()
+                    text = "".join(out[open_index + 1 :])
+                    # Splice out everything from "[" onward and replace with
+                    # the Slack-native anchor format.
+                    del out[open_index:]
+                    out.append(f"<{url}|{text}>")
+                    # Skip past the closing ">)".
+                    i = close + 2
+                    continue
+
+            # Emphasis: CommonMark uses * for bold (**) and italic (*).
+            # Convert to Slack mrkdwn using the shared LIFO helper.
+            if ch == "*":
+                i = commonmark_emphasis_run(body, i, n, stack, out)
+                continue
+
+            # All other characters pass through unchanged.
+            out.append(ch)
+            i += 1
+
+        # Force-close any spans still open so each chunk of output is
+        # independently valid Slack mrkdwn even if the input was malformed.
+        commonmark_force_close_spans(out, stack)
+
+        return "".join(out)
+
     def __init__(
         self,
         access_token=None,
@@ -402,10 +551,7 @@ class NotifySlack(NotifyBase):
         """Initialize Slack Object."""
         super().__init__(**kwargs)
 
-        # Store our webhook mode
-        # Track whether the caller supplied an explicit mode so we can
-        # decide later whether to validate exact segment count or
-        # auto-detect the workflow sub-mode from segment count.
+        # Track explicit modes; otherwise workflow segments select the mode.
         _mode_explicit = bool(mode and isinstance(mode, str))
         if _mode_explicit:
             self.mode = next(
@@ -442,9 +588,7 @@ class NotifySlack(NotifyBase):
             else:
                 self.workflow_path = []
 
-            # Segment counts are fixed by Slack:
-            #   /workflows/ URLs have exactly 4 segments
-            #   /triggers/  URLs have exactly 3 segments
+            # Slack workflows use four segments and triggers use three.
             seg_count = len(self.workflow_path)
             if _mode_explicit:
                 # Validate exact count for the declared mode
@@ -615,12 +759,7 @@ class NotifySlack(NotifyBase):
     def gen_payload(
         self, body, title="", notify_type=NotifyType.INFO, **kwargs
     ):
-        """Generate our payload from an external Block Kit JSON template.
-
-        Returns the validated attachment content dict (which must contain
-        a non-empty 'blocks' list with typed entries) to be placed into
-        the Slack attachments array.  Returns False on any failure.
-        """
+        """Return a validated Block Kit attachment, or ``False``."""
         # Acquire the first template attachment
         template = self.template[0]
         if not template:
@@ -652,12 +791,7 @@ class NotifySlack(NotifyBase):
         # Templates are always Block Kit JSON; enforce JSON escaping
         tokens["app_mode"] = TemplateType.JSON
 
-        # Coerce all substitution values to str before JSON-escaping.
-        # apply_template's _escape_json() calls json.dumps(v)[1:-1] which
-        # is only correct for strings; None produces "ul" and other non-
-        # string types produce similarly corrupted output.  app_mode is a
-        # TemplateType sentinel passed as a named parameter, not a
-        # substitution value, so it is left as-is.
+        # Stringify substitutions before JSON escaping; preserve app_mode.
         safe_tokens = {
             k: (
                 v
@@ -726,18 +860,57 @@ class NotifySlack(NotifyBase):
         # Return the validated attachment content dict
         return content
 
+    def _build_send_calls(
+        self, body=None, title=None, body_format=None, **kwargs
+    ):
+        """Split HTML-derived CommonMark before Slack conversion.
+
+        Markdown-aware splitting protects links; ``send()`` then converts each
+        chunk to independently valid ``mrkdwn``.
+        """
+
+        # Only adapt HTML-derived Markdown; pass other formats through.
+        if not (
+            self.notify_format == NotifyFormat.MARKDOWN
+            and body_format == NotifyFormat.HTML
+        ):
+            yield from super()._build_send_calls(
+                body=body,
+                title=title,
+                body_format=body_format,
+                **kwargs,
+            )
+            return
+
+        # Split as Markdown to protect links, then restore HTML provenance.
+        # Each resulting chunk is converted independently by ``send()``.
+        for chunk in super()._build_send_calls(
+            body=body,
+            title=title,
+            body_format=NotifyFormat.MARKDOWN,
+            **kwargs,
+        ):
+            yield {**chunk, "body_format": NotifyFormat.HTML}
+
     def send(
         self,
         body,
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """Perform Slack Notification."""
 
         # error tracking (used for function return)
         has_error = False
+
+        if self.notify_format == NotifyFormat.MARKDOWN and (
+            body_format == NotifyFormat.HTML
+        ):
+            # Adapt converted CommonMark; direct mrkdwn input is unchanged.
+            body = self._commonmark_to_slack(body)
 
         #
         # Workflow Builder mode: fixed endpoint, no channel iteration
@@ -860,7 +1033,10 @@ class NotifySlack(NotifyBase):
             #
             # Legacy API Formatting
             #
-            if self.notify_format == NotifyFormat.MARKDOWN:
+            # Apply legacy formatting only to direct Slack mrkdwn input.
+            if self.notify_format == NotifyFormat.MARKDOWN and (
+                body_format != NotifyFormat.HTML
+            ):
                 body = self._re_formatting_rules.sub(  # pragma: no branch
                     lambda x: self._re_formatting_map[x.group()],
                     body,
