@@ -346,6 +346,28 @@ def test_plugin_onesignal_edge_cases():
         )
 
 
+def test_plugin_onesignal_url_round_trip():
+    """NotifyOneSignal() url() is reloadable without mutating targets."""
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/@user/#segment/player/user@email.com"
+    )
+    assert isinstance(obj, NotifyOneSignal)
+
+    # The user and segment prefixes are stored as part of the target
+    assert obj.targets["include_external_user_ids"] == ["@user"]
+    assert obj.targets["included_segments"] == ["#segment"]
+
+    # Reloading the url() must not double the @ / # prefixes, and the
+    # generated url() must be stable (idempotent) across reloads.
+    url = obj.url()
+    reloaded = Apprise.instantiate(url)
+    assert isinstance(reloaded, NotifyOneSignal)
+
+    assert reloaded.targets["include_external_user_ids"] == ["@user"]
+    assert reloaded.targets["included_segments"] == ["#segment"]
+    assert reloaded.url() == url
+
+
 @mock.patch("requests.post")
 def test_plugin_onesignal_notifications(mock_post):
     """OneSignal() Notifications Support."""
