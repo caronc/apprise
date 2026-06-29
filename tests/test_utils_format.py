@@ -461,6 +461,18 @@ def test_smart_split_markdown_guard_split_at_start_is_reset() -> None:
     assert "".join(chunks) == text
 
 
+def test_markdown_adjust_image_bang_opener_path() -> None:
+    """Cover the '!' opener path in markdown_adjust."""
+    # Bang found, but no '[' after it, so the fallback path is taken.
+    text = "AAAAAA![b](c)"
+    assert markdown_adjust(text, window_start=0, split_at=7) == 6
+
+    # Stray '!' not followed by '[' -- bang found but condition is False;
+    # no link construct detected, split point returned unchanged.
+    text2 = "hello!world"
+    assert markdown_adjust(text2, window_start=0, split_at=6) == 6
+
+
 def test_smart_split_uses_punctuation_branch_on_rare_whitespace() -> None:
     """
     When punctuation is followed by rare whitespace (vertical tab / form feed)
