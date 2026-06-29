@@ -52,6 +52,7 @@ dependencies = [
 # Identifies all of the supported plugins
 keywords = [
     "46elks",
+    "800.com",
     "Africas Talking",
     "Alerts",
     "Apprise API",

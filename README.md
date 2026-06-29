@@ -176,6 +176,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
 | [46elks](https://appriseit.com/services/46elks/) | 46elks://  | (TCP) 443   | 46elks://user:password@FromPhoneNo<br/>46elks://user:password@FromPhoneNo/ToPhoneNo<br/>46elks://user:password@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
+| [800.com](https://appriseit.com/services/eight00com/) | eight00com://  | (TCP) 443   | eight00com://Token@FromPhoneNo<br/>eight00com://Token@FromPhoneNo/ToPhoneNo<br/>eight00com://Token@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Africas Talking](https://appriseit.com/services/africas_talking/) | atalk://  | (TCP) 443   | atalk://AppUser@ApiKey/ToPhoneNo<br/>atalk://AppUser@ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Automated Packet Reporting System (ARPS)](https://appriseit.com/services/aprs/)  | aprs:// | (TCP) 10152 | aprs://user:pass@callsign<br/>aprs://user:pass@callsign1/callsign2/callsignN
 | [AWS SNS](https://appriseit.com/services/sns/)  | sns://   | (TCP) 443   | sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo<br/>sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo1/+PhoneNo2/+PhoneNoN<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic1/Topic2/TopicN
