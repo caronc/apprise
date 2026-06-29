@@ -583,28 +583,16 @@ class NotifyOneSignal(NotifyBase):
                         NotifyOneSignal.quote(x)
                         for x in self.targets[OneSignalCategory.EMAIL]
                     ],
+                    # User and segment entries already retain their leading
+                    # @ / # prefix from when they were parsed, so emit them
+                    # as-is; re-adding the prefix here would compound it on
+                    # every url() reload (e.g. @user -> @@user -> @@@user).
                     [
-                        NotifyOneSignal.quote(
-                            "{}{}".format(
-                                NotifyOneSignal.template_tokens["target_user"][
-                                    "prefix"
-                                ],
-                                x,
-                            ),
-                            safe="",
-                        )
+                        NotifyOneSignal.quote(x, safe="")
                         for x in self.targets[OneSignalCategory.USER]
                     ],
                     [
-                        NotifyOneSignal.quote(
-                            "{}{}".format(
-                                NotifyOneSignal.template_tokens[
-                                    "target_segment"
-                                ]["prefix"],
-                                x,
-                            ),
-                            safe="",
-                        )
+                        NotifyOneSignal.quote(x, safe="")
                         for x in self.targets[OneSignalCategory.SEGMENT]
                     ],
                 )
