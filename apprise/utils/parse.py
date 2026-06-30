@@ -97,7 +97,7 @@ IS_PHONE_NO = re.compile(r"^\+?(?P<phone>[0-9\s)(+-]+)\s*$")
 
 # Regular expression used to destinguish between multiple phone numbers
 PHONE_NO_DETECTION_RE = re.compile(
-    r"\s*([+(\s]*[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])", re.I
+    r"((?:[+(][+(\s]*)?[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])", re.I
 )
 
 IS_DOMAIN_SERVICE_TARGET = re.compile(
@@ -109,13 +109,13 @@ IS_DOMAIN_SERVICE_TARGET = re.compile(
 DOMAIN_SERVICE_TARGET_DETECTION_RE = re.compile(
     r"\s*((?:[a-z0-9_-]+\.)?[a-z0-9_-]+"
     r"(?::(?:[a-z0-9_-]+(?:,+[a-z0-9_-]+)+?))?)"
-    r"(?=$|(?:\s|,+\s|\s,+)+(?:[a-z0-9_-]+\.)?[a-z0-9_-]+)",
+    r"(?=$|[\s,]+(?:[a-z0-9_-]+\.)?[a-z0-9_-]+)",
     re.I,
 )
 
 # Support for prefix: (string followed by colon) infront of phone no
 PHONE_NO_WPREFIX_DETECTION_RE = re.compile(
-    r"\s*((?:[a-z]+:)?[+(\s]*[0-9][0-9()\s-]+[0-9])"
+    r"((?:[a-z]+:)?(?:[+(][+(\s]*)?[0-9][0-9()\s-]+[0-9])"
     r"(?=$|(?:[a-z]+:)?[\s,+(]+[0-9])",
     re.I,
 )
@@ -140,10 +140,20 @@ URL_DETECTION_RE = re.compile(
     r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{1,32}?:\/\/)", re.I
 )
 
+# No leading separator; first-char anchors make separator positions O(1)-fail
+# so findall skips them without any backtracking blowup.
 EMAIL_DETECTION_RE = re.compile(
-    r"[\s,]*([^@]+@.*?)(?=$|[\s,]+"
-    r"(?:[^:<]+?[:<\s]+?)?"
-    r"[^@\s,]+@[^\s,]+)",
+    r"("
+    # Angle-bracketed: bounded display name then <local@domain>
+    r"(?=[^\s,;])"
+    r'(?:"(?:[^"\\]|\\.){0,256}"|[^<>"@,;\r\n]){0,256}?'
+    r"<[^@>\r\n]{1,64}@"
+    r"(?:[a-z0-9][a-z0-9_-]{0,62}\.){1,10}[a-z]{2,63}>"
+    r"|"
+    # Bare email: non-space/non-separator first char, then local@domain
+    r"[^\s@,;\r\n][^@,;\r\n]{0,255}"
+    r"@(?:[a-z0-9][a-z0-9_-]{0,62}\.){1,10}[a-z]{2,63}"
+    r")",
     re.IGNORECASE,
 )
 
@@ -1012,7 +1022,7 @@ def parse_emails(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            result_ = EMAIL_DETECTION_RE.findall(arg)
+            result_ = EMAIL_DETECTION_RE.findall(arg) if "@" in arg else []
             if result_:
                 result += result_
 
@@ -1128,7 +1138,9 @@ def parse_urls(*args, store_unparseable=True, **kwargs):
     result = []
     for arg in args:
         if isinstance(arg, str) and arg:
-            result_ = URL_DETECTION_RE.findall(arg)
+            result_ = (
+                URL_DETECTION_RE.findall(arg.rstrip()) if "://" in arg else []
+            )
             if result_:
                 result += result_
 

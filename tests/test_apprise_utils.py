@@ -33,6 +33,7 @@ import logging
 import os
 import re
 import sys
+import time
 from unittest import mock
 from urllib.parse import unquote
 
@@ -2010,6 +2011,11 @@ def test_parse_domain_service_targets():
     assert isinstance(results, list)
     assert len(results) == 0
 
+    # Verify many separators complete in reasonable time.
+    t0 = time.monotonic()
+    utils.parse.parse_domain_service_targets("ha.smtp" + " , " * 30)
+    assert time.monotonic() - t0 < 5.0
+
 
 def test_parse_phone_no():
     """utils: parse_phone_no() testing"""
@@ -2095,6 +2101,12 @@ def test_parse_phone_no():
     assert len(results) == 2
     assert "911" in results
     assert "+ 1 ( 123 ) 123-1234" in results
+
+    # Verify trailing-whitespace runs complete in reasonable time.
+    t0 = time.monotonic()
+    results = utils.parse.parse_phone_no("+12345678901" + " " * 1000)
+    assert time.monotonic() - t0 < 5.0
+    assert results == ["+12345678901"]
 
 
 def test_parse_emails():
@@ -2213,6 +2225,25 @@ def test_parse_emails():
     results = utils.parse.parse_emails([None, object, 42])
     assert isinstance(results, list)
     assert len(results) == 0
+
+    # Verify trailing-whitespace runs complete in reasonable time.
+    t0 = time.monotonic()
+    results = utils.parse.parse_emails("victim@example.com" + " " * 400)
+    assert time.monotonic() - t0 < 5.0
+    assert results == ["victim@example.com"]
+
+    # Quoted display names containing commas are kept as a single token.
+    results = utils.parse.parse_emails(
+        '"John, Jason & Mike" <team@example.com>'
+    )
+    assert results == ['"John, Jason & Mike" <team@example.com>']
+
+    results = utils.parse.parse_emails(
+        '"Smith, Jane" <jane@example.com>, Bob Jones <bob@example.com>'
+    )
+    assert len(results) == 2
+    assert '"Smith, Jane" <jane@example.com>' in results
+    assert "Bob Jones <bob@example.com>" in results
 
 
 def test_parse_urls():
@@ -2345,6 +2376,12 @@ def test_parse_urls():
     results = utils.parse.parse_urls([None, object, 42])
     assert isinstance(results, list)
     assert len(results) == 0
+
+    # Verify trailing-whitespace runs complete in reasonable time.
+    t0 = time.monotonic()
+    results = utils.parse.parse_urls("https://example.com" + " " * 50000)
+    assert time.monotonic() - t0 < 5.0
+    assert results == ["https://example.com"]
 
 
 def test_dict_full_update():
