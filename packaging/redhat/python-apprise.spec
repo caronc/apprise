@@ -85,7 +85,8 @@ notification services. It supports sending alerts to platforms such as: \
 `SendPulse`, `ServerChan`, `Session Open Group Server`, `Seven`, `SFR`, \
 `Signal`, `SIGNL4`, `SimplePush`, \
 `Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, `SparkPost`, \
-`Splunk`, `Spike`, `Spug Push`, `Super Toasty`, `Streamlabs`, `Stride`, \
+`Splunk`, `Spike`, `Spug Push`, `Stackfield`, `Super Toasty`, \
+`Streamlabs`, `Stride`, \
 `Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, \
 `Twilio`, `Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, `Voipms`, \
 `Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `WhatsApp`, \
