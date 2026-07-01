@@ -151,6 +151,7 @@ The table below identifies the services this tool supports and some example serv
 | [Spike.sh](https://appriseit.com/services/spike/) | spike://  | (TCP) 443   | spike://Token
 | [Splunk](https://appriseit.com/services/splunk/) | splunk:// or victorops:/ | (TCP) 443 | splunk://route_key@apikey<br />splunk://route_key@apikey/entity_id
 | [Spug Push](https://appriseit.com/services/spugpush/) | spugpush://  | (TCP) 443   | spugpush://Token
+| [Stackfield](https://appriseit.com/services/stackfield/) | stackfield://  | (TCP) 443   | stackfield://WebhookToken
 | [Streamlabs](https://appriseit.com/services/streamlabs/) | strmlabs:// | (TCP) 443 | strmlabs://AccessToken/<br/>strmlabs://AccessToken/?name=name&identifier=identifier&amount=0&currency=USD
 | [Synology Chat](https://appriseit.com/services/synology_chat/) | synology:// or synologys:// |  (TCP) 80 or 443 | synology://hostname/token<br />synology://hostname:port/token
 | [Syslog](https://appriseit.com/services/syslog/) | syslog://  | n/a | syslog://<br />syslog://Facility
