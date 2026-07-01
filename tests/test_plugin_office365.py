@@ -1593,3 +1593,36 @@ def test_plugin_office365_personal_large_attachment(
         mock_post.call_args_list[3][0][0] == "https://graph.microsoft.com/v1.0"
         "/me/messages/draft-id-no/send"
     )
+
+
+def test_plugin_office365_cc_bcc_invalid_branch():
+    """NotifyOffice365() CC/BCC/Reply-To invalid entries dropped."""
+
+    # Build a NotifyOffice365 in personal mode with:
+    #   cc       = one valid address + one that parse_emails passes through
+    #              but is_email rejects (hits the FALSE branch in the CC loop).
+    #              A list must be used -- parse_emails filters invalid tokens
+    #              out of comma-separated strings before is_email is called.
+    #   bcc      = same, for the FALSE branch in the BCC loop
+    #   reply_to = same, for the FALSE branch in the Reply-To loop
+    obj = NotifyOffice365(
+        client_id="aa-bb-cc",
+        secret="seed-refresh-token",
+        source="user@live.com",
+        targets=["target@example.com"],
+        cc=["good@example.com", "notanemail"],
+        bcc=["bcc@example.com", "alsonotanemail"],
+        reply_to=["reply@example.com", "badreply"],
+    )
+
+    # Valid CC entry was added; invalid one was silently dropped
+    assert "good@example.com" in obj.cc
+    assert len(obj.cc) == 1
+
+    # Valid BCC entry was added; invalid one was silently dropped
+    assert "bcc@example.com" in obj.bcc
+    assert len(obj.bcc) == 1
+
+    # Valid Reply-To entry was added; invalid one was silently dropped
+    assert "reply@example.com" in obj.reply_to
+    assert len(obj.reply_to) == 1

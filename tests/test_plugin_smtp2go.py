@@ -344,3 +344,30 @@ def test_plugin_smtp2go_attachments(mock_post):
         is True
     )
     assert mock_post.call_count == 1
+
+
+def test_plugin_smtp2go_cc_bcc_invalid_branch():
+    """NotifySMTP2Go() CC/BCC validation: invalid entries are dropped."""
+
+    # Build a NotifySMTP2Go with:
+    #   cc  = one valid address + one that parse_emails passes through but
+    #         is_email rejects (hits the FALSE branch in the CC loop).
+    #         A list must be used -- parse_emails filters invalid tokens out
+    #         of comma-separated strings before is_email is ever called.
+    #   bcc = same, for the FALSE branch in the BCC loop
+    obj = NotifySMTP2Go(
+        apikey="abc123",
+        targets=["user@example.com"],
+        cc=["good@example.com", "notanemail"],
+        bcc=["bcc@example.com", "alsonotanemail"],
+        user="user",
+        host="example.com",
+    )
+
+    # Valid CC entry was added; invalid one was silently dropped
+    assert "good@example.com" in obj.cc
+    assert len(obj.cc) == 1
+
+    # Valid BCC entry was added; invalid one was silently dropped
+    assert "bcc@example.com" in obj.bcc
+    assert len(obj.bcc) == 1

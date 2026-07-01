@@ -557,3 +557,33 @@ def test_plugin_mailgun_header_check(mock_post):
     assert "to" in payload
     assert payload["from"] == "luke@rebels.com"
     assert payload["to"] == "luke@rebels.com"
+
+
+def test_plugin_mailgun_cc_bcc_invalid_branch():
+    """NotifyMailgun() CC/BCC validation: invalid entries are dropped."""
+
+    # API key and a valid 'from' address (required by __init__)
+    apikey = "abc123"
+
+    # Build a NotifyMailgun with:
+    #   cc  = one valid address + one that parse_emails passes but is_email
+    #         rejects (hits the FALSE branch at line 327).
+    #         A list must be used -- parse_emails filters invalid tokens out
+    #         of comma-separated strings before is_email is ever called.
+    #   bcc = same, for the FALSE branch at line 343
+    obj = NotifyMailgun(
+        apikey=apikey,
+        targets=["user@example.com"],
+        cc=["good@example.com", "notanemail"],
+        bcc=["bcc@example.com", "alsonotanemail"],
+        user="user",
+        host="example.com",
+    )
+
+    # Valid CC entry was added; invalid one was silently dropped
+    assert "good@example.com" in obj.cc
+    assert len(obj.cc) == 1
+
+    # Valid BCC entry was added; invalid one was silently dropped
+    assert "bcc@example.com" in obj.bcc
+    assert len(obj.bcc) == 1
