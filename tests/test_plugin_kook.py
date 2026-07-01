@@ -26,9 +26,9 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+from json import dumps
 import logging
 import os
-from json import dumps
 from unittest import mock
 from urllib.parse import urlparse
 
@@ -36,10 +36,8 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment
 from apprise.plugins.kook import (
-    KOOK_MODES,
-    KOOK_MSG_TYPES,
     KookMode,
     KookMsgType,
     NotifyKook,
@@ -328,9 +326,7 @@ def test_plugin_kook_bot_mode():
     assert obj.dm_users == []
 
     # msg_type = text
-    obj = NotifyKook(
-        token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="text"
-    )
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="text")
     assert obj.msg_type == KookMsgType.TEXT
     url = obj.url()
     assert "msg_type=text" in url
@@ -386,9 +382,7 @@ def test_plugin_kook_mode_invalid():
 def test_plugin_kook_msg_type_invalid():
     """Invalid msg_type raises TypeError."""
     with pytest.raises(TypeError):
-        NotifyKook(
-            token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="card"
-        )
+        NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="card")
 
 
 def test_plugin_kook_url_parsing():
@@ -522,9 +516,7 @@ def test_plugin_kook_bot_send(mock_post):
 
     # Multiple channels
     mock_post.return_value = _ok()
-    obj = NotifyKook(
-        token=BOT_TOKEN, targets=[CHANNEL_ID, CHANNEL_ID2]
-    )
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID, CHANNEL_ID2])
     mock_post.reset_mock()
     assert obj.notify(body="hello") is True
     assert mock_post.call_count == 2
@@ -540,9 +532,7 @@ def test_plugin_kook_bot_send(mock_post):
 
     # Mixed channel + DM
     mock_post.return_value = _ok()
-    obj = NotifyKook(
-        token=BOT_TOKEN, targets=[CHANNEL_ID, f"@{USER_ID}"]
-    )
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID, f"@{USER_ID}"])
     mock_post.reset_mock()
     assert obj.notify(body="hello") is True
     assert mock_post.call_count == 2
@@ -571,21 +561,18 @@ def test_plugin_kook_bot_send(mock_post):
 
     # Partial failure: first channel fails, second would succeed,
     # but has_error is still True so overall False
-    obj = NotifyKook(
-        token=BOT_TOKEN, targets=[CHANNEL_ID, CHANNEL_ID2]
-    )
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID, CHANNEL_ID2])
     mock_post.side_effect = [_err(), _ok()]
     assert obj.notify(body="hello") is False
     mock_post.side_effect = None
 
     # msg_type=text uses Kook type integer 1 in the payload
     mock_post.return_value = _ok()
-    obj = NotifyKook(
-        token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="text"
-    )
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="text")
     mock_post.reset_mock()
     assert obj.notify(body="hello") is True
     import json
+
     payload = json.loads(mock_post.call_args[1]["data"])
     assert payload["type"] == 1
 
@@ -610,17 +597,18 @@ def test_plugin_kook_attachments_success(mock_post):
     def _ok(cdn_url="https://img.kookapp.cn/assets/test.png"):
         r = mock.Mock()
         r.status_code = requests.codes.ok
-        r.content = dumps({
-            "code": 0, "data": {"url": cdn_url},
-        }).encode()
+        r.content = dumps(
+            {
+                "code": 0,
+                "data": {"url": cdn_url},
+            }
+        ).encode()
         return r
 
     # call order: (1) text message, (2) CDN upload, (3) attach-msg POST
     mock_post.side_effect = [_ok(), _ok(), _ok()]
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello", attach=attach) is True
@@ -635,9 +623,7 @@ def test_plugin_kook_attachments_inaccessible(mock_post):
         content=dumps({"code": 0}).encode(),
     )
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
 
@@ -655,9 +641,7 @@ def test_plugin_kook_attachments_oserror(mock_post):
         content=dumps({"code": 0}).encode(),
     )
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
 
@@ -679,9 +663,7 @@ def test_plugin_kook_attachments_upload_http_error(mock_post):
     # Text message OK, then upload fails
     mock_post.side_effect = [ok_resp, upload_err]
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello", attach=attach) is False
@@ -700,9 +682,7 @@ def test_plugin_kook_attachments_upload_no_url(mock_post):
 
     mock_post.side_effect = [ok_resp, no_url_resp]
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello", attach=attach) is False
@@ -720,9 +700,7 @@ def test_plugin_kook_attachments_upload_request_exception(mock_post):
         requests.RequestException("upload error"),
     ]
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello", attach=attach) is False
@@ -735,9 +713,12 @@ def test_plugin_kook_attachments_post_http_error(mock_post):
     def _ok(cdn_url="https://img.kookapp.cn/assets/test.png"):
         r = mock.Mock()
         r.status_code = requests.codes.ok
-        r.content = dumps({
-            "code": 0, "data": {"url": cdn_url},
-        }).encode()
+        r.content = dumps(
+            {
+                "code": 0,
+                "data": {"url": cdn_url},
+            }
+        ).encode()
         return r
 
     err_resp = mock.Mock()
@@ -747,9 +728,7 @@ def test_plugin_kook_attachments_post_http_error(mock_post):
     # Text message OK, CDN upload OK, attachment-message POST fails
     mock_post.side_effect = [_ok(), _ok(), err_resp]
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello", attach=attach) is False
@@ -762,9 +741,12 @@ def test_plugin_kook_attachments_post_request_exception(mock_post):
     def _ok(cdn_url="https://img.kookapp.cn/assets/test.png"):
         r = mock.Mock()
         r.status_code = requests.codes.ok
-        r.content = dumps({
-            "code": 0, "data": {"url": cdn_url},
-        }).encode()
+        r.content = dumps(
+            {
+                "code": 0,
+                "data": {"url": cdn_url},
+            }
+        ).encode()
         return r
 
     # Text message OK, CDN upload OK, attachment-message POST raises
@@ -774,9 +756,7 @@ def test_plugin_kook_attachments_post_request_exception(mock_post):
         requests.RequestException("post error"),
     ]
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello", attach=attach) is False
@@ -790,9 +770,12 @@ def test_plugin_kook_attachments_image_and_file(mock_post):
     def _ok(cdn_url="https://img.kookapp.cn/assets/f"):
         r = mock.Mock()
         r.status_code = requests.codes.ok
-        r.content = dumps({
-            "code": 0, "data": {"url": cdn_url},
-        }).encode()
+        r.content = dumps(
+            {
+                "code": 0,
+                "data": {"url": cdn_url},
+            }
+        ).encode()
         return r
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
@@ -827,9 +810,7 @@ def test_plugin_kook_webhook_no_attachment_support(mock_post):
     r.content = dumps({"code": 0}).encode()
     mock_post.return_value = r
 
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     obj = NotifyKook(token=WEBHOOK_KEY, mode="webhook")
     assert obj.attachment_support is False
@@ -864,9 +845,7 @@ def test_plugin_kook_invalid_json_responses(mock_post):
     # with bad JSON. The except fires, cdn_url is None, send returns False.
     mock_post.return_value = r  # same bad JSON response for all calls
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
-    attach = AppriseAttachment(
-        os.path.join(TEST_VAR_DIR, "apprise-test.png")
-    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     # Text succeeds (code defaults to 0); CDN upload has no URL -> False
     assert obj.notify(body="hello", attach=attach) is False
 
