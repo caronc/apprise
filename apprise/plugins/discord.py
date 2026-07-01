@@ -383,6 +383,14 @@ class NotifyDiscord(NotifyBase):
         tokens["app_id"] = self.app_id
         tokens["app_desc"] = self.app_desc
         tokens["app_color"] = self.color(notify_type)
+        # app_color_hex is an explicit alias for app_color, provided so
+        # templates can name the hex variant unambiguously alongside
+        # app_color_int
+        tokens["app_color_hex"] = self.color(notify_type)
+        # Discord embed payloads require color as a decimal integer;
+        # app_color_int provides that while app_color stays hex for
+        # consistency with all other template-capable plugins
+        tokens["app_color_int"] = self.color(notify_type, int)
         tokens["app_image_url"] = image_url
         tokens["app_url"] = self.app_url
 

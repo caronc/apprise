@@ -387,6 +387,9 @@ class NotifyWorkflows(NotifyBase):
         tokens["app_id"] = self.app_id
         tokens["app_desc"] = self.app_desc
         tokens["app_color"] = self.color(notify_type)
+        # app_color_hex is an explicit alias for app_color so templates
+        # can reference the hex variant by a self-documenting name
+        tokens["app_color_hex"] = self.color(notify_type)
         tokens["app_image_url"] = image_url
         tokens["app_url"] = self.app_url
 
