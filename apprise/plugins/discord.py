@@ -46,16 +46,19 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 from itertools import chain
-from json import dumps
+from json import dumps, loads
+from json.decoder import JSONDecodeError
 import re
 from typing import Any
 
 import requests
 
+from ..apprise_attachment import AppriseAttachment
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
 
 # Used to detect user/role IDs and @here/@everyone tokens.
@@ -110,6 +113,10 @@ class NotifyDiscord(NotifyBase):
     # embeds message. This value allows the discord message to safely
     # break into multiple messages to handle these cases.
     discord_max_fields = 10
+
+    # There is no reason we should exceed 35KB when reading in a JSON
+    # file. If it is more than this, then it is not accepted
+    max_discord_template_size = 35000
 
     # Define object templates
     templates = (
@@ -205,8 +212,21 @@ class NotifyDiscord(NotifyBase):
                 "name": _("Ping Users/Roles"),
                 "type": "list:string",
             },
+            "template": {
+                "name": _("Template Path"),
+                "type": "string",
+                "private": True,
+            },
         },
     )
+
+    # Define our token control
+    template_kwargs = {
+        "tokens": {
+            "name": _("Template Tokens"),
+            "prefix": ":",
+        },
+    }
 
     def __init__(
         self,
@@ -223,6 +243,8 @@ class NotifyDiscord(NotifyBase):
         thread: str | None = None,
         flags: int | None = None,
         ping: list[str] | None = None,
+        template: str | None = None,
+        tokens: dict | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize Discord Object."""
@@ -301,7 +323,144 @@ class NotifyDiscord(NotifyBase):
         # Default to 1.0
         self.ratelimit_remaining = 1.0
 
+        # Our template object is just an AppriseAttachment object
+        self.template = AppriseAttachment(asset=self.asset)
+        if template:
+            # Add our definition to our template
+            self.template.add(template)
+            if not len(self.template):
+                # add() failed (unsupported schema, unparseable URL, etc.)
+                msg = "The Discord template specified could not be loaded."
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # Enforce maximum file size
+            self.template[0].max_file_size = self.max_discord_template_size
+
+        # Template functionality
+        self.tokens: dict = {}
+        if isinstance(tokens, dict):
+            self.tokens.update(tokens)
+
+        elif tokens:
+            msg = (
+                "The specified Discord Template Tokens "
+                f"({tokens}) are not identified as a dictionary."
+            )
+            self.logger.warning(msg)
+            raise TypeError(msg)
+
+        # else: NoneType - this is okay
+
         return
+
+    def gen_payload(
+        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+    ):
+        """Return a validated Discord webhook payload from template,
+        or False on failure."""
+
+        # Acquire the first template attachment
+        template = self.template[0]
+        if not template:
+            # We could not access the attachment
+            self.logger.error(
+                "Could not access Discord template"
+                f" {template.url(privacy=True)}."
+            )
+            return False
+
+        # Acquire our image URL for potential token substitution
+        image_url = self.image_url(notify_type)
+
+        # Take a copy of our token dictionary
+        tokens = self.tokens.copy()
+
+        # Apply our standard template variable defaults
+        tokens["app_body"] = body
+        tokens["app_title"] = title
+        tokens["app_type"] = notify_type.value
+        tokens["app_id"] = self.app_id
+        tokens["app_desc"] = self.app_desc
+        tokens["app_color"] = self.color(notify_type)
+        tokens["app_image_url"] = image_url
+        tokens["app_url"] = self.app_url
+
+        # Templates are always JSON; enforce JSON escaping
+        tokens["app_mode"] = TemplateType.JSON
+
+        # Stringify substitutions before JSON escaping; preserve app_mode
+        safe_tokens = {
+            k: (
+                v
+                if k == "app_mode" or isinstance(v, str)
+                else ("" if v is None else str(v))
+            )
+            for k, v in tokens.items()
+        }
+
+        try:
+            with open(template.path) as fp:
+                content = apply_template(fp.read(), **safe_tokens)
+
+        except OSError:
+            self.logger.error(
+                "Discord template"
+                f" {template.url(privacy=True)} could not be read."
+            )
+            return False
+
+        # Parse and validate as JSON
+        try:
+            content = loads(content)
+
+        except (JSONDecodeError, ValueError) as e:
+            self.logger.error(
+                "Discord template"
+                f" {template.url(privacy=True)} contains invalid JSON."
+            )
+            self.logger.debug(f"JSONDecodeError: {e}")
+            return False
+
+        # Template must parse to a JSON object, not an array or scalar
+        if not isinstance(content, dict):
+            self.logger.error(
+                "Discord template"
+                f" {template.url(privacy=True)} must be a JSON object"
+                " (got {}).".format(type(content).__name__)
+            )
+            return False
+
+        # A Discord webhook payload must have a non-empty 'content' string
+        # or a non-empty 'embeds' list containing embed dicts
+        has_content = (
+            isinstance(content.get("content"), str) and content["content"]
+        )
+        has_embeds = (
+            isinstance(content.get("embeds"), list) and content["embeds"]
+        )
+        if not (has_content or has_embeds):
+            self.logger.error(
+                "Discord template"
+                f" {template.url(privacy=True)} must contain"
+                " a non-empty 'content' string or a non-empty 'embeds'"
+                " list."
+            )
+            return False
+
+        # If embeds is present, each entry must be a JSON object (dict)
+        if has_embeds and not all(
+            isinstance(e, dict) for e in content["embeds"]
+        ):
+            self.logger.error(
+                "Discord template"
+                f" {template.url(privacy=True)} contains"
+                " an embed entry that is not a JSON object."
+            )
+            return False
+
+        # Return the validated payload content dict
+        return content
 
     def send(
         self,
@@ -339,21 +498,45 @@ class NotifyDiscord(NotifyBase):
         # Associate our thread_id with our message
         params = {"thread_id": self.thread_id} if self.thread_id else None
 
-        # Ping handling rules:
-        # - If ping= is set, it is an additive if in MARKDOWN mode otherwise
-        #   it is explicit for TEXT/HTML formats.
-        # - Otherwise, ping detection only happens in MARKDOWN mode
-        if self.notify_format == NotifyFormat.MARKDOWN:
-            if self.ping:
-                payload.update(self.ping_payload(body, " ".join(self.ping)))
-            else:
-                payload.update(self.ping_payload(body))
+        # Template mode bypasses ping detection and embed construction;
+        # the template defines the complete payload content.
+        if not self.template:
+            # Ping handling rules:
+            # - If ping= is set, it is an additive if in MARKDOWN mode
+            #   otherwise it is explicit for TEXT/HTML formats.
+            # - Otherwise, ping detection only happens in MARKDOWN mode
+            if self.notify_format == NotifyFormat.MARKDOWN:
+                if self.ping:
+                    payload.update(
+                        self.ping_payload(body, " ".join(self.ping))
+                    )
+                else:
+                    payload.update(self.ping_payload(body))
 
-        # TEXT/HTML: no body parsing, ping= is exclusive
-        elif self.ping:
-            payload.update(self.ping_payload(" ".join(self.ping)))
+            # TEXT/HTML: no body parsing, ping= is exclusive
+            elif self.ping:
+                payload.update(self.ping_payload(" ".join(self.ping)))
 
-        if body:
+        if self.template:
+            # Generate our payload from the user-supplied template file
+            template_payload = self.gen_payload(
+                body=body,
+                title=title,
+                notify_type=notify_type,
+                **kwargs,
+            )
+            if template_payload is False:
+                # gen_payload() already logged the error; bail early
+                return False
+
+            # Merge template content over our base payload
+            payload.update(template_payload)
+
+            if not self._send(payload, params=params):
+                # We failed to post our message
+                return False
+
+        elif body:
             # Track extra embed fields (if used)
             fields: list[dict[str, str]] = []
 
@@ -407,12 +590,13 @@ class NotifyDiscord(NotifyBase):
                             : self.discord_max_fields
                         ]
                         fields = fields[self.discord_max_fields :]
+
             else:
                 # TEXT or HTML:
                 # - No ping detection unless ping= was provided.
                 # - If ping= was provided, ping_payload() already generated
-                #   payload["content"] starting with "👉 ...", and we append
-                #   it.
+                #   payload["content"] starting with "👉 ...", and we
+                #   append it.
                 payload["content"] = (
                     body if not title else f"{title}\r\n{body}"
                 ) + payload.get("content", "")
@@ -675,6 +859,15 @@ class NotifyDiscord(NotifyBase):
             # Let Apprise urlencode handle list formatting
             params["ping"] = ",".join(self.ping)
 
+        if self.template:
+            # Include our template reference
+            params["template"] = NotifyDiscord.quote(
+                self.template[0].url(), safe=""
+            )
+
+        # Store any template token entries if specified
+        params.update({f":{k}": v for k, v in self.tokens.items()})
+
         # Ensure our botname is set
         botname = f"{self.user}@" if self.user else ""
 
@@ -783,6 +976,15 @@ class NotifyDiscord(NotifyBase):
         # Extract ping targets, comma/space separated
         if "ping" in results["qsd"]:
             results["ping"] = NotifyDiscord.unquote(results["qsd"]["ping"])
+
+        # Template Handling
+        if "template" in results["qsd"] and results["qsd"]["template"]:
+            results["template"] = NotifyDiscord.unquote(
+                results["qsd"]["template"]
+            )
+
+        # Store our template tokens
+        results["tokens"] = results["qsd:"]
 
         return results
 
