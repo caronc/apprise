@@ -252,6 +252,22 @@ apprise_url_tests = (
             "include_image": False,
         },
     ),
+    # Test batch attachment mode enabled (default)
+    (
+        "discord://{}/{}?batch=yes".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyDiscord,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    # Test batch attachment mode disabled (legacy one-per-message)
+    (
+        "discord://{}/{}?batch=no".format("i" * 24, "t" * 64),
+        {
+            "instance": NotifyDiscord,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     (
         "discord://{}/{}/".format("a" * 24, "b" * 64),
         {
@@ -1695,3 +1711,117 @@ def test_plugin_discord_template_with_attachments(mock_post, tmpdir):
 
     # Both the template message and the attachment should have been posted
     assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_discord_attach_multi_batch(mock_post):
+    """NotifyDiscord() multi-attachment batching."""
+
+    webhook_id = "C" * 24
+    webhook_token = "D" * 64
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    response.headers = {}
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        f"discord://{webhook_id}/{webhook_token}/?format=markdown"
+    )
+    assert isinstance(obj, NotifyDiscord)
+    assert obj.batch is True
+
+    # Three test attachments
+    gif = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    png = os.path.join(TEST_VAR_DIR, "apprise-test.png")
+    jpg = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
+    attach = AppriseAttachment([gif, png, jpg])
+
+    # Default batch mode: all 3 files go in one POST (plus 1 for the message)
+    assert obj.send(body="test", attach=attach) is True
+    assert mock_post.call_count == 2
+    mock_post.reset_mock()
+
+    # Reduce max per batch to 1: each file gets its own POST (4 calls total)
+    obj.discord_max_attachments = 1
+    assert obj.send(body="test", attach=attach) is True
+    assert mock_post.call_count == 4
+    mock_post.reset_mock()
+    obj.discord_max_attachments = 10
+
+    # Size-based split: force a tiny per-batch byte budget
+    obj.discord_max_attach_bytes = 1
+    assert obj.send(body="test", attach=attach) is True
+    assert mock_post.call_count == 4
+    mock_post.reset_mock()
+    obj.discord_max_attach_bytes = 25 * 1024 * 1024
+
+    # batch=False: reverts to legacy one-per-message regardless of max
+    obj_no_batch = Apprise.instantiate(
+        f"discord://{webhook_id}/{webhook_token}/?batch=no"
+    )
+    assert isinstance(obj_no_batch, NotifyDiscord)
+    assert obj_no_batch.batch is False
+    assert obj_no_batch.send(body="test", attach=attach) is True
+    assert mock_post.call_count == 4
+    mock_post.reset_mock()
+
+    # URL round-trip preserves batch flag
+    url_on = NotifyDiscord(
+        webhook_id=webhook_id,
+        webhook_token=webhook_token,
+        batch=True,
+    ).url()
+    assert "batch=yes" in url_on
+    url_off = NotifyDiscord(
+        webhook_id=webhook_id,
+        webhook_token=webhook_token,
+        batch=False,
+    ).url()
+    assert "batch=no" in url_off
+    parsed = NotifyDiscord.parse_url(url_off)
+    assert parsed["batch"] is False
+
+    # Guard 1: inaccessible file causes failure; body POST still goes out
+    with mock.patch("os.path.isfile", return_value=False):
+        assert obj.send(body="test", attach=attach) is False
+    assert mock_post.call_count == 1
+    mock_post.reset_mock()
+
+    # Guard 2: OSError on open causes failure; body POST still goes out
+    with mock.patch("builtins.open", side_effect=OSError()):
+        assert obj.send(body="test", attach=attach) is False
+    assert mock_post.call_count == 1
+    mock_post.reset_mock()
+
+    # HTTP error on the attachment batch POST; body POST succeeds
+    bad_response = mock.Mock()
+    bad_response.status_code = requests.codes.internal_server_error
+    bad_response.content = b""
+    bad_response.headers = {}
+    mock_post.side_effect = [response, bad_response]
+    assert obj.send(body="test", attach=attach) is False
+    mock_post.side_effect = None
+    mock_post.reset_mock()
+
+    # RequestException on the attachment batch POST
+    mock_post.side_effect = [response, requests.RequestException()]
+    assert obj.send(body="test", attach=attach) is False
+    mock_post.side_effect = None
+    mock_post.reset_mock()
+
+    # OSError raised by requests.post() during attachment send
+    mock_post.side_effect = [response, OSError()]
+    assert obj.send(body="test", attach=attach) is False
+    mock_post.side_effect = None
+    mock_post.reset_mock()
+
+    # Partial batch failure: first batch (files 0+1) succeeds, second fails.
+    # Set max=2 so 3 files split into [gif, png] and [jpg].
+    obj.discord_max_attachments = 2
+    mock_post.side_effect = [response, response, bad_response]
+    assert obj.send(body="test", attach=attach) is False
+    assert mock_post.call_count == 3
+    mock_post.side_effect = None
+    obj.discord_max_attachments = 10

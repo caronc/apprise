@@ -118,6 +118,13 @@ class NotifyDiscord(NotifyBase):
     # file. If it is more than this, then it is not accepted
     max_discord_template_size = 35000
 
+    # Maximum number of attachments Discord accepts in a single message
+    discord_max_attachments = 10
+
+    # Maximum total attachment bytes per message.
+    # Discord's documented default is 25 MiB for most users.
+    discord_max_attach_bytes = 25 * 1024 * 1024
+
     # Define object templates
     templates = (
         "{schema}://{webhook_id}/{webhook_token}",
@@ -217,6 +224,14 @@ class NotifyDiscord(NotifyBase):
                 "type": "string",
                 "private": True,
             },
+            # When True (default) multiple attachments are grouped into
+            # batches and sent in a single message where possible.
+            # Set to no/false to revert to one attachment per message.
+            "batch": {
+                "name": _("Batch Attachments"),
+                "type": "bool",
+                "default": True,
+            },
         },
     )
 
@@ -245,6 +260,7 @@ class NotifyDiscord(NotifyBase):
         ping: list[str] | None = None,
         template: str | None = None,
         tokens: dict | None = None,
+        batch: bool | None = None,
         **kwargs: Any,
     ) -> None:
         """Initialize Discord Object."""
@@ -317,6 +333,18 @@ class NotifyDiscord(NotifyBase):
 
         # Ping targets (tokens from URL, already split by parse_list)
         self.ping: list[str] = parse_list(ping)
+
+        # When True, group multiple attachments into a single message
+        # where count and size limits allow; False reverts to one per
+        # message (old behaviour)
+        self.batch = (
+            self.template_args["batch"]["default"]
+            if batch is None
+            else parse_bool(
+                batch,
+                default=self.template_args["batch"]["default"],
+            )
+        )
 
         self.ratelimit_reset = datetime.now(timezone.utc).replace(tzinfo=None)
 
@@ -644,14 +672,48 @@ class NotifyDiscord(NotifyBase):
             payload.pop("allow_mentions", None)
 
             #
-            # Send our attachments
+            # Build attachment batches in strict serial order.
+            # Each batch respects the per-message attachment count and
+            # total byte limits.  When batch=False every attachment is
+            # its own message (legacy one-per-message behaviour).
             #
+            max_per = self.discord_max_attachments if self.batch else 1
+
+            batches: list[list[AttachBase]] = []
+            current: list[AttachBase] = []
+            current_size = 0
+
             for attachment in attach:
-                self.logger.info(
-                    f"Posting Discord Attachment {attachment.name}"
+                # Size is only needed for byte-limit batching; skip the
+                # stat()/download() it triggers when batching is off
+                size = (
+                    (len(attachment) if attachment else 0) if self.batch else 0
                 )
-                if not self._send(payload, params=params, attach=attachment):
-                    # We failed to post our message
+
+                if current and (
+                    len(current) >= max_per
+                    or (
+                        self.batch
+                        and current_size + size > self.discord_max_attach_bytes
+                    )
+                ):
+                    # Current batch is full; flush and start a new one
+                    batches.append(current)
+                    current = []
+                    current_size = 0
+
+                current.append(attachment)
+                current_size += size
+
+            # current always holds at least the last attachment here
+            batches.append(current)
+
+            #
+            # Send each attachment batch
+            #
+            for batch in batches:
+                if not self._send(payload, params=params, attach=batch):
+                    # We failed to post our attachment batch
                     return False
 
         # Otherwise return
@@ -660,7 +722,7 @@ class NotifyDiscord(NotifyBase):
     def _send(
         self,
         payload: dict[str, Any],
-        attach: AttachBase | None = None,
+        attach: list[AttachBase] | None = None,
         params: dict[str, str] | None = None,
         rate_limit: int = 1,
         **kwargs: Any,
@@ -704,40 +766,70 @@ class NotifyDiscord(NotifyBase):
         # Always call throttle before any remote server i/o is made;
         self.throttle(wait=wait)
 
-        # Perform some simple error checking
-        if isinstance(attach, AttachBase):
-            if not attach:
-                # We could not access the attachment
-                self.logger.error(
-                    f"Could not access attachment {attach.url(privacy=True)}."
-                )
-                return False
+        # File handles opened for this call; all closed in `finally`
+        handles: list[Any] = []
+        # Multipart file list built from the attach batch
+        files: list[Any] | None = None
+        attach_ok = True
 
-            self.logger.debug(
-                f"Posting Discord attachment {attach.url(privacy=True)}"
-            )
-
-        # Our attachment path (if specified)
-        files = None
         try:
-            # Open our attachment path if required:
+            # Open our attachment path(s) if required:
             if attach:
-                files = {
-                    "file": (
-                        attach.name,
-                        # file handle is safely closed in `finally`; inline
-                        # open is intentional; attach.open() dispatches to
-                        # BytesIO for memory attachments
-                        attach.open(),
+                files = []
+                for idx, attachment in enumerate(attach):
+                    # Verify accessibility before opening
+                    if not attachment:
+                        self.logger.warning(
+                            "Could not access Discord attachment %s.",
+                            attachment.url(privacy=True),
+                        )
+                        attach_ok = False
+                        break
+
+                    self.logger.debug(
+                        "Posting Discord attachment %s",
+                        attachment.url(privacy=True),
                     )
-                }
+
+                    # Catch OSError per attachment open
+                    try:
+                        handle = attachment.open()
+                    except OSError as e:
+                        self.logger.warning(
+                            "An I/O error occurred while reading %s.",
+                            attachment.name or "attachment",
+                        )
+                        self.logger.debug("I/O Exception: %s", str(e))
+                        attach_ok = False
+                        break
+
+                    # Register handle before appending to files
+                    handles.append(handle)
+                    files.append(
+                        (
+                            f"files[{idx}]",
+                            (
+                                attachment.name,
+                                handle,
+                                attachment.mimetype,
+                            ),
+                        )
+                    )
+
+                if not attach_ok:
+                    return False
+
             else:
                 headers["Content-Type"] = "application/json; charset=utf-8"
 
             r = requests.post(
                 notify_url,
                 params=params,
-                data=payload if files else dumps(payload),
+                data=(
+                    {"payload_json": dumps(payload)}
+                    if files
+                    else dumps(payload)
+                ),
                 headers=headers,
                 files=files,
                 verify=self.verify_certificate,
@@ -790,13 +882,15 @@ class NotifyDiscord(NotifyBase):
                     )
 
                 self.logger.warning(
-                    "Failed to send {}to Discord notification: "
-                    "{}{}error={}.".format(
-                        attach.name if attach else "",
-                        status_str,
-                        ", " if status_str else "",
-                        r.status_code,
-                    )
+                    "Failed to send Discord %s: %s%serror=%s.",
+                    (
+                        "{} attachment(s)".format(len(attach))
+                        if attach
+                        else "notification"
+                    ),
+                    status_str,
+                    ", " if status_str else "",
+                    r.status_code,
                 )
 
                 self.logger.debug(
@@ -807,35 +901,31 @@ class NotifyDiscord(NotifyBase):
                 return False
 
             else:
-                self.logger.info(
-                    "Sent Discord {}.".format(
-                        "attachment" if attach else "notification"
+                if attach:
+                    self.logger.info(
+                        "Sent Discord %d attachment(s).", len(attach)
                     )
-                )
+                else:
+                    self.logger.info("Sent Discord notification.")
 
         except requests.RequestException as e:
             self.logger.warning(
-                "A Connection error occurred posting {}to Discord.".format(
-                    attach.name if attach else ""
-                )
+                "A Connection error occurred posting to Discord."
             )
             self.logger.debug(f"Socket Exception: {e!s}")
             return False
 
         except OSError as e:
-            self.logger.warning(
-                "An I/O error occurred while reading {}.".format(
-                    attach.name if attach else "attachment"
-                )
-            )
+            # Catches I/O errors from requests.post() and any unexpected
+            # file-system errors not caught by the per-attachment check above
+            self.logger.warning("An I/O error occurred posting to Discord.")
             self.logger.debug(f"I/O Exception: {e!s}")
             return False
 
         finally:
-            # Close our file (if it's open) stored in the second element
-            # of our files tuple (index 1)
-            if files:
-                files["file"][1].close()
+            # Close all handles regardless of success or failure
+            for handle in handles:
+                handle.close()
 
         return True
 
@@ -849,6 +939,7 @@ class NotifyDiscord(NotifyBase):
             "footer_logo": "yes" if self.footer_logo else "no",
             "image": "yes" if self.include_image else "no",
             "fields": "yes" if self.fields else "no",
+            "batch": "yes" if self.batch else "no",
         }
 
         if self.avatar_url:
@@ -993,6 +1084,14 @@ class NotifyDiscord(NotifyBase):
 
         # Store our template tokens
         results["tokens"] = results["qsd:"]
+
+        # Batch attachments flag
+        results["batch"] = parse_bool(
+            results["qsd"].get(
+                "batch",
+                NotifyDiscord.template_args["batch"]["default"],
+            )
+        )
 
         return results
 
