@@ -90,7 +90,6 @@ msgstr "Nombre de Usuario de la Aplicacion"
 #: apprise/plugins/kumulos.py:87 apprise/plugins/mailgun.py:146
 #: apprise/plugins/messagebird.py:78 apprise/plugins/octopush.py:136
 #: apprise/plugins/one_signal.py:113 apprise/plugins/opsgenie.py:228
-#: apprise/plugins/pagerduty.py:131 apprise/plugins/popcorn_notify.py:71
 #: apprise/plugins/postmark.py:117 apprise/plugins/prowl.py:121
 #: apprise/plugins/resend.py:107 apprise/plugins/resend.py:145
 #: apprise/plugins/sendgrid.py:116 apprise/plugins/seven.py:75
@@ -127,7 +126,6 @@ msgstr "Telefono de Destino"
 #: apprise/plugins/notifiarr.py:103 apprise/plugins/notificationapi.py:192
 #: apprise/plugins/ntfy.py:241 apprise/plugins/octopush.py:153
 #: apprise/plugins/office365.py:287 apprise/plugins/one_signal.py:141
-#: apprise/plugins/plivo.py:114 apprise/plugins/popcorn_notify.py:89
 #: apprise/plugins/postmark.py:133 apprise/plugins/pushbullet.py:105
 #: apprise/plugins/pushed.py:107 apprise/plugins/pushover.py:252
 #: apprise/plugins/pushsafer.py:376 apprise/plugins/pushy.py:97
@@ -167,7 +165,6 @@ msgstr "Modo SMS"
 #: apprise/plugins/mailgun.py:194 apprise/plugins/mastodon.py:247
 #: apprise/plugins/octopush.py:173 apprise/plugins/one_signal.py:185
 #: apprise/plugins/opsgenie.py:307 apprise/plugins/plivo.py:137
-#: apprise/plugins/popcorn_notify.py:104 apprise/plugins/signal_api.py:160
 #: apprise/plugins/smseagle.py:211 apprise/plugins/smsmanager.py:152
 #: apprise/plugins/smtp2go.py:151 apprise/plugins/sparkpost.py:209
 #: apprise/plugins/twitter.py:218
@@ -443,7 +440,6 @@ msgstr "Correo de Origen"
 #: apprise/plugins/brevo.py:169 apprise/plugins/email/base.py:159
 #: apprise/plugins/mailgun.py:152 apprise/plugins/notificationapi.py:177
 #: apprise/plugins/office365.py:282 apprise/plugins/one_signal.py:124
-#: apprise/plugins/popcorn_notify.py:84 apprise/plugins/postmark.py:128
 #: apprise/plugins/pushbullet.py:100 apprise/plugins/pushsafer.py:371
 #: apprise/plugins/resend.py:119 apprise/plugins/sendgrid.py:128
 #: apprise/plugins/sendpulse.py:134 apprise/plugins/slack.py:256
@@ -482,7 +478,6 @@ msgstr "Copia de Carbono Oculta"
 #: apprise/plugins/exotel.py:183 apprise/plugins/httpsms.py:90
 #: apprise/plugins/kavenegar.py:128 apprise/plugins/messagebird.py:92
 #: apprise/plugins/msg91.py:116 apprise/plugins/octopush.py:146
-#: apprise/plugins/plivo.py:107 apprise/plugins/popcorn_notify.py:77
 #: apprise/plugins/ringcentral.py:213 apprise/plugins/seven.py:81
 #: apprise/plugins/signal_api.py:124 apprise/plugins/sinch.py:127
 #: apprise/plugins/smpp.py:121 apprise/plugins/smseagle.py:151
