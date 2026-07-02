@@ -59,9 +59,6 @@ USER_ID = "5555555555"
 WEBHOOK_KEY = "abc123webhookkey"
 
 
-# -----------------------------------------------------------------------
-# URL tester table
-# -----------------------------------------------------------------------
 TEST_URLS = (
     ##
     # Invalid cases
@@ -230,11 +227,6 @@ def apprise_url_tester():
 def test_plugin_kook_urls(apprise_url_tester):
     """Run all URL test table entries through AppriseURLTester."""
     apprise_url_tester.run_all()
-
-
-# -----------------------------------------------------------------------
-# __init__ and url() round-trip tests
-# -----------------------------------------------------------------------
 
 
 def test_plugin_kook_bot_mode():
@@ -411,11 +403,6 @@ def test_plugin_kook_native_url():
     assert NotifyKook.parse_native_url("https://example.com/") is None
 
 
-# -----------------------------------------------------------------------
-# send() tests - webhook mode
-# -----------------------------------------------------------------------
-
-
 @mock.patch("requests.post")
 def test_plugin_kook_webhook_send(mock_post):
     """Webhook mode send: success, HTTP error, API error, RequestException."""
@@ -463,11 +450,6 @@ def test_plugin_kook_webhook_send(mock_post):
     mock_post.side_effect = requests.RequestException("conn error")
     assert obj.notify(body="hello") is False
     mock_post.side_effect = None
-
-
-# -----------------------------------------------------------------------
-# send() tests - bot mode
-# -----------------------------------------------------------------------
 
 
 @mock.patch("requests.post")
@@ -574,11 +556,6 @@ def test_plugin_kook_bot_send(mock_post):
     assert obj.notify(body="hello") is True
     payload = json.loads(mock_post.call_args[1]["data"])
     assert payload["type"] == 9
-
-
-# -----------------------------------------------------------------------
-# Attachment tests
-# -----------------------------------------------------------------------
 
 
 @mock.patch("requests.post")
@@ -754,6 +731,36 @@ def test_plugin_kook_attachments_post_request_exception(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_kook_attachments_post_api_error(mock_post):
+    """API error in attach-message response sets has_error -> False."""
+
+    def _ok(cdn_url="https://img.kookapp.cn/assets/test.png"):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(
+            {
+                "code": 0,
+                "data": {"url": cdn_url},
+            }
+        ).encode()
+        return r
+
+    def _api_err():
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps({"code": 40001, "message": "forbidden"}).encode()
+        return r
+
+    # Text message OK, CDN upload OK, attach-msg POST returns API error
+    mock_post.side_effect = [_ok(), _ok(), _api_err()]
+
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
+
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
+    assert obj.notify(body="hello", attach=attach) is False
+
+
+@mock.patch("requests.post")
 def test_plugin_kook_attachments_image_and_file(mock_post):
     """Image attachment uses type=2; non-image uses type=4."""
     import json as _json
@@ -771,7 +778,7 @@ def test_plugin_kook_attachments_image_and_file(mock_post):
 
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
 
-    # --- Image attachment (PNG) ---
+    # Image attachment (PNG)
     # call order: text-msg, upload, attach-msg
     mock_post.side_effect = [_ok(), _ok(), _ok()]
     attach_img = AppriseAttachment(
@@ -781,7 +788,7 @@ def test_plugin_kook_attachments_image_and_file(mock_post):
     attach_msg_payload = _json.loads(mock_post.call_args_list[2][1]["data"])
     assert attach_msg_payload["type"] == 2
 
-    # --- Non-image attachment (mp4 file) ---
+    # Non-image attachment (mp4 file)
     mock_post.side_effect = [_ok(), _ok(), _ok()]
     attach_file = AppriseAttachment(
         os.path.join(TEST_VAR_DIR, "apprise-test.mp4")
@@ -811,16 +818,11 @@ def test_plugin_kook_webhook_no_attachment_support(mock_post):
     assert mock_post.call_count == 1
 
 
-# -----------------------------------------------------------------------
-# Apprise integration test
-# -----------------------------------------------------------------------
-
-
 @mock.patch("requests.post")
 def test_plugin_kook_invalid_json_responses(mock_post):
     """Verify invalid JSON in API responses is handled gracefully."""
 
-    # --- _send_bot: API response with unparseable JSON (lines 493-494) ---
+    # _send_bot: API response with unparseable JSON
     # The message POST returns 200 but with invalid JSON body; the except
     # clause must handle it and fall back to code=0 (success).
     r = mock.Mock()
@@ -831,7 +833,7 @@ def test_plugin_kook_invalid_json_responses(mock_post):
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.notify(body="hello") is True
 
-    # --- _upload: CDN upload response with unparseable JSON (lines 660-661)
+    # _upload: CDN upload response with unparseable JSON
     # Text message POST returns ok with bad JSON; CDN upload also returns ok
     # with bad JSON. The except fires, cdn_url is None, send returns False.
     mock_post.return_value = r  # same bad JSON response for all calls
@@ -839,6 +841,28 @@ def test_plugin_kook_invalid_json_responses(mock_post):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     # Text succeeds (code defaults to 0); CDN upload has no URL -> False
     assert obj.notify(body="hello", attach=attach) is False
+
+    # _send_bot: attach-message POST response with unparseable JSON
+    # text OK, CDN upload OK (valid cdn_url), attach-msg POST returns bad JSON;
+    # the except fires, content defaults to {}, code=0 -> treated as success.
+    def _ok_cdn():
+        resp = mock.Mock()
+        resp.status_code = requests.codes.ok
+        resp.content = dumps(
+            {"code": 0, "data": {"url": "https://cdn/f"}}
+        ).encode()
+        return resp
+
+    bad_json_resp = mock.Mock()
+    bad_json_resp.status_code = requests.codes.ok
+    bad_json_resp.content = b"not-json"
+
+    mock_post.side_effect = [_ok_cdn(), _ok_cdn(), bad_json_resp]
+    mock_post.return_value = None
+    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
+    assert obj.notify(body="hello", attach=attach) is True
+    mock_post.side_effect = None
 
 
 @mock.patch("requests.post")

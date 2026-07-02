@@ -546,6 +546,24 @@ class NotifyKook(NotifyBase):
                                 "Response Details:\r\n%s", r.content
                             )
                             has_error = True
+                            continue
+
+                        # Check API-level error code in the attachment response
+                        try:
+                            content = loads(r.content) or {}
+
+                        except (AttributeError, TypeError, ValueError):
+                            content = {}
+
+                        if content.get("code", 0) != 0:
+                            self.logger.warning(
+                                "Failed to post Kook attachment to"
+                                " %s: code=%s, message=%s.",
+                                target_id,
+                                content.get("code"),
+                                content.get("message", "Unknown"),
+                            )
+                            has_error = True
 
                     except requests.RequestException as e:
                         self.logger.warning(
