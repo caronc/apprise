@@ -687,9 +687,7 @@ class NotifyDiscord(NotifyBase):
                 # Size is only needed for byte-limit batching; skip the
                 # stat()/download() it triggers when batching is off
                 size = (
-                    (len(attachment) if attachment else 0)
-                    if self.batch
-                    else 0
+                    (len(attachment) if attachment else 0) if self.batch else 0
                 )
 
                 if current and (
