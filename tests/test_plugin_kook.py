@@ -36,10 +36,9 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, AppriseAttachment
+from apprise import Apprise, AppriseAttachment, NotifyFormat
 from apprise.plugins.kook import (
     KookMode,
-    KookMsgType,
     NotifyKook,
 )
 
@@ -48,8 +47,8 @@ logging.disable(logging.CRITICAL)
 # Attachment directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
-# A realistic-looking fake bot token
-BOT_TOKEN = "1/MTQ3OTE5MTA3MzQ1ODE4OTQ0/YJVvSXB0IK+ABC123XYZ"
+# A realistic-looking fake bot token (no slashes so URL interpolation works)
+BOT_TOKEN = "MTQ3OTE5MTA3MzQ1ODE4OTQ0ABC123XYZ"
 
 # Fake channel / user IDs (numeric snowflakes)
 CHANNEL_ID = "1234567890"
@@ -77,13 +76,6 @@ TEST_URLS = (
     # Invalid mode
     (
         f"kook://{BOT_TOKEN}/?mode=invalid",
-        {
-            "instance": TypeError,
-        },
-    ),
-    # Invalid msg_type
-    (
-        f"kook://{BOT_TOKEN}/{CHANNEL_ID}/?msg_type=invalid",
         {
             "instance": TypeError,
         },
@@ -185,9 +177,9 @@ TEST_URLS = (
             "attach_response": False,
         },
     ),
-    # Bot mode with msg_type=text
+    # Bot mode with ?format=text (plain text delivery)
     (
-        f"kook://{BOT_TOKEN}/{CHANNEL_ID}/?msg_type=text",
+        f"kook://{BOT_TOKEN}/{CHANNEL_ID}/?format=text",
         {
             "instance": NotifyKook,
             "attach_response": False,
@@ -251,7 +243,7 @@ def test_plugin_kook_bot_mode():
     # Single channel
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     assert obj.mode == KookMode.BOT
-    assert obj.msg_type == KookMsgType.KMARKDOWN
+    assert obj.notify_format == NotifyFormat.MARKDOWN
     assert obj.channels == [CHANNEL_ID]
     assert obj.dm_users == []
     assert obj.attachment_support is True
@@ -325,17 +317,19 @@ def test_plugin_kook_bot_mode():
     assert obj.channels == []
     assert obj.dm_users == []
 
-    # msg_type = text
-    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="text")
-    assert obj.msg_type == KookMsgType.TEXT
-    url = obj.url()
-    assert "msg_type=text" in url
+    # ?format=text sets notify_format to TEXT; url() round-trips it
+    url = f"kook://{BOT_TOKEN}/{CHANNEL_ID}/?format=text"
     parsed = NotifyKook.parse_url(url)
-    obj2 = NotifyKook(**parsed)
-    assert obj2.msg_type == KookMsgType.TEXT
+    obj = NotifyKook(**parsed)
+    assert obj.notify_format == NotifyFormat.TEXT
+    url2 = obj.url()
+    parsed2 = NotifyKook.parse_url(url2)
+    obj2 = NotifyKook(**parsed2)
+    assert obj2.notify_format == NotifyFormat.TEXT
 
-    # Default msg_type not emitted in URL
+    # Default notify_format stays MARKDOWN (kmarkdown mode)
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
+    assert obj.notify_format == NotifyFormat.MARKDOWN
     url = obj.url()
     assert "msg_type" not in url
 
@@ -377,12 +371,6 @@ def test_plugin_kook_mode_invalid():
     """Invalid mode raises TypeError."""
     with pytest.raises(TypeError):
         NotifyKook(token=BOT_TOKEN, mode="invalid_mode")
-
-
-def test_plugin_kook_msg_type_invalid():
-    """Invalid msg_type raises TypeError."""
-    with pytest.raises(TypeError):
-        NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="card")
 
 
 def test_plugin_kook_url_parsing():
@@ -566,17 +554,20 @@ def test_plugin_kook_bot_send(mock_post):
     assert obj.notify(body="hello") is False
     mock_post.side_effect = None
 
-    # msg_type=text uses Kook type integer 1 in the payload
-    mock_post.return_value = _ok()
-    obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID], msg_type="text")
-    mock_post.reset_mock()
-    assert obj.notify(body="hello") is True
+    # ?format=text -> notify_format=TEXT -> Kook API type 1 in the payload
     import json
 
+    mock_post.return_value = _ok()
+    parsed = NotifyKook.parse_url(
+        f"kook://{BOT_TOKEN}/{CHANNEL_ID}/?format=text"
+    )
+    obj = NotifyKook(**parsed)
+    mock_post.reset_mock()
+    assert obj.notify(body="hello") is True
     payload = json.loads(mock_post.call_args[1]["data"])
     assert payload["type"] == 1
 
-    # Default (kmarkdown) uses Kook type integer 9
+    # Default (markdown) -> notify_format=MARKDOWN -> Kook API type 9
     mock_post.return_value = _ok()
     obj = NotifyKook(token=BOT_TOKEN, targets=[CHANNEL_ID])
     mock_post.reset_mock()

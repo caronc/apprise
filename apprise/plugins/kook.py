@@ -85,31 +85,11 @@ KOOK_HTTP_ERROR_MAP = {
 KOOK_API_URL = "https://www.kookapp.cn/api/v3"
 
 
-class KookMsgType:
-    """Tracks the Kook message-body format sent to the API."""
-
-    # KMarkdown rich text (type=9); best for markdown-formatted content
-    KMARKDOWN = "kmarkdown"
-
-    # Plain text (type=1); no formatting applied by Kook
-    TEXT = "text"
-
-
-# Valid msg_type values for template_args
-KOOK_MSG_TYPES = (
-    KookMsgType.KMARKDOWN,
-    KookMsgType.TEXT,
-)
-
-# Maps our friendly msg_type strings to Kook API integer type values
-KOOK_MSGTYPE_TO_INT = {
-    KookMsgType.TEXT: 1,
-    KookMsgType.KMARKDOWN: 9,
-}
-
-# Kook API image and file type integers used when posting attachments
+# Kook API message and asset type integers
+KOOK_API_TYPE_TEXT = 1
 KOOK_API_TYPE_IMAGE = 2
 KOOK_API_TYPE_FILE = 4
+KOOK_API_TYPE_KMARKDOWN = 9
 
 
 class KookMode:
@@ -218,13 +198,6 @@ class NotifyKook(NotifyBase):
                 "values": KOOK_MODES,
                 "default": KookMode.BOT,
             },
-            # Message body type: kmarkdown (default) or text
-            "msg_type": {
-                "name": _("Message Type"),
-                "type": "choice:string",
-                "values": KOOK_MSG_TYPES,
-                "default": KookMsgType.KMARKDOWN,
-            },
         },
     )
 
@@ -233,7 +206,6 @@ class NotifyKook(NotifyBase):
         token,
         targets=None,
         mode=None,
-        msg_type=None,
         **kwargs,
     ):
         """Initialize Kook Object."""
@@ -265,21 +237,6 @@ class NotifyKook(NotifyBase):
         # Disable attachment support in webhook mode (CDN upload requires auth)
         if self.mode == KookMode.WEBHOOK:
             self.attachment_support = False
-
-        # Resolve message type
-        if msg_type and isinstance(msg_type, str):
-            self.msg_type = next(
-                (t for t in KOOK_MSG_TYPES if t.startswith(msg_type.lower())),
-                None,
-            )
-            if self.msg_type not in KOOK_MSG_TYPES:
-                msg = f"The Kook msg_type specified ({msg_type}) is not valid."
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
-        else:
-            # Default: KMarkdown for maximum formatting support
-            self.msg_type = KookMsgType.KMARKDOWN
 
         # Process targets: channel IDs (bare) and DM users (@user_id)
         self.channels = []
@@ -341,8 +298,12 @@ class NotifyKook(NotifyBase):
         # Prepare the API endpoint
         url = self.webhook_notify_url.format(key=self.token)
 
-        # Determine the Kook API type integer for the message
-        kook_type = KOOK_MSGTYPE_TO_INT[self.msg_type]
+        # Use KMarkdown when the body is markdown; plain text otherwise
+        kook_type = (
+            KOOK_API_TYPE_KMARKDOWN
+            if self.notify_format == NotifyFormat.MARKDOWN
+            else KOOK_API_TYPE_TEXT
+        )
 
         # Prepare the payload
         payload = {
@@ -424,8 +385,12 @@ class NotifyKook(NotifyBase):
             )
             return False
 
-        # Determine the Kook API type integer for the message
-        kook_type = KOOK_MSGTYPE_TO_INT[self.msg_type]
+        # Use KMarkdown when the body is markdown; plain text otherwise
+        kook_type = (
+            KOOK_API_TYPE_KMARKDOWN
+            if self.notify_format == NotifyFormat.MARKDOWN
+            else KOOK_API_TYPE_TEXT
+        )
 
         # Prepare the authorization header
         headers = {
@@ -703,10 +668,6 @@ class NotifyKook(NotifyBase):
         if self.mode != KookMode.BOT:
             params["mode"] = self.mode
 
-        # Include msg_type only when non-default (text)
-        if self.msg_type != KookMsgType.KMARKDOWN:
-            params["msg_type"] = self.msg_type
-
         # Append standard Apprise URL parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -760,12 +721,6 @@ class NotifyKook(NotifyBase):
         if "mode" in results["qsd"] and results["qsd"]["mode"]:
             results["mode"] = NotifyKook.unquote(results["qsd"]["mode"])
 
-        # Extract message type override
-        if "msg_type" in results["qsd"] and results["qsd"]["msg_type"]:
-            results["msg_type"] = NotifyKook.unquote(
-                results["qsd"]["msg_type"]
-            )
-
         return results
 
     @staticmethod
@@ -776,7 +731,7 @@ class NotifyKook(NotifyBase):
         """
         result = re.match(
             r"^https?://www\.kookapp\.cn/api/v3/incoming/"
-            r"(?P<key>[A-Za-z0-9_=+/-]+)/?"
+            r"(?P<key>[A-Za-z0-9_=+-]+)/?"
             r"(?P<params>\?.+)?$",
             url,
             re.I,
