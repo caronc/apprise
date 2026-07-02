@@ -117,7 +117,6 @@ The table below identifies the services this tool supports and some example serv
 | [PagerDuty](https://appriseit.com/services/pagerduty/) | pagerduty:// | (TCP) 443 | pagerduty://IntegrationKey@ApiKey<br/>pagerduty://IntegrationKey@ApiKey/Source/Component
 | [PagerTree](https://appriseit.com/services/pagertree/) | pagertree:// | (TCP) 443 | pagertree://integration_id
 | [ParsePlatform](https://appriseit.com/services/parseplatform/) | parsep:// or parseps:// | (TCP) 80 or 443 | parsep://AppID:MasterKey@Hostname<br/>parseps://AppID:MasterKey@Hostname
-| [PopcornNotify](https://appriseit.com/services/popcornnotify/) | popcorn://  | (TCP) 443   | popcorn://ApiKey/ToPhoneNo<br/>popcorn://ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/<br/>popcorn://ApiKey/ToEmail<br/>popcorn://ApiKey/ToEmail1/ToEmail2/ToEmailN/<br/>popcorn://ApiKey/ToPhoneNo1/ToEmail1/ToPhoneNoN/ToEmailN
 | [Postmark](https://appriseit.com/services/postmark/) | postmark://  | (TCP) 443   | postmark://APIToken:FromEmail/<br />postmark://APIToken:FromEmail/ToEmail<br />postmark://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [Prowl](https://appriseit.com/services/prowl/) | prowl://   | (TCP) 443    | prowl://apikey<br />prowl://apikey/providerkey
 | [PushBullet](https://appriseit.com/services/pushbullet/) | pbul://    | (TCP) 443    | pbul://accesstoken<br />pbul://accesstoken/#channel<br/>pbul://accesstoken/A_DEVICE_ID<br />pbul://accesstoken/email@address.com<br />pbul://accesstoken/#channel/#channel2/email@address.net/DEVICE

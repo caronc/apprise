@@ -76,7 +76,7 @@ notification services. It supports sending alerts to platforms such as: \
 `NextcloudTalk`, `Notica`, `NotificationAPI`, `Notifiarr`, `Notifico`, \
 `Notifyre`, \
 `ntfy`, `Octopush`, `Office365`, `OneSignal`, `Opsgenie`, `PagerDuty`, \
-`PagerTree`, `ParsePlatform`, `Plivo`, `PopcornNotify`, `Prowl`, \
+`PagerTree`, `ParsePlatform`, `Plivo`, `Prowl`, \
 `Postmark`, `Pushalot`, `PushBullet`, \
 `Pushjet`, `PushMe`, `Pushover`, `Pushplus`, `PushSafer`, `PushWard`, \
 `Pushy`, `PushDeer`, \
