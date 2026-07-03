@@ -1302,8 +1302,14 @@ class NotifyEmail(NotifyBase):
             cid_refs = set()
             if inline and attach:
                 if notify_format == NotifyFormat.HTML:
-                    # Collect filenames already referenced via cid:
-                    cid_refs = set(re.findall(r'cid:([^\s"\'>\)]+)', body))
+                    # Collect filenames already referenced via cid:;
+                    # decode %20 to spaces so filenames with spaces match
+                    # the raw attachment name regardless of how the caller
+                    # encoded the URI.
+                    cid_refs = {
+                        ref.replace("%20", " ")
+                        for ref in re.findall(r'cid:([^\s"\'>\)]+)', body)
+                    }
 
                     # Build a set of all attachment filenames so we can
                     # warn about cid: refs that have no matching file
@@ -1322,14 +1328,23 @@ class NotifyEmail(NotifyBase):
                             _ref,
                         )
 
+                    # Drop refs that have no matching attachment so they
+                    # do not influence the multipart/related decision.
+                    # Note: only IMAGE attachments are ever auto-appended
+                    # (see img_appends loop below), but explicit cid: refs
+                    # in the caller-supplied body are honored for any
+                    # attachment type -- a cid: URI can only resolve
+                    # within the same MIME package, so if the caller wrote
+                    # it they clearly attached the file on purpose.
+                    cid_refs &= _attach_names
+
                     # Append inline anchors for any image not yet listed
                     img_appends = []
                     for _no, _a in enumerate(attach, start=1):
                         _fname = _a.name or f"file{_no:03}.dat"
-                        if (
-                            _a.mimetype.startswith("image/")
-                            and _fname not in cid_refs
-                        ):
+                        if (_a.mimetype or "").lower().startswith(
+                            "image/"
+                        ) and _fname not in cid_refs:
                             img_appends.append(_fname)
                             cid_refs.add(_fname)
 
@@ -1349,7 +1364,7 @@ class NotifyEmail(NotifyBase):
                     txt_imgs = []
                     for _no, _a in enumerate(attach, start=1):
                         _fname = _a.name or f"file{_no:03}.dat"
-                        if _a.mimetype.startswith("image/"):
+                        if (_a.mimetype or "").lower().startswith("image/"):
                             txt_imgs.append(_fname)
 
                     if txt_imgs:

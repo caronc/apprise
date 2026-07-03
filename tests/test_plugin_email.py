@@ -4043,9 +4043,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert "Content-ID" not in msg
     assert f"[Image: {img_name}]" in msg
 
-    # inline=True, TEXT format, non-image attachment: the mimetype
-    # check fails (application/pdf is not image/*) so txt_imgs stays empty
-    # and the body is not modified
+    # inline=True, TEXT format, non-image attachment
     sent_messages.clear()
     assert (
         obj_txt.notify(
@@ -4062,6 +4060,45 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # Non-image in text inline mode: body unchanged, no [Image:] annotation
     assert "Content-Disposition: attachment" in msg
     assert "[Image:" not in msg
+
+    # inline=True, HTML, image attachment with uppercase mimetype
+    upper_attach = AttachFile(img)
+    upper_attach.detected_mimetype = "Image/GIF"
+    aa_upper = AppriseAttachment()
+    aa_upper.add(upper_attach)
+
+    sent_messages.clear()
+    assert (
+        obj.notify(
+            body="<p>no cid</p>",
+            title="test",
+            notify_type=NotifyType.INFO,
+            attach=aa_upper,
+        )
+        is True
+    )
+    assert len(sent_messages) == 1
+    msg = sent_messages[0]
+
+    # Uppercase mimetype must still be treated as an image
+    assert "multipart/related" in msg
+    assert "Content-Disposition: inline" in msg
+
+    # inline=True, TEXT format, uppercase mimetype: [Image: name] marker must
+    # also appear, proving the case-insensitive check works in the text path
+    sent_messages.clear()
+    assert (
+        obj_txt.notify(
+            body="plain body",
+            title="test",
+            notify_type=NotifyType.INFO,
+            attach=aa_upper,
+        )
+        is True
+    )
+    assert len(sent_messages) == 1
+    msg = sent_messages[0]
+    assert f"[Image: {img_name}]" in msg
 
     # inline=True, HTML, cid: ref in body with no matching attachment:
     # warning is logged so the user can debug the mismatch
@@ -4081,6 +4118,121 @@ def test_plugin_email_inline_attachments(mock_smtplib):
             str(c) for c in mock_logger.warning.call_args_list
         )
         assert "missing-file.jpg" in warning_texts
+
+    # inline=True, HTML, only unmatched cid: ref with a non-image attachment:
+    # the unmatched ref is dropped after the warning so cid_refs is empty
+    # when the wrapper type is chosen -- wrapper must be multipart/mixed
+    sent_messages.clear()
+    with mock.patch("apprise.plugins.email.base.logger"):
+        assert (
+            obj.notify(
+                body='<p>body <img src="cid:ghost.jpg"></p>',
+                title="test",
+                notify_type=NotifyType.INFO,
+                # application/pdf -- not an image, not named ghost.jpg
+                attach=aa,
+            )
+            is True
+        )
+    assert len(sent_messages) == 1
+    msg = sent_messages[0]
+
+    # No inline parts exist: wrapper must be mixed, not related
+    assert "multipart/mixed" in msg
+    assert "multipart/related" not in msg
+    assert "Content-ID" not in msg
+
+    # inline=True, HTML, explicit cid: ref whose filename MATCHES a
+    # non-image attachment (PDF): a cid: URI can only resolve within
+    # the same MIME package, so if the caller wrote it they attached
+    # the file deliberately.  The ref is honored regardless of type --
+    # wrapper becomes multipart/related and the PDF is inlined.
+    sent_messages.clear()
+    with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
+        assert (
+            obj.notify(
+                body=f'<p>body <embed src="cid:{pdf_attach.name}"></p>',
+                title="test",
+                notify_type=NotifyType.INFO,
+                # same PDF attachment as earlier tests
+                attach=aa,
+            )
+            is True
+        )
+    # The body ref matched by name, so no "no attachment matches" warning
+    for call in mock_logger.warning.call_args_list:
+        assert "apprise-test" not in str(call)
+    assert len(sent_messages) == 1
+    msg = sent_messages[0]
+
+    # Explicit cid: ref to PDF must be honored: related wrapper, inline
+    assert "multipart/related" in msg
+    assert "Content-Disposition: inline" in msg
+    assert "Content-ID" in msg
+
+    # inline=True, HTML, cid: ref encoded with %20 for a file whose actual
+    # name contains a space: the decoded ref matches the attachment so no
+    # spurious warning is fired and the image is inlined exactly once
+    spaced_attach = AttachFile(img, name="my photo.gif")
+    aa_spaced = AppriseAttachment()
+    aa_spaced.add(spaced_attach)
+
+    sent_messages.clear()
+    with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
+        assert (
+            obj.notify(
+                body='<img src="cid:my%20photo.gif">',
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_spaced,
+            )
+            is True
+        )
+
+    # No warning about an unmatched ref -- %20 decoded to space matched it
+    for call in mock_logger.warning.call_args_list:
+        assert "my" not in str(call), (
+            "Spurious warning fired for a cid: ref that should have "
+            "matched after %20 normalisation"
+        )
+    assert len(sent_messages) == 1
+    msg = sent_messages[0]
+
+    # Image is inlined exactly once (no duplicate anchor)
+    assert msg.count("cid:my%20photo.gif") == 1
+    assert "Content-Disposition: inline" in msg
+    assert "Content-ID" in msg
+
+    # inline=True, HTML, inaccessible attachment
+    bad_attach = AttachFile("/nonexistent/path/photo.jpg")
+    aa_bad = AppriseAttachment()
+    aa_bad.add(bad_attach)
+
+    sent_messages.clear()
+    assert (
+        obj.notify(
+            body="<p>body</p>",
+            title="test",
+            notify_type=NotifyType.INFO,
+            attach=aa_bad,
+        )
+        is False  # bad attachment detected by the main loop
+    )
+    # No sendmail call -- the bad attachment caused an early failure
+    assert len(sent_messages) == 0
+
+    # inline=True, TEXT format, inaccessible attachment
+    sent_messages.clear()
+    assert (
+        obj_txt.notify(
+            body="plain body",
+            title="test",
+            notify_type=NotifyType.INFO,
+            attach=aa_bad,
+        )
+        is False
+    )
+    assert len(sent_messages) == 0
 
     # URL round-trip: inline=yes survives url() -> parse_url()
     assert "inline=yes" in obj.url()
