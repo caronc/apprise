@@ -29,6 +29,7 @@ from json import loads
 
 # Disable logging for a cleaner testing output
 import logging
+import os
 from unittest import mock
 from urllib.parse import urlparse
 
@@ -36,8 +37,11 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
-from apprise import Apprise, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.plugins.serwersms import NotifySerwerSMS
+
+# Attachment test fixtures directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 logging.disable(logging.CRITICAL)
 
@@ -665,3 +669,250 @@ def test_plugin_serwersms_apprise_integration(mock_post):
         notify_type=NotifyType.INFO,
     )
     assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_phone_success(mock_post):
+    """NotifySerwerSMS() MMS to phone -- success path."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"success": true}'
+
+    obj = NotifySerwerSMS(
+        user="myuser",
+        password="mypass",
+        sender="AppName",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="MMS test", attach=attach) is True
+    assert mock_post.call_count == 1
+
+    # Confirm multipart files kwarg was set (MMS endpoint used)
+    call_kwargs = mock_post.call_args[1]
+    assert call_kwargs["files"] is not None
+
+    # Confirm form fields (not JSON body)
+    assert call_kwargs["data"]["phone"] == "+48123456789"
+    assert call_kwargs["data"]["sender"] == "AppName"
+    assert call_kwargs["data"]["text"] == "MMS test"
+
+    # Confirm MMS endpoint was used
+    call_url = mock_post.call_args[0][0]
+    assert "send_mms" in call_url
+
+    # Confirm Content-Type was not forced (requests sets multipart boundary)
+    assert "Content-Type" not in call_kwargs["headers"]
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_group_success(mock_post):
+    """NotifySerwerSMS() MMS to group -- success path."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"success": true}'
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["#500"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="Group MMS", attach=attach) is True
+    assert mock_post.call_count == 1
+
+    # Confirm group_id was sent as a form field
+    call_kwargs = mock_post.call_args[1]
+    assert call_kwargs["data"]["group_id"] == "500"
+    assert "phone" not in call_kwargs["data"]
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_guard1_inaccessible(mock_post):
+    """NotifySerwerSMS() MMS -- guard 1 inaccessible attachment."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"success": true}'
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+
+    # Simulate file being inaccessible (bool(attachment) -> False)
+    with mock.patch("os.path.isfile", return_value=False):
+        assert obj.notify(body="Test", attach=attach) is False
+
+    # No HTTP call should have been made
+    assert mock_post.call_count == 0
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_guard2_oserror(mock_post):
+    """NotifySerwerSMS() MMS -- guard 2 OSError on open."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"success": true}'
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+
+    with mock.patch("builtins.open", side_effect=OSError("IO fail")):
+        assert obj.notify(body="Test", attach=attach) is False
+
+    # No HTTP call should have been made
+    assert mock_post.call_count == 0
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_http_error(mock_post):
+    """NotifySerwerSMS() MMS -- HTTP error response."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.internal_server_error
+    mock_post.return_value.content = b""
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="Test", attach=attach) is False
+    assert mock_post.call_count == 1
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_api_failure_with_error(mock_post):
+    """NotifySerwerSMS() MMS -- API success=false with error object."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = (
+        b'{"success": false, "error": {"code": 201, "message": "MMS fail"}}'
+    )
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="Test", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_api_failure_no_error(mock_post):
+    """NotifySerwerSMS() MMS -- API success=false without error detail."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b'{"success": false}'
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="Test", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_bad_json(mock_post):
+    """NotifySerwerSMS() MMS -- unparseable JSON response."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"not-json"
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    # Bad JSON -> content = {} -> success absent -> False
+    assert obj.notify(body="Test", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_null_json(mock_post):
+    """NotifySerwerSMS() MMS -- null JSON response body."""
+
+    mock_post.return_value = mock.Mock()
+    mock_post.return_value.status_code = requests.codes.ok
+    # JSON null parses to Python None; plugin normalises to {}
+    mock_post.return_value.content = b"null"
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="Test", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_serwersms_mms_request_exception(mock_post):
+    """NotifySerwerSMS() MMS -- RequestException guard."""
+
+    mock_post.side_effect = requests.RequestException("Connection refused")
+
+    obj = NotifySerwerSMS(
+        user="u",
+        password="p",
+        sender="Sender",
+        targets=["+48123456789"],
+    )
+
+    attach = AppriseAttachment.instantiate(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+    assert obj.notify(body="Test", attach=attach) is False

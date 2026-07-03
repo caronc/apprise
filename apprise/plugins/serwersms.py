@@ -38,6 +38,9 @@
 #  - Phone targets use a leading + followed by the country code and number.
 #  - Group targets use a leading # followed by the numeric group ID.
 #
+# When an attachment is provided, the message is automatically sent as MMS
+# via the send_mms endpoint instead of the standard send_sms endpoint.
+#
 # Your Apprise URLs should be assembled as:
 #   serwersms://username:password@SenderName/+48123456789
 #   serwersms://username:password@SenderName/+48123456789/%23123
@@ -100,8 +103,12 @@ class NotifySerwerSMS(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/serwersms/"
 
-    # SerwerSMS API endpoint
+    # SerwerSMS SMS API endpoint
     notify_url = "https://api2.serwersms.pl/messages/send_sms"
+
+    # SerwerSMS MMS API endpoint (used automatically when attachments
+    # are provided)
+    notify_url_mms = "https://api2.serwersms.pl/messages/send_mms"
 
     # The maximum length of an SMS body
     body_maxlen = 160
@@ -109,6 +116,10 @@ class NotifySerwerSMS(NotifyBase):
     # A title can not be used for SMS messages; any title will be
     # prepended into the body automatically by the framework.
     title_maxlen = 0
+
+    # Attachments are supported; the plugin switches to MMS automatically
+    # when one is provided
+    attachment_support = True
 
     # Define object URL templates
     templates = (
@@ -228,8 +239,15 @@ class NotifySerwerSMS(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
-        """Perform SerwerSMS Notification."""
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        attach=None,
+        **kwargs,
+    ):
+        """Perform SerwerSMS SMS/MMS Notification."""
 
         # Abort early when there is nothing to deliver
         if not self.target_phones and not self.target_groups:
@@ -239,14 +257,17 @@ class NotifySerwerSMS(NotifyBase):
         # error tracking variable
         has_error = False
 
-        # Prepare our headers
-        headers = {
-            "User-Agent": self.app_id,
-            "Content-Type": "application/json",
-        }
+        # Auto-select MMS when attachments are provided
+        use_mms = bool(attach and self.attachment_support and len(attach))
 
-        # Base payload shared by every API call
-        base_payload = {
+        # Prepare our headers; Content-Type is omitted for MMS because
+        # requests sets it automatically with the multipart boundary
+        headers = {"User-Agent": self.app_id}
+        if not use_mms:
+            headers["Content-Type"] = "application/json"
+
+        # Base fields shared by every API call
+        base_fields = {
             "username": self.user,
             "password": self.password,
             "text": body,
@@ -263,9 +284,18 @@ class NotifySerwerSMS(NotifyBase):
         ]
 
         for label, extra in calls:
-            # Assemble the per-target payload
-            payload = dict(base_payload)
-            payload.update(extra)
+            # Assemble the per-target fields
+            fields = dict(base_fields)
+            fields.update(extra)
+
+            # Always call throttle before any remote server i/o is made
+            self.throttle()
+
+            if use_mms:
+                # Delegate to the MMS helper
+                if not self._send_mms(label, fields, attach, headers):
+                    has_error = True
+                continue
 
             # Debug logging
             self.logger.debug(
@@ -273,15 +303,12 @@ class NotifySerwerSMS(NotifyBase):
                 self.notify_url,
                 self.verify_certificate,
             )
-            self.logger.debug("SerwerSMS Payload: %s", payload)
-
-            # Always call throttle before any remote server i/o is made
-            self.throttle()
+            self.logger.debug("SerwerSMS Payload: %s", fields)
 
             try:
                 r = requests.post(
                     self.notify_url,
-                    data=dumps(payload),
+                    data=dumps(fields),
                     headers=headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
@@ -320,8 +347,7 @@ class NotifySerwerSMS(NotifyBase):
                 except (AttributeError, TypeError, ValueError):
                     content = {}
                     self.logger.debug(
-                        "Failed to parse SerwerSMS JSON response; "
-                        "body: %r",
+                        "Failed to parse SerwerSMS JSON response; body: %r",
                         (r.content or b"")[:2000],
                     )
 
@@ -363,6 +389,135 @@ class NotifySerwerSMS(NotifyBase):
                 continue
 
         return not has_error
+
+    def _send_mms(self, label, fields, attach, headers):
+        """Send MMS via the SerwerSMS MMS endpoint."""
+
+        # Build attachment file handles and multipart file list
+        handles = []
+        files = []
+        attach_ok = True
+
+        for attachment in attach:
+            # Guard 1: accessibility check
+            if not attachment:
+                attach_ok = False
+                break
+
+            # Guard 2: I/O error check
+            try:
+                handle = attachment.open()
+
+            except OSError:
+                attach_ok = False
+                break
+
+            handles.append(handle)
+            files.append(
+                ("file", (attachment.name, handle, attachment.mimetype))
+            )
+
+        try:
+            if not attach_ok:
+                self.logger.warning(
+                    "Failed to send SerwerSMS MMS notification to %s; "
+                    "could not access attachment.",
+                    label,
+                )
+                return False
+
+            # Debug logging
+            self.logger.debug(
+                "SerwerSMS MMS POST URL: %s (cert_verify=%s)",
+                self.notify_url_mms,
+                self.verify_certificate,
+            )
+            self.logger.debug("SerwerSMS MMS Fields: %s", fields)
+
+            try:
+                r = requests.post(
+                    self.notify_url_mms,
+                    data=fields,
+                    headers=headers,
+                    files=files,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
+                )
+
+                if r.status_code != requests.codes.ok:
+                    # HTTP-level failure
+                    status_str = NotifyBase.http_response_code_lookup(
+                        r.status_code
+                    )
+                    self.logger.warning(
+                        "Failed to send SerwerSMS MMS notification "
+                        "to {}: {}{}error={}.".format(
+                            label,
+                            status_str,
+                            ", " if status_str else "",
+                            r.status_code,
+                        )
+                    )
+                    self.logger.debug(
+                        "Response Details:\r\n%r",
+                        (r.content or b"")[:2000],
+                    )
+                    return False
+
+                # Parse JSON response body
+                try:
+                    content = loads(r.content)
+                    if not isinstance(content, dict):
+                        content = {}
+
+                except (AttributeError, TypeError, ValueError):
+                    content = {}
+                    self.logger.debug(
+                        "Failed to parse SerwerSMS MMS JSON response; "
+                        "body: %r",
+                        (r.content or b"")[:2000],
+                    )
+
+                if not content.get("success"):
+                    # API-level failure reported in the response body
+                    error = content.get("error", {})
+                    if error:
+                        self.logger.warning(
+                            "Failed to send SerwerSMS MMS notification "
+                            "to {}: API error {} - {}.".format(
+                                label,
+                                error.get("code", "unknown"),
+                                error.get("message", ""),
+                            )
+                        )
+
+                    else:
+                        self.logger.warning(
+                            "Failed to send SerwerSMS MMS notification "
+                            "to {}: unexpected API response.".format(label)
+                        )
+
+                    return False
+
+                self.logger.info(
+                    "Sent SerwerSMS MMS notification to %s.", label
+                )
+                return True
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    "A Connection error occurred sending SerwerSMS MMS "
+                    "notification to %s.",
+                    label,
+                )
+                self.logger.debug("Socket Exception: %s", str(e))
+                return False
+
+        finally:
+            # Always close file handles
+            for handle in handles:
+                handle.close()
 
     @property
     def url_identifier(self):
