@@ -904,3 +904,117 @@ def test_plugin_workflows_html_to_markdown_format(mock_post):
     body_blocks = payload["attachments"][0]["content"]["body"]
     body_text = next(b["text"] for b in body_blocks if b.get("id") == "body")
     assert body_text == "**hello** *world*"
+
+
+@mock.patch("requests.post")
+def test_plugin_workflows_mention_entities(mock_post):
+    """Teams mention tags populate unique ``msteams.entities`` entries."""
+
+    # Prepare a successful mocked HTTP response.
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    aobj = Apprise()
+    assert aobj.add("workflow://hostname/workflow1/signature1/?image=no")
+
+    # Keep Teams metadata minimal when the body contains no mentions.
+    assert aobj.notify(body="Hello world", title="T") is True
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    msteams = payload["attachments"][0]["content"]["msteams"]
+    assert msteams == {"width": "full"}
+    mock_post.reset_mock()
+
+    # Add one entity for a single mention.
+    assert (
+        aobj.notify(
+            body="Hello <at>foo@example.com</at>!",
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    msteams = payload["attachments"][0]["content"]["msteams"]
+    assert msteams == {
+        "width": "full",
+        "entities": [
+            {
+                "type": "mention",
+                "text": "<at>foo@example.com</at>",
+                "mentioned": {
+                    "id": "foo@example.com",
+                    "name": "foo@example.com",
+                },
+            }
+        ],
+    }
+    mock_post.reset_mock()
+
+    # Preserve source order for distinct mentions.
+    assert (
+        aobj.notify(
+            body=(
+                "Hi <at>alice@example.com</at> and <at>bob@example.com</at>!"
+            ),
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    entities = payload["attachments"][0]["content"]["msteams"]["entities"]
+    assert len(entities) == 2
+    assert entities[0]["mentioned"]["id"] == "alice@example.com"
+    assert entities[1]["mentioned"]["id"] == "bob@example.com"
+    mock_post.reset_mock()
+
+    # Deduplicate repeated mention IDs.
+    assert (
+        aobj.notify(
+            body=(
+                "<at>dup@example.com</at> and <at>dup@example.com</at> again"
+            ),
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    entities = payload["attachments"][0]["content"]["msteams"]["entities"]
+    assert len(entities) == 1
+    assert entities[0]["mentioned"]["id"] == "dup@example.com"
+    mock_post.reset_mock()
+
+    # Recover the valid inner tag from a nested opening sequence.
+    assert (
+        aobj.notify(
+            body="Hi <at><at>user@example.com</at>!",
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    entities = payload["attachments"][0]["content"]["msteams"]["entities"]
+    assert len(entities) == 1
+    assert entities[0]["mentioned"]["id"] == "user@example.com"
+    mock_post.reset_mock()
+
+    # Recover an inner mention when text invalidates the outer tag.
+    assert (
+        aobj.notify(
+            body="<at>garbage<at>inner@example.com</at>",
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    entities = payload["attachments"][0]["content"]["msteams"]["entities"]
+    assert len(entities) == 1
+    assert entities[0]["mentioned"]["id"] == "inner@example.com"
+    mock_post.reset_mock()
+
+    # Ignore empty, whitespace-only, and unclosed mention tags.
+    for bad_body in ("<at></at>", "<at>   </at>", "<at>unclosed"):
+        assert aobj.notify(body=bad_body, title="T") is True
+        payload = json.loads(mock_post.call_args_list[-1][1]["data"])
+        msteams = payload["attachments"][0]["content"]["msteams"]
+        assert msteams == {"width": "full"}, (
+            f"expected no entities for {bad_body!r}"
+        )

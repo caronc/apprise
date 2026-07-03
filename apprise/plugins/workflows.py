@@ -79,6 +79,18 @@ class APIVersion:
     POWER_AUTOMATE = "2022-03-01-preview"
 
 
+# Match Teams ``<at>...</at>`` mentions in the message body.
+# Adaptive Cards require a matching entity for each resolved mention.
+#
+# ``[^<]+`` keeps matching linear and stops before a nested opening tag.
+# This allows a valid inner mention to survive a malformed outer wrapper,
+# such as ``<at><at>user</at>`` or ``<at>text<at>user</at>``.
+#
+# Detection runs only for generated Teams Adaptive Cards. Template-based
+# Power Automate flows bypass this payload path.
+WORKFLOWS_MENTION_RE = re.compile(r"<at>([^<]+)</at>", re.I)
+
+
 class NotifyWorkflows(NotifyBase):
     """A wrapper for Microsoft Workflows (MS Teams) Notifications."""
 
@@ -345,6 +357,30 @@ class NotifyWorkflows(NotifyBase):
             # By default we use a generic working payload if there was
             # no template specified
             schema = "http://adaptivecards.io/schemas/adaptive-card.json"
+
+            # Collect the explicit entities required to resolve Teams mentions.
+            # Dict insertion order preserves the first occurrence of each ID.
+            seen = {}
+            for m in WORKFLOWS_MENTION_RE.finditer(body):
+                # Normalize the ID and skip empty or duplicate mentions.
+                key = m.group(1).strip()
+                if not key or key in seen:
+                    continue
+
+                seen[key] = {
+                    "type": "mention",
+                    "text": f"<at>{key}</at>",
+                    "mentioned": {
+                        "id": key,
+                        "name": key,
+                    },
+                }
+
+            # Build the Teams metadata and include entities only when present.
+            msteams = {"width": "full"}
+            if seen:
+                msteams["entities"] = list(seen.values())
+
             payload = {
                 "type": "message",
                 "attachments": [
@@ -359,7 +395,7 @@ class NotifyWorkflows(NotifyBase):
                             "version": self.adaptive_card_version,
                             "body": body_content,
                             # Additionally
-                            "msteams": {"width": "full"},
+                            "msteams": msteams,
                         },
                     }
                 ],
