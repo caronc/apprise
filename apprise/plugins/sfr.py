@@ -304,6 +304,10 @@ class NotifySFR(NotifyBase):
                     # TypeError = r.content is None
                     # AttributeError = r is None
                     content = {}
+                    self.logger.debug(
+                        "Failed to parse SFR JSON response; body: %r",
+                        (r.content or b"")[:2000],
+                    )
 
                 # Check if the request was successfull
                 if r.status_code not in (

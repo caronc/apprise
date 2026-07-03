@@ -673,6 +673,10 @@ class NotifyTwist(NotifyBase):
                 # ValueError = r.content is Unparsable
                 # AttributeError = r.content is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse Twist JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             # handle authentication errors where our token has just simply
             # expired. The error response content looks like this:
@@ -716,6 +720,10 @@ class NotifyTwist(NotifyBase):
                     # ValueError = r.content is Unparsable
                     # AttributeError = r.content is None
                     content = {}
+                    self.logger.debug(
+                        "Failed to parse Twist JSON response; body: %r",
+                        (r.content or b"")[:2000],
+                    )
 
             if r.status_code != requests.codes.ok:
                 # We had a problem

@@ -580,6 +580,10 @@ class NotifyBlueSky(NotifyBase):
                 # ValueError = r.content is Unparsable
                 # AttributeError = r.content is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse BlueSky JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             # Rate limit handling... our header objects at this point are:
             # 'RateLimit-Limit': '10',     # Total # of requests per hour

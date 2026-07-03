@@ -537,6 +537,10 @@ class NotifySMSEagle(NotifyBase):
                         # AttributeError = r is None
                         # KeyError = 'result' is not found in result
                         content = {}
+                        self.logger.debug(
+                            "Failed to parse SMSEagle JSON response; body: %r",
+                            (r.content or b"")[:2000],
+                        )
 
                     # The result set can be a list such as:
                     #   b'{"result":[{"message_id":4753,"status":"ok"}]}'

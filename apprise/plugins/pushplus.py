@@ -434,6 +434,10 @@ class NotifyPushplus(NotifyBase):
                     # TypeError  = r.content is None
                     # AttributeError = r is None
                     content = {}
+                    self.logger.debug(
+                        "Failed to parse PushPlus JSON response; body: %r",
+                        (r.content or b"")[:2000],
+                    )
 
                 # Check the application-level status code
                 api_code = content.get("code") if content else None

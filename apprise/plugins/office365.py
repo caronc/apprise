@@ -1245,6 +1245,10 @@ class NotifyOffice365(NotifyBase):
                 # TypeError = r.content is None
                 # AttributeError = r is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse Office365 JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
         except requests.RequestException as e:
             self.logger.warning(

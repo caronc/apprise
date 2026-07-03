@@ -355,6 +355,10 @@ class NotifyNextcloud(NotifyBase):
                 # TypeError = r.content is None
                 # AttributeError = r is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse Nextcloud JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             if r.status_code != requests.codes.ok:
                 status_str = NotifyNextcloud.http_response_code_lookup(

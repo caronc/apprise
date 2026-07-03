@@ -556,6 +556,10 @@ class NotifyOpsgenie(NotifyBase):
                 # TypeError = r.content is None
                 # AttributeError = r is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse OpsGenie JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             if r.status_code not in (
                 requests.codes.accepted,

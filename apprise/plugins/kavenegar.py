@@ -270,6 +270,11 @@ class NotifyKavenegar(NotifyBase):
 
                         # We could not parse JSON response.
                         # We will just use the status we already have.
+                        self.logger.debug(
+                            "Failed to parse Kavenegar JSON response; "
+                            "body: %r",
+                            (r.content or b"")[:2000],
+                        )
                         pass
 
                     self.logger.warning(

@@ -270,6 +270,10 @@ class NotifyPushy(NotifyBase):
                         "id": "",
                         "info": {},
                     }
+                    self.logger.debug(
+                        "Failed to parse Pushy JSON response; body: %r",
+                        (r.content or b"")[:2000],
+                    )
 
                 if r.status_code != requests.codes.ok or not content.get(
                     "success"

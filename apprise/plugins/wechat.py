@@ -364,6 +364,10 @@ class NotifyWeChat(NotifyBase):
                 content = json.loads(r.content)
             except (AttributeError, TypeError, ValueError):
                 content = {}
+                self.logger.debug(
+                    "Failed to parse WeChat JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             # Check the WeCom application-level error code
             errcode = content.get("errcode", 0) if content else -1
@@ -508,6 +512,10 @@ class NotifyWeChat(NotifyBase):
                 content = json.loads(r.content)
             except (AttributeError, TypeError, ValueError):
                 content = {}
+                self.logger.debug(
+                    "Failed to parse WeChat JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             # Check the WeCom application-level error code
             errcode = content.get("errcode", 0) if content else -1

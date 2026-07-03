@@ -664,6 +664,10 @@ class NotifyRocketChat(NotifyBase):
             # - ValueError = r.content is Unparsable
             # - TypeError = r.content is None
             # - AttributeError = r is None
+            self.logger.debug(
+                "Failed to parse Rocket.Chat JSON response; body: %r",
+                (r.content or b"")[:2000],
+            )
             self.logger.warning(
                 f"A commuication error occurred authenticating {self.user} on "
                 "Rocket.Chat."

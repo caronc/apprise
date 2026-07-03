@@ -281,6 +281,10 @@ class NotifyRevolt(NotifyBase):
                 # TypeError = r.content is None
                 # AttributeError = r is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse Revolt JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             # Handle rate limiting (if specified)
             try:

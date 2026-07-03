@@ -712,6 +712,10 @@ class NotifyTelegram(NotifyBase):
                     # TypeError = r.content is None
                     # AttributeError = r is None
                     error_msg = None
+                    self.logger.debug(
+                        "Failed to parse Telegram JSON response; body: %r",
+                        (r.content or b"")[:2000],
+                    )
 
                 if error_msg:
                     self.logger.warning(

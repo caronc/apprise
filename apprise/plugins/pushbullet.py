@@ -365,6 +365,10 @@ class NotifyPushBullet(NotifyBase):
                 # AttributeError = r is None
 
                 # Fall back to the existing unparsed value
+                self.logger.debug(
+                    "Failed to parse Pushbullet JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
                 response = r.content
 
             if r.status_code not in (

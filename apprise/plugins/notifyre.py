@@ -368,6 +368,10 @@ class NotifyNotifyre(NotifyBase):
                     content = {}
             except (AttributeError, TypeError, ValueError):
                 content = {}
+                self.logger.debug(
+                    "Failed to parse Notifyre JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             if r.status_code != requests.codes.ok:
                 # We had a failure
@@ -535,6 +539,10 @@ class NotifyNotifyre(NotifyBase):
                         content = {}
                 except (AttributeError, TypeError, ValueError):
                     content = {}
+                    self.logger.debug(
+                        "Failed to parse Notifyre JSON response; body: %r",
+                        (r.content or b"")[:2000],
+                    )
 
                 if r.status_code != requests.codes.ok:
                     # We had a failure

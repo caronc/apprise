@@ -449,6 +449,10 @@ class NotifySessionOGS(NotifyBase):
                 content = loads(r.content)
             except (AttributeError, TypeError, ValueError):
                 content = {}
+                self.logger.debug(
+                    "Failed to parse SOGS JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             if r.status_code not in (
                 requests.codes.ok,

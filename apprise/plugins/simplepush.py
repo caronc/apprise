@@ -282,6 +282,10 @@ class NotifySimplePush(NotifyBase):
                 # TypeError = r.content is not a String
                 # ValueError = r.content is Unparsable
                 # AttributeError = r.content is None
+                self.logger.debug(
+                    "Failed to parse SimplePush JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
                 pass
 
             if r.status_code != requests.codes.ok or status != "OK":

@@ -263,6 +263,10 @@ class NotifyWxPusher(NotifyBase):
                 # TypeError = r.content is None
                 # AttributeError = r is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse WxPusher JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             # 1000 is the expected return code for a successful query
             if (

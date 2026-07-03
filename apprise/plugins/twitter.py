@@ -797,6 +797,10 @@ class NotifyTwitter(NotifyBase):
                 # TypeError = r.content is None
                 # AttributeError = r is None
                 content = {}
+                self.logger.debug(
+                    "Failed to parse Twitter JSON response; body: %r",
+                    (r.content or b"")[:2000],
+                )
 
             if not (200 <= r.status_code < 300):
                 # We had a problem
