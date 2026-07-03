@@ -65,11 +65,7 @@ from ..utils.parse import (
 )
 from .base import NotifyBase
 
-# Validates an alphanumeric sender name (1-11 characters)
-SERWERSMS_SENDER_REGEX = re.compile(
-    r"^[a-z0-9][a-z0-9 _-]{0,10}$",
-    re.I,
-)
+# Sender validation regex is defined in template_tokens["sender"]["regex"].
 
 # Matches a group ID target, optionally prefixed with # or %23
 SERWERSMS_GROUP_REGEX = re.compile(
