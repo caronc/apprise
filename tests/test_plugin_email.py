@@ -3618,7 +3618,6 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.notify("test body") is True
 
 
-@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 def test_plugin_email_prepare():
     """NotifyEmail() prepare_emails static function."""
     with pytest.raises(AppriseException):
@@ -3887,7 +3886,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     img2 = os.path.join(TEST_VAR_DIR, "apprise-test.png")
     img2_name = "apprise-test.png"
 
-    # --- inline=False (default): multipart/mixed, attachment ---
+    # inline=False (default): multipart/mixed, attachment
     obj = Apprise.instantiate(
         "mailto://user:pass@gmail.com", suppress_exceptions=False
     )
@@ -3918,9 +3917,9 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
     assert obj.inline is True
 
-    # --- inline=True, HTML, image with no pre-existing cid: ref:
+    # inline=True, HTML, image with no pre-existing cid: ref:
     # a <br/><img src="cid:name"> anchor is appended to the body and
-    # the attachment is embedded inline ---
+    # the attachment is embedded inline
     sent_messages.clear()
     assert (
         obj.notify(
@@ -3940,8 +3939,8 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert "Content-ID:" in msg
     assert img_name in msg
 
-    # --- inline=True, HTML, image WITH pre-existing cid: ref:
-    # no duplicate anchor is added; attachment still inlined ---
+    # inline=True, HTML, image WITH pre-existing cid: ref:
+    # no duplicate anchor is added; attachment still inlined
     html_with_ref = f'<img src="cid:{img_name}">'
 
     sent_messages.clear()
@@ -3964,8 +3963,8 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # Only one cid: anchor expected in the body part
     assert msg.count(f"cid:{img_name}") == 1
 
-    # --- inline=True, HTML, two images: both inlined, body gets an
-    # anchor appended for the one not already referenced ---
+    # inline=True, HTML, two images: both inlined, body gets an
+    # anchor appended for the one not already referenced
     html_one_ref = f'<img src="cid:{img_name}">'
 
     sent_messages.clear()
@@ -3988,8 +3987,8 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert img_name in msg
     assert img2_name in msg
 
-    # --- inline=True, HTML, non-image attachment: stays as regular
-    # download regardless of inline flag ---
+    # inline=True, HTML, non-image attachment: stays as regular
+    # download regardless of inline flag
     img_jpeg = os.path.join(TEST_VAR_DIR, "apprise-test.jpeg")
 
     from apprise.attachment.file import AttachFile
@@ -4016,8 +4015,8 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert "Content-Disposition: attachment" in msg
     assert "Content-ID" not in msg
 
-    # --- inline=True, TEXT format: [Image: name] is appended to the
-    # text body; attachment stays as a regular download ---
+    # inline=True, TEXT format: [Image: name] is appended to the
+    # text body; attachment stays as a regular download
     obj_txt = Apprise.instantiate(
         "mailto://user:pass@gmail.com?inline=yes&format=text",
         suppress_exceptions=False,
@@ -4044,8 +4043,28 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert "Content-ID" not in msg
     assert f"[Image: {img_name}]" in msg
 
-    # --- inline=True, HTML, cid: ref in body with no matching attachment:
-    # a warning is logged so the user can debug the mismatch ---
+    # inline=True, TEXT format, non-image attachment: the mimetype
+    # check fails (application/pdf is not image/*) so txt_imgs stays empty
+    # and the body is not modified
+    sent_messages.clear()
+    assert (
+        obj_txt.notify(
+            body="plain text body",
+            title="test",
+            notify_type=NotifyType.INFO,
+            attach=aa,  # application/pdf override -- not an image
+        )
+        is True
+    )
+    assert len(sent_messages) == 1
+    msg = sent_messages[0]
+
+    # Non-image in text inline mode: body unchanged, no [Image:] annotation
+    assert "Content-Disposition: attachment" in msg
+    assert "[Image:" not in msg
+
+    # inline=True, HTML, cid: ref in body with no matching attachment:
+    # warning is logged so the user can debug the mismatch
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
             obj.notify(
@@ -4063,13 +4082,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
         )
         assert "missing-file.jpg" in warning_texts
 
-    # --- URL round-trip: inline=yes survives url() -> parse_url() ---
+    # URL round-trip: inline=yes survives url() -> parse_url()
     assert "inline=yes" in obj.url()
     parsed = email.NotifyEmail.parse_url(obj.url())
     assert parsed is not None
     assert parsed.get("inline") is True
 
-    # --- inline=no parses as False ---
+    # inline=no parses as False
     obj2 = Apprise.instantiate(
         "mailto://user:pass@gmail.com?inline=no", suppress_exceptions=False
     )
