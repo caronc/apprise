@@ -82,7 +82,8 @@ notification services. It supports sending alerts to platforms such as: \
 `Pushy`, `PushDeer`, \
 `QQ Push`, `Revolt`, `Reddit`, `Resend`, `RingCentral`, `Rocket.Chat`, \
 `RSyslog`, `SendGrid`, \
-`SendPulse`, `ServerChan`, `Session Open Group Server`, `Seven`, `SFR`, \
+`SendPulse`, `ServerChan`, `SerwerSMS`, `Session Open Group Server`, \
+`Seven`, `SFR`, \
 `Signal`, `SIGNL4`, `SimplePush`, \
 `Sinch`, `Slack`, `SMPP`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, `SparkPost`, \
 `Splunk`, `Spike`, `Spug Push`, `Stackfield`, `Super Toasty`, \
