@@ -91,6 +91,7 @@ The table below identifies the services this tool supports and some example serv
 | [Jira](https://appriseit.com/services/jira/) | jira:// | (TCP) 443 | jira://APIKey<br/>jira://APIKey/@UserID<br/>jira://APIKey/#Team<br/>jira://APIKey/\*Schedule<br/>jira://APIKey/^Escalation
 | [Join](https://appriseit.com/services/join/) | join://   | (TCP) 443    | join://apikey/device<br />join://apikey/device1/device2/deviceN/<br />join://apikey/group<br />join://apikey/groupA/groupB/groupN<br />join://apikey/DeviceA/groupA/groupN/DeviceN/
 | [KODI](https://appriseit.com/services/kodi/) | kodi:// or kodis://    | (TCP) 8080 or 443   | kodi://hostname<br />kodi://user@hostname<br />kodi://user:password@hostname:port
+| [Kook](https://appriseit.com/services/kook/) | kook:// | (TCP) 443 | kook://token/channel_id<br/>kook://token/channel1/channel2<br/>kook://token/@user_id<br/>kook://webhook_key?mode=webhook
 | [Kumulos](https://appriseit.com/services/kumulos/) | kumulos:// | (TCP) 443 | kumulos://apikey/serverkey
 | [LaMetric Time](https://appriseit.com/services/lametric/) | lametric:// | (TCP) 443 | lametric://apikey@device_ipaddr<br/>lametric://apikey@hostname:port<br/>lametric://client_id@client_secret
 | [Lark](https://appriseit.com/services/lark/) | lark://  | (TCP) 443   | lark://BotToken
