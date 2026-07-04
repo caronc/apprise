@@ -30,9 +30,9 @@ You can build your own rpm packges with the following:
    tox -e build-el9-rpm
    ```
 
-* Fedora 42
+* Fedora 44
    ```bash
-   tox -e build-f42-rpm
+   tox -e build-f44-rpm
    ```
 
 * Fedora Rawhide

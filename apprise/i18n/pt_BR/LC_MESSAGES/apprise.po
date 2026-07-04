@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apprise 1.11.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2026-05-29 11:13-0400\n"
+"POT-Creation-Date: 2026-07-04 12:10-0400\n"
 "PO-Revision-Date: 2019-05-24 20:00-0400\n"
 "Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
 "Language: pt_BR\n"
@@ -18,20 +18,20 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Generated-By: Babel 2.18.0\n"
 
-#: apprise/attachment/base.py:96 apprise/url.py:148
+#: apprise/attachment/base.py:96 apprise/url.py:157
 msgid "Verify SSL"
 msgstr "Verificar SSL"
 
-#: apprise/url.py:158
+#: apprise/url.py:167
 msgid "Follow Redirects"
 msgstr ""
 
-#: apprise/url.py:168
+#: apprise/url.py:177
 #, fuzzy
 msgid "Socket Read Timeout"
 msgstr "Tempo Limite de Leitura do Socket"
 
-#: apprise/url.py:182
+#: apprise/url.py:191
 #, fuzzy
 msgid "Socket Connect Timeout"
 msgstr "Tempo Limite de Conexao do Socket"
@@ -83,13 +83,15 @@ msgstr "Nome de Usuario do Aplicativo"
 
 #: apprise/plugins/africas_talking.py:138 apprise/plugins/brevo.py:157
 #: apprise/plugins/burstsms.py:104 apprise/plugins/clicksend.py:98
-#: apprise/plugins/dot.py:136 apprise/plugins/evolution.py:105
+#: apprise/plugins/dot.py:136 apprise/plugins/evolution.py:113
 #: apprise/plugins/exotel.py:213 apprise/plugins/fcm/__init__.py:143
-#: apprise/plugins/httpsms.py:77 apprise/plugins/jira.py:230
-#: apprise/plugins/join.py:140 apprise/plugins/kavenegar.py:115
-#: apprise/plugins/kumulos.py:87 apprise/plugins/mailgun.py:146
-#: apprise/plugins/messagebird.py:78 apprise/plugins/octopush.py:136
-#: apprise/plugins/one_signal.py:113 apprise/plugins/opsgenie.py:228
+#: apprise/plugins/flowtriq.py:112 apprise/plugins/httpsms.py:77
+#: apprise/plugins/jira.py:230 apprise/plugins/join.py:140
+#: apprise/plugins/kavenegar.py:115 apprise/plugins/kumulos.py:87
+#: apprise/plugins/mailersend.py:126 apprise/plugins/mailgun.py:146
+#: apprise/plugins/messagebird.py:78 apprise/plugins/notifyre.py:130
+#: apprise/plugins/octopush.py:136 apprise/plugins/one_signal.py:113
+#: apprise/plugins/opsgenie.py:228 apprise/plugins/pagerduty.py:131
 #: apprise/plugins/postmark.py:117 apprise/plugins/prowl.py:121
 #: apprise/plugins/resend.py:107 apprise/plugins/resend.py:145
 #: apprise/plugins/sendgrid.py:116 apprise/plugins/seven.py:75
@@ -112,38 +114,41 @@ msgstr "Telefone de Destino"
 #: apprise/plugins/burstsms.py:131 apprise/plugins/clickatell.py:90
 #: apprise/plugins/clicksend.py:112 apprise/plugins/d7networks.py:110
 #: apprise/plugins/dapnet.py:138 apprise/plugins/dingtalk.py:111
-#: apprise/plugins/email/base.py:164 apprise/plugins/evolution.py:134
-#: apprise/plugins/exotel.py:190 apprise/plugins/fcm/__init__.py:168
-#: apprise/plugins/flock.py:125 apprise/plugins/fortysixelks.py:111
-#: apprise/plugins/home_assistant.py:153 apprise/plugins/httpsms.py:97
-#: apprise/plugins/humhub.py:149 apprise/plugins/irc/base.py:149
-#: apprise/plugins/join.py:172 apprise/plugins/kavenegar.py:135
-#: apprise/plugins/line.py:93 apprise/plugins/mailgun.py:157
-#: apprise/plugins/mastodon.py:202 apprise/plugins/matrix/base.py:307
-#: apprise/plugins/mattermost.py:189 apprise/plugins/messagebird.py:99
-#: apprise/plugins/mqtt.py:177 apprise/plugins/msg91.py:123
-#: apprise/plugins/nextcloud.py:148 apprise/plugins/nextcloudtalk.py:101
-#: apprise/plugins/notifiarr.py:103 apprise/plugins/notificationapi.py:192
+#: apprise/plugins/eight00com.py:128 apprise/plugins/email/base.py:168
+#: apprise/plugins/evolution.py:142 apprise/plugins/exotel.py:190
+#: apprise/plugins/fcm/__init__.py:168 apprise/plugins/flock.py:125
+#: apprise/plugins/fortysixelks.py:111 apprise/plugins/home_assistant.py:153
+#: apprise/plugins/httpsms.py:97 apprise/plugins/humhub.py:149
+#: apprise/plugins/irc/base.py:149 apprise/plugins/join.py:172
+#: apprise/plugins/kavenegar.py:135 apprise/plugins/kook.py:176
+#: apprise/plugins/line.py:93 apprise/plugins/mailersend.py:143
+#: apprise/plugins/mailgun.py:157 apprise/plugins/mastodon.py:202
+#: apprise/plugins/matrix/base.py:307 apprise/plugins/mattermost.py:189
+#: apprise/plugins/messagebird.py:99 apprise/plugins/mqtt.py:177
+#: apprise/plugins/msg91.py:123 apprise/plugins/nextcloud.py:148
+#: apprise/plugins/nextcloudtalk.py:101 apprise/plugins/notifiarr.py:103
+#: apprise/plugins/notificationapi.py:192 apprise/plugins/notifyre.py:143
 #: apprise/plugins/ntfy.py:241 apprise/plugins/octopush.py:153
 #: apprise/plugins/office365.py:287 apprise/plugins/one_signal.py:141
-#: apprise/plugins/postmark.py:133 apprise/plugins/pushbullet.py:105
-#: apprise/plugins/pushed.py:107 apprise/plugins/pushover.py:252
-#: apprise/plugins/pushsafer.py:376 apprise/plugins/pushy.py:97
-#: apprise/plugins/reddit.py:170 apprise/plugins/resend.py:124
-#: apprise/plugins/revolt.py:112 apprise/plugins/ringcentral.py:219
-#: apprise/plugins/rocketchat.py:167 apprise/plugins/sendgrid.py:133
-#: apprise/plugins/sendpulse.py:139 apprise/plugins/seven.py:88
+#: apprise/plugins/plivo.py:114 apprise/plugins/postmark.py:133
+#: apprise/plugins/pushbullet.py:105 apprise/plugins/pushed.py:107
+#: apprise/plugins/pushover.py:252 apprise/plugins/pushsafer.py:376
+#: apprise/plugins/pushy.py:97 apprise/plugins/reddit.py:170
+#: apprise/plugins/resend.py:124 apprise/plugins/revolt.py:112
+#: apprise/plugins/ringcentral.py:219 apprise/plugins/rocketchat.py:167
+#: apprise/plugins/sendgrid.py:133 apprise/plugins/sendpulse.py:139
+#: apprise/plugins/serwersms.py:161 apprise/plugins/seven.py:88
 #: apprise/plugins/sfr.py:113 apprise/plugins/signal_api.py:138
-#: apprise/plugins/sinch.py:140 apprise/plugins/slack.py:273
-#: apprise/plugins/smpp.py:128 apprise/plugins/smseagle.py:172
-#: apprise/plugins/smsmanager.py:119 apprise/plugins/sns.py:170
-#: apprise/plugins/telegram.py:359 apprise/plugins/threema.py:115
-#: apprise/plugins/twilio.py:174 apprise/plugins/twist.py:123
-#: apprise/plugins/twitter.py:193 apprise/plugins/vapid/__init__.py:158
-#: apprise/plugins/voipms.py:108 apprise/plugins/vonage.py:108
-#: apprise/plugins/wechat.py:218 apprise/plugins/whatsapp.py:166
-#: apprise/plugins/wxpusher.py:139 apprise/plugins/xmpp/base.py:134
-#: apprise/plugins/zulip.py:153
+#: apprise/plugins/sinch.py:140 apprise/plugins/slack.py:281
+#: apprise/plugins/smpp.py:128 apprise/plugins/smsc.py:156
+#: apprise/plugins/smseagle.py:172 apprise/plugins/smsmanager.py:119
+#: apprise/plugins/sns.py:170 apprise/plugins/telegram.py:365
+#: apprise/plugins/threema.py:115 apprise/plugins/twilio.py:174
+#: apprise/plugins/twist.py:123 apprise/plugins/twitter.py:193
+#: apprise/plugins/vapid/__init__.py:158 apprise/plugins/voipms.py:108
+#: apprise/plugins/vonage.py:108 apprise/plugins/wechat.py:218
+#: apprise/plugins/whatsapp.py:166 apprise/plugins/wxpusher.py:139
+#: apprise/plugins/xmpp/base.py:134 apprise/plugins/zulip.py:153
 msgid "Targets"
 msgstr "Destinatarios"
 
@@ -165,9 +170,9 @@ msgstr "Modo SMS"
 #: apprise/plugins/mailgun.py:194 apprise/plugins/mastodon.py:247
 #: apprise/plugins/octopush.py:173 apprise/plugins/one_signal.py:185
 #: apprise/plugins/opsgenie.py:307 apprise/plugins/plivo.py:137
-#: apprise/plugins/smseagle.py:211 apprise/plugins/smsmanager.py:152
-#: apprise/plugins/smtp2go.py:151 apprise/plugins/sparkpost.py:209
-#: apprise/plugins/twitter.py:218
+#: apprise/plugins/signal_api.py:160 apprise/plugins/smseagle.py:211
+#: apprise/plugins/smsmanager.py:152 apprise/plugins/smtp2go.py:151
+#: apprise/plugins/sparkpost.py:209 apprise/plugins/twitter.py:218
 #, fuzzy
 msgid "Batch Mode"
 msgstr "Modo em Lote"
@@ -175,45 +180,45 @@ msgstr "Modo em Lote"
 #: apprise/plugins/apprise_api.py:102 apprise/plugins/bark.py:134
 #: apprise/plugins/custom_form.py:130 apprise/plugins/custom_json.py:112
 #: apprise/plugins/custom_xml.py:112 apprise/plugins/emby.py:85
-#: apprise/plugins/enigma2.py:110 apprise/plugins/evolution.py:111
-#: apprise/plugins/fluxer.py:159 apprise/plugins/gotify.py:129
-#: apprise/plugins/growl.py:140 apprise/plugins/home_assistant.py:122
-#: apprise/plugins/humhub.py:138 apprise/plugins/irc/base.py:117
-#: apprise/plugins/kodi.py:96 apprise/plugins/lametric.py:460
-#: apprise/plugins/mastodon.py:180 apprise/plugins/matrix/base.py:262
-#: apprise/plugins/mattermost.py:155 apprise/plugins/misskey.py:117
-#: apprise/plugins/mqtt.py:149 apprise/plugins/nextcloud.py:116
-#: apprise/plugins/nextcloudtalk.py:74 apprise/plugins/notica.py:126
-#: apprise/plugins/notifico.py:166 apprise/plugins/ntfy.py:211
-#: apprise/plugins/parseplatform.py:90 apprise/plugins/pushdeer.py:75
-#: apprise/plugins/pushjet.py:71 apprise/plugins/rocketchat.py:120
-#: apprise/plugins/rsyslog.py:180 apprise/plugins/signal_api.py:97
-#: apprise/plugins/smseagle.py:135 apprise/plugins/sogs.py:207
-#: apprise/plugins/synology.py:83 apprise/plugins/workflows.py:126
-#: apprise/plugins/xmpp/base.py:101
+#: apprise/plugins/enigma2.py:110 apprise/plugins/evolution.py:119
+#: apprise/plugins/flowtriq.py:118 apprise/plugins/fluxer.py:159
+#: apprise/plugins/gotify.py:129 apprise/plugins/growl.py:140
+#: apprise/plugins/home_assistant.py:122 apprise/plugins/humhub.py:138
+#: apprise/plugins/irc/base.py:117 apprise/plugins/kodi.py:96
+#: apprise/plugins/lametric.py:460 apprise/plugins/mastodon.py:180
+#: apprise/plugins/matrix/base.py:262 apprise/plugins/mattermost.py:155
+#: apprise/plugins/misskey.py:117 apprise/plugins/mqtt.py:149
+#: apprise/plugins/nextcloud.py:116 apprise/plugins/nextcloudtalk.py:74
+#: apprise/plugins/notica.py:126 apprise/plugins/notifico.py:166
+#: apprise/plugins/ntfy.py:211 apprise/plugins/parseplatform.py:90
+#: apprise/plugins/pushdeer.py:75 apprise/plugins/pushjet.py:71
+#: apprise/plugins/rocketchat.py:120 apprise/plugins/rsyslog.py:180
+#: apprise/plugins/signal_api.py:97 apprise/plugins/smseagle.py:135
+#: apprise/plugins/sogs.py:207 apprise/plugins/synology.py:83
+#: apprise/plugins/workflows.py:138 apprise/plugins/xmpp/base.py:101
 msgid "Hostname"
 msgstr "Nome do Host"
 
 #: apprise/plugins/apprise_api.py:107 apprise/plugins/bark.py:139
 #: apprise/plugins/custom_form.py:135 apprise/plugins/custom_json.py:117
-#: apprise/plugins/custom_xml.py:117 apprise/plugins/email/base.py:153
+#: apprise/plugins/custom_xml.py:117 apprise/plugins/email/base.py:157
 #: apprise/plugins/emby.py:90 apprise/plugins/enigma2.py:115
-#: apprise/plugins/evolution.py:116 apprise/plugins/fluxer.py:163
-#: apprise/plugins/gotify.py:140 apprise/plugins/growl.py:145
-#: apprise/plugins/home_assistant.py:127 apprise/plugins/humhub.py:143
-#: apprise/plugins/irc/base.py:122 apprise/plugins/kodi.py:101
-#: apprise/plugins/lametric.py:464 apprise/plugins/mastodon.py:190
-#: apprise/plugins/matrix/base.py:267 apprise/plugins/mattermost.py:171
-#: apprise/plugins/misskey.py:127 apprise/plugins/mqtt.py:154
-#: apprise/plugins/nextcloud.py:121 apprise/plugins/nextcloudtalk.py:79
-#: apprise/plugins/notica.py:130 apprise/plugins/notifico.py:170
-#: apprise/plugins/ntfy.py:215 apprise/plugins/parseplatform.py:95
-#: apprise/plugins/pushdeer.py:79 apprise/plugins/pushjet.py:76
-#: apprise/plugins/rocketchat.py:125 apprise/plugins/rsyslog.py:185
-#: apprise/plugins/signal_api.py:102 apprise/plugins/smpp.py:108
-#: apprise/plugins/smseagle.py:140 apprise/plugins/sogs.py:212
-#: apprise/plugins/synology.py:88 apprise/plugins/workflows.py:131
-#: apprise/plugins/xmpp/base.py:106
+#: apprise/plugins/evolution.py:124 apprise/plugins/flowtriq.py:123
+#: apprise/plugins/fluxer.py:163 apprise/plugins/gotify.py:140
+#: apprise/plugins/growl.py:145 apprise/plugins/home_assistant.py:127
+#: apprise/plugins/humhub.py:143 apprise/plugins/irc/base.py:122
+#: apprise/plugins/kodi.py:101 apprise/plugins/lametric.py:464
+#: apprise/plugins/mastodon.py:190 apprise/plugins/matrix/base.py:267
+#: apprise/plugins/mattermost.py:171 apprise/plugins/misskey.py:127
+#: apprise/plugins/mqtt.py:154 apprise/plugins/nextcloud.py:121
+#: apprise/plugins/nextcloudtalk.py:79 apprise/plugins/notica.py:130
+#: apprise/plugins/notifico.py:170 apprise/plugins/ntfy.py:215
+#: apprise/plugins/parseplatform.py:95 apprise/plugins/pushdeer.py:79
+#: apprise/plugins/pushjet.py:76 apprise/plugins/rocketchat.py:125
+#: apprise/plugins/rsyslog.py:185 apprise/plugins/signal_api.py:102
+#: apprise/plugins/smpp.py:108 apprise/plugins/smseagle.py:140
+#: apprise/plugins/sogs.py:212 apprise/plugins/synology.py:88
+#: apprise/plugins/workflows.py:143 apprise/plugins/xmpp/base.py:106
 msgid "Port"
 msgstr "Porta"
 
@@ -228,8 +233,8 @@ msgstr "Porta"
 #: apprise/plugins/notica.py:136 apprise/plugins/notifico.py:176
 #: apprise/plugins/ntfy.py:221 apprise/plugins/opsgenie.py:234
 #: apprise/plugins/pushjet.py:88 apprise/plugins/rocketchat.py:131
-#: apprise/plugins/signal_api.py:108 apprise/plugins/smpp.py:92
-#: apprise/plugins/synology.py:94
+#: apprise/plugins/serwersms.py:131 apprise/plugins/signal_api.py:108
+#: apprise/plugins/smpp.py:92 apprise/plugins/synology.py:94
 msgid "Username"
 msgstr "Nome de Usuario"
 
@@ -238,7 +243,7 @@ msgstr "Nome de Usuario"
 #: apprise/plugins/bulksms.py:117 apprise/plugins/bulkvs.py:90
 #: apprise/plugins/custom_form.py:145 apprise/plugins/custom_json.py:127
 #: apprise/plugins/custom_xml.py:127 apprise/plugins/dapnet.py:123
-#: apprise/plugins/email/base.py:143 apprise/plugins/emby.py:101
+#: apprise/plugins/email/base.py:147 apprise/plugins/emby.py:101
 #: apprise/plugins/enigma2.py:125 apprise/plugins/freemobile.py:83
 #: apprise/plugins/growl.py:151 apprise/plugins/home_assistant.py:137
 #: apprise/plugins/humhub.py:133 apprise/plugins/irc/base.py:132
@@ -247,8 +252,9 @@ msgstr "Nome de Usuario"
 #: apprise/plugins/nextcloudtalk.py:90 apprise/plugins/notica.py:140
 #: apprise/plugins/notifico.py:180 apprise/plugins/ntfy.py:225
 #: apprise/plugins/pushjet.py:92 apprise/plugins/reddit.py:145
-#: apprise/plugins/rocketchat.py:135 apprise/plugins/signal_api.py:112
-#: apprise/plugins/simplepush.py:108 apprise/plugins/smpp.py:97
+#: apprise/plugins/rocketchat.py:135 apprise/plugins/serwersms.py:136
+#: apprise/plugins/signal_api.py:112 apprise/plugins/simplepush.py:108
+#: apprise/plugins/smpp.py:97 apprise/plugins/smsc.py:143
 #: apprise/plugins/synology.py:98 apprise/plugins/twist.py:101
 #: apprise/plugins/voipms.py:88 apprise/plugins/xmpp/base.py:117
 msgid "Password"
@@ -257,16 +263,17 @@ msgstr "Senha"
 #: apprise/plugins/apprise_api.py:122 apprise/plugins/chanify.py:74
 #: apprise/plugins/dingtalk.py:93 apprise/plugins/exotel.py:166
 #: apprise/plugins/feishu.py:80 apprise/plugins/gotify.py:123
-#: apprise/plugins/mattermost.py:161 apprise/plugins/notica.py:119
-#: apprise/plugins/notifiarr.py:91 apprise/plugins/ntfy.py:230
-#: apprise/plugins/pushme.py:62 apprise/plugins/ryver.py:99
-#: apprise/plugins/serverchan.py:70 apprise/plugins/slack.py:323
-#: apprise/plugins/synology.py:103 apprise/plugins/zulip.py:136
+#: apprise/plugins/kook.py:170 apprise/plugins/mattermost.py:161
+#: apprise/plugins/notica.py:119 apprise/plugins/notifiarr.py:91
+#: apprise/plugins/ntfy.py:230 apprise/plugins/pushme.py:62
+#: apprise/plugins/ryver.py:99 apprise/plugins/serverchan.py:70
+#: apprise/plugins/slack.py:331 apprise/plugins/synology.py:103
+#: apprise/plugins/zulip.py:136
 msgid "Token"
 msgstr "Token"
 
 #: apprise/plugins/apprise_api.py:136 apprise/plugins/jira.py:301
-#: apprise/plugins/ntfy.py:288 apprise/plugins/opsgenie.py:294
+#: apprise/plugins/ntfy.py:289 apprise/plugins/opsgenie.py:294
 #: apprise/plugins/pagertree.py:133
 #, fuzzy
 msgid "Tags"
@@ -286,7 +293,7 @@ msgstr "Cabecalho HTTP"
 
 #: apprise/plugins/aprs.py:167 apprise/plugins/bulksms.py:112
 #: apprise/plugins/bulkvs.py:85 apprise/plugins/clicksend.py:93
-#: apprise/plugins/dapnet.py:118 apprise/plugins/email/base.py:139
+#: apprise/plugins/dapnet.py:118 apprise/plugins/email/base.py:143
 #: apprise/plugins/mailgun.py:136 apprise/plugins/mqtt.py:160
 #: apprise/plugins/reddit.py:140 apprise/plugins/sendpulse.py:110
 #: apprise/plugins/smtp2go.py:108 apprise/plugins/sparkpost.py:159
@@ -320,15 +327,15 @@ msgstr "Dispositivo de Destino"
 msgid "Sound"
 msgstr "Som"
 
-#: apprise/plugins/bark.py:176
+#: apprise/plugins/bark.py:176 apprise/plugins/pushward.py:152
 msgid "Level"
 msgstr "Nivel"
 
-#: apprise/plugins/bark.py:181
+#: apprise/plugins/bark.py:181 apprise/plugins/pushward.py:182
 msgid "Volume"
 msgstr "Volume"
 
-#: apprise/plugins/bark.py:187 apprise/plugins/ntfy.py:270
+#: apprise/plugins/bark.py:187 apprise/plugins/ntfy.py:271
 #: apprise/plugins/pagerduty.py:172
 msgid "Click"
 msgstr "Clique"
@@ -347,18 +354,18 @@ msgid "Group"
 msgstr "Grupo"
 
 #: apprise/plugins/bark.py:204 apprise/plugins/dbus.py:228
-#: apprise/plugins/discord.py:196 apprise/plugins/fcm/__init__.py:197
+#: apprise/plugins/discord.py:210 apprise/plugins/fcm/__init__.py:197
 #: apprise/plugins/flock.py:136 apprise/plugins/fluxer.py:250
 #: apprise/plugins/glib.py:188 apprise/plugins/gnome.py:154
 #: apprise/plugins/growl.py:175 apprise/plugins/join.py:183
 #: apprise/plugins/kodi.py:129 apprise/plugins/line.py:108
 #: apprise/plugins/macosx.py:115 apprise/plugins/matrix/base.py:318
 #: apprise/plugins/mattermost.py:212 apprise/plugins/notifiarr.py:125
-#: apprise/plugins/ntfy.py:256 apprise/plugins/one_signal.py:164
+#: apprise/plugins/ntfy.py:257 apprise/plugins/one_signal.py:164
 #: apprise/plugins/pagerduty.py:191 apprise/plugins/ryver.py:124
-#: apprise/plugins/slack.py:291 apprise/plugins/telegram.py:370
+#: apprise/plugins/slack.py:299 apprise/plugins/telegram.py:376
 #: apprise/plugins/vapid/__init__.py:204 apprise/plugins/windows.py:106
-#: apprise/plugins/workflows.py:163
+#: apprise/plugins/workflows.py:175
 msgid "Include Image"
 msgstr "Incluir Imagem"
 
@@ -431,18 +438,20 @@ msgstr ""
 msgid "LED Number"
 msgstr ""
 
-#: apprise/plugins/brevo.py:164 apprise/plugins/postmark.py:123
-#: apprise/plugins/resend.py:114 apprise/plugins/sendgrid.py:123
+#: apprise/plugins/brevo.py:164 apprise/plugins/mailersend.py:133
+#: apprise/plugins/postmark.py:123 apprise/plugins/resend.py:114
+#: apprise/plugins/sendgrid.py:123
 #, fuzzy
 msgid "Source Email"
 msgstr "E-mail de Origem"
 
-#: apprise/plugins/brevo.py:169 apprise/plugins/email/base.py:159
-#: apprise/plugins/mailgun.py:152 apprise/plugins/notificationapi.py:177
-#: apprise/plugins/office365.py:282 apprise/plugins/one_signal.py:124
+#: apprise/plugins/brevo.py:169 apprise/plugins/email/base.py:163
+#: apprise/plugins/mailersend.py:138 apprise/plugins/mailgun.py:152
+#: apprise/plugins/notificationapi.py:177 apprise/plugins/office365.py:282
+#: apprise/plugins/one_signal.py:124 apprise/plugins/postmark.py:128
 #: apprise/plugins/pushbullet.py:100 apprise/plugins/pushsafer.py:371
 #: apprise/plugins/resend.py:119 apprise/plugins/sendgrid.py:128
-#: apprise/plugins/sendpulse.py:134 apprise/plugins/slack.py:256
+#: apprise/plugins/sendpulse.py:134 apprise/plugins/slack.py:264
 #: apprise/plugins/threema.py:105
 msgid "Target Email"
 msgstr "E-mail de Destino"
@@ -453,38 +462,42 @@ msgstr "E-mail de Destino"
 msgid "Reply To Email"
 msgstr "Responder para E-mail"
 
-#: apprise/plugins/brevo.py:193 apprise/plugins/email/base.py:240
-#: apprise/plugins/mailgun.py:186 apprise/plugins/notificationapi.py:243
-#: apprise/plugins/office365.py:307 apprise/plugins/postmark.py:157
-#: apprise/plugins/resend.py:158 apprise/plugins/sendgrid.py:153
-#: apprise/plugins/sendpulse.py:169 apprise/plugins/ses.py:232
-#: apprise/plugins/smtp2go.py:143 apprise/plugins/sparkpost.py:201
+#: apprise/plugins/brevo.py:193 apprise/plugins/email/base.py:249
+#: apprise/plugins/mailersend.py:157 apprise/plugins/mailgun.py:186
+#: apprise/plugins/notificationapi.py:243 apprise/plugins/office365.py:307
+#: apprise/plugins/postmark.py:157 apprise/plugins/resend.py:158
+#: apprise/plugins/sendgrid.py:153 apprise/plugins/sendpulse.py:169
+#: apprise/plugins/ses.py:232 apprise/plugins/smtp2go.py:143
+#: apprise/plugins/sparkpost.py:201
 msgid "Carbon Copy"
 msgstr "Copia Carbono"
 
-#: apprise/plugins/brevo.py:197 apprise/plugins/email/base.py:244
-#: apprise/plugins/mailgun.py:190 apprise/plugins/notificationapi.py:247
-#: apprise/plugins/office365.py:311 apprise/plugins/postmark.py:161
-#: apprise/plugins/resend.py:162 apprise/plugins/sendgrid.py:157
-#: apprise/plugins/sendpulse.py:173 apprise/plugins/ses.py:236
-#: apprise/plugins/smtp2go.py:147 apprise/plugins/sparkpost.py:205
+#: apprise/plugins/brevo.py:197 apprise/plugins/email/base.py:253
+#: apprise/plugins/mailersend.py:161 apprise/plugins/mailgun.py:190
+#: apprise/plugins/notificationapi.py:247 apprise/plugins/office365.py:311
+#: apprise/plugins/postmark.py:161 apprise/plugins/resend.py:162
+#: apprise/plugins/sendgrid.py:157 apprise/plugins/sendpulse.py:173
+#: apprise/plugins/ses.py:236 apprise/plugins/smtp2go.py:147
+#: apprise/plugins/sparkpost.py:205
 msgid "Blind Carbon Copy"
 msgstr "Copia Carbono Oculta"
 
 #: apprise/plugins/bulksms.py:123 apprise/plugins/bulkvs.py:103
 #: apprise/plugins/burstsms.py:124 apprise/plugins/clickatell.py:83
 #: apprise/plugins/clicksend.py:105 apprise/plugins/d7networks.py:103
-#: apprise/plugins/dingtalk.py:106 apprise/plugins/evolution.py:127
-#: apprise/plugins/exotel.py:183 apprise/plugins/httpsms.py:90
-#: apprise/plugins/kavenegar.py:128 apprise/plugins/messagebird.py:92
-#: apprise/plugins/msg91.py:116 apprise/plugins/octopush.py:146
-#: apprise/plugins/ringcentral.py:213 apprise/plugins/seven.py:81
+#: apprise/plugins/dingtalk.py:106 apprise/plugins/eight00com.py:121
+#: apprise/plugins/evolution.py:135 apprise/plugins/exotel.py:183
+#: apprise/plugins/httpsms.py:90 apprise/plugins/kavenegar.py:128
+#: apprise/plugins/messagebird.py:92 apprise/plugins/msg91.py:116
+#: apprise/plugins/notifyre.py:136 apprise/plugins/octopush.py:146
+#: apprise/plugins/plivo.py:107 apprise/plugins/ringcentral.py:213
+#: apprise/plugins/serwersms.py:148 apprise/plugins/seven.py:81
 #: apprise/plugins/signal_api.py:124 apprise/plugins/sinch.py:127
-#: apprise/plugins/smpp.py:121 apprise/plugins/smseagle.py:151
-#: apprise/plugins/smsmanager.py:112 apprise/plugins/sns.py:157
-#: apprise/plugins/threema.py:98 apprise/plugins/twilio.py:161
-#: apprise/plugins/voipms.py:101 apprise/plugins/vonage.py:101
-#: apprise/plugins/whatsapp.py:147
+#: apprise/plugins/smpp.py:121 apprise/plugins/smsc.py:149
+#: apprise/plugins/smseagle.py:151 apprise/plugins/smsmanager.py:112
+#: apprise/plugins/sns.py:157 apprise/plugins/threema.py:98
+#: apprise/plugins/twilio.py:161 apprise/plugins/voipms.py:101
+#: apprise/plugins/vonage.py:101 apprise/plugins/whatsapp.py:147
 msgid "Target Phone No"
 msgstr "Numero de Telefone de Destino"
 
@@ -496,6 +509,7 @@ msgstr "Grupo de Destino"
 
 #: apprise/plugins/bulksms.py:149 apprise/plugins/bulkvs.py:96
 #: apprise/plugins/bulkvs.py:122 apprise/plugins/clickatell.py:78
+#: apprise/plugins/eight00com.py:114 apprise/plugins/eight00com.py:142
 #: apprise/plugins/fortysixelks.py:100 apprise/plugins/httpsms.py:83
 #: apprise/plugins/httpsms.py:115 apprise/plugins/ringcentral.py:207
 #: apprise/plugins/signal_api.py:117 apprise/plugins/sinch.py:120
@@ -521,7 +535,7 @@ msgstr "Caracteres Unicode"
 msgid "API Secret"
 msgstr "Segredo de API"
 
-#: apprise/plugins/burstsms.py:118
+#: apprise/plugins/burstsms.py:118 apprise/plugins/smsc.py:171
 #, fuzzy
 msgid "Sender ID"
 msgstr "ID do Remetente"
@@ -538,15 +552,15 @@ msgstr "validade"
 msgid "Chanify"
 msgstr "Chanify"
 
-#: apprise/plugins/chime.py:130 apprise/plugins/discord.py:130
+#: apprise/plugins/chime.py:130 apprise/plugins/discord.py:144
 #: apprise/plugins/fluxer.py:174 apprise/plugins/ifttt.py:103
 #: apprise/plugins/zoom.py:139
 msgid "Webhook ID"
 msgstr "ID do Webhook"
 
-#: apprise/plugins/chime.py:136 apprise/plugins/discord.py:136
-#: apprise/plugins/fluxer.py:181 apprise/plugins/google_chat.py:118
-#: apprise/plugins/webexteams.py:171
+#: apprise/plugins/chime.py:136 apprise/plugins/discord.py:150
+#: apprise/plugins/fluxer.py:181 apprise/plugins/google_chat.py:127
+#: apprise/plugins/stackfield.py:92 apprise/plugins/webexteams.py:171
 msgid "Webhook Token"
 msgstr "Token do Webhook"
 
@@ -554,7 +568,8 @@ msgstr "Token do Webhook"
 msgid "Clickatell"
 msgstr "Clickatell"
 
-#: apprise/plugins/clickatell.py:72 apprise/plugins/rocketchat.py:140
+#: apprise/plugins/clickatell.py:72 apprise/plugins/eight00com.py:108
+#: apprise/plugins/rocketchat.py:140
 #, fuzzy
 msgid "API Token"
 msgstr "Token de API"
@@ -590,7 +605,7 @@ msgstr "Endereco de Origem"
 #: apprise/plugins/dapnet.py:150 apprise/plugins/exotel.py:240
 #: apprise/plugins/gotify.py:153 apprise/plugins/growl.py:163
 #: apprise/plugins/jira.py:287 apprise/plugins/join.py:189
-#: apprise/plugins/lametric.py:494 apprise/plugins/ntfy.py:282
+#: apprise/plugins/lametric.py:494 apprise/plugins/ntfy.py:283
 #: apprise/plugins/opsgenie.py:280 apprise/plugins/prowl.py:141
 #: apprise/plugins/pushover.py:263 apprise/plugins/pushsafer.py:387
 #: apprise/plugins/smseagle.py:187
@@ -627,56 +642,73 @@ msgstr "Eixo Y"
 msgid "Secret"
 msgstr "Segredo"
 
-#: apprise/plugins/discord.py:125 apprise/plugins/flock.py:106
+#: apprise/plugins/discord.py:139 apprise/plugins/flock.py:106
 #: apprise/plugins/fluxer.py:169 apprise/plugins/ryver.py:106
-#: apprise/plugins/slack.py:208 apprise/plugins/viber.py:99
+#: apprise/plugins/slack.py:216 apprise/plugins/viber.py:99
 #: apprise/plugins/zulip.py:124
 msgid "Bot Name"
 msgstr "Nome do Bot"
 
-#: apprise/plugins/discord.py:149 apprise/plugins/fluxer.py:201
+#: apprise/plugins/discord.py:163 apprise/plugins/fluxer.py:201
 msgid "Text To Speech"
 msgstr "Texto para Fala"
 
-#: apprise/plugins/discord.py:154 apprise/plugins/fluxer.py:206
+#: apprise/plugins/discord.py:168 apprise/plugins/fluxer.py:206
 msgid "Avatar Image"
 msgstr "Imagem de Avatar"
 
-#: apprise/plugins/discord.py:159 apprise/plugins/fluxer.py:211
-#: apprise/plugins/ntfy.py:262
+#: apprise/plugins/discord.py:173 apprise/plugins/fluxer.py:211
+#: apprise/plugins/ntfy.py:263
 #, fuzzy
 msgid "Avatar URL"
 msgstr "URL do Avatar"
 
-#: apprise/plugins/discord.py:163 apprise/plugins/fluxer.py:215
+#: apprise/plugins/discord.py:177 apprise/plugins/fluxer.py:215
 #: apprise/plugins/pushover.py:275
 msgid "URL"
 msgstr "URL"
 
-#: apprise/plugins/discord.py:172 apprise/plugins/fluxer.py:222
+#: apprise/plugins/discord.py:186 apprise/plugins/fluxer.py:222
 msgid "Thread ID"
 msgstr "ID da Thread"
 
-#: apprise/plugins/discord.py:176 apprise/plugins/fluxer.py:230
+#: apprise/plugins/discord.py:190 apprise/plugins/fluxer.py:230
 msgid "Display Footer"
 msgstr "Exibir Rodape"
 
-#: apprise/plugins/discord.py:181 apprise/plugins/fluxer.py:235
+#: apprise/plugins/discord.py:195 apprise/plugins/fluxer.py:235
 msgid "Footer Logo"
 msgstr "Logo do Rodape"
 
-#: apprise/plugins/discord.py:186 apprise/plugins/fluxer.py:240
+#: apprise/plugins/discord.py:200 apprise/plugins/fluxer.py:240
 #, fuzzy
 msgid "Use Fields"
 msgstr "Usar Campos"
 
-#: apprise/plugins/discord.py:191 apprise/plugins/fluxer.py:245
+#: apprise/plugins/discord.py:205 apprise/plugins/fluxer.py:245
 msgid "Discord Flags"
 msgstr "Flags do Discord"
 
-#: apprise/plugins/discord.py:205 apprise/plugins/fluxer.py:256
+#: apprise/plugins/discord.py:219 apprise/plugins/fluxer.py:256
 msgid "Ping Users/Roles"
 msgstr "Mencionar Usuarios/Cargos"
+
+#: apprise/plugins/discord.py:223 apprise/plugins/slack.py:338
+#: apprise/plugins/workflows.py:193
+msgid "Template Path"
+msgstr "Caminho do Template"
+
+#: apprise/plugins/discord.py:231
+#, fuzzy
+msgid "Batch Attachments"
+msgstr "Anexos Sensiveis"
+
+#: apprise/plugins/discord.py:241 apprise/plugins/mailgun.py:208
+#: apprise/plugins/notificationapi.py:256 apprise/plugins/slack.py:348
+#: apprise/plugins/sparkpost.py:223 apprise/plugins/workflows.py:214
+#, fuzzy
+msgid "Template Tokens"
+msgstr "Tokens do Template"
 
 #: apprise/plugins/dot.py:142
 #, fuzzy
@@ -739,7 +771,7 @@ msgstr "Caminho"
 msgid "Server Timeout"
 msgstr "Tempo Limite do Servidor"
 
-#: apprise/plugins/evolution.py:122
+#: apprise/plugins/evolution.py:130
 #, fuzzy
 msgid "Instance Name"
 msgstr "Nome do Dispositivo"
@@ -777,10 +809,16 @@ msgstr "ID do Usuario de Destino"
 msgid "To Channel ID"
 msgstr "ID do Canal de Destino"
 
+#: apprise/plugins/flowtriq.py:129 apprise/plugins/matrix/base.py:340
+#, fuzzy
+msgid "Webhook Path"
+msgstr "Webhook"
+
 #: apprise/plugins/fcm/__init__.py:182 apprise/plugins/fcm/__init__.py:188
-#: apprise/plugins/fluxer.py:195 apprise/plugins/lametric.py:510
-#: apprise/plugins/mattermost.py:224 apprise/plugins/notificationapi.py:218
-#: apprise/plugins/ntfy.py:296 apprise/plugins/office365.py:319
+#: apprise/plugins/fluxer.py:195 apprise/plugins/kook.py:196
+#: apprise/plugins/lametric.py:510 apprise/plugins/mattermost.py:224
+#: apprise/plugins/notificationapi.py:218 apprise/plugins/notifyre.py:157
+#: apprise/plugins/ntfy.py:297 apprise/plugins/office365.py:319
 #: apprise/plugins/sns.py:202 apprise/plugins/vapid/__init__.py:169
 #: apprise/plugins/webexteams.py:197 apprise/plugins/zoom.py:158
 #, fuzzy
@@ -827,16 +865,16 @@ msgstr "Um ambiente Gnome local e necessario."
 msgid "Gnome Notification"
 msgstr "Notificacao Gnome"
 
-#: apprise/plugins/google_chat.py:106
+#: apprise/plugins/google_chat.py:115
 msgid "Workspace"
 msgstr "Espaco de Trabalho"
 
-#: apprise/plugins/google_chat.py:112
+#: apprise/plugins/google_chat.py:121
 #, fuzzy
 msgid "Webhook Key"
 msgstr "Chave do Webhook"
 
-#: apprise/plugins/google_chat.py:124
+#: apprise/plugins/google_chat.py:133
 #, fuzzy
 msgid "Thread Key"
 msgstr "Chave da Thread"
@@ -910,7 +948,7 @@ msgstr "Agendamento de Destino"
 #: apprise/plugins/matrix/base.py:289 apprise/plugins/nextcloud.py:136
 #: apprise/plugins/one_signal.py:129 apprise/plugins/opsgenie.py:250
 #: apprise/plugins/pushed.py:95 apprise/plugins/rocketchat.py:156
-#: apprise/plugins/slack.py:261 apprise/plugins/twitter.py:187
+#: apprise/plugins/slack.py:269 apprise/plugins/twitter.py:187
 #: apprise/plugins/wechat.py:198 apprise/plugins/xmpp/base.py:123
 #: apprise/plugins/zulip.py:143
 msgid "Target User"
@@ -960,7 +998,7 @@ msgid "Device Name"
 msgstr "Nome do Dispositivo"
 
 #: apprise/plugins/kavenegar.py:122 apprise/plugins/messagebird.py:85
-#: apprise/plugins/plivo.py:100
+#: apprise/plugins/notifyre.py:163 apprise/plugins/plivo.py:100
 #, fuzzy
 msgid "Source Phone No"
 msgstr "Numero de Telefone de Origem"
@@ -1012,7 +1050,7 @@ msgid "Lark (Feishu)"
 msgstr "Lark (Feishu)"
 
 #: apprise/plugins/lark.py:67 apprise/plugins/revolt.py:98
-#: apprise/plugins/telegram.py:344
+#: apprise/plugins/telegram.py:350
 msgid "Bot Token"
 msgstr "Token do Bot"
 
@@ -1030,31 +1068,30 @@ msgstr "Notificacao MacOSX"
 msgid "Open/Click URL"
 msgstr "URL de Abertura/Clique"
 
-#: apprise/plugins/email/base.py:148 apprise/plugins/mailgun.py:141
+#: apprise/plugins/email/base.py:200 apprise/plugins/mailersend.py:165
+#: apprise/plugins/notificationapi.py:223 apprise/plugins/office365.py:315
+#: apprise/plugins/resend.py:150
+msgid "Reply To"
+msgstr "Responder Para"
+
+#: apprise/plugins/email/base.py:152 apprise/plugins/mailgun.py:141
 #: apprise/plugins/sendpulse.py:115 apprise/plugins/smtp2go.py:113
 #: apprise/plugins/sparkpost.py:164
 msgid "Domain"
 msgstr "Dominio"
 
-#: apprise/plugins/email/base.py:179 apprise/plugins/mailgun.py:168
+#: apprise/plugins/email/base.py:183 apprise/plugins/mailgun.py:168
 #: apprise/plugins/postmark.py:144 apprise/plugins/resend.py:140
 #: apprise/plugins/ses.py:210 apprise/plugins/smtp2go.py:135
 #: apprise/plugins/sparkpost.py:186
 msgid "From Name"
 msgstr "Nome de Origem"
 
-#: apprise/plugins/email/base.py:253 apprise/plugins/mailgun.py:204
+#: apprise/plugins/email/base.py:262 apprise/plugins/mailgun.py:204
 #: apprise/plugins/smtp2go.py:161 apprise/plugins/sparkpost.py:219
 #, fuzzy
 msgid "Email Header"
 msgstr "Cabecalho de E-mail"
-
-#: apprise/plugins/mailgun.py:208 apprise/plugins/notificationapi.py:256
-#: apprise/plugins/slack.py:340 apprise/plugins/sparkpost.py:223
-#: apprise/plugins/workflows.py:202
-#, fuzzy
-msgid "Template Tokens"
-msgstr "Tokens do Template"
 
 #: apprise/plugins/mastodon.py:216 apprise/plugins/misskey.py:143
 msgid "Visibility"
@@ -1094,7 +1131,7 @@ msgstr "Usuario"
 #: apprise/plugins/irc/base.py:143 apprise/plugins/mattermost.py:177
 #: apprise/plugins/notifiarr.py:97 apprise/plugins/pushbullet.py:94
 #: apprise/plugins/pushed.py:101 apprise/plugins/rocketchat.py:150
-#: apprise/plugins/slack.py:267 apprise/plugins/twist.py:112
+#: apprise/plugins/slack.py:275 apprise/plugins/twist.py:112
 #: apprise/plugins/xmpp/base.py:128
 msgid "Target Channel"
 msgstr "Canal de Destino"
@@ -1190,12 +1227,7 @@ msgstr "SMS de Destino"
 msgid "Channels"
 msgstr "Canais"
 
-#: apprise/plugins/email/base.py:196 apprise/plugins/notificationapi.py:223
-#: apprise/plugins/office365.py:315 apprise/plugins/resend.py:150
-msgid "Reply To"
-msgstr "Responder Para"
-
-#: apprise/plugins/email/base.py:174 apprise/plugins/notificationapi.py:228
+#: apprise/plugins/email/base.py:178 apprise/plugins/notificationapi.py:228
 #: apprise/plugins/sendpulse.py:150 apprise/plugins/ses.py:163
 msgid "From Email"
 msgstr "E-mail de Origem"
@@ -1217,33 +1249,56 @@ msgstr "Cores IRC"
 msgid "Prefix"
 msgstr "Prefixo"
 
+#: apprise/plugins/notifyre.py:168
+#, fuzzy
+msgid "Campaign Name"
+msgstr "Nome de Usuario de API"
+
+#: apprise/plugins/notifyre.py:172 apprise/plugins/whatsapp.py:128
+msgid "Template Name"
+msgstr "Nome do Template"
+
+#: apprise/plugins/notifyre.py:176
+#, fuzzy
+msgid "Client Reference"
+msgstr "Segredo do Cliente"
+
+#: apprise/plugins/notifyre.py:180
+msgid "High Quality"
+msgstr ""
+
+#: apprise/plugins/notifyre.py:185
+#, fuzzy
+msgid "Fax Header"
+msgstr "Cabecalho de E-mail"
+
 #: apprise/plugins/ntfy.py:235
 msgid "Topic"
 msgstr "Topico"
 
-#: apprise/plugins/ntfy.py:252
+#: apprise/plugins/ntfy.py:253
 msgid "Attach"
 msgstr "Anexar"
 
-#: apprise/plugins/ntfy.py:266
+#: apprise/plugins/ntfy.py:267
 msgid "Attach Filename"
 msgstr "Nome do Arquivo Anexado"
 
-#: apprise/plugins/ntfy.py:274
+#: apprise/plugins/ntfy.py:275
 msgid "Delay"
 msgstr "Atraso"
 
-#: apprise/plugins/ntfy.py:278 apprise/plugins/twist.py:107
+#: apprise/plugins/ntfy.py:279 apprise/plugins/twist.py:107
 #, fuzzy
 msgid "Email"
 msgstr "E-mail"
 
-#: apprise/plugins/ntfy.py:292
+#: apprise/plugins/ntfy.py:293
 #, fuzzy
 msgid "Actions"
 msgstr "Acoes"
 
-#: apprise/plugins/ntfy.py:305
+#: apprise/plugins/ntfy.py:306
 #, fuzzy
 msgid "Authentication Type"
 msgstr "Tipo de Autenticacao"
@@ -1325,7 +1380,8 @@ msgstr "Dados Personalizados"
 msgid "Postback Data"
 msgstr "Dados de Postback"
 
-#: apprise/plugins/pagerduty.py:138 apprise/plugins/spike.py:68
+#: apprise/plugins/pagerduty.py:138 apprise/plugins/pushward.py:134
+#: apprise/plugins/spike.py:68
 #, fuzzy
 msgid "Integration Key"
 msgstr "Chave de Integracao"
@@ -1464,6 +1520,24 @@ msgstr "Chave Privada"
 msgid "Vibration"
 msgstr "Vibracao"
 
+#: apprise/plugins/pushward.py:158
+#, fuzzy
+msgid "Info Level"
+msgstr "Nivel"
+
+#: apprise/plugins/pushward.py:164
+#, fuzzy
+msgid "Success Level"
+msgstr "Segredo de Acesso"
+
+#: apprise/plugins/pushward.py:170
+msgid "Warning Level"
+msgstr ""
+
+#: apprise/plugins/pushward.py:176
+msgid "Failure Level"
+msgstr ""
+
 #: apprise/plugins/pushy.py:79
 #, fuzzy
 msgid "Secret API Key"
@@ -1582,6 +1656,17 @@ msgstr "Organizacao"
 msgid "Template Data"
 msgstr "Dados do Template"
 
+#: apprise/plugins/serwersms.py:142 apprise/plugins/sfr.py:131
+#, fuzzy
+msgid "Sender Name"
+msgstr "Nome do Remetente"
+
+#: apprise/plugins/serwersms.py:155 apprise/plugins/signal_api.py:131
+#: apprise/plugins/smseagle.py:158 apprise/plugins/whatsapp.py:159
+#, fuzzy
+msgid "Target Group ID"
+msgstr "ID do Grupo de Destino"
+
 #: apprise/plugins/ses.py:157 apprise/plugins/sns.py:132
 #, fuzzy
 msgid "Session Token"
@@ -1636,11 +1721,6 @@ msgstr "ID do Espaco"
 msgid "Recipient Phone Number"
 msgstr "Numero de Telefone do Destinatario"
 
-#: apprise/plugins/sfr.py:131
-#, fuzzy
-msgid "Sender Name"
-msgstr "Nome do Remetente"
-
 #: apprise/plugins/sfr.py:138
 msgid "Media Type"
 msgstr "Tipo de Midia"
@@ -1654,12 +1734,6 @@ msgstr "Tempo Limite"
 #, fuzzy
 msgid "TTS Voice"
 msgstr "Voz TTS"
-
-#: apprise/plugins/signal_api.py:131 apprise/plugins/smseagle.py:158
-#: apprise/plugins/whatsapp.py:159
-#, fuzzy
-msgid "Target Group ID"
-msgstr "ID do Grupo de Destino"
 
 #: apprise/plugins/signl4.py:89
 #, fuzzy
@@ -1702,54 +1776,50 @@ msgstr "Evento"
 msgid "Target Short Code"
 msgstr "Codigo Curto de Destino"
 
-#: apprise/plugins/slack.py:216
+#: apprise/plugins/slack.py:224
 #, fuzzy
 msgid "OAuth Access Token"
 msgstr "Token de Acesso OAuth"
 
-#: apprise/plugins/slack.py:225
+#: apprise/plugins/slack.py:233
 msgid "Token A"
 msgstr "Token A"
 
-#: apprise/plugins/slack.py:234
+#: apprise/plugins/slack.py:242
 msgid "Token B"
 msgstr "Token B"
 
-#: apprise/plugins/slack.py:243
+#: apprise/plugins/slack.py:251
 msgid "Token C"
 msgstr "Token C"
 
-#: apprise/plugins/slack.py:250
+#: apprise/plugins/slack.py:258
 msgid "Target Encoded ID"
 msgstr "ID Codificado de Destino"
 
-#: apprise/plugins/slack.py:279
+#: apprise/plugins/slack.py:287
 #, fuzzy
 msgid "Workflow Path"
 msgstr "ID do Fluxo de Trabalho"
 
-#: apprise/plugins/slack.py:297
+#: apprise/plugins/slack.py:305
 #, fuzzy
 msgid "Include Footer"
 msgstr "Incluir Rodape"
 
-#: apprise/plugins/slack.py:305
+#: apprise/plugins/slack.py:313
 msgid "Use Blocks"
 msgstr "Usar Blocos"
 
-#: apprise/plugins/slack.py:311
+#: apprise/plugins/slack.py:319
 #, fuzzy
 msgid "Include Timestamp"
 msgstr "Incluir Timestamp"
 
-#: apprise/plugins/slack.py:317 apprise/plugins/twitter.py:204
+#: apprise/plugins/slack.py:325 apprise/plugins/twitter.py:204
 #, fuzzy
 msgid "Message Mode"
 msgstr "Modo de Mensagem"
-
-#: apprise/plugins/slack.py:330 apprise/plugins/workflows.py:181
-msgid "Template Path"
-msgstr "Caminho do Template"
 
 #: apprise/plugins/smpp.py:61
 msgid "SMPP"
@@ -1759,6 +1829,15 @@ msgstr "SMPP"
 #, fuzzy
 msgid "Host"
 msgstr "Host"
+
+#: apprise/plugins/smsc.py:138
+#, fuzzy
+msgid "Login"
+msgstr "Token de API"
+
+#: apprise/plugins/smsc.py:175
+msgid "Transliterate"
+msgstr ""
 
 #: apprise/plugins/smseagle.py:165
 #, fuzzy
@@ -1852,32 +1931,32 @@ msgstr "Enviar"
 msgid "Log to STDERR"
 msgstr "Registrar no STDERR"
 
-#: apprise/plugins/telegram.py:353
+#: apprise/plugins/telegram.py:359
 msgid "Target Chat ID"
 msgstr "ID do Chat de Destino"
 
-#: apprise/plugins/telegram.py:376
+#: apprise/plugins/telegram.py:382
 msgid "Detect Bot Owner"
 msgstr "Detectar Proprietario do Bot"
 
-#: apprise/plugins/telegram.py:382
+#: apprise/plugins/telegram.py:388
 msgid "Silent Notification"
 msgstr "Notificacao Silenciosa"
 
-#: apprise/plugins/telegram.py:387
+#: apprise/plugins/telegram.py:393
 msgid "Web Page Preview"
 msgstr "Pre-visualizacao de Pagina Web"
 
-#: apprise/plugins/telegram.py:392
+#: apprise/plugins/telegram.py:398
 msgid "Topic Thread ID"
 msgstr "ID de Thread do Topico"
 
-#: apprise/plugins/telegram.py:399
+#: apprise/plugins/telegram.py:405
 #, fuzzy
 msgid "Markdown Version"
 msgstr "Versao do Markdown"
 
-#: apprise/plugins/telegram.py:408
+#: apprise/plugins/telegram.py:414
 msgid "Content Placement"
 msgstr "Posicionamento de Conteudo"
 
@@ -1973,10 +2052,6 @@ msgstr "Equipe de Destino"
 msgid "Bot Webhook Key"
 msgstr "Chave Webhook do Bot"
 
-#: apprise/plugins/whatsapp.py:128
-msgid "Template Name"
-msgstr "Nome do Template"
-
 #: apprise/plugins/whatsapp.py:134
 #, fuzzy
 msgid "From Phone ID"
@@ -1986,24 +2061,24 @@ msgstr "ID do Telefone de Origem"
 msgid "A local Microsoft Windows environment is required."
 msgstr "Um ambiente Microsoft Windows local e necessario."
 
-#: apprise/plugins/workflows.py:138
+#: apprise/plugins/workflows.py:150
 #, fuzzy
 msgid "Workflow ID"
 msgstr "ID do Fluxo de Trabalho"
 
-#: apprise/plugins/workflows.py:146
+#: apprise/plugins/workflows.py:158
 msgid "Signature"
 msgstr "Assinatura"
 
-#: apprise/plugins/workflows.py:169
+#: apprise/plugins/workflows.py:181
 msgid "Use Power Automate URL"
 msgstr "Usar URL do Power Automate"
 
-#: apprise/plugins/workflows.py:176
+#: apprise/plugins/workflows.py:188
 msgid "Wrap Text"
 msgstr "Quebrar Texto"
 
-#: apprise/plugins/workflows.py:191
+#: apprise/plugins/workflows.py:203
 #, fuzzy
 msgid "API Version"
 msgstr "Versao da API"
@@ -2028,33 +2103,38 @@ msgstr "Token de Autenticacao"
 msgid "Target Stream"
 msgstr "Stream de Destino"
 
-#: apprise/plugins/email/base.py:184
+#: apprise/plugins/email/base.py:188
 msgid "SMTP Server"
 msgstr "Servidor SMTP"
 
-#: apprise/plugins/email/base.py:189 apprise/plugins/xmpp/base.py:149
+#: apprise/plugins/email/base.py:193 apprise/plugins/xmpp/base.py:149
 msgid "Secure Mode"
 msgstr "Modo Seguro"
 
-#: apprise/plugins/email/base.py:201
+#: apprise/plugins/email/base.py:205
 #, fuzzy
 msgid "PGP Security Mode"
 msgstr "Modo Seguro"
 
-#: apprise/plugins/email/base.py:208
+#: apprise/plugins/email/base.py:212
 msgid "PGP Public Key Path"
 msgstr "Caminho da Chave Publica PGP"
 
-#: apprise/plugins/email/base.py:221
+#: apprise/plugins/email/base.py:225
 #, fuzzy
 msgid "PGP Private Key Path"
 msgstr "Caminho da Chave Publica PGP"
 
-#: apprise/plugins/email/base.py:229
+#: apprise/plugins/email/base.py:233
 msgid "Web Key Directory"
 msgstr ""
 
-#: apprise/plugins/email/base.py:235
+#: apprise/plugins/email/base.py:239
+#, fuzzy
+msgid "Inline Attachments"
+msgstr "Anexos Sensiveis"
+
+#: apprise/plugins/email/base.py:244
 msgid "To Email"
 msgstr "Para E-mail"
 
@@ -2105,11 +2185,6 @@ msgstr "Descoberta de Servidor"
 #: apprise/plugins/matrix/base.py:329
 msgid "Force Home Server on Room IDs"
 msgstr "Forcar Servidor Home nos IDs de Sala"
-
-#: apprise/plugins/matrix/base.py:340
-#, fuzzy
-msgid "Webhook Path"
-msgstr "Webhook"
 
 #: apprise/plugins/matrix/base.py:346
 msgid "Matrix API Verion"

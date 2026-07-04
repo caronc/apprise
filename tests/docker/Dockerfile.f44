@@ -37,7 +37,7 @@
 # advance and just force them.
 #
 # Base
-FROM fedora:42
+FROM fedora:44
 ENV container=docker
 
 # https://bugzilla.redhat.com/show_bug.cgi?id=2216807 workaround
@@ -64,7 +64,7 @@ RUN rpmspec -q --buildrequires /python-apprise.spec | cut -f1 -d' ' | \
     xargs dnf install -y && dnf clean all
 
 # RPM Build Structure Setup
-ENV FLAVOR=rpmbuild OS=centos DIST=f42
+ENV FLAVOR=rpmbuild OS=centos DIST=f44
 RUN useradd builder -u 1000 -m -G users,wheel &>/dev/null && \
     echo "builder ALL=(ALL:ALL) NOPASSWD:ALL" >> /etc/sudoers
 

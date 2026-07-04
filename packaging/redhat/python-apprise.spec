@@ -94,7 +94,7 @@ notification services. It supports sending alerts to platforms such as: \
 `Webex Teams`, `Workflows`, `WxPusher`, `XBMC`, `XMPP`, `Zoom`, and `Zulip`.}
 
 Name:           python-%{pypi_name}
-Version:        1.11.0
+Version:        1.12.0
 Release:        1%{?dist}
 Summary:        A simple wrapper to many popular notification services used today
 License:        BSD-2-Clause
@@ -129,6 +129,8 @@ BuildRequires: python%{python3_pkgversion}-devel
 
 %if %{legacy_python_build}
 BuildRequires: python3dist(setuptools)
+%else
+BuildRequires: python3dist(setuptools) >= 69
 %endif
 
 BuildRequires: python3dist(wheel)
@@ -247,6 +249,12 @@ LANG=C.UTF-8 PYTHONPATH=%{buildroot}%{python3_sitelib}:%{_builddir}/%{name}-%{ve
 %{python3_sitelib}/%{pypi_name}/__pycache__/cli*.py?
 
 %changelog
+* Sat Jul  4 2026 Chris Caron <lead2gold@gmail.com> - 1.12.0-1
+- Updated to v1.12.0
+
+* Thu Jun 04 2026 Python Maint <python-maint@redhat.com> - 1.11.0-2
+- Rebuilt for Python 3.15
+
 * Fri May 29 2026 Chris Caron <lead2gold@gmail.com> - 1.11.0-1
 - Updated to v1.11.0
 

@@ -53,10 +53,10 @@ services:
     working_dir: /apprise
     user: "1000:1000"
 
-  rpmbuild.f42:
+  rpmbuild.f44:
     build:
       context: .
-      dockerfile: tests/docker/Dockerfile.f42
+      dockerfile: tests/docker/Dockerfile.f44
     volumes:
       - ./:/apprise
     working_dir: /apprise
@@ -95,5 +95,5 @@ services:
 #  - docker-compose run --rm rpmbuild.el9 /apprise/bin/build-rpm.sh
 # el10
 #  - docker-compose run --rm rpmbuild.el10 /apprise/bin/build-rpm.sh
-# f42 (Fedora)
-#  - docker-compose run --rm rpmbuild.f42 /apprise/bin/build-rpm.sh
+# f44 (Fedora)
+#  - docker-compose run --rm rpmbuild.f44 /apprise/bin/build-rpm.sh
