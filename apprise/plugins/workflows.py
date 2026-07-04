@@ -369,7 +369,9 @@ class NotifyWorkflows(NotifyBase):
 
                 seen[key] = {
                     "type": "mention",
-                    "text": f"<at>{key}</at>",
+                    # Preserve the original tag because Teams matches mention
+                    # text verbatim, including its casing and whitespace.
+                    "text": m.group(0),
                     "mentioned": {
                         "id": key,
                         "name": key,
@@ -377,9 +379,14 @@ class NotifyWorkflows(NotifyBase):
                 }
 
             # Build the Teams metadata and include entities only when present.
-            msteams = {"width": "full"}
-            if seen:
-                msteams["entities"] = list(seen.values())
+            msteams = (
+                {
+                    "width": "full",
+                    "entities": list(seen.values()),
+                }
+                if seen
+                else {"width": "full"}
+            )
 
             payload = {
                 "type": "message",
@@ -432,12 +439,8 @@ class NotifyWorkflows(NotifyBase):
         # Enforce Application mode
         tokens["app_mode"] = TemplateType.JSON
 
-        # Coerce all substitution values to str before JSON-escaping.
-        # apply_template's _escape_json() calls json.dumps(v)[1:-1] which
-        # is only correct for strings; None produces "ul" and other non-
-        # string types produce similarly corrupted output.  app_mode is a
-        # TemplateType sentinel passed as a named parameter, not a
-        # substitution value, so it is left as-is.
+        # JSON escaping expects string substitutions; map None to empty text.
+        # Preserve app_mode because it controls the template escaping mode.
         safe_tokens = {
             k: (
                 v

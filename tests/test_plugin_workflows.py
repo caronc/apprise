@@ -1018,3 +1018,32 @@ def test_plugin_workflows_mention_entities(mock_post):
         assert msteams == {"width": "full"}, (
             f"expected no entities for {bad_body!r}"
         )
+
+    mock_post.reset_mock()
+
+    # Preserve mixed-case entity text for Teams' verbatim body match.
+    assert (
+        aobj.notify(
+            body="Hi <AT>user@example.com</AT>!",
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    entity = payload["attachments"][0]["content"]["msteams"]["entities"][0]
+    assert entity["text"] == "<AT>user@example.com</AT>"
+    assert entity["mentioned"]["id"] == "user@example.com"
+    mock_post.reset_mock()
+
+    # Preserve tag padding while trimming the ID used for user resolution.
+    assert (
+        aobj.notify(
+            body="Hi <at>  padded@example.com  </at>!",
+            title="T",
+        )
+        is True
+    )
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    entity = payload["attachments"][0]["content"]["msteams"]["entities"][0]
+    assert entity["text"] == "<at>  padded@example.com  </at>"
+    assert entity["mentioned"]["id"] == "padded@example.com"
