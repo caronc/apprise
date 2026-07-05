@@ -301,11 +301,13 @@ def test_notify_apprise_api_payload_check(mock_post):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -329,11 +331,13 @@ def test_notify_apprise_api_payload_check(mock_post):
     assert isinstance(obj, NotifyAppriseAPI)
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -381,11 +385,13 @@ def test_notify_apprise_api_attachments(mock_post):
         path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
         attach = AppriseAttachment(path)
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
@@ -395,11 +401,13 @@ def test_notify_apprise_api_attachments(mock_post):
             TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg"
         )
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=path,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=path,
+                )
             )
             is False
         )
@@ -419,11 +427,13 @@ def test_notify_apprise_api_attachments(mock_post):
             # We can't send the message we can't open the attachment for
             # reading
             assert (
-                obj.notify(
-                    body="body",
-                    title="title",
-                    notify_type=NotifyType.INFO,
-                    attach=attach,
+                bool(
+                    obj.notify(
+                        body="body",
+                        title="title",
+                        notify_type=NotifyType.INFO,
+                        attach=attach,
+                    )
                 )
                 is False
             )
@@ -431,11 +441,13 @@ def test_notify_apprise_api_attachments(mock_post):
         with mock.patch("requests.post", side_effect=OSError()):
             # Attachment issue
             assert (
-                obj.notify(
-                    body="body",
-                    title="title",
-                    notify_type=NotifyType.INFO,
-                    attach=attach,
+                bool(
+                    obj.notify(
+                        body="body",
+                        title="title",
+                        notify_type=NotifyType.INFO,
+                        attach=attach,
+                    )
                 )
                 is False
             )
@@ -448,11 +460,13 @@ def test_notify_apprise_api_attachments(mock_post):
         mock_post.reset_mock()
 
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )

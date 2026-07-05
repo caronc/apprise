@@ -197,7 +197,7 @@ def test_plugin_groupme_send(mock_post):
     assert isinstance(obj, NotifyGroupMe)
 
     # Successful send
-    assert obj.notify(body="Test message") is True
+    assert bool(obj.notify(body="Test message")) is True
     assert mock_post.call_count == 1
 
     # Verify the correct URL host was used
@@ -208,49 +208,49 @@ def test_plugin_groupme_send(mock_post):
 
     # 200 OK also accepted as success
     mock_post.return_value = _mk_resp(requests.codes.ok)
-    assert obj.notify(body="Test message") is True
+    assert bool(obj.notify(body="Test message")) is True
 
     mock_post.reset_mock()
 
     # HTTP 400 returns False
     mock_post.return_value = _mk_resp(requests.codes.bad_request)
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
     mock_post.reset_mock()
 
     # HTTP 401 returns False
     mock_post.return_value = _mk_resp(requests.codes.unauthorized)
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
     mock_post.reset_mock()
 
     # HTTP 404 returns False
     mock_post.return_value = _mk_resp(requests.codes.not_found)
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
     mock_post.reset_mock()
 
     # HTTP 429 returns False
     mock_post.return_value = _mk_resp(429)
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
     mock_post.reset_mock()
 
     # HTTP 500 returns False
     mock_post.return_value = _mk_resp(requests.codes.internal_server_error)
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
     mock_post.reset_mock()
 
     # Unknown error code returns False
     mock_post.return_value = _mk_resp(999)
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
     mock_post.reset_mock()
 
     # RequestException returns False
     mock_post.side_effect = requests.RequestException("Network error")
-    assert obj.notify(body="Test message") is False
+    assert bool(obj.notify(body="Test message")) is False
 
 
 @mock.patch("requests.post")
@@ -273,7 +273,7 @@ def test_plugin_groupme_attach_no_token(mock_post):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     # Attachment send without token -- text message still succeeds
-    assert obj.notify(body="Test", attach=attach) is True
+    assert bool(obj.notify(body="Test", attach=attach)) is True
 
     # Only the bot POST is made (no upload call since no token)
     assert mock_post.call_count == 1
@@ -300,7 +300,7 @@ def test_plugin_groupme_attach_success(mock_post):
     obj = NotifyGroupMe(bot_id=TEST_BOT_ID, token=TEST_TOKEN)
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Test", attach=attach) is True
+    assert bool(obj.notify(body="Test", attach=attach)) is True
 
     # Two requests: upload + bot post
     assert mock_post.call_count == 2
@@ -333,7 +333,7 @@ def test_plugin_groupme_attach_inaccessible(mock_post):
 
     # Simulate the file being inaccessible (isfile returns False)
     with mock.patch("os.path.isfile", return_value=False):
-        assert obj.notify(body="Test", attach=attach) is False
+        assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # No HTTP calls should have been made
     assert mock_post.call_count == 0
@@ -358,7 +358,7 @@ def test_plugin_groupme_attach_oserror(mock_post):
 
     # Simulate an I/O error when opening the file
     with mock.patch("builtins.open", side_effect=OSError("disk error")):
-        assert obj.notify(body="Test", attach=attach) is False
+        assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # No HTTP calls should have been made
     assert mock_post.call_count == 0
@@ -381,7 +381,7 @@ def test_plugin_groupme_attach_upload_http_error(mock_post):
     obj = NotifyGroupMe(bot_id=TEST_BOT_ID, token=TEST_TOKEN)
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # Only the upload attempt was made (bot post never called)
     assert mock_post.call_count == 1
@@ -397,7 +397,7 @@ def test_plugin_groupme_attach_upload_request_exception(mock_post):
 
     # Simulate a network error during the image upload
     mock_post.side_effect = requests.RequestException("Network error")
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
     # Only the upload attempt was made
     assert mock_post.call_count == 1
@@ -420,13 +420,13 @@ def test_plugin_groupme_attach_bad_response(mock_post):
     obj = NotifyGroupMe(bot_id=TEST_BOT_ID, token=TEST_TOKEN)
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
     mock_post.reset_mock()
 
     # Upload returns 200 but with invalid JSON
     mock_post.return_value = _mk_resp(requests.codes.ok, b"not-json")
-    assert obj.notify(body="Test", attach=attach) is False
+    assert bool(obj.notify(body="Test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -450,7 +450,7 @@ def test_plugin_groupme_attach_non_image(mock_post):
     )
 
     # Non-image attachment is skipped; text message still succeeds
-    assert obj.notify(body="Test", attach=attach) is True
+    assert bool(obj.notify(body="Test", attach=attach)) is True
 
     # Only the bot POST is made (no upload attempted for non-image file)
     assert mock_post.call_count == 1
@@ -481,7 +481,7 @@ def test_plugin_groupme_attach_multi(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"))
 
-    assert obj.notify(body="Test", attach=attach) is True
+    assert bool(obj.notify(body="Test", attach=attach)) is True
 
     # 2 uploads + 1 bot post
     assert mock_post.call_count == 3
@@ -615,7 +615,7 @@ def test_plugin_groupme_apprise_integration(mock_post):
     assert len(a) == 1
     assert isinstance(a[0], NotifyGroupMe)
 
-    assert a.notify(body="Test", title="Title") is True
+    assert bool(a.notify(body="Test", title="Title")) is True
     assert mock_post.call_count == 1
 
     mock_post.reset_mock()
@@ -629,11 +629,11 @@ def test_plugin_groupme_apprise_integration(mock_post):
     assert isinstance(a2[0], NotifyGroupMe)
 
     mock_post.return_value = _mk_resp(requests.codes.accepted)
-    assert a2.notify(body="Test", title="Title") is True
+    assert bool(a2.notify(body="Test", title="Title")) is True
     assert mock_post.call_count == 1
 
     mock_post.reset_mock()
 
     # Failure response
     mock_post.return_value = _mk_resp(requests.codes.internal_server_error)
-    assert a.notify(body="Test") is False
+    assert bool(a.notify(body="Test")) is False

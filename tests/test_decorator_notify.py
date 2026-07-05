@@ -96,14 +96,16 @@ def test_notify_simple_decoration():
     assert len(verify_obj) == 0
 
     assert (
-        aobj.notify(
-            "Hello World",
-            title="My Title",
-            # add some attachments too
-            attach=(
-                join(TEST_VAR_DIR, "apprise-test.gif"),
-                join(TEST_VAR_DIR, "apprise-test.png"),
-            ),
+        bool(
+            aobj.notify(
+                "Hello World",
+                title="My Title",
+                # add some attachments too
+                attach=(
+                    join(TEST_VAR_DIR, "apprise-test.gif"),
+                    join(TEST_VAR_DIR, "apprise-test.png"),
+                ),
+            )
         )
         is True
     )
@@ -138,7 +140,7 @@ def test_notify_simple_decoration():
     verify_obj = {}
 
     # Send unicode
-    assert aobj.notify("ツ".encode()) is True
+    assert bool(aobj.notify("ツ".encode())) is True
     # Our content was populated after the notify() call
     assert len(verify_obj) > 0
     assert verify_obj["body"] == "ツ"  # content comes back as str (utf-8)
@@ -168,7 +170,7 @@ def test_notify_simple_decoration():
     verify_obj = {}
 
     # Send utf-8 string
-    assert aobj.notify("ツ") is True
+    assert bool(aobj.notify("ツ")) is True
 
     assert len(verify_obj) > 0
     assert verify_obj["body"] == "ツ"  # content comes back as str (utf-8)
@@ -196,16 +198,16 @@ def test_notify_simple_decoration():
 
     # Some cases that will fail internal validation:
     # - No Body
-    assert aobj.notify("") is False
+    assert bool(aobj.notify("")) is False
     # - Title only
-    assert aobj.notify("", title="hello world!") is False
+    assert bool(aobj.notify("", title="hello world!")) is False
 
     # Reset our verify object (so it can be populated again)
     verify_obj = {}
 
     # No Body but has attachment (valid)
     assert (
-        aobj.notify("", attach=(join(TEST_VAR_DIR, "apprise-test.png"),))
+        bool(aobj.notify("", attach=(join(TEST_VAR_DIR, "apprise-test.png"),)))
         is True
     )
 
@@ -240,11 +242,13 @@ def test_notify_simple_decoration():
 
     # We'll do another test now
     assert (
-        aobj.notify(
-            "Hello Another World",
-            title="My Other Title",
-            body_format=common.NotifyFormat.HTML,
-            notify_type=common.NotifyType.WARNING,
+        bool(
+            aobj.notify(
+                "Hello Another World",
+                title="My Other Title",
+                body_format=common.NotifyFormat.HTML,
+                notify_type=common.NotifyType.WARNING,
+            )
         )
         is True
     )
@@ -290,7 +294,7 @@ def test_notify_simple_decoration():
     assert aobj.add("notexc://") is True
 
     # Isn't handled
-    assert aobj.notify("Exceptions will be thrown!") is False
+    assert bool(aobj.notify("Exceptions will be thrown!")) is False
 
     # Tidy
     N_MGR.remove("utiltest", "notexc")
@@ -337,14 +341,16 @@ def test_notify_complex_decoration():
     assert len(verify_obj) == 0
 
     assert (
-        aobj.notify(
-            "Hello World",
-            title="My Title",
-            # add some attachments too
-            attach=(
-                join(TEST_VAR_DIR, "apprise-test.gif"),
-                join(TEST_VAR_DIR, "apprise-test.png"),
-            ),
+        bool(
+            aobj.notify(
+                "Hello World",
+                title="My Title",
+                # add some attachments too
+                attach=(
+                    join(TEST_VAR_DIR, "apprise-test.gif"),
+                    join(TEST_VAR_DIR, "apprise-test.png"),
+                ),
+            )
         )
         is True
     )
@@ -400,7 +406,7 @@ def test_notify_complex_decoration():
     assert len(verify_obj) == 0
 
     # Send our notification
-    assert aobj.notify("Hello World", title="My Title") is True
+    assert bool(aobj.notify("Hello World", title="My Title")) is True
 
     # Our content was populated after the notify() call
     assert len(verify_obj) > 0
@@ -495,7 +501,7 @@ def test_notify_decorator_urls_with_space():
     assert len(verify_obj) == 0
 
     # Send utf-8 characters
-    assert aobj.notify("ツ".encode(), title="My Title") is True
+    assert bool(aobj.notify("ツ".encode(), title="My Title")) is True
 
     # Service notified
     assert len(verify_obj) == 1
@@ -590,7 +596,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert len(verify_obj) == 0
 
     # Send utf-8 characters
-    assert aobj.notify("ツ".encode(), title="My Title") is True
+    assert bool(aobj.notify("ツ".encode(), title="My Title")) is True
 
     assert len(verify_obj) == 2
 

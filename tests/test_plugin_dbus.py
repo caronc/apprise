@@ -183,7 +183,7 @@ def test_plugin_dbus_send_success(mock_dbus_module, mocker):
     obj = NotifyDBus()
 
     # Send notification
-    assert obj.notify(title="Title", body="Body") is True
+    assert bool(obj.notify(title="Title", body="Body")) is True
 
     # VERIFICATION
     # Check SessionBus was called
@@ -232,7 +232,7 @@ def test_plugin_dbus_send_connection_failure(mock_dbus_module):
 
     obj = NotifyDBus()
     # Should handle exception and return False
-    assert obj.notify(title="T", body="B") is False
+    assert bool(obj.notify(title="T", body="B")) is False
 
 
 def test_plugin_dbus_send_notify_failure(mock_dbus_module):
@@ -247,7 +247,7 @@ def test_plugin_dbus_send_notify_failure(mock_dbus_module):
     mock_interface.Notify.side_effect = Exception("Generic Failure")
 
     obj = NotifyDBus()
-    assert obj.notify(title="T", body="B") is False
+    assert bool(obj.notify(title="T", body="B")) is False
 
 
 def test_plugin_dbus_image_loading_failure(mock_dbus_module, mocker):
@@ -269,7 +269,7 @@ def test_plugin_dbus_image_loading_failure(mock_dbus_module, mocker):
     spy_logger = mocker.spy(obj, "logger")
 
     # Notification should still succeed (return True), just log a warning
-    assert obj.notify(title="T", body="B") is True
+    assert bool(obj.notify(title="T", body="B")) is True
 
     # Verify the warning was logged
     spy_logger.warning.assert_called_with(
@@ -338,7 +338,7 @@ def test_plugin_dbus_send_sets_xy_meta_payload(mock_dbus_module):
     mock_interface = mock_dbus_module.Interface.return_value
     obj = NotifyDBus(x_axis=100, y_axis=200)
 
-    assert obj.notify(title="T", body="B") is True
+    assert bool(obj.notify(title="T", body="B")) is True
 
     args, _ = mock_interface.Notify.call_args
     # meta output (app, id, icon, title, body, actions, meta, timeout)
@@ -365,7 +365,7 @@ def test_plugin_dbus_send_image_condition_false_skips_pixbuf(
     # Ensure image_path is not even consulted when include_image=False
     spy_image_path = mocker.spy(obj, "image_path")
 
-    assert obj.notify(title="T", body="B") is True
+    assert bool(obj.notify(title="T", body="B")) is True
 
     assert mock_interface.Notify.called
     assert gi.repository.GdkPixbuf.Pixbuf.new_from_file.called is False

@@ -33,7 +33,12 @@ import time
 
 import requests
 
-from ...common import NotifyImageSize, NotifyType, PersistentStoreMode
+from ...common import (
+    JSON_COMPACT_SEPARATORS,
+    NotifyImageSize,
+    NotifyType,
+    PersistentStoreMode,
+)
 from ...locale import gettext_lazy as _
 from ...utils import pem as _pem
 from ...utils.base64 import base64_urlencode
@@ -600,10 +605,10 @@ class NotifyVapid(NotifyBase):
 
         # Base64 URL encode header and payload
         header_b64 = base64_urlencode(
-            dumps(header, separators=(",", ":")).encode("utf-8")
+            dumps(header, separators=JSON_COMPACT_SEPARATORS).encode("utf-8")
         )
         payload_b64 = base64_urlencode(
-            dumps(payload, separators=(",", ":")).encode("utf-8")
+            dumps(payload, separators=JSON_COMPACT_SEPARATORS).encode("utf-8")
         )
         signing_input = f"{header_b64}.{payload_b64}".encode()
         signature_b64 = base64_urlencode(self.pem.sign(signing_input))

@@ -200,7 +200,10 @@ class NotifyMacOSX(NotifyBase):
 
         if output.returncode:
             self.logger.warning("Failed to send MacOSX notification.")
-            self.logger.exception("MacOSX Exception")
+            self.logger.debug(
+                "MacOSX notification command exited with code %s.",
+                output.returncode,
+            )
             return False
 
         self.logger.info("Sent MacOSX notification.")

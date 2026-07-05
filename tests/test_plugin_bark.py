@@ -311,9 +311,11 @@ def test_plugin_bark_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework converts it to Markdown
     # before dispatching to the Bark plugin
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

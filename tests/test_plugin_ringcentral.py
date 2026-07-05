@@ -432,7 +432,7 @@ def test_plugin_ringc_send_success(mock_post):
         token="password",
         targets=["15559998888"],
     )
-    assert obj.notify(body="Test message") is True
+    assert bool(obj.notify(body="Test message")) is True
     assert mock_post.call_count == 2
 
     # Second call reuses cached token (no new auth call)
@@ -440,7 +440,7 @@ def test_plugin_ringc_send_success(mock_post):
     good_sms2.status_code = requests.codes.ok
     good_sms2.content = jdumps(GOOD_RESPONSE).encode()
     mock_post.side_effect = [good_sms2]
-    assert obj.notify(body="Second message") is True
+    assert bool(obj.notify(body="Second message")) is True
     assert mock_post.call_count == 3
 
 
@@ -465,7 +465,7 @@ def test_plugin_ringc_send_multi_target(mock_post):
         token="password",
         targets=["15559998881", "15559998882"],
     )
-    assert obj.notify(body="Multi-target") is True
+    assert bool(obj.notify(body="Multi-target")) is True
     assert mock_post.call_count == 3
 
 
@@ -487,7 +487,7 @@ def test_plugin_ringc_send_loopback(mock_post):
         source=SOURCE,
         token="password",
     )
-    assert obj.notify(body="Loopback") is True
+    assert bool(obj.notify(body="Loopback")) is True
     assert mock_post.call_count == 2
 
 
@@ -505,7 +505,7 @@ def test_plugin_ringc_auth_failure(mock_post):
         source=SOURCE,
         token="password",
     )
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
 
 @mock.patch("requests.post")
@@ -524,7 +524,7 @@ def test_plugin_ringc_auth_no_access_token(mock_post):
         source=SOURCE,
         token="password",
     )
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
 
 @mock.patch("requests.post")
@@ -549,7 +549,7 @@ def test_plugin_ringc_send_http_error(mock_post):
         token="password",
         targets=["15559998888"],
     )
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
 
 @mock.patch("requests.post")
@@ -574,7 +574,7 @@ def test_plugin_ringc_send_unknown_code(mock_post):
         token="password",
         targets=["15559998888"],
     )
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
 
 @mock.patch("requests.post")
@@ -589,7 +589,7 @@ def test_plugin_ringc_request_exception(mock_post):
         token="password",
         targets=["15559998888"],
     )
-    assert obj.notify(body="Test") is False
+    assert bool(obj.notify(body="Test")) is False
 
 
 @mock.patch("requests.post")
@@ -619,7 +619,7 @@ def test_plugin_ringc_send_partial_failure(mock_post):
         token="password",
         targets=["15559998881", "15559998882"],
     )
-    assert obj.notify(body="Partial") is False
+    assert bool(obj.notify(body="Partial")) is False
 
 
 @mock.patch("requests.post")
@@ -642,7 +642,7 @@ def test_plugin_ringc_jwt_mode(mock_post):
         targets=["15559998888"],
     )
     assert obj.mode == RingCentralAuthMode.JWT
-    assert obj.notify(body="JWT test") is True
+    assert bool(obj.notify(body="JWT test")) is True
 
     # Verify the auth call used the JWT grant type
     auth_call = mock_post.call_args_list[0]
@@ -670,7 +670,7 @@ def test_plugin_ringc_sandbox_environment(mock_post):
         targets=["15559998888"],
     )
     assert obj.environment == RingCentralEnvironment.SANDBOX
-    assert obj.notify(body="Sandbox test") is True
+    assert bool(obj.notify(body="Sandbox test")) is True
 
     # Verify .devtest appears in the URL and /sms is used (no attachments)
     notify_call = mock_post.call_args_list[1]
@@ -699,7 +699,7 @@ def test_plugin_ringc_mms_attachment(mock_post):
         token="password",
         targets=["15559998888"],
     )
-    assert obj.notify(body="MMS test", attach=attach) is True
+    assert bool(obj.notify(body="MMS test", attach=attach)) is True
     assert mock_post.call_count == 2
 
     # Verify the MMS endpoint was used
@@ -713,7 +713,7 @@ def test_plugin_ringc_mms_attachment(mock_post):
         bad_attach = AppriseAttachment(
             os.path.join(TEST_VAR_DIR, "apprise-test.gif")
         )
-        assert obj.notify(body="Bad attach", attach=bad_attach) is False
+        assert bool(obj.notify(body="Bad attach", attach=bad_attach)) is False
 
     # No HTTP calls should have been made (failed at attachment check)
     assert mock_post.call_count == 0
@@ -722,7 +722,7 @@ def test_plugin_ringc_mms_attachment(mock_post):
     mock_post.reset_mock()
 
     with mock.patch("builtins.open", side_effect=OSError("disk error")):
-        assert obj.notify(body="OSError test", attach=attach) is False
+        assert bool(obj.notify(body="OSError test", attach=attach)) is False
 
     assert mock_post.call_count == 0
 
@@ -733,7 +733,7 @@ def test_plugin_ringc_mms_attachment(mock_post):
     bad_mms.content = b"{}"
     mock_post.side_effect = [bad_mms]
 
-    assert obj.notify(body="MMS HTTP fail", attach=attach) is False
+    assert bool(obj.notify(body="MMS HTTP fail", attach=attach)) is False
     assert mock_post.call_count == 1
 
 
@@ -837,7 +837,7 @@ def test_plugin_ringc_logout(mock_post):
         token="password",
         targets=["15559998888"],
     )
-    assert obj.notify(body="Test") is True
+    assert bool(obj.notify(body="Test")) is True
     assert obj._access_token is not None
 
     # Explicit logout (token is still valid, sends revoke)
@@ -892,7 +892,7 @@ def test_plugin_ringc_invalid_json_response(mock_post):
         targets=["15559998888"],
     )
     # Should succeed (status 200 regardless of body parseability)
-    assert obj.notify(body="Test") is True
+    assert bool(obj.notify(body="Test")) is True
 
 
 @mock.patch("requests.post")
@@ -930,4 +930,4 @@ def test_plugin_ringc_apprise_integration(mock_post):
         "c" * 60
     )
     assert a.add(url) is True
-    assert a.notify(body="Apprise integration test") is True
+    assert bool(a.notify(body="Apprise integration test")) is True
