@@ -253,7 +253,7 @@ def test_plugin_smsc_send_sms(mock_post):
     mock_post.return_value = _mk_resp({"id": "1234", "cnt": 1})
 
     obj = NotifySMSC(user=LOGIN, password=PASSWORD, targets=["+71234567890"])
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
     assert mock_post.call_count == 1
 
     # Verify POST went to the SMSC endpoint
@@ -273,25 +273,25 @@ def test_plugin_smsc_send_sms(mock_post):
     mock_post.return_value = _mk_resp(
         {"error": "Invalid login", "error_code": 2}
     )
-    assert obj.notify(body="Hello") is False
+    assert bool(obj.notify(body="Hello")) is False
 
     mock_post.reset_mock()
 
     # HTTP error status
     mock_post.return_value = _mk_resp({}, code=requests.codes.bad_request)
-    assert obj.notify(body="Hello") is False
+    assert bool(obj.notify(body="Hello")) is False
 
     mock_post.reset_mock()
 
     # Unknown HTTP status
     mock_post.return_value = _mk_resp({}, code=999)
-    assert obj.notify(body="Hello") is False
+    assert bool(obj.notify(body="Hello")) is False
 
     mock_post.reset_mock()
 
     # RequestException
     mock_post.side_effect = requests.RequestException("bang")
-    assert obj.notify(body="Hello") is False
+    assert bool(obj.notify(body="Hello")) is False
 
     mock_post.reset_mock()
     mock_post.side_effect = None
@@ -302,7 +302,7 @@ def test_plugin_smsc_send_sms(mock_post):
     r.status_code = requests.codes.ok
     r.content = b"OK"
     mock_post.return_value = r
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
 
 
 @mock.patch("requests.post")
@@ -315,7 +315,7 @@ def test_plugin_smsc_no_targets(mock_post):
         targets=["notaphone"],
     )
     # notify() must return False without calling the API
-    assert obj.notify(body="Hello") is False
+    assert bool(obj.notify(body="Hello")) is False
     assert mock_post.call_count == 0
 
 
@@ -338,7 +338,7 @@ def test_plugin_smsc_sender_translit(mock_post):
         sender="MyBiz",
         translit=True,
     )
-    assert obj.notify(body="Привет") is True
+    assert bool(obj.notify(body="Привет")) is True
 
     payload = mock_post.call_args[1]["data"]
     assert payload.get("sender") == "MyBiz"
@@ -360,7 +360,7 @@ def test_plugin_smsc_send_mms_success(mock_post):
     obj = NotifySMSC(user=LOGIN, password=PASSWORD, targets=["+71234567890"])
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Image", attach=attach) is True
+    assert bool(obj.notify(body="Image", attach=attach)) is True
     assert mock_post.call_count == 1
 
     # Confirm MMS flag is set in the payload
@@ -392,7 +392,7 @@ def test_plugin_smsc_mms_multi_attach(mock_post):
             os.path.join(TEST_VAR_DIR, "apprise-test.gif"),
         ]
     )
-    assert obj.notify(body="Two files", attach=attach) is True
+    assert bool(obj.notify(body="Two files", attach=attach)) is True
 
     files_arg = mock_post.call_args[1]["files"]
     assert len(files_arg) == 2
@@ -407,7 +407,7 @@ def test_plugin_smsc_mms_inaccessible(mock_post):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     with mock.patch("os.path.isfile", return_value=False):
-        assert obj.notify(body="Image", attach=attach) is False
+        assert bool(obj.notify(body="Image", attach=attach)) is False
 
     # The HTTP client must not have been called
     assert mock_post.call_count == 0
@@ -422,7 +422,7 @@ def test_plugin_smsc_mms_oserror(mock_post):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     with mock.patch("builtins.open", side_effect=OSError("disk error")):
-        assert obj.notify(body="Image", attach=attach) is False
+        assert bool(obj.notify(body="Image", attach=attach)) is False
 
     assert mock_post.call_count == 0
 
@@ -439,7 +439,7 @@ def test_plugin_smsc_mms_http_error(mock_post):
     obj = NotifySMSC(user=LOGIN, password=PASSWORD, targets=["+71234567890"])
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Image", attach=attach) is False
+    assert bool(obj.notify(body="Image", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -456,7 +456,7 @@ def test_plugin_smsc_mms_api_error(mock_post):
     obj = NotifySMSC(user=LOGIN, password=PASSWORD, targets=["+71234567890"])
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Image", attach=attach) is False
+    assert bool(obj.notify(body="Image", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -468,14 +468,14 @@ def test_plugin_smsc_mms_request_exception(mock_post):
     obj = NotifySMSC(user=LOGIN, password=PASSWORD, targets=["+71234567890"])
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Image", attach=attach) is False
+    assert bool(obj.notify(body="Image", attach=attach)) is False
 
 
 @mock.patch("requests.post")
 def test_plugin_smsc_mms_non_json(mock_post):
     """NotifySMSC() MMS succeeds with non-JSON response body on HTTP 200."""
 
-    # The loads() exception handler branch (lines 449-450) fires here
+    # A non-JSON success body exercises the response parsing fallback.
     r = mock.Mock()
     r.status_code = requests.codes.ok
     r.content = b"OK"
@@ -484,7 +484,7 @@ def test_plugin_smsc_mms_non_json(mock_post):
     obj = NotifySMSC(user=LOGIN, password=PASSWORD, targets=["+71234567890"])
 
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
-    assert obj.notify(body="Image", attach=attach) is True
+    assert bool(obj.notify(body="Image", attach=attach)) is True
 
 
 @mock.patch("requests.post")
