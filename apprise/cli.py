@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import contextlib
 import logging
 import os
 from os.path import exists, isfile
@@ -33,6 +34,7 @@ import re
 import shutil
 import sys
 import textwrap
+import time
 
 import click
 
@@ -40,12 +42,17 @@ from . import (
     Apprise,
     AppriseAsset,
     AppriseConfig,
+    AppriseResultStatus,
     NotificationManager,
     PersistentStore,
     __copyright__,
     __license__,
     __title__,
     __version__,
+)
+from .apprise import (
+    _abandoned_call_descriptions,
+    _any_abandoned_calls_still_running,
 )
 from .common import (
     NOTIFY_FORMATS,
@@ -89,6 +96,13 @@ DEFAULT_ENV_APPRISE_PLUGIN_PATH = "APPRISE_PLUGIN_PATH"
 
 # Defines the override path for the persistent storage
 DEFAULT_ENV_APPRISE_STORAGE_PATH = "APPRISE_STORAGE_PATH"
+
+# Grace period for abandoned service calls to finish before forced exit.
+# Normal interpreter shutdown would otherwise wait on those threads.
+CLI_TIMEOUT_EXIT_GRACE_SECONDS = 5.0
+
+# Poll interval while waiting for abandoned service calls to finish.
+CLI_TIMEOUT_EXIT_POLL_INTERVAL = 0.25
 
 # Defines our click context settings adding -h to the additional options that
 # can be specified to get the help menu to come up
@@ -474,6 +488,85 @@ class CustomHelpCommand(click.Command):
         self.format_epilog(ctx, formatter)
 
 
+def _wait_for_abandoned_calls(timeout: float) -> bool:
+    """Poll up to ``timeout`` seconds for any abandoned service call
+    (see _any_abandoned_calls_still_running()) to finish naturally.
+
+    Returns True once nothing is left running.
+    """
+    # Logged once, at DEBUG only: _abandoned_call_descriptions()
+    # includes each service's url(privacy=True), so this stays out of
+    # the default log level even though the privacy mask is applied.
+    # This only reflects what Apprise itself dispatched and is still
+    # waiting on -- a plugin whose underlying library manages its own
+    # separate background resources (e.g. a persistent connection kept
+    # alive independently) is invisible here regardless of whether
+    # it's also still running.
+    descriptions = _abandoned_call_descriptions()
+    logger.debug(
+        "One or more services timed out. Waiting up to %.1fs more for "
+        "these services to finish: %s",
+        timeout,
+        ", ".join(descriptions)
+        if descriptions
+        else "(no services are still running)",
+    )
+    elapsed = 0.0
+    while elapsed < timeout:
+        if not _any_abandoned_calls_still_running():
+            logger.debug(
+                "Timed-out service calls finished after %.2fs.",
+                elapsed,
+            )
+            return True
+        sleep_for = min(CLI_TIMEOUT_EXIT_POLL_INTERVAL, timeout - elapsed)
+        time.sleep(sleep_for)
+        elapsed += sleep_for
+
+    still_running = _any_abandoned_calls_still_running()
+    if still_running:
+        logger.debug(
+            "%.1fs elapsed and some timed-out services are still running; "
+            "exiting now.",
+            timeout,
+        )
+    return not still_running
+
+
+def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
+    """Unconditionally end the process, skipping Python's normal
+    shutdown sequence entirely.
+    """
+    # os._exit() skips normal object cleanup, so flush every store first.
+    # A failed flush must not stop the remaining services from trying.
+    for service in apobj:
+        try:
+            logger.trace(
+                "Flushing persistent store for service: %s",
+                service.url(privacy=True),
+            )
+            service.flush_store()
+
+        except Exception as e:
+            logger.warning(
+                "Could not save one service's persistent data before "
+                "exiting; continuing with the remaining services."
+            )
+            logger.debug("Persistent store save error: %s", e)
+
+    # os._exit() skips atexit hooks, so flush logging and stdio manually.
+    # Each flush is independent; one failure should not block the others.
+    with contextlib.suppress(Exception):
+        logging.shutdown()
+    with contextlib.suppress(Exception):
+        sys.stdout.flush()
+    with contextlib.suppress(Exception):
+        sys.stderr.flush()
+
+    # Hard-exit last so abandoned worker threads cannot keep the CLI alive.
+    os._exit(status)
+
+
 @click.command(context_settings=CONTEXT_SETTINGS, cls=CustomHelpCommand)
 @click.option(
     "--body",
@@ -615,6 +708,32 @@ class CustomHelpCommand(click.Command):
     ),
 )
 @click.option(
+    "--limit",
+    "-L",
+    default=0,
+    type=float,
+    metavar="SECONDS",
+    help=(
+        "Give up on the whole run if it's taking too long, in seconds "
+        "(whole number or decimal, e.g. 2.5). By default (0) there is "
+        "no limit -- see --service-limit to cap each service on its own "
+        "instead."
+    ),
+)
+@click.option(
+    "--service-limit",
+    "-SL",
+    default=None,
+    type=float,
+    metavar="SECONDS",
+    help=(
+        "Give up on any single service if it's taking too long, in "
+        "seconds (whole number or decimal, e.g. 2.5), or 0 to turn this "
+        "off entirely. Leave unset to use Apprise's own default of "
+        f"{AppriseAsset._service_timeout:g} seconds."
+    ),
+)
+@click.option(
     "--disable-async",
     "-Da",
     is_flag=True,
@@ -693,6 +812,8 @@ def main(
     tag,
     input_format,
     dry_run,
+    limit,
+    service_limit,
     recursion_depth,
     verbose,
     disable_async,
@@ -886,6 +1007,8 @@ def main(
         storage_idlen=storage_uid_length,
         # Define if we flush to disk as soon as possible or not when required
         storage_mode=storage_mode,
+        # Apply the optional per-service delivery budget to every plugin.
+        service_timeout=service_limit,
     )
 
     # Create our Apprise object
@@ -1252,7 +1375,7 @@ def main(
                         click.echo(
                             "{:>10}: {}".format(
                                 "tags",
-                                ", ".join(str(t) for t in entry.tags),
+                                ", ".join(sorted(str(t) for t in entry.tags)),
                             )
                         )
 
@@ -1301,14 +1424,32 @@ def main(
             # if no body was specified, then read from STDIN
             body = click.get_text_stream("stdin").read()
 
-        # now print it out
+        # Send the notification. AppriseResult.status maps directly to the
+        # process exit values handled after the dry-run branch.
+        notify_start = time.monotonic()
         result = a.notify(
             body=body,
             title=title,
             notify_type=notification_type,
             tag=tags,
             attach=attach,
+            timeout=limit,
         )
+
+        status = result.status
+
+        # Status report
+        logger.debug(
+            "Finished in %.2fs. %d service(s) tried (%s): %d sent / "
+            "%d failed / %d timed out.",
+            time.monotonic() - notify_start,
+            len(result),
+            status.name,
+            result.success_count,
+            result.failed_count,
+            result.timeout_count,
+        )
+
     else:
         # Number of columns to assume in the terminal.  In future, maybe this
         # can be detected and made dynamic. The actual column count is 80, but
@@ -1345,26 +1486,22 @@ def main(
                 click.echo(
                     "{:>10}: {}".format(
                         "tags",
-                        ", ".join(str(t) for t in server.tags),
+                        ", ".join(sorted(str(t) for t in server.tags)),
                     )
                 )
 
-        # Initialize a default response of nothing matched, otherwise
-        # if we matched at least one entry, we can return True
-        result = None if url is None else True
+        # Dry-run has no AppriseResult, so map its outcome to the same enum.
+        status = (
+            AppriseResultStatus.NOMATCH
+            if url is None
+            else AppriseResultStatus.SUCCESS
+        )
 
-    if result is None:
-        # There were no notifications set.  This is a result of just having
-        # empty configuration files and/or being to restrictive when filtering
-        # by specific tag(s)
+    if status == AppriseResultStatus.TIMEOUT and not _wait_for_abandoned_calls(
+        CLI_TIMEOUT_EXIT_GRACE_SECONDS
+    ):
+        _force_exit(a, status)
 
-        # Exit code 3 is used since Click uses exit code 2 if there is an
-        # error with the parameters specified
-        ctx.exit(3)
-
-    elif result is False:
-        # At least 1 notification service failed to send
-        ctx.exit(1)
-
-    # else:  We're good!
-    ctx.exit(0)
+    # AppriseResultStatus values map directly to CLI exit codes.
+    # Exit code 2 is left to Click for bad command-line parameters.
+    ctx.exit(status)

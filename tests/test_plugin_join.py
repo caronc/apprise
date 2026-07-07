@@ -211,7 +211,8 @@ def test_plugin_join_edge_cases(mock_post, mock_get):
     # Test notifications without a body or a title; nothing to send
     # so we return False
     assert (
-        p.notify(body=None, title=None, notify_type=NotifyType.INFO) is False
+        bool(p.notify(body=None, title=None, notify_type=NotifyType.INFO))
+        is False
     )
 
 
@@ -276,4 +277,4 @@ def test_plugin_join_config_files(mock_post):
     assert next(aobj.find(tag="join_invalid")).priority == JoinPriority.NORMAL
 
     # Notifications work
-    assert aobj.notify(title="title", body="body") is True
+    assert bool(aobj.notify(title="title", body="body")) is True

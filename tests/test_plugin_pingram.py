@@ -412,7 +412,9 @@ def test_plugin_pingram_template_sms_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -481,7 +483,9 @@ def test_plugin_pingram_template_email_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -556,7 +560,9 @@ def test_plugin_pingram_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -609,7 +615,9 @@ def test_plugin_pingram_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -656,7 +664,9 @@ def test_plugin_pingram_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -711,7 +721,9 @@ def test_plugin_pingram_targets(mock_post):
     assert isinstance(obj.url(), str)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -743,7 +755,9 @@ def test_plugin_pingram_targets(mock_post):
     assert len(obj.targets) == 2
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 2
@@ -754,7 +768,9 @@ def test_plugin_pingram_targets(mock_post):
     obj = Apprise.instantiate(f"pingram://{apikey}/+15551234567?region=eu")
     assert isinstance(obj, NotifyPingram)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 1
@@ -768,7 +784,9 @@ def test_plugin_pingram_targets(mock_post):
     obj = Apprise.instantiate(f"pingram://{apikey}/myid/+15551234567")
     assert isinstance(obj, NotifyPingram)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     payload = loads(mock_post.call_args_list[0][1]["data"])

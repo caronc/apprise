@@ -343,7 +343,7 @@ def test_plugin_notifyre_sms_send(mock_post):
     # Successful send
     mock_post.return_value = _mk_resp(GOOD_RESPONSE)
     obj = NotifyNotifyre(apikey=API_KEY, targets=["+15551234567"])
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
     assert mock_post.call_count == 1
 
     # Verify the correct endpoint was used
@@ -353,17 +353,17 @@ def test_plugin_notifyre_sms_send(mock_post):
     # HTTP error response
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp({}, code=requests.codes.bad_request)
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
     # Unknown HTTP error
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp({}, code=999)
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
     # API-level failure (success=false on HTTP 200)
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp(FAIL_RESPONSE)
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
     # Unparseable response body on HTTP 200 is treated as success
     mock_post.reset_mock()
@@ -371,19 +371,19 @@ def test_plugin_notifyre_sms_send(mock_post):
     r.status_code = requests.codes.ok
     r.content = b"not-json"
     mock_post.return_value = r
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
 
     # RequestException
     mock_post.reset_mock()
     mock_post.side_effect = requests.RequestException("connection refused")
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
 
 @mock.patch("requests.post")
 def test_plugin_notifyre_sms_no_targets(mock_post):
     """SMS send with no valid targets returns False without HTTP call."""
     obj = NotifyNotifyre(apikey=API_KEY, targets=["not-valid"])
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
     assert mock_post.call_count == 0
 
 
@@ -403,7 +403,7 @@ def test_plugin_notifyre_sms_with_source(mock_post):
         targets=["+15551234567"],
         source="+15559876543",
     )
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
 
     # Verify 'from' was included in the posted payload
     posted = json.loads(mock_post.call_args[1]["data"])
@@ -428,10 +428,12 @@ def test_plugin_notifyre_sms_attachment_warning(mock_post):
 
     # Should warn but still succeed (attachments are ignored in SMS mode)
     assert (
-        obj.notify(
-            body="Hello",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Hello",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -451,7 +453,7 @@ def test_plugin_notifyre_fax_send(mock_post):
     # Successful send (body text as only document)
     mock_post.return_value = _mk_resp(GOOD_RESPONSE)
     obj = NotifyNotifyre(apikey=API_KEY, targets=["+15551234567"], mode="fax")
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
     assert mock_post.call_count == 1
 
     call_url = mock_post.call_args[0][0]
@@ -460,17 +462,17 @@ def test_plugin_notifyre_fax_send(mock_post):
     # HTTP error
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp({}, code=requests.codes.bad_request)
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
     # Unknown HTTP error
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp({}, code=999)
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
     # API-level failure (success=false on HTTP 200)
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp(FAIL_RESPONSE)
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
     # Unparseable JSON on HTTP 200 -- treated as success
     mock_post.reset_mock()
@@ -478,12 +480,12 @@ def test_plugin_notifyre_fax_send(mock_post):
     r.status_code = requests.codes.ok
     r.content = b"not-json"
     mock_post.return_value = r
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
 
     # RequestException
     mock_post.reset_mock()
     mock_post.side_effect = requests.RequestException("timeout")
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is False
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is False
 
 
 @mock.patch("requests.post")
@@ -503,10 +505,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     attach = AppriseAttachment()
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     assert (
-        obj.notify(
-            body="Fax body",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Fax body",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -518,10 +522,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="Fax body",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="Fax body",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -533,10 +539,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     with mock.patch("builtins.open", side_effect=OSError("perm denied")):
         assert (
-            obj.notify(
-                body="Fax body",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="Fax body",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -552,10 +560,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     mock_fh.read.side_effect = OSError("read error")
     with mock.patch("builtins.open", return_value=mock_fh):
         assert (
-            obj.notify(
-                body="Fax body",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="Fax body",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -568,10 +578,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     attach = AppriseAttachment()
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     assert (
-        obj.notify(
-            body="Fax body",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Fax body",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -582,10 +594,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     attach = AppriseAttachment()
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     assert (
-        obj.notify(
-            body="Fax body",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Fax body",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -599,10 +613,12 @@ def test_plugin_notifyre_fax_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"))
     assert (
-        obj.notify(
-            body="Multi-page fax",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Multi-page fax",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -783,7 +799,7 @@ def test_plugin_notifyre_sms_campaign(mock_post):
         targets=["+15551234567"],
         campaign="MyCampaign",
     )
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert posted["campaignName"] == "MyCampaign"
 
@@ -791,7 +807,7 @@ def test_plugin_notifyre_sms_campaign(mock_post):
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp(GOOD_RESPONSE)
     obj = NotifyNotifyre(apikey=API_KEY, targets=["+15551234567"])
-    assert obj.notify(body="Hello", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Hello", notify_type=NotifyType.INFO)) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert posted["campaignName"] == obj.app_id
 
@@ -818,7 +834,9 @@ def test_plugin_notifyre_fax_params(mock_post):
         hq=False,
         header="CONFIDENTIAL",
     )
-    assert obj.notify(body="Fax body", notify_type=NotifyType.INFO) is True
+    assert (
+        bool(obj.notify(body="Fax body", notify_type=NotifyType.INFO)) is True
+    )
     posted = json.loads(mock_post.call_args[1]["data"])
     assert posted["campaignName"] == "FaxCampaign"
     assert posted["templateName"] == "CoverTpl"
@@ -833,7 +851,7 @@ def test_plugin_notifyre_fax_params(mock_post):
     mock_post.reset_mock()
     mock_post.return_value = _mk_resp(GOOD_RESPONSE)
     obj = NotifyNotifyre(apikey=API_KEY, targets=["+15551234567"], mode="fax")
-    assert obj.notify(body="Test", notify_type=NotifyType.INFO) is True
+    assert bool(obj.notify(body="Test", notify_type=NotifyType.INFO)) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert posted["isHighQuality"] is True
     assert posted["templateName"] == ""
@@ -857,9 +875,9 @@ def test_plugin_notifyre_apprise_integration(mock_post):
     # SMS via string URL
     app = Apprise()
     assert app.add("notifyre://{}/+15551234567".format(API_KEY))
-    assert app.notify(title="Title", body="Body") is True
+    assert bool(app.notify(title="Title", body="Body")) is True
 
     # Fax via string URL
     app = Apprise()
     assert app.add("notifyre://{}/+15551234567?mode=fax".format(API_KEY))
-    assert app.notify(title="Title", body="Body") is True
+    assert bool(app.notify(title="Title", body="Body")) is True

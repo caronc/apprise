@@ -132,15 +132,21 @@ def test_plugin_gnome_general_success(obj):
 
     # test notifications
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
 
     # test notification without a title
     assert (
-        obj.notify(title="", body="body", notify_type=apprise.NotifyType.INFO)
+        bool(
+            obj.notify(
+                title="", body="body", notify_type=apprise.NotifyType.INFO
+            )
+        )
         is True
     )
 
@@ -153,8 +159,10 @@ def test_plugin_gnome_image_success(glib_environment):
     )
     assert isinstance(obj, NotifyGnome) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -164,8 +172,10 @@ def test_plugin_gnome_image_success(glib_environment):
     )
     assert isinstance(obj, NotifyGnome) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -181,8 +191,10 @@ def test_plugin_gnome_priority(glib_environment):
     assert isinstance(obj, NotifyGnome) is True
     assert obj.urgency == 1
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -193,8 +205,10 @@ def test_plugin_gnome_priority(glib_environment):
     assert isinstance(obj, NotifyGnome) is True
     assert obj.urgency == 2
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -205,8 +219,10 @@ def test_plugin_gnome_priority(glib_environment):
     assert isinstance(obj, NotifyGnome) is True
     assert obj.urgency == 2
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -222,8 +238,10 @@ def test_plugin_gnome_urgency(glib_environment):
     assert obj.urgency == 1
     assert isinstance(obj, NotifyGnome) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -234,8 +252,10 @@ def test_plugin_gnome_urgency(glib_environment):
     assert obj.urgency == 2
     assert isinstance(obj, NotifyGnome) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -246,8 +266,10 @@ def test_plugin_gnome_urgency(glib_environment):
     assert isinstance(obj, NotifyGnome) is True
     assert obj.urgency == 2
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -338,8 +360,10 @@ def test_plugin_gnome_missing_icon(mocker, obj):
 
     logger: Mock = mocker.spy(obj, "logger")
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -347,6 +371,7 @@ def test_plugin_gnome_missing_icon(mocker, obj):
         call.warning("Could not load notification icon (%s).", ANY),
         call.debug("Gnome Exception: Something failed"),
         call.info("Sent Gnome notification."),
+        call.debug("%s send() completed in %.2fs.", ANY, ANY),
     ]
 
 
@@ -354,8 +379,10 @@ def test_plugin_gnome_disabled_plugin(obj):
     """Verify notification will not be submitted if plugin is disabled."""
     obj.enabled = False
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
@@ -397,14 +424,17 @@ def test_plugin_gnome_notify_croaks(mocker, obj):
 
     logger: Mock = mocker.spy(obj, "logger")
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
     assert logger.mock_calls == [
         call.warning("Failed to send Gnome notification."),
         call.debug("Gnome Exception: Something failed"),
+        call.debug("%s send() completed in %.2fs.", ANY, ANY),
     ]
 
 
@@ -433,7 +463,7 @@ def test_plugin_gnome_show_exception(mocker, obj):
 
     # 5. Execute the notification.
     #    It should crash at .show(), catch the exception, and return False.
-    assert obj.notify(title="Title", body="Body") is False
+    assert bool(obj.notify(title="Title", body="Body")) is False
 
     # 6. Verify the specific log message.
     logger_spy.warning.assert_called_with("Failed to send Gnome notification.")

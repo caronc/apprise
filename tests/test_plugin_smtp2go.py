@@ -243,11 +243,13 @@ def test_plugin_smtp2go_attachments(mock_post):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -255,11 +257,13 @@ def test_plugin_smtp2go_attachments(mock_post):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -268,11 +272,13 @@ def test_plugin_smtp2go_attachments(mock_post):
     mock_post.side_effect = OSError()
     # We can't send the message if we can't read the attachment
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -291,11 +297,13 @@ def test_plugin_smtp2go_attachments(mock_post):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -319,11 +327,13 @@ def test_plugin_smtp2go_attachments(mock_post):
     mock_post.reset_mock()
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -335,11 +345,13 @@ def test_plugin_smtp2go_attachments(mock_post):
     obj.default_batch_size = 2
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

@@ -174,7 +174,9 @@ def test_plugin_atalk_edge_cases(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -228,7 +230,9 @@ def test_plugin_atalk_edge_cases(mock_post):
     assert len(obj) == 1
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

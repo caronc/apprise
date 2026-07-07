@@ -185,7 +185,9 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -210,7 +212,9 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -225,7 +229,9 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -244,7 +250,9 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

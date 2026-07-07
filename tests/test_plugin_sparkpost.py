@@ -401,13 +401,13 @@ def test_plugin_sparkpost_throttling(mock_post):
 
     # We'll successfully perform the notification as we're within
     # our retry limit
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     mock_post.reset_mock()
     mock_post.side_effect = (retry_response, retry_response, retry_response)
 
     # Now we are less than our expected limit check so we will fail
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
 
 @mock.patch("requests.post")
@@ -443,11 +443,13 @@ def test_plugin_sparkpost_attachments(mock_post):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -455,11 +457,13 @@ def test_plugin_sparkpost_attachments(mock_post):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -467,11 +471,13 @@ def test_plugin_sparkpost_attachments(mock_post):
     with mock.patch("base64.b64encode", side_effect=OSError()):
         # We can't send the message if we fail to parse the data
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -493,11 +499,13 @@ def test_plugin_sparkpost_attachments(mock_post):
     mock_post.reset_mock()
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -509,11 +517,13 @@ def test_plugin_sparkpost_attachments(mock_post):
     obj.default_batch_size = 2
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

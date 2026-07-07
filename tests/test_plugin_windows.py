@@ -122,6 +122,21 @@ def mocked_win32_environment():
     # test files continues to point at live (non-abandoned) module dicts.
     sys.modules.update(saved_apprise)
 
+    # sys.modules.update() above only fixes the dict *keys* -- Python's
+    # import machinery separately sets each submodule as an ATTRIBUTE on
+    # its parent package too (e.g. sys.modules["apprise"].apprise), and
+    # that binding is untouched by the update. Left stale, any later
+    # `import apprise.apprise as x` anywhere else in the test session --
+    # resolved via getattr(sys.modules["apprise"], "apprise"), not a
+    # sys.modules lookup -- would silently get the module object this
+    # fixture created and already discarded above, rather than the real,
+    # restored one.
+    for name, mod in saved_apprise.items():
+        parent_name, _, attr = name.rpartition(".")
+        parent = sys.modules.get(parent_name)
+        if parent is not None:
+            setattr(parent, attr, mod)
+
 
 @pytest.mark.skipif(
     (
@@ -155,8 +170,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
 
     # test notifications
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -167,8 +184,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
     obj.duration = 0
     assert isinstance(obj.url(), str)
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -179,8 +198,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
     obj.duration = 0
     assert isinstance(obj.url(), str)
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -192,8 +213,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
     # loads okay
     assert obj.duration == 1
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -223,8 +246,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
     # notification to be sent
     win32gui.LoadImage.side_effect = AttributeError
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -234,8 +259,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
     # Test our global exception handling
     win32gui.UpdateWindow.side_effect = AttributeError
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
@@ -246,8 +273,10 @@ def test_plugin_windows_mocked(mocked_win32_environment):
     # package has been made unavailable to us
     obj.enabled = False
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
@@ -282,8 +311,10 @@ def test_plugin_windows_native(
 
     # test notifications
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -294,8 +325,10 @@ def test_plugin_windows_native(
     obj.duration = 0
     assert isinstance(obj.url(), str)
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -306,8 +339,10 @@ def test_plugin_windows_native(
     obj.duration = 0
     assert isinstance(obj.url(), str)
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -317,8 +352,10 @@ def test_plugin_windows_native(
     )
     assert isinstance(obj.url(), str)
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -351,8 +388,10 @@ def test_plugin_windows_native(
     # notification to be sent
     mock_loadimage.side_effect = AttributeError
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -362,8 +401,10 @@ def test_plugin_windows_native(
     # Test our global exception handling
     mock_update_window.side_effect = AttributeError
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
@@ -374,8 +415,10 @@ def test_plugin_windows_native(
     # package has been made unavailable to us
     obj.enabled = False
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )

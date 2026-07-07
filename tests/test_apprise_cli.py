@@ -44,7 +44,14 @@ from helpers import environ
 import pytest
 import requests
 
-from apprise import NotificationManager, NotifyBase, cli
+from apprise import (
+    Apprise,
+    AppriseAsset,
+    AppriseResultStatus,
+    NotificationManager,
+    NotifyBase,
+    cli,
+)
 from apprise.locale import gettext_lazy as _
 from apprise.plugins.base import RequirementsSpec
 
@@ -2967,3 +2974,462 @@ def test_apprise_cli_runtime_env_py39_no_packages_distributions(
 
     # No dep listing -- packages_distributions unavailable on Python < 3.11
     assert not any(a[0] == "Runtime deps: %s" for a in calls)
+
+
+def test_apprise_cli_limit_option_in_help():
+    """
+    CLI: --limit (-L) appears in --help output
+    """
+    runner = CliRunner()
+    result = runner.invoke(cli.main, ["--help"])
+    assert result.exit_code == 0
+    assert "--limit" in result.output
+    assert "-L" in result.output
+
+
+@mock.patch("requests.request")
+def test_apprise_cli_notify_runtime_stat_log(mock_request):
+    """
+    CLI: right after notify() returns, a single DEBUG line reports how
+    long it took and how the AppriseResult broke down (success/failed/
+    timeout counts, plus the overall status by name -- PARTIAL or
+    TIMEOUT show up there without needing a separate line).
+
+    Only logger.debug itself is patched (not the whole logger object) --
+    main() also reads logger.level/setLevel() during its own verbosity
+    setup, which would break against a fully mocked logger.
+    """
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    mock_request.return_value = response
+
+    runner = CliRunner()
+    with mock.patch.object(cli.logger, "debug") as mock_debug:
+        result = runner.invoke(
+            cli.main,
+            ["-t", "title", "-b", "body", "json://good"],
+        )
+    assert result.exit_code == 0
+
+    calls = [a for a, _ in mock_debug.call_args_list]
+    assert any(
+        a[0]
+        == (
+            "Finished in %.2fs. %d service(s) tried (%s): %d sent / "
+            "%d failed / %d timed out."
+        )
+        # a[1] is the elapsed seconds float -- not asserted here, just
+        # that it's present as the first substitution.
+        and a[2:] == (1, "SUCCESS", 1, 0, 0)
+        for a in calls
+    )
+
+
+@mock.patch("apprise.cli._force_exit")
+@mock.patch("requests.request")
+def test_apprise_cli_limit_option_times_out_service(
+    mock_request, mock_force_exit
+):
+    """
+    CLI: --limit (-L) caps how long a single notification may take,
+    reporting the service as timed out and exiting 5.
+
+    _force_exit() is mocked purely as a safety net: for real it calls
+    os._exit(), which would otherwise end this test process itself --
+    CliRunner.invoke() runs main() in-process, not as a subprocess, so
+    os._exit() has no SystemExit for it to catch the way ctx.exit()
+    normally provides. In practice it's never actually reached here:
+    the service's own 0.2s delay finishes well within the default 5s
+    grace period, so _wait_for_abandoned_calls() reports success on
+    its own and main() falls through to its normal, catchable
+    ctx.exit(status) -- see the assertion below confirming this.
+    """
+    import time
+
+    def _slow_failure(*args, **kwargs):
+        """Return a delayed HTTP failure to force the CLI timeout path."""
+        time.sleep(0.2)
+        response = mock.Mock()
+        response.status_code = requests.codes.internal_server_error
+        response.content = b""
+        response.text = ""
+        return response
+
+    mock_request.side_effect = _slow_failure
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            "-t",
+            "title",
+            "-b",
+            "body",
+            "--limit",
+            "0.05",
+            "json://good?retry=3",
+        ],
+    )
+
+    # The only service dispatched timed out (no plain failure to take
+    # priority over it -- see _aggregate_status in apprise/apprise.py),
+    # so the overall result -- and thus this exit code -- is TIMEOUT (5)
+    # rather than the generic FAILURE (1).
+    # (The "timed out" diagnostic itself goes through Python logging,
+    # not click.echo, so it isn't visible in CliRunner's captured
+    # result.output -- it's covered directly in tests/test_retry_wait.py.)
+    assert result.exit_code == AppriseResultStatus.TIMEOUT
+
+    # The abandoned call's own 0.2s delay finished naturally well
+    # within the default 5s grace period, so _wait_for_abandoned_calls()
+    # already confirmed nothing was left running -- the hard-exit path
+    # was never needed. This exit code is itself unambiguous proof the
+    # TIMEOUT branch was taken (nothing else in main() produces it).
+    mock_force_exit.assert_not_called()
+
+
+@mock.patch("apprise.cli._force_exit")
+@mock.patch("requests.request")
+def test_apprise_cli_limit_option_hard_exit_when_call_still_running(
+    mock_request, mock_force_exit
+):
+    """
+    CLI: the counterpart to test_apprise_cli_limit_option_times_out_
+    service above -- when the abandoned call is STILL genuinely running
+    after the full grace period (not just briefly delayed), main()
+    actually reaches _force_exit(), rather than falling through to a
+    normal ctx.exit().
+
+    CLI_TIMEOUT_EXIT_GRACE_SECONDS is shortened here purely so this
+    test runs quickly; the service's own delay is longer than that
+    shortened window, so _wait_for_abandoned_calls() genuinely times
+    out instead of resolving on its own. _force_exit() is mocked so
+    the real os._exit() call doesn't end this test process (see the
+    sibling test's docstring for why).
+    """
+    import time
+
+    def _slow_failure(*args, **kwargs):
+        """Return a delayed HTTP failure to force the CLI timeout path."""
+        time.sleep(0.5)
+        response = mock.Mock()
+        response.status_code = requests.codes.internal_server_error
+        response.content = b""
+        response.text = ""
+        return response
+
+    mock_request.side_effect = _slow_failure
+
+    with mock.patch("apprise.cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS", 0.05):
+        runner = CliRunner()
+        result = runner.invoke(
+            cli.main,
+            [
+                "-t",
+                "title",
+                "-b",
+                "body",
+                "--limit",
+                "0.05",
+                "json://good?retry=3",
+            ],
+        )
+
+    assert result.exit_code == AppriseResultStatus.TIMEOUT
+    mock_force_exit.assert_called_once()
+    assert mock_force_exit.call_args.args[1] == AppriseResultStatus.TIMEOUT
+
+
+def test_wait_for_abandoned_calls_polls_full_grace_period():
+    """_wait_for_abandoned_calls() polls in
+    CLI_TIMEOUT_EXIT_POLL_INTERVAL increments (never a single lump
+    sleep) and returns False once the full timeout elapses with
+    _any_abandoned_calls_still_running() still reporting True
+    throughout.
+    """
+    with (
+        mock.patch("apprise.cli.time.sleep") as mock_sleep,
+        mock.patch(
+            "apprise.cli._any_abandoned_calls_still_running",
+            return_value=True,
+        ) as mock_still_running,
+    ):
+        result = cli._wait_for_abandoned_calls(
+            cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS
+        )
+
+    assert result is False
+    assert mock_still_running.called
+    total_slept = sum(call.args[0] for call in mock_sleep.call_args_list)
+    assert total_slept == pytest.approx(cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS)
+    for call in mock_sleep.call_args_list:
+        assert call.args[0] <= cli.CLI_TIMEOUT_EXIT_POLL_INTERVAL
+
+
+def test_wait_for_abandoned_calls_logs_service_descriptions_at_debug():
+    """_wait_for_abandoned_calls() logs which specific still-running
+    service(s) it's waiting on, once, at DEBUG level only -- so this
+    stays out of default-verbosity output even though the url() is
+    already privacy-masked by _abandoned_call_descriptions()."""
+    with (
+        mock.patch("apprise.cli.time.sleep"),
+        mock.patch(
+            "apprise.cli._any_abandoned_calls_still_running",
+            return_value=False,
+        ),
+        mock.patch(
+            "apprise.cli._abandoned_call_descriptions",
+            return_value=["dummy (dummy://masked@host)"],
+        ),
+        mock.patch("apprise.cli.logger.debug") as mock_debug,
+    ):
+        cli._wait_for_abandoned_calls(cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS)
+
+    first_call_message = mock_debug.call_args_list[0].args
+    assert "dummy (dummy://masked@host)" in first_call_message
+
+
+def test_wait_for_abandoned_calls_exits_early_when_calls_finish():
+    """_wait_for_abandoned_calls() returns True as soon as
+    _any_abandoned_calls_still_running() reports False, rather than
+    always waiting out the full grace period -- the whole point of
+    polling instead of a single fixed sleep.
+    """
+    # "Still running" for the first two checks, then finished -- so
+    # only 2 short sleeps happen instead of the full grace period.
+    with (
+        mock.patch("apprise.cli.time.sleep") as mock_sleep,
+        mock.patch(
+            "apprise.cli._any_abandoned_calls_still_running",
+            side_effect=[True, True, False],
+        ) as mock_still_running,
+    ):
+        result = cli._wait_for_abandoned_calls(
+            cli.CLI_TIMEOUT_EXIT_GRACE_SECONDS
+        )
+
+    assert result is True
+    assert mock_still_running.call_count == 3
+    assert mock_sleep.call_count == 2
+    for call in mock_sleep.call_args_list:
+        assert call.args[0] == cli.CLI_TIMEOUT_EXIT_POLL_INTERVAL
+
+
+def test_wait_for_abandoned_calls_finishes_right_as_grace_period_ends():
+    """A final post-loop check can catch work that just finished."""
+    with (
+        mock.patch("apprise.cli.time.sleep"),
+        mock.patch(
+            "apprise.cli._any_abandoned_calls_still_running",
+            # Four in-loop polls still report running. The final check
+            # sees that the abandoned work has just finished.
+            side_effect=[True, True, True, True, False],
+        ) as mock_still_running,
+    ):
+        result = cli._wait_for_abandoned_calls(1.0)
+
+    assert result is True
+    assert mock_still_running.call_count == 5
+
+
+def test_force_exit_sequence():
+    """_force_exit() unconditionally flushes every service's
+    persistent store (AUTO mode only writes on-demand, and os._exit()
+    skips the garbage-collection that would normally trigger it),
+    flushes logging/stdio, and only then forces the process to end via
+    os._exit() with the given status -- no polling of any kind, since
+    _wait_for_abandoned_calls() having already reported "still running"
+    is a precondition for this being called at all.
+
+    Every external effect is mocked directly (not through the CLI) so
+    this asserts the full sequence in isolation, without actually
+    ending this test process.
+    """
+    a = Apprise()
+    services = [mock.Mock(spec=NotifyBase) for _ in range(3)]
+    for service in services:
+        a.add(service)
+
+    with (
+        mock.patch("apprise.cli.logging.shutdown") as mock_shutdown,
+        mock.patch("apprise.cli.sys.stdout.flush") as mock_stdout_flush,
+        mock.patch("apprise.cli.sys.stderr.flush") as mock_stderr_flush,
+        mock.patch("apprise.cli.os._exit") as mock_os_exit,
+    ):
+        cli._force_exit(a, AppriseResultStatus.TIMEOUT)
+
+    for service in services:
+        service.flush_store.assert_called_once()
+    mock_shutdown.assert_called_once()
+    mock_stdout_flush.assert_called_once()
+    mock_stderr_flush.assert_called_once()
+    mock_os_exit.assert_called_once_with(AppriseResultStatus.TIMEOUT)
+
+
+def test_force_exit_flush_failure_does_not_skip_others():
+    """A failing flush_store() must never prevent the hard exit below,
+    NOR stop the remaining services from getting their own chance to
+    flush -- one bad store shouldn't cost every other one its own
+    flush. The broken service is deliberately added FIRST here so its
+    failure has to happen before the good one is ever reached.
+    """
+    a = Apprise()
+    broken_service = mock.Mock(spec=NotifyBase)
+    broken_service.flush_store.side_effect = RuntimeError("disk full")
+    ok_service = mock.Mock(spec=NotifyBase)
+    a.add(broken_service)
+    a.add(ok_service)
+
+    with (
+        mock.patch("apprise.cli.logging.shutdown") as mock_shutdown,
+        mock.patch("apprise.cli.os._exit") as mock_os_exit,
+    ):
+        cli._force_exit(a, AppriseResultStatus.TIMEOUT)
+
+    # The service after the broken one in iteration order still got
+    # its own flush attempt.
+    ok_service.flush_store.assert_called_once()
+    mock_os_exit.assert_called_once_with(AppriseResultStatus.TIMEOUT)
+    # logging.shutdown() is unrelated to the failing store and should
+    # still run normally afterward.
+    mock_shutdown.assert_called_once()
+
+
+def test_force_exit_reaches_exit_despite_logging_failure():
+    """os._exit() must still run even when logging.shutdown() itself
+    raises -- there is nothing reliable left to log to at that point,
+    so the failure is swallowed rather than reported. sys.stdout/
+    stderr.flush() are independently guarded too, so logging.shutdown()
+    failing must not stop them from still being attempted.
+    """
+    a = Apprise()
+    service = mock.Mock(spec=NotifyBase)
+    a.add(service)
+
+    with (
+        mock.patch(
+            "apprise.cli.logging.shutdown",
+            side_effect=RuntimeError("logging is broken"),
+        ),
+        mock.patch("apprise.cli.sys.stdout.flush") as mock_stdout_flush,
+        mock.patch("apprise.cli.sys.stderr.flush") as mock_stderr_flush,
+        mock.patch("apprise.cli.os._exit") as mock_os_exit,
+    ):
+        cli._force_exit(a, AppriseResultStatus.TIMEOUT)
+
+    service.flush_store.assert_called_once()
+    mock_stdout_flush.assert_called_once()
+    mock_stderr_flush.assert_called_once()
+    mock_os_exit.assert_called_once_with(AppriseResultStatus.TIMEOUT)
+
+
+def test_apprise_cli_limit_option_negative_value_errors():
+    """
+    CLI: --limit (-L) rejects a negative value the same way notify()
+    and AppriseAsset(service_timeout=...) do.
+    """
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        ["-t", "title", "-b", "body", "--limit", "-5", "json://good"],
+    )
+    assert result.exit_code != 0
+
+
+def test_apprise_cli_service_limit_option_in_help():
+    """
+    CLI: --service-limit (-SL) appears in --help output
+    """
+    runner = CliRunner()
+    result = runner.invoke(cli.main, ["--help"])
+    assert result.exit_code == 0
+    assert "--service-limit" in result.output
+    assert "-SL" in result.output
+
+
+def test_apprise_cli_service_limit_option_negative_value_errors():
+    """
+    CLI: --service-limit (-SL) rejects a negative value the same way
+    AppriseAsset(service_timeout=...) does.
+    """
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            "-t",
+            "title",
+            "-b",
+            "body",
+            "--service-limit",
+            "-5",
+            "json://good",
+        ],
+    )
+    assert result.exit_code != 0
+
+
+@mock.patch("apprise.cli.AppriseAsset")
+@mock.patch("requests.request")
+def test_apprise_cli_service_limit_option_passed_to_asset(
+    mock_request, mock_asset_cls
+):
+    """
+    CLI: --service-limit (-SL), when specified, is passed into
+    AppriseAsset(service_timeout=...) independently of --limit.
+    """
+    mock_asset_cls.side_effect = AppriseAsset
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            "-t",
+            "title",
+            "-b",
+            "body",
+            "--limit",
+            "30",
+            "--service-limit",
+            "5",
+            "json://localhost",
+        ],
+    )
+    assert result.exit_code == 0
+
+    # --service-limit is independently set on the AppriseAsset, no
+    # matter what --limit was also set to.
+    assert mock_asset_cls.call_args.kwargs.get("service_timeout") == 5.0
+
+
+@mock.patch("apprise.cli.AppriseAsset")
+@mock.patch("requests.request")
+def test_apprise_cli_service_limit_option_omitted(
+    mock_request, mock_asset_cls
+):
+    """
+    CLI: when --service-limit is not specified, AppriseAsset() receives
+    service_timeout=None -- its own built-in default remains in effect,
+    even if --limit was specified.
+    """
+    mock_asset_cls.side_effect = AppriseAsset
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+
+    runner = CliRunner()
+    result = runner.invoke(
+        cli.main,
+        [
+            "-t",
+            "title",
+            "-b",
+            "body",
+            "--limit",
+            "30",
+            "json://localhost",
+        ],
+    )
+    assert result.exit_code == 0
+    assert mock_asset_cls.call_args.kwargs.get("service_timeout") is None

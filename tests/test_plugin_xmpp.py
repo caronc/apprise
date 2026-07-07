@@ -634,7 +634,9 @@ def test_xmpp_apprise_notify_invokes_adapter(
     apobj.add("xmpp://me:secret@example.com/a@example.com")
 
     assert (
-        apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        bool(
+            apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert captured["targets"] == [("chat", "a@example.com")]
@@ -645,7 +647,9 @@ def test_xmpp_apprise_notify_invokes_adapter(
     apobj.add("xmpp://me:secret@example.com/a@example.com?subject=yes")
 
     assert (
-        apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        bool(
+            apobj.notify("hello", title="subject", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert captured["targets"] == [("chat", "a@example.com")]

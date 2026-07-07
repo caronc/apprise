@@ -472,7 +472,7 @@ def test_plugin_ntfy_attachments(mock_post):
     obj = apprise.Apprise.instantiate("ntfy://user:pass@localhost:8084/topic")
 
     # Send a good attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count; includes both image and message
     assert mock_post.call_count == 1
@@ -494,7 +494,9 @@ def test_plugin_ntfy_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     # Send our attachments
-    assert obj.notify(body="test", title="wonderful", attach=attach) is True
+    assert (
+        bool(obj.notify(body="test", title="wonderful", attach=attach)) is True
+    )
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -522,7 +524,7 @@ def test_plugin_ntfy_attachments(mock_post):
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = apprise.AppriseAttachment(path)
-    assert obj.notify(body="test", attach=attach) is False
+    assert bool(obj.notify(body="test", attach=attach)) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -608,8 +610,10 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert "topic1" in instance.topics
 
     assert (
-        instance.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            instance.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -634,8 +638,10 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     instance = NotifyNtfy(**results)
 
     assert (
-        instance.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            instance.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -871,9 +877,11 @@ def test_plugin_ntfy_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to ntfy
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

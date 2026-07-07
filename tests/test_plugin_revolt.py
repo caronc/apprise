@@ -379,7 +379,9 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -391,7 +393,9 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -454,7 +458,9 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -468,7 +474,7 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
     # Toggle our logo availability
     a.asset.image_url_logo = None
     assert (
-        a.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(a.notify(body="body", title="title", notify_type=NotifyType.INFO))
         is True
     )
 
@@ -555,17 +561,19 @@ def test_plugin_revolt_markdown_extra(mock_post):
 
     # This call includes an image with it's payload:
     assert (
-        a.notify(
-            body=test_markdown,
-            title="title",
-            notify_type=NotifyType.INFO,
-            body_format=NotifyFormat.TEXT,
+        bool(
+            a.notify(
+                body=test_markdown,
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(a.notify(body="body", title="title", notify_type=NotifyType.INFO))
         is True
     )
 
@@ -593,7 +601,7 @@ def test_plugin_revolt_html_to_markdown_format(mock_post):
         body="<b>hello</b> <i>world</i>",
         body_format=NotifyFormat.HTML,
     )
-    assert result is True
+    assert bool(result) is True
     assert mock_post.call_count == 1
 
     # The body must arrive inside the Markdown embed, not as

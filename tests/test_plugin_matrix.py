@@ -1425,7 +1425,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
     # Notification was successful, however we could not post image and since
     # we had post errors (of any kind) we still report a failure.
-    assert obj.notify("test", "test") is False
+    assert bool(obj.notify("test", "test")) is False
     del obj
 
     obj = NotifyMatrix(host="host", include_image=False, version="2")
@@ -1434,7 +1434,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
     # We didn't post an image (which was set to fail) and therefore our
     # post was okay
-    assert obj.notify("test", "test") is True
+    assert bool(obj.notify("test", "test")) is True
 
     # Force a object removal (thus a logout call)
     del obj
@@ -1464,14 +1464,14 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
-    assert obj.notify("test", "test") is True
+    assert bool(obj.notify("test", "test")) is True
     del obj
 
     obj = NotifyMatrix(host="host", include_image=False)
     assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
-    assert obj.notify("test", "test") is True
+    assert bool(obj.notify("test", "test")) is True
 
     # Force a object removal (thus a logout call)
     del obj
@@ -1503,11 +1503,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1545,11 +1547,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
         os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
     )
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1558,11 +1562,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1632,7 +1638,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     obj = Apprise.instantiate(
         "matrixs://user:pass@example.com/#general?v=2&discovery=yes"
     )
-    assert obj.notify("body") is True
+    assert bool(obj.notify("body")) is True
 
     response = mock.Mock()
     response.status_code = requests.codes.unavailable
@@ -1675,7 +1681,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
     # We fail our discovery and therefore can't send our notification
-    assert obj.notify("hello world") is False
+    assert bool(obj.notify("hello world")) is False
 
     # bad key
     resp["m.homeserver"] = {}
@@ -1703,7 +1709,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     assert NotifyMatrix.discovery_identity_key in obj.store
 
     # Discovery passes so notifications work too
-    assert obj.notify("hello world") is True
+    assert bool(obj.notify("hello world")) is True
 
     # bad data
     resp["m.identity_server"] = "!garbage!:303"
@@ -1761,7 +1767,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
 
     # Discovery passes so notifications work too
     response.status_code = requests.codes.ok
-    assert obj.notify("hello world") is True
+    assert bool(obj.notify("hello world")) is True
 
     response.status_code = requests.codes.ok
     mock_get.return_value = None
@@ -1838,11 +1844,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1868,11 +1876,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     mock_put.reset_mock()
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1909,11 +1919,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
         os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
     )
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1922,11 +1934,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1990,7 +2004,9 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 
     # image attachment didn't succeed
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -2024,7 +2040,7 @@ def test_plugin_matrix_v2_compliance(mock_post, mock_put):
     obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=2")
 
     # Send a standard notification
-    assert obj.notify(body="test message") is True
+    assert bool(obj.notify(body="test message")) is True
 
     # Confirm the fix:
     # 1. Path contains the transaction ID '0'
@@ -2056,7 +2072,7 @@ def test_plugin_matrix_v2_token_mode_no_txn_increment(
     assert obj is not None
 
     # Send with image inline enabled
-    assert obj.notify(body="token mode image test") is True
+    assert bool(obj.notify(body="token mode image test")) is True
 
     # Send with an attachment
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
@@ -2086,7 +2102,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
     )
     assert obj is not None
 
-    assert obj.notify(title="Title", body="<b>Body</b>") is True
+    assert bool(obj.notify(title="Title", body="<b>Body</b>")) is True
 
     assert mock_post.call_args.args[0] == (
         "https://hookshot.example/public-hooks/supersecret"
@@ -2114,7 +2130,7 @@ def test_plugin_matrix_hookshot_webhook_empty_title(mock_post):
     )
     assert obj is not None
 
-    assert obj.notify(body="**Body**") is True
+    assert bool(obj.notify(body="**Body**")) is True
 
     payload = loads(mock_post.call_args.kwargs["data"])
     assert payload["username"] == "apprise"
@@ -2147,7 +2163,7 @@ def test_plugin_matrix_hookshot_root_path_text(mock_post):
         "?mode=hookshot&format=text&path=%2F"
     )
     assert obj is not None
-    assert obj.notify(body="<b>Body</b>") is True
+    assert bool(obj.notify(body="<b>Body</b>")) is True
 
     assert mock_post.call_args.args[0] == (
         "https://hookshot.example/supersecret"
@@ -2192,7 +2208,11 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
 
         # Performs a login
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is True
         )
         assert mock_get.call_count == 0
@@ -2219,8 +2239,10 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
             mock_put.reset_mock()
 
             assert (
-                obj.notify(
-                    body="body", title="title", notify_type=NotifyType.INFO
+                bool(
+                    obj.notify(
+                        body="body", title="title", notify_type=NotifyType.INFO
+                    )
                 )
                 is True
             )
@@ -2301,7 +2323,11 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
 
         # Performs a login
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is True
         )
         assert mock_get.call_count == 0
@@ -2331,8 +2357,10 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
             mock_put.reset_mock()
 
             assert (
-                obj.notify(
-                    body="body", title="title", notify_type=NotifyType.INFO
+                bool(
+                    obj.notify(
+                        body="body", title="title", notify_type=NotifyType.INFO
+                    )
                 )
                 is True
             )
@@ -2394,7 +2422,9 @@ def test_plugin_matrix_v3_url_with_port_assembly(
     )
     # Performs a login
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -2497,7 +2527,7 @@ def test_plugin_matrix_no_room_create_on_non_not_found_join(
     ap = Apprise()
     ap.add("matrixs://user:pass@matrix.vip/#backup?discovery=no")
 
-    assert ap.notify(title="t", body="b") is False
+    assert bool(ap.notify(title="t", body="b")) is False
 
     # Cleanup explicitly to ensure __del__ executes while mocks are active.
     import gc
@@ -2572,7 +2602,7 @@ def test_plugin_matrix_room_create_on_not_found_join(
     ap = Apprise()
     ap.add("matrixs://user:pass@matrix.vip/#backup?discovery=no")
 
-    assert ap.notify(title="t", body="b") is True
+    assert bool(ap.notify(title="t", body="b")) is True
 
     import gc
 
@@ -7597,7 +7627,8 @@ def test_plugin_matrix_init_recovers_home_server_from_user_id(tmpdir):
     # Flush to disk before the second instance reads it.
     obj.store.flush()
 
-    # The matching instance recovers its home server from the stored user ID.
+    # Second instance with the same credentials (same url_id) reads the store.
+    # The recovery path should derive home_server from the stored user_id.
     obj2 = NotifyMatrix(
         host="h", user="u", password="pass", targets=["#r"], asset=asset
     )

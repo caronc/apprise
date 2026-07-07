@@ -162,9 +162,11 @@ def test_plugin_dingtalk_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework converts it to Markdown
     # before dispatching to the DingTalk plugin
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

@@ -123,14 +123,14 @@ def test_plugin_emby_general(
 
     obj = Apprise.instantiate("emby://l2g:l2gpass@localhost?modal=False")
     assert isinstance(obj, NotifyEmby)
-    assert obj.notify("title", "body", "info") is True
+    assert bool(obj.notify("title", "body", "info")) is True
     obj.access_token = "abc"
     obj.user_id = "123"
 
     # Test Modal support
     obj = Apprise.instantiate("emby://l2g:l2gpass@localhost?modal=True")
     assert isinstance(obj, NotifyEmby)
-    assert obj.notify("title", "body", "info") is True
+    assert bool(obj.notify("title", "body", "info")) is True
     obj.access_token = "abc"
     obj.user_id = "123"
 
@@ -139,7 +139,7 @@ def test_plugin_emby_general(
         mock_post.side_effect = exception
         mock_get.side_effect = exception
         # We'll fail to log in each time
-        assert obj.notify("title", "body", "info") is False
+        assert bool(obj.notify("title", "body", "info")) is False
 
     # Disable Exceptions
     mock_post.side_effect = None
@@ -152,12 +152,12 @@ def test_plugin_emby_general(
     # KeyError handling
     mock_post.return_value.status_code = 999
     mock_get.return_value.status_code = 999
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
     # General Internal Server Error
     mock_post.return_value.status_code = requests.codes.internal_server_error
     mock_get.return_value.status_code = requests.codes.internal_server_error
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
     mock_post.return_value.status_code = requests.codes.ok
     mock_get.return_value.status_code = requests.codes.ok
@@ -165,12 +165,12 @@ def test_plugin_emby_general(
 
     # Disable the port completely
     obj.port = None
-    assert obj.notify("title", "body", "info") is True
+    assert bool(obj.notify("title", "body", "info")) is True
 
     # An Empty return set (no query is made, but notification will still
     # succeed
     mock_sessions.return_value = {}
-    assert obj.notify("title", "body", "info") is True
+    assert bool(obj.notify("title", "body", "info")) is True
 
     # Tidy our object
     del obj

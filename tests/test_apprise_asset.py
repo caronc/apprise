@@ -61,3 +61,60 @@ def test_timezone():
 
     with pytest.raises(AttributeError):
         AppriseAsset(timezone="invalid")
+
+
+def test_service_timeout():
+    "asset: service_timeout() testing"
+
+    # Default value is 60 seconds, defined directly on AppriseAsset
+    asset = AppriseAsset()
+    assert asset._service_timeout == 60.0
+
+    # Accepts an int and stores it as a float
+    asset = AppriseAsset(service_timeout=10)
+    assert asset._service_timeout == 10.0
+    assert isinstance(asset._service_timeout, float)
+
+    # Accepts a float directly
+    asset = AppriseAsset(service_timeout=12.5)
+    assert asset._service_timeout == 12.5
+
+    # 0 is valid -- it disables the timeout entirely
+    asset = AppriseAsset(service_timeout=0)
+    assert asset._service_timeout == 0.0
+
+    # Negative values are rejected
+    with pytest.raises(ValueError):
+        AppriseAsset(service_timeout=-1)
+
+    # Non-numeric types are rejected
+    with pytest.raises(TypeError):
+        AppriseAsset(service_timeout="invalid")
+
+    # Booleans are rejected even though bool is technically an int subclass
+    with pytest.raises(TypeError):
+        AppriseAsset(service_timeout=True)
+
+    # inf might look like a second way to spell "unbounded" (0 is the
+    # documented one), but concurrent.futures.Future.result(timeout=
+    # float("inf")) raises OverflowError on some platforms, silently
+    # turning a successful notification into a reported FAILURE -- so
+    # it's rejected outright, same as any other non-finite value.
+    with pytest.raises(ValueError):
+        AppriseAsset(service_timeout=float("inf"))
+
+    with pytest.raises(ValueError):
+        AppriseAsset(service_timeout=float("-inf"))
+
+    # NaN fails every ordering comparison, so it would otherwise slip
+    # past a plain "< 0" check and silently disable the timeout as an
+    # accidental side effect of its comparison semantics.
+    with pytest.raises(ValueError):
+        AppriseAsset(service_timeout=float("nan"))
+
+    # The internal/system attribute can also be set the same way every
+    # other underscore-prefixed AppriseAsset field can: directly through
+    # the generic kwarg mechanism (bypassing the friendly named parameter
+    # and its validation).
+    asset = AppriseAsset(_service_timeout=99.0)
+    assert asset._service_timeout == 99.0

@@ -196,6 +196,7 @@ def test_plugin_pagerduty_urls():
 
 @mock.patch("requests.post")
 def test_plugin_pagerduty_notify_type_is_string(mock_post):
+    """Verify string notification types are accepted and delivered."""
     response = mock.Mock()
     response.status_code = requests.codes.ok
     response.content = ""
@@ -205,7 +206,9 @@ def test_plugin_pagerduty_notify_type_is_string(mock_post):
     assert isinstance(obj, NotifyPagerDuty)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 1

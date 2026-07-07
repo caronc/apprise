@@ -195,4 +195,4 @@ def test_plugin_simplepush_general(mock_post):
     obj = Apprise.instantiate("spush://{}".format("Y" * 14))
 
     # Verify our content works as expected
-    assert obj.notify(title="test", body="test") is True
+    assert bool(obj.notify(title="test", body="test")) is True

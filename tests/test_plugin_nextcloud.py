@@ -300,7 +300,9 @@ def test_plugin_nextcloud_url_prefix(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
