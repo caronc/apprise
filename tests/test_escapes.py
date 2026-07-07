@@ -57,7 +57,7 @@ def test_apprise_interpret_escapes(mock_request):
     assert a[0].asset.interpret_escapes is False
 
     # Send notification
-    assert a.notify("ab\\ncd") is True
+    assert bool(a.notify("ab\\ncd")) is True
 
     # Test our call count
     assert mock_request.call_count == 1
@@ -71,7 +71,7 @@ def test_apprise_interpret_escapes(mock_request):
     mock_request.reset_mock()
 
     # Send notification and provide override:
-    assert a.notify("ab\\ncd", interpret_escapes=True) is True
+    assert bool(a.notify("ab\\ncd", interpret_escapes=True)) is True
 
     # Test our call count
     assert mock_request.call_count == 1
@@ -103,7 +103,7 @@ def test_apprise_interpret_escapes(mock_request):
     assert a[0].asset.interpret_escapes is True
 
     # Send notification
-    assert a.notify("ab\\ncd") is True
+    assert bool(a.notify("ab\\ncd")) is True
 
     # Test our call count
     assert mock_request.call_count == 1
@@ -117,7 +117,7 @@ def test_apprise_interpret_escapes(mock_request):
     mock_request.reset_mock()
 
     # Send notification and provide override:
-    assert a.notify("ab\\ncd", interpret_escapes=False) is True
+    assert bool(a.notify("ab\\ncd", interpret_escapes=False)) is True
 
     # Test our call count
     assert mock_request.call_count == 1
@@ -187,19 +187,23 @@ def test_apprise_escaping(mock_request):
     # Error handling
     #
     # We can't escape the content below
-    assert a.notify(title=None, body=4, interpret_escapes=True) is False
-    assert a.notify(title=4, body=None, interpret_escapes=True) is False
+    assert bool(a.notify(title=None, body=4, interpret_escapes=True)) is False
+    assert bool(a.notify(title=4, body=None, interpret_escapes=True)) is False
     assert (
-        a.notify(title=object(), body=False, interpret_escapes=True) is False
+        bool(a.notify(title=object(), body=False, interpret_escapes=True))
+        is False
     )
     assert (
-        a.notify(title=False, body=object(), interpret_escapes=True) is False
+        bool(a.notify(title=False, body=object(), interpret_escapes=True))
+        is False
     )
 
     # We support bytes
     assert (
-        a.notify(
-            title=b"byte title", body=b"byte body", interpret_escapes=True
+        bool(
+            a.notify(
+                title=b"byte title", body=b"byte body", interpret_escapes=True
+            )
         )
         is True
     )
@@ -211,7 +215,9 @@ def test_apprise_escaping(mock_request):
     # זו הודעה translates to 'This is a notification'
     title = "כותרת נפלאה".encode("ISO-8859-8")
     body = "[_[זו הודעה](http://localhost)_".encode("ISO-8859-8")
-    assert a.notify(title=title, body=body, interpret_escapes=True) is False
+    assert (
+        bool(a.notify(title=title, body=body, interpret_escapes=True)) is False
+    )
 
     # However if we let Apprise know in advance the encoding, it will handle
     # it for us
@@ -219,7 +225,9 @@ def test_apprise_escaping(mock_request):
     a = apprise.Apprise(asset=asset)
     # Create ourselves a test object to work with
     a.add("json://localhost")
-    assert a.notify(title=title, body=body, interpret_escapes=True) is True
+    assert (
+        bool(a.notify(title=title, body=body, interpret_escapes=True)) is True
+    )
 
     # We'll restore our configuration back to how it was now
     a = apprise.Apprise()
@@ -228,14 +236,25 @@ def test_apprise_escaping(mock_request):
     # The body is proessed first, so the errors thrown above get tested on
     # the body only.  Now we run similar tests but only make the title
     # bad and always mark the body good
-    assert a.notify(title=None, body="valid", interpret_escapes=True) is True
-    assert a.notify(title=4, body="valid", interpret_escapes=True) is False
     assert (
-        a.notify(title=object(), body="valid", interpret_escapes=True) is False
+        bool(a.notify(title=None, body="valid", interpret_escapes=True))
+        is True
     )
-    assert a.notify(title=False, body="valid", interpret_escapes=True) is True
+    assert (
+        bool(a.notify(title=4, body="valid", interpret_escapes=True)) is False
+    )
+    assert (
+        bool(a.notify(title=object(), body="valid", interpret_escapes=True))
+        is False
+    )
+    assert (
+        bool(a.notify(title=False, body="valid", interpret_escapes=True))
+        is True
+    )
     # Bytes are supported
     assert (
-        a.notify(title=b"byte title", body="valid", interpret_escapes=True)
+        bool(
+            a.notify(title=b"byte title", body="valid", interpret_escapes=True)
+        )
         is True
     )

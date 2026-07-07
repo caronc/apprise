@@ -214,7 +214,7 @@ def test_plugin_blink1_device_open_failure():
 
         obj = Apprise.instantiate("blink1://ABCD1234/")
         assert obj is not None
-        assert obj.notify(body="test") is False
+        assert bool(obj.notify(body="test")) is False
 
 
 def test_plugin_blink1_device_open_failure_no_serial():
@@ -228,7 +228,7 @@ def test_plugin_blink1_device_open_failure_no_serial():
 
         obj = Apprise.instantiate("blink1://")
         assert obj is not None
-        assert obj.notify(body="test") is False
+        assert bool(obj.notify(body="test")) is False
 
 
 def test_plugin_blink1_send_feature_report_exception():
@@ -247,7 +247,7 @@ def test_plugin_blink1_send_feature_report_exception():
 
         obj = Apprise.instantiate("blink1://")
         assert obj is not None
-        assert obj.notify(body="test") is False
+        assert bool(obj.notify(body="test")) is False
 
         # close() must always be called
         assert mock_dev.close.called
@@ -268,7 +268,7 @@ def test_plugin_blink1_short_report_fails():
 
         obj = Apprise.instantiate("blink1://")
         assert obj is not None
-        assert obj.notify(body="test") is False
+        assert bool(obj.notify(body="test")) is False
 
 
 def test_plugin_blink1_notify_types():
@@ -293,7 +293,9 @@ def test_plugin_blink1_notify_types():
             NotifyType.WARNING,
             NotifyType.FAILURE,
         ):
-            assert obj.notify(body="test", notify_type=notify_type) is True
+            assert (
+                bool(obj.notify(body="test", notify_type=notify_type)) is True
+            )
 
         # Each notification sends two reports (color + off)
         assert mock_dev.send_feature_report.call_count == 8
@@ -333,7 +335,9 @@ def test_plugin_blink1_fade_rgb_args():
 
         obj = Apprise.instantiate("blink1://?fade=200&duration=100&ledn=2")
         assert obj is not None
-        assert obj.notify(body="test", notify_type=NotifyType.INFO) is True
+        assert (
+            bool(obj.notify(body="test", notify_type=NotifyType.INFO)) is True
+        )
 
         first_call_buf = mock_dev.send_feature_report.call_args_list[0][0][0]
         assert first_call_buf[1] == ord("c")  # command byte
@@ -358,7 +362,7 @@ def test_plugin_blink1_off_sent_after_duration():
 
         obj = Apprise.instantiate("blink1://?fade=500&duration=2000")
         assert obj is not None
-        assert obj.notify(body="test") is True
+        assert bool(obj.notify(body="test")) is True
 
         mock_time.sleep.assert_called_once_with(2.5)
 
@@ -389,7 +393,7 @@ def test_plugin_blink1_off_command_failure_returns_false():
 
         obj = Apprise.instantiate("blink1://")
         assert obj is not None
-        assert obj.notify(body="test") is False
+        assert bool(obj.notify(body="test")) is False
 
         # close() must still be called
         assert mock_dev.close.called

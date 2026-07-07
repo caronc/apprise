@@ -3793,7 +3793,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3815,7 +3815,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=no")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3837,7 +3837,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=yes")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3859,7 +3859,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=no")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3886,7 +3886,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3910,7 +3910,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=no")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3934,7 +3934,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=yes")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3961,7 +3961,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3988,7 +3988,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=yes")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]

@@ -944,7 +944,7 @@ def test_plugin_wechat_apprise_integration(mock_post, mock_get):
     app = Apprise()
     url = "wechat://{}:{}@{}/@all".format(CORPID, CORPSECRET, AGENTID)
     assert app.add(url) is True
-    assert app.notify(title="T", body="B") is True
+    assert bool(app.notify(title="T", body="B")) is True
 
 
 @mock.patch("requests.get")

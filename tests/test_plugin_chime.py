@@ -194,7 +194,7 @@ def test_plugin_chime_send(mock_post):
     assert isinstance(obj, NotifyChime)
 
     # Perform a successful send
-    assert obj.notify(body="Test body", title="Test title") is True
+    assert bool(obj.notify(body="Test body", title="Test title")) is True
 
     # Verify the POST was made exactly once
     assert mock_post.call_count == 1
@@ -210,43 +210,43 @@ def test_plugin_chime_send(mock_post):
 
     # A 401 response returns False
     mock_post.return_value = _mk_resp(requests.codes.unauthorized)
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
     mock_post.reset_mock()
 
     # A 403 response returns False
     mock_post.return_value = _mk_resp(requests.codes.forbidden)
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
     mock_post.reset_mock()
 
     # A 404 response returns False
     mock_post.return_value = _mk_resp(requests.codes.not_found)
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
     mock_post.reset_mock()
 
     # A 429 too-many-requests response returns False
     mock_post.return_value = _mk_resp(429)
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
     mock_post.reset_mock()
 
     # A 500 response returns False
     mock_post.return_value = _mk_resp(requests.codes.internal_server_error)
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
     mock_post.reset_mock()
 
     # An unknown response code returns False
     mock_post.return_value = _mk_resp(999)
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
     mock_post.reset_mock()
 
     # A RequestException returns False
     mock_post.side_effect = requests.RequestException("Network error")
-    assert obj.notify(body="Test body") is False
+    assert bool(obj.notify(body="Test body")) is False
 
 
 @mock.patch("requests.post")
@@ -351,7 +351,7 @@ def test_plugin_chime_native_url(mock_post):
     # The constructed object must be functional
     obj = NotifyChime(**results)
     assert isinstance(obj, NotifyChime)
-    assert obj.notify(body="Native URL test") is True
+    assert bool(obj.notify(body="Native URL test")) is True
 
     # A non-matching URL returns None
     assert (
@@ -395,14 +395,14 @@ def test_plugin_chime_apprise_integration(mock_post):
     assert isinstance(a[0], NotifyChime)
 
     # Notify succeeds
-    assert a.notify(body="Test", title="Title") is True
+    assert bool(a.notify(body="Test", title="Title")) is True
     assert mock_post.call_count == 1
 
     mock_post.reset_mock()
 
     # Test failure response
     mock_post.return_value.status_code = requests.codes.internal_server_error
-    assert a.notify(body="Test", title="Title") is False
+    assert bool(a.notify(body="Test", title="Title")) is False
 
     mock_post.reset_mock()
 
@@ -420,7 +420,7 @@ def test_plugin_chime_apprise_integration(mock_post):
     assert isinstance(a2[0], NotifyChime)
 
     mock_post.return_value.status_code = requests.codes.ok
-    assert a2.notify(body="Native test", title="Title") is True
+    assert bool(a2.notify(body="Native test", title="Title")) is True
 
 
 @mock.patch("requests.post")
@@ -461,9 +461,11 @@ def test_plugin_chime_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Chime
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

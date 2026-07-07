@@ -164,7 +164,9 @@ def test_plugin_smsmgr_edge_cases(mock_get):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -210,7 +212,9 @@ def test_plugin_smsmgr_edge_cases(mock_get):
     assert len(obj) == 1
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

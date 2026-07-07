@@ -230,4 +230,4 @@ def test_plugin_burstsms_edge_cases(mock_post):
     obj = NotifyBurstSMS(apikey=apikey, secret=secret, source=source)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False

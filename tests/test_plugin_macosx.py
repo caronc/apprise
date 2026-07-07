@@ -104,15 +104,21 @@ def test_plugin_macosx_general_success(macos_notify_environment):
 
     # test notifications
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
 
     # test notification without a title
     assert (
-        obj.notify(title="", body="body", notify_type=apprise.NotifyType.INFO)
+        bool(
+            obj.notify(
+                title="", body="body", notify_type=apprise.NotifyType.INFO
+            )
+        )
         is True
     )
 
@@ -121,8 +127,10 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     )
     assert isinstance(obj, NotifyMacOSX) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -133,8 +141,10 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     assert isinstance(obj, NotifyMacOSX) is True
     assert isinstance(obj.url(), str) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -147,8 +157,10 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     assert obj.sound == "default"
     assert isinstance(obj.url(), str) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -161,8 +173,10 @@ def test_plugin_macosx_general_success(macos_notify_environment):
     assert obj.click == "http://google.com"
     assert isinstance(obj.url(), str) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -180,8 +194,10 @@ def test_plugin_macosx_terminal_notifier_not_executable(
     os.chmod(terminal_notifier, 0o644)
 
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
@@ -198,8 +214,10 @@ def test_plugin_macosx_terminal_notifier_invalid(macos_notify_environment):
     assert not os.path.isfile(obj.notify_path)
 
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
@@ -217,8 +235,10 @@ def test_plugin_macosx_terminal_notifier_croaks(
     obj = apprise.Apprise.instantiate("macosx://", suppress_exceptions=False)
     assert isinstance(obj, NotifyMacOSX) is True
     assert (
-        obj.notify(
-            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                title="title", body="body", notify_type=apprise.NotifyType.INFO
+            )
         )
         is False
     )
