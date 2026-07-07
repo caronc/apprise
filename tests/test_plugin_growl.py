@@ -94,8 +94,12 @@ def test_plugin_growl_exception_handling(mock_gntp):
         # We will fail to send the notification because our registration
         # would have failed
         assert (
-            obj.notify(
-                title="test", body="body", notify_type=apprise.NotifyType.INFO
+            bool(
+                obj.notify(
+                    title="test",
+                    body="body",
+                    notify_type=apprise.NotifyType.INFO,
+                )
             )
             is False
         )
@@ -116,8 +120,12 @@ def test_plugin_growl_exception_handling(mock_gntp):
         # We will fail to send the notification because of the underlining
         # notify() call throws an exception
         assert (
-            obj.notify(
-                title="test", body="body", notify_type=apprise.NotifyType.INFO
+            bool(
+                obj.notify(
+                    title="test",
+                    body="body",
+                    notify_type=apprise.NotifyType.INFO,
+                )
             )
             is False
         )

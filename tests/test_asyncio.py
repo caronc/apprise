@@ -98,7 +98,7 @@ def test_apprise_asyncio_runtime_error():
         # Below, we internally will throw a RuntimeError() since there will
         # be no active event_loop in place. However internally it will be smart
         # enough to create a new event loop and continue...
-        assert a.notify(title="title", body="body") is True
+        assert bool(a.notify(title="title", body="body")) is True
 
     finally:
         # Restore our event loop (in the event the above test failed)

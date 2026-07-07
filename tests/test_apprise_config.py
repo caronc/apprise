@@ -608,7 +608,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(a) == 1
 
     # Notify our service
-    assert a.notify(body="apprise configuration power!") is True
+    assert bool(a.notify(body="apprise configuration power!")) is True
 
     # Add our configuration object
     assert (

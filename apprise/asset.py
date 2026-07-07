@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from datetime import datetime, tzinfo
+import math
 from os.path import abspath, dirname, isfile, join
 import re
 from typing import Any, Optional, Union
@@ -239,6 +240,10 @@ class AppriseAsset:
     # is uzed
     _tzinfo = None
 
+    # Default budget for one service, including retries and waits. Apprise
+    # reports TIMEOUT after this many seconds; 0 disables the service limit.
+    _service_timeout = 60.0
+
     def __init__(
         self,
         plugin_paths: Optional[list[str]] = None,
@@ -247,9 +252,15 @@ class AppriseAsset:
         storage_salt: Optional[Union[str, bytes]] = None,
         storage_idlen: Optional[int] = None,
         timezone: Optional[Union[str, tzinfo]] = None,
+        service_timeout: Optional[Union[int, float]] = None,
         **kwargs: Any,
     ) -> None:
-        """Asset Initialization."""
+        """Initialize shared Apprise settings and service limits.
+
+        ``service_timeout`` limits the total seconds one service may spend on
+        delivery, retries, and retry waits. ``None`` keeps the class default,
+        while ``0`` disables the per-service limit.
+        """
         # Assign default arguments if specified
         for key, value in kwargs.items():
             if not hasattr(AppriseAsset, key):
@@ -308,6 +319,29 @@ class AppriseAsset:
         else:
             # Default our timezone to what is detected on the system
             self._tzinfo = datetime.now().astimezone().tzinfo
+
+        if service_timeout is not None:
+            # Normalize numeric values to float so deadline calculations use
+            # one consistent representation. bool is rejected explicitly
+            # because it is an int subclass but not a meaningful duration.
+            if not isinstance(service_timeout, (int, float)) or isinstance(
+                service_timeout, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset service_timeout must be an int or float."
+                )
+
+            if not math.isfinite(service_timeout) or service_timeout < 0:
+                # inf might look like a second way to spell "unbounded",
+                # but concurrent.futures.Future.result(timeout=float(
+                # "inf")) raises OverflowError on some platforms -- 0 is
+                # the only supported way to disable the limit.
+                raise ValueError(
+                    "AppriseAsset service_timeout must be >= 0 and "
+                    "finite (0 disables the timeout entirely)."
+                )
+
+            self._service_timeout = float(service_timeout)
 
         if storage_salt is not None:
             # Define the number of characters utilized from our namespace lengh

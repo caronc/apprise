@@ -116,7 +116,7 @@ def test_plugin_glib_basic_notify(enabled_glib_environment):
     """Basic notification path"""
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     assert isinstance(obj, NotifyGLib)
-    assert obj.notify("body", title="title") is True
+    assert bool(obj.notify("body", title="title")) is True
 
 
 def test_plugin_glib_url_includes_coordinates(enabled_glib_environment):
@@ -175,7 +175,7 @@ def test_plugin_glib_icon_fails_gracefully(mocker, enabled_glib_environment):
     )
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     spy = mocker.spy(obj, "logger")
-    assert obj.notify("msg", title="t") is True
+    assert bool(obj.notify("msg", title="t")) is True
     assert any(
         "Could not load notification icon" in str(x)
         for x in spy.warning.call_args_list
@@ -190,7 +190,7 @@ def test_plugin_glib_send_raises_glib_error(mocker, enabled_glib_environment):
         gi.repository.GLib.Error("fail")
     )
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
-    assert obj.notify("fail test") is False
+    assert bool(obj.notify("fail test")) is False
 
 
 def test_plugin_glib_send_raises_generic(mocker, enabled_glib_environment):
@@ -236,7 +236,7 @@ def test_plugin_glib_send_raises_generic(mocker, enabled_glib_environment):
 
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     logger = mocker.spy(obj, "logger")
-    assert obj.notify("boom", title="fail") is False
+    assert bool(obj.notify("boom", title="fail")) is False
     logger.warning.assert_called_with("Failed to send GLib/Gio notification.")
 
 
@@ -244,7 +244,7 @@ def test_plugin_glib_disabled(mocker, enabled_glib_environment):
     """Test disabled plugin returns False on notify()"""
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
     obj.enabled = False
-    assert obj.notify("x") is False
+    assert bool(obj.notify("x")) is False
 
 
 def test_plugin_glib_invalid_coords():
@@ -284,7 +284,7 @@ def test_plugin_glib_xy_axis_applied_to_variant(enabled_glib_environment):
     spy_variant = Mock(wraps=gi.repository.GLib.Variant)
     gi.repository.GLib.Variant = spy_variant
 
-    assert obj.notify("Test with coords", title="xy") is True
+    assert bool(obj.notify("Test with coords", title="xy")) is True
 
     # Check x and y were added to meta_payload
     assert call("i", 5) in spy_variant.mock_calls
@@ -297,7 +297,7 @@ def test_plugin_glib_no_image_support(monkeypatch, enabled_glib_environment):
         "apprise.plugins.glib.NOTIFY_GLIB_IMAGE_SUPPORT", False
     )
     obj = apprise.Apprise.instantiate("glib://", suppress_exceptions=False)
-    assert obj.notify("no image") is True
+    assert bool(obj.notify("no image")) is True
 
 
 def test_plugin_glib_url_redaction(enabled_glib_environment):
@@ -406,7 +406,7 @@ def test_plugin_glib_notify_generic_exception(
 
     # 6. Execute notify()
     #    It should catch the exception and return False
-    assert obj.notify(title="Title", body="Body") is False
+    assert bool(obj.notify(title="Title", body="Body")) is False
 
     # 7. Verify the specific log message from glib.py
     logger_spy.warning.assert_called_with(

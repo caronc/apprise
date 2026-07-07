@@ -45,6 +45,7 @@ import zlib
 from . import exception
 from .common import (
     AWARE_DATE_ISO_FORMAT,
+    JSON_COMPACT_SEPARATORS,
     NAIVE_DATE_ISO_FORMAT,
     PersistentStoreMode,
 )
@@ -1226,7 +1227,7 @@ class PersistentStore:
                             for k, v in self._cache.items()
                             if v and v.persistent
                         },
-                        separators=(",", ":"),
+                        separators=JSON_COMPACT_SEPARATORS,
                         cls=CacheJSONEncoder,
                     ).encode(self.encoding)
                 )

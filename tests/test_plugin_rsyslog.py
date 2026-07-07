@@ -65,14 +65,14 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     assert isinstance(obj, NotifyRSyslog)
     assert obj.url().startswith("rsyslog://localhost") is True
     assert r"logpid=yes" in obj.url()
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     mock_connection.sendto.return_value = 18
     obj = apprise.Apprise.instantiate("rsyslog://localhost/?facility=local5")
     assert isinstance(obj, NotifyRSyslog)
     assert obj.url().startswith("rsyslog://localhost/local5") is True
     assert r"logpid=yes" in obj.url()
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     # Invalid instantiation
     assert (
@@ -86,11 +86,11 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     assert isinstance(obj, NotifyRSyslog)
     assert obj.url().startswith("rsyslog://localhost/daemon") is True
     assert r"logpid=yes" in obj.url()
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     # Test bad return count
     mock_connection.sendto.return_value = 0
-    assert obj.notify(body=payload) is False
+    assert bool(obj.notify(body=payload)) is False
 
     # Test with port
     mock_connection.sendto.return_value = 17
@@ -98,11 +98,13 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     assert isinstance(obj, NotifyRSyslog)
     assert obj.url().startswith("rsyslog://localhost:518") is True
     assert r"logpid=yes" in obj.url()
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     # Set length to include title (for test)
     mock_connection.sendto.return_value = 39
-    assert obj.notify(body=payload, title="Testing a title entry") is True
+    assert (
+        bool(obj.notify(body=payload, title="Testing a title entry")) is True
+    )
 
     # Return length back to where it was
     mock_connection.sendto.return_value = 16
@@ -112,14 +114,14 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     assert isinstance(obj, NotifyRSyslog)
     assert obj.url().startswith("rsyslog://localhost") is True
     assert r"logpid=yes" in obj.url()
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     # Specify a facility
     obj = apprise.Apprise.instantiate("rsyslog://localhost/kern")
     assert isinstance(obj, NotifyRSyslog)
     assert obj.url().startswith("rsyslog://localhost/kern") is True
     assert r"logpid=yes" in obj.url()
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     # Specify a facility requiring a lookup and having the port identified
     # resolves any ambiguity
@@ -128,7 +130,7 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     assert obj.url().startswith("rsyslog://localhost/daemon") is True
     assert r"logpid=yes" in obj.url()
     mock_connection.sendto.return_value = 17  # daemon is one more byte in size
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
 
     obj = apprise.Apprise.instantiate("rsyslog://localhost:9000/d?logpid=no")
     assert isinstance(obj, NotifyRSyslog)
@@ -144,18 +146,18 @@ def test_plugin_rsyslog_by_url(mock_getpid, mock_socket):
     mock_connection.sendto.return_value = (
         len(payload) + 5 + len(str(mock_getpid.return_value))
     )
-    assert obj.notify(body=payload) is True
+    assert bool(obj.notify(body=payload)) is True
     # This only fails because the underlining sendto() will return a
     # length different then what was expected
-    assert obj.notify(body="a different payload size") is False
+    assert bool(obj.notify(body="a different payload size")) is False
 
     # Test timeouts and errors that can occur
     mock_connection.sendto.return_value = None
     mock_connection.sendto.side_effect = socket.gaierror
-    assert obj.notify(body=payload) is False
+    assert bool(obj.notify(body=payload)) is False
 
     mock_connection.sendto.side_effect = socket.timeout
-    assert obj.notify(body=payload) is False
+    assert bool(obj.notify(body=payload)) is False
 
 
 def test_plugin_rsyslog_edge_cases():

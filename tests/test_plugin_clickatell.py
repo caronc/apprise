@@ -210,4 +210,4 @@ def test_plugin_clickatell_edge_cases(mock_post):
     obj = NotifyClickatell(apikey=apikey, from_phone=from_phone)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False

@@ -230,11 +230,13 @@ def test_plugin_brevo_attachments(mock_post):
     obj = Apprise.instantiate("brevo://abcd:user@example.com")
     assert isinstance(obj, NotifyBrevo)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -244,11 +246,13 @@ def test_plugin_brevo_attachments(mock_post):
     # Try again in a use case where we can't access the file
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -256,11 +260,13 @@ def test_plugin_brevo_attachments(mock_post):
     # Try again in a use case where we can't access the file
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
