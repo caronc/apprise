@@ -3248,3 +3248,122 @@ class TestServiceTimeout:
             assert apprise_module._any_abandoned_calls_still_running() is False
         finally:
             N_MGR.unload_modules()
+
+
+class _SlowFailNotify(NotifyBase):
+    """Fails after a configurable delay so deadlines can pass mid-attempt."""
+
+    app_id = "SlowFailApp"
+    app_desc = "Test"
+    notify_url = "slowfail://"
+    title_maxlen = 250
+    body_maxlen = 32768
+
+    def __init__(self, delay=0.0, **kwargs):
+        """Initialize the test plugin with its artificial delay."""
+        super().__init__(**kwargs)
+        self._delay = delay
+        self.calls = 0
+
+    def url(self, *args, **kwargs):
+        """Return a stable URL containing the test host."""
+        return "slowfail://{}".format(self.host)
+
+    def send(self, **kwargs):
+        """Block for the configured delay, then report failure."""
+        self.calls += 1
+        time.sleep(self._delay)
+        return False
+
+    async def async_notify(self, **kwargs):
+        """Block for the configured delay, then report failure."""
+        self.calls += 1
+        await asyncio.sleep(self._delay)
+        return False
+
+    @staticmethod
+    def parse_url(url):
+        """Parse the synthetic URL without requiring a real host."""
+        return NotifyBase.parse_url(url, verify_host=False)
+
+
+class TestDeadlineExpiresDuringAttempt:
+    """Deadline-expired retries should stop without sleeping first."""
+
+    def test_sequential_skips_wait_when_deadline_already_passed(self):
+        """Sequential retry skips its wait once the deadline has passed."""
+        N_MGR["slowfail"] = _SlowFailNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0.05)
+            service = _SlowFailNotify(
+                host="x", asset=asset, retry=1, wait=1.0, delay=0.2
+            )
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            real_sleep = time.sleep
+            with mock.patch(
+                "apprise.apprise.time.sleep", side_effect=real_sleep
+            ) as mock_sleep:
+                result = a.notify(body="test")
+
+            # The first attempt failed before the retry deadline check.
+            # A confirmed failure takes priority over the later TIMEOUT.
+            assert result.status == AppriseResultStatus.FAILURE
+            # The retry loop stopped before sleeping or calling send() again.
+            assert service.calls == 1
+            mock_sleep.assert_called_once_with(pytest.approx(0.2))
+        finally:
+            N_MGR.unload_modules()
+
+    def test_asyncio_skips_wait_when_deadline_already_passed(self):
+        """Async retry skips its wait once the deadline has passed."""
+        N_MGR["slowfail"] = _SlowFailNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            service = _SlowFailNotify(
+                host="x", asset=asset, retry=1, wait=1.0, delay=0.08
+            )
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            # Keep the delay just above service_timeout so do_call() reaches
+            # its retry check before the outer abandon window takes over.
+            result = asyncio.run(a.async_notify(body="test"))
+
+            assert result.status == AppriseResultStatus.FAILURE
+            assert service.calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestSharedExecutorRace:
+    """_get_shared_executor() must reuse an executor created during locking."""
+
+    def test_inner_check_skips_creation_if_already_set(self):
+        """The inner lock check returns the executor another thread created."""
+        import apprise.apprise as apprise_module
+
+        sentinel = mock.Mock(name="already-created-executor")
+
+        class _RaceLock:
+            """Simulate another thread creating the executor first."""
+
+            def __enter__(self):
+                apprise_module._shared_executor = sentinel
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        with (
+            mock.patch("apprise.apprise._shared_executor", None),
+            mock.patch("apprise.apprise._shared_executor_lock", _RaceLock()),
+            mock.patch("apprise.apprise.cf.ThreadPoolExecutor") as mock_pool,
+        ):
+            result = apprise_module._get_shared_executor()
+
+        assert result is sentinel
+        mock_pool.assert_not_called()

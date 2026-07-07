@@ -3216,6 +3216,23 @@ def test_wait_for_abandoned_calls_exits_early_when_calls_finish():
         assert call.args[0] == cli.CLI_TIMEOUT_EXIT_POLL_INTERVAL
 
 
+def test_wait_for_abandoned_calls_finishes_right_as_grace_period_ends():
+    """A final post-loop check can catch work that just finished."""
+    with (
+        mock.patch("apprise.cli.time.sleep"),
+        mock.patch(
+            "apprise.cli._any_abandoned_calls_still_running",
+            # Four in-loop polls still report running. The final check
+            # sees that the abandoned work has just finished.
+            side_effect=[True, True, True, True, False],
+        ) as mock_still_running,
+    ):
+        result = cli._wait_for_abandoned_calls(1.0)
+
+    assert result is True
+    assert mock_still_running.call_count == 5
+
+
 def test_force_exit_sequence():
     """_force_exit() unconditionally flushes every service's
     persistent store (AUTO mode only writes on-demand, and os._exit()
