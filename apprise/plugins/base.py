@@ -741,7 +741,7 @@ class NotifyBase(URLBase):
             return False
 
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
             # Deferred import to dodge a circular import (apprise.apprise
             # loads this module first). Fine by call time.
