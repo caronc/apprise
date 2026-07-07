@@ -106,11 +106,11 @@ def test_plugin_syslog_by_url(openlog, syslog):
     assert r"logperror=yes" in obj.url()
 
     # Test sending a notification
-    assert obj.notify("body") is True
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify("body")) is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Invalid Notification Type
-    assert obj.notify("body", notify_type="invalid") is False
+    assert bool(obj.notify("body", notify_type="invalid")) is False
 
     obj = apprise.Apprise.instantiate("syslog://_/?facility=local5")
     assert isinstance(obj, NotifySyslog)

@@ -598,11 +598,13 @@ def test_plugin_webex_teams_bot_attachments(mock_post):
     # Successful single attachment
     mock_post.reset_mock()
     assert (
-        obj.notify(
-            body="see attached",
-            title="",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="see attached",
+                title="",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -673,10 +675,12 @@ def test_plugin_webex_teams_bot_attachments(mock_post):
     invalid_path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/file.jpg")
     bad_attach = AppriseAttachment(invalid_path)
     assert (
-        obj.notify(
-            body="test",
-            notify_type=NotifyType.INFO,
-            attach=bad_attach,
+        bool(
+            obj.notify(
+                body="test",
+                notify_type=NotifyType.INFO,
+                attach=bad_attach,
+            )
         )
         is False
     )
@@ -696,14 +700,14 @@ def test_plugin_webex_teams_apprise_integration(mock_post):
     # Webhook mode via Apprise
     app = Apprise()
     assert app.add("wxteams://{}".format(WEBHOOK_TOKEN))
-    assert app.notify(body="webhook test") is True
+    assert bool(app.notify(body="webhook test")) is True
 
     mock_post.reset_mock()
 
     # Bot mode via Apprise
     app2 = Apprise()
     assert app2.add("wxteams://{}/{}".format(BOT_TOKEN, ROOM_ID))
-    assert app2.notify(body="bot test") is True
+    assert bool(app2.notify(body="bot test")) is True
 
 
 @mock.patch("requests.post")
@@ -721,9 +725,11 @@ def test_plugin_webex_teams_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Webex Teams
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
