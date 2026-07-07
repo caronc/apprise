@@ -365,11 +365,14 @@ class NotifyGLib(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         # x in (x,y) screen coordinates
-        if self.x_axis:
+        # Use an explicit None check so a valid coordinate of 0 (a screen
+        # edge) is preserved; this mirrors the send() payload which guards
+        # on `is None` rather than truthiness.
+        if self.x_axis is not None:
             params["x"] = str(self.x_axis)
 
         # y in (x,y) screen coordinates
-        if self.y_axis:
+        if self.y_axis is not None:
             params["y"] = str(self.y_axis)
 
         schema = self.protocol[0]

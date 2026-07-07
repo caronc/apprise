@@ -313,6 +313,45 @@ def test_plugin_dbus_url_parsing(mock_dbus_module):
         NotifyDBus(x_axis="invalid")
 
 
+def test_plugin_dbus_zero_coordinate_round_trip(mock_dbus_module):
+    """
+    Coordinate 0 is a valid screen edge (send() emits it via an `is None`
+    guard); url() must preserve it so the configuration survives a
+    save/reload cycle instead of being silently dropped.
+    """
+    reload_plugin("dbus")
+    from apprise.plugins.dbus import NotifyDBus
+
+    obj = apprise.Apprise.instantiate(
+        "dbus://_/?x=0&y=0", suppress_exceptions=False
+    )
+    assert isinstance(obj, NotifyDBus)
+    assert obj.x_axis == 0
+    assert obj.y_axis == 0
+
+    url = obj.url()
+    assert "x=0" in url
+    assert "y=0" in url
+
+    # The rendered URL must round-trip back to an identical object rather
+    # than dropping x=0 (which previously also raised a TypeError on reload
+    # whenever the surviving axis kept the guard truthy).
+    reloaded = apprise.Apprise.instantiate(url, suppress_exceptions=False)
+    assert isinstance(reloaded, NotifyDBus)
+    assert reloaded.x_axis == 0
+    assert reloaded.y_axis == 0
+
+    # A single zero axis must also survive without dropping the other value.
+    obj = apprise.Apprise.instantiate(
+        "dbus://_/?x=0&y=5", suppress_exceptions=False
+    )
+    reloaded = apprise.Apprise.instantiate(
+        obj.url(), suppress_exceptions=False
+    )
+    assert reloaded.x_axis == 0
+    assert reloaded.y_axis == 5
+
+
 def test_plugin_dbus_schema_not_supported(mock_dbus_module, mocker):
     """
     Dbus test for unsupported schema warning
