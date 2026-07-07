@@ -377,7 +377,7 @@ def test_notify_dot_auto_icon_passthrough():
 def test_notify_dot_image_mode_requires_image():
     """Explicit image mode fails without image data."""
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
-    assert dot.notify(title="x", body="y") is False
+    assert bool(dot.notify(title="x", body="y")) is False
 
 
 def test_notify_dot_image_mode_with_attachment():
@@ -457,7 +457,9 @@ def test_notify_dot_image_mode_with_failed_attachment():
 
     dot = NotifyDot(apikey="token", device_id="device", mode="image")
     assert (
-        dot.notify(title="test", body="test", attach=[FailedAttachment()])
+        bool(
+            dot.notify(title="test", body="test", attach=[FailedAttachment()])
+        )
         is False
     )
 
@@ -1036,7 +1038,7 @@ def test_notify_dot_url_roundtrip_with_task_key():
 def test_notify_dot_no_device_id():
     """send() returns False when device_id is missing."""
     dot = NotifyDot(apikey="token", device_id=None)
-    assert dot.notify(title="test", body="test") is False
+    assert bool(dot.notify(title="test", body="test")) is False
     assert len(dot) == 0
 
 

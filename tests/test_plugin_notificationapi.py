@@ -510,7 +510,9 @@ def test_plugin_napi_template_sms_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -583,7 +585,9 @@ def test_plugin_napi_template_email_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -665,7 +669,9 @@ def test_plugin_napi_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -724,7 +730,9 @@ def test_plugin_napi_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -777,7 +785,9 @@ def test_plugin_napi_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

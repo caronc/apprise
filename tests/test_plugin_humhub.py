@@ -249,7 +249,7 @@ def test_plugin_humhub_bearer_send(mock_post):
     mock_post.return_value.content = b""
 
     obj = NotifyHumHub(user="mytoken", host="localhost", targets=["1"])
-    assert obj.notify(body="Test body") is True
+    assert bool(obj.notify(body="Test body")) is True
 
     # Confirm bearer token header was set
     assert mock_post.called
@@ -271,7 +271,7 @@ def test_plugin_humhub_basic_send(mock_post):
     obj = NotifyHumHub(
         user="admin", password="secret", host="localhost", targets=["1"]
     )
-    assert obj.notify(body="Test body") is True
+    assert bool(obj.notify(body="Test body")) is True
 
     # Confirm basic auth tuple was passed and no Authorization header
     assert mock_post.called
@@ -289,7 +289,7 @@ def test_plugin_humhub_multi_container(mock_post):
     mock_post.return_value.content = b""
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2", "3"])
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
 
     # One POST per container
     assert mock_post.call_count == 3
@@ -315,7 +315,7 @@ def test_plugin_humhub_partial_failure(mock_post):
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2", "3"])
     # Partial failure means overall False
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
     assert mock_post.call_count == 3
 
 
@@ -329,15 +329,15 @@ def test_plugin_humhub_http_errors(mock_post):
     mock_post.return_value.content = b"Unauthorized"
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
 
     # HTTP 500 Internal Server Error
     mock_post.return_value.status_code = requests.codes.internal_server_error
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
 
     # Unknown / unexpected code
     mock_post.return_value.status_code = 999
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
 
 
 @mock.patch("requests.post")
@@ -347,7 +347,7 @@ def test_plugin_humhub_request_exception(mock_post):
     mock_post.side_effect = requests.RequestException("Connection refused")
 
     obj = NotifyHumHub(user="token", host="localhost", targets=["1", "2"])
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
     # Both containers attempted
     assert mock_post.call_count == 2
 
@@ -445,11 +445,11 @@ def test_plugin_humhub_apprise_integration(mock_post):
 
     aobj = Apprise()
     assert aobj.add("humhubs://mytoken@localhost/1")
-    assert aobj.notify(title="Title", body="Body") is True
+    assert bool(aobj.notify(title="Title", body="Body")) is True
 
     aobj2 = Apprise()
     assert aobj2.add("humhubs://user:pass@localhost/1")
-    assert aobj2.notify(title="Title", body="Body") is True
+    assert bool(aobj2.notify(title="Title", body="Body")) is True
 
 
 @mock.patch("requests.post")

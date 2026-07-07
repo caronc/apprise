@@ -382,7 +382,9 @@ def test_plugin_rocket_chat_edge_cases(mock_post, mock_get):
     # Send Notification
     #
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert obj._send(payload="test", notify_type=NotifyType.INFO) is False
@@ -400,7 +402,9 @@ def test_plugin_rocket_chat_edge_cases(mock_post, mock_get):
     # Send Notification
     #
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert obj._send(payload="test", notify_type=NotifyType.INFO) is False
@@ -425,7 +429,9 @@ def test_plugin_rocket_chat_edge_cases(mock_post, mock_get):
     obj.login = mock.Mock()
     obj.login.return_value = True
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     #
@@ -450,9 +456,11 @@ def test_plugin_rocket_chat_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to RocketChat
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

@@ -362,5 +362,5 @@ def test_plugin_flowtriq_apprise_integration(mock_post):
 
     app = Apprise()
     assert app.add("flowtriq://mykey@flowtriq.com/hooks/abc123") is True
-    assert app.notify(title="Title", body="Body") is True
+    assert bool(app.notify(title="Title", body="Body")) is True
     assert mock_post.call_count == 1

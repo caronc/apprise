@@ -82,6 +82,7 @@ except ImportError:
     # E2EE support unavailable; `pip install cryptography` to enable
     MATRIX_E2EE_SUPPORT = False
 
+from ...common import JSON_COMPACT_SEPARATORS
 
 # Rotate the MegOLM session after this many messages
 MEGOLM_ROTATION_MSGS = 100
@@ -177,7 +178,7 @@ def _canonical_json(obj):
         obj,
         sort_keys=True,
         ensure_ascii=False,
-        separators=(",", ":"),
+        separators=JSON_COMPACT_SEPARATORS,
     ).encode("utf-8")
 
 

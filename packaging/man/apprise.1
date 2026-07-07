@@ -1,6 +1,6 @@
 .\" generated with Ronn-NG/v0.10.1
 .\" http://github.com/apjanke/ronn-ng/tree/0.10.1
-.TH "APPRISE" "1" "May 2026" "Chris Caron <lead2gold@gmail.com>"
+.TH "APPRISE" "1" "July 2026" "Chris Caron <lead2gold@gmail.com>"
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
 .SH "SYNOPSIS"
@@ -64,6 +64,10 @@ Tag values may include an optional priority prefix and/or retry suffix:
 .P
 \fB\-Da\fR, \fB\-\-disable\-async\fR: Send notifications synchronously (one after the other) instead of all at once\.
 .P
+\fB\-L\fR, \fB\-\-limit=\fR\fISECONDS\fR: Give up on the whole run if it's taking too long, e\.g\. \fB\-L 10\fR or \fB\-L 2\.5\fR\. By default (\fB0\fR) there's no limit; see \fB\-\-service\-limit\fR below to cap each service on its own instead\. If a service is truly stuck, Apprise gives it a few extra seconds to wrap up, then exits anyway with status \fB5\fR\.
+.P
+\fB\-SL\fR, \fB\-\-service\-limit=\fR\fISECONDS\fR: Give up on any single service if it's taking too long, e\.g\. \fB\-SL 10\fR or \fB\-SL 2\.5\fR, or \fB0\fR to turn this off entirely\. Leave it unset to use Apprise's own default of 60 seconds\.
+.P
 \fB\-R\fR, \fB\-\-recursion\-depth\fR\fIINTEGER\fR: The number of recursive import entries that can be loaded from within Apprise configuration\. By default this is set to 1\. If this is set to zero, then import statements found in any configuration is ignored\.
 .P
 \fB\-e\fR, \fB\-\-interpret\-escapes\fR Enable interpretation of backslash escapes\. For example, this would convert sequences such as \en and \er to their respected ascii new\-line and carriage return characters prior to the delivery of the notification\.
@@ -116,11 +120,15 @@ The \fBstorage\fR action has the following sub actions:
 .IP "\(bu" 4
 \fB0\fR if all of the notifications were sent successfully\.
 .IP "\(bu" 4
-\fB1\fR if one or more notifications could not be sent\.
+\fB1\fR if every notification failed, or the notification could not start\.
 .IP "\(bu" 4
-\fB2\fR if there was an error specified on the command line such as not providing an valid argument\.
+\fB2\fR if there was an error specified on the command line such as not providing a valid argument\.
 .IP "\(bu" 4
-\fB3\fR if there was one or more Apprise Service URLs successfully loaded but none could be notified due to user filtering (via tags)\.
+\fB3\fR if one or more Apprise Service URLs were successfully loaded but none could be notified due to user filtering (via tags)\.
+.IP "\(bu" 4
+\fB4\fR if at least one notification was sent successfully and at least one other was not (whether it failed outright or ran out of time)\.
+.IP "\(bu" 4
+\fB5\fR if no notification was sent, and the only problem was that one or more services ran out of time\.
 .IP "" 0
 .SH "SERVICE URLS"
 There are too many service URL and combinations to list here\. It's best to visit the Apprise GitHub page \fIhttps://appriseit\.com/services/\fR and see what's available\. Also try out the Apprise URL Builder \fIhttps://appriseit\.com/tools/url\-builder/\fR to easily construct the URLS this tool supports and works with\.
