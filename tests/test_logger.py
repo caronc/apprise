@@ -28,6 +28,7 @@
 import asyncio
 import concurrent.futures as cf
 from datetime import datetime, timezone
+import json
 import os
 import re
 import sys
@@ -38,6 +39,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAsset, URLBase
+from apprise.common import AWARE_DATE_ISO_FORMAT
 
 # Disable logging for a cleaner testing output
 from apprise.logger import (
@@ -546,6 +548,68 @@ def test_notify_log_entry_combine_and_sort_across_calls():
     assert len(combined) == 2
     assert combined[0].message == "from service B"
     assert combined[1].message == "from service A"
+
+
+def test_notify_log_entry_ordering_notimplemented():
+    """Comparing to a non-NotifyLogEntry returns NotImplemented for
+    every relational operator."""
+    entry = NotifyLogEntry(level="WARNING", message="hi")
+
+    assert entry.__lt__("nope") is NotImplemented
+    assert entry.__le__("nope") is NotImplemented
+    assert entry.__gt__("nope") is NotImplemented
+    assert entry.__ge__("nope") is NotImplemented
+
+
+def test_notify_log_entry_asdict_json_repr():
+    """asdict(), json(), and repr() all render the entry consistently."""
+    t = datetime(2026, 1, 1, 12, 30, 0, tzinfo=timezone.utc)
+    entry = NotifyLogEntry(level="WARNING", message="hi", time=t)
+
+    d = entry.asdict()
+    assert d == {
+        "level": "WARNING",
+        "message": "hi",
+        "time": t.strftime(AWARE_DATE_ISO_FORMAT),
+    }
+
+    assert json.loads(entry.json()) == d
+
+    assert repr(entry) == (
+        f"<NotifyLogEntry level='WARNING' message='hi' time={t!r}>"
+    )
+
+
+def test_service_log_capture_max_entries_cap():
+    """Once _MAX_CAPTURED_LOG_ENTRIES is reached, further entries are
+    dropped instead of growing the buffer without bound."""
+    logging.disable(logging.NOTSET)
+
+    try:
+        service = _DummyNotify()
+        with (
+            mock.patch("apprise.logger._MAX_CAPTURED_LOG_ENTRIES", 2),
+            _ServiceLogCapture(service) as cap,
+        ):
+            service.logger.warning("one")
+            service.logger.warning("two")
+            # Dropped -- the cap was already reached.
+            service.logger.warning("three")
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert [e.message for e in cap.entries] == ["one", "two"]
+
+
+def test_service_log_capture_exit_without_enter():
+    """__exit__ tolerates being called when __enter__ never ran, and
+    skips the contextvar reset since there is no token to restore."""
+    service = _DummyNotify()
+    cap = _ServiceLogCapture(service)
+    assert cap._token is None
+
+    # Must not raise even though __enter__ was never called.
+    cap.__exit__(None, None, None)
 
 
 def test_service_log_capture_bad_format():
