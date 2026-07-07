@@ -277,5 +277,5 @@ def test_plugin_stackfield_apprise_integration(mock_post):
 
     a = Apprise()
     assert a.add(f"stackfield://{TEST_TOKEN}") is True
-    assert a.notify(title="Test", body="Integration test") is True
+    assert bool(a.notify(title="Test", body="Integration test")) is True
     assert mock_post.call_count == 1
