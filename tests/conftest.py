@@ -88,13 +88,27 @@ def _reset_apprise_logger_state():
     capturing. Reset to NOTSET (deferring to the root logger's default
     WARNING) before each test so no test's ambient logger state
     depends on what a previous test/file happened to leave behind.
+
+    main() also mirrors this same mutation onto the stdlib 'asyncio'
+    logger (copies every 'apprise' handler onto it and matches its
+    level), so that logger needs the exact same save/reset treatment
+    or it leaks state across tests the same way.
     """
+    asyncio_logger = logging.getLogger("asyncio")
+
     original_level = apprise_logger.level
     original_handlers = list(apprise_logger.handlers)
+    original_asyncio_level = asyncio_logger.level
+    original_asyncio_handlers = list(asyncio_logger.handlers)
+
     apprise_logger.setLevel(logging.NOTSET)
+    asyncio_logger.setLevel(logging.NOTSET)
+    asyncio_logger.handlers[:] = []
     yield
     apprise_logger.setLevel(original_level)
     apprise_logger.handlers[:] = original_handlers
+    asyncio_logger.setLevel(original_asyncio_level)
+    asyncio_logger.handlers[:] = original_asyncio_handlers
 
 
 @pytest.fixture(scope="function", autouse=True)
