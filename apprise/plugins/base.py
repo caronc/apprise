@@ -27,10 +27,12 @@
 
 import asyncio
 from collections.abc import Generator
+import contextvars
 from datetime import tzinfo
 from functools import partial
 import math
 import re
+import time
 from typing import Any, ClassVar, Optional, TypedDict, Union
 from zoneinfo import ZoneInfo
 
@@ -697,6 +699,21 @@ class NotifyBase(URLBase):
             notify_type=notify_type,
         )
 
+    def _timed_send(self, **kwargs2: Any) -> bool:
+        """Call send() once, logging how long it took at DEBUG.
+
+        Shared by notify() and async_notify() so every attempt is timed
+        the same way.
+        """
+        send_start = time.monotonic()
+        result = self.send(**kwargs2)
+        self.logger.debug(
+            "%s send() completed in %.2fs.",
+            self.service_name,
+            time.monotonic() - send_start,
+        )
+        return result
+
     def notify(self, *args: Any, **kwargs: Any) -> bool:
         """Performs notification."""
         try:
@@ -710,7 +727,7 @@ class NotifyBase(URLBase):
         else:
             # Loop through each call, one at a time. (Use a list rather than a
             # generator to call all the partials, even in case of a failure.)
-            the_calls = [self.send(**kwargs2) for kwargs2 in send_calls]
+            the_calls = [self._timed_send(**kwargs2) for kwargs2 in send_calls]
             return all(the_calls)
 
     async def async_notify(self, *args: Any, **kwargs: Any) -> bool:
@@ -724,14 +741,24 @@ class NotifyBase(URLBase):
             return False
 
         else:
-            loop = asyncio.get_event_loop()
+            loop = asyncio.get_running_loop()
 
-            # Wrap each call in a coroutine that uses the default executor.
-            # TODO: In the future, allow plugins to supply a native
-            # async_send() method.
+            # Deferred import to dodge a circular import (apprise.apprise
+            # loads this module first). Fine by call time.
+            from ..apprise import _get_shared_executor
+
+            # Use Apprise's own shared pool, not the loop's default one --
+            # keeps a stuck send() from starving unrelated executor work.
+            # TODO: let plugins supply a native async_send() instead.
+            executor = _get_shared_executor()
+
             async def do_send(**kwargs2):
-                send = partial(self.send, **kwargs2)
-                result = await loop.run_in_executor(None, send)
+                """Run one prepared send() call in the executor."""
+                send = partial(self._timed_send, **kwargs2)
+                # Carries our log-capture ContextVar into the worker
+                # thread -- run_in_executor() doesn't do this on its own.
+                ctx = contextvars.copy_context()
+                result = await loop.run_in_executor(executor, ctx.run, send)
                 return result
 
             # gather() all calls in parallel.
@@ -1314,6 +1341,22 @@ class NotifyBase(URLBase):
             )
 
         return self.__store
+
+    def flush_store(self) -> None:
+        """Write this service's persistent store to disk if it was used.
+
+        A no-op if self.store was never accessed this run. In
+        PersistentStoreMode.AUTO (the default), writes made via
+        self.store.set()/clear() are only kept in memory until flushed;
+        normally that happens naturally when this object is garbage
+        collected (PersistentStore.__del__ calls flush()). A caller
+        that is about to end the process by some means other than
+        normal interpreter shutdown -- which runs pending finalizers,
+        including that one -- needs to call this explicitly first, or
+        those in-memory changes are simply never written.
+        """
+        if self.__store is not None:
+            self.__store.flush()
 
     @property
     def tzinfo(self) -> tzinfo:

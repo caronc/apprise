@@ -1,8 +1,8 @@
 name: Run Tests
 
 on:
-  # Run tests on push to main, master, a long-lived parked branch
-  # (such as apprise-v1-release), or any release/ branch
+  # master             - v2.x branch
+  # apprise-v1-release - v1.x branch
   push:
     branches: [main, master, apprise-v1-release, 'release/**']
   # Always test on pull requests targeting any of our long-lived branches

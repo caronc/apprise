@@ -661,11 +661,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
 
     # Send our notification
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -723,11 +725,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
 
     # Send our notification
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -812,11 +816,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     # adding the @caronc to the begining of the same message (since it's a
     # direct message)
     assert (
-        obj.notify(
-            body="Check this out @caronc",
-            title="Apprise",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Check this out @caronc",
+                title="Apprise",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -882,11 +888,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     mock_post.side_effect = [mr1, mr2, mr3, good_response, good_response]
     mock_get.return_value = good_whoami_response
     assert (
-        obj.notify(
-            body="Check this out @caronc",
-            title="Apprise",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Check this out @caronc",
+                title="Apprise",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -913,11 +921,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     obj = Apprise.instantiate(mastodon_url)
 
     assert (
-        obj.notify(
-            body="Check this out @caronc",
-            title="Apprise",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Check this out @caronc",
+                title="Apprise",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -975,11 +985,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
         # This is the same test as above, except our error response isn't
         # parseable
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -1017,7 +1029,11 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
         # This is the same test as above, except our error response isn't
         # parseable
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )
 
@@ -1050,7 +1066,11 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
         # This is the same test as above, except our error response isn't
         # parseable
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )
 
@@ -1075,11 +1095,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1112,11 +1134,13 @@ def test_plugin_mastodon_attachments(mock_get, mock_post):
 
     # We'll fail to send this time
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1181,5 +1205,5 @@ def test_plugin_mastodon_apprise_tags(mock_post):
     assert len(found) == 1
 
     # A tag-filtered notify() follows the same code path
-    assert a.notify(body="test", tag="prod") is True
+    assert bool(a.notify(body="test", tag="prod")) is True
     assert mock_post.call_count == 1

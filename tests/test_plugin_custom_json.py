@@ -365,11 +365,13 @@ def test_notify_json_plugin_attachments(mock_request):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -377,11 +379,13 @@ def test_notify_json_plugin_attachments(mock_request):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -400,11 +404,13 @@ def test_notify_json_plugin_attachments(mock_request):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -416,11 +422,13 @@ def test_notify_json_plugin_attachments(mock_request):
     # Now send an attachment normally without issues
     mock_request.reset_mock()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

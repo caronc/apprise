@@ -73,6 +73,18 @@ The Apprise options are as follows:
   Send notifications synchronously (one after the other) instead of
   all at once.
 
+  `-L`, `--limit=`<SECONDS>:
+  Give up on the whole run if it's taking too long, e.g. `-L 10` or
+  `-L 2.5`. By default (`0`) there's no limit; see `--service-limit`
+  below to cap each service on its own instead. If a service is truly
+  stuck, Apprise gives it a few extra seconds to wrap up, then exits
+  anyway with status **5**.
+
+  `-SL`, `--service-limit=`<SECONDS>:
+  Give up on any single service if it's taking too long, e.g. `-SL 10`
+  or `-SL 2.5`, or `0` to turn this off entirely. Leave it unset to use
+  Apprise's own default of 60 seconds.
+
   `-R`, `--recursion-depth`<INTEGER>:
   The number of recursive import entries that can be loaded from within
   Apprise configuration. By default this is set to 1. If this is set to
@@ -158,11 +170,15 @@ The **storage** action has the following sub actions:
 **apprise** exits with a status of:
 
 * **0** if all of the notifications were sent successfully.
-* **1** if one or more notifications could not be sent.
+* **1** if every notification failed, or the notification could not start.
 * **2** if there was an error specified on the command line such as not
-  providing an valid argument.
-* **3** if there was one or more Apprise Service URLs successfully
-  loaded but none could be notified due to user filtering (via tags).
+  providing a valid argument.
+* **3** if one or more Apprise Service URLs were successfully loaded but
+  none could be notified due to user filtering (via tags).
+* **4** if at least one notification was sent successfully and at least
+  one other was not (whether it failed outright or ran out of time).
+* **5** if no notification was sent, and the only problem was that one or
+  more services ran out of time.
 
 ## SERVICE URLS
 

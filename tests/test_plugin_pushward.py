@@ -196,7 +196,7 @@ def test_plugin_pushward_send(mock_post):
 
     obj = Apprise.instantiate("pushward://hlk_abc123")
     assert isinstance(obj, NotifyPushWard)
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     assert mock_post.call_count == 1
     details = mock_post.call_args
@@ -227,7 +227,7 @@ def test_plugin_pushward_created(mock_post):
     mock_post.return_value = response
 
     obj = Apprise.instantiate("pushward://hlk_abc123")
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
 
 @mock.patch("requests.post")
@@ -242,7 +242,7 @@ def test_plugin_pushward_level_override(mock_post):
     obj = Apprise.instantiate("pushward://hlk_abc123?level=passive")
     assert isinstance(obj, NotifyPushWard)
     assert obj.level == "passive"
-    assert obj.notify(title="t", body="b") is True
+    assert bool(obj.notify(title="t", body="b")) is True
 
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["level"] == "passive"
@@ -259,7 +259,8 @@ def test_plugin_pushward_notify_type_mapping(mock_post):
 
     obj = Apprise.instantiate("pushward://hlk_abc123")
     assert (
-        obj.notify(title="t", body="b", notify_type=NotifyType.WARNING) is True
+        bool(obj.notify(title="t", body="b", notify_type=NotifyType.WARNING))
+        is True
     )
 
     payload = loads(mock_post.call_args[1]["data"])
@@ -282,7 +283,7 @@ def test_plugin_pushward_critical_volume(mock_post):
     assert isinstance(obj, NotifyPushWard)
     assert obj.level == "critical"
     assert obj.volume == 0.8
-    assert obj.notify(title="t", body="b") is True
+    assert bool(obj.notify(title="t", body="b")) is True
 
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["level"] == "critical"
@@ -290,7 +291,7 @@ def test_plugin_pushward_critical_volume(mock_post):
 
     # The volume is dropped when the level is not critical
     obj = Apprise.instantiate("pushward://hlk_abc123?level=active&volume=0.5")
-    assert obj.notify(title="t", body="b") is True
+    assert bool(obj.notify(title="t", body="b")) is True
     payload = loads(mock_post.call_args[1]["data"])
     assert "volume" not in payload
 
@@ -306,7 +307,7 @@ def test_plugin_pushward_no_image(mock_post):
 
     asset = AppriseAsset(image_url_mask=None)
     obj = Apprise.instantiate("pushward://hlk_abc123", asset=asset)
-    assert obj.notify(title="t", body="b") is True
+    assert bool(obj.notify(title="t", body="b")) is True
 
     payload = loads(mock_post.call_args[1]["data"])
     assert "icon_url" not in payload
@@ -323,7 +324,7 @@ def test_plugin_pushward_empty_title(mock_post):
 
     # No title provided; falls back to the asset descriptor
     obj = Apprise.instantiate("pushward://hlk_abc123")
-    assert obj.notify(body="body only") is True
+    assert bool(obj.notify(body="body only")) is True
 
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["title"]
@@ -333,7 +334,7 @@ def test_plugin_pushward_empty_title(mock_post):
     # When the descriptor is also empty, fall back to the application id
     asset = AppriseAsset(app_desc="")
     obj = Apprise.instantiate("pushward://hlk_abc123", asset=asset)
-    assert obj.notify(body="body only") is True
+    assert bool(obj.notify(body="body only")) is True
 
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["title"] == obj.app_id
@@ -424,11 +425,15 @@ def test_plugin_pushward_per_type_levels(mock_post):
     # Untouched types keep their defaults
     assert obj.level_map[NotifyType.WARNING] == "time-sensitive"
 
-    assert obj.notify(title="t", body="b", notify_type=NotifyType.INFO) is True
+    assert (
+        bool(obj.notify(title="t", body="b", notify_type=NotifyType.INFO))
+        is True
+    )
     assert loads(mock_post.call_args[1]["data"])["level"] == "passive"
 
     assert (
-        obj.notify(title="t", body="b", notify_type=NotifyType.FAILURE) is True
+        bool(obj.notify(title="t", body="b", notify_type=NotifyType.FAILURE))
+        is True
     )
     assert loads(mock_post.call_args[1]["data"])["level"] == "critical"
 
@@ -436,5 +441,8 @@ def test_plugin_pushward_per_type_levels(mock_post):
     obj = Apprise.instantiate(
         "pushward://hlk_abc123?level=passive&info=critical"
     )
-    assert obj.notify(title="t", body="b", notify_type=NotifyType.INFO) is True
+    assert (
+        bool(obj.notify(title="t", body="b", notify_type=NotifyType.INFO))
+        is True
+    )
     assert loads(mock_post.call_args[1]["data"])["level"] == "passive"

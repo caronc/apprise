@@ -65,12 +65,18 @@ from .config.base import ConfigBase
 from .locale import AppriseLocale
 
 # Inherit our logging with our additional entries added to it
-from .logger import LOGGER_NAME, LogCapture, logger, logging
+from .logger import LOGGER_NAME, LogCapture, NotifyLogEntry, logger, logging
 from .manager_attachment import AttachmentManager
 from .manager_config import ConfigurationManager
 from .manager_plugins import NotificationManager
 from .persistent_store import PersistentStore
 from .plugins.base import NotifyBase
+from .result import (
+    AppriseResult,
+    AppriseResultStatus,
+    NotifyAttempt,
+    NotifyResult,
+)
 from .tag import AppriseTag
 from .url import PrivacyMode, URLBase
 
@@ -94,6 +100,8 @@ __all__ = [
     "AppriseAttachment",
     "AppriseConfig",
     "AppriseLocale",
+    "AppriseResult",
+    "AppriseResultStatus",
     "AppriseTag",
     "AttachBase",
     "AttachmentManager",
@@ -105,9 +113,12 @@ __all__ = [
     "LogCapture",
     # Managers
     "NotificationManager",
+    "NotifyAttempt",
     "NotifyBase",
     "NotifyFormat",
     "NotifyImageSize",
+    "NotifyLogEntry",
+    "NotifyResult",
     # Reference
     "NotifyType",
     "OverflowMode",
