@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from datetime import datetime, timedelta
+import glob
 
 # Disable logging for a cleaner testing output
 import logging
@@ -476,3 +477,48 @@ def test_notify_base_runtime_deps_override():
     assert deps == ("fakelibA", "fakelibB")
     assert deps[0] == "fakelibA"
     assert deps[1] == "fakelibB"
+
+
+def test_notify_base_flush_store_noop_when_unused(tmpdir):
+    """flush_store() is a silent no-op when self.store was never
+    accessed -- it must not create a PersistentStore (or its on-disk
+    directory structure) just to immediately flush nothing."""
+    asset = AppriseAsset(storage_path=str(tmpdir))
+    obj = NotifyBase(asset=asset)
+
+    # Nothing touched .store yet -- flush_store() must not crash, and
+    # must not create any on-disk content for this service.
+    obj.flush_store()
+
+    assert len(tmpdir.listdir()) == 0
+
+
+def test_notify_base_flush_store_writes_pending_auto_mode_changes(tmpdir):
+    """flush_store() writes a service's cached changes to disk on
+    demand.  In PersistentStoreMode.AUTO (the default), set() alone
+    only updates the in-memory cache -- normally the on-disk write only
+    happens later, when the PersistentStore object is garbage
+    collected. A caller about to end the process some other way (e.g.
+    apprise/cli.py's _force_exit_after_timeout(), which calls
+    os._exit()) needs to be able to force that write immediately
+    instead."""
+    asset = AppriseAsset(storage_path=str(tmpdir))
+    obj = NotifyBase(asset=asset)
+
+    # Accessing .store alone already creates its namespace directory
+    # structure (independent of whether anything is written), so the
+    # cache file itself -- not "any file at all" -- is what actually
+    # indicates a flush occurred.
+    cache_glob = str(tmpdir.join("**", "*.psdata"))
+
+    obj.store.set("token", "abc123")
+
+    # AUTO mode: the cached change has not been written to disk yet.
+    assert glob.glob(cache_glob, recursive=True) == []
+
+    obj.flush_store()
+
+    # The cache file now exists, and the value survives a fresh
+    # PersistentStore instance reading from the same path/namespace.
+    assert glob.glob(cache_glob, recursive=True) != []
+    assert obj.store.get("token") == "abc123"

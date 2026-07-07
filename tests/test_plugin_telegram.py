@@ -457,16 +457,22 @@ def test_plugin_telegram_general(mock_post):
 
     # This tests erroneous messages involving multiple chat ids
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert (
-        nimg_obj.notify(
-            body="body", title="title", notify_type=NotifyType.INFO
+        bool(
+            nimg_obj.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -477,12 +483,16 @@ def test_plugin_telegram_general(mock_post):
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert (
-        nimg_obj.notify(
-            body="body", title="title", notify_type=NotifyType.INFO
+        bool(
+            nimg_obj.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -564,8 +574,12 @@ def test_plugin_telegram_general(mock_post):
     mock_post.reset_mock()
     body = "<p>'\"This can't\t\r\nfail&nbsp;us\"'</p>"
     assert (
-        obj.notify(
-            body=body, title="special characters", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body=body,
+                title="special characters",
+                notify_type=NotifyType.INFO,
+            )
         )
         is True
     )
@@ -590,22 +604,26 @@ def test_plugin_telegram_general(mock_post):
             os.path.join(TEST_VAR_DIR, "apprise-test.gif")
         )
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
 
         # Test large messages
         assert (
-            obj.notify(
-                body="a" * (obj.telegram_caption_maxlen + 1),
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="a" * (obj.telegram_caption_maxlen + 1),
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
@@ -616,22 +634,26 @@ def test_plugin_telegram_general(mock_post):
         )
         attach = AppriseAttachment(path)
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=path,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=path,
+                )
             )
             is False
         )
 
         # Test large messages
         assert (
-            obj.notify(
-                body="a" * (obj.telegram_caption_maxlen + 1),
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=path,
+            bool(
+                obj.notify(
+                    body="a" * (obj.telegram_caption_maxlen + 1),
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=path,
+                )
             )
             is False
         )
@@ -640,7 +662,7 @@ def test_plugin_telegram_general(mock_post):
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
 
-    assert obj.notify(title="hello", body="world") is True
+    assert bool(obj.notify(title="hello", body="world")) is True
     assert len(obj.targets) == 1
     assert obj.targets[0] == ("532389719", None)
 
@@ -656,7 +678,7 @@ def test_plugin_telegram_general(mock_post):
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Do the test again, but with ok not set to True
@@ -698,7 +720,7 @@ def test_plugin_telegram_general(mock_post):
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # An edge case where no results were provided; this will probably never
@@ -713,7 +735,7 @@ def test_plugin_telegram_general(mock_post):
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
     # Detect the bot with a bad response
     mock_post.return_value.content = dumps({})
@@ -725,29 +747,31 @@ def test_plugin_telegram_general(mock_post):
     # internal server error prevents notification from being sent
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Test our bot detection with an unmappable html error
     mock_post.return_value.status_code = 999
     NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message
     mock_post.return_value.content = dumps({"description": "Failure Message"})
     NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message and perform a
     # notification without a bot detection by providing at least 1 chat id
     obj = NotifyTelegram(bot_token=bot_token, targets=["@abcd"])
     assert (
-        nimg_obj.notify(
-            body="body", title="title", notify_type=NotifyType.INFO
+        bool(
+            nimg_obj.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -758,7 +782,7 @@ def test_plugin_telegram_general(mock_post):
     # No chat_ids specified
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Test Telegram Group
@@ -2124,5 +2148,5 @@ def test_plugin_telegram_attach_memory(mock_post):
         mimetype="text/html",
     )
 
-    assert obj.notify(body="Test", attach=mem) is True
+    assert bool(obj.notify(body="Test", attach=mem)) is True
     assert mock_post.call_count >= 1

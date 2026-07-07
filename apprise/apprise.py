@@ -32,22 +32,30 @@ from collections.abc import Iterator
 import concurrent.futures as cf
 from itertools import chain
 import json
+import math
 import os
+import threading
 import time
-from typing import Any, Optional, Union
+from typing import Any, Callable, Optional, Union
 
 from . import __version__, common, plugins
 from .apprise_attachment import AppriseAttachment
 from .apprise_config import AppriseConfig
 from .asset import AppriseAsset
-from .common import ContentLocation
+from .common import JSON_COMPACT_SEPARATORS, ContentLocation
 from .config.base import ConfigBase
 from .conversion import convert_between
 from .emojis import apply_emojis
 from .locale import AppriseLocale
-from .logger import logger
+from .logger import NotifyLogEntry, _ServiceLogCapture, logger
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase
+from .result import (
+    AppriseResult,
+    AppriseResultStatus,
+    NotifyAttempt,
+    NotifyResult,
+)
 from .tag import AppriseTag
 from .utils.cwe312 import cwe312_url
 from .utils.json import AppriseJSONEncoder
@@ -56,6 +64,235 @@ from .utils.parse import parse_list, parse_urls
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
+
+# One (server, notify()-kwargs) pair as produced by _create_notify_gen()
+# and threaded through every dispatch primitive below.
+ServerCall = tuple[NotifyBase, dict[str, Any]]
+
+# Extra seconds of patience for notify() calls.
+_ABANDON_GRACE_SECONDS = 0.1
+
+# Shared thread pool for _notify_parallel_threadpool(). One pool for the
+# whole process -- a fresh one per call would leak a thread every time a
+# service hangs.
+_shared_executor: Optional[cf.ThreadPoolExecutor] = None
+_shared_executor_lock = threading.Lock()
+
+
+def _get_shared_executor() -> cf.ThreadPoolExecutor:
+    """Return the shared thread pool, creating it on first use."""
+    global _shared_executor
+    if _shared_executor is None:
+        with _shared_executor_lock:
+            if _shared_executor is None:
+                _shared_executor = cf.ThreadPoolExecutor()
+    return _shared_executor
+
+
+# Services abandoned on timeout that are still genuinely running. Lets
+# cli.py poll instead of just sleeping out its whole grace window.
+_abandoned_futures: list[tuple[cf.Future, str, str]] = []
+_abandoned_futures_lock = threading.Lock()
+
+
+def _track_abandoned_future(future: cf.Future, name: str, url: str) -> None:
+    """Record one abandoned-but-still-running service call."""
+    with _abandoned_futures_lock:
+        _abandoned_futures[:] = [
+            entry for entry in _abandoned_futures if not entry[0].done()
+        ]
+        _abandoned_futures.append((future, name, url))
+
+
+def _any_abandoned_calls_still_running() -> bool:
+    """True if any abandoned service call is still actually running."""
+    with _abandoned_futures_lock:
+        _abandoned_futures[:] = [
+            entry for entry in _abandoned_futures if not entry[0].done()
+        ]
+        return bool(_abandoned_futures)
+
+
+def _abandoned_call_descriptions() -> list[str]:
+    """Return "name (url)" for each still-running abandoned call."""
+    with _abandoned_futures_lock:
+        _abandoned_futures[:] = [
+            entry for entry in _abandoned_futures if not entry[0].done()
+        ]
+        return [f"{name} ({url})" for _, name, url in _abandoned_futures]
+
+
+def _service_metadata(
+    server: NotifyBase,
+) -> tuple[str, str, Optional[str], tuple[str, ...], int]:
+    """Safely gather one service's identifying metadata.
+
+    Plugin metadata helpers can raise. This helper keeps result-building
+    defensive and returns (name, url, url_id, tag, weight).
+    """
+    name = getattr(server, "service_name", "Unknown")
+
+    try:
+        url = server.url(privacy=True)
+
+    except Exception:
+        url = "unknown://"
+
+    try:
+        url_id = server.url_id()
+
+    except Exception:
+        url_id = None
+
+    try:
+        weight = len(server)
+
+    except Exception:
+        weight = 1
+
+    # tags is a set -- sort so output order is stable.
+    tag = tuple(sorted(str(t) for t in getattr(server, "tags", ())))
+
+    return name, url, url_id, tag, weight
+
+
+def _safe_error_result(server: NotifyBase) -> NotifyResult:
+    """Build a best-effort result when a plugin fails outside dispatch."""
+    name, url, url_id, tag, weight = _service_metadata(server)
+
+    return NotifyResult(
+        name=name,
+        url=url,
+        url_id=url_id,
+        tag=tag,
+        optional=getattr(server, "optional", False),
+        weight=weight,
+        max_attempts=1,
+        # No real attempt data exists here, so keep one synthetic failure.
+        # NotifyResult still applies the service's optional flag.
+        attempts=[NotifyAttempt(status=AppriseResultStatus.FAILURE)],
+    )
+
+
+def _compute_deadline(
+    server: NotifyBase, call_deadline: Optional[float]
+) -> Optional[float]:
+    """Return the monotonic deadline for one service dispatch.
+
+    The earlier of these independent limits wins:
+
+      - The service's own AppriseAsset._service_timeout (default 60s,
+        where 0 disables the limit).
+      - *call_deadline*, the shared notify(timeout=...) ceiling for the
+        entire call.
+
+    The service budget begins when dispatch starts, so time spent waiting
+    for a worker does not consume it. ``None`` means the service is unbounded.
+    """
+    service_timeout = getattr(
+        server.asset,
+        "_service_timeout",
+        AppriseAsset._service_timeout,
+    )
+    deadline = time.monotonic() + service_timeout if service_timeout else None
+    if call_deadline is not None:
+        deadline = (
+            call_deadline if deadline is None else min(deadline, call_deadline)
+        )
+
+    # TRACE keeps large batches from spamming normal DEBUG output.
+    logger.trace(
+        "Deadline for '%s': %s",
+        getattr(server, "service_name", "Unknown"),
+        "none"
+        if deadline is None
+        else "{:.3f}s from now".format(deadline - time.monotonic()),
+    )
+    return deadline
+
+
+def _timeout_result(server: NotifyBase, elapsed: float) -> NotifyResult:
+    """Build the result for a service that exceeded the outer wait.
+
+    The worker may still be running. Record only what Apprise knows here:
+    it stopped waiting, and optional handling still belongs to NotifyResult.
+    """
+    name, url, url_id, tag, weight = _service_metadata(server)
+
+    return NotifyResult(
+        name=name,
+        url=url,
+        url_id=url_id,
+        tag=tag,
+        optional=getattr(server, "optional", False),
+        weight=weight,
+        max_attempts=1,
+        attempts=[
+            NotifyAttempt(
+                status=AppriseResultStatus.TIMEOUT,
+                elapsed=elapsed,
+                logs=[_timeout_log_entry(name, elapsed)],
+            )
+        ],
+    )
+
+
+def _timeout_log_entry(name: str, elapsed: float) -> NotifyLogEntry:
+    """Log and return the error entry describing a service timeout.
+
+    All timeout paths use this helper so every TIMEOUT attempt carries the
+    same useful diagnostic instead of only a status value.
+    """
+    message = f"Service '{name}' did not finish within {elapsed:.3f}s."
+    logger.error(message)
+    return NotifyLogEntry(level="ERROR", message=message)
+
+
+def _validate_timeout(value: Union[int, float]) -> float:
+    """Validate a timeout value shared by notify()/async_notify()."""
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        raise TypeError("timeout must be an int or float.")
+
+    # inf/nan rejected: use 0 to mean "unbounded" instead.
+    if not math.isfinite(value) or value < 0:
+        raise ValueError("timeout must be >= 0 and finite.")
+
+    return float(value)
+
+
+def _aggregate_status(
+    ok: bool, results: list[NotifyResult]
+) -> AppriseResultStatus:
+    """Roll a batch's per-service results up into one overall status.
+
+    All succeeded -> SUCCESS. Some genuinely delivered, some didn't ->
+    PARTIAL. Nothing delivered -> FAILURE beats TIMEOUT.
+    """
+    if ok:
+        return AppriseResultStatus.SUCCESS
+
+    # Real success only -- ignores optional=yes services being forgiven.
+    if any(
+        attempt.status == AppriseResultStatus.SUCCESS
+        for result in results
+        for attempt in result.attempts
+    ):
+        return AppriseResultStatus.PARTIAL
+
+    if any(r.status == AppriseResultStatus.FAILURE for r in results):
+        return AppriseResultStatus.FAILURE
+
+    if any(r.status == AppriseResultStatus.TIMEOUT for r in results):
+        return AppriseResultStatus.TIMEOUT
+
+    return AppriseResultStatus.FAILURE
+
+
+def _attempt_status(success: bool) -> AppriseResultStatus:
+    """Map one attempt's plain success/failure into the shared enum."""
+    return (
+        AppriseResultStatus.SUCCESS if success else AppriseResultStatus.FAILURE
+    )
 
 
 class Apprise:
@@ -76,6 +313,9 @@ class Apprise:
         asset: Optional[AppriseAsset] = None,
         location: Optional[ContentLocation] = None,
         debug: bool = False,
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, NotifyBase], Any]
+        ] = None,
     ) -> None:
         """Loads a set of server urls while applying the Asset() module to each
         if specified.
@@ -84,6 +324,9 @@ class Apprise:
 
         Optionally specify a global ContentLocation for a more strict means of
         handling Attachments.
+
+        log_callback, when given, fires on every warning/error a service
+        logs. Applies to every notify() call unless overridden per-call.
         """
 
         # Initialize a server list of URLs
@@ -111,6 +354,10 @@ class Apprise:
         # of Attachments.  Setting this to None removes any attachment
         # restrictions.
         self.location = location
+
+        # Default log_callback for every notify()/async_notify() call made
+        # with this instance, unless overridden per-call.
+        self._log_callback = log_callback
 
     @staticmethod
     def instantiate(
@@ -411,6 +658,7 @@ class Apprise:
                     ft = AppriseTag.parse(tok)
                     if ft.retry is not None:
                         return ft.retry
+
             else:
                 ft = AppriseTag.parse(str(entry))
                 if ft.retry is not None:
@@ -429,6 +677,7 @@ class Apprise:
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
             return False
+
         for entry in (
             [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
         ):
@@ -477,14 +726,17 @@ class Apprise:
                 if isinstance(entry, (list, tuple, set))
                 else parse_list(str(entry))
             )
+
             for tok in tokens:
                 ft = AppriseTag.parse(tok)
                 if ft.retry is None:
                     continue
+
                 tag_name = str(ft)
                 if not ft.has_priority:
                     if tag_name in server.tags:
                         return ft.retry
+
                 else:
                     for stag in server.tags:
                         if isinstance(stag, AppriseTag):
@@ -515,6 +767,17 @@ class Apprise:
                 kwargs = dict(kwargs, _retry_override=retry)
             result.append((server, kwargs))
         return result
+
+    @staticmethod
+    def _inject_log_callback(all_calls, log_callback):
+        """Inject _log_callback into every call's kwargs. No-op if
+        log_callback is None."""
+        if log_callback is None:
+            return all_calls
+        return [
+            (service, dict(kwargs, _log_callback=log_callback))
+            for service, kwargs in all_calls
+        ]
 
     @staticmethod
     def _build_tag_chains(all_calls, tag):
@@ -556,8 +819,10 @@ class Apprise:
                 if len(flat) == 1:
                     # single OR token wrapped in a list (CLI convention)
                     or_tag_names.append(str(AppriseTag.parse(flat[0])))
+
                 else:
                     or_tag_names.append("")  # AND group placeholder
+
             else:
                 for tok in parse_list(str(entry)):
                     or_tag_names.append(str(AppriseTag.parse(tok)))
@@ -613,6 +878,87 @@ class Apprise:
         ]
         return min(priorities) if priorities else 0
 
+    @staticmethod
+    def _split_and_dispatch(
+        batch: list[ServerCall], call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
+        """Dispatch sequential and parallel subsets of ``batch``.
+
+        Results keep the caller's original order. ``call_deadline`` is passed
+        through to the dispatch helpers.
+        """
+        # Tag each entry with its position in *batch* before splitting so
+        # the two dispatched subsets can be recombined in original order.
+        indexed = list(enumerate(batch))
+        sequential = [
+            (i, s, k) for i, (s, k) in indexed if not s.asset.async_mode
+        ]
+        parallel = [(i, s, k) for i, (s, k) in indexed if s.asset.async_mode]
+
+        seq_ok, seq_results = (
+            Apprise._notify_sequential(
+                *[(s, k) for _, s, k in sequential],
+                call_deadline=call_deadline,
+            )
+            if sequential
+            else (True, [])
+        )
+        par_ok, par_results = (
+            Apprise._notify_parallel_threadpool(
+                *[(s, k) for _, s, k in parallel], call_deadline=call_deadline
+            )
+            if parallel
+            else (True, [])
+        )
+
+        # Recombine by original index so the returned list matches the
+        # order entries appeared in *batch*, regardless of which subset
+        # (sequential/parallel) each one was dispatched through.
+        indexed_results = list(zip((i for i, _, _ in sequential), seq_results))
+        indexed_results += list(zip((i for i, _, _ in parallel), par_results))
+        indexed_results.sort(key=lambda entry: entry[0])
+
+        return seq_ok and par_ok, [r for _, r in indexed_results]
+
+    @staticmethod
+    async def _split_and_dispatch_async(
+        batch: list[ServerCall], call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
+        """Dispatch sequential and asynchronous subsets of ``batch``.
+
+        Blocking entries still use _notify_sequential(); async entries use
+        _notify_parallel_asyncio(). Results keep the original order.
+        """
+        # Preserve each entry's original position before dividing the work.
+        indexed = list(enumerate(batch))
+        sequential = [
+            (i, s, k) for i, (s, k) in indexed if not s.asset.async_mode
+        ]
+        parallel = [(i, s, k) for i, (s, k) in indexed if s.asset.async_mode]
+
+        seq_ok, seq_results = (
+            Apprise._notify_sequential(
+                *[(s, k) for _, s, k in sequential],
+                call_deadline=call_deadline,
+            )
+            if sequential
+            else (True, [])
+        )
+        par_ok, par_results = (
+            await Apprise._notify_parallel_asyncio(
+                *[(s, k) for _, s, k in parallel], call_deadline=call_deadline
+            )
+            if parallel
+            else (True, [])
+        )
+
+        # Merge both result streams back into the caller's batch order.
+        indexed_results = list(zip((i for i, _, _ in sequential), seq_results))
+        indexed_results += list(zip((i for i, _, _ in parallel), par_results))
+        indexed_results.sort(key=lambda entry: entry[0])
+
+        return seq_ok and par_ok, [r for _, r in indexed_results]
+
     def notify(
         self,
         body: Union[str, bytes],
@@ -623,7 +969,11 @@ class Apprise:
         match_always: bool = True,
         attach: Any = None,
         interpret_escapes: Optional[bool] = None,
-    ) -> Optional[bool]:
+        timeout: Union[int, float] = 0,
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, NotifyBase], Any]
+        ] = None,
+    ) -> AppriseResult:
         """Send a notification to all the plugins previously loaded.
 
         If the body_format specified is NotifyFormat.MARKDOWN, it will be
@@ -634,10 +984,15 @@ class Apprise:
         are notified.  By default, all added services are notified
         (tag=MATCH_ALL_TAG)
 
-        This function returns True if all notifications were successfully sent,
-        False if even just one of them fails, and None if no notifications were
-        sent at all as a result of tag filtering and/or simply having empty
-        configuration files that were read.
+        This function always returns an AppriseResult. bool(result) preserves
+        the previous True/False behavior. result.status distinguishes success,
+        failure (including invalid arguments), no match, and timeout (see
+        timeout= below). Iterate the result to inspect each service actually
+        dispatched:
+
+            result = apobj.notify(body="hello")
+            for service_result in result:
+                print(service_result.name, bool(service_result))
 
         A filter tag may carry an optional priority prefix and/or retry suffix:
 
@@ -649,7 +1004,7 @@ class Apprise:
         When no priority prefix is given, matched services are grouped by
         their configured tag priority and dispatched in ascending order
         (lowest number = highest urgency).  If every service in the lowest
-        priority group succeeds, Apprise returns True immediately without
+        priority group succeeds, Apprise returns success immediately without
         running higher-numbered priority groups (escalation chain).
 
         When an explicit priority prefix IS given (e.g. "3:endpoint"), only
@@ -662,7 +1017,38 @@ class Apprise:
 
         Set interpret_escapes to True if you want to pre-escape a string such
         as turning a \n into an actual new line, etc.
+
+        timeout, when given (as a non-zero int or float), is a ceiling in
+        seconds on how long this entire notify() call is allowed to run.
+        Any service not finished by then is reported with
+        AppriseResultStatus.TIMEOUT instead of being waited on further.
+        Each service is independently also bounded by its own
+        AppriseAsset._service_timeout (default 60s, set via
+        AppriseAsset(service_timeout=...); 0 disables it) -- whichever of
+        the two limits is sooner applies to a given service.  timeout
+        defaults to 0 (no call-level override at all), deliberately
+        leaving AppriseAsset._service_timeout as the only thing that
+        controls the default behaviour; negative values raise ValueError,
+        non-numeric values raise TypeError, exactly like
+        AppriseAsset(service_timeout=...) itself.
+
+        log_callback overrides the instance default for this call only.
         """
+        timeout = _validate_timeout(timeout)
+        effective_log_callback = (
+            log_callback if log_callback is not None else self._log_callback
+        )
+
+        # Wall-clock start for AppriseResult.elapsed -- covers the entire
+        # call, including argument validation, not just service dispatch.
+        start = time.monotonic()
+
+        # An absolute time.monotonic() ceiling for the whole call, or None
+        # when no override was given (each service still has its own
+        # AppriseAsset._service_timeout budget -- see _compute_deadline()).
+        call_deadline: Optional[float] = (
+            time.monotonic() + timeout if timeout else None
+        )
 
         try:
             all_calls = list(
@@ -679,34 +1065,42 @@ class Apprise:
             )
 
         except TypeError:
-            return False
+            # Invalid notify() arguments -- no service was ever attempted.
+            return AppriseResult(
+                status=AppriseResultStatus.FAILURE,
+                results=[],
+                elapsed=time.monotonic() - start,
+            )
 
         if not all_calls:
-            return None
+            # Tag filter matched nothing, or no servers are loaded at all.
+            return AppriseResult(
+                status=AppriseResultStatus.NOMATCH,
+                results=[],
+                elapsed=time.monotonic() - start,
+            )
 
         # Inject the per-service call-time retry override.  Each matched
         # service gets the retry from the first filter token that both matches
         # it and carries a retry suffix (e.g. "devops:3" applies retry=3 only
         # to devops-tagged services, not to management-tagged services).
         all_calls = Apprise._inject_per_service_retries(all_calls, tag)
+        all_calls = Apprise._inject_log_callback(
+            all_calls, effective_log_callback
+        )
 
         if Apprise._filter_has_explicit_priority(tag):
             # Tag filter carries an explicit priority prefix (e.g. "2:alerts").
             # Skip the escalation chain: dispatch all matched services as a
             # single flat batch regardless of their individual tag priorities.
-            sequential = [
-                (s, k) for s, k in all_calls if not s.asset.async_mode
-            ]
-            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
-            seq_ok = (
-                Apprise._notify_sequential(*sequential) if sequential else True
+            ok, results = Apprise._split_and_dispatch(
+                all_calls, call_deadline=call_deadline
             )
-            par_ok = (
-                Apprise._notify_parallel_threadpool(*parallel)
-                if parallel
-                else True
+            return AppriseResult(
+                status=_aggregate_status(ok, results),
+                results=results,
+                elapsed=time.monotonic() - start,
             )
-            return seq_ok and par_ok
 
         # No explicit priority in the filter -- use per-tag escalation chains.
         #
@@ -714,21 +1108,13 @@ class Apprise:
         # services are grouped by their configured tag priority.  The lowest-
         # numbered group (highest urgency) runs first.  If every service in
         # that group succeeds the chain is done; any failure escalates to the
-        # next priority group.  notify() returns True only when every chain
-        # finds a fully-successful group.
+        # next priority group.  notify() only reports overall success when
+        # every chain finds a fully-successful group.
         #
         # When multiple chains are active in the same round their current
         # priority-group batches run concurrently via a thread pool so that
         # one chain's services cannot delay another chain.
         chains = Apprise._build_tag_chains(all_calls, tag)
-
-        def _run_batch(batch):
-            """Dispatch one priority-group batch; True = all services ok."""
-            seq = [(s, k) for s, k in batch if not s.asset.async_mode]
-            par = [(s, k) for s, k in batch if s.asset.async_mode]
-            seq_ok = Apprise._notify_sequential(*seq) if seq else True
-            par_ok = Apprise._notify_parallel_threadpool(*par) if par else True
-            return seq_ok and par_ok
 
         # Per-chain state: priorities (sorted), groups dict, current index,
         # and a flag marking whether a successful group has been found.
@@ -742,6 +1128,10 @@ class Apprise:
             for key, groups in chains.items()
         }
 
+        # Every NotifyResult actually dispatched across every chain and
+        # every priority-group attempt, in the order each batch was run.
+        all_results = []
+
         while True:
             # When abort_on_chain_failure is enabled, stop as soon as any
             # chain has exhausted all its priority groups without success.
@@ -751,7 +1141,11 @@ class Apprise:
                 not st["succeeded"] and st["idx"] >= len(st["priorities"])
                 for st in chain_states.values()
             ):
-                return False
+                return AppriseResult(
+                    status=_aggregate_status(False, all_results),
+                    results=all_results,
+                    elapsed=time.monotonic() - start,
+                )
 
             # Collect chains that still need to try their next priority group.
             active = [
@@ -764,74 +1158,143 @@ class Apprise:
 
             if len(active) == 1:
                 # Single active chain: dispatch directly, no thread overhead.
-                _, st = active[0]
-                batch = st["groups"][st["priorities"][st["idx"]]]
-                if _run_batch(batch):
+                key, st = active[0]
+                priority = st["priorities"][st["idx"]]
+                batch = st["groups"][priority]
+                ok, batch_results = Apprise._split_and_dispatch(
+                    batch, call_deadline=call_deadline
+                )
+                all_results.extend(batch_results)
+                if ok:
+                    logger.trace(
+                        "Chain '%s' priority group %s succeeded.",
+                        key,
+                        priority,
+                    )
                     st["succeeded"] = True
                 else:
+                    logger.trace(
+                        "Chain '%s' priority group %s failed; escalating.",
+                        key,
+                        priority,
+                    )
                     st["idx"] += 1  # escalate to next priority
             else:
                 # Multiple active chains: run their current-priority batches
                 # concurrently so independent chains don't block each other.
+                # Per-service deadlines are enforced inside
+                # _split_and_dispatch.
                 with cf.ThreadPoolExecutor() as executor:
                     future_map = {
                         executor.submit(
-                            _run_batch,
+                            Apprise._split_and_dispatch,
                             st["groups"][st["priorities"][st["idx"]]],
+                            call_deadline,
                         ): (key, st)
                         for key, st in active
                     }
-                    for future in cf.as_completed(future_map):
-                        _, st = future_map[future]
+                    # Collect in submission order so results are stable even
+                    # when chains finish in a different order.
+                    for future, (key, st) in future_map.items():
                         try:
-                            ok = future.result()
-                        except Exception:
-                            logger.exception(
-                                "Unhandled Notification Exception"
+                            ok, batch_results = future.result()
+                        except Exception as e:
+                            logger.warning(
+                                "Notification chain '%s' priority group %s "
+                                "raised an exception.",
+                                key,
+                                st["priorities"][st["idx"]],
                             )
-                            ok = False
+                            logger.debug("Notification Exception: %s", str(e))
+                            ok, batch_results = False, []
+                        all_results.extend(batch_results)
                         if ok:
+                            logger.trace(
+                                "Chain '%s' priority group %s succeeded.",
+                                key,
+                                st["priorities"][st["idx"]],
+                            )
                             st["succeeded"] = True
                         else:
+                            logger.trace(
+                                "Chain '%s' priority group %s failed; "
+                                "escalating.",
+                                key,
+                                st["priorities"][st["idx"]],
+                            )
                             st["idx"] += 1  # escalate to next priority
 
-        return all(st["succeeded"] for st in chain_states.values())
+        success = all(st["succeeded"] for st in chain_states.values())
+        return AppriseResult(
+            status=_aggregate_status(success, all_results),
+            results=all_results,
+            elapsed=time.monotonic() - start,
+        )
 
-    async def async_notify(self, *args: Any, **kwargs: Any) -> Optional[bool]:
+    async def async_notify(self, *args: Any, **kwargs: Any) -> AppriseResult:
         """Send a notification to all the plugins previously loaded, for
         asynchronous callers.
 
-        The arguments are identical to those of Apprise.notify().
+        The arguments and return value are identical to those of
+        Apprise.notify() -- see its docstring for the full AppriseResult
+        contract, including the timeout= and log_callback= parameters.
         """
         tag = kwargs.get("tag", common.MATCH_ALL_TAG)
+
+        # Pop both -- neither is a _create_notify_gen() parameter.
+        timeout: Union[int, float] = _validate_timeout(
+            kwargs.pop("timeout", 0)
+        )
+        log_callback: Optional[Callable[[NotifyLogEntry, NotifyBase], Any]] = (
+            kwargs.pop("log_callback", None)
+        )
+        effective_log_callback = (
+            log_callback if log_callback is not None else self._log_callback
+        )
+
+        # Wall-clock start for AppriseResult.elapsed -- see notify().
+        start = time.monotonic()
+
+        # See notify() for what this is.
+        call_deadline: Optional[float] = (
+            time.monotonic() + timeout if timeout else None
+        )
 
         try:
             all_calls = list(self._create_notify_gen(*args, **kwargs))
 
         except TypeError:
-            return False
+            # Invalid notify() arguments -- no service was ever attempted.
+            return AppriseResult(
+                status=AppriseResultStatus.FAILURE,
+                results=[],
+                elapsed=time.monotonic() - start,
+            )
 
         if not all_calls:
-            return None
+            # Tag filter matched nothing, or no servers are loaded at all.
+            return AppriseResult(
+                status=AppriseResultStatus.NOMATCH,
+                results=[],
+                elapsed=time.monotonic() - start,
+            )
 
         # Inject per-service call-time retry overrides (same logic as notify).
         all_calls = Apprise._inject_per_service_retries(all_calls, tag)
+        all_calls = Apprise._inject_log_callback(
+            all_calls, effective_log_callback
+        )
 
         if Apprise._filter_has_explicit_priority(tag):
             # Explicit priority prefix: flat dispatch, no escalation.
-            sequential = [
-                (s, k) for s, k in all_calls if not s.asset.async_mode
-            ]
-            parallel = [(s, k) for s, k in all_calls if s.asset.async_mode]
-            seq_ok = (
-                Apprise._notify_sequential(*sequential) if sequential else True
+            ok, results = await Apprise._split_and_dispatch_async(
+                all_calls, call_deadline=call_deadline
             )
-            par_ok = (
-                await Apprise._notify_parallel_asyncio(*parallel)
-                if parallel
-                else True
+            return AppriseResult(
+                status=_aggregate_status(ok, results),
+                results=results,
+                elapsed=time.monotonic() - start,
             )
-            return seq_ok and par_ok
 
         # Per-tag independent escalation chains -- same semantics as notify().
         #
@@ -841,18 +1304,6 @@ class Apprise:
         # simultaneously.  Only chains whose current batch failed advance to
         # the next priority group (escalation).
         chains = Apprise._build_tag_chains(all_calls, tag)
-
-        async def _run_batch_async(batch):
-            """Dispatch one priority-group batch; True = all services ok."""
-            seq = [(s, k) for s, k in batch if not s.asset.async_mode]
-            par = [(s, k) for s, k in batch if s.asset.async_mode]
-            # Sequential items (async_mode=False) run blocking in the caller;
-            # async items are gathered concurrently.
-            seq_ok = Apprise._notify_sequential(*seq) if seq else True
-            par_ok = (
-                await Apprise._notify_parallel_asyncio(*par) if par else True
-            )
-            return seq_ok and par_ok
 
         chain_states = {
             key: {
@@ -864,13 +1315,21 @@ class Apprise:
             for key, groups in chains.items()
         }
 
+        # Every NotifyResult actually dispatched across every chain and
+        # every priority-group attempt, in the order each batch was run.
+        all_results = []
+
         while True:
             # Same abort_on_chain_failure guard as notify().
             if self.asset.abort_on_chain_failure and any(
                 not st["succeeded"] and st["idx"] >= len(st["priorities"])
                 for st in chain_states.values()
             ):
-                return False
+                return AppriseResult(
+                    status=_aggregate_status(False, all_results),
+                    results=all_results,
+                    elapsed=time.monotonic() - start,
+                )
 
             active = [
                 (key, st)
@@ -885,25 +1344,52 @@ class Apprise:
             # different chains can pipeline their I/O simultaneously.
             # return_exceptions=True prevents one failing batch from cancelling
             # the others; exceptions are treated as delivery failures below.
-            results = await asyncio.gather(
+            gathered = await asyncio.gather(
                 *(
-                    _run_batch_async(st["groups"][st["priorities"][st["idx"]]])
+                    Apprise._split_and_dispatch_async(
+                        st["groups"][st["priorities"][st["idx"]]],
+                        call_deadline=call_deadline,
+                    )
                     for _, st in active
                 ),
                 return_exceptions=True,
             )
 
-            for (_, st), ok in zip(active, results):
-                if isinstance(ok, Exception):
+            for (key, st), item in zip(active, gathered):
+                if isinstance(item, Exception):
                     # Escaped exception -- safety net; treat as failure.
-                    logger.exception("Unhandled Notification Exception")
+                    logger.warning(
+                        "Notification chain '%s' priority group %s raised "
+                        "an exception.",
+                        key,
+                        st["priorities"][st["idx"]],
+                    )
+                    logger.debug("Notification Exception: %s", str(item))
                     st["idx"] += 1
-                elif ok:
-                    st["succeeded"] = True
                 else:
-                    st["idx"] += 1  # escalate to next priority group
+                    ok, batch_results = item
+                    all_results.extend(batch_results)
+                    if ok:
+                        logger.trace(
+                            "Chain '%s' priority group %s succeeded.",
+                            key,
+                            st["priorities"][st["idx"]],
+                        )
+                        st["succeeded"] = True
+                    else:
+                        logger.trace(
+                            "Chain '%s' priority group %s failed; escalating.",
+                            key,
+                            st["priorities"][st["idx"]],
+                        )
+                        st["idx"] += 1  # escalate to next priority group
 
-        return all(st["succeeded"] for st in chain_states.values())
+        success = all(st["succeeded"] for st in chain_states.values())
+        return AppriseResult(
+            status=_aggregate_status(success, all_results),
+            results=all_results,
+            elapsed=time.monotonic() - start,
+        )
 
     def _create_notify_calls(self, *args, **kwargs):
         """Creates notifications for all the plugins loaded.
@@ -939,10 +1425,10 @@ class Apprise:
         """Internal generator function for _create_notify_calls()."""
 
         if len(self) == 0:
-            # Nothing to notify
-            msg = "There are no service(s) to notify"
-            logger.error(msg)
-            raise TypeError(msg)
+            # Nothing loaded -- same as an empty tag match: NOMATCH, not
+            # FAILURE.
+            logger.warning("There are no service(s) to notify")
+            return
 
         if not (title or body or attach):
             msg = "No message content specified to deliver"
@@ -1085,321 +1571,667 @@ class Apprise:
             yield (server, kwargs)
 
     @staticmethod
-    def _notify_sequential(*servers_kwargs):
+    def _notify_sequential(
+        *services_kwargs: ServerCall, call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of notify() calls sequentially and synchronously.
 
-        Each server is attempted once and then retried up to server.retry
-        additional times on failure before moving on.  When server.wait is
-        greater than zero, the process sleeps that many seconds between
-        each retry attempt.
-
-        A per-call retry override may be injected into kwargs under the key
-        ``_retry_override``; when present it takes precedence over the
-        server's own retry attribute for this invocation only.
-
-        Exceptions raised by a plugin's notify() -- including those from
-        third-party @notify-decorated functions that are outside our control
-        -- are caught here and treated as a delivery failure.  The retry
-        logic still applies, so a plugin that raises on the first attempt
-        will be retried the configured number of times before giving up.
+        Retries, wait times, per-call retry overrides, and deadlines are all
+        handled here. A blocking in-flight call cannot be preempted.
         """
 
         success = True
+        results: list[NotifyResult] = []
 
-        for server, kwargs in servers_kwargs:
-            # Pop the per-call override before forwarding kwargs to the
-            # plugin so it never sees the internal _retry_override key.
-            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
-            wait = getattr(server, "wait", 0.0)
+        for service, kwargs in services_kwargs:
+            # Pop the per-call overrides before forwarding kwargs to the
+            # plugin so it never sees these internal keys.
+            retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
+            wait = getattr(service, "wait", 0.0)
+            log_callback = kwargs.pop("_log_callback", None)
 
-            result = False
+            # The deadline is computed fresh right as this service's own
+            # dispatch begins, per-service, not from when notify() was
+            # first called.
+            deadline = _compute_deadline(service, call_deadline)
+            attempts: list[NotifyAttempt] = []
             for attempt in range(retry + 1):
-                # Attempt delivery.  TypeError comes from Apprise's own
-                # validation; bare Exception guards against buggy or
-                # third-party plugins (including @notify decorators) that
-                # may raise unexpectedly.  Both are treated as failure so
-                # the retry loop can continue.
-                try:
-                    result = server.notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    result = False
+                if deadline is not None and time.monotonic() >= deadline:
+                    # Out of time -- do not start another attempt.  Record
+                    # a zero-elapsed TIMEOUT attempt marking the decision
+                    # to stop, with its own diagnostic log entry, rather
+                    # than silently dropping it.
+                    logger.trace(
+                        "Deadline already passed for '%s'; skipping "
+                        "attempt %d/%d.",
+                        service.service_name,
+                        attempt + 1,
+                        retry + 1,
+                    )
+                    attempts.append(
+                        NotifyAttempt(
+                            status=AppriseResultStatus.TIMEOUT,
+                            logs=[
+                                _timeout_log_entry(service.service_name, 0.0)
+                            ],
+                        )
+                    )
+                    break
+
+                # monotonic() avoids wall-clock jumps while timing an attempt.
+                attempt_start = time.monotonic()
+                logger.trace(
+                    "Starting attempt %d/%d for '%s'.",
+                    attempt + 1,
+                    retry + 1,
+                    service.service_name,
+                )
+                # Isolate this attempt's log output so it can be
+                # attributed to exactly this call in the NotifyAttempt
+                # built below (see _ServiceLogCapture).
+                with _ServiceLogCapture(
+                    service, log_callback=log_callback
+                ) as capture:
+                    # Treat validation and plugin exceptions as failed
+                    # attempts.
+                    try:
+                        result = service.notify(**kwargs)
+                    except TypeError:
+                        result = False
+                    except Exception as e:
+                        logger.warning(
+                            "Notification service '%s' raised an exception.",
+                            service.service_name,
+                        )
+                        logger.debug("Notification Exception: %s", str(e))
+                        result = False
+
+                attempt_elapsed = time.monotonic() - attempt_start
+                logger.trace(
+                    "Attempt %d/%d for '%s' finished in %.3fs: %s.",
+                    attempt + 1,
+                    retry + 1,
+                    service.service_name,
+                    attempt_elapsed,
+                    "success" if result else "failure",
+                )
+                attempts.append(
+                    NotifyAttempt(
+                        status=_attempt_status(result),
+                        elapsed=attempt_elapsed,
+                        logs=capture.entries,
+                    )
+                )
 
                 if result:
-                    # Delivered successfully; no need to retry this server.
+                    # Delivered successfully; no need to retry this service.
                     break
 
                 if attempt < retry:
                     # Delivery failed and retries remain.  Log the attempt
                     # number and pause before the next try.
                     logger.warning(
-                        "Retry %d/%d for %s",
+                        "Attempt %d/%d for '%s' failed; trying again.",
                         attempt + 1,
                         retry,
-                        server.service_name,
+                        service.service_name,
                     )
                     if wait > 0:
-                        time.sleep(wait)
+                        # Never sleep past the deadline -- the top-of-loop
+                        # check above will report the timeout on the next
+                        # iteration once we wake up.
+                        sleep_for = wait
+                        if deadline is not None:
+                            sleep_for = min(
+                                wait, max(0.0, deadline - time.monotonic())
+                            )
+                        if sleep_for > 0:
+                            time.sleep(sleep_for)
 
-            # Optional-service check.
+            # Optional-service check after all retries have completed.
+            # NotifyResult reflects optional failures/timeouts as SUCCESS;
+            # this log only records that the underlying delivery failed.
             #
-            # At this point all retry attempts for 'server' have been
-            # exhausted (the for-loop above has finished).  If the final
-            # result is still False *and* the service is marked optional,
-            # we overwrite result to True before folding it into the
-            # running 'success' accumulator.  This silently absorbs the
-            # failure: the caller will not see it as a delivery error.
-            #
-            # Interaction with retries:
-            #   The retry loop above has already run.  optional= does not
-            #   short-circuit or bypass retries -- it only changes the
-            #   interpretation of the *final* result once all attempts
-            #   are done.  A service with retry=3 and optional=True will
-            #   still be attempted four times before the failure is
-            #   absorbed here.
-            if not result and getattr(server, "optional", False):
+            # Optional services still use every retry; only the final status
+            # is interpreted differently.
+            optional = getattr(service, "optional", False)
+            succeeded = any(
+                a.status == AppriseResultStatus.SUCCESS for a in attempts
+            )
+            if not succeeded and optional:
                 logger.info(
-                    "Optional service '%s' failed; ignoring failure.",
-                    server.service_name,
+                    "Optional service '%s' did not send successfully; "
+                    "continuing.",
+                    service.service_name,
                 )
-                result = True
 
-            # Fold this service's result into the running batch outcome.
-            # Boolean AND is used so that a single False from any required
-            # (non-optional) service permanently taints 'success' for the
-            # whole batch -- even if later services succeed.  Optional
-            # failures are already re-mapped to True above, so they never
-            # contribute a False here.
-            success = success and result
+            # Gathered defensively -- see _service_metadata() -- so a
+            # plugin whose url()/url_id()/__len__ raises can never crash
+            # this call or discard a delivery that already succeeded.
+            name, url, url_id, tag, weight = _service_metadata(service)
+            notify_result = NotifyResult(
+                name=name,
+                url=url,
+                url_id=url_id,
+                tag=tag,
+                optional=optional,
+                weight=weight,
+                max_attempts=retry + 1,
+                attempts=attempts,
+            )
+            results.append(notify_result)
 
-        return success
+            # One required failure means the whole batch cannot succeed.
+            # Optional failures already count as SUCCESS in NotifyResult.
+            success = success and bool(notify_result)
+
+        return success, results
 
     @staticmethod
-    def _notify_parallel_threadpool(*servers_kwargs):
+    def _notify_parallel_threadpool(
+        *services_kwargs: ServerCall, call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of notify() calls in parallel via a thread pool.
 
-        Each server runs in its own thread.  Within each thread, the server
-        is retried up to server.retry additional times on failure with an
-        optional server.wait second sleep between each attempt.
-
-        Falls back to _notify_sequential() when only a single server is
-        given to avoid the overhead of spawning a thread pool for one call.
-
-        Exceptions from a plugin's notify() -- including those from
-        third-party @notify-decorated functions -- are caught inside each
-        thread and treated as delivery failures so the retry logic can
-        still run.
+        Each worker handles retries and deadlines for one service. Timed-out
+        workers may keep running, but Apprise stops waiting.
         """
 
-        n_calls = len(servers_kwargs)
+        n_calls = len(services_kwargs)
 
         if n_calls == 0:
-            return True
+            return True, []
 
-        # Avoid thread-pool overhead for a single notification.
         if n_calls == 1:
-            return Apprise._notify_sequential(servers_kwargs[0])
+            service, _ = services_kwargs[0]
+            # Only take the no-thread-pool shortcut when this service has
+            # no deadline whatsoever -- there is nothing to abandon, so a
+            # plain blocking call is strictly cheaper and behaves
+            # identically. Otherwise fall through to the thread-pool path
+            # below so the deadline can actually be enforced.
+            if _compute_deadline(service, call_deadline) is None:
+                return Apprise._notify_sequential(
+                    services_kwargs[0], call_deadline=call_deadline
+                )
 
         logger.info(
-            "Notifying %d service(s) with threads.", len(servers_kwargs)
+            "Notifying %d service(s) with threads.", len(services_kwargs)
         )
 
-        def _call_with_retry(server, kwargs):
-            """Execute one server's notify() with retry/wait logic.
+        def _call_with_retry(
+            service: NotifyBase, kwargs: dict[str, Any]
+        ) -> tuple[bool, NotifyResult]:
+            """Execute one service's notify() with retry/wait logic.
 
             Runs inside a worker thread.  Pops ``_retry_override`` from
             kwargs so it is never forwarded to the plugin's notify() call.
             Exceptions are caught and treated as failures so the retry
             loop continues even when a plugin raises unexpectedly.
-            """
-            # Pop the per-call override so it stays internal.
-            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
-            wait = getattr(server, "wait", 0.0)
 
-            result = False
+            Returns (bool, NotifyResult) -- the bool is this service's
+            contribution to the batch's aggregate success value (mirrors
+            the NotifyResult's own reflective status, already adjusted
+            for optional=); the NotifyResult also carries every raw,
+            unadjusted NotifyAttempt for the caller's AppriseResult.
+            """
+            # Pop the per-call overrides so they stay internal.
+            retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
+            wait = getattr(service, "wait", 0.0)
+            log_callback = kwargs.pop("_log_callback", None)
+
+            # The deadline is computed here, right as this worker actually
+            # begins running -- not at submission time -- so time spent
+            # queued behind other work in the pool never counts against
+            # this service's own budget.
+            deadline = _compute_deadline(service, call_deadline)
+            attempts: list[NotifyAttempt] = []
             for attempt in range(retry + 1):
+                if deadline is not None and time.monotonic() >= deadline:
+                    # Out of time -- record a zero-elapsed TIMEOUT attempt
+                    # marking the decision to stop, and do not start
+                    # another one.
+                    logger.trace(
+                        "Deadline already passed for '%s'; skipping "
+                        "attempt %d/%d.",
+                        service.service_name,
+                        attempt + 1,
+                        retry + 1,
+                    )
+                    attempts.append(
+                        NotifyAttempt(
+                            status=AppriseResultStatus.TIMEOUT,
+                            logs=[
+                                _timeout_log_entry(service.service_name, 0.0)
+                            ],
+                        )
+                    )
+                    break
+
+                attempt_start = time.monotonic()
+                logger.trace(
+                    "Starting attempt %d/%d for '%s'.",
+                    attempt + 1,
+                    retry + 1,
+                    service.service_name,
+                )
                 # Same exception handling as _notify_sequential: TypeError
                 # from Apprise validation and bare Exception for buggy or
                 # third-party plugins both map to a retriable failure.
-                try:
-                    result = server.notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    result = False
+                with _ServiceLogCapture(
+                    service, log_callback=log_callback
+                ) as capture:
+                    try:
+                        result = service.notify(**kwargs)
+                    except TypeError:
+                        result = False
+                    except Exception as e:
+                        logger.warning(
+                            "Notification service '%s' raised an exception.",
+                            service.service_name,
+                        )
+                        logger.debug("Notification Exception: %s", str(e))
+                        result = False
+
+                attempt_elapsed = time.monotonic() - attempt_start
+                logger.trace(
+                    "Attempt %d/%d for '%s' finished in %.3fs: %s.",
+                    attempt + 1,
+                    retry + 1,
+                    service.service_name,
+                    attempt_elapsed,
+                    "success" if result else "failure",
+                )
+                attempts.append(
+                    NotifyAttempt(
+                        status=_attempt_status(result),
+                        elapsed=attempt_elapsed,
+                        logs=capture.entries,
+                    )
+                )
 
                 if result:
-                    return True
+                    break
 
                 if attempt < retry:
                     logger.warning(
-                        "Retry %d/%d for %s",
+                        "Attempt %d/%d for '%s' failed; trying again.",
                         attempt + 1,
                         retry,
-                        server.service_name,
+                        service.service_name,
                     )
                     if wait > 0:
-                        time.sleep(wait)
+                        sleep_for = wait
+                        if deadline is not None:
+                            sleep_for = min(
+                                wait, max(0.0, deadline - time.monotonic())
+                            )
+                        if sleep_for > 0:
+                            time.sleep(sleep_for)
 
-            # Optional-service check (thread-pool path).
-            #
-            # All retry attempts for this server have been exhausted by the
-            # loop above.  If the final result is still False and the service
-            # is tagged as optional, return True from this worker function
-            # instead of False.  The caller (_notify_parallel_threadpool)
-            # collects each worker's return value via future.result() and
-            # ANDs them together; returning True here prevents this worker's
-            # failure from tainting the aggregate result.
-            #
-            # This is the thread-pool equivalent of the same check in
-            # _notify_sequential.  See the comment there for a full
-            # explanation of the getattr() guard and the retry interaction.
-            if not result and getattr(server, "optional", False):
+            # Optional services can fail quietly, but keep a log breadcrumb.
+            optional = getattr(service, "optional", False)
+            succeeded = any(
+                a.status == AppriseResultStatus.SUCCESS for a in attempts
+            )
+            if not succeeded and optional:
                 logger.info(
-                    "Optional service '%s' failed; ignoring failure.",
-                    server.service_name,
+                    "Optional service '%s' did not send successfully; "
+                    "continuing.",
+                    service.service_name,
                 )
-                # Return True so future.result() in the caller reports
-                # success for this optional worker thread.
-                return True
 
-            # Every attempt for this service failed and it is not optional;
-            # propagate the failure to the caller.
-            return result
+            # Build result metadata defensively; plugin helpers may raise.
+            name, url, url_id, tag, weight = _service_metadata(service)
+            notify_result = NotifyResult(
+                name=name,
+                url=url,
+                url_id=url_id,
+                tag=tag,
+                optional=optional,
+                weight=weight,
+                max_attempts=retry + 1,
+                attempts=attempts,
+            )
 
-        # Submit all server calls to the thread pool and collect results.
-        with cf.ThreadPoolExecutor() as executor:
-            success = True
-            futures = [
-                executor.submit(_call_with_retry, server, kwargs)
-                for (server, kwargs) in servers_kwargs
-            ]
+            return bool(notify_result), notify_result
 
-            for future in cf.as_completed(futures):
+        # Keep output ordered by input, though threads finish out of order.
+        # This is the shared, process-wide pool (see _get_shared_executor()),
+        # not a fresh one per call -- never shut down here, it persists for
+        # the life of the process so a chronically hanging endpoint cannot
+        # leak one more permanently-running thread with every call.
+        executor = _get_shared_executor()
+        success = True
+        results: list[Optional[NotifyResult]] = [None] * n_calls
+
+        # Snapshot every service's deadline once, right at submission
+        # time (they all start at essentially the same instant here).
+        deadlines: list[Optional[float]] = [
+            _compute_deadline(service, call_deadline)
+            for service, kwargs in services_kwargs
+        ]
+        future_to_idx: dict[cf.Future, int] = {
+            executor.submit(_call_with_retry, service, kwargs): i
+            for i, (service, kwargs) in enumerate(services_kwargs)
+        }
+
+        for future, idx in future_to_idx.items():
+            service = services_kwargs[idx][0]
+            # Give each expired service one grace window, not one per loop.
+            abandon_at = (
+                deadlines[idx] + _ABANDON_GRACE_SECONDS
+                if deadlines[idx] is not None
+                else None
+            )
+            wait_start = time.monotonic()
+            wait_for = (
+                max(0.0, abandon_at - wait_start)
+                if abandon_at is not None
+                else None
+            )
+            logger.trace(
+                "Waiting up to %s for '%s'.",
+                "no limit" if wait_for is None else f"{wait_for:.3f}s",
+                service.service_name,
+            )
+            try:
                 # future.result() re-raises any exception that escaped
                 # _call_with_retry (should not happen given the inner
                 # try/except, but guard here as a safety net).
-                try:
-                    success = success and future.result()
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    success = False
+                ok, notify_result = future.result(timeout=wait_for)
+                logger.trace(
+                    "'%s' finished after %.3fs: %s.",
+                    service.service_name,
+                    time.monotonic() - wait_start,
+                    "success" if ok else "failure",
+                )
 
-            return success
+            except cf.TimeoutError:
+                # Stop waiting once this service's grace window is spent.
+                # NotifyResult keeps optional services successful.
+                wait_elapsed = time.monotonic() - wait_start
+
+                # Still queued -> cancel() succeeds, nothing to track.
+                # Already running -> cancel() fails, so track it instead.
+                cancelled = future.cancel()
+                if not cancelled:
+                    name, url, _, _, _ = _service_metadata(service)
+                    _track_abandoned_future(future, name, url)
+                logger.trace(
+                    "Stopped waiting for '%s' after %.3fs (%s).",
+                    service.service_name,
+                    wait_elapsed,
+                    "it was still queued and has been cancelled"
+                    if cancelled
+                    else "its worker thread may still be running in the "
+                    "background",
+                )
+                notify_result = _timeout_result(service, wait_elapsed)
+                ok = bool(notify_result)
+
+            except Exception as e:
+                logger.warning(
+                    "Notification service '%s' raised an exception.",
+                    service.service_name,
+                )
+                logger.debug("Notification Exception: %s", str(e))
+                notify_result = _safe_error_result(service)
+                ok = bool(notify_result)
+
+            success = success and ok
+            results[idx] = notify_result
+
+        return success, results
 
     @staticmethod
-    async def _notify_parallel_asyncio(*servers_kwargs):
+    async def _notify_parallel_asyncio(
+        *services_kwargs: ServerCall, call_deadline: Optional[float] = None
+    ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of async_notify() calls concurrently via asyncio.
 
-        All coroutines are gathered with asyncio.gather().  Each server is
-        retried up to server.retry additional times on failure with an
-        optional asyncio.sleep(server.wait) between attempts.
+        Each coroutine handles one service, including retry and wait logic.
+        The outer wait_for() keeps one stuck service from blocking its peers.
 
-        Unlike the thread-pool path, there is no single-server optimisation
-        here because asyncio can pipeline work across coroutines while one
-        is awaiting I/O.
-
-        Exceptions from a plugin's async_notify() -- including those from
-        third-party @notify-decorated coroutines -- are caught inside each
-        coroutine and treated as delivery failures so the retry loop can
-        still run for that service.
+        A timeout means Apprise stops waiting and reports TIMEOUT. If the
+        plugin is running sync work in a worker thread, that work may still
+        finish later.
         """
 
-        n_calls = len(servers_kwargs)
+        n_calls = len(services_kwargs)
 
         if n_calls == 0:
-            return True
+            return True, []
 
         logger.info(
-            "Notifying %d service(s) asynchronously.", len(servers_kwargs)
+            "Notifying %d service(s) asynchronously.", len(services_kwargs)
         )
 
-        async def do_call(server, kwargs):
-            """Coroutine driving one server's async_notify() with retry/wait.
+        async def do_call(
+            service: NotifyBase, kwargs: dict[str, Any]
+        ) -> tuple[bool, NotifyResult]:
+            """Coroutine driving one service's async_notify() with retry/wait.
 
             Pops ``_retry_override`` from kwargs so it is never forwarded
             to the plugin.  Exceptions are caught and treated as failures
             so the retry loop continues even when a plugin raises
             unexpectedly (e.g. a third-party @notify-decorated coroutine).
-            """
-            # Pop the per-call override so it stays internal.
-            retry = kwargs.pop("_retry_override", getattr(server, "retry", 0))
-            wait = getattr(server, "wait", 0.0)
 
-            result = False
+            Returns (bool, NotifyResult) -- see _call_with_retry in
+            _notify_parallel_threadpool for the equivalent contract.
+            """
+            # Pop the per-call overrides so they stay internal.
+            retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
+            wait = getattr(service, "wait", 0.0)
+            log_callback = kwargs.pop("_log_callback", None)
+
+            # Computed fresh as this coroutine actually starts running,
+            # same rationale as _notify_parallel_threadpool's worker.
+            deadline = _compute_deadline(service, call_deadline)
+            attempts: list[NotifyAttempt] = []
             for attempt in range(retry + 1):
+                if deadline is not None and time.monotonic() >= deadline:
+                    # Out of time -- record a zero-elapsed TIMEOUT attempt
+                    # marking the decision to stop, and do not start
+                    # another one.
+                    logger.trace(
+                        "Deadline already passed for '%s'; skipping "
+                        "attempt %d/%d.",
+                        service.service_name,
+                        attempt + 1,
+                        retry + 1,
+                    )
+                    attempts.append(
+                        NotifyAttempt(
+                            status=AppriseResultStatus.TIMEOUT,
+                            logs=[
+                                _timeout_log_entry(service.service_name, 0.0)
+                            ],
+                        )
+                    )
+                    break
+
+                attempt_start = time.monotonic()
+                logger.trace(
+                    "Starting attempt %d/%d for '%s'.",
+                    attempt + 1,
+                    retry + 1,
+                    service.service_name,
+                )
                 # Mirror the exception handling from the synchronous paths:
-                # TypeError from Apprise's own validation layer and bare
-                # Exception for any plugin that raises unexpectedly are both
-                # treated as retriable failures rather than hard crashes.
-                try:
-                    result = await server.async_notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception:
-                    logger.exception("Unhandled Notification Exception")
-                    result = False
+                # Treat validation and plugin exceptions as failed attempts.
+                # The retry loop can still continue for this service.
+                with _ServiceLogCapture(
+                    service, log_callback=log_callback
+                ) as capture:
+                    try:
+                        result = await service.async_notify(**kwargs)
+
+                    except TypeError:
+                        result = False
+
+                    except Exception as e:
+                        logger.warning(
+                            "Notification service '%s' raised an exception.",
+                            service.service_name,
+                        )
+                        logger.debug("Notification Exception: %s", str(e))
+                        result = False
+
+                attempt_elapsed = time.monotonic() - attempt_start
+                logger.trace(
+                    "Attempt %d/%d for '%s' finished in %.3fs: %s.",
+                    attempt + 1,
+                    retry + 1,
+                    service.service_name,
+                    attempt_elapsed,
+                    "success" if result else "failure",
+                )
+                attempts.append(
+                    NotifyAttempt(
+                        status=_attempt_status(result),
+                        elapsed=attempt_elapsed,
+                        logs=capture.entries,
+                    )
+                )
 
                 if result:
-                    return True
+                    break
 
                 if attempt < retry:
                     logger.warning(
-                        "Retry %d/%d for %s",
+                        "Attempt %d/%d for '%s' failed; trying again.",
                         attempt + 1,
                         retry,
-                        server.service_name,
+                        service.service_name,
                     )
                     if wait > 0:
-                        await asyncio.sleep(wait)
+                        sleep_for = wait
+                        if deadline is not None:
+                            sleep_for = min(
+                                wait, max(0.0, deadline - time.monotonic())
+                            )
+                        if sleep_for > 0:
+                            await asyncio.sleep(sleep_for)
 
-            # Optional-service check (asyncio coroutine path).
-            #
-            # All retry attempts have been exhausted by the async loop
-            # above.  If the final result is still False and the service
-            # is tagged optional, return True from this coroutine so that
-            # asyncio.gather() receives a truthy value for this task.
-            # The caller inspects all gathered results with all(); a True
-            # here ensures this coroutine does not lower the aggregate
-            # result for the batch.
-            #
-            # This is the asyncio equivalent of the same check in
-            # _notify_sequential and _call_with_retry.  See the comment
-            # in _notify_sequential for a full explanation of the getattr()
-            # guard and the interaction with the retry count.
-            if not result and getattr(server, "optional", False):
+            # Optional services can fail quietly, but keep a log breadcrumb.
+            optional = getattr(service, "optional", False)
+            succeeded = any(
+                a.status == AppriseResultStatus.SUCCESS for a in attempts
+            )
+            if not succeeded and optional:
                 logger.info(
-                    "Optional service '%s' failed; ignoring failure.",
-                    server.service_name,
+                    "Optional service '%s' did not send successfully; "
+                    "continuing.",
+                    service.service_name,
                 )
-                # Return True so asyncio.gather() sees a success value
-                # for this optional coroutine.
-                return True
 
-            # Every attempt for this service failed and it is not optional;
-            # propagate the failure to the caller.
-            return result
+            # Build result metadata defensively; plugin helpers may raise.
+            name, url, url_id, tag, weight = _service_metadata(service)
+            notify_result = NotifyResult(
+                name=name,
+                url=url,
+                url_id=url_id,
+                tag=tag,
+                optional=optional,
+                weight=weight,
+                max_attempts=retry + 1,
+                attempts=attempts,
+            )
+
+            return bool(notify_result), notify_result
+
+        async def do_call_bounded(
+            service: NotifyBase,
+            kwargs: dict[str, Any],
+            deadline: Optional[float],
+        ) -> tuple[bool, NotifyResult]:
+            """Apply an outer asyncio timeout to one service call.
+
+            The service still owns its normal retry deadline inside do_call().
+            This wrapper limits how long this batch waits for the result.
+            """
+            remaining = (
+                max(0.0, deadline - time.monotonic())
+                if deadline is not None
+                else None
+            )
+            # Add one small grace window so a nearly-finished service can
+            # settle before it is reported as abandoned.
+            wait_for = (
+                remaining + _ABANDON_GRACE_SECONDS
+                if remaining is not None
+                else None
+            )
+            logger.trace(
+                "Waiting up to %s for '%s'.",
+                "no limit" if wait_for is None else f"{wait_for:.3f}s",
+                service.service_name,
+            )
+            wait_start = time.monotonic()
+            try:
+                # timeout=None makes wait_for() behave like a plain await.
+                # This keeps the bounded and unbounded paths together.
+                ok, notify_result = await asyncio.wait_for(
+                    do_call(service, kwargs), timeout=wait_for
+                )
+                logger.trace(
+                    "'%s' finished after %.3fs: %s.",
+                    service.service_name,
+                    time.monotonic() - wait_start,
+                    "success" if ok else "failure",
+                )
+                return ok, notify_result
+
+            except asyncio.TimeoutError:
+                # Derive the outcome from NotifyResult so an optional timeout
+                # remains successful.
+                # Apprise stops waiting here; it does not promise delivery
+                # work has stopped underneath.
+                logger.trace(
+                    "Stopped waiting for '%s' after %.3fs; it may still "
+                    "be finishing in the background.",
+                    service.service_name,
+                    time.monotonic() - wait_start,
+                )
+                notify_result = _timeout_result(service, remaining or 0.0)
+                return bool(notify_result), notify_result
+
+        # Snapshot outer wait deadlines before launching the async workers.
+        # do_call() still computes its own deadline once it starts running.
+        deadlines: list[Optional[float]] = [
+            _compute_deadline(service, call_deadline)
+            for service, kwargs in services_kwargs
+        ]
 
         # Run all coroutines concurrently.  return_exceptions=True ensures
-        # that one coroutine raising does not cancel the others; any escaped
-        # exception (beyond what do_call already handles) is caught below.
-        cors = (do_call(server, kwargs) for (server, kwargs) in servers_kwargs)
-        results = await asyncio.gather(*cors, return_exceptions=True)
+        # one escaped exception is reported without cancelling other services.
+        cors = (
+            do_call_bounded(service, kwargs, deadlines[i])
+            for i, (service, kwargs) in enumerate(services_kwargs)
+        )
+        gathered = await asyncio.gather(*cors, return_exceptions=True)
 
-        if any(isinstance(status, Exception) for status in results):
-            # Safety net: an exception escaped do_call's own try/except.
-            # Log each one and treat the whole batch as failed.
-            for status in results:
-                if isinstance(status, Exception):
-                    logger.error(
-                        "Unhandled Notification Exception: %s", status
-                    )
-            return False
+        success = True
+        results: list[NotifyResult] = []
+        for idx, item in enumerate(gathered):
+            service = services_kwargs[idx][0]
+            if isinstance(item, Exception):
+                # Safety net: an exception escaped do_call's own try/except.
+                logger.warning(
+                    "Notification service '%s' raised an exception.",
+                    service.service_name,
+                )
+                logger.debug("Notification Exception: %s", str(item))
+                notify_result = _safe_error_result(service)
+                success = success and bool(notify_result)
+                results.append(notify_result)
 
-        return all(results)
+            else:
+                ok, notify_result = item
+                success = success and ok
+                results.append(notify_result)
+
+        return success, results
 
     def json(
         self,
@@ -1419,7 +2251,7 @@ class Apprise:
         if not path:
             return json.dumps(
                 details,
-                separators=(",", ":"),
+                separators=JSON_COMPACT_SEPARATORS,
                 indent=indent,
                 cls=AppriseJSONEncoder,
             )
@@ -1429,7 +2261,7 @@ class Apprise:
                 json.dump(
                     details,
                     fp,
-                    separators=(",", ":"),
+                    separators=JSON_COMPACT_SEPARATORS,
                     indent=indent,
                     cls=AppriseJSONEncoder,
                     ensure_ascii=False,
