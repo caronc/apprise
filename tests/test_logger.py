@@ -796,7 +796,7 @@ def test_service_log_capture_async_callback_error():
         return cap
 
     try:
-        with mock.patch("apprise.logger.logger.debug") as mock_debug:
+        with mock.patch.object(logger, "debug") as mock_debug:
             cap = asyncio.run(_run())
     finally:
         logging.disable(logging.CRITICAL)
@@ -815,8 +815,8 @@ def test_service_log_capture_cancelled_callback_future():
     assert future.cancelled()
 
     with (
-        mock.patch("apprise.logger.logger.warning") as mock_warning,
-        mock.patch("apprise.logger.logger.debug") as mock_debug,
+        mock.patch.object(logger, "warning") as mock_warning,
+        mock.patch.object(logger, "debug") as mock_debug,
     ):
         # Must not raise.
         _ServiceLogCapture._log_callback_done(future)

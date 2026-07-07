@@ -276,7 +276,8 @@ def test_plugin_mqtt_tls_no_certificates_failure(mqtt_client_mock, mocker):
         call.error(
             "MQTT secure communication can not be verified, "
             "CA certificates file missing"
-        )
+        ),
+        call.debug("%s send() completed in %.2fs.", ANY, ANY),
     ]
 
 
