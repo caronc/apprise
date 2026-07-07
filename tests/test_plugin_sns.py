@@ -248,7 +248,7 @@ def test_plugin_sns_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
     # The phone number is invalid, and without it, there is nothing
     # to notify
@@ -260,7 +260,7 @@ def test_plugin_sns_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
     # The phone number is invalid, and without it, there is nothing
     # to notify; we
@@ -272,7 +272,7 @@ def test_plugin_sns_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
 
 def test_plugin_sns_url_parsing():
@@ -462,7 +462,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     )
 
     # CreateTopic fails
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     def post(url, data, **kwargs):
         """Since Publishing a token requires 2 posts, we need to return our
@@ -487,7 +487,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     mock_post.side_effect = post
 
     # Publish fails
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     # Disable our side effect
     mock_post.side_effect = None
@@ -499,14 +499,14 @@ def test_plugin_sns_aws_topic_handling(mock_post):
 
     # Assign ourselves a new function
     mock_post.return_value = robj
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     # Handle case where we fails get a bad response
     robj = mock.Mock()
     robj.text = ""
     robj.status_code = requests.codes.bad_request
     mock_post.return_value = robj
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     # Handle case where we get a valid response and TopicARN
     robj = mock.Mock()
@@ -514,7 +514,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     robj.status_code = requests.codes.ok
     mock_post.return_value = robj
     # We would have failed to make Post
-    assert a.notify(title="", body="test") is True
+    assert bool(a.notify(title="", body="test")) is True
 
 
 @mock.patch("requests.post")
@@ -537,7 +537,7 @@ def test_plugin_sns_session_token(mock_post):
     assert obj.aws_session_token == TEST_SESSION_TOKEN
 
     # send() must include X-Amz-Security-Token in request headers
-    assert obj.notify(body="test") is True
+    assert bool(obj.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" in call_kwargs["headers"]
     assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
@@ -575,7 +575,7 @@ def test_plugin_sns_session_token(mock_post):
         targets="+18001234567",
     )
     assert obj_plain.aws_session_token is None
-    assert obj_plain.notify(body="test") is True
+    assert bool(obj_plain.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" not in call_kwargs["headers"]
 
@@ -602,7 +602,7 @@ def test_plugin_sns_session_token_via_kwarg(mock_post):
 
     obj = NotifySNS(**results)
     assert obj.aws_session_token == TEST_SESSION_TOKEN
-    assert obj.notify(body="test") is True
+    assert bool(obj.notify(body="test")) is True
 
     call_kwargs = mock_post.call_args[1]
     assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
@@ -670,7 +670,7 @@ def test_plugin_sns_detailed_failures(mocker):
     mock_post.return_value = mock_response_bad
 
     # Should return False because the SMS failed
-    assert obj_sms.notify(body="test") is False
+    assert bool(obj_sms.notify(body="test")) is False
 
     # --- Scenario 2: Topic Creation Failure ---
     obj_topic = NotifySNS(
@@ -684,7 +684,7 @@ def test_plugin_sns_detailed_failures(mocker):
     mock_post.return_value = mock_response_bad
 
     # Should return False because CreateTopic failed
-    assert obj_topic.notify(body="test") is False
+    assert bool(obj_topic.notify(body="test")) is False
 
     # --- Scenario 3: CreateTopic Success, but Publish Failure ---
     # We need a side_effect to return 200 for the first call (CreateTopic)
@@ -712,7 +712,7 @@ def test_plugin_sns_detailed_failures(mocker):
     mock_post.side_effect = side_effect
 
     # Should return False because Publish failed
-    assert obj_topic.notify(body="test") is False
+    assert bool(obj_topic.notify(body="test")) is False
 
 
 def test_plugin_sns_mode_detection():
@@ -841,14 +841,14 @@ def test_plugin_sns_topic_mode_send(mock_post):
     assert obj.mode == SNSMode.TOPIC
 
     # With title: Subject must appear in the Publish payload
-    assert obj.notify(title="My Title", body="My Body") is True
+    assert bool(obj.notify(title="My Title", body="My Body")) is True
     # urlencode() uses %20 for spaces
     assert "Subject=My%20Title" in publish_data["data"]
     assert "Message=My%20Body" in publish_data["data"]
 
     # With no title: Subject must not appear in the Publish payload
     publish_data.clear()
-    assert obj.notify(title="", body="My Body") is True
+    assert bool(obj.notify(title="", body="My Body")) is True
     assert "Subject=" not in publish_data.get("data", "")
 
 
@@ -872,7 +872,7 @@ def test_plugin_sns_topic_mode_phone_forced(mock_post):
     assert obj.mode == SNSMode.TOPIC
 
     # With a title: it must be prepended to the body in the SMS payload
-    assert obj.notify(title="My Title", body="My Body") is True
+    assert bool(obj.notify(title="My Title", body="My Body")) is True
     data = mock_post.call_args[1]["data"]
     # urlencode() uses %20 for spaces; \r\n becomes %0D%0A
     assert "My%20Title" in data
@@ -880,7 +880,7 @@ def test_plugin_sns_topic_mode_phone_forced(mock_post):
 
     # With no title: body is sent as-is without modification
     mock_post.reset_mock()
-    assert obj.notify(title="", body="My Body") is True
+    assert bool(obj.notify(title="", body="My Body")) is True
     data = mock_post.call_args[1]["data"]
     assert "My%20Body" in data
 

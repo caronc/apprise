@@ -337,7 +337,7 @@ def test_plugin_fcm_legacy_default(mock_post_legacy):
     )
 
     # Send our notification
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -376,7 +376,7 @@ def test_plugin_fcm_legacy_priorities(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -409,7 +409,7 @@ def test_plugin_fcm_legacy_no_colors(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -439,7 +439,7 @@ def test_plugin_fcm_legacy_colors(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -474,7 +474,7 @@ def test_plugin_fcm_oauth_default(mock_post):
     )
 
     # send our notification
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # Test our call count
     assert mock_post.call_count == 3
@@ -504,7 +504,7 @@ def test_plugin_fcm_oauth_invalid_project_id(mock_post):
     )
 
     # we'll fail as a result
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -523,7 +523,7 @@ def test_plugin_fcm_oauth_keyfile_error(mock_post):
 
     with mock.patch("builtins.open", side_effect=OSError):
         # we'll fail as a result
-        assert obj.notify("test") is False
+        assert bool(obj.notify("test")) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -546,7 +546,7 @@ def test_plugin_fcm_oauth_data_parameters(mock_post):
     assert mock_post.call_count == 0
 
     # send our notification
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # Test our call count
     assert mock_post.call_count == 3
@@ -615,7 +615,7 @@ def test_plugin_fcm_oauth_priorities(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -653,7 +653,7 @@ def test_plugin_fcm_oauth_no_colors(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -688,7 +688,7 @@ def test_plugin_fcm_oauth_colors(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post.call_count == 2

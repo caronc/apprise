@@ -103,11 +103,11 @@ def test_plugin_mqtt_default_success(mqtt_client_mock):
     assert r"client_id=" not in obj.url()
 
     # Verify notification succeeds.
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
     # Send another notification (a new connection isn't attempted to be
     # established as one already exists)
-    assert obj.notify(body="foo=bar") is True
+    assert bool(obj.notify(body="foo=bar")) is True
 
     # Verify the right calls have been made to the MQTT client object.
     assert mqtt_client_mock.mock_calls == [
@@ -138,7 +138,7 @@ def test_plugin_mqtt_multiple_topics_success(mqtt_client_mock):
     assert obj.url().startswith("mqtt://localhost")
     assert r"my/topic" in obj.url()
     assert r"my/other/topic" in obj.url()
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
     # Verify the right calls have been made to the MQTT client object.
     assert mqtt_client_mock.mock_calls == [
@@ -171,7 +171,7 @@ def test_plugin_mqtt_to_success(mqtt_client_mock):
     assert re.search(r"version=v3.1.1", obj.url())
 
     # Verify notification succeeds.
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
 
 def test_plugin_mqtt_valid_settings_success(mqtt_client_mock):
@@ -222,7 +222,7 @@ def test_plugin_mqtt_no_topic_failure(mqtt_client_mock):
         "mqtt://localhost", suppress_exceptions=False
     )
     assert isinstance(obj, NotifyMQTT)
-    assert obj.notify(body="test=test") is False
+    assert bool(obj.notify(body="test=test")) is False
 
 
 def test_plugin_mqtt_tls_connect_success(mqtt_client_mock):
@@ -233,7 +233,7 @@ def test_plugin_mqtt_tls_connect_success(mqtt_client_mock):
     )
     assert isinstance(obj, NotifyMQTT)
     assert obj.url().startswith("mqtts://user:pass@localhost/my/topic")
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
     # Verify the right calls have been made to the MQTT client object.
     assert mqtt_client_mock.mock_calls == [
@@ -270,13 +270,14 @@ def test_plugin_mqtt_tls_no_certificates_failure(mqtt_client_mock, mocker):
     logger: Mock = mocker.spy(obj, "logger")
 
     # Verify notification fails w/o CA certificates.
-    assert obj.notify(body="test=test") is False
+    assert bool(obj.notify(body="test=test")) is False
 
     assert logger.mock_calls == [
         call.error(
             "MQTT secure communication can not be verified, "
             "CA certificates file missing"
-        )
+        ),
+        call.debug("%s send() completed in %.2fs.", ANY, ANY),
     ]
 
 
@@ -289,7 +290,7 @@ def test_plugin_mqtt_tls_no_verify_success(mqtt_client_mock):
         suppress_exceptions=False,
     )
     assert isinstance(obj, NotifyMQTT)
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
     # Chain validation must be disabled via CERT_NONE (not just hostname
     # skipping via tls_insecure_set) so self-signed certs are accepted.
@@ -320,7 +321,7 @@ def test_plugin_mqtt_tls_no_verify_no_ca_success(mqtt_client_mock, mocker):
     assert isinstance(obj, NotifyMQTT)
 
     # Should succeed without CA certificates when verify is disabled
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
     assert (
         call.tls_set(
@@ -349,7 +350,7 @@ def test_plugin_mqtt_session_client_id_success(mqtt_client_mock):
     assert r"client_id=apprise" in obj.url()
     assert r"session=yes" in obj.url()
     assert r"retain=no" in obj.url()
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
 
 def test_plugin_mqtt_retain(mqtt_client_mock):
@@ -364,7 +365,7 @@ def test_plugin_mqtt_retain(mqtt_client_mock):
     assert r"my/topic" in obj.url()
     assert r"session=no" in obj.url()
     assert r"retain=yes" in obj.url()
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True
 
 
 def test_plugin_mqtt_connect_failure(mqtt_client_mock):
@@ -378,7 +379,7 @@ def test_plugin_mqtt_connect_failure(mqtt_client_mock):
     )
 
     # Verify notification fails.
-    assert obj.notify(body="test=test") is False
+    assert bool(obj.notify(body="test=test")) is False
 
 
 def test_plugin_mqtt_reconnect_failure(mqtt_client_mock):
@@ -393,7 +394,7 @@ def test_plugin_mqtt_reconnect_failure(mqtt_client_mock):
     )
 
     # Verify notification fails.
-    assert obj.notify(body="test=test") is False
+    assert bool(obj.notify(body="test=test")) is False
 
 
 def test_plugin_mqtt_publish_failure(mqtt_client_mock):
@@ -408,7 +409,7 @@ def test_plugin_mqtt_publish_failure(mqtt_client_mock):
     )
 
     # Verify notification fails.
-    assert obj.notify(body="test=test") is False
+    assert bool(obj.notify(body="test=test")) is False
 
 
 def test_plugin_mqtt_exception_failure(mqtt_client_mock):
@@ -431,7 +432,7 @@ def test_plugin_mqtt_exception_failure(mqtt_client_mock):
         ValueError,
     ):
         mqtt_client_mock.connect.side_effect = side_effect
-        assert obj.notify(body="test=test") is False
+        assert bool(obj.notify(body="test=test")) is False
 
 
 def test_plugin_mqtt_not_published_failure(mqtt_client_mock, mocker):
@@ -451,7 +452,7 @@ def test_plugin_mqtt_not_published_failure(mqtt_client_mock, mocker):
     )
 
     # Verify notification fails.
-    assert obj.notify(body="test=test") is False
+    assert bool(obj.notify(body="test=test")) is False
 
 
 def test_plugin_mqtt_not_published_recovery_success(mqtt_client_mock):
@@ -468,4 +469,4 @@ def test_plugin_mqtt_not_published_recovery_success(mqtt_client_mock):
     )
 
     # Verify notification fails.
-    assert obj.notify(body="test=test") is True
+    assert bool(obj.notify(body="test=test")) is True

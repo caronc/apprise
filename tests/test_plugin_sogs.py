@@ -357,12 +357,12 @@ def test_plugin_sogs_send_success(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Hello SOGS") is True
+    assert bool(obj.notify(body="Hello SOGS")) is True
     assert mock_post.call_count == 1
 
     # HTTP 200 (OK) is also treated as success.
     mock_post.return_value = _mk_resp(requests.codes.ok)
-    assert obj.notify(body="Hello SOGS") is True
+    assert bool(obj.notify(body="Hello SOGS")) is True
 
 
 @pytest.mark.skipif(
@@ -387,7 +387,7 @@ def test_plugin_sogs_send_multi_room(mock_post):
         targets=[ROOM, ROOM2],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Multi") is True
+    assert bool(obj.notify(body="Multi")) is True
     assert mock_post.call_count == 2
 
 
@@ -416,7 +416,7 @@ def test_plugin_sogs_send_partial_failure(mock_post):
         targets=[ROOM, ROOM2],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Partial") is False
+    assert bool(obj.notify(body="Partial")) is False
     assert mock_post.call_count == 2
 
 
@@ -451,7 +451,7 @@ def test_plugin_sogs_http_error(mock_post):
     ):
         mock_post.reset_mock()
         mock_post.return_value = _mk_resp(code)
-        assert obj.notify(body="Error") is False
+        assert bool(obj.notify(body="Error")) is False
 
 
 @pytest.mark.skipif(
@@ -469,7 +469,7 @@ def test_plugin_sogs_request_exception(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Error") is False
+    assert bool(obj.notify(body="Error")) is False
 
 
 @pytest.mark.skipif(
@@ -490,7 +490,7 @@ def test_plugin_sogs_http_insecure(mock_post):
 
     obj = Apprise()
     assert obj.add(f"session://{PUBLIC_KEY}:{SEED}@open.getsession.org/{ROOM}")
-    assert obj.notify(body="Plain HTTP") is True
+    assert bool(obj.notify(body="Plain HTTP")) is True
 
     # Confirm the request was sent to http:// not https://.
     url_called = mock_post.call_args[0][0]
@@ -559,7 +559,7 @@ def test_plugin_sogs_custom_port(mock_post):
         port=8443,
     )
     assert ":8443" in obj.url()
-    assert obj.notify(body="custom port") is True
+    assert bool(obj.notify(body="custom port")) is True
 
     url_called = mock_post.call_args[0][0]
     assert ":8443" in url_called
@@ -709,7 +709,7 @@ def test_plugin_sogs_auth_headers(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Auth test") is True
+    assert bool(obj.notify(body="Auth test")) is True
 
     call_kwargs = mock_post.call_args[1]
     headers = call_kwargs.get("headers", {})
@@ -761,7 +761,7 @@ def test_plugin_sogs_response_unparseable_json(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
 
 
 def test_plugin_sogs_build_session_message():
@@ -818,5 +818,5 @@ def test_plugin_sogs_apprise_integration(mock_post):
 
     app = Apprise()
     assert app.add(BASE_URL)
-    assert app.notify(title="Title", body="Body") is True
+    assert bool(app.notify(title="Title", body="Body")) is True
     assert mock_post.call_count == 1

@@ -248,7 +248,7 @@ def test_plugin_voipms_edge_cases(mock_get):
     assert isinstance(obj, NotifyVoipms)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
 
 @mock.patch("requests.get")
@@ -283,7 +283,7 @@ def test_plugin_voipms_non_success_status(mock_get):
     assert isinstance(obj, NotifyVoipms)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
     response.content = "{"
     assert obj.send("title", "body") is False
