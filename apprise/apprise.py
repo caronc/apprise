@@ -1491,13 +1491,25 @@ class Apprise:
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
 
+            # Resolve this server's actual per-call rendering target.
+            # Single-format servers always resolve to their one declared
+            # format. Multi-format servers may resolve differently per
+            # call depending on ?format= or this notify() call's
+            # body_format.
+            target_format = server.resolve_format(body_format)
+
             # First we need to generate a key we will use to determine if we
             # need to build our data out.  Entries without are merged with
-            # the body at this stage.
+            # the body at this stage. Keying off the resolved target
+            # keeps conversion caching about the actual rendered format,
+            # not the plugin's raw notify_format declaration. Two
+            # servers that both resolve to HTML still share one converted
+            # body even if one of them declared multiple supported
+            # formats.
             key = (
-                server.notify_format
+                target_format
                 if server.title_maxlen > 0
-                else f"_{server.notify_format}"
+                else f"_{target_format}"
             )
 
             if server.interpret_emojis:
@@ -1514,13 +1526,13 @@ class Apprise:
                 if conversion_title_map[key] and server.title_maxlen <= 0:
                     conversion_title_map[key] = convert_between(
                         body_format,
-                        server.notify_format,
+                        target_format,
                         content=conversion_title_map[key],
                     )
 
                 # Our body is always converted no matter what
                 conversion_body_map[key] = convert_between(
-                    body_format, server.notify_format, content=body
+                    body_format, target_format, content=body
                 )
 
                 if interpret_escapes:
@@ -1566,7 +1578,11 @@ class Apprise:
                 "title": conversion_title_map[key],
                 "notify_type": notify_type,
                 "attach": attach,
-                "body_format": body_format,
+                # Pass the resolved target format; downstream notify()
+                # calls use it directly without resolving again.
+                # Preserve whether the caller declared a source format.
+                "body_format": target_format,
+                "format_controlled": body_format is not None,
             }
             yield (server, kwargs)
 
