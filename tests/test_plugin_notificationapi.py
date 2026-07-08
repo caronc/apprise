@@ -468,6 +468,62 @@ apprise_url_tests = (
             "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
         },
     ),
+    #
+    # Pingram (rebranded NotificationAPI) API key support. These issue a
+    # single Bearer-style key (pingram_sk_.../pingram_pk_...) instead of a
+    # client_id/client_secret pair, so no client_secret is present in the
+    # path and a recipient id is no longer required.
+    #
+    (
+        "napi://pingram_sk_abc123/+15551235553",
+        {
+            # A bare phone number with no id is valid in Pingram mode
+            "instance": NotifyNotificationAPI,
+            "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "napi://pingram_sk_abc123/user@example.ca",
+        {
+            # A bare email with no id is valid in Pingram mode
+            "instance": NotifyNotificationAPI,
+            "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "napi://pingram_sk_abc123/+15551235553/+15551235554",
+        {
+            # Multiple id-less phone numbers are treated as separate
+            # targets instead of raising an ambiguous "too many" error
+            "instance": NotifyNotificationAPI,
+            "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "napi://pingram_sk_abc123/id/+15551235553",
+        {
+            # An id can still optionally be supplied in Pingram mode
+            "instance": NotifyNotificationAPI,
+            "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "napi://pingram_pk_abc123/+15551235553",
+        {
+            # Public key prefix is recognized too
+            "instance": NotifyNotificationAPI,
+            "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "napi://pingram_sk_abc123/",
+        {
+            # No targets specified
+            "instance": NotifyNotificationAPI,
+            "requests_response_text": NOTIFICATIONAPI_GOOD_RESPONSE,
+            "notify_response": False,
+        },
+    ),
 )
 
 
@@ -815,6 +871,98 @@ def test_plugin_napi_message_payloads(mock_post):
     }
 
 
+@mock.patch("requests.post")
+def test_plugin_napi_pingram_payloads(mock_post):
+    """NotifyNotificationAPI() Testing Pingram API Key Payloads."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = NOTIFICATIONAPI_GOOD_RESPONSE
+
+    # Assign our mock object our return value
+    mock_post.return_value = okay_response
+
+    # A Pingram API key has no paired client_secret
+    api_key = "pingram_sk_abc123"
+    targets = "+15551234567"
+
+    obj = Apprise.instantiate(f"napi://{api_key}/{targets}")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert obj.client_secret is None
+    assert isinstance(obj.url(), str)
+
+    # No calls made yet
+    assert mock_post.call_count == 0
+
+    # Send our notification
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+
+    # delivery of message; Pingram uses a flat /send endpoint (no
+    # client_id in the path like the legacy NotificationAPI one)
+    assert mock_post.call_count == 1
+    assert mock_post.call_args_list[0][0][0] == "https://api.pingram.io/send"
+
+    # No "id" present since none was supplied in the URL
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload == {
+        "type": "apprise",
+        "to": {
+            "number": "+15551234567",
+        },
+        "sms": {"message": "title\nbody"},
+    }
+
+    headers = mock_post.call_args_list[0][1]["headers"]
+    assert headers == {
+        "User-Agent": "Apprise",
+        "Content-Type": "application/json",
+        "Authorization": f"Bearer {api_key}",
+    }
+
+    mock_post.reset_mock()
+
+    # Multiple id-less phone targets each become their own recipient
+    # instead of raising an ambiguous "too many phone no's" error
+    obj = Apprise.instantiate(f"napi://{api_key}/+15551234567/+15551234568")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert len(obj.targets) == 2
+
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+    assert mock_post.call_count == 2
+
+    mock_post.reset_mock()
+
+    # Region support carries over to the Pingram endpoints too
+    obj = Apprise.instantiate(f"napi://{api_key}/+15551234567?region=eu")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0] == "https://api.eu.pingram.io/send"
+    )
+
+    mock_post.reset_mock()
+
+    # An id can still optionally be supplied alongside the number
+    obj = Apprise.instantiate(f"napi://{api_key}/myid/+15551234567")
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert (
+        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        is True
+    )
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["to"] == {"id": "myid", "number": "+15551234567"}
+
+
 def test_plugin_napi_edge_cases():
     """
     NotifyNotificationAPI() Edge Cases
@@ -827,4 +975,12 @@ def test_plugin_napi_edge_cases():
     # Tests case where tokens is == None
     obj = NotifyNotificationAPI(client_id, client_secret, targets=targets)
     assert isinstance(obj, NotifyNotificationAPI)
+    assert isinstance(obj.url(), str)
+
+    # A Pingram API key requires no client_secret
+    obj = NotifyNotificationAPI(
+        "pingram_sk_my_key", None, targets=["+15551239876"]
+    )
+    assert isinstance(obj, NotifyNotificationAPI)
+    assert obj.client_secret is None
     assert isinstance(obj.url(), str)
