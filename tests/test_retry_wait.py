@@ -1050,13 +1050,15 @@ class TestExceptionHandling:
                     """Forward context cleanup to the wrapped executor."""
                     return self._real.__exit__(*exc)
 
-                def submit(self, fn, service, kwargs):
+                def submit(self, fn, service, kwargs, call_deadline):
                     """Return a failed future for ``s1`` and submit others."""
                     if service is s1:
                         fut = cf.Future()
                         fut.set_exception(RuntimeError("future boom"))
                         return fut
-                    return self._real.submit(fn, service, kwargs)
+                    return self._real.submit(
+                        fn, service, kwargs, call_deadline
+                    )
 
                 def shutdown(self, *args, **kwargs):
                     """Forward shutdown behavior to the wrapped executor."""
@@ -1077,6 +1079,64 @@ class TestExceptionHandling:
                 apprise_module._shared_executor._real.shutdown(wait=True)
 
             # One future raised -> overall result is False
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_sequential_future_exception_caught(self):
+        """An exception escaping a sequential dispatch's thread future is
+        caught by the outer safety net, same as the thread-pool path."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0.05)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            import concurrent.futures as cf
+
+            real_executor_cls = cf.ThreadPoolExecutor
+
+            class _PatchedExecutor:
+                """Delegate to a real executor while always failing."""
+
+                def __init__(self, *args, **kwargs):
+                    """Create the wrapped executor with the same args."""
+                    self._real = real_executor_cls(*args, **kwargs)
+
+                def __enter__(self):
+                    """Return this wrapper when entering the context."""
+                    return self
+
+                def __exit__(self, *exc):
+                    """Forward context cleanup to the wrapped executor."""
+                    return self._real.__exit__(*exc)
+
+                def submit(self, fn, service, kwargs, call_deadline):
+                    """Return a future that raises instead of running."""
+                    fut = cf.Future()
+                    fut.set_exception(RuntimeError("future boom"))
+                    return fut
+
+                def shutdown(self, *args, **kwargs):
+                    """Forward shutdown behavior to the wrapped executor."""
+                    return self._real.shutdown(*args, **kwargs)
+
+            # Reset the shared executor so the patched class is used here.
+            import apprise.apprise as apprise_module
+
+            with (
+                mock.patch("apprise.apprise._shared_executor", None),
+                mock.patch(
+                    "apprise.apprise.cf.ThreadPoolExecutor", _PatchedExecutor
+                ),
+            ):
+                result = a.notify(body="test")
+
+                # Clean up the real executor wrapped by _PatchedExecutor.
+                apprise_module._shared_executor._real.shutdown(wait=True)
+
             assert bool(result) is False
         finally:
             N_MGR.unload_modules()
@@ -3144,6 +3204,46 @@ class TestServiceTimeout:
         assert started_later == started_at_return
         assert finished_later == started_at_return
 
+    def test_sequential_queued_future_cancelled(self):
+        """A sequential service whose future never got a chance to start
+        (still queued behind other work in a size-limited pool) is
+        cancelled outright at the deadline -- nothing is left running,
+        so it is never tracked as abandoned."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            import concurrent.futures as cf
+
+            import apprise.apprise as apprise_module
+
+            release = threading.Event()
+
+            with mock.patch(
+                "apprise.apprise._shared_executor",
+                cf.ThreadPoolExecutor(max_workers=1),
+            ):
+                executor = apprise_module._shared_executor
+                # Occupy the pool's only worker so the service's own
+                # future stays queued until its deadline has passed.
+                blocker = executor.submit(release.wait, 2.0)
+
+                asset = AppriseAsset(async_mode=False, service_timeout=0.05)
+                service = _SlowNotify(host="x", asset=asset, delay=0.0)
+                a = Apprise(asset=asset)
+                a.add(service)
+
+                result = a.notify(body="test")
+
+                release.set()
+                blocker.result(timeout=2.0)
+                executor.shutdown(wait=True)
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.TIMEOUT
+        # Still queued when abandoned -- it never actually got to run.
+        assert service.calls == 0
+
     def test_threadpool_shared_across_notify_calls(self):
         """Separate notify() calls reuse the shared executor."""
         N_MGR["slow"] = _SlowNotify
@@ -3290,8 +3390,8 @@ class _SlowFailNotify(NotifyBase):
 class TestDeadlineExpiresDuringAttempt:
     """Deadline-expired retries should stop without sleeping first."""
 
-    def test_sequential_skips_wait_when_deadline_already_passed(self):
-        """Sequential retry skips its wait once the deadline has passed."""
+    def test_sequential_abandons_service_that_blocks_past_deadline(self):
+        """A blocking sync service is abandoned once its deadline passes."""
         N_MGR["slowfail"] = _SlowFailNotify
 
         try:
@@ -3302,18 +3402,15 @@ class TestDeadlineExpiresDuringAttempt:
             a = Apprise(asset=asset)
             a.add(service)
 
-            real_sleep = time.sleep
-            with mock.patch(
-                "apprise.apprise.time.sleep", side_effect=real_sleep
-            ) as mock_sleep:
-                result = a.notify(body="test")
+            t0 = time.monotonic()
+            result = a.notify(body="test")
+            wall = time.monotonic() - t0
 
-            # The first attempt failed before the retry deadline check.
-            # A confirmed failure takes priority over the later TIMEOUT.
-            assert result.status == AppriseResultStatus.FAILURE
-            # The retry loop stopped before sleeping or calling send() again.
+            # The result returns before the full blocking send() delay.
+            assert wall < 0.2
+            assert result.status == AppriseResultStatus.TIMEOUT
+            # The first attempt started, but no retry was launched.
             assert service.calls == 1
-            mock_sleep.assert_called_once_with(pytest.approx(0.2))
         finally:
             N_MGR.unload_modules()
 
