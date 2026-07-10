@@ -34,7 +34,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.apprise_api import NotifyAppriseAPI
 
 logging.disable(logging.CRITICAL)
@@ -314,11 +314,11 @@ def test_notify_apprise_api_payload_check(mock_post):
 
     details = mock_post.call_args_list[0]
     assert details[0][0] == "http://localhost/notify/mytoken1"
+    # Undeclared input relays no format; the downstream server chooses.
     assert details[1]["data"] == {
         "title": "title",
         "body": "body",
         "type": "info",
-        "format": "text",
     }
     assert "X-Apprise-ID" in details[1]["headers"]
     assert details[1]["headers"].get("User-Agent") == "Apprise"
@@ -351,16 +351,71 @@ def test_notify_apprise_api_payload_check(mock_post):
 
     # Remove our attachment to make the next assert easier
     del data["attachments"]
+    # Undeclared input relays no format.
     assert data == {
         "title": "title",
         "body": "body",
         "type": "info",
-        "format": "text",
     }
     assert "X-Apprise-ID" in details[1]["headers"]
     assert details[1]["headers"].get("User-Agent") == "Apprise"
     assert details[1]["headers"].get("Accept") == "application/json"
     assert details[1]["headers"].get("X-Apprise-Recursion-Count") == "1"
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_relays_declared_format(mock_post):
+    """NotifyAppriseAPI() relays only caller-declared formats."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/")
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # A declared source is relayed onward as-is
+    assert (
+        bool(
+            obj.notify(
+                body="# hi",
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+
+    details = mock_post.call_args_list[0]
+    assert details[1]["data"] == {
+        "title": "title",
+        "body": "# hi",
+        "type": "info",
+        "format": "markdown",
+    }
+
+    mock_post.reset_mock()
+
+    # Undeclared input relays no format, despite the internal default.
+    assert (
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+            )
+        )
+        is True
+    )
+
+    details = mock_post.call_args_list[0]
+    assert details[1]["data"] == {
+        "title": "title",
+        "body": "body",
+        "type": "info",
+    }
 
 
 @mock.patch("requests.post")

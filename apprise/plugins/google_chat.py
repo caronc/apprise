@@ -376,22 +376,31 @@ class NotifyGoogleChat(NotifyBase):
         return "\n".join(result)
 
     def _build_send_calls(
-        self, body=None, title=None, body_format=None, **kwargs
+        self,
+        body=None,
+        title=None,
+        body_format=None,
+        format_controlled=None,
+        **kwargs,
     ):
-        """Convert HTML-derived CommonMark before splitting for Chat.
+        """Convert declared CommonMark to Google Chat syntax before split.
 
-        Direct Markdown and other source formats pass through unchanged.
+        Undeclared sources are left untouched, even if the resolved
+        target is Markdown.
         """
 
-        # Only adapt HTML-derived Markdown; pass other formats through.
-        if not (
-            self.notify_format == NotifyFormat.MARKDOWN
-            and body_format == NotifyFormat.HTML
-        ):
+        # Direct plugin calls bypass Apprise's format resolution.
+        if format_controlled is None:
+            format_controlled = body_format is not None
+            body_format = self.resolve_format(body_format)
+
+        # Only adapt a declared source; pass an undeclared one through.
+        if not (body_format == NotifyFormat.MARKDOWN and format_controlled):
             yield from super()._build_send_calls(
                 body=body,
                 title=title,
                 body_format=body_format,
+                format_controlled=format_controlled,
                 **kwargs,
             )
             return
@@ -400,16 +409,15 @@ class NotifyGoogleChat(NotifyBase):
         if self.title_maxlen <= 0 and title:
             body, title = commonmark_prepend_title(body, title)
 
-        # Apply the Chat dialect adapter to convert CommonMark constructs
-        # (backslash escapes, links, emphasis) into Chat-native syntax.
+        # Translate CommonMark constructs to Chat-native syntax.
         body = self._commonmark_to_google_chat(body)
 
-        # Tell the base splitter that the body is now Chat Markdown so that
-        # the split heuristics protect link and code-span constructs.
+        # Split as Markdown so links and code spans stay intact.
         yield from super()._build_send_calls(
             body=body,
             title=title,
             body_format=NotifyFormat.MARKDOWN,
+            format_controlled=format_controlled,
             **kwargs,
         )
 

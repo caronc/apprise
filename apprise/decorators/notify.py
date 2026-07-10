@@ -28,7 +28,7 @@
 from .base import CustomNotifyPlugin
 
 
-def notify(on, name=None):
+def notify(on, name=None, body_format=None):
     """
     @notify decorator allows you to map functions you've defined to be loaded
     as a regular notify by Apprise.  You must identify a protocol that
@@ -42,6 +42,13 @@ def notify(on, name=None):
     is what calling functions via the API will receive.
 
         @notify(on="foobar", name="My Foobar Process")
+        def your_action(body, title, notify_type, meta, *args, **kwargs):
+            ...
+
+    You can optionally declare the prepared body format(s) your function
+    accepts. Without this, all formats pass through unconverted.
+
+        @notify(on="foobar", body_format=NotifyFormat.MARKDOWN)
         def your_action(body, title, notify_type, meta, *args, **kwargs):
             ...
 
@@ -59,8 +66,9 @@ def notify(on, name=None):
       body:        The message body associated with the notification
       title:       The message title associated with the notification
       notify_type: The message type (info, success, warning, and failure)
-      body_format: The format of the incoming notification body. This is
-                   either text, html, or markdown.
+      body_format: The resolved format delivered to your function.
+      format_controlled:
+                   True if the caller declared a source format.
       meta:        Combines the URL arguments specified on the `on` call
                    with the ones loaded from a users configuration. This
                    is a dictionary that presents itself like this:
@@ -94,8 +102,9 @@ def notify(on, name=None):
 
       attach:      An array AppriseAttachment objects (if any were provided)
 
-      body_format: Defaults to the expected format output; By default this
-                   will be TEXT unless over-ridden in the Apprise URL
+      @notify body_format:
+                   Declares the prepared body format(s) your wrapper
+                   accepts; omitted means pass-through for every format.
 
 
     If you don't intend on using all of the parameters, your @notify() call
@@ -118,7 +127,7 @@ def notify(on, name=None):
 
         # Generate
         CustomNotifyPlugin.instantiate_plugin(
-            url=on, send_func=func, name=name
+            url=on, send_func=func, name=name, body_format=body_format
         )
 
         return func

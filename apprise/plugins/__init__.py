@@ -321,6 +321,25 @@ def details(plugin):
                 # We only nee to remove this key
                 del template_args[key]["_exists_if"]
 
+    # notify_format may be one NotifyFormat or a tuple of supported
+    # formats. `values` stays the broad three-item set because ?format=
+    # remains a standard Apprise URL parameter on every plugin. The
+    # additive `supported` field tells newer consumers which destination
+    # formats this plugin actually renders natively, with index 0 as the
+    # default. Keeping older `values`/`default` consumers working avoids
+    # making the service metadata update a breaking change.
+    # sort=False preserves declaration order because parse_list() sorts
+    # alphabetically by default, which would change the fallback format.
+    if "format" in template_args:
+        formats = parse_list(plugin.notify_format, sort=False)
+        template_args["format"]["supported"] = formats
+        if len(formats) > 1:
+            # A single-format plugin's default was already correctly
+            # resolved above via _lookup_default; only a multi-format
+            # plugin needs correcting here (that mechanism would
+            # otherwise leave the raw tuple in place).
+            template_args["format"]["default"] = formats[0]
+
     return {
         "templates": templates,
         "tokens": template_tokens,
