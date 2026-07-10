@@ -85,6 +85,10 @@ class NotifyDiscord(NotifyBase):
     # Discord Webhook
     notify_url = "https://discord.com/api/webhooks"
 
+    # Discord supports plain text and Markdown-style embeds. Plain text
+    # remains the default.
+    notify_format = (NotifyFormat.TEXT, NotifyFormat.MARKDOWN)
+
     # Support attachments
     attachment_support = True
 
@@ -504,9 +508,12 @@ class NotifyDiscord(NotifyBase):
         title: str = "",
         notify_type: NotifyType = NotifyType.INFO,
         attach: list[AttachBase] | None = None,
+        body_format: NotifyFormat | None = None,
         **kwargs: Any,
     ) -> bool:
         """Perform Discord Notification."""
+
+        # body_format arrives as the resolved render target.
 
         payload: dict[str, Any] = {
             "tts": self.tts,
@@ -537,11 +544,9 @@ class NotifyDiscord(NotifyBase):
         # Template mode bypasses ping detection and embed construction;
         # the template defines the complete payload content.
         if not self.template:
-            # Ping handling rules:
-            # - If ping= is set, it is an additive if in MARKDOWN mode
-            #   otherwise it is explicit for TEXT/HTML formats.
-            # - Otherwise, ping detection only happens in MARKDOWN mode
-            if self.notify_format == NotifyFormat.MARKDOWN:
+            # Markdown can detect pings; ping= is additive there and
+            # explicit for text/HTML.
+            if body_format == NotifyFormat.MARKDOWN:
                 if self.ping:
                     payload.update(
                         self.ping_payload(body, " ".join(self.ping))
@@ -549,7 +554,7 @@ class NotifyDiscord(NotifyBase):
                 else:
                     payload.update(self.ping_payload(body))
 
-            # TEXT/HTML: no body parsing, ping= is exclusive
+            # TEXT destination: no body parsing, ping= is exclusive.
             elif self.ping:
                 payload.update(self.ping_payload(" ".join(self.ping)))
 
@@ -576,7 +581,7 @@ class NotifyDiscord(NotifyBase):
             # Track extra embed fields (if used)
             fields: list[dict[str, str]] = []
 
-            if self.notify_format == NotifyFormat.MARKDOWN:
+            if body_format == NotifyFormat.MARKDOWN:
                 # Use embeds for payload
                 payload["embeds"] = [
                     {
