@@ -189,8 +189,8 @@ class NotifySlack(NotifyBase):
     # If it is more than this, then it is not accepted
     max_slack_template_size = 35000
 
-    # Default Notification Format
-    notify_format = NotifyFormat.MARKDOWN
+    # Slack supports mrkdwn and plain text. mrkdwn remains the default.
+    notify_format = (NotifyFormat.MARKDOWN, NotifyFormat.TEXT)
 
     # Bot's do not have default channels to notify; so #general
     # becomes the default channel in BOT mode
@@ -863,38 +863,6 @@ class NotifySlack(NotifyBase):
         # Return the validated attachment content dict
         return content
 
-    def _build_send_calls(
-        self, body=None, title=None, body_format=None, **kwargs
-    ):
-        """Split HTML-derived CommonMark before Slack conversion.
-
-        Markdown-aware splitting protects links; ``send()`` then converts each
-        chunk to independently valid ``mrkdwn``.
-        """
-
-        # Only adapt HTML-derived Markdown; pass other formats through.
-        if not (
-            self.notify_format == NotifyFormat.MARKDOWN
-            and body_format == NotifyFormat.HTML
-        ):
-            yield from super()._build_send_calls(
-                body=body,
-                title=title,
-                body_format=body_format,
-                **kwargs,
-            )
-            return
-
-        # Split as Markdown to protect links, then restore HTML provenance.
-        # Each resulting chunk is converted independently by ``send()``.
-        for chunk in super()._build_send_calls(
-            body=body,
-            title=title,
-            body_format=NotifyFormat.MARKDOWN,
-            **kwargs,
-        ):
-            yield {**chunk, "body_format": NotifyFormat.HTML}
-
     def send(
         self,
         body,
@@ -902,6 +870,7 @@ class NotifySlack(NotifyBase):
         notify_type=NotifyType.INFO,
         attach=None,
         body_format=None,
+        format_controlled=None,
         **kwargs,
     ):
         """Perform Slack Notification."""
@@ -909,10 +878,9 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        if self.notify_format == NotifyFormat.MARKDOWN and (
-            body_format == NotifyFormat.HTML
-        ):
-            # Adapt converted CommonMark; direct mrkdwn input is unchanged.
+        if body_format == NotifyFormat.MARKDOWN and format_controlled:
+            # Declared Markdown targets are treated as CommonMark first,
+            # then translated to Slack's mrkdwn dialect.
             body = self._commonmark_to_slack(body)
 
         #
@@ -966,7 +934,7 @@ class NotifySlack(NotifyBase):
                 # Our slack format
                 slack_format = (
                     "mrkdwn"
-                    if self.notify_format == NotifyFormat.MARKDOWN
+                    if body_format == NotifyFormat.MARKDOWN
                     else "plain_text"
                 )
 
@@ -1036,10 +1004,10 @@ class NotifySlack(NotifyBase):
             #
             # Legacy API Formatting
             #
-            # Apply legacy formatting only to direct Slack mrkdwn input.
-            if self.notify_format == NotifyFormat.MARKDOWN and (
-                body_format != NotifyFormat.HTML
-            ):
+            # _commonmark_to_slack() above already entity-escapes &, <,
+            # and > for any declared source; only escape here for an
+            # undeclared source, to avoid double-escaping.
+            if body_format == NotifyFormat.MARKDOWN and not format_controlled:
                 body = self._re_formatting_rules.sub(  # pragma: no branch
                     lambda x: self._re_formatting_map[x.group()],
                     body,
@@ -1097,7 +1065,7 @@ class NotifySlack(NotifyBase):
             # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
             payload = {
                 # Use Markdown language
-                "mrkdwn": self.notify_format == NotifyFormat.MARKDOWN,
+                "mrkdwn": body_format == NotifyFormat.MARKDOWN,
                 "attachments": [
                     {
                         "title": title,

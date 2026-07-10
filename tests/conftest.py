@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import gc
+import logging
 import mimetypes
 import os
 import sys
@@ -37,6 +38,7 @@ from apprise import (
     ConfigurationManager,
     NotificationManager,
 )
+from apprise.logger import logger as apprise_logger
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "helpers"))
 
@@ -69,6 +71,44 @@ def no_throttling_everywhere(session_mocker):
 
     for plugin in N_MGR.plugins():
         session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
+
+
+@pytest.fixture(scope="function", autouse=True)
+def _reset_apprise_logger_state():
+    """Force the shared 'apprise' logger back to a known-good baseline
+    before every test, then restore whatever was there beforehand.
+
+    apprise/cli.py's main() sets this same shared logger's level from
+    -v/-q verbosity (and appends a StreamHandler) on every invocation
+    and never undoes it -- harmless for a real one-shot CLI process,
+    but toxic for an in-process test suite: any test that runs main()
+    via CliRunner (e.g. tests/test_apprise_cli.py) with default
+    verbosity leaves the logger at ERROR, silently swallowing any
+    .warning()/.info() calls that later, unrelated tests rely on
+    capturing. Reset to NOTSET (deferring to the root logger's default
+    WARNING) before each test so no test's ambient logger state
+    depends on what a previous test/file happened to leave behind.
+
+    main() also mirrors this same mutation onto the stdlib 'asyncio'
+    logger (copies every 'apprise' handler onto it and matches its
+    level), so that logger needs the exact same save/reset treatment
+    or it leaks state across tests the same way.
+    """
+    asyncio_logger = logging.getLogger("asyncio")
+
+    original_level = apprise_logger.level
+    original_handlers = list(apprise_logger.handlers)
+    original_asyncio_level = asyncio_logger.level
+    original_asyncio_handlers = list(asyncio_logger.handlers)
+
+    apprise_logger.setLevel(logging.NOTSET)
+    asyncio_logger.setLevel(logging.NOTSET)
+    asyncio_logger.handlers[:] = []
+    yield
+    apprise_logger.setLevel(original_level)
+    apprise_logger.handlers[:] = original_handlers
+    asyncio_logger.setLevel(original_asyncio_level)
+    asyncio_logger.handlers[:] = original_asyncio_handlers
 
 
 @pytest.fixture(scope="function", autouse=True)

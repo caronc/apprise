@@ -29,7 +29,7 @@ import re
 
 import requests
 
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from .base import NotifyBase
@@ -96,6 +96,14 @@ class NotifyForm(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Pass-through Notify Formats. The endpoint receives whichever body
+    # representation Apprise resolved for this send.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128

@@ -176,8 +176,10 @@ def test_plugin_google_chat_general(mock_post):
     obj = Apprise.instantiate(f"gchat://{workspace}/{key}/{token}")
     assert isinstance(obj, NotifyGoogleChat)
     assert (
-        obj.notify(
-            body="test body", title="title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body="test body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is True
     )
@@ -202,8 +204,10 @@ def test_plugin_google_chat_general(mock_post):
     obj = Apprise.instantiate(f"gchat://{workspace}/{key}/{token}/{threadkey}")
     assert isinstance(obj, NotifyGoogleChat)
     assert (
-        obj.notify(
-            body="test body", title="title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body="test body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is True
     )
@@ -244,9 +248,12 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     mock_post.return_value.text = "{}"
 
     def notify(body):
+        """Send one HTML body through the configured Google Chat plugin."""
         aobj = Apprise()
         assert aobj.add("gchat://workspace/key/token")
-        assert aobj.notify(body=body, body_format=NotifyFormat.HTML) is True
+        assert (
+            bool(aobj.notify(body=body, body_format=NotifyFormat.HTML)) is True
+        )
         payload = loads(mock_post.call_args_list[-1][1]["data"])
         mock_post.reset_mock()
         return payload["text"]
@@ -292,7 +299,7 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # Direct Google Chat Markdown remains unchanged.
     aobj = Apprise()
     assert aobj.add("gchat://workspace/key/token")
-    assert aobj.notify(body="*already* chat-bound markdown") is True
+    assert bool(aobj.notify(body="*already* chat-bound markdown")) is True
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*already* chat-bound markdown"
     mock_post.reset_mock()
@@ -344,10 +351,12 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     aobj = Apprise()
     assert aobj.add("gchat://workspace/key/token")
     assert (
-        aobj.notify(
-            body="<b>hello</b>",
-            title="My Title",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b>",
+                title="My Title",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -359,13 +368,41 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # and list characters (html_to_markdown converts "  - " to "-").
     # The heading is skipped and the title field is cleared regardless.
     assert (
-        aobj.notify(
-            body="<b>hello</b>",
-            title="  - ",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b>",
+                title="  - ",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*hello*"
+
+
+@mock.patch("requests.post")
+def test_plugin_google_chat_declared_markdown_gets_dialect_completion(
+    mock_post,
+):
+    """Declared Markdown gets Google Chat dialect completion."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+
+    aobj = Apprise()
+    assert aobj.add("gchat://workspace/key/token")
+
+    assert (
+        bool(
+            aobj.notify(
+                body="*bold* [click here](<https://example.com/x>)",
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "_bold_ <https://example.com/x|click here>"
     mock_post.reset_mock()

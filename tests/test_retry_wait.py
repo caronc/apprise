@@ -27,11 +27,13 @@
 
 import asyncio
 import logging
+import threading
+import time
 from unittest import mock
 
 import pytest
 
-from apprise import Apprise, AppriseAsset
+from apprise import Apprise, AppriseAsset, AppriseResultStatus
 from apprise.common import (
     APPRISE_MAX_SERVICE_RETRY,
     APPRISE_MAX_SERVICE_WAIT,
@@ -235,53 +237,56 @@ class TestSequentialSleep:
     """time.sleep is called between retries in sequential dispatch."""
 
     def test_sleep_called_on_retry(self):
+        """A failed attempt waits once before its successful retry."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
             a = Apprise(asset=asset)
 
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=2,
                 wait=0.3,
             )
-            a.add(server)
+            a.add(service)
 
             with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
                 result = a.notify(body="test")
 
-            assert result is True
+            assert bool(result) is True
             # Failed once -> sleep once before retry
             mock_sleep.assert_called_once_with(pytest.approx(0.3))
         finally:
             N_MGR.unload_modules()
 
     def test_sleep_not_called_when_wait_zero(self):
+        """A zero wait setting retries without calling sleep."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
             a = Apprise(asset=asset)
 
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=2,
                 wait=0.0,
             )
-            a.add(server)
+            a.add(service)
 
             with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
                 result = a.notify(body="test")
 
-            assert result is True
+            assert bool(result) is True
             mock_sleep.assert_not_called()
         finally:
             N_MGR.unload_modules()
 
     def test_sleep_not_called_when_no_retry(self):
+        """A service without retries never sleeps after failure."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -290,19 +295,19 @@ class TestSequentialSleep:
 
             # retry=0 means only one attempt; with wait=1.0 sleep should
             # never fire since there are no retries
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=0,
                 wait=1.0,
                 fail_times=0,  # always succeeds
             )
-            a.add(server)
+            a.add(service)
 
             with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
                 result = a.notify(body="test")
 
-            assert result is True
+            assert bool(result) is True
             mock_sleep.assert_not_called()
         finally:
             N_MGR.unload_modules()
@@ -315,19 +320,19 @@ class TestSequentialSleep:
             asset = AppriseAsset(async_mode=False)
             a = Apprise(asset=asset)
 
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=3,
                 wait=0.5,
                 fail_times=2,
             )
-            a.add(server)
+            a.add(service)
 
             with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
                 result = a.notify(body="test")
 
-            assert result is True
+            assert bool(result) is True
             assert mock_sleep.call_count == 2
             for call in mock_sleep.call_args_list:
                 assert call == mock.call(pytest.approx(0.5))
@@ -339,15 +344,16 @@ class TestThreadPoolSleep:
     """time.sleep is called between retries in threadpool dispatch."""
 
     def test_sleep_called_in_threadpool(self):
+        """A thread-pool retry honors the configured wait interval."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
-            # async_mode=True -> uses threadpool when > 1 server;
-            # but with a single server it falls through to sequential.
-            # Use two servers so we actually hit the threadpool path.
+            # async_mode=True -> uses threadpool when > 1 service;
+            # but with a single service it falls through to sequential.
+            # Use two services so we actually hit the threadpool path.
             asset = AppriseAsset(async_mode=True)
 
-            # Two separate server objects so a threadpool is used
+            # Two separate service objects so a threadpool is used
             s1 = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
@@ -370,13 +376,14 @@ class TestThreadPoolSleep:
             with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
                 result = a.notify(body="test")
 
-            assert result is True
+            assert bool(result) is True
             # s1 fails once -> sleep once
             mock_sleep.assert_called_once_with(pytest.approx(0.2))
         finally:
             N_MGR.unload_modules()
 
     def test_sleep_not_called_in_threadpool_when_wait_zero(self):
+        """A zero thread-pool wait retries without calling sleep."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -404,7 +411,7 @@ class TestThreadPoolSleep:
             with mock.patch("apprise.apprise.time.sleep") as mock_sleep:
                 result = a.notify(body="test")
 
-            assert result is True
+            assert bool(result) is True
             mock_sleep.assert_not_called()
         finally:
             N_MGR.unload_modules()
@@ -414,12 +421,13 @@ class TestAsyncioSleep:
     """asyncio.sleep is called between retries in async dispatch."""
 
     def test_asyncio_sleep_called(self):
+        """An asynchronous retry honors the configured wait interval."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset()
 
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=2,
@@ -428,9 +436,10 @@ class TestAsyncioSleep:
             )
 
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             async def run():
+                """Dispatch while capturing the asynchronous retry sleep."""
                 with mock.patch("apprise.apprise.asyncio.sleep") as mock_sleep:
                     mock_sleep.return_value = None
                     result = await a.async_notify(body="test")
@@ -438,18 +447,19 @@ class TestAsyncioSleep:
 
             result, mock_sleep = asyncio.run(run())
 
-            assert result is True
+            assert bool(result) is True
             mock_sleep.assert_called_once_with(pytest.approx(0.4))
         finally:
             N_MGR.unload_modules()
 
     def test_asyncio_sleep_not_called_when_wait_zero(self):
+        """A zero asynchronous wait retries without calling sleep."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset()
 
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=2,
@@ -458,9 +468,10 @@ class TestAsyncioSleep:
             )
 
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             async def run():
+                """Dispatch while checking that asyncio.sleep is unused."""
                 with mock.patch("apprise.apprise.asyncio.sleep") as mock_sleep:
                     mock_sleep.return_value = None
                     result = await a.async_notify(body="test")
@@ -468,7 +479,7 @@ class TestAsyncioSleep:
 
             result, mock_sleep = asyncio.run(run())
 
-            assert result is True
+            assert bool(result) is True
             mock_sleep.assert_not_called()
         finally:
             N_MGR.unload_modules()
@@ -506,16 +517,59 @@ class _RaisingNotify(NotifyBase):
     body_maxlen = 32768
 
     def url(self, *args, **kwargs):
+        """Return the stable URL for this raising test plugin."""
         return "raise://localhost"
 
     def send(self, **kwargs):
+        """Raise a delivery error for synchronous exception tests."""
         raise RuntimeError("plugin exploded")
 
     async def async_notify(self, **kwargs):
+        """Raise a delivery error for asynchronous exception tests."""
         raise RuntimeError("plugin exploded async")
 
     @staticmethod
     def parse_url(url):
+        """Parse the synthetic URL without requiring a real host."""
+        return NotifyBase.parse_url(url, verify_host=False)
+
+
+class _SlowNotify(NotifyBase):
+    """Plugin whose send() blocks for a configurable delay before
+    reporting success -- used to exercise AppriseAsset._service_timeout
+    and notify(timeout=...) enforcement with real wall-clock timing."""
+
+    app_id = "SlowApp"
+    app_desc = "Test"
+    notify_url = "slow://"
+    title_maxlen = 250
+    body_maxlen = 32768
+
+    def __init__(self, delay=0.0, **kwargs):
+        """Initialize the test plugin with its artificial delay."""
+        super().__init__(**kwargs)
+        self._delay = delay
+        self.calls = 0
+
+    def url(self, *args, **kwargs):
+        """Return a stable URL containing the test host."""
+        return "slow://{}".format(self.host)
+
+    def send(self, **kwargs):
+        """Simulate blocking delivery before reporting success."""
+        self.calls += 1
+        time.sleep(self._delay)
+        return True
+
+    async def async_notify(self, **kwargs):
+        """Simulate asynchronous delivery before reporting success."""
+        self.calls += 1
+        await asyncio.sleep(self._delay)
+        return True
+
+    @staticmethod
+    def parse_url(url):
+        """Parse the synthetic URL without requiring a real host."""
         return NotifyBase.parse_url(url, verify_host=False)
 
 
@@ -544,12 +598,12 @@ class TestAppriseTag:
         assert repr(AppriseTag("simple")) == "AppriseTag('simple')"
 
     def test_repr_with_priority(self):
-        """repr() includes priority= when non-zero (tag.py lines 121-122)."""
+        """repr() includes priority= when the priority is non-zero."""
         r = repr(AppriseTag("test", priority=3))
         assert "priority=3" in r
 
     def test_repr_with_retry(self):
-        """repr() includes retry= when set (tag.py lines 123-125)."""
+        """repr() includes retry= when a retry count is set."""
         r = repr(AppriseTag("test", retry=5))
         assert "retry=5" in r
 
@@ -584,13 +638,12 @@ class TestAppriseTag:
     # --- __lt__ ---
 
     def test_lt_two_apprisetags(self):
-        """__lt__ sorts by tag name (tag.py lines 159-160)."""
+        """__lt__ sorts two AppriseTag objects by tag name."""
         assert AppriseTag("abc") < AppriseTag("def")
         assert not (AppriseTag("def") < AppriseTag("abc"))
 
     def test_lt_with_string(self):
-        """AppriseTag can be less-than compared to a plain string
-        (tag.py lines 161-162)."""
+        """AppriseTag can be ordered against a plain string."""
         assert AppriseTag("abc") < "def"
         assert not (AppriseTag("zzz") < "aaa")
 
@@ -627,13 +680,13 @@ class TestStaticHelpers:
     covering the nested-list branches not reached by integration tests."""
 
     def test_extract_retry_from_nested_list(self):
-        """Retry suffix found inside a nested list entry (apprise.py:413)."""
+        """A retry suffix is found inside a nested list entry."""
         # tag = [["alerts:3"]] -- outer list, inner list as AND group
         result = Apprise._extract_filter_retry([["alerts:3"]])
         assert result == 3
 
     def test_extract_retry_from_list_of_strings(self):
-        """Retry suffix found in a plain-string list entry (apprise.py:417)."""
+        """A retry suffix is found in a plain-string list entry."""
         result = Apprise._extract_filter_retry(["alerts:3"])
         assert result == 3
 
@@ -651,29 +704,29 @@ class TestStaticHelpers:
         result = Apprise._extract_filter_retry([["alerts"]])
         assert result is None
 
-    def test_server_priority_for_tag_name_absent(self):
-        """Returns 0 when no tag in server.tags matches tag_name."""
-        server = mock.Mock()
-        server.tags = {AppriseTag("alerts", priority=3, has_priority=True)}
-        assert Apprise._server_priority_for_tag_name(server, "backup") == 0
+    def test_service_priority_for_tag_name_absent(self):
+        """Returns 0 when no tag in service.tags matches tag_name."""
+        service = mock.Mock()
+        service.tags = {AppriseTag("alerts", priority=3, has_priority=True)}
+        assert Apprise._server_priority_for_tag_name(service, "backup") == 0
 
-    def test_match_service_retry_plain_string_tag_backward_compat(self):
-        """Plain string in server.tags matched by a priority-prefixed token.
+    def test_match_service_retry_plain_string_tag(self):
+        """Plain string in service.tags matched by a priority-prefixed token.
 
-        Covers the else/str fallback inside _match_service_retry when stag is
-        not an AppriseTag instance and the name matches (lines 497-498).
+        Covers the string fallback when a matching service tag is not an
+        AppriseTag instance.
         """
-        server = mock.Mock()
-        server.tags = {"alerts"}  # plain string, not an AppriseTag
+        service = mock.Mock()
+        service.tags = {"alerts"}  # plain string, not an AppriseTag
         # "3:alerts:2" carries priority=3 + retry=2; plain "alerts" matches
-        result = Apprise._match_service_retry(server, "3:alerts:2")
+        result = Apprise._match_service_retry(service, "3:alerts:2")
         assert result == 2
 
     def test_match_service_retry_plain_string_tag_no_match(self):
-        """Plain string in server.tags that does not match returns None."""
-        server = mock.Mock()
-        server.tags = {"other"}  # plain string -- does not match "alerts"
-        result = Apprise._match_service_retry(server, "3:alerts:2")
+        """Plain string in service.tags that does not match returns None."""
+        service = mock.Mock()
+        service.tags = {"other"}  # plain string -- does not match "alerts"
+        result = Apprise._match_service_retry(service, "3:alerts:2")
         assert result is None
 
     def test_extract_retry_none_for_match_all(self):
@@ -681,37 +734,42 @@ class TestStaticHelpers:
         assert Apprise._extract_filter_retry(None) is None
 
     def test_has_priority_nested_list(self):
-        """Priority prefix found inside a nested list (apprise.py:438)."""
+        """A priority prefix is found inside a nested list."""
         assert Apprise._filter_has_explicit_priority([["2:alerts"]])
 
     def test_has_priority_list_of_strings(self):
-        """Priority prefix found in a plain-string list (apprise.py:441)."""
+        """A priority prefix is found in a plain-string list."""
         assert Apprise._filter_has_explicit_priority(["2:alerts"])
 
     def test_has_priority_false_no_prefix(self):
+        """Filters without a prefix do not carry explicit priority."""
         assert not Apprise._filter_has_explicit_priority("alerts")
         assert not Apprise._filter_has_explicit_priority(["alerts"])
 
     def test_has_priority_false_for_match_all(self):
+        """Match-all filters do not carry an explicit priority."""
         assert not Apprise._filter_has_explicit_priority(MATCH_ALL_TAG)
         assert not Apprise._filter_has_explicit_priority(None)
 
     # _notify_parallel_threadpool / _notify_parallel_asyncio zero-length -----
 
-    def test_threadpool_zero_servers_returns_true(self):
-        """Empty server list returns True immediately (apprise.py:940)."""
-        assert Apprise._notify_parallel_threadpool() is True
+    def test_threadpool_zero_services_returns_true(self):
+        """Empty service list returns (True, []) immediately."""
+        ok, results = Apprise._notify_parallel_threadpool()
+        assert ok is True
+        assert results == []
 
-    def test_asyncio_zero_servers_returns_true(self):
-        """Empty server list returns True immediately (apprise.py:1031)."""
-        result = asyncio.run(Apprise._notify_parallel_asyncio())
-        assert result is True
+    def test_asyncio_zero_services_returns_true(self):
+        """Empty service list returns (True, []) immediately."""
+        ok, results = asyncio.run(Apprise._notify_parallel_asyncio())
+        assert ok is True
+        assert results == []
 
 
 class TestDispatchIntegration:
     """End-to-end notify() tests covering the new priority/retry dispatch."""
 
-    def _make_server(self, host, priority, asset, fail_times=0):
+    def _make_service(self, host, priority, asset, fail_times=0):
         """Create a _FailThenSucceedNotify with an AppriseTag in its tags."""
         s = _FailThenSucceedNotify(
             host=host, asset=asset, fail_times=fail_times
@@ -719,47 +777,46 @@ class TestDispatchIntegration:
         # Assign a fresh instance-level set rather than mutating the
         # class-level tags set.  URLBase.tags is a class attribute (set());
         # .add() would mutate it and share state across all instances.
-        # Assignment shadows the class attribute and gives each server its
+        # Assignment shadows the class attribute and gives each service its
         # own set with the correct priority stored in the AppriseTag object.
         s.tags = {AppriseTag("alerts", priority=priority, has_priority=True)}
         return s
 
     def test_filter_retry_override_via_tag_suffix(self):
-        """tag suffix ':N' overrides per-server retry for this call only."""
+        """tag suffix ':N' overrides per-service retry for this call only."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
-            # Server's own retry=0; tag suffix of 2 should allow 3 attempts
-            server = _FailThenSucceedNotify(
+            # Service's own retry=0; tag suffix of 2 should allow 3 attempts
+            service = _FailThenSucceedNotify(
                 host="localhost",
                 asset=asset,
                 retry=0,
                 wait=0.0,
                 fail_times=2,
             )
-            # Tag the server so the filter "failpass:2" (tag name "failpass",
+            # Tag the service so the filter "failpass:2" (tag name "failpass",
             # retry override 2) can match it via is_exclusive_match.
-            server.tags = {"failpass"}
+            service.tags = {"failpass"}
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             # "failpass:2" -> retry override of 2 (3 total attempts)
             result = a.notify(body="test", tag="failpass:2")
-            assert result is True
-            assert server._calls == 3
+            assert bool(result) is True
+            assert service._calls == 3
         finally:
             N_MGR.unload_modules()
 
     def test_exclusive_priority_dispatch_skips_other_priorities(self):
-        """Explicit priority prefix dispatches only matching-priority services.
-        Covers apprise.py lines 556-572."""
+        """An explicit priority dispatches only matching-priority services."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
-            s1 = self._make_server("host1", priority=1, asset=asset)
-            s2 = self._make_server("host2", priority=2, asset=asset)
+            s1 = self._make_service("host1", priority=1, asset=asset)
+            s2 = self._make_service("host2", priority=2, asset=asset)
 
             a = Apprise(asset=asset)
             a.add(s1)
@@ -767,27 +824,27 @@ class TestDispatchIntegration:
 
             # "2:alerts" -> only priority-2 service fires
             result = a.notify(body="test", tag="2:alerts")
-            assert result is True
+            assert bool(result) is True
             assert s1._calls == 0  # priority-1, not contacted
             assert s2._calls == 1  # priority-2, contacted once
         finally:
             N_MGR.unload_modules()
 
-    def test_escalation_stops_when_highest_priority_group_succeeds(self):
+    def test_escalation_stops_after_priority_success(self):
         """If priority-1 group all succeed, priority-2 group is not run."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
-            s1 = self._make_server("host1", priority=1, asset=asset)
-            s2 = self._make_server("host2", priority=2, asset=asset)
+            s1 = self._make_service("host1", priority=1, asset=asset)
+            s2 = self._make_service("host2", priority=2, asset=asset)
 
             a = Apprise(asset=asset)
             a.add(s1)
             a.add(s2)
 
             result = a.notify(body="test", tag="alerts")
-            assert result is True
+            assert bool(result) is True
             assert s1._calls == 1  # priority 1 succeeded
             assert s2._calls == 0  # never escalated to
         finally:
@@ -800,46 +857,47 @@ class TestDispatchIntegration:
         try:
             asset = AppriseAsset(async_mode=False)
             # priority-1 always fails
-            s1 = self._make_server(
+            s1 = self._make_service(
                 "host1", priority=1, asset=asset, fail_times=999
             )
             # priority-2 always succeeds
-            s2 = self._make_server("host2", priority=2, asset=asset)
+            s2 = self._make_service("host2", priority=2, asset=asset)
 
             a = Apprise(asset=asset)
             a.add(s1)
             a.add(s2)
 
             result = a.notify(body="test", tag="alerts")
-            assert result is True
+            assert bool(result) is True
             assert s1._calls == 1
             assert s2._calls == 1
         finally:
             N_MGR.unload_modules()
 
     def test_async_notify_filter_retry_and_explicit_priority(self):
-        """async_notify() covers the same escalation/exclusive paths.
-        Covers apprise.py lines 630, 637-649."""
+        """async_notify() supports escalation and exclusive priority paths."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset()
-            s1 = self._make_server("host1", priority=1, asset=asset)
-            s2 = self._make_server("host2", priority=2, asset=asset)
+            s1 = self._make_service("host1", priority=1, asset=asset)
+            s2 = self._make_service("host2", priority=2, asset=asset)
 
             a = Apprise(asset=asset)
             a.add(s1)
             a.add(s2)
 
             async def run_exclusive():
+                """Dispatch only the explicitly selected priority."""
                 return await a.async_notify(body="test", tag="2:alerts")
 
             async def run_escalation():
+                """Dispatch the first successful escalation group."""
                 return await a.async_notify(body="test", tag="alerts")
 
             # exclusive: only priority-2 fires
             r = asyncio.run(run_exclusive())
-            assert r is True
+            assert bool(r) is True
             assert s1._calls == 0
             assert s2._calls == 1
 
@@ -847,7 +905,7 @@ class TestDispatchIntegration:
             s1._calls = 0
             s2._calls = 0
             r = asyncio.run(run_escalation())
-            assert r is True
+            assert bool(r) is True
             assert s1._calls == 1
             assert s2._calls == 0
         finally:
@@ -886,10 +944,11 @@ class TestDispatchIntegration:
             a.add(s2)
             a.add(s3)
 
-            # Exclusive "0:family": plain "family" and "0:family" servers are
-            # both priority 0 and must both fire; priority-1 server is skipped.
+            # Exclusive "0:family": plain "family" and "0:family" services
+            # are both priority 0 and must both fire; priority-1 service is
+            # skipped.
             result = a.notify(body="test", tag="0:family")
-            assert result is True
+            assert bool(result) is True
             assert s1._calls == 1  # plain "family" matched by "0:family"
             assert s2._calls == 1  # explicit "0:family" matched
             assert s3._calls == 0  # priority 1, not priority 0 -- skipped
@@ -898,7 +957,7 @@ class TestDispatchIntegration:
             # group.  Both succeed, so s3 (priority 1) is never escalated to.
             s1._calls = s2._calls = s3._calls = 0
             result = a.notify(body="test", tag="family")
-            assert result is True
+            assert bool(result) is True
             assert s1._calls == 1  # priority-0 group
             assert s2._calls == 1  # same priority-0 group
             assert s3._calls == 0  # not escalated to
@@ -915,12 +974,12 @@ class TestExceptionHandling:
 
         try:
             asset = AppriseAsset(async_mode=False)
-            server = _RaisingNotify(host="localhost", asset=asset, retry=0)
+            service = _RaisingNotify(host="localhost", asset=asset, retry=0)
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             result = a.notify(body="test")
-            assert result is False
+            assert bool(result) is False
         finally:
             N_MGR.unload_modules()
 
@@ -932,7 +991,7 @@ class TestExceptionHandling:
         try:
             asset = AppriseAsset(async_mode=False)
             # Use a plugin that raises on the first attempt then succeeds
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost", asset=asset, retry=1, wait=0.0, fail_times=1
             )
             # Patch notify to raise on the first call then succeed
@@ -944,24 +1003,23 @@ class TestExceptionHandling:
                     raise RuntimeError("transient error")
                 return True
 
-            server.send = raising_then_ok
+            service.send = raising_then_ok
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             result = a.notify(body="test")
-            assert result is True
+            assert bool(result) is True
             assert call_count[0] == 2
         finally:
             N_MGR.unload_modules()
 
     def test_threadpool_future_exception_caught(self):
-        """An exception escaping a thread future is caught gracefully.
-        Covers apprise.py lines 1004-1006."""
+        """An exception escaping a thread future is caught gracefully."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=True)
-            # Need 2 servers to trigger the thread pool path
+            # Need 2 services to trigger the thread pool path
             s1 = _FailThenSucceedNotify(
                 host="host1", asset=asset, fail_times=0
             )
@@ -972,47 +1030,133 @@ class TestExceptionHandling:
             a.add(s1)
             a.add(s2)
 
-            # Patch as_completed so one future raises when .result() is called
+            # Inject one failed future so the outer safety net is exercised.
             import concurrent.futures as cf
 
-            real_as_completed = cf.as_completed
+            real_executor_cls = cf.ThreadPoolExecutor
 
-            def patched_as_completed(futures, **kw):
-                for i, f in enumerate(real_as_completed(futures, **kw)):
-                    if i == 0:
-                        # Wrap first future to raise on .result()
-                        m = mock.Mock()
-                        m.result.side_effect = RuntimeError("future boom")
-                        yield m
-                    else:
-                        yield f
+            class _PatchedExecutor:
+                """Delegate to a real executor while injecting one failure."""
 
-            with mock.patch(
-                "apprise.apprise.cf.as_completed", patched_as_completed
+                def __init__(self, *args, **kwargs):
+                    """Create the wrapped executor with the same arguments."""
+                    self._real = real_executor_cls(*args, **kwargs)
+
+                def __enter__(self):
+                    """Return this wrapper when entering the context."""
+                    return self
+
+                def __exit__(self, *exc):
+                    """Forward context cleanup to the wrapped executor."""
+                    return self._real.__exit__(*exc)
+
+                def submit(self, fn, service, kwargs, call_deadline):
+                    """Return a failed future for ``s1`` and submit others."""
+                    if service is s1:
+                        fut = cf.Future()
+                        fut.set_exception(RuntimeError("future boom"))
+                        return fut
+                    return self._real.submit(
+                        fn, service, kwargs, call_deadline
+                    )
+
+                def shutdown(self, *args, **kwargs):
+                    """Forward shutdown behavior to the wrapped executor."""
+                    return self._real.shutdown(*args, **kwargs)
+
+            # Reset the shared executor so the patched class is used here.
+            import apprise.apprise as apprise_module
+
+            with (
+                mock.patch("apprise.apprise._shared_executor", None),
+                mock.patch(
+                    "apprise.apprise.cf.ThreadPoolExecutor", _PatchedExecutor
+                ),
             ):
                 result = a.notify(body="test")
 
+                # Clean up the real executor wrapped by _PatchedExecutor.
+                apprise_module._shared_executor._real.shutdown(wait=True)
+
             # One future raised -> overall result is False
-            assert result is False
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_sequential_future_exception_caught(self):
+        """An exception escaping a sequential dispatch's thread future is
+        caught by the outer safety net, same as the thread-pool path."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0.05)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            import concurrent.futures as cf
+
+            real_executor_cls = cf.ThreadPoolExecutor
+
+            class _PatchedExecutor:
+                """Delegate to a real executor while always failing."""
+
+                def __init__(self, *args, **kwargs):
+                    """Create the wrapped executor with the same args."""
+                    self._real = real_executor_cls(*args, **kwargs)
+
+                def __enter__(self):
+                    """Return this wrapper when entering the context."""
+                    return self
+
+                def __exit__(self, *exc):
+                    """Forward context cleanup to the wrapped executor."""
+                    return self._real.__exit__(*exc)
+
+                def submit(self, fn, service, kwargs, call_deadline):
+                    """Return a future that raises instead of running."""
+                    fut = cf.Future()
+                    fut.set_exception(RuntimeError("future boom"))
+                    return fut
+
+                def shutdown(self, *args, **kwargs):
+                    """Forward shutdown behavior to the wrapped executor."""
+                    return self._real.shutdown(*args, **kwargs)
+
+            # Reset the shared executor so the patched class is used here.
+            import apprise.apprise as apprise_module
+
+            with (
+                mock.patch("apprise.apprise._shared_executor", None),
+                mock.patch(
+                    "apprise.apprise.cf.ThreadPoolExecutor", _PatchedExecutor
+                ),
+            ):
+                result = a.notify(body="test")
+
+                # Clean up the real executor wrapped by _PatchedExecutor.
+                apprise_module._shared_executor._real.shutdown(wait=True)
+
+            assert bool(result) is False
         finally:
             N_MGR.unload_modules()
 
     def test_asyncio_exception_in_do_call_treated_as_failure(self):
-        """An exception inside do_call's retry loop is caught and the
-        service is marked as failed (covers the new try/except in do_call)."""
+        """An exception inside do_call marks the service as failed."""
         N_MGR["raise"] = _RaisingNotify
 
         try:
             asset = AppriseAsset()
-            server = _RaisingNotify(host="localhost", asset=asset, retry=0)
+            service = _RaisingNotify(host="localhost", asset=asset, retry=0)
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             async def run():
+                """Execute async notification with the patched gather."""
                 return await a.async_notify(body="test")
 
             result = asyncio.run(run())
-            assert result is False
+            assert bool(result) is False
         finally:
             N_MGR.unload_modules()
 
@@ -1023,27 +1167,29 @@ class TestExceptionHandling:
 
         try:
             asset = AppriseAsset()
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost", asset=asset, fail_times=0
             )
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             # Mock asyncio.gather to return an escaped exception object.
             # Close any unawaited coroutines passed to the mock to avoid
             # "coroutine was never awaited" RuntimeWarnings.
             async def fake_gather(*args, **kw):
+                """Return an escaped error while closing input coroutines."""
                 for arg in args:
                     if asyncio.iscoroutine(arg):
                         arg.close()
                 return [RuntimeError("escaped")]
 
             async def run():
+                """Dispatch while gather returns an escaped exception."""
                 with mock.patch("apprise.apprise.asyncio.gather", fake_gather):
                     return await a.async_notify(body="test")
 
             result = asyncio.run(run())
-            assert result is False
+            assert bool(result) is False
         finally:
             N_MGR.unload_modules()
 
@@ -1053,24 +1199,128 @@ class TestExceptionHandling:
 
         try:
             asset = AppriseAsset()
-            server = _FailThenSucceedNotify(
+            service = _FailThenSucceedNotify(
                 host="localhost", asset=asset, fail_times=0
             )
             a = Apprise(asset=asset)
-            a.add(server)
+            a.add(service)
 
             async def fake_gather(*args, **kw):
+                """Return a validation error as a gathered result."""
                 for arg in args:
                     if asyncio.iscoroutine(arg):
                         arg.close()
                 return [TypeError("validation")]
 
             async def run():
+                """Dispatch while gather returns a validation error."""
                 with mock.patch("apprise.apprise.asyncio.gather", fake_gather):
                     return await a.async_notify(body="test")
 
             result = asyncio.run(run())
-            assert result is False
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_sequential_raise_does_not_block_other_services(self):
+        """A raising service is marked failed but every other service in
+        the same sequential batch is still attempted and reported."""
+        N_MGR["raise"] = _RaisingNotify
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            bad = _RaisingNotify(host="bad", asset=asset)
+            good1 = _FailThenSucceedNotify(
+                host="good1", asset=asset, fail_times=0
+            )
+            good2 = _FailThenSucceedNotify(
+                host="good2", asset=asset, fail_times=0
+            )
+
+            a = Apprise(asset=asset)
+            a.add(good1)
+            a.add(bad)
+            a.add(good2)
+
+            result = a.notify(body="test")
+            assert bool(result) is False
+            assert len(result) == 3
+
+            # Order matches add() order: good1, bad, good2.
+            results = list(result)
+            assert bool(results[0]) is True
+            assert bool(results[1]) is False
+            assert bool(results[2]) is True
+            # good2 was still attempted despite bad raising before it
+            assert good2._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_threadpool_raise_does_not_block_other_services(self):
+        """Same guarantee as above, but across the thread-pool dispatch
+        path (async_mode=True, >1 service)."""
+        N_MGR["raise"] = _RaisingNotify
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            bad = _RaisingNotify(host="bad", asset=asset)
+            good1 = _FailThenSucceedNotify(
+                host="good1", asset=asset, fail_times=0
+            )
+            good2 = _FailThenSucceedNotify(
+                host="good2", asset=asset, fail_times=0
+            )
+
+            a = Apprise(asset=asset)
+            a.add(good1)
+            a.add(bad)
+            a.add(good2)
+
+            result = a.notify(body="test")
+            assert bool(result) is False
+            assert len(result) == 3
+
+            # Threadpool dispatch preserves original submission order.
+            results = list(result)
+            assert bool(results[0]) is True
+            assert bool(results[1]) is False
+            assert bool(results[2]) is True
+            assert good2._calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_asyncio_raise_does_not_block_other_services(self):
+        """Same guarantee as above, but across the asyncio dispatch path."""
+        N_MGR["raise"] = _RaisingNotify
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            bad = _RaisingNotify(host="bad", asset=asset)
+            good1 = _FailThenSucceedNotify(
+                host="good1", asset=asset, fail_times=0
+            )
+            good2 = _FailThenSucceedNotify(
+                host="good2", asset=asset, fail_times=0
+            )
+
+            a = Apprise(asset=asset)
+            a.add(good1)
+            a.add(bad)
+            a.add(good2)
+
+            result = asyncio.run(a.async_notify(body="test"))
+            assert bool(result) is False
+            assert len(result) == 3
+
+            # asyncio dispatch preserves original submission order too.
+            results = list(result)
+            assert bool(results[0]) is True
+            assert bool(results[1]) is False
+            assert bool(results[2]) is True
+            assert good2._calls == 1
         finally:
             N_MGR.unload_modules()
 
@@ -1084,65 +1334,65 @@ class TestConfigTagRetry:
     """
 
     def test_text_rejects_retry_suffix(self):
-        """'alerts:3=json://...' is rejected; no server loaded."""
-        servers, _ = ConfigBase.config_parse_text("alerts:3=json://localhost")
-        assert servers == []
+        """'alerts:3=json://...' is rejected; no service loaded."""
+        services, _ = ConfigBase.config_parse_text("alerts:3=json://localhost")
+        assert services == []
 
     def test_text_rejects_priority_and_retry_in_tag(self):
         """'1:alerts:3=json://...' is rejected (priority + retry suffix)."""
-        servers, _ = ConfigBase.config_parse_text(
+        services, _ = ConfigBase.config_parse_text(
             "1:alerts:3=json://localhost"
         )
-        assert servers == []
+        assert services == []
 
     def test_text_accepts_priority_tag_without_retry(self):
         """'1:alerts=json://...' loads normally (priority prefix, no retry)."""
-        servers, _ = ConfigBase.config_parse_text("1:alerts=json://localhost")
-        assert len(servers) == 1
+        services, _ = ConfigBase.config_parse_text("1:alerts=json://localhost")
+        assert len(services) == 1
 
     def test_text_accepts_plain_tag(self):
         """'alerts=json://...' loads normally (no prefix, no retry)."""
-        servers, _ = ConfigBase.config_parse_text("alerts=json://localhost")
-        assert len(servers) == 1
+        services, _ = ConfigBase.config_parse_text("alerts=json://localhost")
+        assert len(services) == 1
 
     def test_yaml_rejects_retry_suffix(self):
-        """YAML 'tag: alerts:3' is rejected; no server loaded."""
-        servers, _ = ConfigBase.config_parse_yaml(
+        """YAML 'tag: alerts:3' is rejected; no service loaded."""
+        services, _ = ConfigBase.config_parse_yaml(
             "version: 1\nurls:\n  - json://localhost:\n      tag: alerts:3\n"
         )
-        assert servers == []
+        assert services == []
 
     def test_yaml_rejects_priority_and_retry_in_tag(self):
         """YAML 'tag: 1:alerts:3' is rejected (priority + retry suffix)."""
-        servers, _ = ConfigBase.config_parse_yaml(
+        services, _ = ConfigBase.config_parse_yaml(
             "version: 1\nurls:\n  - json://localhost:\n      tag: 1:alerts:3\n"
         )
-        assert servers == []
+        assert services == []
 
     def test_yaml_accepts_priority_tag_without_retry(self):
         """YAML 'tag: 1:alerts' loads normally (priority prefix, no retry)."""
-        servers, _ = ConfigBase.config_parse_yaml(
+        services, _ = ConfigBase.config_parse_yaml(
             "version: 1\nurls:\n  - json://localhost:\n      tag: 1:alerts\n"
         )
-        assert len(servers) == 1
+        assert len(services) == 1
 
     def test_yaml_accepts_plain_tag(self):
         """YAML 'tag: alerts' loads normally (no prefix, no retry)."""
-        servers, _ = ConfigBase.config_parse_yaml(
+        services, _ = ConfigBase.config_parse_yaml(
             "version: 1\nurls:\n  - json://localhost:\n      tag: alerts\n"
         )
-        assert len(servers) == 1
+        assert len(services) == 1
 
     def test_text_valid_entry_after_rejected_one_still_loads(self):
         """A valid entry that follows a rejected one is still loaded."""
-        servers, _ = ConfigBase.config_parse_text(
+        services, _ = ConfigBase.config_parse_text(
             "alerts:3=json://localhost\nalerts=json://localhost\n"
         )
-        assert len(servers) == 1
+        assert len(services) == 1
 
     def test_yaml_valid_entry_after_rejected_one_still_loads(self):
         """A valid entry that follows a rejected one is still loaded."""
-        servers, _ = ConfigBase.config_parse_yaml(
+        services, _ = ConfigBase.config_parse_yaml(
             "version: 1\n"
             "urls:\n"
             "  - json://localhost:\n"
@@ -1150,7 +1400,7 @@ class TestConfigTagRetry:
             "  - json://localhost:\n"
             "      tag: alerts\n"
         )
-        assert len(servers) == 1
+        assert len(services) == 1
 
 
 class TestMultiTagDispatch:
@@ -1173,7 +1423,7 @@ class TestMultiTagDispatch:
         return s
 
     def _make_priority_tagged(self, tag_str, asset, fail_times=0):
-        """Create a server whose tag is an explicit-priority AppriseTag."""
+        """Create a service whose tag is an explicit-priority AppriseTag."""
         ft = AppriseTag.parse(tag_str)
         s = _FailThenSucceedNotify(
             host=str(ft), asset=asset, fail_times=fail_times
@@ -1210,7 +1460,7 @@ class TestMultiTagDispatch:
             a.add(s_mgmt)
 
             result = a.notify(body="test", tag="devops:3 management:2")
-            assert result is True
+            assert bool(result) is True
             # devops: 1 initial + 3 retries = 4 total calls
             assert s_devops._calls == 4
             # management: 1 initial + 2 retries = 3 total calls
@@ -1241,7 +1491,7 @@ class TestMultiTagDispatch:
             a.add(s_mgmt)
 
             result = a.notify(body="test", tag=["devops:3", "management:2"])
-            assert result is True
+            assert bool(result) is True
             assert s_devops._calls == 4
             assert s_mgmt._calls == 3
         finally:
@@ -1251,10 +1501,10 @@ class TestMultiTagDispatch:
     # Independent escalation chains
     # ------------------------------------------------------------------
 
-    def test_independent_chains_devops_success_does_not_skip_management(self):
+    def test_independent_chains_do_not_skip(self):
         """When devops chain succeeds at priority-1, management chain still
         dispatches independently -- its priority-1 failure escalates to its
-        priority-2 server."""
+        priority-2 service."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1296,7 +1546,7 @@ class TestMultiTagDispatch:
             a.add(s_mgmt_p2)
 
             result = a.notify(body="test", tag="devops management")
-            assert result is True
+            assert bool(result) is True
             assert s_devops_p1._calls == 1  # devops chain: p1 succeeded
             assert s_devops_p2._calls == 0  # never escalated to
             assert s_mgmt_p1._calls == 1  # management chain: p1 failed
@@ -1329,7 +1579,7 @@ class TestMultiTagDispatch:
             a.add(s_mgmt)
 
             result = a.notify(body="test", tag="devops management")
-            assert result is False
+            assert bool(result) is False
             assert s_devops._calls == 1  # its chain succeeded
             assert s_mgmt._calls == 1  # its chain failed
         finally:
@@ -1340,19 +1590,19 @@ class TestMultiTagDispatch:
     # ------------------------------------------------------------------
 
     def test_explicit_priority_list_per_service_retry(self):
-        """['1:tag:2', '2:tag:0'] flat-dispatches both servers; each gets its
-        own retry: the priority-1 server gets retry=2 and the priority-2
-        server gets retry=0 (one attempt only)."""
+        """['1:tag:2', '2:tag:0'] flat-dispatches both services; each gets its
+        own retry: the priority-1 service gets retry=2 and the priority-2
+        service gets retry=0 (one attempt only)."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
 
-            # priority-1 server: fails twice; needs retry=2 to succeed
+            # priority-1 service: fails twice; needs retry=2 to succeed
             s1 = _FailThenSucceedNotify(host="h1", asset=asset, fail_times=2)
             s1.tags = {AppriseTag("tag", priority=1, has_priority=True)}
 
-            # priority-2 server: always succeeds; retry=0 means one attempt
+            # priority-2 service: always succeeds; retry=0 means one attempt
             s2 = _FailThenSucceedNotify(host="h2", asset=asset, fail_times=0)
             s2.tags = {AppriseTag("tag", priority=2, has_priority=True)}
 
@@ -1361,7 +1611,7 @@ class TestMultiTagDispatch:
             a.add(s2)
 
             result = a.notify(body="test", tag=["1:tag:2", "2:tag:0"])
-            assert result is True
+            assert bool(result) is True
             # s1: 1 initial + 2 retries = 3 total
             assert s1._calls == 3
             # s2: retry=0 -> exactly 1 attempt
@@ -1399,7 +1649,7 @@ class TestMultiTagDispatch:
             # Simulate CLI: --tag "devops:3" --tag "management:2"
             cli_tag = [["devops:3"], ["management:2"]]
             result = a.notify(body="test", tag=cli_tag)
-            assert result is True
+            assert bool(result) is True
             assert s_devops._calls == 4  # 1 initial + 3 retries
             assert s_mgmt._calls == 3  # 1 initial + 2 retries
         finally:
@@ -1414,13 +1664,13 @@ class TestMultiTagDispatch:
         try:
             asset = AppriseAsset(async_mode=False)
 
-            # Server must carry BOTH tags to match
+            # Service must carry BOTH tags to match
             s_both = _FailThenSucceedNotify(
                 host="both", asset=asset, fail_times=0
             )
             s_both.tags = {"devops", "management"}
 
-            # Server with only "devops" -- must NOT match AND filter
+            # Service with only "devops" -- must NOT match AND filter
             s_devonly = _FailThenSucceedNotify(
                 host="devonly", asset=asset, fail_times=0
             )
@@ -1433,7 +1683,7 @@ class TestMultiTagDispatch:
             # Simulate CLI: --tag "devops, management" (AND condition)
             cli_tag = [["devops", "management"]]
             result = a.notify(body="test", tag=cli_tag)
-            assert result is True
+            assert bool(result) is True
             assert s_both._calls == 1  # has both tags -- matched
             assert s_devonly._calls == 0  # missing "management" -- not matched
         finally:
@@ -1444,24 +1694,26 @@ class TestMultiTagDispatch:
     # ------------------------------------------------------------------
 
     def test_and_filter_explicit_priority_no_match_returns_none(self):
-        """AND filter with an explicit priority that no server satisfies
-        returns None (no services dispatched at all)."""
+        """AND filter with an explicit priority that no service satisfies
+        returns AppriseResultStatus.NOMATCH (no services dispatched at
+        all)."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
             asset = AppriseAsset(async_mode=False)
 
-            # Server is tagged 'alerts' at priority 2
+            # Service is tagged 'alerts' at priority 2
             s = _FailThenSucceedNotify(host="s", asset=asset, fail_times=0)
             s.tags = {AppriseTag("alerts", priority=2, has_priority=True)}
 
             a = Apprise(asset=asset)
             a.add(s)
 
-            # Request 'alerts' at priority 1 AND 'backup' -- server has
+            # Request 'alerts' at priority 1 AND 'backup' -- service has
             # 'alerts' but at priority 2, not 1; nothing matches.
             result = a.notify(body="test", tag=[["1:alerts", "backup"]])
-            assert result is None
+            assert result.status == AppriseResultStatus.NOMATCH
+            assert len(result) == 0
             assert s._calls == 0
         finally:
             N_MGR.unload_modules()
@@ -1489,7 +1741,7 @@ class TestMultiTagDispatch:
             a.add(s_c)
 
             result = a.notify(body="test", tag=["alpha", "beta", "gamma"])
-            assert result is True
+            assert bool(result) is True
             assert s_a._calls == 1
             assert s_b._calls == 1
             assert s_c._calls == 1
@@ -1520,7 +1772,7 @@ class TestMultiTagDispatch:
             a.add(s_c)
 
             result = a.notify(body="test", tag=["alpha", "beta", "gamma"])
-            assert result is False
+            assert bool(result) is False
             assert s_a._calls == 1  # alpha succeeded
             assert s_c._calls == 1  # gamma succeeded
         finally:
@@ -1534,13 +1786,13 @@ class TestMultiTagDispatch:
         try:
             asset = AppriseAsset(async_mode=False)
 
-            # priority-0 server: always fails (no retry configured)
+            # priority-0 service: always fails (no retry configured)
             s_p0 = _FailThenSucceedNotify(
                 host="p0", asset=asset, fail_times=99
             )
             s_p0.tags = {AppriseTag("alerts", priority=0, has_priority=False)}
 
-            # priority-1 server: succeeds on first attempt
+            # priority-1 service: succeeds on first attempt
             s_p1 = _FailThenSucceedNotify(host="p1", asset=asset, fail_times=0)
             s_p1.tags = {AppriseTag("alerts", priority=1, has_priority=True)}
 
@@ -1549,7 +1801,7 @@ class TestMultiTagDispatch:
             a.add(s_p1)
 
             result = a.notify(body="test", tag="alerts")
-            assert result is True
+            assert bool(result) is True
             # priority-0 group was attempted once and failed
             assert s_p0._calls == 1
             # priority-1 group was then tried as fallback
@@ -1565,13 +1817,13 @@ class TestMultiTagDispatch:
         try:
             asset = AppriseAsset(async_mode=False)
 
-            # priority-0 server: always fails
+            # priority-0 service: always fails
             s_p0 = _FailThenSucceedNotify(
                 host="p0", asset=asset, fail_times=99
             )
             s_p0.tags = {AppriseTag("alerts", priority=0, has_priority=False)}
 
-            # priority-1 server: also always fails
+            # priority-1 service: also always fails
             s_p1 = _FailThenSucceedNotify(
                 host="p1", asset=asset, fail_times=99
             )
@@ -1582,7 +1834,7 @@ class TestMultiTagDispatch:
             a.add(s_p1)
 
             result = a.notify(body="test", tag="alerts")
-            assert result is False
+            assert bool(result) is False
             # Both groups were attempted
             assert s_p0._calls == 1
             assert s_p1._calls == 1
@@ -1593,8 +1845,8 @@ class TestMultiTagDispatch:
         """An exception escaping _run_batch is caught in the chain-dispatch
         ThreadPoolExecutor loop and treated as a delivery failure.
 
-        Covers the 'except Exception: ok = False' branch (apprise.py:788-792)
-        that is only reachable when multiple chains are active simultaneously
+        Covers the exception fallback that is only reachable when multiple
+        chains are active simultaneously
         (triggering the ThreadPoolExecutor path) and _run_batch raises.
         Uses _ExplodingAsset (raises on async_mode access) instead of
         patching a @staticmethod, which is unreliable across Python versions
@@ -1605,13 +1857,16 @@ class TestMultiTagDispatch:
         try:
             # _ExplodingAsset.async_mode raises RuntimeError.  _run_batch
             # reads s.asset.async_mode to split seq/par, so a batch with
-            # one of these servers raises and the future captures it.
+            # one of these services raises and the future captures it.
             class _ExplodingAsset(AppriseAsset):
+                """Asset whose mode lookup fails inside chain dispatch."""
+
                 @property
                 def async_mode(self):
+                    """Raise the injected failure when dispatch reads mode."""
                     raise RuntimeError("injected async_mode access")
 
-            # Two servers with distinct tags -> two independent chains so
+            # Two services with distinct tags -> two independent chains so
             # the ThreadPoolExecutor path (len(active) > 1) is taken.
             s_a = _FailThenSucceedNotify(
                 host="a", asset=_ExplodingAsset(), fail_times=0
@@ -1630,7 +1885,7 @@ class TestMultiTagDispatch:
             result = a.notify(body="test", tag=["alpha", "beta"])
 
             # Both chains raised instead of returning True -- overall False.
-            assert result is False
+            assert bool(result) is False
         finally:
             N_MGR.unload_modules()
 
@@ -1675,7 +1930,7 @@ class TestAbortOnChainFailure:
             a.add(s_c)
 
             result = a.notify(body="test", tag=["alpha", "beta", "gamma"])
-            assert result is False
+            assert bool(result) is False
             # alpha and gamma were still dispatched despite beta failing
             assert s_a._calls == 1
             assert s_b._calls == 1
@@ -1713,7 +1968,7 @@ class TestAbortOnChainFailure:
             a.add(s_b)
 
             result = a.notify(body="test", tag=["alpha", "beta"])
-            assert result is False
+            assert bool(result) is False
             # beta failed in round 1 and was exhausted -- abort triggered.
             # alpha's p1 (escalation) should NOT have been attempted.
             assert s_b._calls == 1
@@ -1753,7 +2008,7 @@ class TestAbortOnChainFailure:
             result = asyncio.run(
                 a.async_notify(body="test", tag=["alpha", "beta"])
             )
-            assert result is False
+            assert bool(result) is False
             # beta was exhausted in round 1 -- abort fires before alpha's p1
             assert s_b._calls == 1
             assert s_a_p0._calls == 1
@@ -1765,8 +2020,8 @@ class TestAbortOnChainFailure:
 class TestOptionalService:
     """optional=True silently absorbs per-service delivery failures.
 
-    The overall notify()/async_notify() result is True even when an
-    optional service cannot be reached, so callers are not penalised
+    The overall notify()/async_notify() result evaluates truthy even when
+    an optional service cannot be reached, so callers are not penalised
     for "nice to have" endpoints (e.g. home screens, debug logging).
     """
 
@@ -1807,7 +2062,7 @@ class TestOptionalService:
         assert nb_no.optional is False
 
     def test_optional_sequential_failure_absorbed(self):
-        """Sequential dispatch: failed optional server -> overall True."""
+        """Sequential dispatch: failed optional service -> overall True."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1819,15 +2074,15 @@ class TestOptionalService:
             a.add(s)
 
             result = a.notify(body="test")
-            assert result is True
+            assert bool(result) is True
             assert s._calls == 1
         finally:
             N_MGR.unload_modules()
 
     def test_optional_threadpool_failure_absorbed(self):
-        """Thread-pool dispatch: failed optional servers -> overall True.
+        """Thread-pool dispatch: failed optional services -> overall True.
 
-        Two async_mode=True servers ensure _notify_parallel_threadpool
+        Two async_mode=True services ensure _notify_parallel_threadpool
         uses the actual thread pool (n_calls==1 falls back to sequential).
         """
         N_MGR["failpass"] = _FailThenSucceedNotify
@@ -1844,12 +2099,12 @@ class TestOptionalService:
             a.add(s2)
 
             result = a.notify(body="test")
-            assert result is True
+            assert bool(result) is True
         finally:
             N_MGR.unload_modules()
 
     def test_optional_asyncio_failure_absorbed(self):
-        """Asyncio dispatch: failed optional server -> overall True."""
+        """Asyncio dispatch: failed optional service -> overall True."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1861,12 +2116,12 @@ class TestOptionalService:
             a.add(s)
 
             result = asyncio.run(a.async_notify(body="test"))
-            assert result is True
+            assert bool(result) is True
         finally:
             N_MGR.unload_modules()
 
     def test_optional_all_fail_all_optional_returns_true(self):
-        """When every server is optional and every server fails -> True."""
+        """When every service is optional and every service fails -> True."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1880,12 +2135,12 @@ class TestOptionalService:
                 a.add(s)
 
             result = a.notify(body="test")
-            assert result is True
+            assert bool(result) is True
         finally:
             N_MGR.unload_modules()
 
     def test_optional_mixed_required_fails_returns_false(self):
-        """Required server failure taints result even with optional peers."""
+        """Required service failure taints result even with optional peers."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1905,12 +2160,12 @@ class TestOptionalService:
             a.add(s_req)
 
             result = a.notify(body="test")
-            assert result is False
+            assert bool(result) is False
         finally:
             N_MGR.unload_modules()
 
     def test_optional_success_unaffected(self):
-        """An optional server that succeeds is still counted as True."""
+        """An optional service that succeeds is still counted as True."""
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
@@ -1922,21 +2177,162 @@ class TestOptionalService:
             a.add(s)
 
             result = a.notify(body="test")
-            assert result is True
+            assert bool(result) is True
             assert s._calls == 1
         finally:
             N_MGR.unload_modules()
 
 
+class TestPartialStatus:
+    """AppriseResultStatus.PARTIAL: a batch where at least one service
+    genuinely delivered and at least one did not, in the same call."""
+
+    def test_mixed_success_and_failure_is_partial(self):
+        """One service succeeds, one fails outright -> PARTIAL, not
+        FAILURE."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s_ok = _FailThenSucceedNotify(host="ok", asset=asset, fail_times=0)
+            s_fail = _FailThenSucceedNotify(
+                host="fail", asset=asset, fail_times=99
+            )
+
+            a = Apprise(asset=asset)
+            a.add(s_ok)
+            a.add(s_fail)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.PARTIAL
+            # PARTIAL is not the truthy SUCCESS value.
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_all_succeed_is_success_not_partial(self):
+        """Every service succeeding stays SUCCESS -- PARTIAL requires at
+        least one non-delivery in the same batch."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s1 = _FailThenSucceedNotify(host="s1", asset=asset, fail_times=0)
+            s2 = _FailThenSucceedNotify(host="s2", asset=asset, fail_times=0)
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.SUCCESS
+        finally:
+            N_MGR.unload_modules()
+
+    def test_all_fail_is_failure_not_partial(self):
+        """Every service failing outright stays FAILURE -- there is no
+        genuine success in the batch to make it PARTIAL."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s1 = _FailThenSucceedNotify(host="s1", asset=asset, fail_times=99)
+            s2 = _FailThenSucceedNotify(host="s2", asset=asset, fail_times=99)
+
+            a = Apprise(asset=asset)
+            a.add(s1)
+            a.add(s2)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.FAILURE
+        finally:
+            N_MGR.unload_modules()
+
+    def test_optional_absorbed_failure_does_not_count_as_partial(self):
+        """A forgiven optional=yes failure does not count as a 'genuine'
+        success -- an optional service that never actually delivered,
+        paired with a required service that also failed, is still a
+        clean FAILURE, not PARTIAL."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            s_opt = _FailThenSucceedNotify(
+                host="opt", asset=asset, fail_times=99
+            )
+            s_opt.optional = True
+            s_req = _FailThenSucceedNotify(
+                host="req", asset=asset, fail_times=99
+            )
+
+            a = Apprise(asset=asset)
+            a.add(s_opt)
+            a.add(s_req)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.FAILURE
+        finally:
+            N_MGR.unload_modules()
+
+    def test_success_plus_timeout_is_partial(self):
+        """One service succeeds, another times out with no failures at
+        all -- still a mixed outcome, so PARTIAL rather than TIMEOUT.
+
+        async_mode=True with 2+ services is required so dispatch actually
+        goes through _notify_parallel_threadpool -- only that path (and
+        the asyncio one) can genuinely abandon an in-flight call via a
+        bounded wait; _notify_sequential has no way to stop waiting on a
+        single already-blocking call, so s_slow would just eventually
+        succeed there instead of timing out.
+        """
+        N_MGR["failpass"] = _FailThenSucceedNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            s_ok = _FailThenSucceedNotify(host="ok", asset=asset, fail_times=0)
+            s_slow = _SlowNotify(host="slow", asset=asset, delay=0.3)
+
+            a = Apprise(asset=asset)
+            a.add(s_ok)
+            a.add(s_slow)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.PARTIAL
+        finally:
+            N_MGR.unload_modules()
+
+    def test_async_notify_mixed_outcome_is_partial(self):
+        """The asyncio dispatch path reports PARTIAL the same way as the
+        synchronous paths."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            s_ok = _FailThenSucceedNotify(host="ok", asset=asset, fail_times=0)
+            s_fail = _FailThenSucceedNotify(
+                host="fail", asset=asset, fail_times=99
+            )
+
+            a = Apprise(asset=asset)
+            a.add(s_ok)
+            a.add(s_fail)
+
+            result = asyncio.run(a.async_notify(body="test"))
+            assert result.status == AppriseResultStatus.PARTIAL
+        finally:
+            N_MGR.unload_modules()
+
+
 class TestCreateNotifyCalls:
-    """Cover Apprise._create_notify_calls() which splits servers into
+    """Cover Apprise._create_notify_calls() which splits services into
     sequential and parallel buckets based on their asset.async_mode flag."""
 
     def test_splits_sequential_and_parallel(self):
-        """Sequential and parallel servers are split into separate lists."""
+        """Sequential and parallel services are split into separate lists."""
         N_MGR["failpass"] = _FailThenSucceedNotify
         try:
-            # With async_mode=False all loaded servers go to the sequential
+            # With async_mode=False all loaded services go to the sequential
             # bucket; the parallel bucket remains empty.
             asset_seq = AppriseAsset(async_mode=False)
             s_seq = _FailThenSucceedNotify(
@@ -1950,7 +2346,7 @@ class TestCreateNotifyCalls:
             assert len(seq) == 1
             assert len(par) == 0
 
-            # With async_mode=True the same server is placed in the parallel
+            # With async_mode=True the same service is placed in the parallel
             # bucket instead.
             asset_par = AppriseAsset(async_mode=True)
             s_par = _FailThenSucceedNotify(
@@ -1968,22 +2364,13 @@ class TestCreateNotifyCalls:
 
 
 class TestAsyncioSafetyNet:
-    """Cover the safety-net branch in _notify_parallel_asyncio that handles
-    exceptions which escape do_call's own try/except block."""
+    """Cover async safety nets for exceptions that escape do_call."""
 
     def test_exception_outside_try_block_triggers_safety_net(self):
-        """An exception raised before the per-attempt try block (e.g. from
-        a misbehaving server.retry property) escapes do_call, is captured by
-        asyncio.gather(return_exceptions=True), and causes the batch to
-        return False via the safety-net handler.
+        """A retry-property failure is reported beside a good service."""
 
-        A second well-behaved server is included so that results contains
-        both an Exception and a bool value, exercising both branches of the
-        inner ``if isinstance(status, Exception)`` check in the loop."""
-
-        class _RaisingRetryServer:
-            """Server whose retry property raises to simulate a broken plugin
-            that fails before the per-attempt try/except in do_call."""
+        class _RaisingRetryService:
+            """Service whose retry property fails before delivery starts."""
 
             service_name = "raiser"
             asset = AppriseAsset(async_mode=True)
@@ -1991,29 +2378,1091 @@ class TestAsyncioSafetyNet:
 
             @property
             def retry(self):
-                # This exception is raised when do_call evaluates
-                # getattr(server, "retry", 0), which happens OUTSIDE the
-                # per-attempt try/except.  It therefore escapes do_call
-                # entirely and is captured by asyncio.gather as a value.
+                """Raise before per-attempt handling to test the safety net."""
+                # This escapes do_call and is captured by asyncio.gather.
                 raise RuntimeError("injected: property raised outside try")
 
             async def async_notify(self, **kwargs):
+                """Represent delivery that must not be reached in this test."""
                 return True  # pragma: no cover -- never reached
 
-        class _GoodServer:
-            """Minimal well-behaved server that succeeds immediately."""
+        class _GoodService:
+            """Minimal well-behaved service that succeeds immediately."""
 
             service_name = "good"
+            asset = AppriseAsset(async_mode=True)
+            optional = False
+            tags = set()
+
+            def url(self, privacy=False):
+                """Return the stable URL used to identify this service."""
+                return "good://localhost"
+
+            def url_id(self):
+                """Return a stable identifier for result assertions."""
+                return "good-id"
+
+            def __len__(self):
+                """Report the single target represented by this service."""
+                return 1
 
             async def async_notify(self, **kwargs):
+                """Report immediate successful asynchronous delivery."""
                 return True
 
-        raiser = _RaisingRetryServer()
-        good = _GoodServer()
-        # Two servers: raiser -> Exception in results; good -> True in results.
-        # The safety-net loop therefore hits both branches of the inner
-        # ``if isinstance(status, Exception)`` check.
-        result = asyncio.run(
+        raiser = _RaisingRetryService()
+        good = _GoodService()
+        # Exercise both the escaped-exception and successful-result branches.
+        ok, results = asyncio.run(
             Apprise._notify_parallel_asyncio((raiser, {}), (good, {}))
         )
-        assert result is False
+        assert ok is False
+        assert len(results) == 2
+
+
+class TestServiceTimeout:
+    """AppriseAsset._service_timeout / notify(timeout=...) enforcement.
+
+    Real sleeps are intentional here: these tests protect threaded/async
+    deadline behaviour. Margins stay generous so slower CI hosts fail only for
+    real regressions, not ordinary timing jitter.
+    """
+
+    def test_sequential_between_attempts_timeout(self):
+        """A real failure before timeout remains a FAILURE."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0.5)
+            # First attempt costs 0.1s and fails, leaving ~0.4s of the
+            # 0.5s budget.  retry=5 with wait=5.0 would normally sleep
+            # five seconds between attempts, but that must be capped to
+            # the remaining budget, and no second attempt may start.
+            service = _SlowNotify(
+                host="x", asset=asset, delay=0.0, retry=5, wait=5.0
+            )
+            service.send = lambda **kw: (time.sleep(0.1), False)[1]
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            t0 = time.monotonic()
+            result = a.notify(body="test")
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        r0 = next(iter(result))
+        # One real attempt ran; the expired retry is recorded as TIMEOUT.
+        assert len(r0.attempts) == 2
+        assert r0.attempts[0].status == AppriseResultStatus.FAILURE
+        assert r0.attempts[-1].status == AppriseResultStatus.TIMEOUT
+        assert r0.max_attempts == 6
+        # The confirmed FAILURE outranks the trailing synthetic TIMEOUT.
+        assert r0.status == AppriseResultStatus.FAILURE
+        assert result.status == AppriseResultStatus.FAILURE
+        # The wait= sleep was capped to the remaining budget, not the
+        # full 5.0s -- confirms the cap actually applied.
+        assert wall < 3.0
+
+    def test_threadpool_between_attempts_timeout_and_sleep_cap(self):
+        """Thread-pool retry sleep is capped by the worker deadline."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=2.0)
+            # The failed first attempt leaves enough budget for the worker to
+            # cap wait=5.0 itself before the outer bounded wait races it.
+            slow = _SlowNotify(
+                host="slow", asset=asset, delay=0.0, retry=3, wait=5.0
+            )
+            slow.send = lambda **kw: (time.sleep(0.3), False)[1]
+            fast = _SlowNotify(host="fast", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(slow)
+            a.add(fast)
+
+            t0 = time.monotonic()
+            result = a.notify(body="test")
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        by_host = {r.url: r for r in result}
+        slow_result = by_host["slow://slow"]
+        # Only the one over-budget attempt was made, plus the synthetic
+        # TIMEOUT attempt marking the decision to stop.
+        assert len(slow_result.attempts) == 2
+        assert slow_result.attempts[0].status == AppriseResultStatus.FAILURE
+        assert slow_result.attempts[-1].status == AppriseResultStatus.TIMEOUT
+        # The confirmed FAILURE on the first attempt outranks the
+        # synthetic TIMEOUT that follows it (see NotifyResult.__init__).
+        assert slow_result.status == AppriseResultStatus.FAILURE
+        assert by_host["slow://fast"].status == AppriseResultStatus.SUCCESS
+        # The wait= sleep was capped to the remaining budget rather than
+        # running the full 5.0s -- confirms the cap actually applied.
+        assert wall < 5.0
+
+    def test_asyncio_between_attempts_timeout_and_sleep_cap(self):
+        """Same guarantee as the thread-pool test above, for the asyncio
+        do_call() coroutine's own between-attempts deadline check."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=2.0)
+            slow = _SlowNotify(
+                host="slow", asset=asset, delay=0.0, retry=3, wait=5.0
+            )
+
+            async def _fail_slowly(**kw):
+                """Delay briefly, then fail so retry waiting consumes time."""
+                await asyncio.sleep(0.3)
+                return False
+
+            slow.async_notify = _fail_slowly
+            fast = _SlowNotify(host="fast", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(slow)
+            a.add(fast)
+
+            t0 = time.monotonic()
+            result = asyncio.run(a.async_notify(body="test"))
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        by_host = {r.url: r for r in result}
+        slow_result = by_host["slow://slow"]
+        assert len(slow_result.attempts) == 2
+        assert slow_result.attempts[0].status == AppriseResultStatus.FAILURE
+        assert slow_result.attempts[-1].status == AppriseResultStatus.TIMEOUT
+        # The confirmed FAILURE on the first attempt outranks the
+        # synthetic TIMEOUT that follows it (see NotifyResult.__init__).
+        assert slow_result.status == AppriseResultStatus.FAILURE
+        assert by_host["slow://fast"].status == AppriseResultStatus.SUCCESS
+        assert wall < 5.0
+
+    def test_sequential_service_timeout_disabled(self):
+        """service_timeout=0 disables the cap -- a slow service still
+        completes normally."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0)
+            service = _SlowNotify(host="x", asset=asset, delay=0.05)
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        r0 = next(iter(result))
+        assert r0.status == AppriseResultStatus.SUCCESS
+        assert service.calls == 1
+
+    def test_sequential_timeout_disabled_retry_wait(self):
+        """With service_timeout=0 (no deadline at all), the retry/wait
+        loop keeps its normal uncapped wait behaviour."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0)
+            service = _SlowNotify(
+                host="x", asset=asset, delay=0.0, retry=1, wait=0.01
+            )
+            call_count = {"n": 0}
+
+            def _fail_then_succeed(**kw):
+                """Fail once, then succeed to exercise an uncapped retry."""
+                call_count["n"] += 1
+                return call_count["n"] >= 2
+
+            service.send = _fail_then_succeed
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        r0 = next(iter(result))
+        assert r0.status == AppriseResultStatus.SUCCESS
+        assert len(r0.attempts) == 2
+
+    def test_threadpool_outer_bound_abandons_slow_service(self):
+        """A service stuck past its deadline is abandoned by the outer
+        bounded wait; the batch returns promptly and the other service is
+        unaffected."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
+            slow = _SlowNotify(host="slow", asset=asset, delay=2.0)
+            fast = _SlowNotify(host="fast", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(slow)
+            a.add(fast)
+
+            t0 = time.monotonic()
+            result = a.notify(body="test")
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        # The whole call returned promptly -- nowhere near the slow
+        # service's 2.0s delay -- even though that thread is still
+        # running in the background because Python cannot stop the worker.
+        assert wall < 3.0
+        by_host = {r.url: r for r in result}
+        assert by_host["slow://slow"].status == (AppriseResultStatus.TIMEOUT)
+        assert by_host["slow://fast"].status == (AppriseResultStatus.SUCCESS)
+
+    def test_asyncio_outer_bound_abandons_slow_service(self):
+        """Same guarantee as the thread-pool test, for async_notify()."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
+            slow = _SlowNotify(host="slow", asset=asset, delay=2.0)
+            fast = _SlowNotify(host="fast", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(slow)
+            a.add(fast)
+
+            t0 = time.monotonic()
+            result = asyncio.run(a.async_notify(body="test"))
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        assert wall < 3.0
+        by_host = {r.url: r for r in result}
+        assert by_host["slow://slow"].status == (AppriseResultStatus.TIMEOUT)
+        assert by_host["slow://fast"].status == (AppriseResultStatus.SUCCESS)
+
+    def test_threadpool_timeout_disabled_retry_wait(self):
+        """With service_timeout=0, the thread-pool worker's retry/wait
+        loop keeps its normal uncapped wait behaviour."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0)
+            call_count = {"n": 0}
+
+            def _fail_then_succeed(**kw):
+                """Fail once, then succeed in the thread-pool retry loop."""
+                call_count["n"] += 1
+                return call_count["n"] >= 2
+
+            flaky = _SlowNotify(
+                host="flaky", asset=asset, delay=0.0, retry=1, wait=0.01
+            )
+            flaky.send = _fail_then_succeed
+            other = _SlowNotify(host="other", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(flaky)
+            a.add(other)
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        by_host = {r.url: r for r in result}
+        assert by_host["slow://flaky"].status == AppriseResultStatus.SUCCESS
+        assert len(by_host["slow://flaky"].attempts) == 2
+        assert by_host["slow://other"].status == AppriseResultStatus.SUCCESS
+
+    def test_asyncio_timeout_disabled_retry_wait(self):
+        """Same guarantee as the thread-pool test above, for the asyncio
+        do_call() coroutine's retry/wait loop."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0)
+            call_count = {"n": 0}
+
+            async def _fail_then_succeed(**kw):
+                """Fail once, then succeed in the asyncio retry loop."""
+                call_count["n"] += 1
+                return call_count["n"] >= 2
+
+            flaky = _SlowNotify(
+                host="flaky", asset=asset, delay=0.0, retry=1, wait=0.01
+            )
+            flaky.async_notify = _fail_then_succeed
+            other = _SlowNotify(host="other", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(flaky)
+            a.add(other)
+
+            result = asyncio.run(a.async_notify(body="test"))
+        finally:
+            N_MGR.unload_modules()
+
+        by_host = {r.url: r for r in result}
+        assert by_host["slow://flaky"].status == AppriseResultStatus.SUCCESS
+        assert len(by_host["slow://flaky"].attempts) == 2
+        assert by_host["slow://other"].status == AppriseResultStatus.SUCCESS
+
+    def test_notify_timeout_overrides_longer_asset_default(self):
+        """notify(timeout=...) can cut a call short even when the asset
+        default would have allowed more time."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            # Asset default is generous (10s); the call-level override
+            # of 0.5s must win since it is the sooner of the two.
+            asset = AppriseAsset(async_mode=True, service_timeout=10)
+            slow1 = _SlowNotify(host="one", asset=asset, delay=2.0)
+            slow2 = _SlowNotify(host="two", asset=asset, delay=2.0)
+            a = Apprise(asset=asset)
+            a.add(slow1)
+            a.add(slow2)
+
+            t0 = time.monotonic()
+            result = a.notify(body="test", timeout=0.5)
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        assert wall < 3.0
+        assert all(r.status == AppriseResultStatus.TIMEOUT for r in result)
+
+    def test_notify_timeout_keeps_stricter_asset_default(self):
+        """The reverse also holds: a short asset default still applies
+        even when notify(timeout=...) allows much more time."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
+            slow1 = _SlowNotify(host="one", asset=asset, delay=2.0)
+            slow2 = _SlowNotify(host="two", asset=asset, delay=2.0)
+            a = Apprise(asset=asset)
+            a.add(slow1)
+            a.add(slow2)
+
+            t0 = time.monotonic()
+            result = a.notify(body="test", timeout=60)
+            wall = time.monotonic() - t0
+        finally:
+            N_MGR.unload_modules()
+
+        assert wall < 3.0
+        assert all(r.status == AppriseResultStatus.TIMEOUT for r in result)
+
+    def test_notify_negative_timeout_raises(self):
+        """notify(timeout=-1) is a caller error, not a silent no-op."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(ValueError):
+            a.notify(body="test", timeout=-1)
+
+    def test_async_notify_negative_timeout_raises(self):
+        """async_notify(timeout=-1) is a caller error, not a silent
+        no-op."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(ValueError):
+            asyncio.run(a.async_notify(body="test", timeout=-1))
+
+    def test_notify_infinite_timeout_raises(self):
+        """notify(timeout=inf) is rejected; 0 is the unbounded spelling."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(ValueError):
+            a.notify(body="test", timeout=float("inf"))
+
+    def test_notify_nan_timeout_raises(self):
+        """notify(timeout=nan) is rejected instead of disabling the timeout."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(ValueError):
+            a.notify(body="test", timeout=float("nan"))
+
+    def test_async_notify_infinite_timeout_raises(self):
+        """async_notify(timeout=inf) is rejected for the same reason as
+        notify(timeout=inf)."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(ValueError):
+            asyncio.run(a.async_notify(body="test", timeout=float("inf")))
+
+    def test_notify_non_numeric_timeout_raises_typeerror(self):
+        """notify(timeout="abc") raises TypeError."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(TypeError):
+            a.notify(body="test", timeout="abc")
+
+    def test_notify_bool_timeout_raises_typeerror(self):
+        """A bool timeout is rejected even though bool is an int subclass."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(TypeError):
+            a.notify(body="test", timeout=True)
+
+    def test_async_notify_non_numeric_timeout_raises_typeerror(self):
+        """async_notify(timeout="abc") is a caller error (TypeError)."""
+        a = Apprise()
+        a.add("json://localhost")
+        with pytest.raises(TypeError):
+            asyncio.run(a.async_notify(body="test", timeout="abc"))
+
+    def test_notify_timeout_defaults_to_zero(self):
+        """timeout defaults to 0 (no call-level override) -- only
+        AppriseAsset._service_timeout controls the default behaviour."""
+        import inspect
+
+        signature = inspect.signature(Apprise.notify)
+        assert signature.parameters["timeout"].default == 0
+
+    def test_timeout_logs_include_error_entry(self):
+        """A TIMEOUT attempt includes a matching ERROR log entry."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0.5)
+            service = _SlowNotify(host="x", asset=asset, retry=5)
+            service.send = lambda **kw: (time.sleep(0.15), False)[1]
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        r0 = next(iter(result))
+        # The earlier real failures still outrank the later timeout.
+        assert r0.status == AppriseResultStatus.FAILURE
+        assert r0.attempts[-1].status == AppriseResultStatus.TIMEOUT
+        error_logs = [entry for entry in r0.logs() if entry.level == "ERROR"]
+        assert len(error_logs) == 1
+        assert "did not finish" in error_logs[0].message
+        assert r0.name in error_logs[0].message
+
+    def test_timeout_result_json_includes_start_end_time(self):
+        """A TIMEOUT NotifyResult still has start_time/end_time populated."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.5)
+            slow = _SlowNotify(host="slow", asset=asset, delay=3.0)
+            fast = _SlowNotify(host="fast", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(slow)
+            a.add(fast)
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        by_host = {r.url: r for r in result}
+        r0 = by_host["slow://slow"]
+        assert r0.status == AppriseResultStatus.TIMEOUT
+        assert r0.start_time is not None
+        assert r0.end_time is not None
+        # Datetime arithmetic can differ from float elapsed by tiny rounding.
+        assert (r0.end_time - r0.start_time).total_seconds() == pytest.approx(
+            r0.elapsed, abs=1e-5
+        )
+
+    def test_weight_reflects_service_len(self):
+        """NotifyResult.weight mirrors len(service) (the plugin's own
+        target count)."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        # _SlowNotify has no targets/list -- NotifyBase.__len__ always
+        # reports at least 1.
+        assert next(iter(result)).weight == len(service) == 1
+
+    def test_log_capture_records_warning_message(self):
+        """A service WARNING is captured in NotifyResult.logs()."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _fail_with_warning(**kw):
+                """Emit a warning before reporting a delivery failure."""
+                service.logger.warning("HTTP 429 Too Many Requests")
+                return False
+
+            service.send = _fail_with_warning
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            logging.disable(logging.NOTSET)
+            try:
+                result = a.notify(body="test")
+            finally:
+                logging.disable(logging.CRITICAL)
+        finally:
+            N_MGR.unload_modules()
+
+        r0 = next(iter(result))
+        assert r0.status == AppriseResultStatus.FAILURE
+        logs = list(r0.logs())
+        assert len(logs) == 1
+        assert logs[0].level == "WARNING"
+        assert "429" in logs[0].message
+        assert "429" in str(logs[0])
+
+    def test_log_capture_preserves_preexisting_instance_logger(self):
+        """_ServiceLogCapture does not replace a service's logger."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+            custom_logger = logging.getLogger("apprise.test.custom")
+            service.logger = custom_logger
+
+            a = Apprise(asset=asset)
+            a.add(service)
+            a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        assert "logger" in service.__dict__
+        assert service.__dict__["logger"] is custom_logger
+
+    def test_notify_log_callback_default_from_apprise_instance(self):
+        """A log_callback given to Apprise() applies to every notify()
+        call made with that instance, firing live with (entry, service)
+        for each captured entry."""
+        N_MGR["slow"] = _SlowNotify
+        received = []
+
+        def _cb(entry, service):
+            """Collect the instance-level callback's service/message pair."""
+            received.append((service.service_name, entry.message))
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _fail_with_warning(**kw):
+                """Emit a warning and report a failed delivery attempt."""
+                service.logger.warning("HTTP 429 Too Many Requests")
+                return False
+
+            service.send = _fail_with_warning
+            a = Apprise(asset=asset, log_callback=_cb)
+            a.add(service)
+
+            logging.disable(logging.NOTSET)
+            try:
+                a.notify(body="test")
+            finally:
+                logging.disable(logging.CRITICAL)
+        finally:
+            N_MGR.unload_modules()
+
+        assert received == [
+            (service.service_name, "HTTP 429 Too Many Requests")
+        ]
+
+    def test_notify_log_callback_call_override(self):
+        """log_callback passed directly to notify() takes priority over
+        the Apprise instance's own default for that one call only."""
+        N_MGR["slow"] = _SlowNotify
+        default_received = []
+        override_received = []
+
+        def _default_cb(entry, service):
+            """Collect entries delivered to the instance default callback."""
+            default_received.append(entry.message)
+
+        def _override_cb(entry, service):
+            """Collect entries delivered to the per-call override callback."""
+            override_received.append(entry.message)
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _fail_with_warning(**kw):
+                """Emit a warning and report a failed delivery attempt."""
+                service.logger.warning("overridden call")
+                return False
+
+            service.send = _fail_with_warning
+            a = Apprise(asset=asset, log_callback=_default_cb)
+            a.add(service)
+
+            logging.disable(logging.NOTSET)
+            try:
+                a.notify(body="test", log_callback=_override_cb)
+            finally:
+                logging.disable(logging.CRITICAL)
+        finally:
+            N_MGR.unload_modules()
+
+        assert default_received == []
+        assert override_received == ["overridden call"]
+
+    def test_async_notify_log_callback(self):
+        """log_callback works for a plugin's native async_notify()."""
+        N_MGR["slow"] = _SlowNotify
+        received = []
+
+        def _cb(entry, service):
+            """Collect callback entries produced by async_notify()."""
+            received.append((service.service_name, entry.message))
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            async def _fail_with_warning(**kw):
+                """Emit a warning from the native async_notify override."""
+                service.logger.warning("async 429")
+                return False
+
+            service.async_notify = _fail_with_warning
+            a = Apprise(asset=asset, log_callback=_cb)
+            a.add(service)
+
+            logging.disable(logging.NOTSET)
+            try:
+                asyncio.run(a.async_notify(body="test"))
+            finally:
+                logging.disable(logging.CRITICAL)
+        finally:
+            N_MGR.unload_modules()
+
+        assert received == [(service.service_name, "async 429")]
+
+    def test_notify_log_callback_thread_attribution(self):
+        """Concurrent log callbacks are attributed to the right service."""
+        N_MGR["slow"] = _SlowNotify
+        received = []
+        lock = threading.Lock()
+
+        def _cb(entry, service):
+            """Append callback data under a lock."""
+            with lock:
+                received.append((service.host, entry.message))
+
+        def _make_send(service):
+            """Build a send() replacement bound to one service instance."""
+
+            def _send(**kw):
+                """Emit a host-specific warning from the bound service."""
+                service.logger.warning("warning from %s", service.host)
+                return True
+
+            return _send
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            a = Apprise(asset=asset, log_callback=_cb)
+            services = []
+            for i in range(6):
+                service = _SlowNotify(host=f"host{i}", asset=asset, delay=0.02)
+                service.send = _make_send(service)
+                services.append(service)
+                a.add(service)
+
+            logging.disable(logging.NOTSET)
+            try:
+                a.notify(body="test")
+            finally:
+                logging.disable(logging.CRITICAL)
+        finally:
+            N_MGR.unload_modules()
+
+        assert sorted(received) == sorted(
+            (s.host, f"warning from {s.host}") for s in services
+        )
+
+    def test_timeout_result_defensive_on_malformed_service(self):
+        """Timeout metadata falls back when service helpers are missing."""
+
+        class _MalformedSlowService:
+            """A service missing url()/url_id()/__len__ that never finishes
+            in time, exercising _timeout_result's defensive except paths.
+            """
+
+            service_name = "malformed"
+            asset = AppriseAsset(async_mode=True, service_timeout=0.1)
+            optional = False
+            tags: set = set()
+            retry = 0
+            wait = 0.0
+
+            async def async_notify(self, **kwargs):
+                """Remain active long enough to exceed the test deadline."""
+                await asyncio.sleep(1.0)
+                return True  # pragma: no cover -- never reached in time
+
+        good = _SlowNotify(
+            host="good", asset=AppriseAsset(async_mode=True), delay=0.0
+        )
+        malformed = _MalformedSlowService()
+
+        ok, results = asyncio.run(
+            Apprise._notify_parallel_asyncio(
+                (malformed, {}),
+                (good, {}),
+            )
+        )
+
+        assert ok is False
+        by_url = {r.url: r for r in results}
+        # No url()/url_id()/__len__ on the malformed service -- defensive
+        # fallbacks kick in rather than raising.
+        assert by_url["unknown://"].status == AppriseResultStatus.TIMEOUT
+        assert by_url["unknown://"].url_id is None
+        assert by_url["unknown://"].weight == 1
+        assert by_url["slow://good"].status == AppriseResultStatus.SUCCESS
+
+    def test_notify_result_tag_is_sorted(self):
+        """NotifyResult.tag is sorted for stable output."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            service = _SlowNotify(
+                host="x",
+                asset=AppriseAsset(async_mode=False),
+                delay=0.0,
+                tag=["zeta", "alpha", "middle", "beta"],
+            )
+            a = Apprise()
+            a.add(service)
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        r0 = next(iter(result))
+        assert r0.tag == ("alpha", "beta", "middle", "zeta")
+
+    def test_threadpool_queued_futures_cancelled(self):
+        """A service still queued behind other work in a size-limited
+        thread pool must not execute later after timeout."""
+        N_MGR["slow"] = _SlowNotify
+
+        # More services than the default ThreadPoolExecutor can run at once,
+        # so some work is guaranteed to still be queued at the deadline.
+        n_services = 40
+        started: list[int] = []
+        finished: list[int] = []
+        lock = threading.Lock()
+
+        def _slow_send(idx):
+            """Build a send() replacement that records start and finish."""
+
+            def _send(**kwargs):
+                """Simulate slow work so queued futures can be cancelled."""
+                with lock:
+                    started.append(idx)
+                time.sleep(0.3)
+                with lock:
+                    finished.append(idx)
+                return True
+
+            return _send
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            a = Apprise(asset=asset)
+            services = []
+            for i in range(n_services):
+                service = _SlowNotify(host=f"host{i}", asset=asset, delay=0.0)
+                service.send = _slow_send(i)
+                services.append(service)
+                a.add(service)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.TIMEOUT
+
+            with lock:
+                started_at_return = len(started)
+
+            # Give uncancelled queued work enough time to reveal itself.
+            time.sleep(1.0)
+            with lock:
+                started_later = len(started)
+                finished_later = len(finished)
+        finally:
+            N_MGR.unload_modules()
+
+        # Some work stayed queued because the pool is size-limited.
+        assert 0 < started_at_return < n_services
+        # And none of the ones that hadn't started yet ever did.
+        assert started_later == started_at_return
+        assert finished_later == started_at_return
+
+    def test_sequential_queued_future_cancelled(self):
+        """A sequential service whose future never got a chance to start
+        (still queued behind other work in a size-limited pool) is
+        cancelled outright at the deadline -- nothing is left running,
+        so it is never tracked as abandoned."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            import concurrent.futures as cf
+
+            import apprise.apprise as apprise_module
+
+            release = threading.Event()
+
+            with mock.patch(
+                "apprise.apprise._shared_executor",
+                cf.ThreadPoolExecutor(max_workers=1),
+            ):
+                executor = apprise_module._shared_executor
+                # Occupy the pool's only worker so the service's own
+                # future stays queued until its deadline has passed.
+                blocker = executor.submit(release.wait, 2.0)
+
+                asset = AppriseAsset(async_mode=False, service_timeout=0.05)
+                service = _SlowNotify(host="x", asset=asset, delay=0.0)
+                a = Apprise(asset=asset)
+                a.add(service)
+
+                result = a.notify(body="test")
+
+                release.set()
+                blocker.result(timeout=2.0)
+                executor.shutdown(wait=True)
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.TIMEOUT
+        # Still queued when abandoned -- it never actually got to run.
+        assert service.calls == 0
+
+    def test_threadpool_shared_across_notify_calls(self):
+        """Separate notify() calls reuse the shared executor."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            import apprise.apprise as apprise_module
+
+            # Force this test to observe executor construction.
+            with mock.patch("apprise.apprise._shared_executor", None):
+                executors_seen = set()
+                for i in range(3):
+                    asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+                    a = Apprise(asset=asset)
+                    service = _SlowNotify(
+                        host=f"host{i}", asset=asset, delay=1.0
+                    )
+                    a.add(service)
+                    result = a.notify(body="test")
+                    assert result.status == AppriseResultStatus.TIMEOUT
+                    executors_seen.add(id(apprise_module._shared_executor))
+
+                # All three notify() calls reused the same executor.
+                assert len(executors_seen) == 1
+
+                # Clean up the temporary executor before mock.patch restores.
+                apprise_module._shared_executor.shutdown(wait=False)
+        finally:
+            N_MGR.unload_modules()
+
+    def test_abandoned_calls_reflect_running_state(self):
+        """Tracked abandoned calls clear once their background work ends."""
+        import apprise.apprise as apprise_module
+
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            a = Apprise(asset=asset)
+            service = _SlowNotify(host="host", asset=asset, delay=0.5)
+            a.add(service)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.TIMEOUT
+
+            # The 0.5s send() is still running in the background --
+            # notify() only gave up waiting on it, it did not stop it.
+            assert apprise_module._any_abandoned_calls_still_running() is True
+
+            # Give it a generous window to actually finish.
+            time.sleep(0.7)
+            assert apprise_module._any_abandoned_calls_still_running() is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_abandoned_call_descriptions_clear(self):
+        """Abandoned-call descriptions clear once the service finishes."""
+        import apprise.apprise as apprise_module
+
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            a = Apprise(asset=asset)
+            service = _SlowNotify(
+                host="descriptionhost", asset=asset, delay=0.5
+            )
+            a.add(service)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.TIMEOUT
+
+            descriptions = apprise_module._abandoned_call_descriptions()
+            assert len(descriptions) == 1
+            assert "slow://descriptionhost" in descriptions[0]
+
+            # Once the service finishes, its abandoned-call description clears.
+            time.sleep(0.7)
+            assert apprise_module._abandoned_call_descriptions() == []
+        finally:
+            N_MGR.unload_modules()
+
+    def test_abandoned_calls_false_when_only_queued(self):
+        """Cancelled queued work does not count as still running."""
+        import apprise.apprise as apprise_module
+
+        N_MGR["slow"] = _SlowNotify
+
+        n_services = 40
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            a = Apprise(asset=asset)
+            for i in range(n_services):
+                service = _SlowNotify(host=f"host{i}", asset=asset, delay=0.3)
+                a.add(service)
+
+            result = a.notify(body="test")
+            assert result.status == AppriseResultStatus.TIMEOUT
+
+            # Queued futures are cancelled before they ever touch the tracked
+            # abandoned-call list; any running work should settle quickly.
+            time.sleep(0.5)
+            assert apprise_module._any_abandoned_calls_still_running() is False
+        finally:
+            N_MGR.unload_modules()
+
+
+class _SlowFailNotify(NotifyBase):
+    """Fails after a configurable delay so deadlines can pass mid-attempt."""
+
+    app_id = "SlowFailApp"
+    app_desc = "Test"
+    notify_url = "slowfail://"
+    title_maxlen = 250
+    body_maxlen = 32768
+
+    def __init__(self, delay=0.0, **kwargs):
+        """Initialize the test plugin with its artificial delay."""
+        super().__init__(**kwargs)
+        self._delay = delay
+        self.calls = 0
+
+    def url(self, *args, **kwargs):
+        """Return a stable URL containing the test host."""
+        return "slowfail://{}".format(self.host)
+
+    def send(self, **kwargs):
+        """Block for the configured delay, then report failure."""
+        self.calls += 1
+        time.sleep(self._delay)
+        return False
+
+    async def async_notify(self, **kwargs):
+        """Block for the configured delay, then report failure."""
+        self.calls += 1
+        await asyncio.sleep(self._delay)
+        return False
+
+    @staticmethod
+    def parse_url(url):
+        """Parse the synthetic URL without requiring a real host."""
+        return NotifyBase.parse_url(url, verify_host=False)
+
+
+class TestDeadlineExpiresDuringAttempt:
+    """Deadline-expired retries should stop without sleeping first."""
+
+    def test_sequential_abandons_service_that_blocks_past_deadline(self):
+        """A blocking sync service is abandoned once its deadline passes."""
+        N_MGR["slowfail"] = _SlowFailNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False, service_timeout=0.05)
+            service = _SlowFailNotify(
+                host="x", asset=asset, retry=1, wait=1.0, delay=1.0
+            )
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            t0 = time.monotonic()
+            result = a.notify(body="test")
+            wall = time.monotonic() - t0
+
+            # The result returns nowhere near the full blocking send()
+            # delay -- generous slack here for loaded CI runners, since
+            # only the *relative* gap to the 1.0s delay matters.
+            assert wall < 0.6
+            assert result.status == AppriseResultStatus.TIMEOUT
+            # The first attempt started, but no retry was launched.
+            assert service.calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_asyncio_skips_wait_when_deadline_already_passed(self):
+        """Async retry skips its wait once the deadline has passed."""
+        N_MGR["slowfail"] = _SlowFailNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True, service_timeout=0.05)
+            service = _SlowFailNotify(
+                host="x", asset=asset, retry=1, wait=1.0, delay=0.08
+            )
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            # Keep the delay just above service_timeout so do_call() reaches
+            # its retry check before the outer abandon window takes over.
+            result = asyncio.run(a.async_notify(body="test"))
+
+            assert result.status == AppriseResultStatus.FAILURE
+            assert service.calls == 1
+        finally:
+            N_MGR.unload_modules()
+
+
+class TestSharedExecutorRace:
+    """_get_shared_executor() must reuse an executor created during locking."""
+
+    def test_inner_check_skips_creation_if_already_set(self):
+        """The inner lock check returns the executor another thread created."""
+        import apprise.apprise as apprise_module
+
+        sentinel = mock.Mock(name="already-created-executor")
+
+        class _RaceLock:
+            """Simulate another thread creating the executor first."""
+
+            def __enter__(self):
+                apprise_module._shared_executor = sentinel
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        with (
+            mock.patch("apprise.apprise._shared_executor", None),
+            mock.patch("apprise.apprise._shared_executor_lock", _RaceLock()),
+            mock.patch("apprise.apprise.cf.ThreadPoolExecutor") as mock_pool,
+        ):
+            result = apprise_module._get_shared_executor()
+
+        assert result is sentinel
+        mock_pool.assert_not_called()

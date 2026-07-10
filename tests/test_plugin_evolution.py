@@ -223,7 +223,7 @@ def test_plugin_evolution_send(mock_post):
     )
     assert isinstance(obj, NotifyEvolution)
 
-    assert obj.notify(body="Hello World", title="Test") is True
+    assert bool(obj.notify(body="Hello World", title="Test")) is True
     assert mock_post.call_count == 1
 
     # Verify URL
@@ -255,7 +255,7 @@ def test_plugin_evolution_multiple_targets(mock_post):
     assert isinstance(obj, NotifyEvolution)
     assert len(obj) == 3
 
-    assert obj.notify(body="msg") is True
+    assert bool(obj.notify(body="msg")) is True
     assert mock_post.call_count == 3
 
     numbers = [loads(c[1]["data"])["number"] for c in mock_post.call_args_list]
@@ -281,7 +281,7 @@ def test_plugin_evolution_partial_failure(mock_post):
     obj = Apprise.instantiate(
         "evolution://key@host/inst/5511111111111/5522222222222"
     )
-    assert obj.notify(body="msg") is False
+    assert bool(obj.notify(body="msg")) is False
     assert mock_post.call_count == 2
 
 
@@ -293,7 +293,7 @@ def test_plugin_evolution_title_in_body(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     obj = Apprise.instantiate("evolution://key@host/inst/5511999999999")
-    assert obj.notify(body="body text", title="My Title") is True
+    assert bool(obj.notify(body="body text", title="My Title")) is True
 
     payload = loads(mock_post.call_args[1]["data"])
     assert "My Title" in payload["text"]
@@ -313,7 +313,7 @@ def test_plugin_evolution_https(mock_post):
     assert isinstance(obj, NotifyEvolution)
     assert obj.secure is True
 
-    assert obj.notify(body="secure msg") is True
+    assert bool(obj.notify(body="secure msg")) is True
     url = mock_post.call_args[0][0]
     assert url.startswith("https://")
 
@@ -329,9 +329,12 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     mock_post.return_value.text = "{}"
 
     def notify(body):
+        """Send one HTML body through the configured Evolution plugin."""
         aobj = Apprise()
         assert aobj.add("evolutions://key@host/inst/5511999999999")
-        assert aobj.notify(body=body, body_format=NotifyFormat.HTML) is True
+        assert (
+            bool(aobj.notify(body=body, body_format=NotifyFormat.HTML)) is True
+        )
         payload = loads(mock_post.call_args_list[-1][1]["data"])
         mock_post.reset_mock()
         return payload["text"]
@@ -363,7 +366,7 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # Direct WhatsApp Markdown remains unchanged.
     aobj = Apprise()
     assert aobj.add("evolutions://key@host/inst/5511999999999")
-    assert aobj.notify(body="*already* whatsapp-bound markdown") is True
+    assert bool(aobj.notify(body="*already* whatsapp-bound markdown")) is True
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*already* whatsapp-bound markdown"
     mock_post.reset_mock()
@@ -407,10 +410,12 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     aobj = Apprise()
     assert aobj.add("evolutions://key@host/inst/5511999999999")
     assert (
-        aobj.notify(
-            body="<b>hello</b>",
-            title="My Title",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b>",
+                title="My Title",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -422,13 +427,41 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # and list characters (html_to_markdown converts "  - " to "-").
     # The heading is skipped and the title field is cleared regardless.
     assert (
-        aobj.notify(
-            body="<b>hello</b>",
-            title="  - ",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b>",
+                title="  - ",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*hello*"
     mock_post.reset_mock()
+
+
+@mock.patch("requests.post")
+def test_plugin_evolution_declared_markdown_gets_dialect_completion(
+    mock_post,
+):
+    """Declared Markdown gets WhatsApp dialect completion."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+
+    aobj = Apprise()
+    assert aobj.add("evolution://key@host/inst/5511999999999")
+
+    assert (
+        bool(
+            aobj.notify(
+                body="*bold* [click here](<https://example.com/x>)",
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "_bold_ click here (https://example.com/x)"

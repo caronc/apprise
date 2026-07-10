@@ -396,4 +396,4 @@ def test_notify_wxpusher_plugin_result_list(mock_post):
     assert isinstance(obj, NotifyWxPusher)
 
     # We should now fail
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False

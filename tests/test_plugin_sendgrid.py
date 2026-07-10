@@ -244,11 +244,13 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     obj = Apprise.instantiate("sendgrid://abcd:user@example.com")
     assert isinstance(obj, NotifySendGrid)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -259,11 +261,13 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     # Try again in a use case where we can't access the file
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -271,11 +275,13 @@ def test_plugin_sendgrid_attachments(mock_post, mock_get):
     # Try again in a use case where we can't access the file
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )

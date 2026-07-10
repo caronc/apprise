@@ -90,6 +90,7 @@ def convert_between(from_format, to_format, content):
         (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
         (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
         (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
+        (NotifyFormat.TEXT, NotifyFormat.MARKDOWN): text_to_markdown,
     }
 
     # Fetch the converter registered for this format pair.
@@ -114,6 +115,21 @@ def text_to_html(content):
 
     # First eliminate any carriage returns
     return URLBase.escape_html(content, convert_new_lines=True)
+
+
+# CommonMark syntax characters, including backslash itself.
+# Plain text has no escape state, so escape every occurrence.
+_COMMONMARK_ESCAPABLE_RE = re.compile(r"([\\_*\[\]()~`>#+=|{}.!-])")
+
+
+def text_to_markdown(content):
+    """Converts specified content from plain text to CommonMark.
+
+    Escapes CommonMark-significant characters, including backslashes, so
+    plain text renders literally in Markdown destinations.
+    """
+
+    return _COMMONMARK_ESCAPABLE_RE.sub(r"\\\1", content)
 
 
 def html_to_text(content):

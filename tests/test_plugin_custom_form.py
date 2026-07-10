@@ -33,7 +33,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.custom_form import NotifyForm
 
 logging.disable(logging.CRITICAL)
@@ -236,6 +236,40 @@ def test_plugin_custom_form_urls():
 
 
 @mock.patch("requests.request")
+def test_plugin_custom_form_multi_format(mock_request):
+    """NotifyForm() supports all 3 notify formats as a pass-through."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    assert NotifyForm.notify_format == (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
+    a = Apprise()
+    assert a.add("form://localhost") is True
+
+    # Markdown input aligns directly to the pass-through Markdown path,
+    # so no conversion should alter it.
+    assert (
+        bool(a.notify(body="# hello", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
+    payload = mock_request.call_args_list[-1][1]["data"]
+    assert payload["message"] == "# hello"
+
+    # ?format=html forces the resolved target regardless of input format.
+    a = Apprise()
+    assert a.add("form://localhost/?format=html") is True
+    assert bool(a.notify(body="a < b", body_format=NotifyFormat.TEXT)) is True
+    payload = mock_request.call_args_list[-1][1]["data"]
+    assert payload["message"] == "a&nbsp;&lt;&nbsp;b"
+
+
+@mock.patch("requests.request")
 def test_plugin_custom_form_attachments(mock_request):
     """NotifyForm() Attachments."""
 
@@ -253,11 +287,13 @@ def test_plugin_custom_form_attachments(mock_request):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -265,11 +301,13 @@ def test_plugin_custom_form_attachments(mock_request):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -278,11 +316,13 @@ def test_plugin_custom_form_attachments(mock_request):
     mock_request.side_effect = OSError()
     # We can't send the message if we can't read the attachment
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -301,11 +341,13 @@ def test_plugin_custom_form_attachments(mock_request):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -314,11 +356,13 @@ def test_plugin_custom_form_attachments(mock_request):
     with mock.patch("builtins.open", side_effect=[None, OSError(), None]):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -327,11 +371,13 @@ def test_plugin_custom_form_attachments(mock_request):
     mock_request.return_value = None
     mock_request.side_effect = OSError()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -353,11 +399,13 @@ def test_plugin_custom_form_attachments(mock_request):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -370,11 +418,13 @@ def test_plugin_custom_form_attachments(mock_request):
     )
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -410,11 +460,13 @@ def test_plugin_custom_form_attachments(mock_request):
         path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
         attach = AppriseAttachment(path)
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
@@ -427,11 +479,13 @@ def test_plugin_custom_form_attachments(mock_request):
         )
         attach = AppriseAttachment(path)
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )

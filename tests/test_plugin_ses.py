@@ -350,7 +350,7 @@ def test_plugin_ses_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
     # The phone number is invalid, and without it, there is nothing
     # to notify; we
@@ -363,7 +363,7 @@ def test_plugin_ses_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
 
 def test_plugin_ses_url_parsing():
@@ -499,7 +499,7 @@ def test_plugin_ses_attachments(mock_post):
     )
 
     # Send a good attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Reset our mock object
     mock_post.reset_mock()
@@ -509,7 +509,7 @@ def test_plugin_ses_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Send our attachments
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -520,7 +520,7 @@ def test_plugin_ses_attachments(mock_post):
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
-    assert obj.notify(body="test", attach=attach) is False
+    assert bool(obj.notify(body="test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -544,7 +544,7 @@ def test_plugin_ses_session_token(mock_post):
     assert obj.aws_session_token == TEST_SESSION_TOKEN
 
     # send() must include X-Amz-Security-Token in request headers
-    assert obj.notify(body="test") is True
+    assert bool(obj.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" in call_kwargs["headers"]
     assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
@@ -581,7 +581,7 @@ def test_plugin_ses_session_token(mock_post):
         targets=["recipient@example.com"],
     )
     assert obj_plain.aws_session_token is None
-    assert obj_plain.notify(body="test") is True
+    assert bool(obj_plain.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" not in call_kwargs["headers"]
 

@@ -62,8 +62,9 @@ class NotifySendPulse(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/sendpulse/"
 
-    # Default to markdown
-    notify_format = NotifyFormat.HTML
+    # SendPulse can send either HTML or plain text. HTML remains the
+    # default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # The default Email API URL to use
     notify_email_url = "https://api.sendpulse.com/smtp/emails"
@@ -498,6 +499,7 @@ class NotifySendPulse(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """
@@ -527,9 +529,12 @@ class NotifySendPulse(NotifyBase):
             }
         }
 
-        # Prepare Email Message
-        if self.notify_format == NotifyFormat.HTML:
-            # HTML
+        # Resolve the requested delivery representation for this send.
+        # HTML mode includes a derived plain-text alternative; TEXT mode
+        # sends the plain body only.
+        if self.resolve_format(body_format) == NotifyFormat.HTML:
+            # HTML is the caller-selected representation; derive the
+            # plain-text companion field for mail clients that need it.
             payload_["email"].update(
                 {
                     "text": convert_between(

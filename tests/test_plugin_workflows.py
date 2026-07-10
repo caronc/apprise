@@ -279,7 +279,9 @@ def test_plugin_workflows_simple_test(
     obj = Apprise.instantiate(workflows_url)
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -338,7 +340,9 @@ def test_plugin_workflows_simple_test(
     obj = Apprise.instantiate(f"{workflows_url}?pa=yes")
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -441,7 +445,9 @@ def test_plugin_workflows_templating_basic_success(
 
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -486,7 +492,9 @@ def test_plugin_workflows_templating_invalid_json(
     assert isinstance(obj, NotifyWorkflows)
     # We will fail to preform our notifcation because the JSON is bad
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -508,7 +516,11 @@ def test_plugin_workflows_templating_load_json_failure(
         # we fail, but this time it's because we couldn't
         # access the cached file contents for reading
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )
 
@@ -564,7 +576,9 @@ def test_plugin_workflows_templating_target_success(
 
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -612,7 +626,9 @@ def test_plugin_workflows_templating_invalid_type(
     assert isinstance(obj, NotifyWorkflows)
     # Validation rejects incorrect 'type' value
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert request_mock.called is False
@@ -630,7 +646,9 @@ def test_plugin_workflows_templating_missing_attachments(
     obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert request_mock.called is False
@@ -640,7 +658,11 @@ def test_plugin_workflows_templating_missing_attachments(
     obj2 = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
     assert isinstance(obj2, NotifyWorkflows)
     assert (
-        obj2.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj2.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
+        )
         is False
     )
     assert request_mock.called is False
@@ -658,7 +680,9 @@ def test_plugin_workflows_templating_invalid_contenttype(
     assert isinstance(obj, NotifyWorkflows)
     # An attachment without a 'contentType' string is rejected
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert request_mock.called is False
@@ -731,7 +755,9 @@ def test_plugin_workflows_templating_content_not_dict(
     obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert request_mock.called is False
@@ -748,7 +774,9 @@ def test_plugin_workflows_templating_attachment_not_dict(
     obj = Apprise.instantiate(f"{workflows_url}/?template={template!s}")
     assert isinstance(obj, NotifyWorkflows)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert request_mock.called is False
@@ -777,7 +805,7 @@ def test_plugin_workflows_templating_none_token_value(
     assert isinstance(obj, NotifyWorkflows)
     # Must succeed -- None coerced to "" keeps the JSON valid
     assert (
-        obj.notify(body="hello", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="hello", title="t", notify_type=NotifyType.INFO))
         is True
     )
     assert request_mock.called is True
@@ -819,7 +847,9 @@ def test_workflows_yaml_config_missing_template_filename(
 
     # However we can't send notification since the template couldn't be loaded
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert request_mock.called is False
@@ -890,9 +920,11 @@ def test_plugin_workflows_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Workflows
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -918,7 +950,7 @@ def test_plugin_workflows_mention_entities(mock_post):
     assert aobj.add("workflow://hostname/workflow1/signature1/?image=no")
 
     # Keep Teams metadata minimal when the body contains no mentions.
-    assert aobj.notify(body="Hello world", title="T") is True
+    assert bool(aobj.notify(body="Hello world", title="T")) is True
     payload = json.loads(mock_post.call_args_list[0][1]["data"])
     msteams = payload["attachments"][0]["content"]["msteams"]
     assert msteams == {"width": "full"}
@@ -926,9 +958,11 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Add one entity for a single mention.
     assert (
-        aobj.notify(
-            body="Hello <at>foo@example.com</at>!",
-            title="T",
+        bool(
+            aobj.notify(
+                body="Hello <at>foo@example.com</at>!",
+                title="T",
+            )
         )
         is True
     )
@@ -951,11 +985,14 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Preserve source order for distinct mentions.
     assert (
-        aobj.notify(
-            body=(
-                "Hi <at>alice@example.com</at> and <at>bob@example.com</at>!"
-            ),
-            title="T",
+        bool(
+            aobj.notify(
+                body=(
+                    "Hi <at>alice@example.com</at> and"
+                    " <at>bob@example.com</at>!"
+                ),
+                title="T",
+            )
         )
         is True
     )
@@ -968,11 +1005,14 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Deduplicate repeated mention IDs.
     assert (
-        aobj.notify(
-            body=(
-                "<at>dup@example.com</at> and <at>dup@example.com</at> again"
-            ),
-            title="T",
+        bool(
+            aobj.notify(
+                body=(
+                    "<at>dup@example.com</at> and"
+                    " <at>dup@example.com</at> again"
+                ),
+                title="T",
+            )
         )
         is True
     )
@@ -984,9 +1024,11 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Recover the valid inner tag from a nested opening sequence.
     assert (
-        aobj.notify(
-            body="Hi <at><at>user@example.com</at>!",
-            title="T",
+        bool(
+            aobj.notify(
+                body="Hi <at><at>user@example.com</at>!",
+                title="T",
+            )
         )
         is True
     )
@@ -998,9 +1040,11 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Recover an inner mention when text invalidates the outer tag.
     assert (
-        aobj.notify(
-            body="<at>garbage<at>inner@example.com</at>",
-            title="T",
+        bool(
+            aobj.notify(
+                body="<at>garbage<at>inner@example.com</at>",
+                title="T",
+            )
         )
         is True
     )
@@ -1012,7 +1056,7 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Ignore empty, whitespace-only, and unclosed mention tags.
     for bad_body in ("<at></at>", "<at>   </at>", "<at>unclosed"):
-        assert aobj.notify(body=bad_body, title="T") is True
+        assert bool(aobj.notify(body=bad_body, title="T")) is True
         payload = json.loads(mock_post.call_args_list[-1][1]["data"])
         msteams = payload["attachments"][0]["content"]["msteams"]
         assert msteams == {"width": "full"}, (
@@ -1023,9 +1067,11 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Preserve mixed-case entity text for Teams' verbatim body match.
     assert (
-        aobj.notify(
-            body="Hi <AT>user@example.com</AT>!",
-            title="T",
+        bool(
+            aobj.notify(
+                body="Hi <AT>user@example.com</AT>!",
+                title="T",
+            )
         )
         is True
     )
@@ -1037,9 +1083,11 @@ def test_plugin_workflows_mention_entities(mock_post):
 
     # Preserve tag padding while trimming the ID used for user resolution.
     assert (
-        aobj.notify(
-            body="Hi <at>  padded@example.com  </at>!",
-            title="T",
+        bool(
+            aobj.notify(
+                body="Hi <at>  padded@example.com  </at>!",
+                title="T",
+            )
         )
         is True
     )

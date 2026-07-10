@@ -946,7 +946,7 @@ def test_plugin_pushplus_apprise_integration(mock_post):
     aobj = Apprise()
     assert aobj.add("pushplus://{}".format(GOOD_TOKEN))
     assert len(aobj) == 1
-    assert aobj.notify(title="Test Title", body="Test Body") is True
+    assert bool(aobj.notify(title="Test Title", body="Test Body")) is True
     assert mock_post.call_count == 1
 
     mock_post.reset_mock()
@@ -957,7 +957,7 @@ def test_plugin_pushplus_apprise_integration(mock_post):
     assert aobj2.add(
         "pushplus://{}/mygroup?format=markdown".format(GOOD_TOKEN)
     )
-    assert aobj2.notify(body="Group message") is True
+    assert bool(aobj2.notify(body="Group message")) is True
     assert mock_post.call_count == 1
     payload = loads(mock_post.call_args[1]["data"])
     # format=markdown must map to the PushPlus "markdown" template
@@ -970,6 +970,6 @@ def test_plugin_pushplus_apprise_integration(mock_post):
     # wecom:// schema alias -- channel=cp in payload
     aobj3 = Apprise()
     assert aobj3.add("wecom://{}".format(GOOD_TOKEN))
-    assert aobj3.notify(body="WeCom message") is True
+    assert bool(aobj3.notify(body="WeCom message")) is True
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["channel"] == PushPlusChannel.WECOM
