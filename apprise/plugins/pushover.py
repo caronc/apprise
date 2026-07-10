@@ -197,6 +197,14 @@ class NotifyPushover(NotifyBase):
     # Pushover uses the http protocol with JSON requests
     notify_url = "https://api.pushover.net/1/messages.json"
 
+    # Pushover can send plain text, HTML, or Markdown-derived HTML.
+    # Plain text remains the default.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
     # Support attachments
     attachment_support = True
 
@@ -514,6 +522,8 @@ class NotifyPushover(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
+        format_controlled=None,
         **kwargs,
     ):
         """Perform Pushover Notification."""
@@ -552,11 +562,13 @@ class NotifyPushover(NotifyBase):
         if self.supplemental_url_title:
             base_payload["url_title"] = self.supplemental_url_title
 
-        if self.notify_format == NotifyFormat.HTML:
+        if body_format == NotifyFormat.HTML:
             # https://pushover.net/api#html
             base_payload["html"] = 1
 
-        elif self.notify_format == NotifyFormat.MARKDOWN:
+        elif body_format == NotifyFormat.MARKDOWN and format_controlled:
+            # Pushover has no native Markdown; convert declared Markdown
+            # to HTML and leave undeclared sources untouched.
             base_payload["message"] = convert_between(
                 NotifyFormat.MARKDOWN, NotifyFormat.HTML, body
             )

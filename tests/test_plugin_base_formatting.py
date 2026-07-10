@@ -3762,6 +3762,23 @@ def test_notify_markdown_general():
     assert body.lstrip("\r\n\x0b\x0c").rstrip() == chunks[0].get("body")
     assert chunks[0].get("title") == ""
 
+    # Declared Markdown turns a real title into a heading.
+    real_title = "My Title"
+    chunks = obj._apply_overflow(
+        body=body,
+        title=real_title,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == f"# {real_title}\n{body}"
+    assert chunks[0].get("title") == ""
+
+    # Undeclared input keeps the title literal.
+    chunks = obj._apply_overflow(body=body, title=real_title)
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == f"{real_title}\r\n{body}"
+    assert chunks[0].get("title") == ""
+
 
 @mock.patch("requests.request")
 def test_notify_emoji_general(mock_request):
