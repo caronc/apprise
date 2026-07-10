@@ -72,9 +72,9 @@ ServerCall = tuple[NotifyBase, dict[str, Any]]
 # Extra seconds of patience for notify() calls.
 _ABANDON_GRACE_SECONDS = 0.1
 
-# Shared thread pool for _notify_parallel_threadpool(). One pool for the
-# whole process -- a fresh one per call would leak a thread every time a
-# service hangs.
+# Shared thread pool for _notify_sequential() and
+# _notify_parallel_threadpool(). One pool for the whole process -- a
+# fresh one per call would leak a thread every time a service hangs.
 _shared_executor: Optional[cf.ThreadPoolExecutor] = None
 _shared_executor_lock = threading.Lock()
 
@@ -293,6 +293,123 @@ def _attempt_status(success: bool) -> AppriseResultStatus:
     return (
         AppriseResultStatus.SUCCESS if success else AppriseResultStatus.FAILURE
     )
+
+
+def _call_with_retry(
+    service: NotifyBase,
+    kwargs: dict[str, Any],
+    call_deadline: Optional[float],
+) -> tuple[bool, NotifyResult]:
+    """Run one service with retries, waits, logging, and deadlines.
+
+    Shared by sequential and thread-pool dispatch so both paths report
+    the same NotifyResult shape.
+    """
+    # Pop the per-call overrides so they stay internal.
+    retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
+    wait = getattr(service, "wait", 0.0)
+    log_callback = kwargs.pop("_log_callback", None)
+
+    # Start the service budget when work actually begins.
+    deadline = _compute_deadline(service, call_deadline)
+    attempts: list[NotifyAttempt] = []
+    for attempt in range(retry + 1):
+        if deadline is not None and time.monotonic() >= deadline:
+            # Record that no further attempt was started.
+            logger.trace(
+                "Deadline already passed for '%s'; skipping attempt %d/%d.",
+                service.service_name,
+                attempt + 1,
+                retry + 1,
+            )
+            attempts.append(
+                NotifyAttempt(
+                    status=AppriseResultStatus.TIMEOUT,
+                    logs=[_timeout_log_entry(service.service_name, 0.0)],
+                )
+            )
+            break
+
+        attempt_start = time.monotonic()
+        logger.trace(
+            "Starting attempt %d/%d for '%s'.",
+            attempt + 1,
+            retry + 1,
+            service.service_name,
+        )
+        # Treat validation errors and plugin crashes as retriable failures.
+        with _ServiceLogCapture(service, log_callback=log_callback) as capture:
+            try:
+                result = service.notify(**kwargs)
+            except TypeError:
+                result = False
+            except Exception as e:
+                logger.warning(
+                    "Notification service '%s' raised an exception.",
+                    service.service_name,
+                )
+                logger.debug("Notification Exception: %s", str(e))
+                result = False
+
+        attempt_elapsed = time.monotonic() - attempt_start
+        logger.trace(
+            "Attempt %d/%d for '%s' finished in %.3fs: %s.",
+            attempt + 1,
+            retry + 1,
+            service.service_name,
+            attempt_elapsed,
+            "success" if result else "failure",
+        )
+        attempts.append(
+            NotifyAttempt(
+                status=_attempt_status(result),
+                elapsed=attempt_elapsed,
+                logs=capture.entries,
+            )
+        )
+
+        if result:
+            break
+
+        if attempt < retry:
+            logger.warning(
+                "Attempt %d/%d for '%s' failed; trying again.",
+                attempt + 1,
+                retry,
+                service.service_name,
+            )
+            if wait > 0:
+                sleep_for = wait
+                if deadline is not None:
+                    sleep_for = min(
+                        wait, max(0.0, deadline - time.monotonic())
+                    )
+                if sleep_for > 0:
+                    time.sleep(sleep_for)
+
+    # Optional services can fail quietly, but keep a log breadcrumb.
+    optional = getattr(service, "optional", False)
+    succeeded = any(a.status == AppriseResultStatus.SUCCESS for a in attempts)
+    if not succeeded and optional:
+        logger.info(
+            "Optional service '%s' did not send successfully; continuing.",
+            service.service_name,
+        )
+
+    # Metadata helpers belong to plugins and may raise.
+    name, url, url_id, tag, weight = _service_metadata(service)
+    notify_result = NotifyResult(
+        name=name,
+        url=url,
+        url_id=url_id,
+        tag=tag,
+        optional=optional,
+        weight=weight,
+        max_attempts=retry + 1,
+        attempts=attempts,
+    )
+
+    return bool(notify_result), notify_result
 
 
 class Apprise:
@@ -1491,13 +1608,25 @@ class Apprise:
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
 
+            # Resolve this server's actual per-call rendering target.
+            # Single-format servers always resolve to their one declared
+            # format. Multi-format servers may resolve differently per
+            # call depending on ?format= or this notify() call's
+            # body_format.
+            target_format = server.resolve_format(body_format)
+
             # First we need to generate a key we will use to determine if we
             # need to build our data out.  Entries without are merged with
-            # the body at this stage.
+            # the body at this stage. Keying off the resolved target
+            # keeps conversion caching about the actual rendered format,
+            # not the plugin's raw notify_format declaration. Two
+            # servers that both resolve to HTML still share one converted
+            # body even if one of them declared multiple supported
+            # formats.
             key = (
-                server.notify_format
+                target_format
                 if server.title_maxlen > 0
-                else f"_{server.notify_format}"
+                else f"_{target_format}"
             )
 
             if server.interpret_emojis:
@@ -1514,13 +1643,13 @@ class Apprise:
                 if conversion_title_map[key] and server.title_maxlen <= 0:
                     conversion_title_map[key] = convert_between(
                         body_format,
-                        server.notify_format,
+                        target_format,
                         content=conversion_title_map[key],
                     )
 
                 # Our body is always converted no matter what
                 conversion_body_map[key] = convert_between(
-                    body_format, server.notify_format, content=body
+                    body_format, target_format, content=body
                 )
 
                 if interpret_escapes:
@@ -1566,7 +1695,11 @@ class Apprise:
                 "title": conversion_title_map[key],
                 "notify_type": notify_type,
                 "attach": attach,
-                "body_format": body_format,
+                # Pass the resolved target format; downstream notify()
+                # calls use it directly without resolving again.
+                # Preserve whether the caller declared a source format.
+                "body_format": target_format,
+                "format_controlled": body_format is not None,
             }
             yield (server, kwargs)
 
@@ -1574,156 +1707,86 @@ class Apprise:
     def _notify_sequential(
         *services_kwargs: ServerCall, call_deadline: Optional[float] = None
     ) -> tuple[bool, list[NotifyResult]]:
-        """Process a list of notify() calls sequentially and synchronously.
+        """Process a list of notify() calls one at a time, in order.
 
-        Retries, wait times, per-call retry overrides, and deadlines are all
-        handled here. A blocking in-flight call cannot be preempted.
+        Calls with deadlines use the shared executor so Apprise can stop
+        waiting on a blocked service while preserving result order.
         """
 
         success = True
         results: list[NotifyResult] = []
 
         for service, kwargs in services_kwargs:
-            # Pop the per-call overrides before forwarding kwargs to the
-            # plugin so it never sees these internal keys.
-            retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
-            wait = getattr(service, "wait", 0.0)
-            log_callback = kwargs.pop("_log_callback", None)
-
-            # The deadline is computed fresh right as this service's own
-            # dispatch begins, per-service, not from when notify() was
-            # first called.
+            # The outer wait needs a deadline before submission.
             deadline = _compute_deadline(service, call_deadline)
-            attempts: list[NotifyAttempt] = []
-            for attempt in range(retry + 1):
-                if deadline is not None and time.monotonic() >= deadline:
-                    # Out of time -- do not start another attempt.  Record
-                    # a zero-elapsed TIMEOUT attempt marking the decision
-                    # to stop, with its own diagnostic log entry, rather
-                    # than silently dropping it.
-                    logger.trace(
-                        "Deadline already passed for '%s'; skipping "
-                        "attempt %d/%d.",
-                        service.service_name,
-                        attempt + 1,
-                        retry + 1,
-                    )
-                    attempts.append(
-                        NotifyAttempt(
-                            status=AppriseResultStatus.TIMEOUT,
-                            logs=[
-                                _timeout_log_entry(service.service_name, 0.0)
-                            ],
-                        )
-                    )
-                    break
 
-                # monotonic() avoids wall-clock jumps while timing an attempt.
-                attempt_start = time.monotonic()
-                logger.trace(
-                    "Starting attempt %d/%d for '%s'.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
+            if deadline is None:
+                ok, notify_result = _call_with_retry(
+                    service, kwargs, call_deadline
                 )
-                # Isolate this attempt's log output so it can be
-                # attributed to exactly this call in the NotifyAttempt
-                # built below (see _ServiceLogCapture).
-                with _ServiceLogCapture(
-                    service, log_callback=log_callback
-                ) as capture:
-                    # Treat validation and plugin exceptions as failed
-                    # attempts.
-                    try:
-                        result = service.notify(**kwargs)
-                    except TypeError:
-                        result = False
-                    except Exception as e:
-                        logger.warning(
-                            "Notification service '%s' raised an exception.",
-                            service.service_name,
-                        )
-                        logger.debug("Notification Exception: %s", str(e))
-                        result = False
+                success = success and ok
+                results.append(notify_result)
+                continue
 
-                attempt_elapsed = time.monotonic() - attempt_start
-                logger.trace(
-                    "Attempt %d/%d for '%s' finished in %.3fs: %s.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
-                    attempt_elapsed,
-                    "success" if result else "failure",
-                )
-                attempts.append(
-                    NotifyAttempt(
-                        status=_attempt_status(result),
-                        elapsed=attempt_elapsed,
-                        logs=capture.entries,
-                    )
-                )
+            # Allow a small grace window before abandoning the wait.
+            abandon_at = deadline + _ABANDON_GRACE_SECONDS
+            wait_start = time.monotonic()
+            wait_for = max(0.0, abandon_at - wait_start)
 
-                if result:
-                    # Delivered successfully; no need to retry this service.
-                    break
-
-                if attempt < retry:
-                    # Delivery failed and retries remain.  Log the attempt
-                    # number and pause before the next try.
-                    logger.warning(
-                        "Attempt %d/%d for '%s' failed; trying again.",
-                        attempt + 1,
-                        retry,
-                        service.service_name,
-                    )
-                    if wait > 0:
-                        # Never sleep past the deadline -- the top-of-loop
-                        # check above will report the timeout on the next
-                        # iteration once we wake up.
-                        sleep_for = wait
-                        if deadline is not None:
-                            sleep_for = min(
-                                wait, max(0.0, deadline - time.monotonic())
-                            )
-                        if sleep_for > 0:
-                            time.sleep(sleep_for)
-
-            # Optional-service check after all retries have completed.
-            # NotifyResult reflects optional failures/timeouts as SUCCESS;
-            # this log only records that the underlying delivery failed.
-            #
-            # Optional services still use every retry; only the final status
-            # is interpreted differently.
-            optional = getattr(service, "optional", False)
-            succeeded = any(
-                a.status == AppriseResultStatus.SUCCESS for a in attempts
+            logger.trace(
+                "Waiting up to %.3fs for '%s'.",
+                wait_for,
+                service.service_name,
             )
-            if not succeeded and optional:
-                logger.info(
-                    "Optional service '%s' did not send successfully; "
-                    "continuing.",
+
+            executor = _get_shared_executor()
+            future = executor.submit(
+                _call_with_retry, service, kwargs, call_deadline
+            )
+            try:
+                # Keep a final guard for unexpected executor failures.
+                ok, notify_result = future.result(timeout=wait_for)
+                logger.trace(
+                    "'%s' finished after %.3fs: %s.",
                     service.service_name,
+                    time.monotonic() - wait_start,
+                    "success" if ok else "failure",
                 )
 
-            # Gathered defensively -- see _service_metadata() -- so a
-            # plugin whose url()/url_id()/__len__ raises can never crash
-            # this call or discard a delivery that already succeeded.
-            name, url, url_id, tag, weight = _service_metadata(service)
-            notify_result = NotifyResult(
-                name=name,
-                url=url,
-                url_id=url_id,
-                tag=tag,
-                optional=optional,
-                weight=weight,
-                max_attempts=retry + 1,
-                attempts=attempts,
-            )
-            results.append(notify_result)
+            except cf.TimeoutError:
+                # The service took too long; report TIMEOUT and move on.
+                wait_elapsed = time.monotonic() - wait_start
+
+                # Track only work that already started and cannot be cancelled.
+                cancelled = future.cancel()
+                if not cancelled:
+                    name, url, _, _, _ = _service_metadata(service)
+                    _track_abandoned_future(future, name, url)
+                logger.trace(
+                    "Stopped waiting for '%s' after %.3fs (%s).",
+                    service.service_name,
+                    wait_elapsed,
+                    "it was still queued and has been cancelled"
+                    if cancelled
+                    else "its worker thread may still be running in the "
+                    "background",
+                )
+                notify_result = _timeout_result(service, wait_elapsed)
+                ok = bool(notify_result)
+
+            except Exception as e:
+                logger.warning(
+                    "Notification service '%s' raised an exception.",
+                    service.service_name,
+                )
+                logger.debug("Notification Exception: %s", str(e))
+                notify_result = _safe_error_result(service)
+                ok = bool(notify_result)
 
             # One required failure means the whole batch cannot succeed.
             # Optional failures already count as SUCCESS in NotifyResult.
-            success = success and bool(notify_result)
+            success = success and ok
+            results.append(notify_result)
 
         return success, results
 
@@ -1758,143 +1821,6 @@ class Apprise:
             "Notifying %d service(s) with threads.", len(services_kwargs)
         )
 
-        def _call_with_retry(
-            service: NotifyBase, kwargs: dict[str, Any]
-        ) -> tuple[bool, NotifyResult]:
-            """Execute one service's notify() with retry/wait logic.
-
-            Runs inside a worker thread.  Pops ``_retry_override`` from
-            kwargs so it is never forwarded to the plugin's notify() call.
-            Exceptions are caught and treated as failures so the retry
-            loop continues even when a plugin raises unexpectedly.
-
-            Returns (bool, NotifyResult) -- the bool is this service's
-            contribution to the batch's aggregate success value (mirrors
-            the NotifyResult's own reflective status, already adjusted
-            for optional=); the NotifyResult also carries every raw,
-            unadjusted NotifyAttempt for the caller's AppriseResult.
-            """
-            # Pop the per-call overrides so they stay internal.
-            retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
-            wait = getattr(service, "wait", 0.0)
-            log_callback = kwargs.pop("_log_callback", None)
-
-            # The deadline is computed here, right as this worker actually
-            # begins running -- not at submission time -- so time spent
-            # queued behind other work in the pool never counts against
-            # this service's own budget.
-            deadline = _compute_deadline(service, call_deadline)
-            attempts: list[NotifyAttempt] = []
-            for attempt in range(retry + 1):
-                if deadline is not None and time.monotonic() >= deadline:
-                    # Out of time -- record a zero-elapsed TIMEOUT attempt
-                    # marking the decision to stop, and do not start
-                    # another one.
-                    logger.trace(
-                        "Deadline already passed for '%s'; skipping "
-                        "attempt %d/%d.",
-                        service.service_name,
-                        attempt + 1,
-                        retry + 1,
-                    )
-                    attempts.append(
-                        NotifyAttempt(
-                            status=AppriseResultStatus.TIMEOUT,
-                            logs=[
-                                _timeout_log_entry(service.service_name, 0.0)
-                            ],
-                        )
-                    )
-                    break
-
-                attempt_start = time.monotonic()
-                logger.trace(
-                    "Starting attempt %d/%d for '%s'.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
-                )
-                # Same exception handling as _notify_sequential: TypeError
-                # from Apprise validation and bare Exception for buggy or
-                # third-party plugins both map to a retriable failure.
-                with _ServiceLogCapture(
-                    service, log_callback=log_callback
-                ) as capture:
-                    try:
-                        result = service.notify(**kwargs)
-                    except TypeError:
-                        result = False
-                    except Exception as e:
-                        logger.warning(
-                            "Notification service '%s' raised an exception.",
-                            service.service_name,
-                        )
-                        logger.debug("Notification Exception: %s", str(e))
-                        result = False
-
-                attempt_elapsed = time.monotonic() - attempt_start
-                logger.trace(
-                    "Attempt %d/%d for '%s' finished in %.3fs: %s.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
-                    attempt_elapsed,
-                    "success" if result else "failure",
-                )
-                attempts.append(
-                    NotifyAttempt(
-                        status=_attempt_status(result),
-                        elapsed=attempt_elapsed,
-                        logs=capture.entries,
-                    )
-                )
-
-                if result:
-                    break
-
-                if attempt < retry:
-                    logger.warning(
-                        "Attempt %d/%d for '%s' failed; trying again.",
-                        attempt + 1,
-                        retry,
-                        service.service_name,
-                    )
-                    if wait > 0:
-                        sleep_for = wait
-                        if deadline is not None:
-                            sleep_for = min(
-                                wait, max(0.0, deadline - time.monotonic())
-                            )
-                        if sleep_for > 0:
-                            time.sleep(sleep_for)
-
-            # Optional services can fail quietly, but keep a log breadcrumb.
-            optional = getattr(service, "optional", False)
-            succeeded = any(
-                a.status == AppriseResultStatus.SUCCESS for a in attempts
-            )
-            if not succeeded and optional:
-                logger.info(
-                    "Optional service '%s' did not send successfully; "
-                    "continuing.",
-                    service.service_name,
-                )
-
-            # Build result metadata defensively; plugin helpers may raise.
-            name, url, url_id, tag, weight = _service_metadata(service)
-            notify_result = NotifyResult(
-                name=name,
-                url=url,
-                url_id=url_id,
-                tag=tag,
-                optional=optional,
-                weight=weight,
-                max_attempts=retry + 1,
-                attempts=attempts,
-            )
-
-            return bool(notify_result), notify_result
-
         # Keep output ordered by input, though threads finish out of order.
         # This is the shared, process-wide pool (see _get_shared_executor()),
         # not a fresh one per call -- never shut down here, it persists for
@@ -1911,7 +1837,9 @@ class Apprise:
             for service, kwargs in services_kwargs
         ]
         future_to_idx: dict[cf.Future, int] = {
-            executor.submit(_call_with_retry, service, kwargs): i
+            executor.submit(
+                _call_with_retry, service, kwargs, call_deadline
+            ): i
             for i, (service, kwargs) in enumerate(services_kwargs)
         }
 
@@ -2016,8 +1944,9 @@ class Apprise:
             so the retry loop continues even when a plugin raises
             unexpectedly (e.g. a third-party @notify-decorated coroutine).
 
-            Returns (bool, NotifyResult) -- see _call_with_retry in
-            _notify_parallel_threadpool for the equivalent contract.
+            Returns (bool, NotifyResult) -- see the module-level
+            _call_with_retry() for the equivalent contract used by the
+            sequential and thread-pool dispatch styles.
             """
             # Pop the per-call overrides so they stay internal.
             retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
@@ -2025,7 +1954,7 @@ class Apprise:
             log_callback = kwargs.pop("_log_callback", None)
 
             # Computed fresh as this coroutine actually starts running,
-            # same rationale as _notify_parallel_threadpool's worker.
+            # same rationale as the module-level _call_with_retry().
             deadline = _compute_deadline(service, call_deadline)
             attempts: list[NotifyAttempt] = []
             for attempt in range(retry + 1):

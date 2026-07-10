@@ -343,7 +343,10 @@ def test_plugin_discord_notifications(mock_post):
     instance = NotifyDiscord(**results)
     assert isinstance(instance, NotifyDiscord)
 
-    response = instance.send(body=body)
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    response = instance.send(
+        body=body, body_format=instance.resolve_format(None)
+    )
     assert response is True
     assert mock_post.call_count == 1
 
@@ -1131,7 +1134,8 @@ def test_plugin_discord_markdown_fields_batches_exactly(mock_post):
     )
     assert isinstance(obj, NotifyDiscord)
 
-    assert obj.send(body=body) is True
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    assert obj.send(body=body, body_format=obj.resolve_format(None)) is True
 
     # H1, H2, H3 => 3 fields => 3 posts (since max_fields=1)
     assert mock_post.call_count == 3
@@ -1153,7 +1157,8 @@ def test_plugin_discord_markdown_ping_is_additive(mock_post):
     )
     obj = NotifyDiscord(**results)
 
-    assert obj.send(body=body) is True
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    assert obj.send(body=body, body_format=obj.resolve_format(None)) is True
     assert mock_post.call_count == 1
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
@@ -1203,7 +1208,11 @@ def test_plugin_discord_markdown_no_mentions_has_no_allow_mentions(mock_post):
     )
     obj = NotifyDiscord(**results)
 
-    assert obj.send(body="Hello world") is True
+    # Direct send() bypasses notify(), so pass the URL-resolved format.
+    assert (
+        obj.send(body="Hello world", body_format=obj.resolve_format(None))
+        is True
+    )
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert "allow_mentions" not in payload

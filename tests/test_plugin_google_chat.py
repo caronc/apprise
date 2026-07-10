@@ -379,4 +379,30 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "*hello*"
+
+
+@mock.patch("requests.post")
+def test_plugin_google_chat_declared_markdown_gets_dialect_completion(
+    mock_post,
+):
+    """Declared Markdown gets Google Chat dialect completion."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+
+    aobj = Apprise()
+    assert aobj.add("gchat://workspace/key/token")
+
+    assert (
+        bool(
+            aobj.notify(
+                body="*bold* [click here](<https://example.com/x>)",
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "_bold_ <https://example.com/x|click here>"
     mock_post.reset_mock()

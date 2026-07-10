@@ -35,6 +35,7 @@ from apprise import (
     AppriseAttachment,
     AppriseConfig,
     NotificationManager,
+    NotifyFormat,
     common,
 )
 from apprise.decorators import notify
@@ -118,9 +119,11 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["attach"], AppriseAttachment)
     assert len(verify_obj["attach"]) == 2
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in verify_obj["kwargs"]
-    assert verify_obj["kwargs"]["body_format"] is None
+    assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert verify_obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -148,9 +151,11 @@ def test_notify_simple_decoration():
     assert verify_obj["notify_type"] == common.NotifyType.INFO
     assert verify_obj["attach"] is None
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains
+    # uncontrolled.
     assert "body_format" in verify_obj["kwargs"]
-    assert verify_obj["kwargs"]["body_format"] is None
+    assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert verify_obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -178,9 +183,11 @@ def test_notify_simple_decoration():
     assert verify_obj["notify_type"] == common.NotifyType.INFO
     assert verify_obj["attach"] is None
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in verify_obj["kwargs"]
-    assert verify_obj["kwargs"]["body_format"] is None
+    assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert verify_obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -219,9 +226,11 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["attach"], AppriseAttachment)
     assert len(verify_obj["attach"]) == 1
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in verify_obj["kwargs"]
-    assert verify_obj["kwargs"]["body_format"] is None
+    assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert verify_obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -261,9 +270,10 @@ def test_notify_simple_decoration():
     # We have no attachments
     assert verify_obj["attach"] is None
 
-    # No format was defined
+    # Declared HTML resolves directly and is marked controlled.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.HTML
+    assert verify_obj["kwargs"]["format_controlled"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -298,6 +308,90 @@ def test_notify_simple_decoration():
 
     # Tidy
     N_MGR.remove("utiltest", "notexc")
+
+
+def test_notify_decorator_body_format():
+    """decorators: Test @notify body_format support."""
+
+    assert "multifmt" not in N_MGR
+
+    received = []
+
+    @notify(
+        on="multifmt",
+        name="Apprise @notify Multi-Format Testing",
+        body_format=(NotifyFormat.HTML, NotifyFormat.MARKDOWN),
+    )
+    def my_multi_format_wrapper(body, title, notify_type, *args, **kwargs):
+        """Record the body and original body_format passed to the wrapper."""
+        received.append((body, kwargs.get("body_format")))
+
+    assert "multifmt" in N_MGR
+    assert N_MGR["multifmt"].notify_format == (
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
+    aobj = Apprise()
+    assert aobj.add("multifmt://") is True
+
+    # No override and no matching input body_format resolves to the
+    # declared default, HTML at index 0.
+    assert bool(aobj.notify(body="hello")) is True
+    assert received[-1][1] == NotifyFormat.HTML
+
+    # Markdown input aligns directly to the declared Markdown support.
+    assert (
+        bool(aobj.notify(body="# hi", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
+    assert received[-1][0] == "# hi"
+    assert received[-1][1] == NotifyFormat.MARKDOWN
+
+    # Tidy
+    N_MGR.remove("multifmt")
+
+
+def test_notify_decorator_default_is_pass_through():
+    """decorators: @notify() with no body_format= never converts."""
+
+    assert "passthru" not in N_MGR
+
+    received = []
+
+    @notify(on="passthru")
+    def passthru_wrapper(body, title, notify_type, *args, **kwargs):
+        received.append((body, kwargs.get("body_format")))
+
+    assert N_MGR["passthru"].notify_format == (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
+    aobj = Apprise()
+    assert aobj.add("passthru://") is True
+
+    # Undeclared input passes through, then reports the wrapper default.
+    assert bool(aobj.notify(body="<b>hi</b>")) is True
+    assert received[-1] == ("<b>hi</b>", NotifyFormat.TEXT)
+
+    # Declared HTML still passes through unchanged.
+    assert (
+        bool(aobj.notify(body="<b>hi</b>", body_format=NotifyFormat.HTML))
+        is True
+    )
+    assert received[-1] == ("<b>hi</b>", NotifyFormat.HTML)
+
+    # Markdown declared: also unchanged.
+    assert (
+        bool(aobj.notify(body="*hi*", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
+    assert received[-1] == ("*hi*", NotifyFormat.MARKDOWN)
+
+    # Tidy
+    N_MGR.remove("passthru")
 
 
 def test_notify_complex_decoration():
@@ -363,9 +457,11 @@ def test_notify_complex_decoration():
     assert isinstance(verify_obj["attach"], AppriseAttachment)
     assert len(verify_obj["attach"]) == 2
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in verify_obj["kwargs"]
-    assert verify_obj["kwargs"]["body_format"] is None
+    assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert verify_obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -415,9 +511,11 @@ def test_notify_complex_decoration():
     assert verify_obj["notify_type"] == common.NotifyType.INFO
     assert verify_obj["attach"] is None
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in verify_obj["kwargs"]
-    assert verify_obj["kwargs"]["body_format"] is None
+    assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert verify_obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -515,7 +613,10 @@ def test_notify_decorator_urls_with_space():
     assert obj.get("attach") is None
     assert isinstance(obj.get("args"), tuple)
     assert len(obj.get("args")) == 0
-    assert obj.get("kwargs") == {"body_format": None}
+    assert obj.get("kwargs") == {
+        "body_format": NotifyFormat.TEXT,
+        "format_controlled": False,
+    }
     meta = obj.get("meta")
     assert isinstance(meta, dict)
 
@@ -614,9 +715,11 @@ def test_notify_multi_instance_decoration(tmpdir):
     meta = obj["meta"]
     assert isinstance(meta, dict)
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in obj["kwargs"]
-    assert obj["kwargs"]["body_format"] is None
+    assert obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -653,9 +756,11 @@ def test_notify_multi_instance_decoration(tmpdir):
     meta = obj["meta"]
     assert isinstance(meta, dict)
 
-    # No format was defined
+    # Undeclared input resolves to the wrapper default and remains marked
+    # uncontrolled.
     assert "body_format" in obj["kwargs"]
-    assert obj["kwargs"]["body_format"] is None
+    assert obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
+    assert obj["kwargs"]["format_controlled"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
