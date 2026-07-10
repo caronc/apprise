@@ -1345,7 +1345,7 @@ def test_apprise_multi_format_resolution(caplog):
     API: multi-format notify_format resolution
 
     """
-    caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
+    caplog.set_level(logging.DEBUG, logger=LOGGER_NAME)
 
     class SingleFormatNotification(NotifyBase):
         """Test plugin that resolves to one fixed format."""
@@ -1402,7 +1402,7 @@ def test_apprise_multi_format_resolution(caplog):
     )
 
     # Multi-format plugin, ?format= override NOT in the declared set falls
-    # back through to input alignment, then default, with a warning
+    # back through to input alignment, then default, with a debug message.
     multi_bad_override = MultiFormatNotification(
         host="localhost", format="text"
     )
@@ -1412,10 +1412,13 @@ def test_apprise_multi_format_resolution(caplog):
         NotifyFormat.MARKDOWN
     )
     assert "does not support format" in caplog.text
+    assert "DEBUG" in caplog.text
 
+    # No declared source format: same fallback, but silent -- matches
+    # the historical no-noise conversion behavior.
     caplog.clear()
     assert multi_bad_override.resolve_format(None) == NotifyFormat.HTML
-    assert "does not support format" in caplog.text
+    assert "does not support format" not in caplog.text
 
     # send_{type}() dispatch: send_markdown() defined, used when resolved
     multi.received.clear()
