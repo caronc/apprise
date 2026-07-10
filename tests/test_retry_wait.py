@@ -3397,7 +3397,7 @@ class TestDeadlineExpiresDuringAttempt:
         try:
             asset = AppriseAsset(async_mode=False, service_timeout=0.05)
             service = _SlowFailNotify(
-                host="x", asset=asset, retry=1, wait=1.0, delay=0.2
+                host="x", asset=asset, retry=1, wait=1.0, delay=1.0
             )
             a = Apprise(asset=asset)
             a.add(service)
@@ -3406,8 +3406,10 @@ class TestDeadlineExpiresDuringAttempt:
             result = a.notify(body="test")
             wall = time.monotonic() - t0
 
-            # The result returns before the full blocking send() delay.
-            assert wall < 0.2
+            # The result returns nowhere near the full blocking send()
+            # delay -- generous slack here for loaded CI runners, since
+            # only the *relative* gap to the 1.0s delay matters.
+            assert wall < 0.6
             assert result.status == AppriseResultStatus.TIMEOUT
             # The first attempt started, but no retry was launched.
             assert service.calls == 1

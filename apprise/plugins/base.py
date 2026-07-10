@@ -762,11 +762,12 @@ class NotifyBase(URLBase):
             # The requested destination is not one this plugin declared.
             # Fall through to input alignment/default instead of failing
             # delivery, but log why the override could not be honored.
+            # The actual fallback (input alignment vs formats[0]) is
+            # decided below, so it is not named here.
             self.logger.warning(
-                "%s does not support format %s; using %s instead.",
+                "%s does not support format %s; ignoring override.",
                 self.service_name,
                 self._format_override.value,
-                formats[0].value,
             )
 
         if body_format in formats:
