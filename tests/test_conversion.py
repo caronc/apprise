@@ -42,6 +42,7 @@ from apprise.conversion import (
     build_backtick_run_index,
     convert_between,
     find_unescaped_run,
+    markdown_to_html,
 )
 
 logging.disable(logging.CRITICAL)
@@ -1742,6 +1743,47 @@ def test_conversion_text_to():
         response
         == "&lt;title&gt;Test&nbsp;Message&lt;/title&gt;&lt;body&gt;Body&lt;"
         "/body&gt;"
+    )
+
+
+def test_conversion_text_to_markdown():
+    """conversion: Test Text to Markdown"""
+
+    def to_markdown(body):
+        """Convert plain text through the public dispatcher."""
+        return convert_between(NotifyFormat.TEXT, NotifyFormat.MARKDOWN, body)
+
+    # CommonMark-significant characters are escaped so they read as
+    # literal text instead of being misread as formatting.
+    response = to_markdown("Some *text* with _markdown_ looking chars.")
+    assert response == "Some \\*text\\* with \\_markdown\\_ looking chars\\."
+
+    # Text without Markdown-significant characters is unchanged.
+    assert to_markdown("hello world") == "hello world"
+
+    # Every Markdown-significant punctuation character gets escaped.
+    response = to_markdown("_*[]()~`>#+=|{}.!-")
+    assert response == "\\_\\*\\[\\]\\(\\)\\~\\`\\>\\#\\+\\=\\|\\{\\}\\.\\!\\-"
+
+    # Plain text has no escape state, so a literal backslash is escaped.
+    response = to_markdown("already \\* escaped")
+    assert response == "already \\\\\\* escaped"
+    assert markdown_to_html(response) == "<p>already \\* escaped</p>"
+
+    # Windows-style paths survive CommonMark rendering unchanged.
+    response = to_markdown("C:\\Users\\foo")
+    assert response == "C:\\\\Users\\\\foo"
+    assert markdown_to_html(response) == "<p>C:\\Users\\foo</p>"
+
+    # Backslash-plus-syntax is still literal plain text.
+    response = to_markdown("\\# heading")
+    assert response == "\\\\\\# heading"
+    assert markdown_to_html(response) == "<p>\\# heading</p>"
+
+    # The generic dispatcher resolves the same conversion pair.
+    assert (
+        convert_between(NotifyFormat.TEXT, NotifyFormat.MARKDOWN, "hello")
+        == "hello"
     )
 
 

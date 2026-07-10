@@ -2356,6 +2356,39 @@ def test_plugin_slack_html_to_markdown_format(mock_request):
 
 
 @mock.patch("requests.request")
+def test_plugin_slack_markdown_dialect_requires_declared_source(
+    mock_request,
+):
+    """Slack dialect conversion requires a declared source format."""
+
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    aobj = Apprise()
+    assert aobj.add("slack://{}/#general?blocks=yes".format(slack_token))
+
+    body = "**hello** &amp; <world>"
+
+    def block_text(payload):
+        return payload["attachments"][0]["blocks"][0]["text"]["text"]
+
+    # Declared Markdown is translated to Slack mrkdwn.
+    assert bool(aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN))
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert block_text(payload) == "*hello* &amp;amp; <world>"
+    mock_request.reset_mock()
+
+    # Undeclared input remains byte-for-byte unchanged.
+    assert bool(aobj.notify(body=body))
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert block_text(payload) == body
+
+
+@mock.patch("requests.request")
 def test_plugin_slack_html_to_markdown_hardening(mock_request):
     """Test edge cases in the CommonMark-to-Slack dialect adaptation."""
 
