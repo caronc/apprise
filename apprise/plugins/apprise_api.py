@@ -32,7 +32,7 @@ import re
 import requests
 
 from .. import exception
-from ..common import NotifyType
+from ..common import NotifyFormat, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -73,6 +73,14 @@ class NotifyAppriseAPI(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Relay every format unchanged; the downstream Apprise API instance
+    # performs its own format handling.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
 
     # Depending on the number of transactions/notifications taking place, this
     # could take a while. 30 seconds should be enough to perform the task
@@ -258,6 +266,8 @@ class NotifyAppriseAPI(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
+        format_controlled=None,
         **kwargs,
     ):
         """Perform Apprise API Notification."""
@@ -335,8 +345,12 @@ class NotifyAppriseAPI(NotifyBase):
             "title": title,
             "body": body,
             "type": notify_type.value,
-            "format": self.notify_format.value,
         }
+
+        if format_controlled:
+            # Relay format only when the caller declared one; otherwise
+            # let the downstream Apprise API server choose its default.
+            payload["format"] = body_format.value
 
         if self.method == AppriseAPIMethod.JSON:
             headers["Content-Type"] = "application/json"

@@ -145,8 +145,8 @@ class NotifyTelegram(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/telegram/"
 
-    # Default Notify Format
-    notify_format = NotifyFormat.HTML
+    # Telegram supports HTML and Markdown. HTML remains the default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
 
     # Telegram uses the http protocol with JSON requests
     notify_url = "https://api.telegram.org/bot"
@@ -1236,19 +1236,31 @@ class NotifyTelegram(NotifyBase):
         return "".join(out), new_pending
 
     def _build_send_calls(
-        self, body=None, title=None, body_format=None, **kwargs
+        self,
+        body=None,
+        title=None,
+        body_format=None,
+        format_controlled=None,
+        **kwargs,
     ):
-        """Convert HTML-derived CommonMark and repair each split chunk.
+        """Convert declared CommonMark to Telegram syntax before split.
 
-        Pending Telegram entity state is carried between generated calls.
+        Undeclared sources are left untouched. Pending Telegram entity
+        state is carried between generated calls.
         """
 
-        if not (
-            self.notify_format == NotifyFormat.MARKDOWN
-            and body_format == NotifyFormat.HTML
-        ):
+        # Direct plugin calls bypass Apprise's format resolution.
+        if format_controlled is None:
+            format_controlled = body_format is not None
+            body_format = self.resolve_format(body_format)
+
+        if not (body_format == NotifyFormat.MARKDOWN and format_controlled):
             yield from super()._build_send_calls(
-                body=body, title=title, body_format=body_format, **kwargs
+                body=body,
+                title=title,
+                body_format=body_format,
+                format_controlled=format_controlled,
+                **kwargs,
             )
             return
 
@@ -1264,8 +1276,9 @@ class NotifyTelegram(NotifyBase):
         for kwargs2 in super()._build_send_calls(
             body=body,
             title=title,
-            # Use Markdown-aware splitting on the translated body.
+            # Already Markdown; kept explicit for readability.
             body_format=NotifyFormat.MARKDOWN,
+            format_controlled=format_controlled,
             **kwargs,
         ):
             kwargs2["body"], pending = self._repair_split_chunk(
@@ -1280,6 +1293,7 @@ class NotifyTelegram(NotifyBase):
         notify_type=NotifyType.INFO,
         attach=None,
         body_format=None,
+        format_controlled=None,
         **kwargs,
     ):
         """Perform Telegram Notification."""
@@ -1316,20 +1330,8 @@ class NotifyTelegram(NotifyBase):
         }
 
         # Prepare Message Body
-        if self.notify_format == NotifyFormat.MARKDOWN:
-            if (
-                body_format == NotifyFormat.TEXT
-                and self.markdown_ver == TelegramMarkdownVersion.TWO
-            ):
-                # Escape MarkdownV2-only reserved characters in plain text.
-                # See: https://stackoverflow.com/a/69892704/355584
-                # Also: https://core.telegram.org/bots/api#markdownv2-style
-                # HTML bodies were already escaped during dialect adaptation.
-                body = re.sub(r"(?<!\\)([_*[\]()~`>#+=|{}.!-])", r"\\\1", body)
-
-            # HTML was converted to Telegram Markdown before splitting so no
-            # further transformation is required here; direct Telegram Markdown
-            # input is left unchanged regardless of version.
+        if body_format == NotifyFormat.MARKDOWN:
+            # Markdown bodies were already translated in _build_send_calls().
             payload_["parse_mode"] = self.markdown_ver
             payload_["text"] = body
 
@@ -1338,14 +1340,8 @@ class NotifyTelegram(NotifyBase):
             payload_["parse_mode"] = "HTML"
             for r, v, m in self.__telegram_escape_html_entries:
                 if "html" in m:
-                    # Handle special cases where we need to alter new lines for
-                    # presentation purposes
-                    v = v.format(
-                        m["html"]
-                        if body_format
-                        in (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
-                        else ""
-                    )
+                    # Add heading padding only for declared HTML sources.
+                    v = v.format(m["html"] if format_controlled else "")
 
                 body = r.sub(v, body)
 
