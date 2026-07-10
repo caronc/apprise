@@ -99,8 +99,9 @@ class NotifyMailerSend(NotifyBase):
     # The MailerSend Email API endpoint
     notify_url = "https://api.mailersend.com/v1/email"
 
-    # Default to HTML notifications
-    notify_format = NotifyFormat.HTML
+    # MailerSend can accept either HTML or plain text as the main
+    # message body. HTML remains the default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # Support attachments
     attachment_support = True
@@ -329,6 +330,7 @@ class NotifyMailerSend(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """Perform MailerSend Notification."""
@@ -348,8 +350,10 @@ class NotifyMailerSend(NotifyBase):
             "Authorization": "Bearer {}".format(self.apikey),
         }
 
-        # Determine whether the body is HTML or plain text
-        use_html = self.notify_format == NotifyFormat.HTML
+        # Resolve the requested delivery representation for this send.
+        # MailerSend accepts both html and text fields, so the resolved
+        # format decides which field receives the original body.
+        use_html = self.resolve_format(body_format) == NotifyFormat.HTML
 
         # Build a base payload template reused per recipient
         payload_ = {
@@ -361,7 +365,8 @@ class NotifyMailerSend(NotifyBase):
             "subject": title if title else self.default_empty_subject,
         }
 
-        # Assign body fields; provide both html and text
+        # Assign both body fields so MailerSend has an HTML part and a
+        # plain-text alternative regardless of the selected source.
         if use_html:
             payload_["html"] = body
             payload_["text"] = convert_between(

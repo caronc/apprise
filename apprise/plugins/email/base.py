@@ -112,8 +112,8 @@ class NotifyEmail(NotifyBase):
     # reference; this allows us to auto-generate our config if needed
     storage_mode = PersistentStoreMode.AUTO
 
-    # Default Notify Format
-    notify_format = NotifyFormat.HTML
+    # Email can send either HTML or plain text. HTML remains the default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # Default SMTP Timeout (in seconds)
     socket_connect_timeout = 15
@@ -649,8 +649,10 @@ class NotifyEmail(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
+        """Perform Email Notification."""
 
         if not self.targets:
             # There is no one to email; we're done
@@ -709,12 +711,13 @@ class NotifyEmail(NotifyBase):
             }
             headers.update(self.headers)
 
-            # Iterate over our email messages we can generate and then
-            # send them off.
+            # Resolve the active representation once for each prepared
+            # message. prepare_emails() then decides whether to build an
+            # HTML multipart message or a plain text message.
             for message in NotifyEmail.prepare_emails(
                 subject=title,
                 body=body,
-                notify_format=self.notify_format,
+                notify_format=self.resolve_format(body_format),
                 from_addr=self.from_addr,
                 to=self.targets,
                 cc=self.cc,
