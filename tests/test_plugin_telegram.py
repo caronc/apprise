@@ -961,11 +961,11 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
+    # Declared Markdown gets the same MarkdownV2 dialect completion.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "\\# 🚨 Change detected for _Apprise Test Title_\n"
         "_[Apprise Body Title](http://localhost)_ had "
-        "[a change](http://127.0.0.1)"
+        "[a change](http://127\\.0\\.0\\.1)"
     )
 
     # Reset our values
@@ -1000,9 +1000,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
+    # v1 (non-strict) recognizes a narrower escape set than v2 does.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -1087,8 +1087,13 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert payload["text"] == body
+    # Declared text resolved to Markdown gets title merging and dialect
+    # completion.
+    assert payload["text"] == (
+        "# # \n"
+        r"\_\[Apprise Body Title\](http://localhost)\_"
+        r" had \[a change\](http://127.0.0.2)"
+    )
 
     # Reset our values
     mock_post.reset_mock()
@@ -1116,11 +1121,12 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert (
-        payload["text"]
-        == "\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had \\"
-        "[a change\\]\\(http://127\\.0\\.0\\.2\\)"
+    # v2 (strict) keeps every reserved character escaped, same title
+    # doubling as the v1 case above.
+    assert payload["text"] == (
+        "\\# \\# \n"
+        r"\_\[Apprise Body Title\]\(http://localhost\)\_"
+        r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
 
     # Reset our values
@@ -1156,11 +1162,12 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert (
-        payload["text"] == "# A Great Title\n"
-        "_[Apprise Body Title](http://localhost)_ had "
-        "[a change](http://127.0.0.2)"
+    # v1's narrower escape set un-escapes what the framework's baseline
+    # text-to-markdown pass added, since v1 does not require it.
+    assert payload["text"] == (
+        "# # A Great Title\n"
+        r"\_\[Apprise Body Title\](http://localhost)\_"
+        r" had \[a change\](http://127.0.0.2)"
     )
 
     # Reset our values
@@ -1189,18 +1196,18 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert (
-        payload["text"] == "\\# A Great Title\n"
-        "\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had "
-        "\\[a change\\]\\(http://127\\.0\\.0\\.2\\)"
+    # MarkdownV2 runs its completion pass over the already-amalgamated
+    # title+body, so the literal leading hash is escaped too.
+    assert payload["text"] == (
+        "\\# \\# A Great Title\n"
+        r"\_\[Apprise Body Title\]\(http://localhost\)\_"
+        r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
 
     # Reset our values
     mock_post.reset_mock()
 
-    # If input is markdown and output is v2, it is expected the user knows
-    # what he is doing... no esaping takes place
+    # Declared Markdown gets MarkdownV2 dialect completion.
     assert aobj.notify(
         title=title, body=body, body_format=NotifyFormat.MARKDOWN
     )
@@ -1215,11 +1222,11 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # No escaping in this circumstance
-    assert (
-        payload["text"] == "# A Great Title\r\n"
+    # MarkdownV2 escapes the leading hash and URL dots.
+    assert payload["text"] == (
+        "\\# A Great Title\n"
         "_[Apprise Body Title](http://localhost)_ had "
-        "[a change](http://127.0.0.2)"
+        "[a change](http://127\\.0\\.0\\.2)"
     )
 
     # Reset our values
@@ -1250,7 +1257,8 @@ def test_plugin_telegram_formatting(mock_post):
     mock_post.reset_mock()
 
     #
-    # Now test that <br/> is correctly escaped
+    # Markdown input aligns directly, then gets title merging and v1
+    # dialect completion without an HTML round trip.
     #
     title = "Test Message Title"
     body = "Test Message Body <br/> ok</br>"
@@ -1273,10 +1281,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
-    assert (
-        payload["text"]
-        == "<b>Test Message Title\r\n</b>\r\nTest Message Body\r\nok\r\n"
+    # v1 keeps "#" and HTML-looking body text unescaped.
+    assert payload["text"] == (
+        "# Test Message Title\nTest Message Body <br/> ok</br>"
     )
 
     # Reset our values
@@ -1451,6 +1458,33 @@ def test_plugin_telegram_html_formatting(mock_post):
         "<b>Heading 6</b>\r\nA set of text\r\n"
         "Another line after the set of text\r\nMore text\r\nlabel"
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_html_heading_padding_requires_declared_source(
+    mock_post,
+):
+    """HTML heading padding requires a declared source format."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = "{}"
+
+    body = "<h1>Heading</h1>Body text here"
+
+    aobj = Apprise()
+    assert aobj.add("tgram://123456789:abcdefg_hijklmnop/12345678")
+
+    # Declared HTML: heading gets padded on both sides.
+    assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "\r\n<b>Heading</b>\r\nBody text here"
+    mock_post.reset_mock()
+
+    # Undeclared input resolves to HTML but remains unpadded.
+    assert aobj.notify(body=body)
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "<b>Heading</b>Body text here"
 
 
 @mock.patch("requests.post")
@@ -1915,6 +1949,46 @@ def test_plugin_telegram_overflow_split_repair(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_telegram_overflow_split_repair_declared_markdown(mock_post):
+    """Declared Markdown uses the same split repair as converted HTML."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    def notify_split(body, body_format):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            "?format=markdown&mdv=2&overflow=split"
+        )
+        assert len(aobj) == 1
+        assert aobj.notify(body=body, body_format=body_format)
+        texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+        mock_post.reset_mock()
+        return texts
+
+    # Force a split after a long bold span.
+    body = "**" + ("x" * 4990) + "**" + "TAIL SHOULD NOT BE BOLD"
+    texts_html = notify_split(
+        "<b>" + ("x" * 4990) + "</b>" + "TAIL SHOULD NOT BE BOLD",
+        NotifyFormat.HTML,
+    )
+    texts_md = notify_split(body, NotifyFormat.MARKDOWN)
+
+    # Declared Markdown matches HTML-derived Markdown chunk repair.
+    assert texts_md == texts_html
+
+    # Short declared Markdown still gets dialect completion.
+    texts = notify_split("**short** _text_", NotifyFormat.MARKDOWN)
+    assert texts == ["*short* _text_"]
+
+    # Undeclared input skips dialect completion and repair.
+    texts = notify_split("**short** _text_", None)
+    assert texts == ["**short** _text_"]
+
+
+@mock.patch("requests.post")
 def test_plugin_telegram_threads(mock_post):
     """NotifyTelegram() Threads/Topics."""
     # Prepare Mock
@@ -2081,10 +2155,10 @@ def test_plugin_telegram_markdown_v2(mock_post):
     assert mock_post.call_count == 2
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Our content is escapped properly
+    # Literal backslashes are escaped along with MarkdownV2 syntax.
     assert (
         payload["text"] == "\\# my message\r\n"
-        "\\#\\# more content\r\n\\# already escaped hashtag"
+        "\\#\\# more content\r\n\\\\\\# already escaped hashtag"
     )
 
     mock_post.reset_mock()
@@ -2119,10 +2193,10 @@ def test_plugin_telegram_markdown_v2(mock_post):
         assert mock_post.call_count == 1
         payload = loads(mock_post.call_args_list[0][1]["data"])
 
-        # Our content is escapped properly
+        # The literal backslash before the second occurrence is escaped too.
         assert (
             payload["text"]
-            == f"bad character: \\{c}, and already escapped \\{c}"
+            == f"bad character: \\{c}, and already escapped \\\\\\{c}"
         )
 
         mock_post.reset_mock()

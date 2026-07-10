@@ -45,6 +45,7 @@ from apprise import (
     AppriseAttachment,
     AttachBase,
     NotifyBase,
+    NotifyFormat,
     NotifyType,
     PersistentStoreMode,
     utils,
@@ -3638,6 +3639,46 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     # With both keys present the message is sign+encrypted; the signing
     # step is the behavior under test, so we only assert success here.
     assert bool(obj.notify("test body")) is True
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_multi_format(mock_smtp):
+    """NotifyEmail() declares HTML+TEXT and resolves per-call."""
+
+    assert email.NotifyEmail.notify_format == (
+        NotifyFormat.HTML,
+        NotifyFormat.TEXT,
+    )
+
+    instance = mock_smtp.return_value
+
+    aobj = Apprise()
+    assert aobj.add("mailto://user:pass@example.com") is True
+
+    # Default (no body_format): still builds a multipart/alternative
+    # message with both an HTML and a derived plain-text part.
+    assert bool(aobj.notify(body="<b>Bold HTML</b> body")) is True
+    msg = instance.sendmail.call_args_list[-1][0][2]
+    assert "multipart" in msg
+    assert "text/plain" in msg
+    assert "text/html" in msg
+
+    # body_format=TEXT aligns directly to TEXT mode (no HTML round
+    # trip); the exact original text is sent, unescaped and unchanged.
+    assert (
+        bool(
+            aobj.notify(
+                body="Plain text with <literal> angle brackets.",
+                body_format=NotifyFormat.TEXT,
+            )
+        )
+        is True
+    )
+    msg = instance.sendmail.call_args_list[-1][0][2]
+    assert "multipart" not in msg
+    assert "text/plain" in msg
+    assert "text/html" not in msg
+    assert "Plain text with <literal> angle brackets." in msg
 
 
 def test_plugin_email_prepare():
