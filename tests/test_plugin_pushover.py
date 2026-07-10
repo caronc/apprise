@@ -618,6 +618,43 @@ def test_plugin_pushover_edge_cases(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_pushover_multi_format(mock_post):
+    """NotifyPushover() multi-format resolution."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    token = "a" * 30
+    user_key = "u" * 30
+
+    obj = NotifyPushover(user_key=user_key, token=token)
+
+    # HTML: declared source aligns directly, html flag set, body as-is.
+    mock_post.reset_mock()
+    assert obj.notify(body="<b>hi</b>", body_format=apprise.NotifyFormat.HTML)
+    sent = mock_post.call_args[1]["data"]
+    assert sent["html"] == 1
+    assert sent["message"] == "<b>hi</b>"
+
+    # Markdown is converted to HTML because Pushover has no Markdown mode.
+    mock_post.reset_mock()
+    assert obj.notify(body="*hi*", body_format=apprise.NotifyFormat.MARKDOWN)
+    sent = mock_post.call_args[1]["data"]
+    assert sent["html"] == 1
+    assert sent["message"] != "*hi*"
+
+    # Undeclared input stays unconverted, even with a Markdown override.
+    mock_post.reset_mock()
+    obj_override = NotifyPushover(
+        user_key=user_key, token=token, format="markdown"
+    )
+    assert obj_override.notify(body="*hi*")
+    sent = mock_post.call_args[1]["data"]
+    assert "html" not in sent
+    assert sent["message"] == "*hi*"
+
+
+@mock.patch("requests.post")
 def test_plugin_pushover_config_files(mock_post):
     """NotifyPushover() Config File Cases."""
     content = """

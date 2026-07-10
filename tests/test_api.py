@@ -43,6 +43,8 @@ import pytest
 import requests
 
 from apprise import (
+    LOGGER_NAME,
+    NOTIFY_FORMATS,
     Apprise,
     AppriseAsset,
     AppriseAttachment,
@@ -55,6 +57,7 @@ from apprise import (
     PrivacyMode,
     URLBase,
     __version__,
+    plugins,
 )
 from apprise.locale import LazyTranslation, gettext_lazy as _
 from apprise.plugins.base import RequirementsSpec
@@ -1337,6 +1340,197 @@ def test_apprise_notify_formats():
     )
 
 
+def test_apprise_multi_format_resolution(caplog):
+    """
+    API: multi-format notify_format resolution
+
+    """
+    caplog.set_level(logging.DEBUG, logger=LOGGER_NAME)
+
+    class SingleFormatNotification(NotifyBase):
+        """Test plugin that resolves to one fixed format."""
+
+        # Single-format plugins always use their declared format.
+        notify_format = NotifyFormat.HTML
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    class MultiFormatNotification(NotifyBase):
+        """Test plugin that can render either HTML or Markdown."""
+
+        # Declares more than one supported format, index[0] is default
+        notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+
+        received = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record fallback sends that do not have format-specific hooks."""
+            self.received.append(("send", body))
+            return True
+
+        def send_markdown(self, body, title="", notify_type=None, **kwargs):
+            """Record Markdown-specific dispatch."""
+            self.received.append(("send_markdown", body))
+            return True
+
+    # Single-format plugin: _formats()/resolve_format() resolve to the
+    # one declared format no matter what is passed in.
+    single = SingleFormatNotification(host="localhost")
+    assert single._formats() == (NotifyFormat.HTML,)
+    assert single.resolve_format(None) == NotifyFormat.HTML
+    assert single.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
+    assert single.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.HTML
+
+    # Multi-format plugin, no override, no matching input: default wins
+    multi = MultiFormatNotification(host="localhost")
+    assert multi._formats() == (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+    assert multi.resolve_format(None) == NotifyFormat.HTML
+    assert multi.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
+
+    # Multi-format plugin, no override, input aligns to a declared format
+    assert multi.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.MARKDOWN
+
+    # Multi-format plugin, explicit ?format= override in the declared set
+    multi_override = MultiFormatNotification(
+        host="localhost", format="markdown"
+    )
+    assert multi_override._format_override == NotifyFormat.MARKDOWN
+    assert multi_override.resolve_format(NotifyFormat.HTML) == (
+        NotifyFormat.MARKDOWN
+    )
+
+    # Multi-format plugin, ?format= override NOT in the declared set falls
+    # back through to input alignment, then default, with a debug message.
+    multi_bad_override = MultiFormatNotification(
+        host="localhost", format="text"
+    )
+    assert multi_bad_override._format_override == NotifyFormat.TEXT
+    caplog.clear()
+    assert multi_bad_override.resolve_format(NotifyFormat.MARKDOWN) == (
+        NotifyFormat.MARKDOWN
+    )
+    assert "does not support format" in caplog.text
+    assert "DEBUG" in caplog.text
+
+    # No declared source format: same fallback, but silent -- matches
+    # the historical no-noise conversion behavior.
+    caplog.clear()
+    assert multi_bad_override.resolve_format(None) == NotifyFormat.HTML
+    assert "does not support format" not in caplog.text
+
+    # send_{type}() dispatch: send_markdown() defined, used when resolved
+    multi.received.clear()
+    assert multi.notify(body="# hi", body_format=NotifyFormat.MARKDOWN) is True
+    assert multi.received == [("send_markdown", "# hi")]
+
+    # send_{type}() dispatch: no send_html() defined, falls back to send()
+    multi.received.clear()
+    assert multi.notify(body="hi", body_format=NotifyFormat.HTML) is True
+    assert multi.received == [("send", "hi")]
+
+
+def test_apprise_multi_format_conversion_cache():
+    """
+    API: multi-format resolution reuses one converted body per resolved
+    target, same as the existing single-format conversion cache.
+
+    """
+    asset = AppriseAsset(async_mode=False)
+    a = Apprise(asset=asset)
+
+    class HtmlOnlyNotification(NotifyBase):
+        """Test plugin that resolves to HTML."""
+
+        notify_format = NotifyFormat.HTML
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    class MultiFormatNotification(NotifyBase):
+        """Test plugin that also resolves to HTML by default."""
+
+        # Resolves to HTML by default, same target as HtmlOnlyNotification
+        notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    N_MGR["htmlonly"] = HtmlOnlyNotification
+    N_MGR["multi"] = MultiFormatNotification
+
+    assert a.add("htmlonly://localhost") is True
+    assert a.add("multi://localhost") is True
+    assert len(a) == 2
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda *a, **k: "converted",
+    ) as mock_convert:
+        assert (
+            bool(a.notify(body="hello", body_format=NotifyFormat.TEXT)) is True
+        )
+        # Both servers resolve to HTML; the body should only be converted
+        # once and reused, exactly like the single-format cache today.
+        assert mock_convert.call_count == 1
+
+
+def test_apprise_multi_format_details():
+    """
+    API: Apprise() Details reflect a plugin's real supported formats
+
+    """
+
+    class SingleFormatNotification(NotifyBase):
+        """Test plugin whose public details should stay broad."""
+
+        service_name = "Single Format Testing"
+        protocol = "singlefmt"
+        notify_format = NotifyFormat.HTML
+
+        templates = ("{schema}://{host}",)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    class MultiFormatNotification(NotifyBase):
+        """Test plugin whose public details expose supported formats."""
+
+        service_name = "Multi Format Testing"
+        protocol = "multifmtdetails"
+        # Declaration order matters: markdown is the default (index[0])
+        notify_format = (NotifyFormat.MARKDOWN, NotifyFormat.HTML)
+
+        templates = ("{schema}://{host}",)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    # values/default remain broad for every plugin so consumers that only
+    # know those fields keep seeing the standard Apprise ?format= choices.
+    # The additive `supported` field carries the narrower native subset.
+    single_details = plugins.details(SingleFormatNotification)
+    assert single_details["args"]["format"]["values"] == NOTIFY_FORMATS
+    assert single_details["args"]["format"]["default"] == "html"
+    # `supported` names the subset this plugin actually renders natively:
+    # one entry for a single-format plugin.
+    assert single_details["args"]["format"]["supported"] == ["html"]
+
+    multi_details = plugins.details(MultiFormatNotification)
+    assert multi_details["args"]["format"]["values"] == NOTIFY_FORMATS
+    assert multi_details["args"]["format"]["default"] == "markdown"
+    # Declaration order preserved, not alphabetically re-sorted
+    assert multi_details["args"]["format"]["supported"] == [
+        "markdown",
+        "html",
+    ]
+
+
 def test_apprise_asset(tmpdir):
     """
     API: AppriseAsset() object
@@ -1979,6 +2173,10 @@ def test_apprise_details_plugin_verification():
         "required",
         "type",
         "values",
+        # The subset of `values` this specific plugin actually renders
+        # natively; only meaningfully narrower than `values` for a
+        # multi-format plugin. See NotifyBase.resolve_format().
+        "supported",
         "min",
         "max",
         "regex",
@@ -2344,6 +2542,67 @@ def test_apprise_details_plugin_raw_template_tokens():
                     " Expected one of: string, bool, int, float,"
                     " choice:string, list:string, etc."
                 )
+
+
+def test_apprise_send_format_handlers_match_notify_format():
+    """
+    API: send_text()/send_html()/send_markdown() vs notify_format sanity
+
+    A format-specific send_<format>() method must be reachable through
+    the plugin's notify_format declaration.
+    """
+
+    for plugin in N_MGR.plugins():
+        label = plugin.__name__
+
+        # Only consider format-specific methods defined directly on this
+        # class (not merely inherited), so a subclass that narrows
+        # notify_format isn't blamed for a handler its parent defined.
+        declared_handlers = {
+            fmt for fmt in NOTIFY_FORMATS if f"send_{fmt}" in vars(plugin)
+        }
+
+        if not declared_handlers:
+            continue
+
+        # notify_format may be a single NotifyFormat or a tuple; resolve
+        # it the same way NotifyBase._formats() does.
+        supported = set(parse_list(plugin.notify_format, sort=False))
+
+        missing = declared_handlers - supported
+        assert not missing, (
+            f"{label} defines send_{next(iter(missing))}() but "
+            f"{next(iter(missing))!r} is not declared in its "
+            f"notify_format {plugin.notify_format!r}; the handler can "
+            "never be reached."
+        )
+
+
+def test_apprise_multi_format_plugins_no_scalar_comparison():
+    """Multi-format plugins must resolve before scalar comparisons."""
+
+    scalar_compare_re = re.compile(r"self\.notify_format\s*==")
+
+    for plugin in N_MGR.plugins():
+        formats = parse_list(plugin.notify_format, sort=False)
+        if len(formats) <= 1:
+            # Single-format plugins can compare their scalar directly.
+            continue
+
+        try:
+            source = inspect.getsource(plugin)
+        except (OSError, TypeError):
+            # Dynamic plugins have no source file to inspect.
+            continue
+
+        assert not scalar_compare_re.search(source), (
+            f"{plugin.__name__} declares a multi-format notify_format "
+            f"{plugin.notify_format!r} but compares self.notify_format "
+            "directly somewhere in its source; use "
+            "self.resolve_format(body_format) instead, since a tuple "
+            "never equals a scalar and the comparison can never be "
+            "True."
+        )
 
 
 @mock.patch("requests.request")
