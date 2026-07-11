@@ -64,7 +64,6 @@ from ..conversion import (
     commonmark_emphasis_run,
     commonmark_escape_link_url,
     commonmark_force_close_spans,
-    commonmark_prepend_title,
     commonmark_scan_angle_dest,
     find_unescaped_run,
 )
@@ -375,61 +374,20 @@ class NotifyGoogleChat(NotifyBase):
 
         return "\n".join(result)
 
-    def _build_send_calls(
-        self,
-        body=None,
-        title=None,
-        body_format=None,
-        format_controlled=None,
-        **kwargs,
-    ):
-        """Convert declared CommonMark to Google Chat syntax before split.
-
-        Undeclared sources are left untouched, even if the resolved
-        target is Markdown.
-        """
-
-        # Direct plugin calls bypass Apprise's format resolution.
-        if format_controlled is None:
-            format_controlled = body_format is not None
-            body_format = self.resolve_format(body_format)
-
-        # Only adapt a declared source; pass an undeclared one through.
-        if not (body_format == NotifyFormat.MARKDOWN and format_controlled):
-            yield from super()._build_send_calls(
-                body=body,
-                title=title,
-                body_format=body_format,
-                format_controlled=format_controlled,
-                **kwargs,
-            )
-            return
-
-        # Merge the title before conversion because Chat has no title field.
-        if self.title_maxlen <= 0 and title:
-            body, title = commonmark_prepend_title(body, title)
-
-        # Translate CommonMark constructs to Chat-native syntax.
-        body = self._commonmark_to_google_chat(body)
-
-        # Split as Markdown so links and code spans stay intact.
-        yield from super()._build_send_calls(
-            body=body,
-            title=title,
-            body_format=NotifyFormat.MARKDOWN,
-            format_controlled=format_controlled,
-            **kwargs,
-        )
-
     def send(
         self,
         body,
         title="",
         notify_type=NotifyType.INFO,
         body_format=None,
+        format_controlled=None,
         **kwargs,
     ):
         """Perform Google Chat Notification."""
+
+        if body_format == NotifyFormat.MARKDOWN and format_controlled:
+            # Convert each repaired CommonMark chunk just before delivery.
+            body = self._commonmark_to_google_chat(body)
 
         # Our headers
         headers = {

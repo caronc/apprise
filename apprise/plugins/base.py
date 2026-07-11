@@ -48,6 +48,7 @@ from ..common import (
     OverflowMode,
     PersistentStoreMode,
 )
+from ..conversion import commonmark_repair_chunk
 from ..locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
@@ -1078,12 +1079,11 @@ class NotifyBase(URLBase):
 
         # TRUNCATE mode: hard truncation (no smart-splitting)
         if overflow == OverflowMode.TRUNCATE:
-            response.append(
-                {
-                    "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
-                    "title": title,
-                }
-            )
+            truncated = body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip()
+            if body_format == NotifyFormat.MARKDOWN and format_controlled:
+                # Repair truncated constructs before dialect conversion.
+                truncated, _ = commonmark_repair_chunk(truncated, {})
+            response.append({"body": truncated, "title": title})
             return response
 
         #
@@ -1226,6 +1226,14 @@ class NotifyBase(URLBase):
                             "title": "",
                         }
                     )
+
+        if body_format == NotifyFormat.MARKDOWN and format_controlled:
+            # Repair chunks in order before plugin-specific dialect conversion.
+            pending = {}
+            for chunk in response:
+                chunk["body"], pending = commonmark_repair_chunk(
+                    chunk["body"], pending
+                )
 
         return response
 

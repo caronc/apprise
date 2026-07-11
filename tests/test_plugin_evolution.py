@@ -404,9 +404,7 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # rather than emitting a dangling " (url)".
     assert f("[](<https://example.com/x>)") == "https://example.com/x"
 
-    # HTML body with a title: title is merged into the body as a heading
-    # before the WhatsApp dialect conversion runs (covers _build_send_calls
-    # title-merge branch).
+    # The framework merges titles as headings, which WhatsApp renders bold.
     aobj = Apprise()
     assert aobj.add("evolutions://key@host/inst/5511999999999")
     assert (
@@ -465,3 +463,30 @@ def test_plugin_evolution_declared_markdown_gets_dialect_completion(
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "_bold_ click here (https://example.com/x)"
+
+
+@mock.patch("requests.post")
+def test_plugin_evolution_overflow_split_code_fence(mock_post):
+    """Ensure split code never leaves a dangling WhatsApp fence."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+
+    aobj = Apprise()
+    assert aobj.add("evolutions://key@host/inst/5511999999999?overflow=split")
+
+    content = "line.with.dots-and-dashes_under " * 2000
+    assert (
+        bool(
+            aobj.notify(
+                body=f"<pre>{content}</pre>", body_format=NotifyFormat.HTML
+            )
+        )
+        is True
+    )
+    texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+    assert len(texts) >= 2
+    for text in texts:
+        # Each delivered chunk must avoid an unmatched WhatsApp code fence.
+        assert "```" not in text

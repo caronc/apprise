@@ -345,9 +345,7 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # Collapse an empty, unterminated emphasis span.
     assert f("**") == ""
 
-    # HTML body with a title: title is merged into the body as a heading
-    # before the Chat dialect conversion runs (covers _build_send_calls
-    # title-merge branch).
+    # Merge the title as a heading before Chat dialect conversion.
     aobj = Apprise()
     assert aobj.add("gchat://workspace/key/token")
     assert (

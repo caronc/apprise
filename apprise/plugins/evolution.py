@@ -209,6 +209,7 @@ class NotifyEvolution(NotifyBase):
 
         CommonMark          WhatsApp
         ------------------  ---------------------------
+        # heading           *heading* (WhatsApp has no heading syntax)
         **bold**            *bold*
         *italic*            _italic_
         `code`              ```code``` (triple backticks)
@@ -218,6 +219,15 @@ class NotifyEvolution(NotifyBase):
         WhatsApp auto-links bare URLs but has no custom-label link syntax.
         Backslash escapes are removed because WhatsApp does not use them.
         """
+
+        # Convert headings, including merged titles, to WhatsApp bold text.
+        body = re.sub(
+            r"(?m)^#{1,6}[ \t]+(.*)$",
+            lambda m: (
+                f"**{m.group(1).rstrip()}**" if m.group(1).strip() else ""
+            ),
+            body,
+        )
 
         # Accumulate translated characters one item at a time.
         out = []
@@ -325,68 +335,20 @@ class NotifyEvolution(NotifyBase):
         # Join the translated fragments once.
         return "".join(out)
 
-    def _build_send_calls(
-        self,
-        body=None,
-        title=None,
-        body_format=None,
-        format_controlled=None,
-        **kwargs,
-    ):
-        """Convert declared CommonMark to WhatsApp Markdown before split.
-
-        Undeclared sources are left untouched, even if the resolved
-        target is Markdown.
-        """
-
-        # Direct plugin calls bypass Apprise's format resolution.
-        if format_controlled is None:
-            format_controlled = body_format is not None
-            body_format = self.resolve_format(body_format)
-
-        # Only adapt a declared source; pass an undeclared one through.
-        if not (body_format == NotifyFormat.MARKDOWN and format_controlled):
-            yield from super()._build_send_calls(
-                body=body,
-                title=title,
-                body_format=body_format,
-                format_controlled=format_controlled,
-                **kwargs,
-            )
-            return
-
-        # WhatsApp has no title field or heading syntax, so use bold text.
-        if self.title_maxlen <= 0 and title:
-            # Strip leading whitespace and Markdown heading / list chars.
-            title_text = title.lstrip("\r\n \t\v\f#-")
-            if title_text:
-                # Prepend the title as a bold line above the body.
-                heading = f"**{title_text}**"
-                body = f"{heading}\n{body}" if body else heading
-            # Clear the title so the base class does not send it separately.
-            title = ""
-
-        # Translate CommonMark constructs to WhatsApp syntax.
-        body = self._commonmark_to_whatsapp(body)
-
-        # Split as Markdown so links and code spans stay intact.
-        yield from super()._build_send_calls(
-            body=body,
-            title=title,
-            body_format=NotifyFormat.MARKDOWN,
-            format_controlled=format_controlled,
-            **kwargs,
-        )
-
     def send(
         self,
         body,
         title="",
         notify_type=NotifyType.INFO,
         body_format=None,
+        format_controlled=None,
         **kwargs,
     ):
         """Perform Evolution API Notification."""
+
+        if body_format == NotifyFormat.MARKDOWN and format_controlled:
+            # Convert each repaired CommonMark chunk just before delivery.
+            body = self._commonmark_to_whatsapp(body)
 
         # Build the base URL
         schema = "https" if self.secure else "http"

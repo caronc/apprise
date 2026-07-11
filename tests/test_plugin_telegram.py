@@ -1087,10 +1087,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Declared text resolved to Markdown gets title merging and dialect
-    # completion.
+    # Generic title merging strips surrounding whitespace before conversion.
     assert payload["text"] == (
-        "# # \n"
+        "# #\n"
         r"\_\[Apprise Body Title\](http://localhost)\_"
         r" had \[a change\](http://127.0.0.2)"
     )
@@ -1124,7 +1123,7 @@ def test_plugin_telegram_formatting(mock_post):
     # v2 (strict) keeps every reserved character escaped, same title
     # doubling as the v1 case above.
     assert payload["text"] == (
-        "\\# \\# \n"
+        "\\# \\#\n"
         r"\_\[Apprise Body Title\]\(http://localhost\)\_"
         r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
@@ -1780,11 +1779,72 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         )
         == "text \\`\\`unterminated"
     )
+    # "](<" with no preceding "[" (so not a real link) and no closing ">)"
+    # either: every reserved bracket/paren is escaped as stray punctuation.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "a](<https://incomplete no close", strict=True
         )
-        == "a](\\<https://incomplete no close"
+        == "a\\]\\(\\<https://incomplete no close"
+    )
+
+    # Always escape stray MarkdownV2 brackets and parentheses.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "literal (value) and [bracket] text", strict=True
+        )
+        == "literal \\(value\\) and \\[bracket\\] text"
+    )
+
+    # Prevent an orphaned "[" from matching a later unrelated link.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("[a] b (c) ](d)", strict=True)
+        == "\\[a\\] b \\(c\\) \\]\\(d\\)"
+    )
+
+    # Escape a dangling "[" during end-of-scan cleanup.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "text [dangling forever", strict=True
+        )
+        == "text \\[dangling forever"
+    )
+
+    # Preserve plain Markdown links while escaping their destinations.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[a link](https://example.com/x.y)", strict=True
+        )
+        == "[a link](https://example\\.com/x\\.y)"
+    )
+
+    # Preserve an escaped parenthesis inside a plain link destination.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](http://example.com/a\\)b)", strict=True
+        )
+        == "[label](http://example\\.com/a\\)b)"
+    )
+
+    # A plain destination containing a balanced, unescaped pair of
+    # parentheses: the real terminator is the ")" that brings nesting
+    # back to zero, not the first unescaped ")" encountered -- otherwise
+    # the link closes early and the real closing ")" leaks out as
+    # ordinary (and here, unescaped-until-fixed) text.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](https://example.com/a_(b))", strict=True
+        )
+        == "[label](https://example\\.com/a_\\(b\\))"
+    )
+
+    # Same balance check in V1 (non-strict) mode -- the reserved-char
+    # escaping differs, but the paren nesting still must not misclose.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](https://example.com/a_(b))", strict=False
+        )
+        == "[label](https://example.com/a_\\(b\\))"
     )
 
     # Empty adjacent entities collapse without affecting following text.
@@ -1809,8 +1869,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == r"[click](https://example.com/x\\>y)"
     )
 
-    # HTML body with a title in V1 mode: _build_send_calls merges the title
-    # as a heading before dialect conversion (covers the title-merge branch).
+    # Merge the title as a heading before Telegram V1 conversion.
     aobj_v1 = Apprise()
     aobj_v1.add(
         "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1"
@@ -1834,11 +1893,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_telegram_overflow_split_repair(mock_post):
-    """Test that overflow=split can't break entity boundaries across
-    messages: _build_send_calls() adapts the whole body to Telegram's
-    dialect before splitting (not per-chunk after), and
-    _repair_split_chunk() patches up whatever the split itself still cuts
-    in half across two messages."""
+    """Test generic split repair before Telegram dialect conversion."""
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -1892,60 +1947,7 @@ def test_plugin_telegram_overflow_split_repair(mock_post):
     texts = notify_split("<b>short</b> <i>text</i>")
     assert texts == ["*short* _text_"]
 
-    # A continuation chunk where the carried-over destination *does* close
-    # within this same chunk (not needing yet another one), even with an.
-    assert NotifyTelegram._repair_split_chunk(
-        "a\\)b)more text\\.", True, {"in_link_dest": True}
-    ) == ("a\\)b\\)more text\\.", {})
-
-    # A carried-over code span closing within this chunk, same idea.
-    assert NotifyTelegram._repair_split_chunk(
-        "code```more text\\.", True, {"in_code": 3}
-    ) == ("codemore text\\.", {})
-
-    # A carried-over destination that doesn't end in *this* chunk either.
-    assert NotifyTelegram._repair_split_chunk(
-        "still no close here", True, {"in_link_dest": True}
-    ) == ("still no close here", {"in_link_dest": True})
-
-    repair = NotifyTelegram._repair_split_chunk
-
-    # V1 (non-strict) with an unmatched backtick: the backtick run has no
-    # closing partner, so the `if strict:` branch is NOT taken.
-    assert repair("`code no close", False, {}) == ("`code no close", {})
-
-    # A pending close count for '*' in strict mode: the matching close
-    # delimiter in this chunk is discarded (the open was already dropped).
-    assert repair("*text", True, {"*": 1}) == ("text", {"*": 0})
-
-    # Same for '_'.
-    assert repair("_text", True, {"_": 1}) == ("text", {"_": 0})
-
-    # Strict mode: '](url)' with NO matching '[' on the link stack escapes
-    # the construct rather than emitting it verbatim.
-    assert repair("](https://e.com)", True, {}) == (
-        "\\]\\(https://e\\.com\\)",
-        {},
-    )
-
-    # Strict mode: '](url' with no closing ')' sets in_link_dest pending.
-    assert repair("](https://e.com no-close", True, {}) == (
-        "\\]\\(https://e\\.com no\\-close",
-        {"in_link_dest": True},
-    )
-
-    # Strict mode: opening and immediately closing the same delimiter with no
-    # content in between -- the empty span is dropped from the output.
-    assert repair("**", True, {}) == ("", {})
-
-    # Strict mode: a stray ']', '(', or ')' outside any complete link entity
-    # is backslash-escaped rather than passed through verbatim.
-    assert repair("]text", True, {}) == ("\\]text", {})
-    assert repair("(text)", True, {}) == ("\\(text\\)", {})
-
-    # Strict mode: a dangling open at the end of the chunk with no content
-    # after it is removed as an empty span (not propagated as pending).
-    assert repair("text*", True, {}) == ("text", {})
+    # Conversion tests cover the repair primitive used indirectly here.
 
 
 @mock.patch("requests.post")

@@ -40,6 +40,7 @@ from apprise.conversion import (
     MAX_FRAME_DEPTH,
     HTMLMarkdownConverter,
     build_backtick_run_index,
+    commonmark_repair_chunk,
     convert_between,
     find_unescaped_run,
     markdown_to_html,
@@ -1850,3 +1851,178 @@ def test_conversion_markdown_to_html():
     assert "<td>Content Cell2</td>" in response
     assert "<td>Content Cell3</td>" in response
     assert "<td>Content Cell4</td>" in response
+
+
+def test_conversion_commonmark_repair_chunk():
+    """Test dialect-neutral repair of split or truncated CommonMark."""
+
+    # No cut at all: input passes through unchanged.
+    assert commonmark_repair_chunk("**bold** and *italic*", {}) == (
+        "**bold** and *italic*",
+        {},
+    )
+
+    # A complete, uncut code span within a single chunk is untouched.
+    assert commonmark_repair_chunk("before ```code``` after", {}) == (
+        "before ```code``` after",
+        {},
+    )
+
+    # A complete, uncut link within a single chunk is untouched.
+    assert commonmark_repair_chunk(
+        "[label](<https://example.com>) tail", {}
+    ) == ("[label](<https://example.com>) tail", {})
+
+    # Collapse an empty span without affecting following text.
+    assert commonmark_repair_chunk("a**** b", {}) == ("a b", {})
+
+    # Preserve existing escapes rather than treating them as delimiters.
+    assert commonmark_repair_chunk("a\\*b\\*c", {}) == ("a\\*b\\*c", {})
+
+    # Close split bold early, then discard its original closing marker.
+    assert commonmark_repair_chunk("**xxxxx", {}) == ("**xxxxx**", {"**": 1})
+    assert commonmark_repair_chunk("xxxx**TAIL", {"**": 1}) == (
+        "xxxxTAIL",
+        {"**": 0},
+    )
+
+    # Same for an italic span.
+    assert commonmark_repair_chunk("*hello wor", {}) == (
+        "*hello wor*",
+        {"*": 1},
+    )
+    assert commonmark_repair_chunk("ld*end", {"*": 1}) == ("ldend", {"*": 0})
+
+    # A triple-asterisk run (bold+italic combined) cut mid-content.
+    assert commonmark_repair_chunk("***strong italic", {}) == (
+        "***strong italic***",
+        {"**": 1, "*": 1},
+    )
+    assert commonmark_repair_chunk("text***tail", {"**": 1, "*": 1}) == (
+        "texttail",
+        {"**": 0, "*": 0},
+    )
+
+    # Repair split underscore italics independently of asterisks.
+    assert commonmark_repair_chunk("_hello wor", {}) == (
+        "_hello wor_",
+        {"_": 1},
+    )
+    assert commonmark_repair_chunk("ld_end", {"_": 1}) == ("ldend", {"_": 0})
+
+    # Underscore-based CommonMark bold ("__") behaves the same way.
+    assert commonmark_repair_chunk("__strong wor", {}) == (
+        "__strong wor__",
+        {"__": 1},
+    )
+    assert commonmark_repair_chunk("ld__end", {"__": 1}) == (
+        "ldend",
+        {"__": 0},
+    )
+
+    # Preserve complete underscore spans and collapse empty ones.
+    assert commonmark_repair_chunk("_italic text_ done", {}) == (
+        "_italic text_ done",
+        {},
+    )
+    assert commonmark_repair_chunk("a____ b", {}) == ("a b", {})
+
+    # Drop an empty trailing span rather than carrying it forward.
+    assert commonmark_repair_chunk("text **", {}) == ("text ", {})
+
+    # Drop a split code fence while carrying its width to the next chunk.
+    assert commonmark_repair_chunk("text ```code sti", {}) == (
+        "text code sti",
+        {"in_code": 3},
+    )
+
+    # Render a cross-message code continuation as plain text.
+    assert commonmark_repair_chunk("ll going```code done", {"in_code": 3}) == (
+        "ll goingcode done",
+        {},
+    )
+
+    # Carry an unclosed code span into another chunk.
+    assert commonmark_repair_chunk("more code", {"in_code": 3}) == (
+        "more code",
+        {"in_code": 3},
+    )
+
+    # Drop and carry a newly opened single-backtick span.
+    assert commonmark_repair_chunk("`code no close", {}) == (
+        "code no close",
+        {"in_code": 1},
+    )
+
+    # Escape a link label cut across the chunk boundary.
+    assert commonmark_repair_chunk("[click", {}) == ("\\[click", {})
+
+    # Render the unmatched destination side as literal text.
+    assert commonmark_repair_chunk(
+        "here](<https://example.com/path>) rest", {}
+    ) == ("here\\]\\(https://example.com/path\\>\\) rest", {})
+
+    # Carry a closing marker split after its trailing ">".
+    c1, pending = commonmark_repair_chunk("[label](<https://x.com>", {})
+    assert (c1, pending) == (
+        "[label\\]\\(https://x.com\\>",
+        {"in_link_dest": True, "dest_gt": True},
+    )
+    c2, pending = commonmark_repair_chunk(") tail", pending)
+    assert (c2, pending) == ("\\) tail", {})
+
+    # Ignore a mid-destination ">" and continue to the real terminator.
+    assert commonmark_repair_chunk("a>b>) tail", {"in_link_dest": True}) == (
+        "a\\>b\\>\\) tail",
+        {},
+    )
+
+    # Carry a link destination cut across chunks.
+    assert commonmark_repair_chunk("[label](<https://example.com/", {}) == (
+        "[label\\]\\(https://example.com/",
+        {"in_link_dest": True},
+    )
+
+    # Render a carried destination's closing fragment as literal text.
+    assert commonmark_repair_chunk(
+        "more-path>) tail", {"in_link_dest": True}
+    ) == ("more-path\\>\\) tail", {})
+
+    # Ignore escaped characters while finding a destination terminator.
+    assert commonmark_repair_chunk("a\\)b>) tail", {"in_link_dest": True}) == (
+        "a\\\\\\)b\\>\\) tail",
+        {},
+    )
+
+    # Carry a destination that remains unclosed.
+    assert commonmark_repair_chunk(
+        "still not done", {"in_link_dest": True}
+    ) == ("still not done", {"in_link_dest": True})
+
+    # Complete a destination terminator spread across three chunks.
+    c1, pending = commonmark_repair_chunk(
+        "[label](<https://example.com/path", {}
+    )
+    assert (c1, pending) == (
+        "[label\\]\\(https://example.com/path",
+        {"in_link_dest": True},
+    )
+    c2, pending = commonmark_repair_chunk("/more>", pending)
+    assert (c2, pending) == (
+        "/more\\>",
+        {"in_link_dest": True, "dest_gt": True},
+    )
+    c3, pending = commonmark_repair_chunk(") tail text", pending)
+    assert (c3, pending) == ("\\) tail text", {})
+
+    # Treat a trailing ">" as literal when the next chunk lacks ")".
+    c2b, pending = commonmark_repair_chunk("more>", {"in_link_dest": True})
+    assert (c2b, pending) == (
+        "more\\>",
+        {"in_link_dest": True, "dest_gt": True},
+    )
+    c3b, pending = commonmark_repair_chunk("no closing paren here", pending)
+    assert (c3b, pending) == (
+        "no closing paren here",
+        {"in_link_dest": True},
+    )
