@@ -733,9 +733,9 @@ def commonmark_repair_chunk(text, pending):
     for marker in sorted(empty, key=lambda m: open_pos[m], reverse=True):
         del out[open_pos[marker]]
 
-    # Close nonempty spans and carry state to discard their later closes.
+    # Close spans from innermost to outermost, then carry their state.
     new_pending = dict(pending)
-    for marker in nonempty:
+    for marker in sorted(nonempty, key=lambda m: open_pos[m], reverse=True):
         out.append(marker)
         new_pending[marker] = new_pending.get(marker, 0) + 1
 

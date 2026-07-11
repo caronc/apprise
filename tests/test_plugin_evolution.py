@@ -404,6 +404,12 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # rather than emitting a dangling " (url)".
     assert f("[](<https://example.com/x>)") == "https://example.com/x"
 
+    # Convert a leading title heading but preserve later code content.
+    assert f("# Heading\nbody") == "*Heading*\nbody"
+    assert f("intro\n```\n# not a heading\ncode\n```\nend") == (
+        "intro\n```\n# not a heading\ncode\n```\nend"
+    )
+
     # The framework merges titles as headings, which WhatsApp renders bold.
     aobj = Apprise()
     assert aobj.add("evolutions://key@host/inst/5511999999999")

@@ -220,9 +220,10 @@ class NotifyEvolution(NotifyBase):
         Backslash escapes are removed because WhatsApp does not use them.
         """
 
-        # Convert headings, including merged titles, to WhatsApp bold text.
+        # Convert only a leading merged-title heading to WhatsApp bold.
+        # Later headings may be literal text inside a code block.
         body = re.sub(
-            r"(?m)^#{1,6}[ \t]+(.*)$",
+            r"^#{1,6}[ \t]+([^\n]*)",
             lambda m: (
                 f"**{m.group(1).rstrip()}**" if m.group(1).strip() else ""
             ),

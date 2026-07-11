@@ -904,9 +904,7 @@ class NotifyTelegram(NotifyBase):
             # Preserve a complete plain Markdown link using Telegram escaping.
             if body.startswith("](", i):
                 close = None
-                # A plain (non-angle-bracket) destination may contain a
-                # balanced pair of parens; only an unescaped ")" that
-                # brings the nesting back to zero is the real terminator.
+                # Track balanced parentheses until the link terminator.
                 depth = 0
                 k = i + 2
                 while k < n:
@@ -925,13 +923,7 @@ class NotifyTelegram(NotifyBase):
 
                 if close is not None and link_stack:
                     link_stack.pop()
-                    # Escape the destination while preserving existing
-                    # pairs. Any "(" / ")" found here is, by construction,
-                    # part of the balanced pair confirmed above rather
-                    # than the link's own terminator, so it must be
-                    # escaped too -- otherwise Telegram's own parser could
-                    # repeat the same premature-close mistake this scan
-                    # just avoided.
+                    # Escape balanced parentheses and other reserved content.
                     dest = []
                     k = i + 2
                     while k < close:

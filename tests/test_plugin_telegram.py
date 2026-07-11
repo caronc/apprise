@@ -1826,11 +1826,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "[label](http://example\\.com/a\\)b)"
     )
 
-    # A plain destination containing a balanced, unescaped pair of
-    # parentheses: the real terminator is the ")" that brings nesting
-    # back to zero, not the first unescaped ")" encountered -- otherwise
-    # the link closes early and the real closing ")" leaks out as
-    # ordinary (and here, unescaped-until-fixed) text.
+    # Preserve balanced parentheses inside a plain link destination.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "[label](https://example.com/a_(b))", strict=True
@@ -1838,8 +1834,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "[label](https://example\\.com/a_\\(b\\))"
     )
 
-    # Same balance check in V1 (non-strict) mode -- the reserved-char
-    # escaping differs, but the paren nesting still must not misclose.
+    # Apply the same parenthesis balancing in Telegram V1.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "[label](https://example.com/a_(b))", strict=False

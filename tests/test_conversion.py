@@ -1903,6 +1903,12 @@ def test_conversion_commonmark_repair_chunk():
         {"**": 0, "*": 0},
     )
 
+    # Close mixed emphasis from innermost to outermost.
+    assert commonmark_repair_chunk("**bold _italic", {}) == (
+        "**bold _italic_**",
+        {"_": 1, "**": 1},
+    )
+
     # Repair split underscore italics independently of asterisks.
     assert commonmark_repair_chunk("_hello wor", {}) == (
         "_hello wor_",
