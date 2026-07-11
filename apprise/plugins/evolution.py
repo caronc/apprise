@@ -202,6 +202,35 @@ class NotifyEvolution(NotifyBase):
     # Adapt HTML-derived CommonMark to WhatsApp formatting.
     # Direct WhatsApp Markdown is left unchanged.
     # Syntax: https://faq.whatsapp.com/539178204879377/
+    @classmethod
+    def _commonmark_code_spans(cls, body):
+        """Return (start, end) ranges of complete CommonMark code spans.
+
+        Used to keep pre-processing passes (like heading conversion)
+        from touching content meant to stay literal.
+        """
+        spans = []
+        backtick_runs = build_backtick_run_index(body)
+        i = 0
+        n = len(body)
+        while i < n:
+            if body[i] == "\\" and i + 1 < n:
+                i += 2
+                continue
+            if body[i] == "`":
+                j = i
+                while j < n and body[j] == "`":
+                    j += 1
+                run = j - i
+                close = find_unescaped_run(backtick_runs, j, run)
+                if close is not None:
+                    spans.append((i, close + run))
+                    i = close + run
+                    continue
+                i = j
+                continue
+            i += 1
+        return spans
 
     @classmethod
     def _commonmark_to_whatsapp(cls, body):
@@ -219,16 +248,18 @@ class NotifyEvolution(NotifyBase):
         WhatsApp auto-links bare URLs but has no custom-label link syntax.
         Backslash escapes are removed because WhatsApp does not use them.
         """
-
-        # Convert only a leading merged-title heading to WhatsApp bold.
+        # Convert leading merged-title headings to WhatsApp bold.
         # Later headings may be literal text inside a code block.
-        body = re.sub(
-            r"^#{1,6}[ \t]+([^\n]*)",
-            lambda m: (
-                f"**{m.group(1).rstrip()}**" if m.group(1).strip() else ""
-            ),
-            body,
-        )
+        code_spans = cls._commonmark_code_spans(body)
+
+        def _heading_to_bold(match):
+            if any(start <= match.start() < end for start, end in code_spans):
+                # Inside a code span: leave the line untouched.
+                return match.group(0)
+            heading = match.group(1).rstrip()
+            return f"**{heading}**" if heading else ""
+
+        body = re.sub(r"(?m)^#{1,6}[ \t]+(.*)$", _heading_to_bold, body)
 
         # Accumulate translated characters one item at a time.
         out = []

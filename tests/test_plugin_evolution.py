@@ -404,11 +404,23 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # rather than emitting a dangling " (url)".
     assert f("[](<https://example.com/x>)") == "https://example.com/x"
 
-    # Convert a leading title heading but preserve later code content.
+    # Convert a leading title heading to bold.
     assert f("# Heading\nbody") == "*Heading*\nbody"
+
+    # A genuine heading appearing later in the body (e.g. from an HTML
+    # <h2> elsewhere in the source, not just a merged title) also
+    # converts -- headings are not limited to the first line.
+    assert f("intro\n## Real heading\nmore text") == (
+        "intro\n*Real heading*\nmore text"
+    )
+
+    # A "#"-prefixed line inside a fenced code block must stay literal.
     assert f("intro\n```\n# not a heading\ncode\n```\nend") == (
         "intro\n```\n# not a heading\ncode\n```\nend"
     )
+
+    # Same for an inline code span.
+    assert f("see `# not code` here") == "see ```# not code``` here"
 
     # The framework merges titles as headings, which WhatsApp renders bold.
     aobj = Apprise()
