@@ -342,14 +342,15 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # Convert CommonMark emphasis to WhatsApp delimiters.
     assert notify("<b>hello</b> <i>world</i>") == "*hello* _world_"
 
-    # Preserve adjacent nested emphasis.
-    assert notify("<b><i>x</i></b>") == "*_x_*"
+    # Adjacent nested tags flatten to CommonMark italic around bold.
+    assert notify("<b><i>x</i></b>") == "_*x*_"
 
     # Non-adjacent nesting and sibling spans are unaffected.
     assert notify("<b>bold <i>italic</i> still bold</b>") == (
         "*bold _italic_ still bold*"
     )
-    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+    # Adjacent bold tags retain their ambiguous middle markers as literals.
+    assert notify("<b>A</b><b>B</b>") == "*A****B*"
 
     # Map inline and fenced code to WhatsApp's monospace syntax.
     assert notify("<code>inline</code>") == "```inline```"
@@ -385,12 +386,18 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
     # Longer backtick runs also collapse to two in one substitution.
     assert f("````` content```` end `````") == "``` content`` end ```"
 
-    # Collapse empty entities without affecting following content.
-    assert f("****x") == "x"
+    # Preserve an opener with no closer.
+    assert f("****x") == "****x"
 
-    # Close nonempty unterminated emphasis and drop empty spans.
-    assert f("**unterminated") == "*unterminated*"
-    assert f("**") == ""
+    # Preserve unmatched markers in a complete body.
+    assert f("**unterminated") == "**unterminated"
+    assert f("**") == "**"
+
+    # User-provided Private Use text must not collide with placeholders.
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+    assert f(attack) == attack
+    assert f(f"*bold* {attack}") == f"_bold_ {attack}"
 
     # Preserve an incomplete link as literal text.
     assert f("[text](<https://example.com/unterminated") == (
@@ -421,6 +428,14 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
 
     # Same for an inline code span.
     assert f("see `# not code` here") == "see ```# not code``` here"
+
+    # A genuine heading appearing after a code span that has already
+    # closed must still convert. The span cursor has to advance past
+    # the already-finished span, instead of treating the heading as
+    # still inside it.
+    assert f("`code` end\n# Heading\nmore") == (
+        "```code``` end\n*Heading*\nmore"
+    )
 
     # The framework merges titles as headings, which WhatsApp renders bold.
     aobj = Apprise()
@@ -458,7 +473,7 @@ def test_plugin_evolution_html_to_markdown_hardening(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_evolution_declared_markdown_gets_dialect_completion(
+def test_plugin_evolution_markdown_dialect_conversion(
     mock_post,
 ):
     """Declared Markdown gets WhatsApp dialect completion."""
@@ -481,6 +496,36 @@ def test_plugin_evolution_declared_markdown_gets_dialect_completion(
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "_bold_ click here (https://example.com/x)"
+
+    # Directly verify the hook leaves unsupported formats unchanged.
+    inst = aobj[0]
+    body = "*bold*"
+    assert inst.dialect_convert(body, NotifyFormat.HTML) == body
+
+
+def test_plugin_evolution_bare_link_and_autolink_dialect():
+    """Bare-paren links and standalone autolinks convert safely."""
+
+    # Bare destinations convert without treating URL punctuation as emphasis.
+    assert (
+        NotifyEvolution._commonmark_to_whatsapp("[click here](https://a*b)")
+        == "click here (https://a*b)"
+    )
+
+    # WhatsApp autolinks the URL after its brackets are removed.
+    assert (
+        NotifyEvolution._commonmark_to_whatsapp("see <https://a*b> now")
+        == "see https://a*b now"
+    )
+
+    # A "<" that never forms a valid scheme is passed through literally.
+    assert NotifyEvolution._commonmark_to_whatsapp("a < b") == "a < b"
+
+    # An unfinished autolink stays literal, including its inner ``*``.
+    assert (
+        NotifyEvolution._commonmark_to_whatsapp("see <https://a*b end")
+        == "see <https://a*b end"
+    )
 
 
 @mock.patch("requests.post")

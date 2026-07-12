@@ -287,14 +287,15 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     # Entity-escape Chat controls inside code spans.
     assert notify("<code>a &lt; b &amp; c</code>") == "`a &lt; b &amp; c`"
 
-    # Preserve adjacent nested emphasis.
-    assert notify("<b><i>x</i></b>") == "*_x_*"
+    # Adjacent nested tags flatten to CommonMark italic around bold.
+    assert notify("<b><i>x</i></b>") == "_*x*_"
 
     # Non-adjacent nesting and sibling spans are unaffected.
     assert notify("<b>bold <i>italic</i> still bold</b>") == (
         "*bold _italic_ still bold*"
     )
-    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+    # Adjacent bold tags retain their ambiguous middle markers as literals.
+    assert notify("<b>A</b><b>B</b>") == "*A****B*"
 
     # Direct Google Chat Markdown remains unchanged.
     aobj = Apprise()
@@ -310,8 +311,8 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
         == "text ``unterminated"
     )
 
-    # Collapse empty entities without affecting following content.
-    assert NotifyGoogleChat._commonmark_to_google_chat("****x") == "x"
+    # Preserve an opener with no closer.
+    assert NotifyGoogleChat._commonmark_to_google_chat("****x") == "****x"
 
     # A backslash-escaped '>' outside of link syntax still needs entity
     # escaping, the same as a bare one.
@@ -338,12 +339,15 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
         "[text](<https://example.com/unterminated"
     )
 
-    # An emphasis span still open at the end of the string is force-closed
-    # rather than left dangling, so the result is valid on its own.
-    assert f("**unterminated") == "*unterminated*"
+    # Preserve unmatched markers in a complete body.
+    assert f("**unterminated") == "**unterminated"
+    assert f("**") == "**"
 
-    # Collapse an empty, unterminated emphasis span.
-    assert f("**") == ""
+    # User-provided Private Use text must not collide with placeholders.
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+    assert f(attack) == attack
+    assert f(f"*bold* {attack}") == f"_bold_ {attack}"
 
     # Merge the title as a heading before Chat dialect conversion.
     aobj = Apprise()
@@ -380,7 +384,7 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_google_chat_declared_markdown_gets_dialect_completion(
+def test_plugin_google_chat_markdown_dialect_conversion(
     mock_post,
 ):
     """Declared Markdown gets Google Chat dialect completion."""
@@ -404,3 +408,66 @@ def test_plugin_google_chat_declared_markdown_gets_dialect_completion(
     payload = loads(mock_post.call_args_list[-1][1]["data"])
     assert payload["text"] == "_bold_ <https://example.com/x|click here>"
     mock_post.reset_mock()
+
+    # Directly verify the hook leaves unsupported formats unchanged.
+    inst = aobj[0]
+    body = "*bold*"
+    assert inst.dialect_convert(body, NotifyFormat.HTML) == body
+
+
+def test_plugin_google_chat_bare_link_and_autolink_dialect():
+    """Bare-paren links and standalone autolinks convert safely."""
+
+    # Bare destinations convert without treating URL punctuation as emphasis.
+    assert (
+        NotifyGoogleChat._commonmark_to_google_chat(
+            "[click here](https://a*b)"
+        )
+        == "<https://a*b|click here>"
+    )
+
+    # Complete autolinks become Chat's unlabeled anchors.
+    assert (
+        NotifyGoogleChat._commonmark_to_google_chat("see <https://a*b> now")
+        == "see <https://a*b> now"
+    )
+
+    # A "<" that never forms a valid scheme is passed through literally.
+    assert NotifyGoogleChat._commonmark_to_google_chat("a < b") == "a < b"
+
+
+@mock.patch("requests.post")
+def test_plugin_google_chat_dialect_overflow(mock_post):
+    """Apply the selected overflow mode after Chat escaping expands text."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b"{}"
+    mock_post.return_value.text = "{}"
+
+    def notify(overflow):
+        aobj = Apprise()
+        assert aobj.add(f"gchat://workspace/key/token?overflow={overflow}")
+        # Entity escaping makes this body exceed the post-conversion limit.
+        assert aobj.notify(
+            body="& " * 10000, body_format=NotifyFormat.MARKDOWN
+        )
+        texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+        mock_post.reset_mock()
+        return texts
+
+    # UPSTREAM: exactly one message, sent oversized rather than split.
+    texts = notify("upstream")
+    assert len(texts) == 1
+    assert len(texts[0]) > NotifyGoogleChat.body_maxlen
+
+    # TRUNCATE: exactly one message, clipped to fit.
+    texts = notify("truncate")
+    assert len(texts) == 1
+    assert len(texts[0]) <= NotifyGoogleChat.body_maxlen
+
+    # SPLIT: as many messages as needed, each one within the limit.
+    texts = notify("split")
+    assert len(texts) > 1
+    for text in texts:
+        assert len(text) <= NotifyGoogleChat.body_maxlen

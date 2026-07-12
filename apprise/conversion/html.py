@@ -25,15 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from bisect import bisect_left
+# HTMLParser-based converters: plain-text extraction (HTMLConverter) and
+# HTML-to-CommonMark rendering (HTMLMarkdownConverter). Both are generic --
+# no service-specific markup lives here; see conversion/commonmark.py for
+# the shared CommonMark dialect-repair engine these feed into downstream.
+
 import contextlib
 from html.parser import HTMLParser
 import re
 
-from markdown import markdown
-
-from .common import NotifyFormat
-from .url import URLBase
+from .commonmark import (
+    commonmark_find_backtick_run,
+    commonmark_index_backtick_runs,
+)
 
 # Cap list indentation so deeply nested input stays linear.
 LIST_DEPTH_MAX = 4
@@ -75,89 +79,6 @@ class _ParaBreak:
 
         # Track whether the boundary remains inside a quote
         self.in_quote = in_quote
-
-
-def convert_between(from_format, to_format, content):
-    """Converts between different suported formats. If no conversion exists, or
-    the selected one fails, the original text will be returned.
-
-    This function returns the content translated (if required)
-    """
-
-    # Map each supported format pair to its converter
-    converters = {
-        (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
-        (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
-        (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
-        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
-        (NotifyFormat.TEXT, NotifyFormat.MARKDOWN): text_to_markdown,
-    }
-
-    # Fetch the converter registered for this format pair.
-    convert = converters.get((from_format, to_format))
-
-    # Preserve the original content when no conversion is available
-    return convert(content) if convert else content
-
-
-def markdown_to_html(content):
-    """Converts specified content from markdown to HTML."""
-
-    # Enable notification-friendly line-break and table extensions.
-    return markdown(
-        content,
-        extensions=["markdown.extensions.nl2br", "markdown.extensions.tables"],
-    )
-
-
-def text_to_html(content):
-    """Converts specified content from plain text to HTML."""
-
-    # First eliminate any carriage returns
-    return URLBase.escape_html(content, convert_new_lines=True)
-
-
-# CommonMark syntax characters, including backslash itself.
-# Plain text has no escape state, so escape every occurrence.
-_COMMONMARK_ESCAPABLE_RE = re.compile(r"([\\_*\[\]()~`>#+=|{}.!-])")
-
-
-def text_to_markdown(content):
-    """Converts specified content from plain text to CommonMark.
-
-    Escapes CommonMark-significant characters, including backslashes, so
-    plain text renders literally in Markdown destinations.
-    """
-
-    return _COMMONMARK_ESCAPABLE_RE.sub(r"\\\1", content)
-
-
-def html_to_text(content):
-    """Converts a content from HTML to plain text."""
-
-    # Initialize the plain-text parser.
-    parser = HTMLConverter()
-
-    # Feed and finalize the HTML document
-    parser.feed(content)
-    parser.close()
-
-    # Return the finalized parser output.
-    return parser.converted
-
-
-def html_to_markdown(content):
-    """Convert HTML content to CommonMark."""
-
-    # Initialize the Markdown parser.
-    parser = HTMLMarkdownConverter()
-
-    # Feed and finalize the HTML document
-    parser.feed(content)
-    parser.close()
-
-    # Return the finalized parser output.
-    return parser.converted
 
 
 class HTMLConverter(HTMLParser):
@@ -231,10 +152,10 @@ class HTMLConverter(HTMLParser):
         self.converted = string.strip()
 
     def _finalize(self, result):
-        """Combines and strips consecutive strings, then converts consecutive
-        block ends into singleton newlines.
+        """Join text fragments and collapse repeated block endings.
 
-        [ {be} " Hello " {be} {be} " World!" ] -> "\nHello\nWorld!"
+        For example, ``[{be}, " Hello ", {be}, {be}, " World!"]`` becomes
+        ``"\nHello\nWorld!"``.
         """
 
         # None means the last visited item was a block end.
@@ -312,435 +233,6 @@ class HTMLConverter(HTMLParser):
         # Close block elements with a line boundary.
         if tag in self.BLOCK_TAGS:
             self._result.append(self.BLOCK_END)
-
-
-def build_backtick_run_index(text):
-    """Index unescaped backtick positions by run length in one pass."""
-
-    # Maps run-length -> [start, ...] in ascending position order.
-    index = {}
-
-    # Track the current scanner position and input length.
-    i = 0
-    n = len(text)
-
-    # Visit each character at most once.
-    while i < n:
-        ch = text[i]
-        # Consume escape pairs so a backslash-escaped backtick is not
-        # mistaken for the start or end of a code span.
-        if ch == "\\" and i + 1 < n:
-            i += 2
-            continue
-        if ch == "`":
-            # Measure the run by advancing until the first non-backtick.
-            j = i
-            while j < n and text[j] == "`":
-                j += 1
-            # Store this run's starting position under its length key.
-            # setdefault ensures the list exists before appending.
-            index.setdefault(j - i, []).append(i)
-            # Jump past the entire run to avoid double-counting.
-            i = j
-            continue
-
-        # Advance past ordinary text.
-        i += 1
-
-    # Return positions grouped by delimiter width.
-    return index
-
-
-def find_unescaped_run(index, start, run):
-    """Find the next indexed backtick run of the requested length."""
-
-    # Nothing to search if no run of this exact length was indexed.
-    positions = index.get(run)
-    if not positions:
-        return None
-    # Binary-search for the first position that is >= start.
-    pos = bisect_left(positions, start)
-    # Return the found position, or None if we went past the end of the list.
-    return positions[pos] if pos < len(positions) else None
-
-
-def commonmark_escape_link_url(url):
-    """Adapt a CommonMark URL for ``<url|label>`` dialects."""
-
-    # Step 1: strip CommonMark backslash escapes so we recover the raw URL
-    # characters before re-applying any encoding the target dialect needs.
-    out = []
-
-    # Scan the URL without allocating intermediate match objects.
-    i = 0
-    n = len(url)
-    while i < n:
-        ch = url[i]
-        if ch == "\\" and i + 1 < n:
-            # Discard the backslash and keep only the escaped character.
-            out.append(url[i + 1])
-            i += 2
-            continue
-        out.append(ch)
-        i += 1
-
-    # Reassemble the decoded CommonMark destination.
-    url = "".join(out)
-
-    # Step 2: re-encode the characters that the <url|label> delimiter syntax
-    # would mis-parse if left bare in the URL string.
-    # "&" must come first to avoid double-encoding the entities below.
-    url = url.replace("&", "&amp;").replace("<", "&lt;")
-    url = url.replace(">", "&gt;")
-    # "|" is the separator between the URL and label inside <url|label>;
-    # percent-encode it so it cannot be mistaken for the delimiter.
-    return url.replace("|", "%7C")
-
-
-def commonmark_scan_angle_dest(body, i, n):
-    """Find the closing ``>`` of a ``](<url>)`` destination.
-
-    ``i`` points at ``](<`` and ``n`` bounds the scan. Escaped ``>)`` pairs
-    are skipped; the closing index or ``None`` is returned.
-    """
-
-    # Start immediately after the opening ``](<`` sequence.
-    k = i + 3
-
-    # Scan until a complete two-character terminator can no longer fit.
-    while k < n - 1:
-        if body[k] == "\\" and k + 1 < n:
-            # Skip escape sequences -- they cannot be the terminator.
-            k += 2
-            continue
-        if body[k] == ">" and body[k + 1] == ")":
-            return k
-        k += 1
-    return None
-
-
-def commonmark_emphasis_run(body, i, n, stack, out):
-    """Map one CommonMark asterisk run to target emphasis delimiters.
-
-    ``stack`` tracks nested bold/italic spans while ``out`` receives their
-    delimiters. The returned index points immediately after the run.
-    """
-    # Measure the full asterisk run starting at i.
-    j = i
-    while j < n and body[j] == "*":
-        j += 1
-    run = j - i
-
-    # Consume the run one span at a time.  Each iteration either closes
-    # the top-of-stack span (if the remaining run width satisfies it) or
-    # opens a new span.
-    while run > 0:
-        if stack and (
-            (stack[-1][0] == "*" and run >= 2)
-            or (stack[-1][0] == "_" and run >= 1)
-        ):
-            # Close the innermost open span.
-            delim, open_index = stack.pop()
-            if open_index == len(out) - 1:
-                # Span opened but collected no content -- drop the orphan.
-                out.pop()
-            else:
-                # Emit the matching close delimiter.
-                out.append(delim)
-            # Bold ("*") consumes 2 asterisks; italic ("_") consumes 1.
-            run -= 2 if delim == "*" else 1
-
-        elif run >= 2:
-            # No closeable bold on stack; open a new bold span.
-            out.append("*")
-            stack.append(("*", len(out) - 1))
-            run -= 2
-
-        else:
-            # run == 1: open a new italic span.
-            out.append("_")
-            stack.append(("_", len(out) - 1))
-            run -= 1
-
-    # Return the position after the full asterisk run.
-    return j
-
-
-def commonmark_force_close_spans(out, stack):
-    """Close remaining LIFO emphasis spans and discard empty ones.
-
-    Both ``out`` and ``stack`` are updated in place.
-    """
-
-    # Close innermost spans first to preserve valid nesting.
-    while stack:
-        delim, open_index = stack.pop()
-        if open_index == len(out) - 1:
-            # Span opened but collected no content -- remove the orphan.
-            out.pop()
-        else:
-            # Emit the close delimiter.
-            out.append(delim)
-
-
-# Escape these CommonMark characters when they must remain literal.
-_COMMONMARK_LITERAL_CHARS = "\\`*_[]()<>"
-
-
-def _commonmark_escape_literal(text):
-    """Escape syntax characters in fragments known to be literal text."""
-    return "".join(
-        f"\\{ch}" if ch in _COMMONMARK_LITERAL_CHARS else ch for ch in text
-    )
-
-
-def _scan_angle_terminator(text, start, n):
-    """Find ``>)`` or report a trailing ``>`` split from the next chunk."""
-    k = start
-    while k < n:
-        if text[k] == "\\" and k + 1 < n:
-            # Skip escape sequences -- they cannot be the terminator.
-            k += 2
-            continue
-        if text[k] == ">":
-            if k + 1 < n and text[k + 1] == ")":
-                return k, False
-            if k + 1 == n:
-                # Unescaped ">" is the last character of this chunk.
-                return None, True
-        k += 1
-    return None, False
-
-
-def commonmark_repair_chunk(text, pending):
-    """Repair split CommonMark and return the text plus continuation state."""
-
-    # Output fragment list; joined once at the end.
-    out = []
-    # Track asterisk and underscore emphasis as independent families.
-    open_state = {"**": False, "*": False, "__": False, "_": False}
-    # Record the out-index of each open delimiter for empty-span cleanup.
-    open_pos = {"**": None, "*": None, "__": None, "_": None}
-    # Work on a mutable copy so we do not mutate the caller's dict.
-    pending = dict(pending)
-
-    # Track possible link-label openings in this chunk.
-    link_stack = []
-
-    # Initialize the single-pass scanner.
-    i = 0
-    n = len(text)
-    # Pre-compute backtick run positions once for O(log n) code matching.
-    backtick_runs = build_backtick_run_index(text)
-
-    # Resume prior state, rendering cross-message code and links as literals.
-    in_code_width = pending.pop("in_code", None)
-    if in_code_width:
-        # Search this chunk for the carried code span's closing fence.
-        close = find_unescaped_run(backtick_runs, 0, in_code_width)
-        if close is not None:
-            # Carried content plus the leftover fence are plain text now.
-            out.append(_commonmark_escape_literal(text[:close]))
-            i = close + in_code_width
-        else:
-            # Still doesn't close in this chunk either; carry it onward.
-            out.append(_commonmark_escape_literal(text))
-            pending["in_code"] = in_code_width
-            i = n
-
-    elif pending.pop("in_link_dest", False):
-        # Complete a terminator split between the previous and current chunk.
-        if pending.pop("dest_gt", False) and n and text[0] == ")":
-            out.append("\\)")
-            i = 1
-        else:
-            # Find the end of a destination already treated as literal text.
-            close, trailing_gt = _scan_angle_terminator(text, 0, n)
-
-            if close is not None:
-                # Escape the remaining destination and its closing marker.
-                out.append(_commonmark_escape_literal(text[:close]))
-                out.append("\\>\\)")
-                i = close + 2
-            else:
-                # Carry the destination and any split closing marker forward.
-                out.append(_commonmark_escape_literal(text))
-                pending["in_link_dest"] = True
-                if trailing_gt:
-                    pending["dest_gt"] = True
-                i = n
-
-    # Scan the remainder of this chunk.
-    while i < n:
-        ch = text[i]
-
-        # Preserve escapes already present in the CommonMark source.
-        if ch == "\\" and i + 1 < n:
-            out.append(text[i : i + 2])
-            i += 2
-            continue
-
-        # Preserve complete code spans or carry split spans forward.
-        if ch == "`":
-            j = i
-            # Measure the opening backtick run.
-            while j < n and text[j] == "`":
-                j += 1
-            run = j - i
-            # Look for the matching close run in the pre-built index.
-            close = find_unescaped_run(backtick_runs, j, run)
-            if close is not None:
-                # Complete span in this chunk: copy verbatim.
-                out.append(text[i : close + run])
-                i = close + run
-                continue
-
-            # Drop a split fence and carry its width; escaping is unsafe for
-            # dialects such as WhatsApp that decode escapes before rendering.
-            pending["in_code"] = run
-            out.append(_commonmark_escape_literal(text[j:]))
-            i = n
-            continue
-
-        # Reconcile carried or local emphasis delimiters.
-        if ch == "*":
-            j = i
-            # Measure the full asterisk run starting at i.
-            while j < n and text[j] == "*":
-                j += 1
-            run = j - i
-
-            # Consume pairs as bold markers and a remainder as italic.
-            while run > 0:
-                marker = "**" if run >= 2 else "*"
-
-                if pending.get(marker, 0) > 0:
-                    # Discard a close for a span closed in an earlier chunk.
-                    pending[marker] -= 1
-
-                elif open_state[marker]:
-                    # Close the local span, dropping an empty opening.
-                    if open_pos[marker] == len(out) - 1:
-                        out.pop()
-                    else:
-                        out.append(marker)
-                    open_state[marker] = False
-                    open_pos[marker] = None
-
-                else:
-                    # This delimiter opens a new span in this chunk.
-                    out.append(marker)
-                    open_pos[marker] = len(out) - 1
-                    open_state[marker] = True
-
-                run -= 2 if marker == "**" else 1
-
-            i = j
-            continue
-
-        # Reconcile carried or local underscore emphasis delimiters.
-        if ch == "_":
-            j = i
-            # Measure the full underscore run starting at i.
-            while j < n and text[j] == "_":
-                j += 1
-            run = j - i
-
-            # Consume pairs as bold markers and a remainder as italic.
-            while run > 0:
-                marker = "__" if run >= 2 else "_"
-
-                if pending.get(marker, 0) > 0:
-                    # Discard a close for a span closed in an earlier chunk.
-                    pending[marker] -= 1
-
-                elif open_state[marker]:
-                    # Close the local span, dropping an empty opening.
-                    if open_pos[marker] == len(out) - 1:
-                        out.pop()
-                    else:
-                        out.append(marker)
-                    open_state[marker] = False
-                    open_pos[marker] = None
-
-                else:
-                    # This delimiter opens a new span in this chunk.
-                    out.append(marker)
-                    open_pos[marker] = len(out) - 1
-                    open_state[marker] = True
-
-                run -= 2 if marker == "__" else 1
-
-            i = j
-            continue
-
-        # Track link labels for carry-over across chunk boundaries.
-        if ch == "[":
-            # Save the opening position until this chunk completes the link.
-            link_stack.append(len(out))
-            out.append(ch)
-            i += 1
-            continue
-
-        if text.startswith("](<", i):
-            # We are at the "](<" that may close a pending link label.
-            close = commonmark_scan_angle_dest(text, i, n)
-            if close is not None and link_stack:
-                # Preserve a complete link contained in this chunk.
-                link_stack.pop()
-                out.append(text[i : close + 2])
-                i = close + 2
-                continue
-
-            # Render any boundary-cut link as escaped literal text.
-            if link_stack:
-                link_stack.pop()
-
-            if close is not None:
-                out.append("\\]\\(")
-                out.append(_commonmark_escape_literal(text[i + 3 : close]))
-                out.append("\\>\\)")
-                i = close + 2
-            else:
-                out.append("\\]\\(")
-                out.append(_commonmark_escape_literal(text[i + 3 :]))
-                pending["in_link_dest"] = True
-                # Record a trailing ">" that may close in the next chunk.
-                _, trailing_gt = _scan_angle_terminator(text, i + 3, n)
-                if trailing_gt:
-                    pending["dest_gt"] = True
-                i = n
-            continue
-
-        # Preserve ordinary characters.
-        out.append(ch)
-        i += 1
-
-    # Escape link labels that do not complete within this chunk.
-    for idx in link_stack:
-        out[idx] = "\\" + out[idx]
-
-    # Classify open spans before deletions shift their indexes.
-    empty, nonempty = [], []
-    for marker in ("**", "*", "__", "_"):
-        if not open_state[marker]:
-            continue
-        (empty if open_pos[marker] == len(out) - 1 else nonempty).append(
-            marker
-        )
-
-    # Delete empty spans from right to left to preserve earlier indexes.
-    for marker in sorted(empty, key=lambda m: open_pos[m], reverse=True):
-        del out[open_pos[marker]]
-
-    # Close spans from innermost to outermost, then carry their state.
-    new_pending = dict(pending)
-    for marker in sorted(nonempty, key=lambda m: open_pos[m], reverse=True):
-        out.append(marker)
-        new_pending[marker] = new_pending.get(marker, 0) + 1
-
-    # Join the translated fragments once.
-    return "".join(out), new_pending
 
 
 class HTMLMarkdownConverter(HTMLConverter):
@@ -1134,7 +626,7 @@ class HTMLMarkdownConverter(HTMLConverter):
         n = len(text)
 
         # Index code delimiters before inspecting table separators.
-        backtick_runs = build_backtick_run_index(text)
+        backtick_runs = commonmark_index_backtick_runs(text)
 
         while i < n:
             ch = text[i]
@@ -1154,7 +646,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                 run = j - i
 
                 # Find the matching closing run of the same length.
-                close = find_unescaped_run(backtick_runs, j, run)
+                close = commonmark_find_backtick_run(backtick_runs, j, run)
                 if close is not None:
                     # Inside a code span, "|" is a literal character --
                     # copy the entire span verbatim without escaping.

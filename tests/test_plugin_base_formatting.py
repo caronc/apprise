@@ -31,6 +31,7 @@ import json
 import logging
 from random import choice
 from string import ascii_uppercase as str_alpha, digits as str_num
+from timeit import default_timer
 from unittest import mock
 
 import pytest
@@ -3789,6 +3790,32 @@ def test_notify_markdown_general():
     )
     assert len(chunks) == 1
     assert chunks[0].get("body") == "**bold**"
+
+    # Escape an unmatched opener when the discarded tail has no closer.
+    obj.body_maxlen = 4
+    chunks = obj._apply_overflow(
+        body="*_a_ and a literal * elsewhere",
+        title="",
+        overflow=OverflowMode.TRUNCATE,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == "\\*_a_"
+
+    # Truncating a large body must use bounded lookahead.
+    obj.body_maxlen = 100
+    huge_body = "hello world " * 200000
+    start = default_timer()
+    chunks = obj._apply_overflow(
+        body=huge_body,
+        title="",
+        overflow=OverflowMode.TRUNCATE,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    elapsed = default_timer() - start
+    assert len(chunks) == 1
+    assert len(chunks[0].get("body")) <= 100
+    assert elapsed < 10.0
 
 
 @mock.patch("requests.request")

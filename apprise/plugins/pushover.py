@@ -523,7 +523,7 @@ class NotifyPushover(NotifyBase):
         notify_type=NotifyType.INFO,
         attach=None,
         body_format=None,
-        format_controlled=None,
+        body_passthrough=None,
         **kwargs,
     ):
         """Perform Pushover Notification."""
@@ -566,7 +566,7 @@ class NotifyPushover(NotifyBase):
             # https://pushover.net/api#html
             base_payload["html"] = 1
 
-        elif body_format == NotifyFormat.MARKDOWN and format_controlled:
+        elif body_format == NotifyFormat.MARKDOWN and not body_passthrough:
             # Pushover has no native Markdown; convert declared Markdown
             # to HTML and leave undeclared sources untouched.
             base_payload["message"] = convert_between(

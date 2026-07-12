@@ -267,7 +267,7 @@ class NotifyAppriseAPI(NotifyBase):
         notify_type=NotifyType.INFO,
         attach=None,
         body_format=None,
-        format_controlled=None,
+        body_passthrough=None,
         **kwargs,
     ):
         """Perform Apprise API Notification."""
@@ -347,7 +347,7 @@ class NotifyAppriseAPI(NotifyBase):
             "type": notify_type.value,
         }
 
-        if format_controlled:
+        if not body_passthrough and body_format is not None:
             # Relay format only when the caller declared one; otherwise
             # let the downstream Apprise API server choose its default.
             payload["format"] = body_format.value

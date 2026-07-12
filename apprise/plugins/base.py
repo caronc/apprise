@@ -48,7 +48,11 @@ from ..common import (
     OverflowMode,
     PersistentStoreMode,
 )
-from ..conversion import commonmark_repair_chunk
+from ..conversion import (
+    commonmark_repair_chunk,
+    split_dialect_chunk,
+    truncate_dialect_chunk,
+)
 from ..locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
@@ -784,14 +788,9 @@ class NotifyBase(URLBase):
         return formats[0]
 
     def _timed_send(self, **kwargs2: Any) -> bool:
-        """Call send() once, logging how long it took at DEBUG.
+        """Send one prepared call and log its duration at DEBUG.
 
-        Shared by notify() and async_notify() so every attempt is timed
-        the same way. Dispatches to a type-specific send_text()/
-        send_html()/send_markdown() when the plugin defines one for the
-        resolved format, falling back to the generic send() otherwise.
-
-        _build_send_calls() yields an already-resolved body_format.
+        Prefer a format-specific sender when available, otherwise use send().
         """
         resolved = kwargs2.get("body_format")
         fn = getattr(self, f"send_{resolved.value}", None)
@@ -853,9 +852,13 @@ class NotifyBase(URLBase):
                 result = await loop.run_in_executor(executor, ctx.run, send)
                 return result
 
-            # gather() all calls in parallel.
-            the_cors = (do_send(**kwargs2) for kwargs2 in send_calls)
-            return all(await asyncio.gather(*the_cors))
+            # Await this plugin's pieces in order so split text and attachments
+            # arrive predictably. Services still run concurrently one level up,
+            # and each blocking send remains in the shared executor.
+            results = []
+            for kwargs2 in send_calls:
+                results.append(await do_send(**kwargs2))
+            return all(results)
 
     def _build_send_calls(
         self,
@@ -865,16 +868,15 @@ class NotifyBase(URLBase):
         overflow: Optional[Union[str, OverflowMode]] = None,
         attach: Optional[Union[list[str], AppriseAttachment]] = None,
         body_format: Optional[NotifyFormat] = None,
-        format_controlled: Optional[bool] = None,
+        body_passthrough: Optional[bool] = None,
         **kwargs: Any,
     ) -> Generator[dict[str, Any], None, None]:
-        """Get a list of dictionaries that can be used to call send() or (in
-        the future) async_send()."""
+        """Yield prepared ``send()`` arguments with their index and total."""
 
         # Direct plugin calls bypass Apprise's per-server resolution, so
         # resolve here and remember whether a source format was declared.
-        if format_controlled is None:
-            format_controlled = body_format is not None
+        if body_passthrough is None:
+            body_passthrough = body_format is None
             body_format = self.resolve_format(body_format)
 
         if not self.enabled:
@@ -919,36 +921,63 @@ class NotifyBase(URLBase):
         # Handle situations where the title is None
         title = title if title else ""
 
-        # Truncate flag set with attachments ensures that only 1
-        # attachment passes through. In the event there could be many
-        # services specified, we only want to do this logic once.
-        # The logic is only applicable if ther was more then 1 attachment
-        # specified
+        # Truncate mode keeps only the first of multiple attachments.
+        # Prepare it once for all calls made by this service.
         overflow = self.overflow_mode if overflow is None else overflow
         if attach and len(attach) > 1 and overflow == OverflowMode.TRUNCATE:
-            # Save first attachment
+            # Save the first attachment.
             attach_ = AppriseAttachment(attach[0], asset=self.asset)
         else:
-            # reference same attachment
+            # Reuse the original attachment collection.
             attach_ = attach
 
-        # Apply our overflow (if defined)
-        for chunk in self._apply_overflow(
-            body=body,
-            title=title,
-            overflow=overflow,
-            body_format=body_format,
-            format_controlled=format_controlled,
-        ):
-            # Send notification
-            yield {
-                "body": chunk["body"],
-                "title": chunk["title"],
-                "notify_type": notify_type,
-                "attach": attach_,
-                "body_format": body_format,
-                "format_controlled": format_controlled,
-            }
+        # Apply overflow and dialect resizing to every chunk first so plugins
+        # receive the final call count before delivery begins.
+        all_pieces = [
+            self._apply_dialect_overflow(
+                chunk, overflow, body_format, body_passthrough
+            )
+            for chunk in self._apply_overflow(
+                body=body,
+                title=title,
+                overflow=overflow,
+                body_format=body_format,
+                body_passthrough=body_passthrough,
+            )
+        ]
+        total = sum(len(pieces) for pieces in all_pieces)
+
+        # Select one attachment-bearing call before split delivery begins.
+        # This avoids duplicates and shared state during concurrent sends.
+        attach_index = self._attachment_send_index(total) if attach_ else None
+
+        # Track each call's position across all chunks so plugins can place
+        # attachments relative to the first or last delivery.
+        index = 0
+        for pieces in all_pieces:
+            for piece in pieces:
+                # Send notification
+                yield {
+                    "body": piece["body"],
+                    "title": piece["title"],
+                    "notify_type": notify_type,
+                    # Attach only on the one call chosen above; never repeat
+                    # it across overflow chunks or dialect-split pieces.
+                    "attach": attach_ if index == attach_index else None,
+                    "body_format": body_format,
+                    "body_passthrough": body_passthrough,
+                    "index": index,
+                    "total": total,
+                }
+                index += 1
+
+    def _attachment_send_index(self, total: int) -> int:
+        """Return the flat call index that should carry an attachment.
+
+        The default is the first call. Plugins may use ``total`` to select a
+        later call when their delivery order requires it.
+        """
+        return 0
 
     def _apply_overflow(
         self,
@@ -956,21 +985,15 @@ class NotifyBase(URLBase):
         title: Optional[str] = None,
         overflow: Optional[Union[str, OverflowMode]] = None,
         body_format: Optional[NotifyFormat] = None,
-        format_controlled: Optional[bool] = None,
+        body_passthrough: Optional[bool] = None,
     ) -> list[dict[str, str]]:
-        """
-        Apply overflow behaviour (UPSTREAM, TRUNCATE, SPLIT) to title/body.
+        """Apply upstream, truncation, or split overflow rules.
 
-        Takes the message body and title as input.  This function then
-        applies any defined overflow restrictions associated with the
-        notification service and may alter the message if/as required.
+        The title may be merged into the body when the service has no title
+        field. ``body_format`` guides splitting and Markdown repair, while
+        ``body_passthrough`` skips format conversion for an undeclared source.
 
-        ``body_format`` is the resolved render target for this send.
-        ``format_controlled`` tracks whether the caller declared a source
-        format; standalone calls resolve both here as a fallback.
-
-        The function will always return a list object in the following
-        structure:
+        Returns one or more independently deliverable title/body mappings:
             [
                 {
                     title: 'the title goes here',
@@ -992,8 +1015,8 @@ class NotifyBase(URLBase):
         if overflow is None:
             overflow = self.overflow_mode
 
-        if format_controlled is None:
-            format_controlled = body_format is not None
+        if body_passthrough is None:
+            body_passthrough = body_format is None
             body_format = self.resolve_format(body_format)
 
         # If the service does not support a title, amalgamate into body
@@ -1005,9 +1028,9 @@ class NotifyBase(URLBase):
                     f"<br />\r\n{body}"
                 )
 
-            elif body_format == NotifyFormat.MARKDOWN and format_controlled:
+            elif body_format == NotifyFormat.MARKDOWN and not body_passthrough:
                 # Declared Markdown/CommonMark can receive a heading.
-                # Undeclared content falls through unchanged below.
+                # Undeclared content uses the normal plain-text title layout.
                 title = title.lstrip("\r\n \t\v\f#-")
                 if title:
                     body = f"# {title}\n{body}"
@@ -1080,9 +1103,20 @@ class NotifyBase(URLBase):
         # TRUNCATE mode: hard truncation (no smart-splitting)
         if overflow == OverflowMode.TRUNCATE:
             truncated = body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip()
-            if body_format == NotifyFormat.MARKDOWN and format_controlled:
+            if body_format == NotifyFormat.MARKDOWN and not body_passthrough:
                 # Repair truncated constructs before dialect conversion.
-                truncated, _ = commonmark_repair_chunk(truncated, {})
+                # Bounded discarded text can identify a possible closer.
+                lookahead_end = body_maxlen + body_maxlen * 8
+                lookahead = body[body_maxlen:lookahead_end]
+                boundary_next_ch = (
+                    body[lookahead_end : lookahead_end + 1] or None
+                )
+                truncated, _ = commonmark_repair_chunk(
+                    truncated,
+                    {},
+                    next_chunk=lookahead or None,
+                    next_chunk_boundary_ch=boundary_next_ch,
+                )
             response.append({"body": truncated, "title": title})
             return response
 
@@ -1227,15 +1261,76 @@ class NotifyBase(URLBase):
                         }
                     )
 
-        if body_format == NotifyFormat.MARKDOWN and format_controlled:
-            # Repair chunks in order before plugin-specific dialect conversion.
+        if body_format == NotifyFormat.MARKDOWN and not body_passthrough:
+            # Repair chunks before dialect conversion. Raw lookahead classifies
+            # a trailing delimiter against its real neighbor.
             pending = {}
-            for chunk in response:
+            for idx, chunk in enumerate(response):
+                next_body = (
+                    response[idx + 1]["body"]
+                    if idx + 1 < len(response)
+                    else None
+                )
                 chunk["body"], pending = commonmark_repair_chunk(
-                    chunk["body"], pending
+                    chunk["body"], pending, next_chunk=next_body
                 )
 
         return response
+
+    def _apply_dialect_overflow(
+        self,
+        chunk: dict[str, str],
+        overflow: Union[str, OverflowMode],
+        body_format: Optional[NotifyFormat],
+        body_passthrough: bool,
+    ) -> list[dict[str, str]]:
+        """Re-split or re-truncate one chunk after ``dialect_convert()``.
+
+        Passthrough bodies and plugins without an override remain unchanged.
+        The first returned piece keeps the original title.
+        """
+        has_dialect = (
+            type(self).dialect_convert is not NotifyBase.dialect_convert
+        )
+        if not has_dialect or body_passthrough:
+            return [chunk]
+
+        def convert_fn(body: str) -> str:
+            return self.dialect_convert(body, body_format)
+
+        if overflow == OverflowMode.SPLIT:
+            bodies = split_dialect_chunk(
+                chunk["body"], self.body_maxlen, convert_fn
+            )
+        elif overflow == OverflowMode.TRUNCATE:
+            bodies = [
+                truncate_dialect_chunk(
+                    chunk["body"], self.body_maxlen, convert_fn
+                )
+            ]
+        else:
+            # UPSTREAM: convert without splitting and let the service
+            # itself handle an oversized payload.
+            bodies = [convert_fn(chunk["body"])]
+
+        return [
+            {"body": body, "title": chunk["title"] if idx == 0 else ""}
+            for idx, body in enumerate(bodies)
+        ]
+
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Convert one chunk to the service's final markup dialect.
+
+        Keep overrides stateless, accept ``*args, **kwargs``, and return
+        unsupported formats unchanged. The framework reapplies size limits.
+        """
+        return body
 
     def send(
         self,
