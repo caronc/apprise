@@ -737,7 +737,9 @@ def parse_url(
 
     # Parse results
     result["host"] = parsed[1].strip()
-    result["fullpath"] = quote(unquote(tidy_path(parsed[2].strip())))
+    result["fullpath"] = quote(
+        unquote(tidy_path(parsed[2].strip())), safe="/@"
+    )
 
     try:
         # Handle trailing slashes removed by tidy_path
