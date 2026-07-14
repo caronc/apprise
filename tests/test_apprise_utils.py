@@ -815,6 +815,12 @@ def test_parse_url_general():
     assert "-token" in result["qsd"]
     assert result["qsd-"]["token"] == "ab cdefg"
 
+    # Testing Defect 1672 - reserved characters in URL paths
+    url = "https://cdn.jsdelivr.net/gh/Cleanuparr/Cleanuparr@main/Logo/256.png"
+    result = utils.parse.parse_url(url)
+    assert result["fullpath"] == "/gh/Cleanuparr/Cleanuparr@main/Logo/256.png"
+    assert result["url"] == url
+
 
 def test_parse_url_simple():
     "utils: parse_url() testing"
