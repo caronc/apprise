@@ -205,6 +205,51 @@ def test_plugin_trigv_duplicate_success(mock_post):
     assert obj.send(body="test", title="title") is True
 
 
+@mock.patch("requests.post")
+def test_plugin_trigv_optional_payload_and_priority(mock_post):
+    """NotifyTrigv() includes optional fields and maps numeric priority."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    mock_post.return_value = response
+
+    obj = NotifyTrigv(
+        api_key=VALID_API_KEY,
+        image_url="https://example.com/image.png",
+        event_type="backup.failed",
+        priority=1,
+    )
+    assert obj.send(body="", title="") is True
+
+    import json
+
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["title"] == obj.app_desc
+    assert payload["description"] == obj.app_desc
+    assert payload["image_url"] == "https://example.com/image.png"
+    assert payload["event_type"] == "backup.failed"
+    assert payload["delivery_urgency"] == "time_sensitive"
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_empty_body_and_invalid_priority(mock_post):
+    """NotifyTrigv() omits an empty body and ignores invalid priority."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    mock_post.return_value = response
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY, priority="invalid")
+    assert obj.send(body="", title="Title", notify_type="unknown") is True
+
+    import json
+
+    payload = json.loads(mock_post.call_args_list[0][1]["data"])
+    assert "description" not in payload
+    assert payload["level"] == "info"
+    assert payload["delivery_urgency"] == "standard"
+
+
 def test_plugin_trigv_invalid_delivery_urgency():
     """NotifyTrigv() rejects unknown delivery urgency."""
 
@@ -223,19 +268,25 @@ def test_plugin_trigv_url_roundtrip(mock_post):
         api_key=VALID_API_KEY,
         channel="deploys",
         supplemental_url="https://example.com/run/1",
+        image_url="https://example.com/image.png",
         delivery_urgency="time_sensitive",
         event_type="deploy.completed",
+        priority=2,
     )
 
     generated = obj.url()
     assert "deploys" in generated
     assert "url=" in generated
+    assert "image_url=" in generated
     assert "delivery_urgency=time_sensitive" in generated
     assert "event_type=deploy.completed" in generated
+    assert "priority=2" in generated
 
     parsed = NotifyTrigv.parse_url(generated)
     obj2 = NotifyTrigv(**parsed)
     assert obj2.channel == "deploys"
     assert obj2.supplemental_url == "https://example.com/run/1"
+    assert obj2.image_url == "https://example.com/image.png"
     assert obj2.delivery_urgency == "time_sensitive"
     assert obj2.event_type == "deploy.completed"
+    assert obj2.priority == "2"

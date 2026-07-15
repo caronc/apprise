@@ -273,8 +273,7 @@ class NotifyTrigv(NotifyBase):
                 )
 
                 self.logger.warning(
-                    "Failed to send Trigv notification: "
-                    "{}{}error={}.".format(
+                    "Failed to send Trigv notification: {}{}error={}.".format(
                         status_str, ", " if status_str else "", r.status_code
                     )
                 )
