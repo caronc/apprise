@@ -57,7 +57,7 @@ The section identifies all of the services supported by this library. [Check out
 
 ## Productivity Based Notifications
 
-The table below identifies the services this tool supports and some example service urls you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them. If you're having trouble constructing your own URL; try our [Apprise URL Builder](https://appriseit.com/tools/url-builder/) out.
+The table below identifies the services this tool supports and some example service URLs you need to use in order to take advantage of it. Click on any of the services listed below to get more details on how you can configure Apprise to access them. If you're having trouble constructing your own URL; try our [Apprise URL Builder](https://appriseit.com/tools/url-builder/) out.
 
 | Notification Service | Service ID | Default Port | Example Syntax |
 | -------------------- | ---------- | ------------ | -------------- |
@@ -179,7 +179,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | [46elks](https://appriseit.com/services/46elks/) | 46elks://  | (TCP) 443   | 46elks://user:password@FromPhoneNo<br/>46elks://user:password@FromPhoneNo/ToPhoneNo<br/>46elks://user:password@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [800.com](https://appriseit.com/services/eight00com/) | eight00com://  | (TCP) 443   | eight00com://Token@FromPhoneNo<br/>eight00com://Token@FromPhoneNo/ToPhoneNo<br/>eight00com://Token@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [Africas Talking](https://appriseit.com/services/africas_talking/) | atalk://  | (TCP) 443   | atalk://AppUser@ApiKey/ToPhoneNo<br/>atalk://AppUser@ApiKey/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
-| [Automated Packet Reporting System (ARPS)](https://appriseit.com/services/aprs/)  | aprs:// | (TCP) 10152 | aprs://user:pass@callsign<br/>aprs://user:pass@callsign1/callsign2/callsignN
+| [Automated Packet Reporting System (APRS)](https://appriseit.com/services/aprs/)  | aprs:// | (TCP) 10152 | aprs://user:pass@callsign<br/>aprs://user:pass@callsign1/callsign2/callsignN
 | [AWS SNS](https://appriseit.com/services/sns/)  | sns://   | (TCP) 443   | sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo<br/>sns://AccessKeyID/AccessSecretKey/RegionName/+PhoneNo1/+PhoneNo2/+PhoneNoN<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic<br/>sns://AccessKeyID/AccessSecretKey/RegionName/Topic1/Topic2/TopicN
 | [BulkSMS](https://appriseit.com/services/bulksms/) | bulksms://  | (TCP) 443   | bulksms://user:password@ToPhoneNo<br/>bulksms://User:Password@ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
 | [BulkVS](https://appriseit.com/services/bulkvs/) | bulkvs://  | (TCP) 443   | bulkvs://user:password@FromPhoneNo<br/>bulkvs://user:password@FromPhoneNo/ToPhoneNo<br/>bulkvs://user:password@FromPhoneNo/ToPhoneNo1/ToPhoneNo2/ToPhoneNoN/
@@ -228,7 +228,7 @@ SMS Notifications for the most part do not have a both a `title` and `body`.  Th
 | [mailto://](https://appriseit.com/services/email/)  |  (TCP) 25    | mailto://userid:pass@domain.com<br />mailto://domain.com?user=userid&pass=password<br/>mailto://domain.com:2525?user=userid&pass=password<br />mailto://user@gmail.com&pass=password<br />mailto://mySendingUsername:mySendingPassword@example.com?to=receivingAddress@example.com<br />mailto://userid:password@example.com?smtp=mail.example.com&from=noreply@example.com&name=no%20reply
 | [mailtos://](https://appriseit.com/services/email/) |  (TCP) 587   | mailtos://userid:pass@domain.com<br />mailtos://domain.com?user=userid&pass=password<br/>mailtos://domain.com:465?user=userid&pass=password<br />mailtos://user@hotmail.com&pass=password<br />mailtos://mySendingUsername:mySendingPassword@example.com?to=receivingAddress@example.com<br />mailtos://userid:password@example.com?smtp=mail.example.com&from=noreply@example.com&name=no%20reply
 
-Apprise have some email services built right into it (such as yahoo, fastmail, hotmail, gmail, etc) that greatly simplify the mailto:// service.  See more details [here](https://appriseit.com/services/email/).
+Apprise has some email services built right into it (such as yahoo, fastmail, hotmail, gmail, etc) that greatly simplify the mailto:// service.  See more details [here](https://appriseit.com/services/email/).
 
 ## Custom Notifications
 
@@ -281,7 +281,7 @@ uptime | apprise -vv \
 
 ## CLI Configuration Files
 
-No one wants to put their credentials out for everyone to see on the command line.  No problem *apprise* also supports configuration files.  It can handle both a specific YAML format or a very simple TEXT format. You can also pull these configuration files via an HTTP query too! Read more about the expected structure of the configuration files [here](https://appriseit.com/config/).
+No one wants to put their credentials out for everyone to see on the command line.  No problem, *apprise* also supports configuration files.  It can handle both a specific YAML format or a very simple TEXT format. You can also pull these configuration files via an HTTP query too! Read more about the expected structure of the configuration files [here](https://appriseit.com/config/).
 
 ```bash
 # By default if no url or configuration is specified apprise will attempt to load
@@ -293,7 +293,7 @@ No one wants to put their credentials out for everyone to see on the command lin
 #  /etc/apprise.conf
 #  /etc/apprise.yaml
 
-# Also a subdirectory handling allows you to leverage plugins
+# Also subdirectory handling allows you to leverage plugins
 #  ~/.apprise/apprise
 #  ~/.apprise/apprise.yaml
 #  ~/.config/apprise/apprise.conf
@@ -474,7 +474,7 @@ apobj.notify(
 
 ## API Configuration Files
 
-Developers need access to configuration files too. The good news is their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://appriseit.com/getting-started/configuration/).
+Developers need access to configuration files too. The good news is that their use just involves declaring another object (called *AppriseConfig*) that the *Apprise* object can ingest.  You can also freely mix and match config and notification entries as often as you wish! You can read more about the expected structure of the configuration files [here](https://appriseit.com/getting-started/configuration/).
 ```python
 import apprise
 
@@ -642,8 +642,8 @@ There are 3 Persistent Storage operational states Apprise can operate using:
 1. `auto`:  Flush gathered cache information to the filesystem on demand.  This option is incredibly light weight.  This is the default behavior for all CLI usage.
    * Developers who choose to use this operational mode can also force cached information manually if they choose.
    * The CLI will use this operational mode by default.
-1. `flush`: Flushes any cache information to the filesystem during every transaction.
-1. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before peristent storage was available. This setting ensures no content is ever written to disk.
+2. `flush`: Flushes any cache information to the filesystem during every transaction.
+3. `memory`: Effectively disable Persistent Storage.  Any caching of data required by each plugin used is done in memory.  Apprise effectively operates as it always did before peristent storage was available. This setting ensures no content is ever written to disk.
    * By default this is the mode Apprise will operate under for those developing with it unless they configure it to otherwise operate as `auto` or `flush`.  This is done through the `AppriseAsset()` object and is explained further on in this documentation.
 
 ## CLI Persistent Storage Commands
