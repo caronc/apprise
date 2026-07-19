@@ -875,6 +875,27 @@ def test_plugin_workflows_azure_webhooks(request_mock):
     assert obj.api_version == "2016-06-01"
 
 
+@pytest.mark.parametrize("routing_id", (123456789, 987654321))
+def test_plugin_workflows_power_automate_cu_webhooks(request_mock, routing_id):
+    """NotifyWorkflows() preserves Power Automate CU routing IDs."""
+    url = (
+        "https://default.environment.api.powerplatform.com:443"
+        f"/powerautomate/automations/direct/cu/{routing_id}"
+        "/workflows/3XXX5/triggers/manual/paths/invoke"
+        "?api-version=2022-03-01-preview&"
+        "sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=iXXXU"
+    )
+
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifyWorkflows)
+    assert obj.notify(body="body", title="title") is True
+    assert request_mock.call_args.args[0] == (
+        "https://default.environment.api.powerplatform.com:443"
+        f"/powerautomate/automations/direct/cu/{routing_id}"
+        "/workflows/3XXX5/triggers/manual/paths/invoke"
+    )
+
+
 @mock.patch("requests.post")
 def test_plugin_workflows_html_to_markdown_format(mock_post):
     """NotifyWorkflows(): HTML body is converted to Markdown."""
