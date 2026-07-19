@@ -222,6 +222,7 @@ class NotifyWorkflows(NotifyBase):
         signature,
         include_image=None,
         power_automate=None,
+        routing_id=None,
         version=None,
         template=None,
         tokens=None,
@@ -260,6 +261,9 @@ class NotifyWorkflows(NotifyBase):
             if power_automate is not None
             else self.template_args["pa"]["default"]
         )
+
+        # Microsoft may provide a routing ID in native Power Automate URLs
+        self.routing_id = routing_id
 
         # Wrap Text
         self.wrap = bool(
@@ -536,6 +540,8 @@ class NotifyWorkflows(NotifyBase):
         path = (
             "/powerautomate/automations/direct" if self.power_automate else ""
         )
+        if path and self.routing_id:
+            path += f"/cu/{self.routing_id}"
 
         notify_url = (
             "https://{host}{port}{path}/workflows/{workflow}/"
@@ -774,7 +780,9 @@ class NotifyWorkflows(NotifyBase):
             r"^https?://(?P<host>[A-Z0-9_.-]+)"
             r"(?P<port>:[1-9][0-9]{0,5})?"
             # The new URL structure includes /powerautomate/automations/direct
-            r"(?P<power_automate>/powerautomate/automations/direct)?"
+            # and may include a CU routing ID before /workflows
+            r"(?P<power_automate>/powerautomate/automations/direct"
+            r"(?:/cu/(?P<routing_id>[0-9]+))?)?"
             r"/workflows/"
             r"(?P<workflow>[A-Z0-9_-]+)"
             r"/triggers/manual/paths/invoke/?"
@@ -790,7 +798,7 @@ class NotifyWorkflows(NotifyBase):
             )
 
             # Construct our URL
-            return NotifyWorkflows.parse_url(
+            results = NotifyWorkflows.parse_url(
                 "{schema}://{host}{port}/{workflow}/{params}{pa}".format(
                     schema=NotifyWorkflows.secure_protocol[0],
                     host=result.group("host"),
@@ -804,4 +812,6 @@ class NotifyWorkflows(NotifyBase):
                     pa=power_automate,
                 )
             )
+            results["routing_id"] = result.group("routing_id")
+            return results
         return None
