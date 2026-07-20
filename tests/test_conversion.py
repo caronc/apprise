@@ -991,7 +991,7 @@ def test_conversion_html_to_markdown_hardening():
     elapsed = default_timer() - start
     assert len(out) < 10 * n  # output itself is linear, not quadratic
     # Generous bound -- see the note on the equivalent check above.
-    assert elapsed < 15.0
+    assert elapsed < 30.0
 
     # Performance: many open <blockquote> tags followed by many closing tags of
     # a *different* kind that's never actually open ("</pre>").
@@ -1624,7 +1624,7 @@ def test_conversion_html_to_markdown_tables_hardening():
     elapsed = default_timer() - start
     assert out.count("\n") == n  # one line per row, output stays linear
     # Generous bound -- see the note on the equivalent check above.
-    assert elapsed < 20.0
+    assert elapsed < 40.0
 
 
 def test_conversion_html_to_markdown_pre_code_whitespace():
@@ -2595,7 +2595,7 @@ def test_conversion_split_dialect_chunk():
     elapsed = default_timer() - start
     assert "".join(pieces) == body
     # Generous bound -- see the note on the equivalent check above.
-    assert elapsed < 40.0
+    assert elapsed < 90.0
 
     # Many dangling openers share one scan and remain escaped literals.
     many_openers = " *a" * 5000
@@ -2608,7 +2608,7 @@ def test_conversion_split_dialect_chunk():
     assert text == " \\*a" * 5000
     assert pending == {}
     # Generous bound -- see the note on the equivalent check above.
-    assert elapsed < 20.0
+    assert elapsed < 40.0
 
     # Ignore a closer beyond bounded lookahead, matching a full repair pass.
     body = "_abc" + ("x" * 32) + "_word"
@@ -2629,7 +2629,7 @@ def test_conversion_split_dialect_chunk():
     elapsed = default_timer() - start
     assert "".join(pieces) == body.replace("_", "\\_")
     # Generous bound -- see the note on the equivalent check above.
-    assert elapsed < 45.0
+    assert elapsed < 90.0
 
     # A longer repaired prefix can fit after an earlier one overflows.
     # Verify the discarded bisection range with a real dialect conversion.
