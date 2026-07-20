@@ -419,6 +419,25 @@ def test_notify_apprise_api_relays_declared_format(mock_post):
 
 
 @mock.patch("requests.post")
+def test_notify_apprise_api_direct_send_defaults(mock_post):
+    """Direct send() calls safely accept their default format arguments."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/")
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # Omit both format arguments to exercise their defaults.
+    assert bool(obj.send(body="body", title="title")) is True
+
+    details = mock_post.call_args_list[0]
+    # No format was declared, so none is relayed onward.
+    assert "format" not in details[1]["data"]
+
+
+@mock.patch("requests.post")
 def test_notify_apprise_api_attachments(mock_post):
     """NotifyAppriseAPI() Attachments."""
 

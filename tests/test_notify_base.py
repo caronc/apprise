@@ -25,16 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import asyncio
 from datetime import datetime, timedelta
 import glob
 
 # Disable logging for a cleaner testing output
 import logging
+import time
 from timeit import default_timer
 
 import pytest
 
-from apprise import AppriseAsset, NotifyImageSize, NotifyType
+from apprise import AppriseAsset, NotifyFormat, NotifyImageSize, NotifyType
+from apprise.common import OverflowMode
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -387,6 +390,32 @@ def test_notify_base_runtime_deps():
     assert isinstance(NotifyBase.runtime_deps(), tuple)
 
 
+def test_notify_base_dialect_convert_default_noop():
+    """The default dialect hook leaves content unchanged.
+
+    Framework conversion only calls plugin overrides, so test the base hook
+    directly.
+    """
+
+    class PlainNotification(NotifyBase):
+        protocol = "plain"
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "plain://"
+
+    instance = PlainNotification(host="localhost")
+    body = "**not markdown-converted**"
+    assert instance.dialect_convert(body) == body
+    assert instance.dialect_convert(body, NotifyFormat.MARKDOWN) == body
+    assert (
+        instance.dialect_convert(body, NotifyFormat.HTML, "extra", flag=True)
+        == body
+    )
+
+
 def test_notify_base_enable_disable():
     """NotifyBase.enable() and disable() toggle the enabled flag."""
 
@@ -522,3 +551,33 @@ def test_notify_base_flush_store_writes_pending_auto_mode_changes(tmpdir):
     # PersistentStore instance reading from the same path/namespace.
     assert glob.glob(cache_glob, recursive=True) != []
     assert obj.store.get("token") == "abc123"
+
+
+def test_notify_base_async_notify_preserves_send_order():
+    """async_notify() dispatches each plugin's split pieces in order."""
+
+    call_order = []
+
+    class OrderedNotification(NotifyBase):
+        protocol = "ordered"
+        body_maxlen = 10
+        title_maxlen = 0
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            # Delay the first piece so concurrent dispatch would reorder it.
+            time.sleep(0.05 if kwargs.get("index") == 0 else 0)
+            call_order.append(kwargs.get("index"))
+            return True
+
+        def url(self, **kwargs):
+            return "ordered://"
+
+    instance = OrderedNotification(host="localhost")
+
+    # 50 characters split at a 10-character limit produces 5 pieces.
+    body = "0123456789" * 5
+    result = asyncio.run(
+        instance.async_notify(body=body, overflow=OverflowMode.SPLIT)
+    )
+    assert result is True
+    assert call_order == [0, 1, 2, 3, 4]

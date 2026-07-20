@@ -67,8 +67,10 @@ def notify(on, name=None, body_format=None):
       title:       The message title associated with the notification
       notify_type: The message type (info, success, warning, and failure)
       body_format: The resolved format delivered to your function.
-      format_controlled:
-                   True if the caller declared a source format.
+      body_passthrough:
+                   True if the caller left the source format
+                   undeclared, so automatic format conversion was
+                   skipped.
       meta:        Combines the URL arguments specified on the `on` call
                    with the ones loaded from a users configuration. This
                    is a dictionary that presents itself like this:

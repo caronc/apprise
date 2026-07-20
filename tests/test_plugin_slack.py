@@ -31,6 +31,7 @@ from json import dumps, loads
 # Disable logging for a cleaner testing output
 import logging
 import os
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -2382,10 +2383,98 @@ def test_plugin_slack_markdown_dialect_requires_declared_source(
     assert block_text(payload) == "*hello* &amp;amp; <world>"
     mock_request.reset_mock()
 
-    # Undeclared input remains byte-for-byte unchanged.
+    # This undeclared body reaches Slack without dialect conversion.
     assert bool(aobj.notify(body=body))
     payload = loads(mock_request.call_args_list[0][1]["data"])
     assert block_text(payload) == body
+    mock_request.reset_mock()
+
+    # Slack's declared plain-text format needs no dialect conversion.
+    assert bool(aobj.notify(body=body, body_format=NotifyFormat.TEXT))
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert block_text(payload) == body
+
+
+def test_plugin_slack_bare_link_and_autolink_dialect():
+    """Bare-paren links and standalone autolinks convert safely."""
+
+    # Bare destinations convert without treating URL punctuation as emphasis.
+    assert (
+        NotifySlack._commonmark_to_slack("[click here](https://a*b)")
+        == "<https://a*b|click here>"
+    )
+
+    # Complete autolinks become Slack's unlabeled anchors.
+    assert (
+        NotifySlack._commonmark_to_slack("see <https://a*b> now")
+        == "see <https://a*b> now"
+    )
+
+    # A "<" that never forms a valid scheme is passed through literally.
+    assert NotifySlack._commonmark_to_slack("a < b") == "a < b"
+
+
+def test_plugin_slack_dialect_long_link_destination():
+    """Convert long links while bounding aggregate destination scanning."""
+    for size in (4092, 4096, 4100, 50000):
+        url = "a" * size
+        body = f"[label](<{url}>)"
+        result = NotifySlack._commonmark_to_slack(body)
+        assert result == f"<{url}|label>", f"failed at size={size}"
+
+
+def test_plugin_slack_dialect_scan_budget_does_not_starve_later_links():
+    """Preserve nearby links after malformed scans exhaust the shared
+    budget."""
+    # A handful of malformed prefixes must not prevent a later link from
+    # converting.
+    body = (
+        "".join(f"[bad{i}](" + ("x" * 1000) for i in range(8)) + "[good](ok)"
+    )
+    assert NotifySlack._commonmark_to_slack(body).endswith("<ok|good>")
+
+    # Scale beyond the shared budget while preserving the trailing link.
+    times = []
+    for count in (500, 2000, 8000):
+        body = (
+            "".join(f"[bad{i}](" + ("x" * 100) for i in range(count))
+            + "[good](ok)"
+        )
+        start = default_timer()
+        result = NotifySlack._commonmark_to_slack(body)
+        times.append(default_timer() - start)
+        assert result.endswith("<ok|good>")
+
+    # A fourfold input increase should remain well below quadratic growth.
+    assert times[1] < times[0] * 4 * 3
+    assert times[2] < times[1] * 4 * 3
+
+
+def test_plugin_slack_dialect_scan_allowance_boundary():
+    """The fallback scan must leave room for a URL's closing characters.
+
+    Malformed prefixes spend the shared budget, forcing the final URL to use
+    only the fixed fallback allowance.
+    """
+    prefix = "".join(f"[bad{i}](" + ("x" * 1000) for i in range(8))
+
+    # Angle URLs need enough fallback space for both the content and ``>)``.
+    for size, should_convert in ((255, True), (256, True), (257, False)):
+        url = "a" * size
+        body = prefix + f"[label](<{url}>)"
+        result = NotifySlack._commonmark_to_slack(body)
+        assert result.endswith(f"<{url}|label>") == should_convert, (
+            f"angle destination size={size}"
+        )
+
+    # Bare destinations: the ")" terminator must fit the same way.
+    for size, should_convert in ((255, True), (256, True), (257, False)):
+        url = "a" * size
+        body = prefix + f"[label]({url})"
+        result = NotifySlack._commonmark_to_slack(body)
+        assert result.endswith(f"<{url}|label>") == should_convert, (
+            f"bare destination size={size}"
+        )
 
 
 @mock.patch("requests.request")
@@ -2413,9 +2502,8 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
     # <code>/<pre> content is buffered raw by html_to_markdown.
     assert notify("<code>a &lt; b &amp; c</code>") == "`a &lt; b &amp; c`"
 
-    # Immediately-adjacent nested emphasis (no text between the outer and inner
-    # tag's open) must stay correctly nested ("*_x_*"), not cross ("*_x*_").
-    assert notify("<b><i>x</i></b>") == "*_x_*"
+    # CommonMark reads the combined "***...***" runs as italic around bold.
+    assert notify("<b><i>x</i></b>") == "_*x*_"
 
     # Bold/italic text nested inside a link is preserved in Slack's own
     # "<url|text>" form.
@@ -2424,8 +2512,8 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         == "<https://example.com/x|*click*>"
     )
 
-    # Sibling (non-nested) bold spans stay separate, not merged.
-    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+    # CommonMark keeps the ambiguous middle run literal inside one bold span.
+    assert notify("<b>A</b><b>B</b>") == "*A****B*"
 
     # Entity-escape Slack control characters in link destinations.
     assert (
@@ -2455,9 +2543,16 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         "text ``unterminated"
     )
 
-    # An empty entity collapse mid-string (not just a final one at the end of
-    # the scan).
-    assert NotifySlack._commonmark_to_slack("****x") == "x"
+    # Preserve an opener with no closer.
+    assert NotifySlack._commonmark_to_slack("****x") == "****x"
+
+    # User-supplied Private Use characters must not collide with internal
+    # emphasis placeholders. ``chr()`` keeps the invisible value explicit.
+    f = NotifySlack._commonmark_to_slack
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+    assert f(attack) == attack
+    assert f(f"*bold* {attack}") == f"_bold_ {attack}"
 
     # overflow=split can hand this method just one chunk of a longer body, with
     # a span that doesn't open or close until a different chunk entirely.
@@ -2496,6 +2591,53 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         NotifySlack._commonmark_to_slack("[text](<https://incomplete")
         == "[text](<https://incomplete"
     )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_dialect_overflow(mock_request):
+    """Reapply Slack overflow limits after ``mrkdwn`` expansion.
+
+    The framework resizes converted output before calling ``send()``.
+    """
+
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    def notify(overflow):
+        aobj = Apprise()
+        assert aobj.add(f"slack://{slack_token}/#general?overflow={overflow}")
+        # Each "&" expands to "&amp;" once entity-escaped, so this body
+        # fits comfortably before dialect conversion but not after it.
+        assert aobj.notify(
+            body="& " * 10000, body_format=NotifyFormat.MARKDOWN
+        )
+        texts = [
+            loads(c[1]["data"])["attachments"][0]["text"]
+            for c in mock_request.call_args_list
+        ]
+        mock_request.reset_mock()
+        return texts
+
+    # UPSTREAM: sent oversized rather than adjusted.
+    texts = notify("upstream")
+    assert len(texts) == 1
+    assert len(texts[0]) > NotifySlack.body_maxlen
+
+    # TRUNCATE: clipped to fit in one message.
+    texts = notify("truncate")
+    assert len(texts) == 1
+    assert len(texts[0]) <= NotifySlack.body_maxlen
+
+    # SPLIT preserves every escaped entity; framework chunking may trim
+    # whitespace exactly at a boundary.
+    texts = notify("split")
+    assert len(texts) > 1
+    assert all(len(text) <= NotifySlack.body_maxlen for text in texts)
+    assert "".join(texts).count("&amp;") == 10000
 
 
 def test_plugin_slack_parse_native_url_fallthrough():

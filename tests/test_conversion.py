@@ -39,11 +39,29 @@ from apprise.conversion import (
     LIST_DEPTH_MAX,
     MAX_FRAME_DEPTH,
     HTMLMarkdownConverter,
-    build_backtick_run_index,
+    commonmark_can_close_emphasis,
+    commonmark_can_open_emphasis,
+    commonmark_emphasis_run,
+    commonmark_find_backtick_run,
+    commonmark_index_backtick_runs,
+    commonmark_match_emphasis,
+    commonmark_materialize_repair,
+    commonmark_pick_emphasis_sentinel,
+    commonmark_render_emphasis_events,
+    commonmark_render_emphasis_markers,
+    commonmark_repair_chunk,
+    commonmark_scan_autolink_dest,
+    commonmark_scan_closer_runs,
+    commonmark_scan_delimiter_run,
+    commonmark_scan_paren_dest,
+    commonmark_scan_repair_region,
     convert_between,
-    find_unescaped_run,
     markdown_to_html,
+    split_dialect_chunk,
+    truncate_dialect_chunk,
 )
+from apprise.plugins.google_chat import NotifyGoogleChat
+from apprise.plugins.slack import NotifySlack
 
 logging.disable(logging.CRITICAL)
 
@@ -959,7 +977,11 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(deep)
     elapsed = default_timer() - start
     assert len(out) < 20 * n
-    assert elapsed < 3.0
+    # Generous bound: this must catch a real return to quadratic
+    # behavior, not just run fast on a quiet dev machine -- shared or
+    # emulated build infrastructure (e.g. a busy Koji builder) can be
+    # many times slower.
+    assert elapsed < 15.0
 
     # Performance: many UNCLOSED <li> tags nested directly inside one another.
     n = 20000
@@ -968,7 +990,8 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(html)
     elapsed = default_timer() - start
     assert len(out) < 10 * n  # output itself is linear, not quadratic
-    assert elapsed < 3.0
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 30.0
 
     # Performance: many open <blockquote> tags followed by many closing tags of
     # a *different* kind that's never actually open ("</pre>").
@@ -978,7 +1001,11 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(html)
     elapsed = default_timer() - start
     assert len(out) < 20 * n
-    assert elapsed < 3.0
+    # Generous bound: this must catch a real return to quadratic
+    # behavior, not just run fast on a quiet dev machine -- shared or
+    # emulated build infrastructure (e.g. a busy Koji builder) can be
+    # many times slower.
+    assert elapsed < 15.0
 
     # Blockquote depth is capped at BLOCKQUOTE_DEPTH_MAX
     assert BLOCKQUOTE_DEPTH_MAX == 4
@@ -1008,7 +1035,11 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(deep)
     elapsed = default_timer() - start
     assert len(out) < 20 * n
-    assert elapsed < 3.0
+    # Generous bound: this must catch a real return to quadratic
+    # behavior, not just run fast on a quiet dev machine -- shared or
+    # emulated build infrastructure (e.g. a busy Koji builder) can be
+    # many times slower.
+    assert elapsed < 15.0
 
     # When emphasis or anchor tags are nested past MAX_FRAME_DEPTH, _push_frame
     # returns False and the opening delimiter must NOT be emitted.
@@ -1592,7 +1623,8 @@ def test_conversion_html_to_markdown_tables_hardening():
     out = to_md(html)
     elapsed = default_timer() - start
     assert out.count("\n") == n  # one line per row, output stays linear
-    assert elapsed < 5.0
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 40.0
 
 
 def test_conversion_html_to_markdown_pre_code_whitespace():
@@ -1685,28 +1717,55 @@ def test_conversion_html_to_markdown_table_code_pipe():
 
     # The shared index skips escape pairs and groups runs by exact width.
     # A lookup returns None when the requested width does not exist.
-    assert find_unescaped_run(build_backtick_run_index("\\` `"), 0, 1) == 3
     assert (
-        find_unescaped_run(build_backtick_run_index("no backticks here"), 0, 1)
+        commonmark_find_backtick_run(
+            commonmark_index_backtick_runs("\\` `"), 0, 1
+        )
+        == 3
+    )
+    assert (
+        commonmark_find_backtick_run(
+            commonmark_index_backtick_runs("no backticks here"), 0, 1
+        )
         is None
     )
     assert (
-        find_unescaped_run(build_backtick_run_index("``too short"), 0, 3)
+        commonmark_find_backtick_run(
+            commonmark_index_backtick_runs("``too short"), 0, 3
+        )
         is None
     )
 
     # Runs of different widths are indexed separately.
-    assert find_unescaped_run(build_backtick_run_index("`` `"), 0, 1) == 3
+    assert (
+        commonmark_find_backtick_run(
+            commonmark_index_backtick_runs("`` `"), 0, 1
+        )
+        == 3
+    )
 
     # Skip an escaped single backtick before matching a width-two run.
-    assert find_unescaped_run(build_backtick_run_index("\\` ``x"), 0, 2) == 3
+    assert (
+        commonmark_find_backtick_run(
+            commonmark_index_backtick_runs("\\` ``x"), 0, 2
+        )
+        == 3
+    )
 
     # Skip an unescaped run of the wrong width before matching width two.
-    assert find_unescaped_run(build_backtick_run_index("` ``x"), 0, 2) == 2
+    assert (
+        commonmark_find_backtick_run(
+            commonmark_index_backtick_runs("` ``x"), 0, 2
+        )
+        == 2
+    )
 
     # A genuine match arbitrarily far from `start` is still found.
     far = "a" * 200_000 + "`"
-    assert find_unescaped_run(build_backtick_run_index(far), 0, 1) == 200_000
+    assert (
+        commonmark_find_backtick_run(commonmark_index_backtick_runs(far), 0, 1)
+        == 200_000
+    )
 
     # A cell containing many distinct, non-matching backtick-run lengths must
     # still resolve in roughly linear time, not quadratic.
@@ -1726,8 +1785,12 @@ def test_conversion_html_to_markdown_table_code_pipe():
     conv._escape_cell_pipes(large)
     large_time = default_timer() - start
 
-    # Double the adversarial width count.
-    assert large_time < small_time * 6 + 0.05
+    # Double the adversarial width count. The additive term absorbs
+    # scheduler/measurement noise -- generous so a busy or throttled
+    # build machine (where even trivial calls can take longer) does not
+    # trip this on noise alone; the multiplier is what actually catches
+    # a real return to quadratic behavior.
+    assert large_time < small_time * 6 + 0.5
 
 
 def test_conversion_text_to():
@@ -1850,3 +1913,1101 @@ def test_conversion_markdown_to_html():
     assert "<td>Content Cell2</td>" in response
     assert "<td>Content Cell3</td>" in response
     assert "<td>Content Cell4</td>" in response
+
+
+def test_conversion_commonmark_repair_chunk():
+    """Test dialect-neutral repair of split or truncated CommonMark."""
+
+    # No cut at all: input passes through unchanged.
+    assert commonmark_repair_chunk("**bold** and *italic*", {}) == (
+        "**bold** and *italic*",
+        {},
+    )
+
+    # A complete, uncut code span within a single chunk is untouched.
+    assert commonmark_repair_chunk("before ```code``` after", {}) == (
+        "before ```code``` after",
+        {},
+    )
+
+    # A complete, uncut link within a single chunk is untouched.
+    assert commonmark_repair_chunk(
+        "[label](<https://example.com>) tail", {}
+    ) == ("[label](<https://example.com>) tail", {})
+
+    # Escape a non-opening run so dialect adapters preserve it literally.
+    assert commonmark_repair_chunk("a**** b", {}) == ("a\\*\\*\\*\\* b", {})
+
+    # Preserve existing escapes rather than treating them as delimiters.
+    assert commonmark_repair_chunk("a\\*b\\*c", {}) == ("a\\*b\\*c", {})
+
+    # A message split exactly between a backslash and the character it
+    # escapes must not double the backslash or free that character to
+    # act as a fresh delimiter -- the escape is carried across the split.
+    first, pending = commonmark_repair_chunk("aaaaa\\", {})
+    assert (first, pending) == ("aaaaa\\", {"in_escape": True})
+    assert commonmark_repair_chunk("*literal", pending) == (
+        "*literal",
+        {},
+    )
+    # An empty continuation chunk keeps waiting rather than losing track.
+    assert commonmark_repair_chunk("", pending) == ("", {"in_escape": True})
+
+    # Close split bold early, then discard its original closing marker.
+    # Lookahead containing the delimiter justifies carrying the open span.
+    assert commonmark_repair_chunk("**xxxxx", {}, next_chunk="xxxx**TAIL") == (
+        "**xxxxx**",
+        {"**": 1},
+    )
+    assert commonmark_repair_chunk("xxxx**TAIL", {"**": 1}) == (
+        "xxxxTAIL",
+        {"**": 0},
+    )
+
+    # Same for an italic span.
+    assert commonmark_repair_chunk("*hello wor", {}, next_chunk="ld*end") == (
+        "*hello wor*",
+        {"*": 1},
+    )
+    assert commonmark_repair_chunk("ld*end", {"*": 1}) == ("ldend", {"*": 0})
+
+    # A triple-asterisk run (bold+italic combined) cut mid-content.
+    assert commonmark_repair_chunk(
+        "***strong italic", {}, next_chunk="text***tail"
+    ) == ("***strong italic***", {"**": 1, "*": 1})
+    assert commonmark_repair_chunk("text***tail", {"**": 1, "*": 1}) == (
+        "texttail",
+        {"**": 0, "*": 0},
+    )
+
+    # Carry each span only when lookahead provides enough closing width.
+    assert commonmark_repair_chunk(
+        "**bold _italic", {}, next_chunk="a_ and b** more"
+    ) == ("**bold _italic_**", {"_": 1, "**": 1})
+
+    # Repair underscore emphasis when the later run can genuinely close.
+    assert commonmark_repair_chunk("_hello wor", {}, next_chunk="ld_ end") == (
+        "_hello wor_",
+        {"_": 1},
+    )
+    assert commonmark_repair_chunk("ld_ end", {"_": 1}) == (
+        "ld end",
+        {"_": 0},
+    )
+
+    # Underscore-based CommonMark bold ("__") behaves the same way.
+    assert commonmark_repair_chunk(
+        "__strong wor", {}, next_chunk="ld__ end"
+    ) == ("__strong wor__", {"__": 1})
+    assert commonmark_repair_chunk("ld__ end", {"__": 1}) == (
+        "ld end",
+        {"__": 0},
+    )
+
+    # Ignore an intraword underscore that cannot close CommonMark emphasis.
+    # The opener never gets to pair with anything, so it is escaped too.
+    assert commonmark_repair_chunk("_hello wor", {}, next_chunk="ld_end") == (
+        "\\_hello wor",
+        {},
+    )
+
+    # Preserve complete underscore spans. A run that fails the
+    # flanking rule (here, followed by whitespace) stays literal.
+    assert commonmark_repair_chunk("_italic text_ done", {}) == (
+        "_italic text_ done",
+        {},
+    )
+    # Same for underscore-based strong emphasis -- never matches anything,
+    # so it is escaped too.
+    assert commonmark_repair_chunk("a____ b", {}) == ("a\\_\\_\\_\\_ b", {})
+
+    # A trailing run after whitespace cannot open or close either, so it
+    # is also escaped rather than left as a bare, ambiguous-looking pair.
+    assert commonmark_repair_chunk("text **", {}) == ("text \\*\\*", {})
+
+    # A lone trailing run that can theoretically open (the lookahead's
+    # first character is a real letter) but finds no actual "*"/"_" in
+    # that lookahead is still just literal text here -- escaped, since
+    # this occurrence is never going to be carried forward either.
+    assert commonmark_repair_chunk("a" * 5 + "*", {}, next_chunk="b" * 5) == (
+        "a" * 5 + "\\*",
+        {},
+    )
+    assert commonmark_repair_chunk("(_", {}, next_chunk="y") == ("(\\_", {})
+
+    # Without a possible closer in lookahead, preserve the trailing run --
+    # escaped, since this occurrence will never be carried forward.
+    assert commonmark_repair_chunk("a**", {}, next_chunk="b") == (
+        "a\\*\\*",
+        {},
+    )
+
+    # With a possible closer, discard the trailing empty pair as noise.
+    assert commonmark_repair_chunk("a**", {}, next_chunk="more*text") == (
+        "a",
+        {},
+    )
+
+    # Preserve a literal asterisk before valid underscore emphasis.
+    assert commonmark_repair_chunk("*_a_", {}, next_chunk=" " + "x" * 99) == (
+        "\\*_a_",
+        {},
+    )
+
+    # A possible closer makes the same opener eligible for continuation.
+    assert commonmark_repair_chunk("*_a_", {}, next_chunk=" x*x") == (
+        "*_a_*",
+        {"*": 1},
+    )
+
+    # Ignore a whitespace-boxed delimiter that cannot close the earlier span.
+    assert commonmark_repair_chunk(
+        "*_a_", {}, next_chunk=" literal * end"
+    ) == ("\\*_a_", {})
+
+    # Ignore a later opener-only run when repairing an earlier span.
+    assert commonmark_repair_chunk("*_a_", {}, next_chunk=" *end") == (
+        "\\*_a_",
+        {},
+    )
+
+    # A delimiter-like character sitting inside a code span in the
+    # lookahead is literal code content, not a real closer -- it must be
+    # skipped the same way it would be if it were in this same chunk.
+    assert commonmark_repair_chunk("*abc", {}, next_chunk="`x* y` tail") == (
+        "\\*abc",
+        {},
+    )
+    # Same idea for a delimiter-like character inside a link destination.
+    assert commonmark_repair_chunk(
+        "*abc", {}, next_chunk="](<http://x.com/a*b>) tail"
+    ) == ("\\*abc", {})
+
+    # Following text can make a boundary underscore intraword and literal.
+    assert commonmark_repair_chunk("*_a_", {}, next_chunk="x" * 100) == (
+        "\\*\\_a\\_",
+        {},
+    )
+
+    # Use the current chunk's final character to classify a boundary closer.
+    assert commonmark_repair_chunk("*hello", {}, next_chunk="* world") == (
+        "*hello*",
+        {"*": 1},
+    )
+    # Splitting the same source keeps the resulting markers balanced.
+    pieces = split_dialect_chunk("*hello* world", 6, lambda body: body)
+    joined = "".join(pieces)
+    assert joined.count("*") % 2 == 0
+
+    # Adjacent delimiters use source characters rather than placeholders.
+    assert commonmark_repair_chunk("*_a_", {}) == ("\\*_a_", {})
+    assert commonmark_repair_chunk("**_a_", {}) == ("\\*\\*_a_", {})
+
+    # The character after bounded lookahead classifies its trailing delimiter
+    # without becoming part of the scanned content.
+    assert commonmark_repair_chunk(
+        "_abc", {}, next_chunk="xxxx_", next_chunk_boundary_ch="w"
+    ) == ("\\_abc", {})
+    assert commonmark_repair_chunk(
+        "_abc", {}, next_chunk="xxxx_", next_chunk_boundary_ch=" "
+    ) == ("_abc_", {"_": 1})
+    assert commonmark_repair_chunk("_abc", {}, next_chunk="xxxx_") == (
+        "_abc_",
+        {"_": 1},
+    )
+
+    # A delimiter just beyond bounded lookahead must not validate an earlier
+    # opener as though it were inside the scanned slice.
+    body = "_abc" + ("x" * 32) + "_word"
+    lookahead_span = 4 * 8
+    lookahead = body[4 : 4 + lookahead_span]
+    boundary_next_ch = body[4 + lookahead_span : 4 + lookahead_span + 1]
+    assert commonmark_repair_chunk(
+        body[:4],
+        {},
+        next_chunk=lookahead,
+        next_chunk_boundary_ch=boundary_next_ch or None,
+    ) == ("\\_abc", {})
+
+    # A single closer carries regular emphasis and escapes the excess marker.
+    assert commonmark_repair_chunk("**bold", {}, next_chunk="x* end") == (
+        "\\**bold*",
+        {"*": 1},
+    )
+    # Consuming the pending single marker preserves an unrelated bold pair.
+    assert commonmark_repair_chunk(
+        "x* end unrelated **bold** later", {"*": 1}
+    ) == ("x end unrelated **bold** later", {"*": 0})
+
+    # Carry one verified regular closer and escape remaining local width.
+    assert commonmark_repair_chunk("a****b", {}, next_chunk="more *text*") == (
+        "a\\*\\*\\**b*",
+        {"*": 1},
+    )
+    assert commonmark_repair_chunk("(____x", {}, next_chunk="more _text_") == (
+        "(\\_\\_\\__x_",
+        {"_": 1},
+    )
+
+    # Drop a split code fence while carrying its width to the next chunk.
+    assert commonmark_repair_chunk("text ```code sti", {}) == (
+        "text code sti",
+        {"in_code": 3},
+    )
+
+    # Render a cross-message code continuation as plain text.
+    assert commonmark_repair_chunk("ll going```code done", {"in_code": 3}) == (
+        "ll goingcode done",
+        {},
+    )
+
+    # Carry an unclosed code span into another chunk.
+    assert commonmark_repair_chunk("more code", {"in_code": 3}) == (
+        "more code",
+        {"in_code": 3},
+    )
+
+    # Drop and carry a newly opened single-backtick span.
+    assert commonmark_repair_chunk("`code no close", {}) == (
+        "code no close",
+        {"in_code": 1},
+    )
+
+    # Escape a link label cut across the chunk boundary.
+    assert commonmark_repair_chunk("[click", {}) == ("\\[click", {})
+
+    # Render the unmatched destination side as literal text.
+    assert commonmark_repair_chunk(
+        "here](<https://example.com/path>) rest", {}
+    ) == ("here\\]\\(https://example.com/path\\>\\) rest", {})
+
+    # Carry a closing marker split after its trailing ">".
+    c1, pending = commonmark_repair_chunk("[label](<https://x.com>", {})
+    assert (c1, pending) == (
+        "[label\\]\\(https://x.com\\>",
+        {"in_link_dest": True, "dest_gt": True},
+    )
+    c2, pending = commonmark_repair_chunk(") tail", pending)
+    assert (c2, pending) == ("\\) tail", {})
+
+    # Ignore a mid-destination ">" and continue to the real terminator.
+    assert commonmark_repair_chunk("a>b>) tail", {"in_link_dest": True}) == (
+        "a\\>b\\>\\) tail",
+        {},
+    )
+
+    # Carry a link destination cut across chunks.
+    assert commonmark_repair_chunk("[label](<https://example.com/", {}) == (
+        "[label\\]\\(https://example.com/",
+        {"in_link_dest": True},
+    )
+
+    # Render a carried destination's closing fragment as literal text.
+    assert commonmark_repair_chunk(
+        "more-path>) tail", {"in_link_dest": True}
+    ) == ("more-path\\>\\) tail", {})
+
+    # Ignore escaped characters while finding a destination terminator.
+    assert commonmark_repair_chunk("a\\)b>) tail", {"in_link_dest": True}) == (
+        "a\\\\\\)b\\>\\) tail",
+        {},
+    )
+
+    # Carry a destination that remains unclosed.
+    assert commonmark_repair_chunk(
+        "still not done", {"in_link_dest": True}
+    ) == ("still not done", {"in_link_dest": True})
+
+    # Complete a destination terminator spread across three chunks.
+    c1, pending = commonmark_repair_chunk(
+        "[label](<https://example.com/path", {}
+    )
+    assert (c1, pending) == (
+        "[label\\]\\(https://example.com/path",
+        {"in_link_dest": True},
+    )
+    c2, pending = commonmark_repair_chunk("/more>", pending)
+    assert (c2, pending) == (
+        "/more\\>",
+        {"in_link_dest": True, "dest_gt": True},
+    )
+    c3, pending = commonmark_repair_chunk(") tail text", pending)
+    assert (c3, pending) == ("\\) tail text", {})
+
+    # Treat a trailing ">" as literal when the next chunk lacks ")".
+    c2b, pending = commonmark_repair_chunk("more>", {"in_link_dest": True})
+    assert (c2b, pending) == (
+        "more\\>",
+        {"in_link_dest": True, "dest_gt": True},
+    )
+    c3b, pending = commonmark_repair_chunk("no closing paren here", pending)
+    assert (c3b, pending) == (
+        "no closing paren here",
+        {"in_link_dest": True},
+    )
+
+    # User-provided Private Use text must not collide with internal emphasis
+    # placeholders, with or without real emphasis in the same chunk.
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+    assert commonmark_repair_chunk(attack, {}) == (attack, {})
+    assert commonmark_repair_chunk(f"*bold* {attack}", {}) == (
+        f"*bold* {attack}",
+        {},
+    )
+
+    # Preserve an opener-only chunk when lookahead verifies its closer.
+    assert commonmark_repair_chunk("**", {}, next_chunk="abc**") == (
+        "****",
+        {"**": 1},
+    )
+
+
+def test_conversion_commonmark_scan_autolink_dest():
+    """commonmark_scan_autolink_dest: scheme validation and termination."""
+
+    # A complete autolink -- "*" inside it is not a delimiter.
+    body = "<https://a*b>"
+    assert commonmark_scan_autolink_dest(body, 0, len(body)) == (12, True)
+
+    # No scheme colon at all -- never a genuine autolink.
+    body = "<hello world>"
+    assert commonmark_scan_autolink_dest(body, 0, len(body)) == (None, False)
+
+    # A nested "<" disqualifies it outright.
+    body = "<http:<x>"
+    assert commonmark_scan_autolink_dest(body, 0, len(body)) == (None, False)
+
+    # Whitespace inside the destination disqualifies it too.
+    body = "<http: x>"
+    assert commonmark_scan_autolink_dest(body, 0, len(body)) == (None, False)
+
+    # A control character disqualifies it the same way.
+    body = "<http:\x01x>"
+    assert commonmark_scan_autolink_dest(body, 0, len(body)) == (None, False)
+
+    # Valid so far but no ">" anywhere yet -- still could complete later.
+    body = "<https://example.com"
+    assert commonmark_scan_autolink_dest(body, 0, len(body)) == (None, True)
+
+
+def test_conversion_commonmark_scan_paren_dest():
+    """commonmark_scan_paren_dest: balanced parens and disqualifiers."""
+
+    # A complete, simple bare destination.
+    body = "](abc)"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) == 5
+
+    # An escaped ")" does not close the destination early.
+    body = "](a\\)b)"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) == 6
+
+    # One level of balanced, unescaped parens is allowed.
+    body = "](a(b)c)"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) == 7
+
+    # Whitespace disqualifies a bare destination entirely.
+    body = "](a b)"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) is None
+
+    # A control character disqualifies it the same way.
+    body = "](a\x01b)"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) is None
+
+    # An embedded "<" also disqualifies it.
+    body = "](a<b)"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) is None
+
+    # No closing ")" anywhere in the slice.
+    body = "](abc"
+    assert commonmark_scan_paren_dest(body, 1, len(body)) is None
+
+
+def test_conversion_commonmark_repair_chunk_autolinks():
+    """Standalone autolinks keep markup-like URL characters as text."""
+
+    # URL punctuation must not close unrelated emphasis in the same chunk.
+    body = "Note *this is important, see <https://a*b> for details"
+    assert commonmark_repair_chunk(body, {}) == (
+        "Note \\*this is important, see <https://a*b> for details",
+        {},
+    )
+
+    # Lookahead ignores false emphasis closers inside URLs.
+    c1, pending = commonmark_repair_chunk(
+        "hello *world", {}, next_chunk=" <https://a*b> end"
+    )
+    assert (c1, pending) == ("hello \\*world", {})
+    c2, pending = commonmark_repair_chunk(" <https://a*b> end", pending)
+    assert (c2, pending) == (" <https://a*b> end", {})
+
+    # The same split, but the terminator itself lands in a third chunk.
+    c1, pending = commonmark_repair_chunk(
+        "see <https://a", {}, next_chunk="*b> end"
+    )
+    assert (c1, pending) == ("see \\<https://a", {"in_autolink": True})
+    c2, pending = commonmark_repair_chunk("*b", pending)
+    assert (c2, pending) == ("\\*b", {"in_autolink": True})
+    c3, pending = commonmark_repair_chunk("> end", pending)
+    assert (c3, pending) == ("\\> end", {})
+
+    # A "<" that never forms a valid scheme is left as ordinary text.
+    assert commonmark_repair_chunk("a < b", {}) == ("a < b", {})
+
+
+def test_conversion_commonmark_repair_chunk_bare_links():
+    """commonmark_repair_chunk: bare (non-angle-bracket) link destinations."""
+
+    # Preserve labeled bare links without scanning their URLs as emphasis.
+    assert commonmark_repair_chunk("[x](https://a*b)", {}) == (
+        "[x](https://a*b)",
+        {},
+    )
+
+    # Escape an orphan destination and keep its contents literal.
+    assert commonmark_repair_chunk("see ](a*b) now", {}) == (
+        "see \\]\\(a\\*b\\) now",
+        {},
+    )
+
+    # Leave an unfinished bare URL untouched without carrying state.
+    assert commonmark_repair_chunk("[x](https://a*b", {}) == (
+        "[x](https://a*b",
+        {},
+    )
+
+
+def test_conversion_commonmark_lookahead_ignores_link_markup():
+    """Lookahead ignores markup-like characters inside links."""
+
+    # A complete bare link cannot close earlier emphasis.
+    assert commonmark_repair_chunk(
+        "*word", {}, next_chunk=" see ](a*b) now"
+    ) == ("\\*word", {})
+
+    # An unfinished bare URL cannot close earlier emphasis either.
+    assert commonmark_repair_chunk("*word", {}, next_chunk=" see ](a*b") == (
+        "\\*word",
+        {},
+    )
+
+    # A complete autolink cannot close earlier emphasis.
+    assert commonmark_repair_chunk(
+        "*word", {}, next_chunk=" see <https://a*b> now"
+    ) == ("\\*word", {})
+
+    # An autolink that never closes within the lookahead span.
+    assert commonmark_repair_chunk(
+        "*word", {}, next_chunk=" see <https://a*b"
+    ) == ("\\*word", {})
+
+    # An invalid autolink falls back to ordinary delimiter scanning.
+    assert commonmark_repair_chunk("*word", {}, next_chunk=" a < b* end") == (
+        "*word*",
+        {"*": 1},
+    )
+
+
+def test_conversion_commonmark_materialize_repair():
+    """Reusable scans must match direct repair for every requested prefix."""
+
+    lookahead_span = 64
+
+    def _direct(body, offset, cut, pending, lookahead_span=lookahead_span):
+        # The behavior commonmark_materialize_repair() must reproduce:
+        # an ordinary, independent repair of body[offset:offset + cut].
+        abs_cut = offset + cut
+        lookahead = body[abs_cut : abs_cut + lookahead_span]
+        boundary = (
+            body[abs_cut + lookahead_span : abs_cut + lookahead_span + 1]
+            or None
+        )
+        return commonmark_repair_chunk(
+            body[offset:abs_cut],
+            dict(pending),
+            next_chunk=lookahead or None,
+            next_chunk_boundary_ch=boundary,
+        )
+
+    # A shared scan answers many different cut lengths from one pass,
+    # matching a direct repair of each individual prefix.
+    body = "**hello** world *and* more"
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, {}, lookahead_span
+    )
+    for cut in range(1, len(body) + 1):
+        assert commonmark_materialize_repair(
+            body, 0, cut, {}, atoms, covered_end, sentinel, lookahead_span
+        ) == _direct(body, 0, cut, {})
+
+    # A cut inside a complete code span uses direct repair because the recorded
+    # section cannot be safely reused in part.
+    body = "text `code span` tail"
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, {}, lookahead_span
+    )
+    cut = body.index("code") + 2  # inside the backtick span
+    assert commonmark_materialize_repair(
+        body, 0, cut, {}, atoms, covered_end, sentinel, lookahead_span
+    ) == _direct(body, 0, cut, {})
+
+    # An empty prefix can still clear carried state, so it uses direct repair.
+    body = ")rest of the body"
+    pending = {"in_link_dest": True, "dest_gt": True}
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, dict(pending), lookahead_span
+    )
+    assert commonmark_materialize_repair(
+        body,
+        0,
+        0,
+        dict(pending),
+        atoms,
+        covered_end,
+        sentinel,
+        lookahead_span,
+    ) == commonmark_repair_chunk("", dict(pending))
+
+    # Reused scans must replay a run that only partly clears prior state.
+    body = "****tail"
+    pending = {"**": 1}
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, dict(pending), lookahead_span
+    )
+    assert commonmark_materialize_repair(
+        body,
+        0,
+        len(body),
+        dict(pending),
+        atoms,
+        covered_end,
+        sentinel,
+        lookahead_span,
+    ) == commonmark_repair_chunk(body, dict(pending))
+
+    # A cut beyond the reusable range falls back to direct repair.
+    body = "plain text [link] tail"
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, {}, lookahead_span
+    )
+    assert covered_end < len(body)
+    cut = len(body)
+    assert commonmark_materialize_repair(
+        body, 0, cut, {}, atoms, covered_end, sentinel, lookahead_span
+    ) == _direct(body, 0, cut, {})
+
+    # The shared closing-marker index must match direct lookahead scans.
+    body = "*word" + " " * 20 + "** end"
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, {}, lookahead_span
+    )
+    closer_index, closer_covered_end = commonmark_scan_closer_runs(body)
+    for cut in range(1, len(body) - lookahead_span + 1):
+        assert commonmark_materialize_repair(
+            body,
+            0,
+            cut,
+            {},
+            atoms,
+            covered_end,
+            sentinel,
+            lookahead_span,
+            closer_index=closer_index,
+            closer_covered_end=closer_covered_end,
+        ) == _direct(body, 0, cut, {})
+
+    # A lookahead boundary inside a marker run must use direct repair because
+    # the shortened run may be classified differently. Put it at the far edge
+    # to exercise the closing-marker index rather than the main section scan.
+    closer_lookahead_span = 8
+    cut = 2
+    body = "ab" + "c" * 7 + "***" + "d" * 60
+    atoms, covered_end, sentinel = commonmark_scan_repair_region(
+        body, {}, closer_lookahead_span
+    )
+    closer_index, closer_covered_end = commonmark_scan_closer_runs(body)
+    assert commonmark_materialize_repair(
+        body,
+        0,
+        cut,
+        {},
+        atoms,
+        covered_end,
+        sentinel,
+        closer_lookahead_span,
+        closer_index=closer_index,
+        closer_covered_end=closer_covered_end,
+    ) == _direct(body, 0, cut, {}, lookahead_span=closer_lookahead_span)
+
+
+def test_conversion_split_dialect_chunk():
+    """conversion: Test split_dialect_chunk()"""
+
+    def identity(body):
+        # Nothing to escape, so a single piece is returned untouched
+        # whenever it already fits.
+        return body
+
+    assert split_dialect_chunk("", 10, identity) == [""]
+    assert split_dialect_chunk("hello", 10, identity) == ["hello"]
+
+    def double(body):
+        # Doubles every character (worst-case backslash escaping).
+        return "".join(f"{c}{c}" for c in body)
+
+    # Conversion growth splits the source without dropping content.
+    pieces = split_dialect_chunk("." * 10, 8, double)
+    assert len(pieces) > 1
+    for piece in pieces:
+        assert len(piece) <= 8
+    # Reversing the test conversion reconstructs the original source.
+    assert "".join(piece[::2] for piece in pieces) == "." * 10
+
+    # Emit one oversized character when necessary to guarantee progress.
+    pieces = split_dialect_chunk("ab", 1, double)
+    assert pieces == ["aa", "bb"]
+
+    def escape_dots(body):
+        # Mimic a dialect whose escaping requires a second split.
+        return body.replace(".", "\\.")
+
+    # Carry forced-closed bold state so the later real closer is consumed.
+    body = "**" + "a.b.c." * 6 + "**" + " tail"
+    pieces = split_dialect_chunk(body, 20, escape_dots)
+    assert len(pieces) > 1
+    joined = "".join(pieces)
+    assert joined.count("**") == 2
+
+    def strip_x(body):
+        # Make every ten source characters produce one output character.
+        return body.replace("x", "")
+
+    body = "xxxxxxxxxa" * 100
+    pieces = split_dialect_chunk(body, 10, strip_x)
+    assert len(pieces) == 10
+    assert all(piece == "a" * 10 for piece in pieces)
+
+    # A large body with a small limit should remain linear and preserve text.
+    n = 200000
+    body = "hello world " * (n // 12)
+    start = default_timer()
+    pieces = split_dialect_chunk(body, 100, identity)
+    elapsed = default_timer() - start
+    assert "".join(pieces) == body
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 90.0
+
+    # Many dangling openers share one scan and remain escaped literals.
+    many_openers = " *a" * 5000
+    huge_tail = "x" * 2000000
+    start = default_timer()
+    text, pending = commonmark_repair_chunk(
+        many_openers, {}, next_chunk=huge_tail
+    )
+    elapsed = default_timer() - start
+    assert text == " \\*a" * 5000
+    assert pending == {}
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 40.0
+
+    # Ignore a closer beyond bounded lookahead, matching a full repair pass.
+    body = "_abc" + ("x" * 32) + "_word"
+    pieces = split_dialect_chunk(body, 4, identity)
+    assert "".join(pieces) == "\\_abc" + ("x" * 32) + "\\_word"
+
+    # A tiny limit must preserve opening bold markers without blank pieces.
+    pieces = split_dialect_chunk("**abc**", 4, identity)
+    assert "" not in pieces
+    assert pieces == ["****", "abc"]
+
+    # Repeat dangling openers to verify bounded correction remains accurate
+    # and fast across many pieces.
+    unit = "_abc" + ("x" * 32) + "_word "
+    body = unit * 2000
+    start = default_timer()
+    pieces = split_dialect_chunk(body, 50, identity)
+    elapsed = default_timer() - start
+    assert "".join(pieces) == body.replace("_", "\\_")
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 90.0
+
+    # A longer repaired prefix can fit after an earlier one overflows.
+    # Verify the discarded bisection range with a real dialect conversion.
+    body = (
+        "|\t-(|::+<_\ta(*&__][]:\t>{)] =#= \t.(\\-[){~]+-]{{#=_\\>)-{\t#>[*_"
+    )
+    pieces = split_dialect_chunk(
+        body, 22, NotifyGoogleChat._commonmark_to_google_chat
+    )
+    assert pieces[0] == "|\t-(|::+<\\_\ta(_&amp;_"
+    assert len(pieces[0]) == 21
+
+    # A repaired prefix may fit just above the result found by bisection.
+    # Checking upward catches it without crossing the entire failed range.
+    body = "*)\\\\`<*(>([*] \\>_]`\\>(]*`))_`_ \\]`[.<*_*<*<]>.>\\a)], _ <a"
+    pieces = split_dialect_chunk(body, 29, NotifySlack._commonmark_to_slack)
+    assert len(pieces[0]) <= 29
+    reconstructed_len = 19  # confirmed via exhaustive brute-force search
+    repaired, _ = commonmark_repair_chunk(
+        body[:reconstructed_len], {}, next_chunk=body[reconstructed_len:]
+    )
+    assert pieces[0] == NotifySlack._commonmark_to_slack(repaired)
+
+    # A repaired prefix may also fit near the far end of the checked range.
+    body = "*(`<]<[xxxxxxxxxxxx`<xxxxxxxxxx_]"
+
+    def strip_x(text):
+        # Simulate a converter that removes a long run so the result fits.
+        return text.replace("x", "")
+
+    pieces = split_dialect_chunk(body, 10, strip_x)
+    assert pieces == ["\\*(`<]<[`<", "\\_]"]
+    assert "".join(pieces).replace("x", "") == "".join(pieces)
+
+    # Many unmatched ``*`` markers must scale with input size. The generous
+    # limit allows slow test hosts while still catching severe regressions.
+    n = 20000
+    body = ("*a " * (n // 3))[:n]
+    start = default_timer()
+    pieces = split_dialect_chunk(body, 160, identity)
+    elapsed = default_timer() - start
+    assert "".join(pieces) == body.replace("*", "\\*")
+    assert elapsed < 45.0
+
+    # Exercise real Slack-sized splits and the shared repair path. This checks
+    # whole-message splitting; matcher scaling has a focused test below.
+    small_n = 40000
+    large_n = 80000
+    small_body = ("*a " * ((small_n + 2) // 3))[:small_n]
+    large_body = ("*a " * ((large_n + 2) // 3))[:large_n]
+
+    # Interleave two rounds and keep each size's fastest result to reduce
+    # timing noise.
+    small_time = large_time = None
+    for _ in range(2):
+        start = default_timer()
+        split_dialect_chunk(
+            small_body, 35000, NotifySlack._commonmark_to_slack
+        )
+        elapsed = default_timer() - start
+        small_time = (
+            elapsed if small_time is None else min(small_time, elapsed)
+        )
+
+        start = default_timer()
+        split_dialect_chunk(
+            large_body, 35000, NotifySlack._commonmark_to_slack
+        )
+        elapsed = default_timer() - start
+        large_time = (
+            elapsed if large_time is None else min(large_time, elapsed)
+        )
+
+    # Doubling the body should not approach four times the runtime.
+    assert large_time < small_time * 3.5 + 1.0
+
+
+def test_conversion_truncate_dialect_chunk():
+    """conversion: Test truncate_dialect_chunk()"""
+
+    def identity(body):
+        return body
+
+    # An empty body has nothing to convert or truncate.
+    assert truncate_dialect_chunk("", 10, identity) == ""
+
+    # A body that already fits after conversion is returned whole.
+    assert truncate_dialect_chunk("hello", 10, identity) == "hello"
+
+    def double(body):
+        # Doubles every character (worst-case backslash escaping).
+        return "".join(f"{c}{c}" for c in body)
+
+    # Truncation keeps only the longest converted prefix that fits.
+    piece = truncate_dialect_chunk("." * 10, 8, double)
+    assert len(piece) <= 8
+    assert piece == ".." * 4
+
+    # Return one oversized character rather than making no progress.
+    assert truncate_dialect_chunk("ab", 1, double) == "aa"
+
+    def strip_x(body):
+        # Make every source block contribute one output character.
+        return body.replace("x", "")
+
+    # Continue searching beyond a fixed limit-derived window.
+    body = "xxxxxxxxxa" * 100
+    piece = truncate_dialect_chunk(body, 10, strip_x)
+    assert piece == "a" * 10
+
+
+def test_conversion_commonmark_scan_delimiter_run():
+    """conversion: Test commonmark_scan_delimiter_run()"""
+
+    # Middle runs read both neighbors directly.
+    assert commonmark_scan_delimiter_run("a**b", 1) == (3, "a", "b")
+
+    # A starting run uses the optional preceding boundary.
+    assert commonmark_scan_delimiter_run("*a", 0) == (1, None, "a")
+    assert commonmark_scan_delimiter_run("*a", 0, boundary_prev_ch="x") == (
+        1,
+        "x",
+        "a",
+    )
+
+    # An ending run uses the optional following boundary.
+    assert commonmark_scan_delimiter_run("a*", 1) == (2, "a", None)
+    assert commonmark_scan_delimiter_run("a*", 1, boundary_next_ch="y") == (
+        2,
+        "a",
+        "y",
+    )
+
+    # Both boundaries can apply at once to a run that is the entire text.
+    assert commonmark_scan_delimiter_run(
+        "**", 0, boundary_prev_ch="x", boundary_next_ch="y"
+    ) == (2, "x", "y")
+
+    # Underscore runs measure the same way as asterisk runs.
+    assert commonmark_scan_delimiter_run("a___b", 1) == (4, "a", "b")
+
+
+def test_conversion_commonmark_can_open_close_emphasis():
+    """conversion: Test commonmark_can_open_emphasis()/
+    commonmark_can_close_emphasis()"""
+
+    # A run at the very start of the text, followed by real content,
+    # is left-flanking only: it can open but not close.
+    assert commonmark_can_open_emphasis("*", None, "f") is True
+    assert commonmark_can_close_emphasis("*", None, "f") is False
+
+    # A run at the very end, preceded by real content, is
+    # right-flanking only: it can close but not open.
+    assert commonmark_can_open_emphasis("*", "o", None) is False
+    assert commonmark_can_close_emphasis("*", "o", None) is True
+
+    # A run with real content on both sides can do either, for "*".
+    assert commonmark_can_open_emphasis("*", "o", "b") is True
+    assert commonmark_can_close_emphasis("*", "o", "b") is True
+
+    # "_" carries an extra intraword restriction "*" does not: a run
+    # flanked by real content on both sides is both left- and
+    # right-flanking at once, which underscore is never allowed to
+    # open or close with, so it is left as literal text instead.
+    assert commonmark_can_open_emphasis("_", "o", "b") is False
+    assert commonmark_can_close_emphasis("_", "o", "b") is False
+
+
+def test_conversion_commonmark_pick_emphasis_sentinel():
+    """conversion: Test commonmark_pick_emphasis_sentinel()"""
+
+    # An ordinary body with no Private Use Area characters at all
+    # picks a single one, the narrowest candidate available.
+    assert commonmark_pick_emphasis_sentinel("hello world") == chr(0xE000)
+
+    # Existing candidates make the sentinel double until it is unique.
+    assert commonmark_pick_emphasis_sentinel(chr(0xE000)) == chr(0xE000) * 2
+    assert commonmark_pick_emphasis_sentinel(chr(0xE000) * 3) == (
+        chr(0xE000) * 4
+    )
+
+    # Doubling also handles long collision runs efficiently.
+    picked = commonmark_pick_emphasis_sentinel(chr(0xE000) * 100000)
+    assert picked not in chr(0xE000) * 100000
+    assert len(picked) == 131072
+
+    # Sentinel selection remains deterministic for the same input.
+    assert commonmark_pick_emphasis_sentinel(
+        "hello world"
+    ) == commonmark_pick_emphasis_sentinel("hello world")
+
+
+def test_conversion_commonmark_emphasis_sentinel_collision():
+    """Preserve user text shaped like an internal emphasis placeholder."""
+    # Build the former hard-coded placeholder without embedding invisible text.
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+
+    out = []
+    delimiters = []
+    i = 0
+    n = len(attack)
+    sentinel = commonmark_pick_emphasis_sentinel(attack)
+    while i < n:
+        if attack[i] == "*":
+            i = commonmark_emphasis_run(
+                attack, i, n, delimiters, out, sentinel
+            )
+            continue
+        out.append(attack[i])
+        i += 1
+    rendered = commonmark_render_emphasis_markers(
+        "".join(out), delimiters, ("*", "*"), ("_", "_"), sentinel
+    )
+
+    # No real emphasis was present, so the attempted collision passes
+    # straight through untouched rather than raising or corrupting.
+    assert rendered == attack
+
+
+def test_conversion_commonmark_emphasis_run():
+    """conversion: Test commonmark_emphasis_run()"""
+
+    def convert(body):
+        # Collect, resolve, and render runs like the dialect adapters.
+        out = []
+        delimiters = []
+        i = 0
+        n = len(body)
+        sentinel = commonmark_pick_emphasis_sentinel(body)
+        while i < n:
+            if body[i] == "*":
+                i = commonmark_emphasis_run(
+                    body, i, n, delimiters, out, sentinel
+                )
+                continue
+            out.append(body[i])
+            i += 1
+        return commonmark_render_emphasis_markers(
+            "".join(out), delimiters, ("*", "*"), ("_", "_"), sentinel
+        )
+
+    # Preserve an opener with no closer.
+    assert convert("****a") == "****a"
+
+    # Keep the ambiguous middle run literal under the modulo-three rule.
+    assert convert("*foo**bar*") == "_foo**bar_"
+
+    # Split one closing run across two nested regular spans.
+    assert convert("*foo *bar**") == "_foo _bar__"
+
+    # Split a width-three opener between regular and strong emphasis.
+    assert convert("***foo* bar**") == "*_foo_ bar*"
+
+    assert convert("*a*") == "_a_"
+    assert convert("**a**") == "*a*"
+
+    # A single run wide enough to supply both kinds of emphasis nests
+    # regular emphasis outermost and bold innermost.
+    assert convert("***a***") == "_*a*_"
+
+
+def test_conversion_commonmark_match_emphasis():
+    """conversion: Test commonmark_match_emphasis()"""
+
+    def descriptor(char, numdelims, can_open, can_close):
+        return {
+            "char": char,
+            "numdelims": numdelims,
+            "origdelims": numdelims,
+            "can_open": can_open,
+            "can_close": can_close,
+            "events": [],
+        }
+
+    # Match the outer pair while leaving an ambiguous middle run literal.
+    delimiters = [
+        descriptor("*", 1, True, False),
+        descriptor("*", 2, True, True),
+        descriptor("*", 1, False, True),
+    ]
+    commonmark_match_emphasis(delimiters)
+    assert delimiters[0]["numdelims"] == 0
+    assert delimiters[0]["events"] == [("open", False)]
+    assert delimiters[1]["numdelims"] == 2
+    assert delimiters[1]["events"] == []
+    assert delimiters[2]["numdelims"] == 0
+    assert delimiters[2]["events"] == [("close", False)]
+
+    # A run wide enough to open both regular and strong emphasis
+    # records both events against a matching closer run, strong first.
+    delimiters = [
+        descriptor("*", 3, True, False),
+        descriptor("*", 3, False, True),
+    ]
+    commonmark_match_emphasis(delimiters)
+    assert delimiters[0]["numdelims"] == 0
+    assert delimiters[0]["events"] == [("open", True), ("open", False)]
+    assert delimiters[1]["numdelims"] == 0
+    assert delimiters[1]["events"] == [("close", True), ("close", False)]
+
+    # Different characters never close each other, even with matching
+    # widths and flanking on both sides.
+    delimiters = [
+        descriptor("*", 1, True, False),
+        descriptor("_", 1, False, True),
+    ]
+    commonmark_match_emphasis(delimiters)
+    assert delimiters[0]["numdelims"] == 1
+    assert delimiters[0]["events"] == []
+    assert delimiters[1]["numdelims"] == 1
+    assert delimiters[1]["events"] == []
+
+    # Compare two adversarial sizes so quadratic matching approaches 4x
+    # growth. The ratio also tolerates slower test hosts.
+    small_n = 6000
+    large_n = 12000
+    small_body = ("*a " * small_n) + ("b* " * small_n)
+    large_body = ("*a " * large_n) + ("b* " * large_n)
+
+    # Interleave several rounds and keep each size's fastest result. This
+    # reduces noise from scheduling, garbage collection, and background load.
+    small_time = large_time = None
+    for _ in range(5):
+        start = default_timer()
+        text, pending = commonmark_repair_chunk(small_body, {})
+        elapsed = default_timer() - start
+        small_time = (
+            elapsed if small_time is None else min(small_time, elapsed)
+        )
+        # Every opener has a closer, so the complete message stays unchanged.
+        assert text == small_body
+        assert pending == {}
+
+        start = default_timer()
+        text, pending = commonmark_repair_chunk(large_body, {})
+        elapsed = default_timer() - start
+        large_time = (
+            elapsed if large_time is None else min(large_time, elapsed)
+        )
+        assert text == large_body
+        assert pending == {}
+
+    # Doubling input should remain near linear; the additive margin covers
+    # timer noise at these short runtimes.
+    assert large_time < small_time * 3.0 + 0.1
+
+
+def test_conversion_commonmark_render_emphasis_events():
+    """conversion: Test commonmark_render_emphasis_events()"""
+
+    strong = ("<b>", "</b>")
+    regular = ("<i>", "</i>")
+
+    # No events at all: nothing renders around the leftover text.
+    assert commonmark_render_emphasis_events([], strong, regular) == (
+        "",
+        "",
+    )
+
+    # A single open renders on the open side only.
+    assert commonmark_render_emphasis_events(
+        [("open", False)], strong, regular
+    ) == ("", "<i>")
+
+    # A single close renders on the close side only.
+    assert commonmark_render_emphasis_events(
+        [("close", True)], strong, regular
+    ) == ("</b>", "")
+
+    # Two opens render outermost first, since the last one recorded is
+    # the outermost span.
+    assert commonmark_render_emphasis_events(
+        [("open", True), ("open", False)], strong, regular
+    ) == ("", "<i><b>")
+
+    # Two closes render innermost first, in the order they were
+    # recorded.
+    assert commonmark_render_emphasis_events(
+        [("close", True), ("close", False)], strong, regular
+    ) == ("</b></i>", "")

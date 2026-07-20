@@ -1697,9 +1697,10 @@ class Apprise:
                 "attach": attach,
                 # Pass the resolved target format; downstream notify()
                 # calls use it directly without resolving again.
-                # Preserve whether the caller declared a source format.
+                # Preserve whether the caller omitted a source format so
+                # downstream code skips automatic format conversion.
                 "body_format": target_format,
-                "format_controlled": body_format is not None,
+                "body_passthrough": body_format is None,
             }
             yield (server, kwargs)
 
