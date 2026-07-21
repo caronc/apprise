@@ -368,10 +368,12 @@ apprise -vv -t "Alert" --config=~/apprise.yml -g "2:alerts"
 
 # With retry override: retry each matched service up to 3 times
 apprise -vv -t "Alert" --config=~/apprise.yml -g "alerts:3"
+```
 
 ## CLI File Attachments
 
 Apprise also supports file attachments too! Specify as many attachments to a notification as you want.
+
 ```bash
 # Send a funny image you found on the internet to a colleague:
 apprise -vv --title 'Agile Joke' \
