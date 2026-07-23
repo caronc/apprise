@@ -48,7 +48,7 @@ jobs:
           repository: ChayanidTermph/DepSecLens   # ⚠️ change to your fork
           token: ${{ secrets.DEPSECLENS_TOKEN }}   # needed because DepSecLens is private
           path: .depseclens
-          ref: depseclens-fullver                 # branch that holds the code
+          ref: main                 # branch that holds the code
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
