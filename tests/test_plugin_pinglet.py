@@ -196,6 +196,10 @@ def test_plugin_pinglet_edge_cases():
     with pytest.raises(TypeError):
         NotifyPinglet(token="abc123", namespace="acme", topic=None)
 
+    # Direct instantiation without a fullpath defaults to "/"
+    obj = NotifyPinglet(token="abc123", namespace="acme", topic="deploys")
+    assert obj.fullpath == "/"
+
 
 @mock.patch("requests.post")
 def test_plugin_pinglet_payload(mock_post):

@@ -39,7 +39,10 @@
 #   pinglets://{apikey}@app.pinglet.co.uk/acme/deploys?priority=urgent
 #   pinglets://{apikey}@my.host/acme/deploys?:CPU=95%25&+region=eu-west
 
+from __future__ import annotations
+
 from json import dumps
+from typing import Any, Optional
 
 import requests
 
@@ -196,14 +199,14 @@ class NotifyPinglet(NotifyBase):
 
     def __init__(
         self,
-        token,
-        namespace,
-        topic,
-        priority=None,
-        badges=None,
-        data=None,
-        **kwargs,
-    ):
+        token: str,
+        namespace: str,
+        topic: str,
+        priority: Optional[str] = None,
+        badges: Optional[dict[str, Any]] = None,
+        data: Optional[dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Pinglet Object."""
         super().__init__(**kwargs)
 
@@ -261,13 +264,17 @@ class NotifyPinglet(NotifyBase):
                     )
                     break
 
+                # Cast the value to a string once so the length check
+                # below and the stored value always agree
+                value = str(value)
                 if (
                     len(key) > self.max_badge_key_len
-                    or len(str(value)) > self.max_badge_value_len
+                    or len(value) > self.max_badge_value_len
                 ):
                     self.logger.warning("Pinglet badge %s was truncated.", key)
 
-                self.badges[key[: self.max_badge_key_len]] = str(value)[
+                # Store the (possibly truncated) badge
+                self.badges[key[: self.max_badge_key_len]] = value[
                     : self.max_badge_value_len
                 ]
 
@@ -275,23 +282,34 @@ class NotifyPinglet(NotifyBase):
         self.data = {}
         if data:
             for key, value in data.items():
+                # Cast the value to a string once so the length check
+                # below and the stored value always agree
+                value = str(value)
                 if (
                     len(key) > self.max_data_key_len
-                    or len(str(value)) > self.max_data_value_len
+                    or len(value) > self.max_data_value_len
                 ):
                     self.logger.warning(
                         "Pinglet metadata %s was truncated.", key
                     )
 
-                self.data[key[: self.max_data_key_len]] = str(value)[
+                # Store the (possibly truncated) metadata entry
+                self.data[key[: self.max_data_key_len]] = value[
                     : self.max_data_value_len
                 ]
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Pinglet Notification."""
 
+        # Prepare our URL
         schema = "https" if self.secure else "http"
         url = f"{schema}://{self.host}"
         if self.port:
@@ -304,20 +322,18 @@ class NotifyPinglet(NotifyBase):
         payload = {
             "message": body,
             "priority": self.priority,
-            "level": PINGLET_LEVEL_MAP.get(
-                notify_type.value
-                if isinstance(notify_type, NotifyType)
-                else str(notify_type),
-                "info",
-            ),
+            "level": PINGLET_LEVEL_MAP.get(notify_type.value, "info"),
         }
 
+        # A title is only included when one was actually provided
         if title:
             payload["title"] = title
 
+        # Include our badges if any were defined
         if self.badges:
             payload["badges"] = self.badges
 
+        # Include our metadata if any was defined
         if self.data:
             payload["data"] = self.data
 
@@ -346,7 +362,7 @@ class NotifyPinglet(NotifyBase):
                 timeout=self.request_timeout,
                 allow_redirects=self.redirects,
             )
-            if r.status_code < 200 or r.status_code >= 300:
+            if r.status_code != requests.codes.ok:
                 # We had a problem
                 status_str = NotifyPinglet.http_response_code_lookup(
                     r.status_code
@@ -382,7 +398,7 @@ class NotifyPinglet(NotifyBase):
         return True
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
         another simliar one.
 
@@ -398,11 +414,11 @@ class NotifyPinglet(NotifyBase):
             self.topic,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
-        params = {
+        params: dict[str, Any] = {
             "priority": self.priority,
         }
 
@@ -439,7 +455,7 @@ class NotifyPinglet(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
         results = NotifyBase.parse_url(url)
