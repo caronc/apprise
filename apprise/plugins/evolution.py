@@ -54,8 +54,10 @@ import requests
 
 from ..common import NotifyFormat, NotifyType
 from ..conversion import (
+    commonmark_decode_backslash_escapes,
     commonmark_emphasis_run,
     commonmark_find_backtick_run,
+    commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_new_scan_budget,
     commonmark_pick_emphasis_sentinel,
@@ -206,51 +208,13 @@ class NotifyEvolution(NotifyBase):
     # Adapt HTML-derived CommonMark to WhatsApp formatting.
     # Direct WhatsApp Markdown is left unchanged.
     # Syntax: https://faq.whatsapp.com/539178204879377/
-    @classmethod
-    def _commonmark_code_spans(cls, body):
-        """Return complete CommonMark code-span ranges as ``(start, end)``."""
-        spans = []
-        backtick_runs = commonmark_index_backtick_runs(body)
-        i = 0
-        n = len(body)
-        while i < n:
-            if body[i] == "\\" and i + 1 < n:
-                i += 2
-                continue
-            if body[i] == "`":
-                j = i
-                while j < n and body[j] == "`":
-                    j += 1
-                run = j - i
-                close = commonmark_find_backtick_run(backtick_runs, j, run)
-                if close is not None:
-                    spans.append((i, close + run))
-                    i = close + run
-                    continue
-                i = j
-                continue
-            i += 1
-        return spans
-
     @staticmethod
     def _append_whatsapp_link(out, open_index, raw_url):
         """Replace a buffered link with WhatsApp's ``label (url)`` form.
 
         CommonMark escapes are decoded and closing parentheses are protected.
         """
-        url = []
-        j2 = 0
-        while j2 < len(raw_url):
-            c2 = raw_url[j2]
-            if c2 == "\\" and j2 + 1 < len(raw_url):
-                # Discard the backslash; keep only the next char.
-                url.append(raw_url[j2 + 1])
-                j2 += 2
-                continue
-            # Plain character: pass through unchanged.
-            url.append(c2)
-            j2 += 1
-        url = "".join(url)
+        url = commonmark_decode_backslash_escapes(raw_url)
 
         # Recover the buffered label and remove its opening ``[``.
         text = "".join(out[open_index + 1 :])
@@ -284,27 +248,8 @@ class NotifyEvolution(NotifyBase):
         WhatsApp auto-links bare URLs but has no custom-label link syntax.
         Backslash escapes are removed because WhatsApp does not use them.
         """
-        # Convert headings to bold without changing literal code.
-        code_spans = cls._commonmark_code_spans(body)
-
-        # Both inputs are ordered, so one forward cursor avoids rescanning.
-        span_idx = 0
-
-        def _heading_to_bold(match):
-            nonlocal span_idx
-            start = match.start()
-            # Advance past any spans that end at or before this heading.
-            while (
-                span_idx < len(code_spans) and code_spans[span_idx][1] <= start
-            ):
-                span_idx += 1
-            if span_idx < len(code_spans) and code_spans[span_idx][0] <= start:
-                # Inside a code span: leave the line untouched.
-                return match.group(0)
-            heading = match.group(1).rstrip()
-            return f"**{heading}**" if heading else ""
-
-        body = re.sub(r"(?m)^#{1,6}[ \t]+(.*)$", _heading_to_bold, body)
+        # WhatsApp represents headings as bold while preserving code.
+        body = commonmark_headings_to_bold(body)
 
         # Accumulate translated characters one item at a time.
         out = []
@@ -321,8 +266,7 @@ class NotifyEvolution(NotifyBase):
         backtick_runs = commonmark_index_backtick_runs(body)
         # Pick a temporary marker that does not occur in the message.
         sentinel = commonmark_pick_emphasis_sentinel(body)
-        # Share one budget across link scans to preserve long valid links while
-        # bounding the total work spent on malformed destinations.
+        # Bound the total work spent scanning labeled-link destinations.
         scan_budget = commonmark_new_scan_budget(body)
 
         while i < n:
@@ -381,8 +325,7 @@ class NotifyEvolution(NotifyBase):
                     i = close + 2
                     continue
 
-                # Retire the unmatched label so later text cannot reuse it.
-                link_stack.pop()
+                # Let the bare-link check handle this failed angle form.
 
             # Convert bare destinations without scanning their URL as emphasis.
             if body.startswith("](", i) and link_stack:
@@ -399,6 +342,12 @@ class NotifyEvolution(NotifyBase):
                     continue
 
                 # Same reasoning as the angle-dest case above.
+                link_stack.pop()
+
+            # A "]" that never forms "](" cannot close a link. Retire the
+            # innermost pending "[" so a later, unrelated "](" cannot
+            # incorrectly reuse it as its own opener.
+            if ch == "]" and link_stack and not body.startswith("](", i):
                 link_stack.pop()
 
             # Drop autolink brackets; WhatsApp recognizes the remaining URL.

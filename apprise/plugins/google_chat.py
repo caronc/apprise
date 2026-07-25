@@ -63,6 +63,7 @@ from ..conversion import (
     commonmark_emphasis_run,
     commonmark_escape_link_url,
     commonmark_find_backtick_run,
+    commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_new_scan_budget,
     commonmark_pick_emphasis_sentinel,
@@ -225,6 +226,7 @@ class NotifyGoogleChat(NotifyBase):
 
         CommonMark          Google Chat
         ------------------  -----------------
+        # heading           *heading* (Chat has no heading syntax)
         **bold**            *bold*
         *italic*            _italic_
         `code`              `code`
@@ -234,6 +236,8 @@ class NotifyGoogleChat(NotifyBase):
         Chat uses HTML-like anchors, so text and code escape ``&``, ``<``,
         and ``>`` before delivery.
         """
+        # Google Chat represents headings as bold text.
+        body = commonmark_headings_to_bold(body)
 
         # Accumulate translated characters one item at a time.
         out = []
@@ -250,8 +254,7 @@ class NotifyGoogleChat(NotifyBase):
         backtick_runs = commonmark_index_backtick_runs(body)
         # Pick a temporary marker that does not occur in the message.
         sentinel = commonmark_pick_emphasis_sentinel(body)
-        # Share one budget across link scans to preserve long valid links while
-        # bounding the total work spent on malformed destinations.
+        # Bound the total work spent scanning labeled-link destinations.
         scan_budget = commonmark_new_scan_budget(body)
 
         while i < n:
@@ -338,8 +341,7 @@ class NotifyGoogleChat(NotifyBase):
                     i = close + 2
                     continue
 
-                # Retire the unmatched label so later text cannot reuse it.
-                link_stack.pop()
+                # Let the bare-link check handle this failed angle form.
 
             # Convert bare destinations without scanning their URL as emphasis.
             if body.startswith("](", i) and link_stack:
@@ -358,6 +360,12 @@ class NotifyGoogleChat(NotifyBase):
                     continue
 
                 # Same reasoning as the angle-dest case above.
+                link_stack.pop()
+
+            # A "]" that never forms "](" cannot close a link. Retire the
+            # innermost pending "[" so a later, unrelated "](" cannot
+            # incorrectly reuse it as its own opener.
+            if ch == "]" and link_stack and not body.startswith("](", i):
                 link_stack.pop()
 
             # Convert complete autolinks; other "<" characters remain literal.

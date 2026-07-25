@@ -349,7 +349,7 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
     assert f(attack) == attack
     assert f(f"*bold* {attack}") == f"_bold_ {attack}"
 
-    # Merge the title as a heading before Chat dialect conversion.
+    # Google Chat renders the merged title heading as bold.
     aobj = Apprise()
     assert aobj.add("gchat://workspace/key/token")
     assert (
@@ -363,7 +363,7 @@ def test_plugin_google_chat_html_to_markdown_hardening(mock_post):
         is True
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
-    assert payload["text"] == "# My Title\n*hello*"
+    assert payload["text"] == "*My Title*\n*hello*"
     mock_post.reset_mock()
 
     # Title that reduces to an empty string after stripping leading heading
@@ -434,6 +434,41 @@ def test_plugin_google_chat_bare_link_and_autolink_dialect():
 
     # A "<" that never forms a valid scheme is passed through literally.
     assert NotifyGoogleChat._commonmark_to_google_chat("a < b") == "a < b"
+
+    # A destination containing whitespace remains literal.
+    assert (
+        NotifyGoogleChat._commonmark_to_google_chat("[label](has space)")
+        == "[label](has space)"
+    )
+
+    # An unfinished destination also remains literal.
+    assert (
+        NotifyGoogleChat._commonmark_to_google_chat("[label](unterminated")
+        == "[label](unterminated"
+    )
+
+
+def test_plugin_google_chat_nested_angle_link():
+    """Keep the outer link when a nested angle link is invalid."""
+
+    # Retire only the invalid inner label so the outer link still converts.
+    body = "[OUTER [INNER](<badstuff)](https://example.com)"
+    assert NotifyGoogleChat._commonmark_to_google_chat(body) == (
+        "<https://example.com|OUTER [INNER](<badstuff)>"
+    )
+
+
+def test_plugin_google_chat_stray_bracket_retires_opener():
+    """A "]" with no "(" must retire its "[" instead of leaving it
+    pending for a later, unrelated link to reuse."""
+
+    # No "(" ever follows the first "]", so "[label]" is not a link and
+    # must not be spliced into the later, unrelated "](https://...)".
+    body = "[label] and ](https://example.com) end"
+    assert (
+        NotifyGoogleChat._commonmark_to_google_chat(body)
+        == "[label] and ](https://example.com) end"
+    )
 
 
 @mock.patch("requests.post")

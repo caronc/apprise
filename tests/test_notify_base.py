@@ -523,14 +523,11 @@ def test_notify_base_flush_store_noop_when_unused(tmpdir):
 
 
 def test_notify_base_flush_store_writes_pending_auto_mode_changes(tmpdir):
-    """flush_store() writes a service's cached changes to disk on
-    demand.  In PersistentStoreMode.AUTO (the default), set() alone
-    only updates the in-memory cache -- normally the on-disk write only
-    happens later, when the PersistentStore object is garbage
-    collected. A caller about to end the process some other way (e.g.
-    apprise/cli.py's _force_exit_after_timeout(), which calls
-    os._exit()) needs to be able to force that write immediately
-    instead."""
+    """Write pending automatic-store changes before the process exits.
+
+    Normally these changes remain cached until the store is collected. An
+    immediate process exit must flush them first.
+    """
     asset = AppriseAsset(storage_path=str(tmpdir))
     obj = NotifyBase(asset=asset)
 

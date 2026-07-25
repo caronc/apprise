@@ -961,11 +961,11 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Declared Markdown gets the same MarkdownV2 dialect completion.
+    # MarkdownV2 renders the merged title heading as bold.
     assert (
-        payload["text"] == "\\# 🚨 Change detected for _Apprise Test Title_\n"
+        payload["text"] == "*🚨 Change detected for _Apprise Test Title_*\n"
         "_[Apprise Body Title](http://localhost)_ had "
-        "[a change](http://127\\.0\\.0\\.1)"
+        "[a change](http://127.0.0.1)"
     )
 
     # Reset our values
@@ -1000,9 +1000,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # v1 (non-strict) recognizes a narrower escape set than v2 does.
+    # Telegram v1 renders the heading as bold and drops nested italic markers.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\n"
+        payload["text"] == "*🚨 Change detected for Apprise Test Title*\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -1087,9 +1087,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Generic title merging strips surrounding whitespace before conversion.
+    # The merged ``# #`` heading renders its literal hash as bold.
     assert payload["text"] == (
-        "# #\n"
+        "*#*\n"
         r"\_\[Apprise Body Title\](http://localhost)\_"
         r" had \[a change\](http://127.0.0.2)"
     )
@@ -1120,10 +1120,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # v2 (strict) keeps every reserved character escaped, same title
-    # doubling as the v1 case above.
+    # MarkdownV2 also escapes the literal hash inside the bold heading.
     assert payload["text"] == (
-        "\\# \\#\n"
+        "*\\#*\n"
         r"\_\[Apprise Body Title\]\(http://localhost\)\_"
         r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
@@ -1162,9 +1161,10 @@ def test_plugin_telegram_formatting(mock_post):
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
     # v1's narrower escape set un-escapes what the framework's baseline
-    # text-to-markdown pass added, since v1 does not require it.
+    # text-to-markdown pass added, since v1 does not require it. The merged
+    # "# # A Great Title" line is itself a heading, so it renders as bold.
     assert payload["text"] == (
-        "# # A Great Title\n"
+        "*# A Great Title*\n"
         r"\_\[Apprise Body Title\](http://localhost)\_"
         r" had \[a change\](http://127.0.0.2)"
     )
@@ -1196,9 +1196,10 @@ def test_plugin_telegram_formatting(mock_post):
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
     # MarkdownV2 runs its completion pass over the already-amalgamated
-    # title+body, so the literal leading hash is escaped too.
+    # title+body; the merged heading line renders as bold, and its
+    # literal leading hash still needs its own reserved-character escape.
     assert payload["text"] == (
-        "\\# \\# A Great Title\n"
+        "*\\# A Great Title*\n"
         r"\_\[Apprise Body Title\]\(http://localhost\)\_"
         r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
@@ -1221,11 +1222,12 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # MarkdownV2 escapes the leading hash and URL dots.
+    # The declared heading renders as bold. Link destinations only need
+    # "(" and ")" escaped, not the full reserved-character set.
     assert payload["text"] == (
-        "\\# A Great Title\n"
+        "*A Great Title*\n"
         "_[Apprise Body Title](http://localhost)_ had "
-        "[a change](http://127\\.0\\.0\\.2)"
+        "[a change](http://127.0.0.2)"
     )
 
     # Reset our values
@@ -1280,9 +1282,10 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # v1 keeps "#" and HTML-looking body text unescaped.
+    # The merged heading renders as bold; v1 keeps HTML-looking body text
+    # unescaped.
     assert payload["text"] == (
-        "# Test Message Title\nTest Message Body <br/> ok</br>"
+        "*Test Message Title*\nTest Message Body <br/> ok</br>"
     )
 
     # Reset our values
@@ -1460,7 +1463,7 @@ def test_plugin_telegram_html_formatting(mock_post):
 
 
 @mock.patch("requests.post")
-def test_plugin_telegram_html_heading_padding_requires_declared_source(
+def test_plugin_telegram_html_heading_padding_needs_source(
     mock_post,
 ):
     """HTML heading padding requires a declared source format."""
@@ -1582,8 +1585,9 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
 
     mock_post.reset_mock()
 
-    # A heading has no MarkdownV2 entity -- its '#' must be escaped (not left
-    # bare), or Telegram rejects the entire message outright rather than just.
+    # A heading has no MarkdownV2 entity, so it renders as bold instead of
+    # a literal, escaped "#" -- either way Telegram never sees a bare '#'
+    # that would make it reject the whole message.
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
     assert len(aobj) == 1
@@ -1596,7 +1600,7 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert payload["parse_mode"] == "MarkdownV2"
-    assert payload["text"] == "\\# Title\n\nbody text"
+    assert payload["text"] == "*Title*\n\nbody text"
 
     mock_post.reset_mock()
 
@@ -1801,6 +1805,64 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "\\[a\\] b \\(c\\) \\]\\(d\\)"
     )
 
+    # An invalid inner angle link must not reuse or consume its outer label.
+    # Telegram returns the unresolved structure as escaped literal text.
+    body = "[OUTER [INNER](<badstuff)](https://example.com)"
+    assert NotifyTelegram._commonmark_to_telegram(body, strict=True) == (
+        "\\[OUTER \\[INNER\\]\\(\\<badstuff\\)\\]\\(https://example\\.com\\)"
+    )
+
+    # A "]" with no "(" must retire its "[" in both Markdown modes,
+    # instead of leaving it pending for a later, unrelated link to reuse.
+    stray_body = "[label] and ](http://x.com/a(b)c) end"
+    assert (
+        NotifyTelegram._commonmark_to_telegram(stray_body, strict=False)
+        == "[label] and ](http://x.com/a(b)c) end"
+    )
+    assert NotifyTelegram._commonmark_to_telegram(stray_body, strict=True) == (
+        "\\[label\\] and \\]\\(http://x\\.com/a\\(b\\)c\\) end"
+    )
+
+    # An invalid destination becomes fully escaped literal text in v2.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](has space)", strict=True
+        )
+        == "\\[label\\]\\(has space\\)"
+    )
+
+    # An unfinished destination follows the same literal-text path.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](unterminated", strict=True
+        )
+        == "\\[label\\]\\(unterminated"
+    )
+
+    # Telegram v1 leaves the rejected destination literal.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](has space)", strict=False
+        )
+        == "[label](has space)"
+    )
+
+    # An unfinished angle destination follows the same v2 fallback.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](<https://unterminated", strict=True
+        )
+        == "\\[label\\]\\(\\<https://unterminated"
+    )
+
+    # Telegram v1 also leaves the unfinished angle destination literal.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](<https://unterminated", strict=False
+        )
+        == "[label](<https://unterminated"
+    )
+
     # Escape a dangling "[" during end-of-scan cleanup.
     assert (
         NotifyTelegram._commonmark_to_telegram(
@@ -1809,12 +1871,13 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == "text \\[dangling forever"
     )
 
-    # Preserve plain Markdown links while escaping their destinations.
+    # Preserve plain Markdown links; only "(" and ")" need escaping inside
+    # a destination, not the full MarkdownV2 reserved-character set.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "[a link](https://example.com/x.y)", strict=True
         )
-        == "[a link](https://example\\.com/x\\.y)"
+        == "[a link](https://example.com/x.y)"
     )
 
     # Preserve an escaped parenthesis inside a plain link destination.
@@ -1822,7 +1885,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         NotifyTelegram._commonmark_to_telegram(
             "[label](http://example.com/a\\)b)", strict=True
         )
-        == "[label](http://example\\.com/a\\)b)"
+        == "[label](http://example.com/a\\)b)"
     )
 
     # Preserve balanced parentheses inside a plain link destination.
@@ -1830,7 +1893,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         NotifyTelegram._commonmark_to_telegram(
             "[label](https://example.com/a_(b))", strict=True
         )
-        == "[label](https://example\\.com/a_\\(b\\))"
+        == "[label](https://example.com/a_\\(b\\))"
     )
 
     # Apply the same parenthesis balancing in Telegram V1.
@@ -1968,7 +2031,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == r"[click](https://example.com/x\\>y)"
     )
 
-    # Merge the title as a heading before Telegram V1 conversion.
+    # Telegram v1 renders the merged title heading as bold.
     aobj_v1 = Apprise()
     aobj_v1.add(
         "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1"
@@ -1977,7 +2040,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         body="<b>hello</b>", title="My Title", body_format=NotifyFormat.HTML
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
-    assert payload["text"] == "# My Title\n*hello*"
+    assert payload["text"] == "*My Title*\n*hello*"
     mock_post.reset_mock()
 
     # Title that reduces to an empty string after stripping leading heading and
@@ -2432,12 +2495,20 @@ def test_plugin_telegram_standalone_autolink_dialect():
         == "see https://a*b now"
     )
 
-    # MarkdownV2 still escapes reserved URL characters.
+    # Escape reserved markup characters inside a MarkdownV2 autolink.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "see <https://a*b-c> now", strict=True
         )
-        == "see https://a*b\\-c now"
+        == "see https://a\\*b\\-c now"
+    )
+
+    # Strict mode also escapes every other reserved autolink character.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "see <https://x.example/*a*_b_[c](d)`e`> now", strict=True
+        )
+        == "see https://x\\.example/\\*a\\*\\_b\\_\\[c\\]\\(d\\)\\`e\\` now"
     )
 
 

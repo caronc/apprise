@@ -2414,6 +2414,58 @@ def test_plugin_slack_bare_link_and_autolink_dialect():
     assert NotifySlack._commonmark_to_slack("a < b") == "a < b"
 
 
+def test_plugin_slack_nested_angle_link():
+    """Keep the outer link when a nested angle link is invalid."""
+
+    # Retire only the invalid inner label so the outer link still converts.
+    body = "[OUTER [INNER](<badstuff)](https://example.com)"
+    assert NotifySlack._commonmark_to_slack(body) == (
+        "<https://example.com|OUTER [INNER](<badstuff)>"
+    )
+
+
+def test_plugin_slack_stray_bracket_retires_opener():
+    """A "]" with no "(" must retire its "[" instead of leaving it
+    pending for a later, unrelated link to reuse."""
+
+    # No "(" ever follows the first "]", so "[label]" is not a link and
+    # must not be spliced into the later, unrelated "](https://...)".
+    body = "[label] and ](https://example.com) end"
+    assert (
+        NotifySlack._commonmark_to_slack(body)
+        == "[label] and ](https://example.com) end"
+    )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_html_blockquote_heading(mock_request):
+    """Render an HTML blockquote heading as quoted, bold Slack text.
+
+    Use ``Apprise`` to exercise the complete HTML-to-Slack conversion path.
+    """
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    token_a = "A" * 9
+    token_b = "B" * 9
+    token_c = "c" * 24
+
+    obj = NotifySlack(token_a=token_a, token_b=token_b, token_c=token_c)
+    aobj = Apprise()
+    assert aobj.add(obj) is True
+    assert bool(
+        aobj.notify(
+            body="<blockquote><h2>Alert</h2><p>body</p></blockquote>",
+            body_format=NotifyFormat.HTML,
+        )
+    )
+
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["attachments"][0]["text"] == "> *Alert*\n> body"
+
+
 def test_plugin_slack_dialect_long_link_destination():
     """Convert long links while bounding aggregate destination scanning."""
     for size in (4092, 4096, 4100, 50000):
@@ -2423,7 +2475,7 @@ def test_plugin_slack_dialect_long_link_destination():
         assert result == f"<{url}|label>", f"failed at size={size}"
 
 
-def test_plugin_slack_dialect_scan_budget_does_not_starve_later_links():
+def test_plugin_slack_scan_budget_preserves_later_links():
     """Preserve nearby links after malformed scans exhaust the shared
     budget."""
     # A handful of malformed prefixes must not prevent a later link from

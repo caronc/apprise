@@ -512,6 +512,18 @@ def test_plugin_evolution_bare_link_and_autolink_dialect():
         == "click here (https://a*b)"
     )
 
+    # A destination containing whitespace remains literal.
+    assert (
+        NotifyEvolution._commonmark_to_whatsapp("[label](has space)")
+        == "[label](has space)"
+    )
+
+    # An unfinished destination also remains literal.
+    assert (
+        NotifyEvolution._commonmark_to_whatsapp("[label](unterminated")
+        == "[label](unterminated"
+    )
+
     # WhatsApp autolinks the URL after its brackets are removed.
     assert (
         NotifyEvolution._commonmark_to_whatsapp("see <https://a*b> now")
@@ -525,6 +537,29 @@ def test_plugin_evolution_bare_link_and_autolink_dialect():
     assert (
         NotifyEvolution._commonmark_to_whatsapp("see <https://a*b end")
         == "see <https://a*b end"
+    )
+
+
+def test_plugin_evolution_nested_angle_link():
+    """Keep the outer link when a nested angle link is invalid."""
+
+    # Retire only the invalid inner label so the outer link still converts.
+    body = "[OUTER [INNER](<badstuff)](https://example.com)"
+    assert NotifyEvolution._commonmark_to_whatsapp(body) == (
+        "OUTER [INNER](<badstuff) (https://example.com)"
+    )
+
+
+def test_plugin_evolution_stray_bracket_retires_opener():
+    """A "]" with no "(" must retire its "[" instead of leaving it
+    pending for a later, unrelated link to reuse."""
+
+    # No "(" ever follows the first "]", so "[label]" is not a link and
+    # must not be spliced into the later, unrelated "](https://...)".
+    body = "[label] and ](https://example.com) end"
+    assert (
+        NotifyEvolution._commonmark_to_whatsapp(body)
+        == "[label] and ](https://example.com) end"
     )
 
 

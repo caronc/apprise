@@ -67,12 +67,14 @@ from ..common import (
 from ..conversion import (
     commonmark_emphasis_run,
     commonmark_find_backtick_run,
+    commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_match_emphasis,
     commonmark_new_scan_budget,
     commonmark_pick_emphasis_sentinel,
     commonmark_scan_angle_dest,
     commonmark_scan_autolink_dest,
+    commonmark_scan_paren_dest,
 )
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -807,6 +809,9 @@ class NotifyTelegram(NotifyBase):
     # Legacy Markdown recognizes escapes only for these characters.
     _TELEGRAM_V1_ESCAPABLE = "`*_[]"
 
+    # Escape the full reserved set in literal text not handled as markup.
+    _TELEGRAM_RESERVED_FULL = _TELEGRAM_STRICT_CHARS + "_*[]()`"
+
     def dialect_convert(self, body, body_format=None, *args, **kwargs):
         """Translate CommonMark to the configured Telegram Markdown."""
         if body_format != NotifyFormat.MARKDOWN:
@@ -822,6 +827,7 @@ class NotifyTelegram(NotifyBase):
 
         CommonMark     Markdown v1     MarkdownV2
         -------------  --------------  --------------------
+        # heading      *heading*       *heading* (no heading syntax here)
         **bold**       *bold*          *bold*
         *italic*       _italic_        _italic_
         `code`         `code`          `code`
@@ -831,6 +837,8 @@ class NotifyTelegram(NotifyBase):
         Both versions normalize links. MarkdownV2 also applies its stricter
         reserved-character escaping pass.
         """
+        # Telegram Markdown represents headings as bold text.
+        body = commonmark_headings_to_bold(body)
 
         # Accumulate output fragments; joined once at the end.
         out = []
@@ -847,8 +855,7 @@ class NotifyTelegram(NotifyBase):
         backtick_runs = commonmark_index_backtick_runs(body)
         # Pick a temporary marker that does not occur in the message.
         sentinel = commonmark_pick_emphasis_sentinel(body)
-        # Share one budget across link scans to preserve long valid links while
-        # bounding the total work spent on malformed destinations.
+        # Bound the total work spent scanning labeled-link destinations.
         scan_budget = commonmark_new_scan_budget(body)
 
         while i < n:
@@ -921,37 +928,17 @@ class NotifyTelegram(NotifyBase):
                     i = close + 2
                     continue
 
-                # Retire the unmatched label so later text cannot reuse it.
-                link_stack.pop()
+                # Let the bare-link check handle this failed angle form.
 
-            # Preserve a complete plain Markdown link using Telegram escaping.
-            # Bare destinations also require a pending label.
-            if body.startswith("](", i) and link_stack and scan_budget[0] > 0:
-                close = None
-                # Track balanced parentheses until the link terminator.
-                depth = 0
-                start = i + 2
-                k = start
-                while k < n:
-                    if body[k] == "\\" and k + 1 < n:
-                        # Skip escape sequences -- not the terminator.
-                        k += 2
-                        continue
-                    if body[k] == "(":
-                        depth += 1
-                    elif body[k] == ")":
-                        if depth == 0:
-                            close = k
-                            break
-                        depth -= 1
-                    k += 1
-
-                # Charge the scanned distance against the shared budget.
-                scan_budget[0] -= (close if close is not None else k) - start
+            # Preserve complete links; invalid destinations remain literal.
+            if body.startswith("](", i) and link_stack:
+                close = commonmark_scan_paren_dest(
+                    body, i + 1, n, budget=scan_budget
+                )
 
                 if close is not None:
                     link_stack.pop()
-                    # Escape balanced parentheses and other reserved content.
+                    # Telegram link destinations escape parentheses only.
                     dest = []
                     k = i + 2
                     while k < close:
@@ -959,9 +946,7 @@ class NotifyTelegram(NotifyBase):
                             dest.append(body[k : k + 2])
                             k += 2
                             continue
-                        if body[k] in "()" or (
-                            strict and body[k] in cls._TELEGRAM_STRICT_CHARS
-                        ):
+                        if body[k] in "()":
                             dest.append("\\" + body[k])
                         else:
                             dest.append(body[k])
@@ -971,26 +956,34 @@ class NotifyTelegram(NotifyBase):
                     continue
 
                 # Same reasoning as the angle-dest case above.
-                link_stack.pop()
+                idx = link_stack.pop()
+                if strict:
+                    out[idx] = "\\" + out[idx]
 
             # Drop autolink brackets and escape its URL for the selected mode.
             if ch == "<":
                 close, _ = commonmark_scan_autolink_dest(body, i, n)
                 if close is not None:
+                    # Escape all markup characters in literal autolink text.
                     for c2 in body[i + 1 : close]:
-                        if strict and c2 in cls._TELEGRAM_STRICT_CHARS:
+                        if strict and c2 in cls._TELEGRAM_RESERVED_FULL:
                             out.append("\\" + c2)
                         else:
                             out.append(c2)
                     i = close + 1
                     continue
 
+            # A "]" that never forms "](" cannot close a link, in either
+            # mode. Retire the innermost pending "[" so a later, unrelated
+            # "](" cannot incorrectly reuse it as its own opener.
+            if ch == "]" and link_stack:
+                idx = link_stack.pop()
+                if strict:
+                    # Escape the orphaned "[" so it cannot match as markup.
+                    out[idx] = "\\" + out[idx]
+
             # Escape non-link punctuation required by strict MarkdownV2.
             if strict and ch in "]()":
-                if ch == "]" and link_stack:
-                    # Escape the orphaned "[" so it cannot match a later link.
-                    idx = link_stack.pop()
-                    out[idx] = "\\" + out[idx]
                 out.append("\\" + ch)
                 i += 1
                 continue

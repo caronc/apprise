@@ -30,6 +30,7 @@ from inspect import cleandoc
 # Disable logging for a cleaner testing output
 import logging
 from timeit import default_timer
+from unittest import mock
 
 import pytest
 
@@ -39,10 +40,13 @@ from apprise.conversion import (
     LIST_DEPTH_MAX,
     MAX_FRAME_DEPTH,
     HTMLMarkdownConverter,
+    commonmark as commonmark_module,
     commonmark_can_close_emphasis,
     commonmark_can_open_emphasis,
+    commonmark_decode_backslash_escapes,
     commonmark_emphasis_run,
     commonmark_find_backtick_run,
+    commonmark_headings_to_bold,
     commonmark_index_backtick_runs,
     commonmark_match_emphasis,
     commonmark_materialize_repair,
@@ -56,6 +60,7 @@ from apprise.conversion import (
     commonmark_scan_paren_dest,
     commonmark_scan_repair_region,
     convert_between,
+    html_to_markdown,
     markdown_to_html,
     split_dialect_chunk,
     truncate_dialect_chunk,
@@ -785,7 +790,7 @@ def test_conversion_html_to_markdown_escaping():
     assert to_md('<a href="file:///etc/passwd">click</a>') == "[click](<#>)"
     assert to_md('<a href="JaVaScRiPt:alert(1)">click</a>') == "[click](<#>)"
 
-    # Leading/trailing whitespace must not defeat scheme detection\
+    # Leading or trailing whitespace must not defeat scheme detection.
     assert to_md('<a href="  javascript:alert(1)">click</a>') == (
         "[click](<#>)"
     )
@@ -1076,6 +1081,981 @@ def test_conversion_html_to_markdown_hardening():
     li_close = "</li>" * depth + "</ul>"
     out_li = to_md(f"{li_open}text{li_close}")
     assert "text" in out_li
+
+
+def test_conversion_headings_to_bold():
+    """Convert supported ATX headings for chat dialects without headings."""
+
+    # Convert the common heading forms generated from HTML.
+    assert commonmark_headings_to_bold("# Alert") == "**Alert**"
+    assert commonmark_headings_to_bold("###### Alert") == "**Alert**"
+
+    # An optional closing sequence of "#" is stripped, not kept as text.
+    assert commonmark_headings_to_bold("## foo ##") == "**foo**"
+    assert commonmark_headings_to_bold("# foo #####") == "**foo**"
+
+    # A hash without preceding whitespace remains part of the heading text.
+    assert commonmark_headings_to_bold("# foo#") == "**foo#**"
+
+    # Preserve up to three spaces allowed before a heading.
+    assert commonmark_headings_to_bold(" # one space") == " **one space**"
+    assert commonmark_headings_to_bold("   # three spaces") == (
+        "   **three spaces**"
+    )
+
+    # Four leading spaces make an indented code block, not a heading.
+    four_spaces = "    # four spaces"
+    assert commonmark_headings_to_bold(four_spaces) == four_spaces
+
+    # Empty headings do not produce empty bold markers.
+    assert commonmark_headings_to_bold("###") == ""
+    assert commonmark_headings_to_bold("###   ") == ""
+
+    # Heading text requires whitespace after its opening hashes.
+    literal = "#nospace"
+    assert commonmark_headings_to_bold(literal) == literal
+
+    # Inline code spans are never touched.
+    assert commonmark_headings_to_bold("`# inline code`") == (
+        "`# inline code`"
+    )
+
+    # Backtick and tilde fences protect heading-like code.
+    fenced_backtick = "```\n# not a heading\n```"
+    assert commonmark_headings_to_bold(fenced_backtick) == fenced_backtick
+
+    fenced_tilde = "~~~\n# not a heading either\n~~~"
+    assert commonmark_headings_to_bold(fenced_tilde) == fenced_tilde
+
+    # An unfinished fence protects the remaining text.
+    unterminated = "```\n# still not a heading\nmore text"
+    assert commonmark_headings_to_bold(unterminated) == unterminated
+
+    # A real heading before and after a fenced block is still converted.
+    mixed = "# Before\n```\n# inside\n```\n# After"
+    assert commonmark_headings_to_bold(mixed) == (
+        "**Before**\n```\n# inside\n```\n**After**"
+    )
+
+    # Preserve blockquote markers emitted by HTML-to-CommonMark conversion.
+    assert commonmark_headings_to_bold("> # Alert") == "> **Alert**"
+    assert commonmark_headings_to_bold("> > # Alert") == "> > **Alert**"
+    assert commonmark_headings_to_bold("> > > # Alert") == ("> > > **Alert**")
+
+    # Preserve unordered and ordered list markers.
+    assert commonmark_headings_to_bold("- # Alert") == "- **Alert**"
+    assert commonmark_headings_to_bold("* # Alert") == "* **Alert**"
+    assert commonmark_headings_to_bold("+ # Alert") == "+ **Alert**"
+    assert commonmark_headings_to_bold("1. # Alert") == "1. **Alert**"
+    assert commonmark_headings_to_bold("2) # Alert") == "2) **Alert**"
+
+    # Preserve combined blockquote and list markers.
+    assert commonmark_headings_to_bold("> - # Alert") == "> - **Alert**"
+
+    # Keep the blockquote marker for an empty heading.
+    assert commonmark_headings_to_bold("> ###") == "> "
+
+    # Recognize CRLF fences without protecting later headings.
+    crlf_fence = "```\r\ncode\r\n```\r\n# Real Heading"
+    assert commonmark_headings_to_bold(crlf_fence) == (
+        "```\r\ncode\r\n```\r\n**Real Heading**"
+    )
+
+    # Invalid backtick fence labels do not protect later headings.
+    invalid_opener = (
+        "Some `inline` text\n"
+        "```code`with`backtick info string\n"
+        "more text\n"
+        "# Real Heading"
+    )
+    assert commonmark_headings_to_bold(invalid_opener) == (
+        "Some `inline` text\n"
+        "```code`with`backtick info string\n"
+        "more text\n"
+        "**Real Heading**"
+    )
+
+    # Tilde fence labels may contain backticks.
+    tilde_with_backtick = "~~~code`ok\nreal code\n~~~"
+    assert (
+        commonmark_headings_to_bold(tilde_with_backtick) == tilde_with_backtick
+    )
+
+    # Preserve heading-like text inside a quoted tilde fence.
+    quoted_tilde_fence = "> ~~~\n> # literal code\n> ~~~"
+    assert (
+        commonmark_headings_to_bold(quoted_tilde_fence) == quoted_tilde_fence
+    )
+
+    # Repeating ``"- "`` starts a sibling list item, so these are three
+    # separate items. The middle heading remains real Markdown and converts.
+    three_sibling_items = "- ~~~\n- # literal code\n- ~~~~"
+    assert commonmark_headings_to_bold(three_sibling_items) == (
+        "- ~~~\n- **literal code**\n- ~~~~"
+    )
+
+    # A backtick closer wider than its opener still closes the fence, even
+    # when both are nested inside a blockquote.
+    quoted_wider_closer = "> ```\n> # literal code\n> ````"
+    assert (
+        commonmark_headings_to_bold(quoted_wider_closer) == quoted_wider_closer
+    )
+
+    # Nested blockquotes around a fence are recognized at every level.
+    nested_quoted_fence = "> > ~~~\n> > # literal code\n> > ~~~"
+    assert (
+        commonmark_headings_to_bold(nested_quoted_fence) == nested_quoted_fence
+    )
+
+    # Quote markers may have up to three leading spaces.
+    assert commonmark_headings_to_bold("   > # Alert") == "   > **Alert**"
+    indented_quoted_fence = "   > ~~~\n   > # literal code\n   > ~~~"
+    assert (
+        commonmark_headings_to_bold(indented_quoted_fence)
+        == indented_quoted_fence
+    )
+
+    # Four leading spaces create indented code, not a top-level fence.
+    # The following real heading must therefore still be converted.
+    four_space_fence_then_heading = (
+        "    ~~~\n    not a real fence\n    ~~~\n# Real Heading"
+    )
+    assert commonmark_headings_to_bold(four_space_fence_then_heading) == (
+        "    ~~~\n    not a real fence\n    ~~~\n**Real Heading**"
+    )
+
+    # An ordered-list marker can be wider than three characters ("123. "
+    # is five), so its continuation lines need more than three leading
+    # spaces too. A real heading after the fence must still convert.
+    wide_ordered_fence = "123. ~~~\n     # literal\n     ~~~\n\n# real"
+    assert commonmark_headings_to_bold(wide_ordered_fence) == (
+        "123. ~~~\n     # literal\n     ~~~\n\n**real**"
+    )
+
+    # A list containing a quote puts the list marker first, while continuation
+    # lines replace it with spaces. Both prefix orders belong to one container.
+    list_then_quote_fence = "- > ~~~\n  > # literal\n  > ~~~\n\n# real"
+    assert commonmark_headings_to_bold(list_then_quote_fence) == (
+        "- > ~~~\n  > # literal\n  > ~~~\n\n**real**"
+    )
+
+    # Up to three leading spaces may belong to a top-level fence rather than
+    # a list. Its heading-like content must remain protected.
+    lightly_indented_fence = " ~~~\n# literal\n ~~~\n# real"
+    assert commonmark_headings_to_bold(lightly_indented_fence) == (
+        " ~~~\n# literal\n ~~~\n**real**"
+    )
+
+    # Opening and closing fences have independent indentation allowances.
+    mismatched_indent_fence = "~~~\n# literal\n  ~~~\n# real"
+    assert commonmark_headings_to_bold(mismatched_indent_fence) == (
+        "~~~\n# literal\n  ~~~\n**real**"
+    )
+
+    # The same closer slack applies inside a blockquote.
+    quoted_mismatched_indent_fence = "> ~~~\n> # literal\n>   ~~~\n> # real"
+    assert commonmark_headings_to_bold(quoted_mismatched_indent_fence) == (
+        "> ~~~\n> # literal\n>   ~~~\n> **real**"
+    )
+
+    # A lightly indented fence can continue a list item without repeating
+    # its marker. An unfinished fence stops when that list item ends.
+    unclosed_narrow_list_fence = "- intro\n  ~~~\n  # literal\n\n# real"
+    assert commonmark_headings_to_bold(unclosed_narrow_list_fence) == (
+        "- intro\n  ~~~\n  # literal\n\n**real**"
+    )
+
+    # A later top-level fence cannot close the list's unfinished fence.
+    unclosed_narrow_list_fence_with_later_fence = (
+        "- intro\n  ~~~\n  # literal\n\n# real\n\n~~~\nunrelated\n~~~"
+    )
+    assert commonmark_headings_to_bold(
+        unclosed_narrow_list_fence_with_later_fence
+    ) == ("- intro\n  ~~~\n  # literal\n\n**real**\n\n~~~\nunrelated\n~~~")
+
+    # Blank lines before the fence may remain within the list item.
+    unclosed_narrow_list_fence_with_blank = (
+        "- intro\n\n  ~~~\n  # literal\n\n# real"
+    )
+    assert commonmark_headings_to_bold(
+        unclosed_narrow_list_fence_with_blank
+    ) == ("- intro\n\n  ~~~\n  # literal\n\n**real**")
+
+    # Light indentation without an earlier list marker is top-level.
+    unmarked_indent_no_list_behind_it = (
+        "Some intro text\n ~~~\n# literal\n ~~~\n# real"
+    )
+    assert commonmark_headings_to_bold(unmarked_indent_no_list_behind_it) == (
+        "Some intro text\n ~~~\n# literal\n ~~~\n**real**"
+    )
+
+    # The paragraph lazily continues the list, but one-space fence indentation
+    # is still insufficient for the two-space item.
+    list_ended_by_unindented_paragraph = (
+        "- intro\nunindented paragraph\n ~~~\n# literal\n ~~~\n# real"
+    )
+    assert commonmark_headings_to_bold(list_ended_by_unindented_paragraph) == (
+        "- intro\nunindented paragraph\n ~~~\n# literal\n ~~~\n**real**"
+    )
+
+    # Indented list text may appear between the marker and fence.
+    unclosed_narrow_list_fence_with_paragraph = (
+        "- intro\n  more text in the same item\n  ~~~\n  # literal\n\n# real"
+    )
+    assert commonmark_headings_to_bold(
+        unclosed_narrow_list_fence_with_paragraph
+    ) == (
+        "- intro\n  more text in the same item\n  ~~~\n  # literal\n\n**real**"
+    )
+
+    # The HTML converter replaces a list marker with equal-width spaces on
+    # continuation lines. Test that real output as well as synthetic input.
+    list_only_fence_html = (
+        "<ul><li><pre><code># literal\nmore</code></pre></li></ul>"
+        "<h1>Real Heading</h1>"
+    )
+    list_only_fence_body = html_to_markdown(list_only_fence_html)
+    assert list_only_fence_body == (
+        "- ```\n  # literal\n  more\n  ```\n\n# Real Heading"
+    )
+    converted = commonmark_headings_to_bold(list_only_fence_body)
+    # The heading-like line inside the fence stays literal code.
+    assert "  # literal\n" in converted
+    # A real heading placed after the fenced block still converts.
+    assert converted.endswith("\n**Real Heading**")
+
+    # Also cover a preceding paragraph and the wider numbered-list marker.
+    text_then_fence_html = (
+        "<ul><li>intro<pre><code># literal\nmore</code></pre></li></ul>"
+        "<h1>Real Heading</h1>"
+    )
+    text_then_fence_body = html_to_markdown(text_then_fence_html)
+    assert text_then_fence_body == (
+        "- intro\n  ```\n  # literal\n  more\n  ```\n\n# Real Heading"
+    )
+    converted = commonmark_headings_to_bold(text_then_fence_body)
+    assert "  # literal\n" in converted
+    assert converted.endswith("\n**Real Heading**")
+
+    ordered_fence_html = (
+        "<ol><li><pre><code># literal\nmore</code></pre></li></ol>"
+        "<h1>Real Heading</h1>"
+    )
+    ordered_fence_body = html_to_markdown(ordered_fence_html)
+    assert ordered_fence_body == (
+        "1. ```\n   # literal\n   more\n   ```\n\n# Real Heading"
+    )
+    converted = commonmark_headings_to_bold(ordered_fence_body)
+    assert "   # literal\n" in converted
+    assert converted.endswith("\n**Real Heading**")
+
+    # List continuation spacing moves before the quote marker on later lines.
+    quoted_list_fence_html = (
+        "<blockquote><ul><li>intro"
+        "<pre><code># literal\nmore</code></pre></li></ul></blockquote>"
+        "<h1>Real Heading</h1>"
+    )
+    quoted_list_fence_body = html_to_markdown(quoted_list_fence_html)
+    assert quoted_list_fence_body == (
+        "> - intro\n  > ```\n  > # literal\n  > more\n  > ```"
+        "\n\n# Real Heading"
+    )
+    converted = commonmark_headings_to_bold(quoted_list_fence_body)
+    assert "  > # literal\n" in converted
+    assert converted.endswith("\n**Real Heading**")
+
+    # Leading list indentation contributes to the continuation width, whether
+    # the fence begins the item or follows its introductory text.
+    indented_marker_then_fence = " - ~~~\n   # literal\n   ~~~\n# real"
+    assert commonmark_headings_to_bold(indented_marker_then_fence) == (
+        " - ~~~\n   # literal\n   ~~~\n**real**"
+    )
+
+    indented_marker_with_intro = " - intro\n   ~~~\n   # literal\n\n# real"
+    assert commonmark_headings_to_bold(indented_marker_with_intro) == (
+        " - intro\n   ~~~\n   # literal\n\n**real**"
+    )
+
+    # A literal "- " inside a closed fence must not create list state for the
+    # unfinished top-level fence that follows it.
+    marker_like_text_inside_closed_fence = (
+        "~~~\n- literal\n  ~~~\n  ~~~\n# still code"
+    )
+    assert commonmark_headings_to_bold(
+        marker_like_text_inside_closed_fence
+    ) == ("~~~\n- literal\n  ~~~\n  ~~~\n# still code")
+
+    # Ending an inner list restores the still-open outer list width.
+    nested_list_falls_back_to_outer = (
+        "- outer\n  - inner\n    text\n  ~~~\n  # literal\n\n# real"
+    )
+    assert commonmark_headings_to_bold(nested_list_falls_back_to_outer) == (
+        "- outer\n  - inner\n    text\n  ~~~\n  # literal\n\n**real**"
+    )
+
+    # An unindented paragraph may lazily continue an open list item.
+    lazy_continuation_keeps_list_open = (
+        "- intro\nlazy continuation\n  ~~~\n  # literal\n\n# real"
+    )
+    assert commonmark_headings_to_bold(lazy_continuation_keeps_list_open) == (
+        "- intro\nlazy continuation\n  ~~~\n  # literal\n\n**real**"
+    )
+
+    # A new list marker ends lazy paragraph continuation.
+    new_marker_ends_lazy_continuation = (
+        "- intro\nordinary text\n- newitem\n  ~~~\n  # literal\n\n# real"
+    )
+    assert commonmark_headings_to_bold(new_marker_ends_lazy_continuation) == (
+        "- intro\nordinary text\n- newitem\n  ~~~\n  # literal\n\n**real**"
+    )
+
+    # A list fence closer may add only three columns of indentation.
+    # Greater indentation leaves it open until the list ends.
+    wildly_overindented_list_closer = (
+        "- intro\n  ```\n  code\n                    ```\n# real"
+    )
+    assert commonmark_headings_to_bold(wildly_overindented_list_closer) == (
+        "- intro\n  ```\n  code\n                    ```\n**real**"
+    )
+
+    # The same three-column closer limit applies outside lists.
+    wildly_overindented_top_level_closer = "```\ncode\n          ```\n# after"
+    assert commonmark_headings_to_bold(
+        wildly_overindented_top_level_closer
+    ) == ("```\ncode\n          ```\n# after")
+
+    # ``-\t`` reaches column four. Two spaces cannot continue that list, so
+    # the following unfinished fence is top-level and protects the remainder.
+    tab_expanded_marker_width = "-\tintro\n  ```\n  # literal\n\n# real"
+    assert commonmark_headings_to_bold(tab_expanded_marker_width) == (
+        tab_expanded_marker_width
+    )
+
+    # A tab reaches the same column as ``-\t``, keeping the fence in the list.
+    tab_expanded_continuation_width = "-\tintro\n\t```\n\t# literal\n\n# real"
+    assert commonmark_headings_to_bold(tab_expanded_continuation_width) == (
+        "-\tintro\n\t```\n\t# literal\n\n**real**"
+    )
+
+    # Accept quote-first continuation lines as well as Apprise's list-first
+    # output when a fenced block is nested in both containers.
+    quote_then_list_continuation = "- > ~~~\n>   # literal\n>   ~~~\n\n# real"
+    assert commonmark_headings_to_bold(quote_then_list_continuation) == (
+        "- > ~~~\n>   # literal\n>   ~~~\n\n**real**"
+    )
+
+    # A quote-first closer still needs the list's full indentation.
+    quote_then_list_insufficient_width = (
+        "- > ~~~\n>   # literal\n> ~~~\n>   ~~~\n\n# real"
+    )
+    assert commonmark_headings_to_bold(quote_then_list_insufficient_width) == (
+        "- > ~~~\n>   # literal\n> ~~~\n>   ~~~\n\n**real**"
+    )
+
+    # List indentation without the required quote marker ends the container.
+    list_width_met_but_no_quote_at_all = (
+        "- > ~~~\n   text without quote\n>   ~~~\n\n# real"
+    )
+    assert commonmark_headings_to_bold(list_width_met_but_no_quote_at_all) == (
+        "- > ~~~\n   text without quote\n>   ~~~\n\n**real**"
+    )
+
+    # A bare quote marker still satisfies its quote depth.
+    bare_quote_marker_line_in_combo = "- > ~~~\n>\n>   ~~~\n\n# real"
+    assert commonmark_headings_to_bold(bare_quote_marker_line_in_combo) == (
+        "- > ~~~\n>\n>   ~~~\n\n**real**"
+    )
+
+    # A heading ends the list, making the following unfinished fence top-level.
+    heading_ends_list_before_fence = (
+        "- intro\n# outside\n  ~~~\n  # literal\n# still code"
+    )
+    assert commonmark_headings_to_bold(heading_ends_list_before_fence) == (
+        "- intro\n**outside**\n  ~~~\n  # literal\n# still code"
+    )
+
+    # A heading inside a list marker cannot gain a lazy continuation.
+    marker_content_is_heading = (
+        "- # heading\noutside\n  ~~~\n  # literal\n# still code"
+    )
+    assert commonmark_headings_to_bold(marker_content_is_heading) == (
+        "- **heading**\noutside\n  ~~~\n  # literal\n# still code"
+    )
+
+    # Blockquotes and thematic breaks also end lazy list continuation.
+    blockquote_ends_list_before_fence = (
+        "- intro\n> outside\n  ~~~\n  # literal\n# still code"
+    )
+    assert commonmark_headings_to_bold(blockquote_ends_list_before_fence) == (
+        "- intro\n> outside\n  ~~~\n  # literal\n# still code"
+    )
+
+    thematic_break_ends_list_before_fence = (
+        "- intro\n---\n  ~~~\n  # literal\n# still code"
+    )
+    assert commonmark_headings_to_bold(
+        thematic_break_ends_list_before_fence
+    ) == ("- intro\n---\n  ~~~\n  # literal\n# still code")
+
+    # CRLF input follows the same thematic-break boundary rule.
+    thematic_break_ends_list_crlf = (
+        "- intro\r\n---\r\n  ~~~\r\n  # literal\r\n# still code"
+    )
+    assert commonmark_headings_to_bold(thematic_break_ends_list_crlf) == (
+        "- intro\r\n---\r\n  ~~~\r\n  # literal\r\n# still code"
+    )
+
+    # A tab at column zero reaches column four, creating indented code.
+    tab_at_column_zero_is_not_slack = "\t# literal"
+    assert (
+        commonmark_headings_to_bold(tab_at_column_zero_is_not_slack)
+        == tab_at_column_zero_is_not_slack
+    )
+
+    tab_at_column_zero_fence_is_not_slack = "\t~~~\ncode\n\t~~~\n# real"
+    assert commonmark_headings_to_bold(
+        tab_at_column_zero_fence_is_not_slack
+    ) == ("\t~~~\ncode\n\t~~~\n**real**")
+
+    # A tab after a quote can remain within the three-column allowance.
+    tab_after_quote_is_slack = ">\t# literal"
+    assert commonmark_headings_to_bold(tab_after_quote_is_slack) == (
+        ">\t**literal**"
+    )
+
+    # Tabs between nested quote markers use one column of marker padding.
+    tab_separated_nested_quote_fence = (
+        ">\t>\t~~~\n>\t>\t# literal\n>\t>\t~~~\n>\t>\t# real"
+    )
+    assert commonmark_headings_to_bold(tab_separated_nested_quote_fence) == (
+        ">\t>\t~~~\n>\t>\t# literal\n>\t>\t~~~\n>\t>\t**real**"
+    )
+
+    # Nested quote markers also work without separating spaces.
+    unspaced_nested_quote_fence = ">>~~~\n>>literal\n>>~~~\n>># real"
+    assert commonmark_headings_to_bold(unspaced_nested_quote_fence) == (
+        ">>~~~\n>>literal\n>>~~~\n>>**real**"
+    )
+
+    # Tab-separated quote/list content uses indentation on continuation lines.
+    tab_separated_quote_list_fence = (
+        ">\t-\tintro\n>\t  ~~~\n>\t  # literal\n>\t  ~~~\n>\t# real"
+    )
+    assert commonmark_headings_to_bold(tab_separated_quote_list_fence) == (
+        ">\t-\tintro\n>\t  ~~~\n>\t  # literal\n>\t  ~~~\n>\t**real**"
+    )
+
+    # HTML blocks end lazy list paragraphs, making the next fence top-level.
+    html_block_ends_list_before_fence = (
+        "- intro\n<div>\nhtml\n</div>\n\n  ~~~\n  # literal\n# still code"
+    )
+    assert commonmark_headings_to_bold(html_block_ends_list_before_fence) == (
+        "- intro\n<div>\nhtml\n</div>\n\n  ~~~\n  # literal\n# still code"
+    )
+
+    html_comment_ends_list_before_fence = (
+        "- intro\n<!-- comment -->\n  ~~~\n  # literal\n# still code"
+    )
+    assert commonmark_headings_to_bold(
+        html_comment_ends_list_before_fence
+    ) == ("- intro\n<!-- comment -->\n  ~~~\n  # literal\n# still code")
+
+    # A backtick in a backtick fence's info string makes the opener invalid.
+    invalid_backtick_info_string_not_a_fence = (
+        "- intro\n  ```bad`info\nlazy\n  ~~~\n  # literal\n# real"
+    )
+    assert commonmark_headings_to_bold(
+        invalid_backtick_info_string_not_a_fence
+    ) == ("- intro\n  ```bad`info\nlazy\n  ~~~\n  # literal\n**real**")
+
+    # Four extra columns inside a two-column list create indented code.
+    six_space_indent_not_a_fence = (
+        "- intro\n      ```\nlazy\n  ~~~\n  # literal\n# real"
+    )
+    assert commonmark_headings_to_bold(six_space_indent_not_a_fence) == (
+        "- intro\n      ```\nlazy\n  ~~~\n  # literal\n**real**"
+    )
+
+    # A blank line ends a blockquote fence but may remain in a plain list.
+    blank_line_ends_blockquote_fence = "> ~~~\n> code\n\n> # real"
+    assert commonmark_headings_to_bold(blank_line_ends_blockquote_fence) == (
+        "> ~~~\n> code\n\n> **real**"
+    )
+
+    # A fence may use up to three extra columns inside an active list.
+    fence_with_extra_slack_stays_in_list = (
+        "1. item\n    ~~~\n   # literal\n   ~~~\n# real"
+    )
+    assert commonmark_headings_to_bold(
+        fence_with_extra_slack_stays_in_list
+    ) == ("1. item\n    ~~~\n   # literal\n   ~~~\n**real**")
+
+    # Active-list indentation can identify a heading without another marker.
+    assert commonmark_headings_to_bold("- item\n    # nested") == (
+        "- item\n    **nested**"
+    )
+    assert commonmark_headings_to_bold("- item\n\t# nested") == (
+        "- item\n\t**nested**"
+    )
+
+    # Content inside an HTML block passes through unchanged.
+    heading_inside_html_block_untouched = "<div>\n# literal\n</div>"
+    assert (
+        commonmark_headings_to_bold(heading_inside_html_block_untouched)
+        == heading_inside_html_block_untouched
+    )
+
+    # Fence-looking text inside HTML must not consume the following document.
+    fence_look_alike_inside_html_block = "<div>\n~~~\n</div>\n\n# real"
+    assert (
+        commonmark_headings_to_bold(fence_look_alike_inside_html_block)
+        == "<div>\n~~~\n</div>\n\n**real**"
+    )
+
+    # A lowercase CDATA look-alike is ordinary text.
+    lowercase_cdata_is_not_html_block = (
+        "- intro\n<![cdata[\n\n  ~~~\n  # literal\n# real"
+    )
+    assert commonmark_headings_to_bold(lowercase_cdata_is_not_html_block) == (
+        "- intro\n<![cdata[\n\n  ~~~\n  # literal\n**real**"
+    )
+
+    # A heading nested nine levels deep still converts -- the scanner
+    # imposes no depth limit.
+    heading_past_old_depth_cap = "> " * 9 + "# real"
+    assert commonmark_headings_to_bold(heading_past_old_depth_cap) == (
+        "> " * 9 + "**real**"
+    )
+
+    # An HTML block is recognized even after an active blockquote prefix,
+    # not just at the very start of a line.
+    html_block_inside_blockquote = "> <div>\n> # literal\n> </div>"
+    assert (
+        commonmark_headings_to_bold(html_block_inside_blockquote)
+        == html_block_inside_blockquote
+    )
+
+    # A tag-looking line inside a real fence is literal fenced content,
+    # not an HTML block start -- it must not swallow what follows the
+    # fence's own close.
+    html_look_alike_inside_fence = "~~~\n<script>\n~~~\n# real"
+    assert commonmark_headings_to_bold(html_look_alike_inside_fence) == (
+        "~~~\n<script>\n~~~\n**real**"
+    )
+
+    # A raw tag's closing form must be complete; a partial closer such as
+    # "</script nope" does not end the block.
+    raw_tag_requires_exact_close = (
+        "<script>\ncontent\n</script nope\nreal end\n</script>\nafter\n"
+        "\n# real"
+    )
+    assert commonmark_headings_to_bold(raw_tag_requires_exact_close) == (
+        "<script>\ncontent\n</script nope\nreal end\n</script>\nafter\n"
+        "\n**real**"
+    )
+
+    # A heading between two same-length backtick runs must not look like
+    # a code span spanning across it -- block structure is resolved
+    # before inline code-span pairing.
+    backtick_run_does_not_cross_heading = "before ``\n# real\nafter ``"
+    assert commonmark_headings_to_bold(
+        backtick_run_does_not_cross_heading
+    ) == ("before ``\n**real**\nafter ``")
+
+    # Type 7: a complete tag for any other name, alone on its own line,
+    # starts an HTML block too -- but only when not interrupting an
+    # already-open paragraph.
+    custom_tag_at_document_start_protects_content = (
+        "<custom>\n# literal\n</custom>"
+    )
+    assert (
+        commonmark_headings_to_bold(
+            custom_tag_at_document_start_protects_content
+        )
+        == custom_tag_at_document_start_protects_content
+    )
+    custom_tag_cannot_interrupt_paragraph = "some text\n<custom>\n# real"
+    assert commonmark_headings_to_bold(
+        custom_tag_cannot_interrupt_paragraph
+    ) == ("some text\n<custom>\n**real**")
+
+    # A space before the self-closing slash makes this an invalid tag.
+    malformed_self_close_not_a_tag = "<custom / >\n# real"
+    assert commonmark_headings_to_bold(malformed_self_close_not_a_tag) == (
+        "<custom / >\n**real**"
+    )
+
+    # A ">" inside a quoted attribute does not end the tag early.
+    quoted_attribute_value_with_gt = '<custom title=">">\n# literal'
+    assert (
+        commonmark_headings_to_bold(quoted_attribute_value_with_gt)
+        == quoted_attribute_value_with_gt
+    )
+
+    # Any raw-tag closer ends a type-1 block, even if its name differs.
+    raw_tag_close_need_not_match_open = "<script>\nx\n</style>\n# real"
+    assert commonmark_headings_to_bold(raw_tag_close_need_not_match_open) == (
+        "<script>\nx\n</style>\n**real**"
+    )
+
+    # An empty list item opens no paragraph, so type-7 HTML may follow.
+    empty_list_item_allows_type7 = "-\n<custom>\n# literal"
+    assert (
+        commonmark_headings_to_bold(empty_list_item_allows_type7)
+        == empty_list_item_allows_type7
+    )
+    empty_quote_item_allows_type7 = ">\n<custom>\n# literal"
+    assert (
+        commonmark_headings_to_bold(empty_quote_item_allows_type7)
+        == empty_quote_item_allows_type7
+    )
+
+    # Extra marker padding makes this indented code, not a heading.
+    excess_list_marker_padding_is_indented_code = "-     # literal"
+    assert commonmark_headings_to_bold(
+        excess_list_marker_padding_is_indented_code
+    ) == ("-     # literal")
+
+    # Nested HTML ends with its blockquote, so the later heading converts.
+    html_block_ends_with_its_blockquote = "> <div>\n# real"
+    assert commonmark_headings_to_bold(
+        html_block_ends_with_its_blockquote
+    ) == ("> <div>\n**real**")
+
+    # A quote marker by itself is blank and ends the nested HTML block.
+    quote_marker_only_line_ends_html_block = "> <div>\n>\n> # real"
+    assert commonmark_headings_to_bold(
+        quote_marker_only_line_ends_html_block
+    ) == ("> <div>\n>\n> **real**")
+
+    # A blank line ends type-6/7 HTML even inside a list.
+    blank_line_ends_html_block_inside_list = "- <div>\n\n  # real"
+    assert commonmark_headings_to_bold(
+        blank_line_ends_html_block_inside_list
+    ) == ("- <div>\n\n  **real**")
+
+    # Excess tab padding belongs to the item's indented code content.
+    tab_padding_after_marker_is_indented_code = "-\t\t\t# literal"
+    assert commonmark_headings_to_bold(
+        tab_padding_after_marker_is_indented_code
+    ) == ("-\t\t\t# literal")
+
+    # A setext underline closes the paragraph before the type-7 tag.
+    setext_underline_ends_paragraph = "text\n===\n<custom>\n# literal"
+    assert (
+        commonmark_headings_to_bold(setext_underline_ends_paragraph)
+        == setext_underline_ends_paragraph
+    )
+
+    # Indented text lazily continues the paragraph, blocking type-7 HTML.
+    indented_text_continues_paragraph_lazily = (
+        "text\n    continuation\n<custom>\n# real"
+    )
+    assert commonmark_headings_to_bold(
+        indented_text_continues_paragraph_lazily
+    ) == ("text\n    continuation\n<custom>\n**real**")
+
+    # An empty list marker cannot interrupt the open paragraph.
+    empty_marker_cannot_interrupt_paragraph = "text\n+\n<custom>\n# literal"
+    assert commonmark_headings_to_bold(
+        empty_marker_cannot_interrupt_paragraph
+    ) == ("text\n+\n<custom>\n**literal**")
+
+    # A non-empty list marker interrupts the open paragraph.
+    nonempty_marker_interrupts_paragraph = "text\n+ item\n<custom>\n# literal"
+    assert (
+        commonmark_headings_to_bold(nonempty_marker_interrupts_paragraph)
+        == nonempty_marker_interrupts_paragraph
+    )
+
+
+def test_conversion_headings_type7_regex_performance():
+    """Keep malformed type-7 tags with long whitespace runs near linear."""
+    times = []
+    for spaces in (1600, 6400):
+        body = "<x " + (" " * spaces) + "<\n# real"
+        start = default_timer()
+        commonmark_headings_to_bold(body)
+        times.append(default_timer() - start)
+
+    # A 4x input must stay well below the roughly 16x cost of quadratic work.
+    assert times[1] < times[0] * 8 + 0.2
+
+
+def test_conversion_headings_nested_quotes_performance():
+    """Keep deeply nested blockquotes fast without limiting their depth."""
+    start = default_timer()
+    commonmark_headings_to_bold("> " * 5000 + "x")
+    elapsed = default_timer() - start
+
+    assert elapsed < 0.5
+
+
+def test_conversion_headings_deep_lines_performance():
+    """Keep repeated deeply nested lines fast as message size grows."""
+    body = ("> " * 8 + "x\n") * 1000
+
+    start = default_timer()
+    commonmark_headings_to_bold(body)
+    elapsed = default_timer() - start
+
+    assert elapsed < 1.0
+
+
+def test_conversion_html_block_spans():
+    """_commonmark_html_block_spans: per-type closing rules."""
+
+    # Type 6 (a named block tag) closes at the next blank line.
+    text = "<div>\ncontent\n</div>\n\nafter"
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, len("<div>\ncontent\n</div>\n"))
+    ]
+
+    # Without a blank line, the block runs to the end of the text.
+    text = "<div>\ncontent\n</div>"
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, len(text))
+    ]
+
+    # A raw tag closes at a complete raw-tag end, even across what would
+    # otherwise be a blank-line boundary.
+    text = "<script>\nvar x = 1;\n\nmore\n</script>\nafter"
+    close = text.index("</script>") + len("</script>")
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 1)
+    ]
+
+    # A comment closes at its own terminator, wherever it appears.
+    text = "<!-- start\nstill a comment -->\nafter"
+    close = text.index("-->") + len("-->")
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 1)
+    ]
+
+    # An unterminated comment runs to the end of the text.
+    text = "<!-- never closes\nmore text"
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, len(text))
+    ]
+
+    # A processing instruction closes at "?>".
+    text = "<?php\necho 1;\n?>\nafter"
+    close = text.index("?>") + len("?>")
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 1)
+    ]
+
+    # A declaration closes at the next literal ">", extended through the
+    # end of the line containing it.
+    text = "<!DOCTYPE html>\nafter"
+    close = text.index(">", text.index("<!DOCTYPE"))
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 2)
+    ]
+
+    # A CDATA section closes at "]]>".
+    text = "<![CDATA[\ndata\n]]>\nafter"
+    close = text.index("]]>") + len("]]>")
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 1)
+    ]
+
+    # Lowercase "cdata" is not a valid opener at all -- case-sensitive.
+    text = "<![cdata[\nnot a block\n\nafter"
+    assert commonmark_module._commonmark_html_block_spans(text) == []
+
+    # Plain text with no HTML block start yields no spans.
+    assert commonmark_module._commonmark_html_block_spans("just text") == []
+
+    # A non-raw closing tag does not end a raw HTML block.
+    text = "<script>\nvar x = 1;\n</div>\nmore\n</script>\nafter"
+    close = text.rindex("</script>") + len("</script>")
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 1)
+    ]
+
+    # A partial string like "</script nope" must not count as "</script>".
+    text = "<script>\ncontent\n</script nope\nreal end\n</script>\nafter"
+    close = text.rindex("</script>") + len("</script>")
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, close + 1)
+    ]
+
+    # Type 7: a complete tag for any other name, alone on its own line,
+    # starts an HTML block too, when not interrupting an open paragraph.
+    text = "<custom>\ncontent\n</custom>\n\nafter"
+    assert commonmark_module._commonmark_html_block_spans(text) == [
+        (0, len("<custom>\ncontent\n</custom>\n"))
+    ]
+
+    # Type 7 cannot interrupt an already-open paragraph.
+    text = "some text\n<custom>\nmore text"
+    assert commonmark_module._commonmark_html_block_spans(text) == []
+
+
+def test_conversion_leaf_block_spans_mutual_exclusion():
+    """Keep fence-like HTML and HTML-like fenced text inside their opener."""
+    # A fence-looking line inside a real (type 6) HTML block is not a
+    # fence -- the HTML block's own span covers it.
+    text = "<div>\n~~~\n</div>\n\nafter"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("<div>\n~~~\n</div>\n"), "html")]
+
+    # An HTML-looking line inside a real fence is not an HTML block --
+    # the fence's own span covers it, and closes normally.
+    text = "~~~\n<script>\n~~~\nafter"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("~~~\n<script>\n~~~\n"), "fence")]
+
+
+def test_conversion_text_width_expands_tabs():
+    """_text_width: a tab expands to the next four-column stop."""
+    assert commonmark_module._text_width("\t") == 4
+    assert commonmark_module._text_width("\t", 1) == 3
+    assert commonmark_module._text_width("a\tb") == 5
+
+
+def test_conversion_html_block_end_bounded_by_quote_container():
+    """Stop fixed and blank-line HTML blocks when their blockquote ends."""
+    # Type 2 (comment): the terminator search must not run past the
+    # blockquote's own end into unquoted text below it.
+    text = "> <!-- start\n\n# real"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("> <!-- start\n"), "html")]
+
+    # Type 6 (a named block tag): same boundary, via the blank-line rule.
+    text = "> <div>\n\n# real"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("> <div>\n"), "html")]
+
+    # A properly quoted continuation line still satisfies the container,
+    # so the terminator search continues through it and finds a closer
+    # on a later line, rather than stopping early.
+    text = "> <!-- comment\n> still comment -->\nafter"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("> <!-- comment\n> still comment -->\n"), "html")]
+
+    # When the quote holds all the way through and no terminator ever
+    # appears, the block runs to the end of the text.
+    text = "> <!-- never closes\n> more text"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len(text), "html")]
+
+
+def test_conversion_html_block_end_blank_line_rule_differs_by_type():
+    """Keep fixed-terminator HTML open; end types 6/7 at a blank line.
+
+    Lists may span blank lines, but that does not extend type-6/7 HTML.
+    """
+    text = "- <!-- start\n\nafter"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("- <!-- start\n\n"), "html")]
+
+    text = "- <div>\n\nafter"
+    spans = commonmark_module._commonmark_leaf_block_spans(text)
+    assert spans == [(0, len("- <div>\n"), "html")]
+
+
+def test_conversion_fenced_code_spans_stay_within_text_bounds():
+    """A fence with no trailing newline must not report an out-of-range end."""
+
+    text = "```\nx\n```"
+    spans = commonmark_module._commonmark_fenced_code_spans(text)
+    assert spans == [(0, len(text))]
+    for start, end in spans:
+        assert 0 <= start <= len(text)
+        assert 0 <= end <= len(text)
+
+
+def test_conversion_code_spans_do_not_cross_block_boundaries():
+    """Backtick pairing must not cross a block boundary between the runs.
+
+    CommonMark resolves block structure before parsing inlines, so a
+    heading (or any other block) sitting between two same-length
+    backtick runs must not make them look like one matched code span.
+    """
+    # A heading between two double-backtick runs ends the paragraph, so
+    # neither run may pair with the other.
+    text = "before ``\n# heading\nafter ``"
+    assert commonmark_module._commonmark_code_spans(text) == []
+
+    # A blank line has the same effect.
+    text = "before ``\n\nafter ``"
+    assert commonmark_module._commonmark_code_spans(text) == []
+
+    # Without a boundary in between, pairing within one paragraph's
+    # continuous lines still works as before.
+    text = "before ``\nstill one paragraph`` after"
+    assert commonmark_module._commonmark_code_spans(text) == [
+        (7, len(text) - len(" after"))
+    ]
+
+
+def test_conversion_headings_to_bold_repeated_fences_linear_time():
+    """Keep repeated, lightly indented fence checks near linear time.
+
+    Every line remains a possible list continuation, exercising the full
+    ambiguous-fence path instead of ending a lookup early.
+    """
+
+    small = " ~~~\n text\n ~~~\n" * 2000
+    large = " ~~~\n text\n ~~~\n" * 4000
+
+    # Create and reuse one scanner for the entire conversion.
+    with mock.patch(
+        "apprise.conversion.commonmark._ContainerScanner",
+        wraps=commonmark_module._ContainerScanner,
+    ) as spy:
+        commonmark_headings_to_bold(large)
+    assert spy.call_count == 1
+
+    start = default_timer()
+    commonmark_headings_to_bold(small)
+    small_time = default_timer() - start
+
+    start = default_timer()
+    commonmark_headings_to_bold(large)
+    large_time = default_timer() - start
+
+    # Allow timing noise while rejecting clear quadratic growth.
+    assert large_time < small_time * 2.5 + 0.5
+
+
+def test_conversion_headings_to_bold_repeated_fences_bounded_memory():
+    """Avoid storing one list-width entry for every preceding line."""
+    tracemalloc = pytest.importorskip("tracemalloc")
+
+    baseline = "\n" * 800_000 + "# heading\n"
+    ambiguous = "\n" * 800_000 + " ~~~\n"
+
+    tracemalloc.start()
+    commonmark_headings_to_bold(baseline)
+    _, baseline_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    tracemalloc.start()
+    commonmark_headings_to_bold(ambiguous)
+    _, ambiguous_peak = tracemalloc.get_traced_memory()
+    tracemalloc.stop()
+
+    # Allow allocator overhead while rejecting a document-sized index.
+    assert ambiguous_peak < baseline_peak * 5 + 1024 * 1024
+
+
+def test_conversion_decode_backslash_escapes():
+    """Only decode backslashes used for CommonMark punctuation escapes."""
+
+    # A backslash before ASCII punctuation is a real CommonMark escape.
+    assert commonmark_decode_backslash_escapes(r"a\*b") == "a*b"
+    assert commonmark_decode_backslash_escapes(r"a\_b") == "a_b"
+    assert commonmark_decode_backslash_escapes(r"a\\b") == "a\\b"
+
+    # Preserve backslashes before letters so paths and URLs are not corrupted.
+    assert commonmark_decode_backslash_escapes(r"a\qb") == r"a\qb"
+    assert commonmark_decode_backslash_escapes(r"C:\Users") == r"C:\Users"
+
+    # A trailing, unescaped backslash has nothing to escape and is kept.
+    assert commonmark_decode_backslash_escapes("a\\") == "a\\"
 
 
 def test_conversion_html_to_markdown_blockquotes():
@@ -2323,6 +3303,17 @@ def test_conversion_commonmark_scan_paren_dest():
     assert commonmark_scan_paren_dest(body, 1, len(body)) is None
 
 
+def test_conversion_lookahead_with_unfinished_angle_url():
+    """An unterminated ``](<url`` in the lookahead stops the scan early.
+
+    This covers the angle-bracket branch alongside the existing bare URL case.
+    """
+    widths = commonmark_module.commonmark_lookahead_closer_widths(
+        "](<https://example.com"
+    )
+    assert widths == {}
+
+
 def test_conversion_commonmark_repair_chunk_autolinks():
     """Standalone autolinks keep markup-like URL characters as text."""
 
@@ -2538,6 +3529,64 @@ def test_conversion_commonmark_materialize_repair():
         closer_index=closer_index,
         closer_covered_end=closer_covered_end,
     ) == _direct(body, 0, cut, {}, lookahead_span=closer_lookahead_span)
+
+
+def test_conversion_commonmark_repair_chunk_record_atoms_link_labels():
+    """record_atoms must cover a resolved "[" with no gap, in every way
+    a link label can be resolved within one chunk."""
+
+    def _assert_gapless(text, pending=None):
+        # Every recorded atom's start must equal the previous atom's end,
+        # beginning at 0 and reaching the end of the input text, so a
+        # caller replaying these atoms never has to guess at a skipped
+        # span (the exact invariant commonmark_materialize_repair() relies
+        # on for cutting a shorter prefix from reusable sections).
+        atoms = []
+        commonmark_repair_chunk(text, dict(pending or {}), record_atoms=atoms)
+        assert atoms, "expected at least one recorded atom"
+        assert atoms[0][0] == 0
+        for prev_atom, next_atom in zip(atoms, atoms[1:]):
+            assert prev_atom[1] == next_atom[0], (prev_atom, next_atom)
+        assert atoms[-1][1] == len(text)
+        return atoms
+
+    # A link label that resolves successfully within the same chunk, via
+    # both the angle-bracket and bare-paren destination forms.
+    _assert_gapless("prefix [label](<https://example.com>) suffix")
+    _assert_gapless("prefix [label](https://example.com) suffix")
+
+    # A label whose destination fails to parse (falls back to escaped
+    # literal text) still leaves the "[" itself covered.
+    _assert_gapless("prefix [label](has space) suffix")
+
+    # A label that never reaches "](" at all in this chunk -- resolved
+    # only by the end-of-scan force-escape cleanup.
+    _assert_gapless("prefix [never closes")
+
+    # Multiple pending labels, only some of which ever see a "](" attempt,
+    # so both the mid-scan and end-of-scan resolution paths fire together.
+    _assert_gapless("[outer [inner](<bad text](https://example.com)")
+
+    # A label carried in from a previous chunk plus a fresh one that
+    # resolves normally.
+    _assert_gapless(
+        "dest>) more [fresh](https://example.com)",
+        pending={"in_link_dest": True},
+    )
+
+    # The atoms replay to the same text commonmark_repair_chunk() produces
+    # directly, for a body whose sole link resolves within the chunk (so
+    # the recorded region spans the whole body, matching what a caller
+    # bypassing commonmark_scan_repair_region()'s conservative
+    # before-the-first-"[" truncation would now be able to reuse).
+    body = "[label](https://example.com) tail"
+    atoms = []
+    direct_result, _ = commonmark_repair_chunk(body, {}, record_atoms=atoms)
+    sentinel = commonmark_pick_emphasis_sentinel(body)
+    materialized_result, _ = commonmark_materialize_repair(
+        body, 0, len(body), {}, atoms, len(body), sentinel, 64
+    )
+    assert materialized_result == direct_result
 
 
 def test_conversion_split_dialect_chunk():

@@ -790,18 +790,10 @@ def test_notify_multi_instance_decoration(tmpdir):
 
 
 def test_notify_yaml_priority_over_qsd():
-    """
-    decorators: YAML tokens take priority over qsd for @notify plugins.
+    """Keep YAML values ahead of query strings for decorator plugins.
 
-    YAML > qsd > URL path must hold for ALL plugin types, including
-    @notify decorator plugins.  Previously, @notify plugins kept qsd
-    intact for the second post_process_parse_url_results() call, which
-    allowed qsd to silently overwrite YAML-token values.  The fix
-    re-applies YAML tokens after post_process to restore priority.
-
-    Also verifies qsd is still preserved in the meta dict (for raw
-    inspection) and that qsd still wins over URL-path when no YAML
-    token is present for a field.
+    The raw query dictionary remains available in metadata, and query values
+    still take priority over URL-path values when YAML omits the field.
     """
     from apprise.config import ConfigBase
 

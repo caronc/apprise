@@ -69,6 +69,17 @@ class RequirementsSpec(TypedDict, total=False):
     details: Optional[Translatable]
 
 
+class _PayloadPrecappedToken:
+    """Prove that ``Apprise.notify()`` capped the source before conversion.
+
+    Only this token skips a second cap; truthy values from direct plugin
+    callers do not bypass ``payload_max_size``.
+    """
+
+
+_PAYLOAD_PRECAPPED = _PayloadPrecappedToken()
+
+
 class NotifyBase(URLBase):
     """This is the base class for all notification services."""
 
@@ -832,8 +843,6 @@ class NotifyBase(URLBase):
             return False
 
         else:
-            loop = asyncio.get_running_loop()
-
             # Deferred import to dodge a circular import (apprise.apprise
             # loads this module first). Fine by call time.
             from ..apprise import _get_shared_executor
@@ -849,7 +858,27 @@ class NotifyBase(URLBase):
                 # Carries our log-capture ContextVar into the worker
                 # thread -- run_in_executor() doesn't do this on its own.
                 ctx = contextvars.copy_context()
-                result = await loop.run_in_executor(executor, ctx.run, send)
+                # Submit directly so cancellation still leaves access to the
+                # worker future. A running send cannot be interrupted, so its
+                # future is needed until the background work finishes.
+                cf_future = executor.submit(ctx.run, send)
+                try:
+                    result = await asyncio.wrap_future(cf_future)
+
+                except asyncio.CancelledError:
+                    if cf_future.running():
+                        # Import here to avoid a circular import. The shared
+                        # helper also protects this cancellation path from
+                        # plugin metadata errors.
+                        from ..apprise import (
+                            _service_metadata,
+                            _track_abandoned_future,
+                        )
+
+                        name, url, _, _, _ = _service_metadata(self)
+                        _track_abandoned_future(cf_future, name, url)
+                    raise
+
                 return result
 
             # Await this plugin's pieces in order so split text and attachments
@@ -869,9 +898,24 @@ class NotifyBase(URLBase):
         attach: Optional[Union[list[str], AppriseAttachment]] = None,
         body_format: Optional[NotifyFormat] = None,
         body_passthrough: Optional[bool] = None,
+        _payload_precapped: object = None,
         **kwargs: Any,
     ) -> Generator[dict[str, Any], None, None]:
-        """Yield prepared ``send()`` arguments with their index and total."""
+        """Prepare the arguments for each ``send()`` call.
+
+        Parameters:
+          - ``body`` and ``title`` provide the message content.
+          - ``notify_type`` identifies the message severity.
+          - ``overflow`` controls upstream, truncation, or splitting.
+          - ``attach`` supplies one or more attachments.
+          - ``body_format`` identifies the source or resolved format.
+          - ``body_passthrough`` preserves content with no declared format.
+          - ``_payload_precapped`` confirms Apprise already applied its cap.
+          - Extra keyword arguments are accepted for caller compatibility.
+
+        Yields one mapping per final ``send()`` call, including its zero-based
+        ``index`` and the total number of calls.
+        """
 
         # Direct plugin calls bypass Apprise's per-server resolution, so
         # resolve here and remember whether a source format was declared.
@@ -943,6 +987,7 @@ class NotifyBase(URLBase):
                 overflow=overflow,
                 body_format=body_format,
                 body_passthrough=body_passthrough,
+                _payload_precapped=_payload_precapped,
             )
         ]
         total = sum(len(pieces) for pieces in all_pieces)
@@ -986,6 +1031,7 @@ class NotifyBase(URLBase):
         overflow: Optional[Union[str, OverflowMode]] = None,
         body_format: Optional[NotifyFormat] = None,
         body_passthrough: Optional[bool] = None,
+        _payload_precapped: object = None,
     ) -> list[dict[str, str]]:
         """Apply upstream, truncation, or split overflow rules.
 
@@ -1010,6 +1056,19 @@ class NotifyBase(URLBase):
         # Tidy
         title = "" if not title else title.strip()
         body = "" if not body else body.rstrip()
+
+        # Direct plugin calls still need the source-size cap. Only Apprise's
+        # private token confirms it was already applied before conversion.
+        if _payload_precapped is not _PAYLOAD_PRECAPPED:
+            original_len = len(title) + len(body)
+            title, body = self.asset.enforce_payload_max_size(title, body)
+            if len(title) + len(body) < original_len:
+                self.logger.warning(
+                    "%s payload trimmed to stay within the configured "
+                    "payload_max_size of %d characters.",
+                    self.service_name,
+                    self.asset._payload_max_size,
+                )
 
         # Default overflow mode
         if overflow is None:
@@ -1202,6 +1261,9 @@ class NotifyBase(URLBase):
                     {
                         "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
                         "title": f"{title}{suffix}",
+                        # Preserve this repeated title if dialect conversion
+                        # splits the chunk again.
+                        "repeat_title": True,
                     }
                 )
 
@@ -1287,7 +1349,8 @@ class NotifyBase(URLBase):
         """Re-split or re-truncate one chunk after ``dialect_convert()``.
 
         Passthrough bodies and plugins without an override remain unchanged.
-        The first returned piece keeps the original title.
+        The first piece keeps its title. Later pieces keep it only when the
+        source chunk requested a repeated title.
         """
         has_dialect = (
             type(self).dialect_convert is not NotifyBase.dialect_convert
@@ -1313,8 +1376,13 @@ class NotifyBase(URLBase):
             # itself handle an oversized payload.
             bodies = [convert_fn(chunk["body"])]
 
+        # Repeated titles follow every new piece; one-time titles stay first.
+        repeat_title = chunk.get("repeat_title", False)
         return [
-            {"body": body, "title": chunk["title"] if idx == 0 else ""}
+            {
+                "body": body,
+                "title": chunk["title"] if (idx == 0 or repeat_title) else "",
+            }
             for idx, body in enumerate(bodies)
         ]
 
@@ -1555,18 +1623,7 @@ class NotifyBase(URLBase):
         return self.__store
 
     def flush_store(self) -> None:
-        """Write this service's persistent store to disk if it was used.
-
-        A no-op if self.store was never accessed this run. In
-        PersistentStoreMode.AUTO (the default), writes made via
-        self.store.set()/clear() are only kept in memory until flushed;
-        normally that happens naturally when this object is garbage
-        collected (PersistentStore.__del__ calls flush()). A caller
-        that is about to end the process by some means other than
-        normal interpreter shutdown -- which runs pending finalizers,
-        including that one -- needs to call this explicitly first, or
-        those in-memory changes are simply never written.
-        """
+        """Write this service's persistent store to disk if it was used."""
         if self.__store is not None:
             self.__store.flush()
 
