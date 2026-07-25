@@ -184,6 +184,13 @@ class NotifyWorkflows(NotifyBase):
                 "map_to": "power_automate",
             },
             "powerautomate": {"alias_of": "pa"},
+            "route": {
+                "name": _("Power Automate Routing ID"),
+                "type": "string",
+                "regex": (r"^[0-9]+$", ""),
+                "map_to": "routing_id",
+            },
+            "routeid": {"alias_of": "route"},
             "wrap": {
                 "name": _("Wrap Text"),
                 "type": "bool",
@@ -263,7 +270,9 @@ class NotifyWorkflows(NotifyBase):
         )
 
         # Microsoft may provide a routing ID in native Power Automate URLs
-        self.routing_id = routing_id
+        self.routing_id = (
+            None if routing_id is None else str(routing_id).strip()
+        ) or None
 
         # Wrap Text
         self.wrap = bool(
@@ -630,6 +639,7 @@ class NotifyWorkflows(NotifyBase):
             self.port,
             self.workflow,
             self.signature,
+            self.routing_id,
         )
 
     def url(self, privacy=False, *args, **kwargs):
@@ -641,6 +651,9 @@ class NotifyWorkflows(NotifyBase):
             "wrap": "yes" if self.wrap else "no",
             "pa": "yes" if self.power_automate else "no",
         }
+
+        if self.routing_id:
+            params["route"] = self.routing_id
 
         if self.template:
             params["template"] = NotifyWorkflows.quote(
@@ -703,6 +716,17 @@ class NotifyWorkflows(NotifyBase):
                 ),
             )
         )
+
+        # Power Automate CU routing ID
+        if "route" in results["qsd"] and results["qsd"]["route"]:
+            results["routing_id"] = NotifyWorkflows.unquote(
+                results["qsd"]["route"]
+            )
+
+        elif "routeid" in results["qsd"] and results["qsd"]["routeid"]:
+            results["routing_id"] = NotifyWorkflows.unquote(
+                results["qsd"]["routeid"]
+            )
 
         # Wrap Text?
         results["wrap"] = parse_bool(
@@ -812,6 +836,7 @@ class NotifyWorkflows(NotifyBase):
                     pa=power_automate,
                 )
             )
-            results["routing_id"] = result.group("routing_id")
+            if result.group("routing_id"):
+                results["routing_id"] = result.group("routing_id")
             return results
         return None
