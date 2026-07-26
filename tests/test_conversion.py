@@ -1915,6 +1915,17 @@ def test_conversion_text_width_expands_tabs():
     assert commonmark_module._text_width("a\tb") == 5
 
 
+def test_conversion_chars_for_width_boundaries():
+    """_chars_for_width: handle tabs and stop before ordinary text."""
+    assert commonmark_module._chars_for_width("\ttext", 4) == 1
+    assert commonmark_module._chars_for_width(" text", 2) == 1
+
+
+def test_conversion_missing_boundary_is_not_punctuation():
+    """_cm_is_punctuation: a missing boundary is not punctuation."""
+    assert commonmark_module._cm_is_punctuation(None) is False
+
+
 def test_conversion_html_block_end_bounded_by_quote_container():
     """Stop fixed and blank-line HTML blocks when their blockquote ends."""
     # Type 2 (comment): the terminator search must not run past the
@@ -3754,6 +3765,18 @@ def test_conversion_split_dialect_chunk():
 
     # Doubling the body should not approach four times the runtime.
     assert large_time < small_time * 3.5 + 1.0
+
+
+def test_conversion_split_keeps_only_first_empty_piece():
+    """conversion: retain one empty piece but skip later empty pieces"""
+
+    with mock.patch(
+        "apprise.conversion.dialect._longest_fitting_prefix",
+        side_effect=[("", 1, {}), ("", 1, {})],
+    ):
+        pieces = split_dialect_chunk("ab", 1, lambda text: text)
+
+    assert pieces == [""]
 
 
 def test_conversion_truncate_dialect_chunk():
