@@ -49,12 +49,12 @@ git clone https://github.com/caronc/apprise.git
 cd apprise
 
 # Install all runtime + dev dependencies
-pip install .[dev]
+pip install '.[dev]'
 ```
 
 (Optional, but recommended if actively developing):
 ```bash
-pip install -e .[dev]
+pip install -e '.[dev]'
 ```
 
 ---
