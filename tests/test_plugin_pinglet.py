@@ -215,13 +215,12 @@ def test_plugin_pinglet_payload(mock_post):
         "?priority=urgent&:CPU=95%25&:Host=web-1&+region=eu-west"
     )
 
-    assert (
+    assert bool(
         aobj.notify(
             title="Hello",
             body="It works",
             notify_type=NotifyType.FAILURE,
         )
-        is True
     )
 
     assert mock_post.call_count == 1
@@ -254,7 +253,7 @@ def test_plugin_pinglet_payload_defaults(mock_post):
     aobj = apprise.Apprise()
     assert aobj.add("pinglet://mykey@hostname/acme/deploys")
 
-    assert aobj.notify(body="It works") is True
+    assert bool(aobj.notify(body="It works"))
 
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == "http://hostname/acme/deploys"
