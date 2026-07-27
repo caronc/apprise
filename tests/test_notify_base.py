@@ -416,6 +416,75 @@ def test_notify_base_dialect_convert_default_noop():
     )
 
 
+def test_notify_base_notify_type_normalization():
+    """A direct plugin notify() call normalizes a recognized string
+    notify_type into a real NotifyType, exactly like format= and overflow=
+    already do for their own values.
+    """
+
+    class RecordingNotification(NotifyBase):
+        protocol = "recording"
+
+        # Exercise the same notify_type.value path used by
+        # AppriseAsset.image_url()/image_path().
+        image_size = NotifyImageSize.XY_256
+
+        received = []
+
+        def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+            self.received.append(notify_type)
+            # Raises AttributeError if notify_type is still a bare string
+            # instead of a real NotifyType.
+            self.image_url(notify_type=notify_type)
+            return True
+
+        def url(self, **kwargs):
+            return "recording://"
+
+    instance = RecordingNotification(host="localhost")
+
+    # A raw string is normalized to the matching NotifyType member.
+    instance.received.clear()
+    assert instance.notify(body="hi", notify_type="warning") is True
+    assert instance.received == [NotifyType.WARNING]
+    assert isinstance(instance.received[0], NotifyType)
+
+    # An actual NotifyType instance passes through unchanged.
+    instance.received.clear()
+    assert instance.notify(body="hi", notify_type=NotifyType.FAILURE) is True
+    assert instance.received == [NotifyType.FAILURE]
+
+    # The same normalization applies to async_notify().
+    instance.received.clear()
+    assert (
+        asyncio.run(instance.async_notify(body="hi", notify_type="success"))
+        is True
+    )
+    assert instance.received == [NotifyType.SUCCESS]
+
+
+def test_notify_base_notify_type_unrecognized_string_passthrough():
+    """An unrecognized notify_type string is left exactly as provided,"""
+
+    class ToleratingNotification(NotifyBase):
+        protocol = "tolerating"
+
+        received = []
+
+        def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+            # No notify_type.value access here -- mirrors a plugin like
+            # Notifico that only ever compares notify_type by equality.
+            self.received.append(notify_type)
+            return True
+
+    instance = ToleratingNotification(host="localhost")
+
+    instance.received.clear()
+    assert instance.notify(body="hi", notify_type="not-a-type") is True
+    assert instance.received == ["not-a-type"]
+    assert not isinstance(instance.received[0], NotifyType)
+
+
 def test_notify_base_enable_disable():
     """NotifyBase.enable() and disable() toggle the enabled flag."""
 
