@@ -25,15 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-from bisect import bisect_left
+# HTMLParser-based converters: plain-text extraction (HTMLConverter) and
+# HTML-to-CommonMark rendering (HTMLMarkdownConverter). Both are generic --
+# no service-specific markup lives here; see conversion/commonmark.py for
+# the shared CommonMark dialect-repair engine these feed into downstream.
+
 import contextlib
 from html.parser import HTMLParser
 import re
 
-from markdown import markdown
-
-from .common import NotifyFormat
-from .url import URLBase
+from .commonmark import (
+    commonmark_find_backtick_run,
+    commonmark_index_backtick_runs,
+)
 
 # Cap list indentation so deeply nested input stays linear.
 LIST_DEPTH_MAX = 4
@@ -75,89 +79,6 @@ class _ParaBreak:
 
         # Track whether the boundary remains inside a quote
         self.in_quote = in_quote
-
-
-def convert_between(from_format, to_format, content):
-    """Converts between different suported formats. If no conversion exists, or
-    the selected one fails, the original text will be returned.
-
-    This function returns the content translated (if required)
-    """
-
-    # Map each supported format pair to its converter
-    converters = {
-        (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
-        (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
-        (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
-        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
-        (NotifyFormat.TEXT, NotifyFormat.MARKDOWN): text_to_markdown,
-    }
-
-    # Fetch the converter registered for this format pair.
-    convert = converters.get((from_format, to_format))
-
-    # Preserve the original content when no conversion is available
-    return convert(content) if convert else content
-
-
-def markdown_to_html(content):
-    """Converts specified content from markdown to HTML."""
-
-    # Enable notification-friendly line-break and table extensions.
-    return markdown(
-        content,
-        extensions=["markdown.extensions.nl2br", "markdown.extensions.tables"],
-    )
-
-
-def text_to_html(content):
-    """Converts specified content from plain text to HTML."""
-
-    # First eliminate any carriage returns
-    return URLBase.escape_html(content, convert_new_lines=True)
-
-
-# CommonMark syntax characters, including backslash itself.
-# Plain text has no escape state, so escape every occurrence.
-_COMMONMARK_ESCAPABLE_RE = re.compile(r"([\\_*\[\]()~`>#+=|{}.!-])")
-
-
-def text_to_markdown(content):
-    """Converts specified content from plain text to CommonMark.
-
-    Escapes CommonMark-significant characters, including backslashes, so
-    plain text renders literally in Markdown destinations.
-    """
-
-    return _COMMONMARK_ESCAPABLE_RE.sub(r"\\\1", content)
-
-
-def html_to_text(content):
-    """Converts a content from HTML to plain text."""
-
-    # Initialize the plain-text parser.
-    parser = HTMLConverter()
-
-    # Feed and finalize the HTML document
-    parser.feed(content)
-    parser.close()
-
-    # Return the finalized parser output.
-    return parser.converted
-
-
-def html_to_markdown(content):
-    """Convert HTML content to CommonMark."""
-
-    # Initialize the Markdown parser.
-    parser = HTMLMarkdownConverter()
-
-    # Feed and finalize the HTML document
-    parser.feed(content)
-    parser.close()
-
-    # Return the finalized parser output.
-    return parser.converted
 
 
 class HTMLConverter(HTMLParser):
@@ -231,10 +152,10 @@ class HTMLConverter(HTMLParser):
         self.converted = string.strip()
 
     def _finalize(self, result):
-        """Combines and strips consecutive strings, then converts consecutive
-        block ends into singleton newlines.
+        """Join text fragments and collapse repeated block endings.
 
-        [ {be} " Hello " {be} {be} " World!" ] -> "\nHello\nWorld!"
+        For example, ``[{be}, " Hello ", {be}, {be}, " World!"]`` becomes
+        ``"\nHello\nWorld!"``.
         """
 
         # None means the last visited item was a block end.
@@ -312,190 +233,6 @@ class HTMLConverter(HTMLParser):
         # Close block elements with a line boundary.
         if tag in self.BLOCK_TAGS:
             self._result.append(self.BLOCK_END)
-
-
-def build_backtick_run_index(text):
-    """Index unescaped backtick positions by run length in one pass."""
-
-    # Maps run-length -> [start, ...] in ascending position order.
-    index = {}
-
-    # Track the current scanner position and input length.
-    i = 0
-    n = len(text)
-
-    # Visit each character at most once.
-    while i < n:
-        ch = text[i]
-        # Consume escape pairs so a backslash-escaped backtick is not
-        # mistaken for the start or end of a code span.
-        if ch == "\\" and i + 1 < n:
-            i += 2
-            continue
-        if ch == "`":
-            # Measure the run by advancing until the first non-backtick.
-            j = i
-            while j < n and text[j] == "`":
-                j += 1
-            # Store this run's starting position under its length key.
-            # setdefault ensures the list exists before appending.
-            index.setdefault(j - i, []).append(i)
-            # Jump past the entire run to avoid double-counting.
-            i = j
-            continue
-
-        # Advance past ordinary text.
-        i += 1
-
-    # Return positions grouped by delimiter width.
-    return index
-
-
-def find_unescaped_run(index, start, run):
-    """Find the next indexed backtick run of the requested length."""
-
-    # Nothing to search if no run of this exact length was indexed.
-    positions = index.get(run)
-    if not positions:
-        return None
-    # Binary-search for the first position that is >= start.
-    pos = bisect_left(positions, start)
-    # Return the found position, or None if we went past the end of the list.
-    return positions[pos] if pos < len(positions) else None
-
-
-def commonmark_escape_link_url(url):
-    """Adapt a CommonMark URL for ``<url|label>`` dialects."""
-
-    # Step 1: strip CommonMark backslash escapes so we recover the raw URL
-    # characters before re-applying any encoding the target dialect needs.
-    out = []
-
-    # Scan the URL without allocating intermediate match objects.
-    i = 0
-    n = len(url)
-    while i < n:
-        ch = url[i]
-        if ch == "\\" and i + 1 < n:
-            # Discard the backslash and keep only the escaped character.
-            out.append(url[i + 1])
-            i += 2
-            continue
-        out.append(ch)
-        i += 1
-
-    # Reassemble the decoded CommonMark destination.
-    url = "".join(out)
-
-    # Step 2: re-encode the characters that the <url|label> delimiter syntax
-    # would mis-parse if left bare in the URL string.
-    # "&" must come first to avoid double-encoding the entities below.
-    url = url.replace("&", "&amp;").replace("<", "&lt;")
-    url = url.replace(">", "&gt;")
-    # "|" is the separator between the URL and label inside <url|label>;
-    # percent-encode it so it cannot be mistaken for the delimiter.
-    return url.replace("|", "%7C")
-
-
-def commonmark_scan_angle_dest(body, i, n):
-    """Find the closing ``>`` of a ``](<url>)`` destination.
-
-    ``i`` points at ``](<`` and ``n`` bounds the scan. Escaped ``>)`` pairs
-    are skipped; the closing index or ``None`` is returned.
-    """
-
-    # Start immediately after the opening ``](<`` sequence.
-    k = i + 3
-
-    # Scan until a complete two-character terminator can no longer fit.
-    while k < n - 1:
-        if body[k] == "\\" and k + 1 < n:
-            # Skip escape sequences -- they cannot be the terminator.
-            k += 2
-            continue
-        if body[k] == ">" and body[k + 1] == ")":
-            return k
-        k += 1
-    return None
-
-
-def commonmark_emphasis_run(body, i, n, stack, out):
-    """Map one CommonMark asterisk run to target emphasis delimiters.
-
-    ``stack`` tracks nested bold/italic spans while ``out`` receives their
-    delimiters. The returned index points immediately after the run.
-    """
-    # Measure the full asterisk run starting at i.
-    j = i
-    while j < n and body[j] == "*":
-        j += 1
-    run = j - i
-
-    # Consume the run one span at a time.  Each iteration either closes
-    # the top-of-stack span (if the remaining run width satisfies it) or
-    # opens a new span.
-    while run > 0:
-        if stack and (
-            (stack[-1][0] == "*" and run >= 2)
-            or (stack[-1][0] == "_" and run >= 1)
-        ):
-            # Close the innermost open span.
-            delim, open_index = stack.pop()
-            if open_index == len(out) - 1:
-                # Span opened but collected no content -- drop the orphan.
-                out.pop()
-            else:
-                # Emit the matching close delimiter.
-                out.append(delim)
-            # Bold ("*") consumes 2 asterisks; italic ("_") consumes 1.
-            run -= 2 if delim == "*" else 1
-
-        elif run >= 2:
-            # No closeable bold on stack; open a new bold span.
-            out.append("*")
-            stack.append(("*", len(out) - 1))
-            run -= 2
-
-        else:
-            # run == 1: open a new italic span.
-            out.append("_")
-            stack.append(("_", len(out) - 1))
-            run -= 1
-
-    # Return the position after the full asterisk run.
-    return j
-
-
-def commonmark_force_close_spans(out, stack):
-    """Close remaining LIFO emphasis spans and discard empty ones.
-
-    Both ``out`` and ``stack`` are updated in place.
-    """
-
-    # Close innermost spans first to preserve valid nesting.
-    while stack:
-        delim, open_index = stack.pop()
-        if open_index == len(out) - 1:
-            # Span opened but collected no content -- remove the orphan.
-            out.pop()
-        else:
-            # Emit the close delimiter.
-            out.append(delim)
-
-
-def commonmark_prepend_title(body, title):
-    """Prepend a clean CommonMark H1 title above the body.
-
-    Returns ``(body, "")`` so callers can clear their separate title field.
-    """
-
-    # Remove whitespace and structural prefixes before adding our heading.
-    title_text = title.lstrip("\r\n \t\v\f#-")
-
-    # Add the heading only when meaningful title text remains.
-    if title_text:
-        body = f"# {title_text}\n{body}" if body else f"# {title_text}"
-    return body, ""
 
 
 class HTMLMarkdownConverter(HTMLConverter):
@@ -889,7 +626,7 @@ class HTMLMarkdownConverter(HTMLConverter):
         n = len(text)
 
         # Index code delimiters before inspecting table separators.
-        backtick_runs = build_backtick_run_index(text)
+        backtick_runs = commonmark_index_backtick_runs(text)
 
         while i < n:
             ch = text[i]
@@ -909,7 +646,7 @@ class HTMLMarkdownConverter(HTMLConverter):
                 run = j - i
 
                 # Find the matching closing run of the same length.
-                close = find_unescaped_run(backtick_runs, j, run)
+                close = commonmark_find_backtick_run(backtick_runs, j, run)
                 if close is not None:
                     # Inside a code span, "|" is a literal character --
                     # copy the entire span verbatim without escaping.
