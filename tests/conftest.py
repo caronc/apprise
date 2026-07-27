@@ -52,17 +52,17 @@ A_MGR = AttachmentManager()
 
 @pytest.fixture(scope="function", autouse=True)
 def mimetypes_always_available():
-    """A pytest session fixture which ensures mimetypes is set correctly
-    pointing to our temporary mime.types file."""
+    """Use the test MIME database for every test."""
     files = (os.path.join(os.path.dirname(__file__), "var", "mime.types"),)
     mimetypes.init(files=files)
 
 
 @pytest.fixture(scope="function", autouse=True)
-def no_throttling_everywhere(session_mocker):
-    """A pytest session fixture which disables throttling on all notifiers.
+def no_throttling_everywhere(mocker):
+    """Disable plugin throttling for every test.
 
-    It is automatically enabled.
+    Function-scoped cleanup prevents patches from accumulating across the
+    suite and slowing final teardown.
     """
     # Ensure we're working with a clean slate for each test
     N_MGR.unload_modules()
@@ -70,29 +70,15 @@ def no_throttling_everywhere(session_mocker):
     A_MGR.unload_modules()
 
     for plugin in N_MGR.plugins():
-        session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
+        mocker.patch.object(plugin, "request_rate_per_sec", 0)
 
 
 @pytest.fixture(scope="function", autouse=True)
 def _reset_apprise_logger_state():
-    """Force the shared 'apprise' logger back to a known-good baseline
-    before every test, then restore whatever was there beforehand.
+    """Reset shared logger state around every test.
 
-    apprise/cli.py's main() sets this same shared logger's level from
-    -v/-q verbosity (and appends a StreamHandler) on every invocation
-    and never undoes it -- harmless for a real one-shot CLI process,
-    but toxic for an in-process test suite: any test that runs main()
-    via CliRunner (e.g. tests/test_apprise_cli.py) with default
-    verbosity leaves the logger at ERROR, silently swallowing any
-    .warning()/.info() calls that later, unrelated tests rely on
-    capturing. Reset to NOTSET (deferring to the root logger's default
-    WARNING) before each test so no test's ambient logger state
-    depends on what a previous test/file happened to leave behind.
-
-    main() also mirrors this same mutation onto the stdlib 'asyncio'
-    logger (copies every 'apprise' handler onto it and matches its
-    level), so that logger needs the exact same save/reset treatment
-    or it leaks state across tests the same way.
+    CLI tests change the Apprise and asyncio loggers. Restoring their levels
+    and handlers prevents those changes from affecting later log assertions.
     """
     asyncio_logger = logging.getLogger("asyncio")
 
@@ -112,11 +98,7 @@ def _reset_apprise_logger_state():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def collect_all_garbage(session_mocker):
-    """A pytest session fixture to ensure no __del__ cleanup call from one
-    plugin will cause testing issues with another.
-
-    Run garbage collection after every test
-    """
+def collect_all_garbage():
+    """Collect garbage after each test to isolate plugin finalizers."""
     # Force garbage collection
     gc.collect()
