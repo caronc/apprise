@@ -1478,6 +1478,228 @@ def test_apprise_multi_format_conversion_cache():
         assert mock_convert.call_count == 1
 
 
+def test_apprise_payload_max_size_enforced_before_conversion():
+    """API: Apply the payload cap before conversion and title merging."""
+    asset = AppriseAsset(async_mode=False, payload_max_size=20)
+    a = Apprise(asset=asset)
+
+    class TitlelessNotification(NotifyBase):
+        """Test plugin with no native title field."""
+
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["titleless"] = TitlelessNotification
+
+    obj = TitlelessNotification(host="localhost", asset=asset)
+    assert a.add(obj) is True
+
+    title = "T" * 100
+    body = "B" * 1000
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda src, dst, content: content,
+    ) as mock_convert:
+        assert bool(a.notify(title=title, body=body)) is True
+
+        # Conversion only receives content that already fits the input cap.
+        for call in mock_convert.call_args_list:
+            assert len(call.kwargs["content"]) <= 20
+
+    # Title markup may add a few characters after the input cap is applied.
+    assert len(obj.sent) == 1
+    delivered_title, delivered_body = obj.sent[0]
+    assert delivered_title == ""
+    assert len(delivered_body) < 30
+
+
+def test_apprise_payload_max_size_not_reapplied_after_conversion():
+    """API: Cap source text once without truncating converted markup."""
+
+    class HTMLNotification(NotifyBase):
+        """Test plugin whose declared format is HTML."""
+
+        notify_format = NotifyFormat.HTML
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["htmltest"] = HTMLNotification
+
+    # The five-character source fits, although its HTML conversion is longer.
+    asset = AppriseAsset(async_mode=False, payload_max_size=5)
+    a = Apprise(asset=asset)
+    obj = HTMLNotification(host="localhost", asset=asset)
+    assert a.add(obj) is True
+
+    result = a.notify(
+        title="", body="**x**", body_format=NotifyFormat.MARKDOWN
+    )
+    assert bool(result) is True
+
+    assert len(obj.sent) == 1
+    _, delivered_body = obj.sent[0]
+    assert delivered_body == "<p><strong>x</strong></p>"
+
+    # Direct plugin calls still enforce the cap because no earlier step did.
+    obj.sent.clear()
+    assert obj.notify(title="", body="B" * 100) is True
+    assert len(obj.sent) == 1
+    _, direct_body = obj.sent[0]
+    assert len(direct_body) <= 5
+
+    # The old public keyword is ignored, so direct callers cannot use it to
+    # bypass the cap.
+    obj.sent.clear()
+    assert obj.notify(title="", body="B" * 100, payload_precapped=True) is True
+    assert len(obj.sent) == 1
+    _, guessed_kwarg_body = obj.sent[0]
+    assert len(guessed_kwarg_body) <= 5
+
+
+def test_apprise_payload_max_size_uses_service_asset_limit():
+    """API: Apply each service's asset cap before conversion.
+
+    The service limit still applies when the top-level asset has no cap.
+    """
+
+    class TitlelessNotification(NotifyBase):
+        """Test plugin with no native title field."""
+
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["titleless"] = TitlelessNotification
+
+    # The top-level asset used by Apprise() itself has the cap disabled.
+    global_asset = AppriseAsset(async_mode=False, payload_max_size=0)
+    a = Apprise(asset=global_asset)
+
+    # Give this service a separate asset with its own cap.
+    service_asset = AppriseAsset(async_mode=False, payload_max_size=20)
+    obj = TitlelessNotification(host="localhost", asset=service_asset)
+    assert a.add(obj) is True
+
+    title = "T" * 100
+    body = "B" * 1000
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda src, dst, content: content,
+    ) as mock_convert:
+        assert bool(a.notify(title=title, body=body)) is True
+
+        # Conversion receives content trimmed to the service's own cap.
+        for call in mock_convert.call_args_list:
+            assert len(call.kwargs["content"]) <= 20
+
+    assert len(obj.sent) == 1
+    delivered_title, delivered_body = obj.sent[0]
+    assert len(delivered_title) + len(delivered_body) < 30
+
+
+def test_apprise_payload_max_size_cache_key_includes_buffer_settings():
+    """API: Services with different payload settings use separate caches."""
+
+    class TitlelessNotification(NotifyBase):
+        """Test plugin with no native title field."""
+
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["titleless"] = TitlelessNotification
+
+    global_asset = AppriseAsset(async_mode=False)
+    a = Apprise(asset=global_asset)
+
+    # The second service disables the short-side rule.
+    asset1 = AppriseAsset(async_mode=False, payload_max_size=35)
+    obj1 = TitlelessNotification(host="host1", asset=asset1)
+    assert a.add(obj1) is True
+
+    asset2 = AppriseAsset(
+        async_mode=False, payload_max_size=35, payload_buffer_threshold=0
+    )
+    obj2 = TitlelessNotification(host="host2", asset=asset2)
+    assert a.add(obj2) is True
+
+    title = "T" * 9
+    body = "B" * 33
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda src, dst, content: content,
+    ):
+        assert bool(a.notify(title=title, body=body)) is True
+
+    assert len(obj1.sent) == 1
+    assert len(obj2.sent) == 1
+
+    # With no title field, the different allocations appear in each body.
+    delivered1 = obj1.sent[0][1]
+    delivered2 = obj2.sent[0][1]
+    assert delivered1 != delivered2
+
+
+def test_apprise_payload_max_size_warns_when_trimming(caplog):
+    """API: Log a warning only when a service cap trims the input."""
+    caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
+
+    class PlainNotification(NotifyBase):
+        title_maxlen = 10
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            return True
+
+    N_MGR["plain"] = PlainNotification
+
+    asset = AppriseAsset(async_mode=False, payload_max_size=5)
+    a = Apprise(asset=asset)
+    obj = PlainNotification(host="localhost", asset=asset)
+    assert a.add(obj) is True
+
+    caplog.clear()
+    assert bool(a.notify(title="", body="x" * 100)) is True
+    assert "payload_max_size" in caplog.text
+
+    # A body that already fits the cap logs no warning at all.
+    caplog.clear()
+    assert bool(a.notify(title="", body="x")) is True
+    assert "payload_max_size" not in caplog.text
+
+
 def test_apprise_multi_format_details():
     """
     API: Apprise() Details reflect a plugin's real supported formats
@@ -2499,14 +2721,10 @@ def test_apprise_details_plugin_verification():
 
 
 def test_apprise_details_plugin_raw_template_tokens():
-    """
-    API: Apprise() Raw Template Token Verification
+    """Require an explicit type in every raw plugin template token.
 
-    Checks that every plugin's template_tokens and template_args declare
-    an explicit 'type' field before _sanitize_token can silently back-fill
-    a default.  _sanitize_token adds 'type': 'string' when the field is
-    missing, so the post-processed details() output always passes -- this
-    test catches the gap at the source.
+    Sanitizing supplies a missing ``string`` default, so this checks the raw
+    declarations first.
     """
 
     # Valid Type Regular Expression Checker -- mirrors the one used by
