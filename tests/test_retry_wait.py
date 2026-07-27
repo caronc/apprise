@@ -1128,6 +1128,12 @@ class TestRetryWarningMessage:
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
+            # Older pytest releases (e.g. the one shipped with EL9) do
+            # not un-disable logging on our behalf when
+            # caplog.set_level() is called, so a prior module-level
+            # logging.disable(logging.CRITICAL) call would otherwise
+            # silently swallow this warning. Clear it explicitly.
+            logging.disable(logging.NOTSET)
             caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
 
             asset = AppriseAsset(async_mode=False)
@@ -1150,6 +1156,7 @@ class TestRetryWarningMessage:
             assert "Attempt 1/2" in caplog.text
             assert "Attempt 1/1" not in caplog.text
         finally:
+            logging.disable(logging.CRITICAL)
             N_MGR.unload_modules()
 
     def test_async_attempt_denominator_counts_total_attempts(self, caplog):
@@ -1157,6 +1164,8 @@ class TestRetryWarningMessage:
         N_MGR["failpass"] = _FailThenSucceedNotify
 
         try:
+            # See the sync test above for why this reset is needed.
+            logging.disable(logging.NOTSET)
             caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
 
             asset = AppriseAsset(async_mode=True)
@@ -1178,6 +1187,7 @@ class TestRetryWarningMessage:
             assert "Attempt 1/2" in caplog.text
             assert "Attempt 1/1" not in caplog.text
         finally:
+            logging.disable(logging.CRITICAL)
             N_MGR.unload_modules()
 
 
