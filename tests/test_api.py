@@ -1345,98 +1345,118 @@ def test_apprise_multi_format_resolution(caplog):
     API: multi-format notify_format resolution
 
     """
+    # Older pytest releases (e.g. the one shipped with EL9) do not
+    # un-disable logging on our behalf when caplog.set_level() is
+    # called, so a prior module-level logging.disable(logging.CRITICAL)
+    # call would otherwise silently swallow this debug message. Clear
+    # it explicitly and restore it once we're done.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.DEBUG, logger=LOGGER_NAME)
 
-    class SingleFormatNotification(NotifyBase):
-        """Test plugin that resolves to one fixed format."""
+    try:
 
-        # Single-format plugins always use their declared format.
-        notify_format = NotifyFormat.HTML
+        class SingleFormatNotification(NotifyBase):
+            """Test plugin that resolves to one fixed format."""
 
-        def send(self, body, title="", notify_type=None, **kwargs):
-            """Accept the prepared body without doing network work."""
-            return True
+            # Single-format plugins always use their declared format.
+            notify_format = NotifyFormat.HTML
 
-    class MultiFormatNotification(NotifyBase):
-        """Test plugin that can render either HTML or Markdown."""
+            def send(self, body, title="", notify_type=None, **kwargs):
+                """Accept the prepared body without doing network work."""
+                return True
 
-        # Declares more than one supported format, index[0] is default
-        notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+        class MultiFormatNotification(NotifyBase):
+            """Test plugin that can render either HTML or Markdown."""
 
-        received = []
+            # Declares more than one supported format, index[0] is default
+            notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
 
-        def send(self, body, title="", notify_type=None, **kwargs):
-            """Record fallback sends that do not have format-specific hooks."""
-            self.received.append(("send", body))
-            return True
+            received = []
 
-        def send_markdown(self, body, title="", notify_type=None, **kwargs):
-            """Record Markdown-specific dispatch."""
-            self.received.append(("send_markdown", body))
-            return True
+            def send(self, body, title="", notify_type=None, **kwargs):
+                """Record fallback sends with no format-specific hook."""
+                self.received.append(("send", body))
+                return True
 
-    # Single-format plugin: _formats()/resolve_format() resolve to the
-    # one declared format no matter what is passed in.
-    single = SingleFormatNotification(host="localhost")
-    assert single._formats() == (NotifyFormat.HTML,)
-    assert single.resolve_format(None) == NotifyFormat.HTML
-    assert single.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
-    assert single.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.HTML
+            def send_markdown(
+                self, body, title="", notify_type=None, **kwargs
+            ):
+                """Record Markdown-specific dispatch."""
+                self.received.append(("send_markdown", body))
+                return True
 
-    # A plain string is accepted
-    assert single.resolve_format("text") == NotifyFormat.HTML
+        # Single-format plugin: _formats()/resolve_format() resolve to the
+        # one declared format no matter what is passed in.
+        single = SingleFormatNotification(host="localhost")
+        assert single._formats() == (NotifyFormat.HTML,)
+        assert single.resolve_format(None) == NotifyFormat.HTML
+        assert single.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
+        assert (
+            single.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.HTML
+        )
 
-    # Multi-format plugin, no override, no matching input: default wins
-    multi = MultiFormatNotification(host="localhost")
-    assert multi._formats() == (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
-    assert multi.resolve_format(None) == NotifyFormat.HTML
-    assert multi.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
+        # A plain string is accepted
+        assert single.resolve_format("text") == NotifyFormat.HTML
 
-    # Multi-format plugin, no override, input aligns to a declared format
-    assert multi.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.MARKDOWN
+        # Multi-format plugin, no override, no matching input: default wins
+        multi = MultiFormatNotification(host="localhost")
+        assert multi._formats() == (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+        assert multi.resolve_format(None) == NotifyFormat.HTML
+        assert multi.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
 
-    # A plain string is supported
-    resolved = multi.resolve_format("markdown")
-    assert resolved == NotifyFormat.MARKDOWN
-    assert isinstance(resolved, NotifyFormat)
+        # Multi-format plugin, no override, input aligns to a declared format
+        assert (
+            multi.resolve_format(NotifyFormat.MARKDOWN)
+            == NotifyFormat.MARKDOWN
+        )
 
-    # Multi-format plugin, explicit ?format= override in the declared set
-    multi_override = MultiFormatNotification(
-        host="localhost", format="markdown"
-    )
-    assert multi_override._format_override == NotifyFormat.MARKDOWN
-    assert multi_override.resolve_format(NotifyFormat.HTML) == (
-        NotifyFormat.MARKDOWN
-    )
+        # A plain string is supported
+        resolved = multi.resolve_format("markdown")
+        assert resolved == NotifyFormat.MARKDOWN
+        assert isinstance(resolved, NotifyFormat)
 
-    # Multi-format plugin, ?format= override NOT in the declared set falls
-    # back through to input alignment, then default, with a debug message.
-    multi_bad_override = MultiFormatNotification(
-        host="localhost", format="text"
-    )
-    assert multi_bad_override._format_override == NotifyFormat.TEXT
-    caplog.clear()
-    assert multi_bad_override.resolve_format(NotifyFormat.MARKDOWN) == (
-        NotifyFormat.MARKDOWN
-    )
-    assert "does not support format" in caplog.text
-    assert "DEBUG" in caplog.text
+        # Multi-format plugin, explicit ?format= override in the declared set
+        multi_override = MultiFormatNotification(
+            host="localhost", format="markdown"
+        )
+        assert multi_override._format_override == NotifyFormat.MARKDOWN
+        assert multi_override.resolve_format(NotifyFormat.HTML) == (
+            NotifyFormat.MARKDOWN
+        )
 
-    # No declared source format: same fallback, but silent -- matches
-    # the historical no-noise conversion behavior.
-    caplog.clear()
-    assert multi_bad_override.resolve_format(None) == NotifyFormat.HTML
-    assert "does not support format" not in caplog.text
+        # Multi-format plugin, ?format= override NOT in the declared set falls
+        # back through to input alignment, then default, with a debug message.
+        multi_bad_override = MultiFormatNotification(
+            host="localhost", format="text"
+        )
+        assert multi_bad_override._format_override == NotifyFormat.TEXT
+        caplog.clear()
+        assert multi_bad_override.resolve_format(NotifyFormat.MARKDOWN) == (
+            NotifyFormat.MARKDOWN
+        )
+        assert "does not support format" in caplog.text
+        assert "DEBUG" in caplog.text
 
-    # send_{type}() dispatch: send_markdown() defined, used when resolved
-    multi.received.clear()
-    assert multi.notify(body="# hi", body_format=NotifyFormat.MARKDOWN) is True
-    assert multi.received == [("send_markdown", "# hi")]
+        # No declared source format: same fallback, but silent -- matches
+        # the historical no-noise conversion behavior.
+        caplog.clear()
+        assert multi_bad_override.resolve_format(None) == NotifyFormat.HTML
+        assert "does not support format" not in caplog.text
 
-    # send_{type}() dispatch: no send_html() defined, falls back to send()
-    multi.received.clear()
-    assert multi.notify(body="hi", body_format=NotifyFormat.HTML) is True
-    assert multi.received == [("send", "hi")]
+        # send_{type}() dispatch: send_markdown() defined, used when resolved
+        multi.received.clear()
+        assert (
+            multi.notify(body="# hi", body_format=NotifyFormat.MARKDOWN)
+            is True
+        )
+        assert multi.received == [("send_markdown", "# hi")]
+
+        # send_{type}() dispatch: no send_html() defined, falls back to send()
+        multi.received.clear()
+        assert multi.notify(body="hi", body_format=NotifyFormat.HTML) is True
+        assert multi.received == [("send", "hi")]
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 def test_apprise_multi_format_conversion_cache():
@@ -1683,29 +1703,39 @@ def test_apprise_payload_max_size_cache_key_includes_buffer_settings():
 
 def test_apprise_payload_max_size_warns_when_trimming(caplog):
     """API: Log a warning only when a service cap trims the input."""
+    # Older pytest releases (e.g. the one shipped with EL9) do not
+    # un-disable logging on our behalf when caplog.set_level() is
+    # called, so a prior module-level logging.disable(logging.CRITICAL)
+    # call would otherwise silently swallow this warning. Clear it
+    # explicitly and restore it once we're done.
+    logging.disable(logging.NOTSET)
     caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
 
-    class PlainNotification(NotifyBase):
-        title_maxlen = 10
+    try:
 
-        def send(self, body, title="", notify_type=None, **kwargs):
-            return True
+        class PlainNotification(NotifyBase):
+            title_maxlen = 10
 
-    N_MGR["plain"] = PlainNotification
+            def send(self, body, title="", notify_type=None, **kwargs):
+                return True
 
-    asset = AppriseAsset(async_mode=False, payload_max_size=5)
-    a = Apprise(asset=asset)
-    obj = PlainNotification(host="localhost", asset=asset)
-    assert a.add(obj) is True
+        N_MGR["plain"] = PlainNotification
 
-    caplog.clear()
-    assert bool(a.notify(title="", body="x" * 100)) is True
-    assert "payload_max_size" in caplog.text
+        asset = AppriseAsset(async_mode=False, payload_max_size=5)
+        a = Apprise(asset=asset)
+        obj = PlainNotification(host="localhost", asset=asset)
+        assert a.add(obj) is True
 
-    # A body that already fits the cap logs no warning at all.
-    caplog.clear()
-    assert bool(a.notify(title="", body="x")) is True
-    assert "payload_max_size" not in caplog.text
+        caplog.clear()
+        assert bool(a.notify(title="", body="x" * 100)) is True
+        assert "payload_max_size" in caplog.text
+
+        # A body that already fits the cap logs no warning at all.
+        caplog.clear()
+        assert bool(a.notify(title="", body="x")) is True
+        assert "payload_max_size" not in caplog.text
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 def test_apprise_multi_format_details():
