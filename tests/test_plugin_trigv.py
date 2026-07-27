@@ -77,13 +77,31 @@ apprise_url_tests = (
         },
     ),
     (
+        f"trigv://{VALID_API_KEY}@trigv-platform.test:8080/general",
+        {
+            "instance": NotifyTrigv,
+        },
+    ),
+    (
+        f"trigvs://{VALID_API_KEY}/alerts/ops",
+        {
+            "instance": NotifyTrigv,
+        },
+    ),
+    (
+        f"trigvs://{VALID_API_KEY}/?to=alerts,ops",
+        {
+            "instance": NotifyTrigv,
+        },
+    ),
+    (
         f"trigvs://{VALID_API_KEY}/?url=https://example.com",
         {
             "instance": NotifyTrigv,
         },
     ),
     (
-        f"trigvs://{VALID_API_KEY}/?delivery_urgency=time_sensitive",
+        f"trigvs://{VALID_API_KEY}/?urgency=time_sensitive",
         {
             "instance": NotifyTrigv,
         },
@@ -95,7 +113,7 @@ apprise_url_tests = (
         },
     ),
     (
-        f"trigvs://{VALID_API_KEY}/INVALID CHANNEL/",
+        f"trigvs://{VALID_API_KEY}/bad.channel/",
         {
             "instance": TypeError,
         },
@@ -143,7 +161,8 @@ def test_plugin_trigv_general(mock_post):
 
     obj = apprise.Apprise.instantiate(f"trigvs://{VALID_API_KEY}/alerts")
     assert isinstance(obj, NotifyTrigv)
-    assert obj.channel == "alerts"
+    assert obj.targets == ["alerts"]
+    assert len(obj) == 1
 
     assert (
         obj.notify(
@@ -191,6 +210,86 @@ def test_plugin_trigv_local_host(mock_post):
         mock_post.call_args_list[0][0][0]
         == "http://trigv-platform.test/api/v1/events"
     )
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_custom_port(mock_post):
+    """NotifyTrigv() custom hostname with an explicit port."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    mock_post.return_value = response
+
+    obj = apprise.Apprise.instantiate(
+        f"trigvs://{VALID_API_KEY}@trigv-platform.test:8443/general"
+    )
+    assert isinstance(obj, NotifyTrigv)
+    assert obj.port == 8443
+
+    assert obj.notify(body="Hello", title="Test") is True
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == "https://trigv-platform.test:8443/api/v1/events"
+    )
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_multiple_channels(mock_post):
+    """NotifyTrigv() notifies every channel specified."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.accepted
+    mock_post.return_value = response
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY, targets=["alerts", "ops"])
+    assert obj.targets == ["alerts", "ops"]
+    assert len(obj) == 2
+
+    assert obj.send(body="test", title="title") is True
+    assert mock_post.call_count == 2
+
+    import json
+
+    channels_notified = {
+        json.loads(call[1]["data"])["channel"]
+        for call in mock_post.call_args_list
+    }
+    assert channels_notified == {"alerts", "ops"}
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_multiple_channels_partial_failure(mock_post):
+    """NotifyTrigv() still tries every channel if one of them fails."""
+
+    ok_response = mock.Mock()
+    ok_response.status_code = requests.codes.accepted
+
+    error_response = mock.Mock()
+    error_response.status_code = requests.codes.internal_server_error
+    error_response.content = b""
+
+    mock_post.side_effect = [error_response, ok_response]
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY, targets=["alerts", "ops"])
+    assert obj.send(body="test", title="title") is False
+    assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_trigv_multiple_channels_request_exception(mock_post):
+    """NotifyTrigv() marks a failure when one channel raises."""
+
+    ok_response = mock.Mock()
+    ok_response.status_code = requests.codes.accepted
+
+    mock_post.side_effect = [
+        requests.RequestException(),
+        ok_response,
+    ]
+
+    obj = NotifyTrigv(api_key=VALID_API_KEY, targets=["alerts", "ops"])
+    assert obj.send(body="test", title="title") is False
+    assert mock_post.call_count == 2
 
 
 @mock.patch("requests.post")
@@ -250,11 +349,22 @@ def test_plugin_trigv_empty_body_and_invalid_priority(mock_post):
     assert payload["delivery_urgency"] == "standard"
 
 
-def test_plugin_trigv_invalid_delivery_urgency():
-    """NotifyTrigv() rejects unknown delivery urgency."""
+def test_plugin_trigv_invalid_urgency():
+    """NotifyTrigv() rejects unknown urgency."""
 
     with pytest.raises(TypeError):
-        NotifyTrigv(api_key=VALID_API_KEY, delivery_urgency="critical")
+        NotifyTrigv(api_key=VALID_API_KEY, urgency="critical")
+
+
+def test_plugin_trigv_to_alias():
+    """NotifyTrigv() parses ?to= into additional targets."""
+
+    parsed = NotifyTrigv.parse_url(
+        f"trigvs://{VALID_API_KEY}/alerts/?to=ops,escalation"
+    )
+    obj = NotifyTrigv(**parsed)
+    # parse_list() de-duplicates and sorts every target it is given
+    assert obj.targets == ["alerts", "escalation", "ops"]
 
 
 @mock.patch("requests.post")
@@ -266,10 +376,10 @@ def test_plugin_trigv_url_roundtrip(mock_post):
 
     obj = NotifyTrigv(
         api_key=VALID_API_KEY,
-        channel="deploys",
+        targets="deploys",
         supplemental_url="https://example.com/run/1",
         image_url="https://example.com/image.png",
-        delivery_urgency="time_sensitive",
+        urgency="time_sensitive",
         event_type="deploy.completed",
         priority=2,
     )
@@ -278,15 +388,15 @@ def test_plugin_trigv_url_roundtrip(mock_post):
     assert "deploys" in generated
     assert "url=" in generated
     assert "image_url=" in generated
-    assert "delivery_urgency=time_sensitive" in generated
+    assert "urgency=time_sensitive" in generated
     assert "event_type=deploy.completed" in generated
     assert "priority=2" in generated
 
     parsed = NotifyTrigv.parse_url(generated)
     obj2 = NotifyTrigv(**parsed)
-    assert obj2.channel == "deploys"
+    assert obj2.targets == ["deploys"]
     assert obj2.supplemental_url == "https://example.com/run/1"
     assert obj2.image_url == "https://example.com/image.png"
-    assert obj2.delivery_urgency == "time_sensitive"
+    assert obj2.urgency == "time_sensitive"
     assert obj2.event_type == "deploy.completed"
-    assert obj2.priority == "2"
+    assert obj2.priority == 2
