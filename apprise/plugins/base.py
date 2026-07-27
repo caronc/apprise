@@ -27,6 +27,7 @@
 
 import asyncio
 from collections.abc import Generator
+import contextlib
 import contextvars
 from datetime import tzinfo
 from functools import partial
@@ -755,7 +756,7 @@ class NotifyBase(URLBase):
         )
 
     def resolve_format(
-        self, body_format: Optional[NotifyFormat] = None
+        self, body_format: Optional[Union[str, NotifyFormat]] = None
     ) -> NotifyFormat:
         """Resolve which format this send should actually render as.
 
@@ -893,10 +894,10 @@ class NotifyBase(URLBase):
         self,
         body: Optional[str] = None,
         title: Optional[str] = None,
-        notify_type: NotifyType = NotifyType.INFO,
+        notify_type: Union[str, NotifyType] = NotifyType.INFO,
         overflow: Optional[Union[str, OverflowMode]] = None,
         attach: Optional[Union[list[str], AppriseAttachment]] = None,
-        body_format: Optional[NotifyFormat] = None,
+        body_format: Optional[Union[str, NotifyFormat]] = None,
         body_passthrough: Optional[bool] = None,
         _payload_precapped: object = None,
         **kwargs: Any,
@@ -916,6 +917,11 @@ class NotifyBase(URLBase):
         Yields one mapping per final ``send()`` call, including its zero-based
         ``index`` and the total number of calls.
         """
+
+        # Normalization of notify_type before it ever reaches a plugin.
+        if not isinstance(notify_type, NotifyType):
+            with contextlib.suppress(AttributeError, ValueError):
+                notify_type = NotifyType(notify_type.lower())
 
         # Direct plugin calls bypass Apprise's per-server resolution, so
         # resolve here and remember whether a source format was declared.

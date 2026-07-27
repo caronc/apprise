@@ -1383,6 +1383,9 @@ def test_apprise_multi_format_resolution(caplog):
     assert single.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
     assert single.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.HTML
 
+    # A plain string is accepted
+    assert single.resolve_format("text") == NotifyFormat.HTML
+
     # Multi-format plugin, no override, no matching input: default wins
     multi = MultiFormatNotification(host="localhost")
     assert multi._formats() == (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
@@ -1391,6 +1394,11 @@ def test_apprise_multi_format_resolution(caplog):
 
     # Multi-format plugin, no override, input aligns to a declared format
     assert multi.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.MARKDOWN
+
+    # A plain string is supported
+    resolved = multi.resolve_format("markdown")
+    assert resolved == NotifyFormat.MARKDOWN
+    assert isinstance(resolved, NotifyFormat)
 
     # Multi-format plugin, explicit ?format= override in the declared set
     multi_override = MultiFormatNotification(
