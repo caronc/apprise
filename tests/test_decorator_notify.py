@@ -119,11 +119,11 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["attach"], AppriseAttachment)
     assert len(verify_obj["attach"]) == 2
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert verify_obj["kwargs"]["format_controlled"] is False
+    assert verify_obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -151,11 +151,11 @@ def test_notify_simple_decoration():
     assert verify_obj["notify_type"] == common.NotifyType.INFO
     assert verify_obj["attach"] is None
 
-    # Undeclared input resolves to the wrapper default and remains
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert verify_obj["kwargs"]["format_controlled"] is False
+    assert verify_obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -183,11 +183,11 @@ def test_notify_simple_decoration():
     assert verify_obj["notify_type"] == common.NotifyType.INFO
     assert verify_obj["attach"] is None
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert verify_obj["kwargs"]["format_controlled"] is False
+    assert verify_obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -226,11 +226,11 @@ def test_notify_simple_decoration():
     assert isinstance(verify_obj["attach"], AppriseAttachment)
     assert len(verify_obj["attach"]) == 1
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert verify_obj["kwargs"]["format_controlled"] is False
+    assert verify_obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -270,10 +270,10 @@ def test_notify_simple_decoration():
     # We have no attachments
     assert verify_obj["attach"] is None
 
-    # Declared HTML resolves directly and is marked controlled.
+    # Declared HTML resolves directly and is not treated as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.HTML
-    assert verify_obj["kwargs"]["format_controlled"] is True
+    assert verify_obj["kwargs"]["body_passthrough"] is False
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -457,11 +457,11 @@ def test_notify_complex_decoration():
     assert isinstance(verify_obj["attach"], AppriseAttachment)
     assert len(verify_obj["attach"]) == 2
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert verify_obj["kwargs"]["format_controlled"] is False
+    assert verify_obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -511,11 +511,11 @@ def test_notify_complex_decoration():
     assert verify_obj["notify_type"] == common.NotifyType.INFO
     assert verify_obj["attach"] is None
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in verify_obj["kwargs"]
     assert verify_obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert verify_obj["kwargs"]["format_controlled"] is False
+    assert verify_obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -615,7 +615,7 @@ def test_notify_decorator_urls_with_space():
     assert len(obj.get("args")) == 0
     assert obj.get("kwargs") == {
         "body_format": NotifyFormat.TEXT,
-        "format_controlled": False,
+        "body_passthrough": True,
     }
     meta = obj.get("meta")
     assert isinstance(meta, dict)
@@ -715,11 +715,11 @@ def test_notify_multi_instance_decoration(tmpdir):
     meta = obj["meta"]
     assert isinstance(meta, dict)
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in obj["kwargs"]
     assert obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert obj["kwargs"]["format_controlled"] is False
+    assert obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -756,11 +756,11 @@ def test_notify_multi_instance_decoration(tmpdir):
     meta = obj["meta"]
     assert isinstance(meta, dict)
 
-    # Undeclared input resolves to the wrapper default and remains marked
-    # uncontrolled.
+    # Undeclared input resolves to the wrapper default and is treated
+    # as passthrough.
     assert "body_format" in obj["kwargs"]
     assert obj["kwargs"]["body_format"] == common.NotifyFormat.TEXT
-    assert obj["kwargs"]["format_controlled"] is False
+    assert obj["kwargs"]["body_passthrough"] is True
 
     # The meta argument allows us to further parse the URL parameters
     # specified
@@ -790,18 +790,10 @@ def test_notify_multi_instance_decoration(tmpdir):
 
 
 def test_notify_yaml_priority_over_qsd():
-    """
-    decorators: YAML tokens take priority over qsd for @notify plugins.
+    """Keep YAML values ahead of query strings for decorator plugins.
 
-    YAML > qsd > URL path must hold for ALL plugin types, including
-    @notify decorator plugins.  Previously, @notify plugins kept qsd
-    intact for the second post_process_parse_url_results() call, which
-    allowed qsd to silently overwrite YAML-token values.  The fix
-    re-applies YAML tokens after post_process to restore priority.
-
-    Also verifies qsd is still preserved in the meta dict (for raw
-    inspection) and that qsd still wins over URL-path when no YAML
-    token is present for a field.
+    The raw query dictionary remains available in metadata, and query values
+    still take priority over URL-path values when YAML omits the field.
     """
     from apprise.config import ConfigBase
 
