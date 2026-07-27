@@ -185,6 +185,12 @@ class CustomNotifyPlugin(NotifyBase):
             ):
                 """Our send() call which triggers our hook."""
 
+                # The decorator does not support split/truncate overflow, so
+                # every delivery is index 0 of 1. Drop them rather than pass
+                # along values that never carry any real meaning here.
+                kwargs.pop("index", None)
+                kwargs.pop("total", None)
+
                 response = False
                 try:
                     # Enforce a boolean response
