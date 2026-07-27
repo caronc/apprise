@@ -28,6 +28,7 @@
 import asyncio
 import concurrent.futures as cf
 from datetime import datetime, timezone
+import importlib
 import json
 import os
 import re
@@ -587,8 +588,16 @@ def test_service_log_capture_max_entries_cap():
 
     try:
         service = _DummyNotify()
+        # apprise.__init__ imports the "logger" object out of the
+        # apprise.logger submodule under the same name, which shadows
+        # the submodule reference on the apprise package. Resolve the
+        # real submodule via importlib rather than a dotted string
+        # path, since older unittest.mock versions (Python 3.9) walk
+        # that path with getattr() and land on the shadowed Logger
+        # instance instead of the module.
+        logger_module = importlib.import_module("apprise.logger")
         with (
-            mock.patch("apprise.logger._MAX_CAPTURED_LOG_ENTRIES", 2),
+            mock.patch.object(logger_module, "_MAX_CAPTURED_LOG_ENTRIES", 2),
             _ServiceLogCapture(service) as cap,
         ):
             service.logger.warning("one")
