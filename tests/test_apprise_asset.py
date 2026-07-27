@@ -62,6 +62,10 @@ def test_timezone():
     with pytest.raises(AttributeError):
         AppriseAsset(timezone="invalid")
 
+    # The private field cannot bypass the validated timezone argument.
+    with pytest.raises(AttributeError):
+        AppriseAsset(_tzinfo=timezone.utc)
+
 
 def test_service_timeout():
     "asset: service_timeout() testing"
@@ -112,9 +116,220 @@ def test_service_timeout():
     with pytest.raises(ValueError):
         AppriseAsset(service_timeout=float("nan"))
 
-    # The internal/system attribute can also be set the same way every
-    # other underscore-prefixed AppriseAsset field can: directly through
-    # the generic kwarg mechanism (bypassing the friendly named parameter
-    # and its validation).
-    asset = AppriseAsset(_service_timeout=99.0)
-    assert asset._service_timeout == 99.0
+    # The private field cannot bypass the validated public argument.
+    with pytest.raises(AttributeError):
+        AppriseAsset(_service_timeout=99.0)
+
+
+def test_payload_max_size():
+    "asset: payload_max_size() testing"
+
+    # Zero disables the cap by default.
+    asset = AppriseAsset()
+    assert asset._payload_max_size == 0
+
+    # Accepts a positive int, turning the cap on
+    asset = AppriseAsset(payload_max_size=500)
+    assert asset._payload_max_size == 500
+
+    # 0 is valid -- it is also the default, and disables the cap entirely
+    asset = AppriseAsset(payload_max_size=0)
+    assert asset._payload_max_size == 0
+
+    # Negative values are rejected
+    with pytest.raises(ValueError):
+        AppriseAsset(payload_max_size=-1)
+
+    # Non-int types are rejected -- a float character count makes no sense
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_max_size=12.5)
+
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_max_size="invalid")
+
+    # Booleans are rejected even though bool is technically an int subclass
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_max_size=True)
+
+    # The private field cannot bypass the validated public argument.
+    with pytest.raises(AttributeError):
+        AppriseAsset(_payload_max_size=250)
+
+
+def test_payload_buffer_threshold_and_min_buffer():
+    "asset: payload_buffer_threshold() / payload_min_buffer() testing"
+
+    # Defaults match the documented values.
+    asset = AppriseAsset()
+    assert asset._payload_buffer_threshold == 10
+    assert asset._payload_min_buffer == 25
+
+    # Public constructor arguments configure both settings.
+    asset = AppriseAsset(payload_buffer_threshold=3, payload_min_buffer=5)
+    assert asset._payload_buffer_threshold == 3
+    assert asset._payload_min_buffer == 5
+
+    # 0 is valid for both.
+    asset = AppriseAsset(payload_buffer_threshold=0, payload_min_buffer=0)
+    assert asset._payload_buffer_threshold == 0
+    assert asset._payload_min_buffer == 0
+
+    # Negative values are rejected.
+    with pytest.raises(ValueError):
+        AppriseAsset(payload_buffer_threshold=-1)
+
+    with pytest.raises(ValueError):
+        AppriseAsset(payload_min_buffer=-1)
+
+    # Non-int types are rejected.
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_buffer_threshold=12.5)
+
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_min_buffer="invalid")
+
+    # Booleans are rejected even though bool is technically an int subclass.
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_buffer_threshold=True)
+
+    with pytest.raises(TypeError):
+        AppriseAsset(payload_min_buffer=True)
+
+    # Private fields cannot bypass the validated public arguments.
+    with pytest.raises(AttributeError):
+        AppriseAsset(_payload_buffer_threshold=2)
+
+    with pytest.raises(AttributeError):
+        AppriseAsset(_payload_min_buffer=7)
+
+
+def test_enforce_payload_max_size():
+    "asset: enforce_payload_max_size() testing"
+
+    # Disabled (the default): nothing is ever trimmed.
+    asset = AppriseAsset()
+    title, body = asset.enforce_payload_max_size("T" * 100, "B" * 1000)
+    assert title == "T" * 100
+    assert body == "B" * 1000
+
+    # Already within budget: left untouched.
+    asset = AppriseAsset(payload_max_size=2000)
+    title, body = asset.enforce_payload_max_size("T" * 100, "B" * 1000)
+    assert title == "T" * 100
+    assert body == "B" * 1000
+
+
+def test_enforce_payload_max_size_absent_side():
+    "asset: enforce_payload_max_size() never trims a missing side"
+
+    asset = AppriseAsset(payload_max_size=20)
+
+    # An empty title never competes with the body for room.
+    title, body = asset.enforce_payload_max_size("", "B" * 1000)
+    assert title == ""
+    assert len(body) == 20
+
+    # An empty body never competes with the title for room.
+    title, body = asset.enforce_payload_max_size("T" * 1000, "")
+    assert len(title) == 20
+    assert body == ""
+
+
+def test_enforce_payload_max_size_short_side_guaranteed():
+    """asset: keep a short side whole when the other minimum fits"""
+
+    # A short title stays whole; the body receives the remaining room.
+    asset = AppriseAsset(payload_max_size=40)
+    title, body = asset.enforce_payload_max_size("T" * 9, "B" * 1000)
+    assert title == "T" * 9
+    assert len(body) == 31
+
+    # The same rule keeps a short body whole.
+    title, body = asset.enforce_payload_max_size("T" * 40, "hi!")
+    assert title == "T" * 37
+    assert body == "hi!"
+
+    # A title exactly at the buffer width still qualifies.
+    title, body = asset.enforce_payload_max_size("T" * 10, "B" * 1000)
+    assert title == "T" * 10
+    assert len(body) == 30
+
+
+def test_enforce_payload_max_size_guarantee_unaffordable():
+    """asset: use proportional sharing when a guarantee cannot fit"""
+
+    # Two long sides share the cap proportionally.
+    asset = AppriseAsset(payload_max_size=20)
+    title, body = asset.enforce_payload_max_size("T" * 20, "B" * 18)
+    assert len(title) + len(body) == 20
+    assert len(title) == 10
+    assert len(body) == 10
+
+    # The title is short, but the body minimum cannot fit beside it.
+    tiny_asset = AppriseAsset(payload_max_size=11)
+    title, body = tiny_asset.enforce_payload_max_size("T" * 10, "B" * 1000)
+    assert len(title) + len(body) == 11
+    assert len(title) == 1
+    assert len(body) == 10
+
+    # The mirrored short-body rule also falls back when space is tight.
+    balanced_asset = AppriseAsset(payload_max_size=15)
+    title, body = balanced_asset.enforce_payload_max_size("T" * 15, "B" * 10)
+    assert len(title) + len(body) == 15
+    assert len(title) == 9
+    assert len(body) == 6
+
+
+def test_enforce_payload_max_size_proportional_tier():
+    "asset: enforce_payload_max_size() proportional split for two long sides"
+
+    # Both sides are longer than the buffer, so title and body share the
+    # cap in proportion to their original lengths.
+    asset = AppriseAsset(payload_max_size=200)
+    title, body = asset.enforce_payload_max_size("T" * 100, "B" * 1000)
+    assert len(title) + len(body) == 200
+    # The title receives 100/1100 of the budget, rounded down.
+    assert len(title) == 18
+    assert len(body) == 182
+
+    # A title-heavy split keeps most of the budget for the title.
+    heavy_asset = AppriseAsset(payload_max_size=50)
+    title, body = heavy_asset.enforce_payload_max_size("T" * 100, "B" * 60)
+    assert len(title) + len(body) == 50
+    assert len(title) > len(body)
+
+    # Keep one title character when a title longer than the buffer still
+    # has its proportional share round down to zero.
+    title, body = asset.enforce_payload_max_size("T" * 11, "B" * 2200)
+    assert title == "T"
+    assert len(body) == 199
+
+
+def test_enforce_payload_max_size_configurable_tiers():
+    "asset: payload_buffer_threshold / payload_min_buffer are tunable"
+
+    # Public constructor arguments can override both settings.
+    asset = AppriseAsset(
+        payload_max_size=12,
+        payload_buffer_threshold=3,
+        payload_min_buffer=5,
+    )
+    assert asset._payload_buffer_threshold == 3
+    assert asset._payload_min_buffer == 5
+
+    # Both sides exceed the custom buffer threshold (3), so this falls
+    # through to the proportional split.
+    title, body = asset.enforce_payload_max_size("T" * 4, "B" * 20)
+    assert len(title) == 2
+    assert len(body) == 10
+
+    # A title at or below the custom buffer threshold now qualifies for
+    # the whole-and-guaranteed rule, using the custom (smaller) minimum.
+    custom_asset = AppriseAsset(
+        payload_max_size=12,
+        payload_buffer_threshold=5,
+        payload_min_buffer=3,
+    )
+    title, body = custom_asset.enforce_payload_max_size("T" * 4, "B" * 20)
+    assert title == "T" * 4
+    assert len(body) == 8
