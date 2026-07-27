@@ -3040,16 +3040,22 @@ def test_apprise_cli_limit_option_times_out_service(
     CliRunner.invoke() runs main() in-process, not as a subprocess, so
     os._exit() has no SystemExit for it to catch the way ctx.exit()
     normally provides. In practice it's never actually reached here:
-    the service's own 0.2s delay finishes well within the default 5s
+    the service's own 2s delay finishes well within the default 5s
     grace period, so _wait_for_abandoned_calls() reports success on
     its own and main() falls through to its normal, catchable
     ctx.exit(status) -- see the assertion below confirming this.
+
+    The delay is kept generous (2s) against the ~0.15s abandon window
+    (--limit 0.05 plus Apprise's fixed 0.1s abandon grace) so slower or
+    heavily loaded CI hosts still reliably hit the TIMEOUT path instead
+    of racing it -- see TestServiceTimeout in tests/test_retry_wait.py
+    for the same margin convention.
     """
     import time
 
     def _slow_failure(*args, **kwargs):
         """Return a delayed HTTP failure to force the CLI timeout path."""
-        time.sleep(0.2)
+        time.sleep(2.0)
         response = mock.Mock()
         response.status_code = requests.codes.internal_server_error
         response.content = b""
@@ -3081,7 +3087,7 @@ def test_apprise_cli_limit_option_times_out_service(
     # result.output -- it's covered directly in tests/test_retry_wait.py.)
     assert result.exit_code == AppriseResultStatus.TIMEOUT
 
-    # The abandoned call's own 0.2s delay finished naturally well
+    # The abandoned call's own 2s delay finished naturally well
     # within the default 5s grace period, so _wait_for_abandoned_calls()
     # already confirmed nothing was left running -- the hard-exit path
     # was never needed. This exit code is itself unambiguous proof the
