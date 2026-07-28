@@ -482,7 +482,7 @@ class Apprise:
         location: Optional[ContentLocation] = None,
         debug: bool = False,
         log_callback: Optional[
-            Callable[[NotifyLogEntry, NotifyBase], Any]
+            Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
     ) -> None:
         """Loads a set of server urls while applying the Asset() module to each
@@ -493,8 +493,24 @@ class Apprise:
         Optionally specify a global ContentLocation for a more strict means of
         handling Attachments.
 
-        log_callback, when given, fires on every warning/error a service
-        logs. Applies to every notify() call unless overridden per-call.
+        log_callback receives each service warning or error as
+        ``log_callback(entry, service)``. It runs inline, so use a short
+        synchronous function and schedule any async work from there.
+        Keep each task referenced until it finishes because the event loop
+        holds only a weak reference:
+
+            loop = asyncio.get_running_loop()
+            background_tasks = set()
+
+            def _schedule(entry, service):
+                task = loop.create_task(
+                    my_async_handler(entry, service)
+                )
+                background_tasks.add(task)
+                task.add_done_callback(background_tasks.discard)
+
+            def log_callback(entry, service):
+                loop.call_soon_threadsafe(_schedule, entry, service)
         """
 
         # Initialize a server list of URLs
@@ -1134,7 +1150,7 @@ class Apprise:
         interpret_escapes: Optional[bool] = None,
         timeout: Union[int, float] = 0,
         log_callback: Optional[
-            Callable[[NotifyLogEntry, NotifyBase], Any]
+            Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
     ) -> AppriseResult:
         """Send a notification to all the plugins previously loaded.
@@ -1195,7 +1211,8 @@ class Apprise:
         non-numeric values raise TypeError, exactly like
         AppriseAsset(service_timeout=...) itself.
 
-        log_callback overrides the instance default for this call only.
+        log_callback overrides the instance default for this call. It must be
+        synchronous; see ``Apprise.__init__()`` for an async-work example.
         """
         timeout = _validate_timeout(timeout)
         effective_log_callback = (
@@ -1395,9 +1412,9 @@ class Apprise:
         timeout: Union[int, float] = _validate_timeout(
             kwargs.pop("timeout", 0)
         )
-        log_callback: Optional[Callable[[NotifyLogEntry, NotifyBase], Any]] = (
-            kwargs.pop("log_callback", None)
-        )
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, NotifyBase], None]
+        ] = kwargs.pop("log_callback", None)
         effective_log_callback = (
             log_callback if log_callback is not None else self._log_callback
         )
