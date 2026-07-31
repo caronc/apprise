@@ -115,6 +115,22 @@ def _b64dec(s):
     return base64.b64decode(s)
 
 
+def _b64_unpadded_len(byte_count):
+    """Return the unpadded base64 length without encoding the data.
+
+    This mirrors ``_b64enc`` after its trailing padding is removed.
+    """
+    # Count complete three-byte base64 groups and the remainder.
+    full_groups, remainder = divmod(byte_count, 3)
+
+    # Complete groups need no stripped padding adjustment.
+    if remainder == 0:
+        return full_groups * 4
+
+    # Partial groups retain two or three characters after padding is removed.
+    return full_groups * 4 + remainder + 1
+
+
 def _hmac_sha256(key, data):
     """32-byte HMAC-SHA-256 of *data* keyed by *key*."""
     h = _hmac_mod.HMAC(key, hashes.SHA256(), backend=default_backend())
@@ -160,6 +176,16 @@ def _varint(n):
     return bytes(out)
 
 
+def _varint_len(n):
+    """Return ``len(_varint(n))`` without building the varint itself."""
+    # Zero still requires one encoded byte.
+    if n == 0:
+        return 1
+
+    # Each varint byte carries seven value bits.
+    return (n.bit_length() + 6) // 7
+
+
 def _pb_bytes(field_num, data):
     """Protobuf wire-type 2 (length-delimited bytes) field."""
     tag = _varint((field_num << 3) | 2)
@@ -170,6 +196,32 @@ def _pb_varint_field(field_num, value):
     """Protobuf wire-type 0 (varint) field."""
     tag = _varint((field_num << 3) | 0)
     return tag + _varint(value)
+
+
+def predict_megolm_ciphertext_len(plaintext_len, counter=0):
+    """Predict MegOLM's base64 ciphertext length without encrypting.
+
+    The calculation mirrors the padding, protobuf framing, authentication,
+    and signature added by ``MatrixMegOlmSession.encrypt()``. It uses
+    arithmetic only, keeping memory use constant for large candidates.
+    """
+    # AES-256-CBC with PKCS7 padding always adds 1-16 bytes.
+    padded_len = (plaintext_len // 16 + 1) * 16
+
+    # These field tags are one byte; only their encoded values vary in size.
+    counter_field_len = 1 + _varint_len(counter)
+
+    # Include the ciphertext tag, encoded length, and padded bytes.
+    ciphertext_field_len = 1 + _varint_len(padded_len) + padded_len
+
+    # The MegOLM version byte precedes both protobuf fields.
+    body_len = 1 + counter_field_len + ciphertext_field_len
+
+    # Add the truncated HMAC and Ed25519 signature.
+    total = body_len + 8 + 64
+
+    # The final Matrix field contains unpadded base64.
+    return _b64_unpadded_len(total)
 
 
 def _canonical_json(obj):
@@ -827,7 +879,8 @@ class MatrixMegOlmSession:
 
         Reference: MegOLM spec, Section 4.
         """
-        plaintext = dumps(payload_dict).encode("utf-8")
+        # Preserve Unicode as UTF-8 instead of expanding it into JSON escapes.
+        plaintext = dumps(payload_dict, ensure_ascii=False).encode("utf-8")
         aes_key, mac_key, iv = self._message_keys()
 
         ct_bytes = _aes_cbc_encrypt(aes_key, iv, plaintext)

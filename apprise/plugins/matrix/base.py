@@ -50,6 +50,7 @@ from ...common import (
     NotifyType,
     PersistentStoreMode,
 )
+from ...conversion import html_to_text
 from ...exception import AppriseException
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
@@ -67,6 +68,14 @@ from .e2ee import (
     encrypt_attachment,
     verify_device_keys,
     verify_signed_otk,
+)
+from .sizing import (
+    MATRIX_EVENT_BYTE_LIMIT,
+    MATRIX_EVENT_SAFETY_MARGIN,
+    body_char_limit as _matrix_body_char_limit,
+    effective_body_maxlen as _matrix_effective_body_maxlen_var,
+    payload_preview as _matrix_payload_preview,
+    sanitize_text as _matrix_sanitize_text,
 )
 
 # Define default path
@@ -190,8 +199,20 @@ class NotifyMatrix(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/matrix/"
 
+    # Matrix supports plain text, HTML, and Markdown (rendered to HTML).
+    # TEXT remains the default to preserve existing URLs' behavior.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_32
+
+    # Matrix sizing accounts for titles separately from body chunks.
+    title_maxlen = 250
+    overflow_amalgamate_title = False
 
     # The maximum allowable characters allowed in the body per message
     # https://spec.matrix.org/v1.6/client-server-api/#size-limits
@@ -199,9 +220,14 @@ class NotifyMatrix(NotifyBase):
     # with the federation event format, including any signatures, and encoded
     # as Canonical JSON.
     #
-    # To gracefully allow for some overhead' we'll define a max body length
-    # of just slighty lower then the limit of the full message itself.
-    body_maxlen = 65000
+    # These are fallback values used outside content-aware message preparation.
+    # They leave room for event structure when body_maxlen is read before a
+    # message is prepared or while a webhook uses its own payload shape.
+    body_maxlen_default = 65000
+
+    # Encrypted events use a lower fallback limit because encryption and its
+    # JSON wrapper increase the final message size.
+    body_maxlen_e2ee = 40000
 
     # Throttle a wee-bit to avoid thrashing
     request_rate_per_sec = 0.5
@@ -552,8 +578,64 @@ class NotifyMatrix(NotifyBase):
                 with contextlib.suppress(Exception):
                     self._e2ee_account = MatrixOlmAccount.from_dict(acct_data)
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def _build_send_calls(
+        self, body=None, title=None, body_format=None, **kwargs
+    ):
+        """Choose a content-aware limit before normal framework splitting.
+
+        A normalized preview sizes direct events without changing the values
+        passed to the framework. This preserves its trimming behavior and
+        warnings while accounting for JSON, rich text, titles, and E2EE.
+        """
+        if self.mode == MatrixWebhookMode.DISABLED:
+            # Build a bounded preview without changing framework inputs.
+            preview_body, preview_title = _matrix_payload_preview(
+                self.asset, body, title
+            )
+
+            # Resolve the actual format used by this individual send.
+            resolved_format = self.resolve_format(body_format)
+
+            # Encryption is possible only with TLS and optional E2EE support.
+            e2ee_capable = self.e2ee and self.secure and MATRIX_E2EE_SUPPORT
+
+            # Keep concurrent calls from sharing temporary sizing state.
+            token = _matrix_effective_body_maxlen_var.set(
+                _matrix_body_char_limit(
+                    preview_body,
+                    preview_title[: self.title_maxlen],
+                    resolved_format,
+                    e2ee_capable,
+                    self.device_id,
+                    self.escape_html,
+                )
+            )
+        else:
+            token = None
+
+        try:
+            # Split and repair the original values through the framework.
+            yield from super()._build_send_calls(
+                body=body, title=title, body_format=body_format, **kwargs
+            )
+        finally:
+            # Restore the previous value after this generator finishes.
+            if token is not None:
+                _matrix_effective_body_maxlen_var.reset(token)
+
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Matrix Notification."""
+
+        # Sanitize each bounded chunk before any delivery mode serializes it.
+        body = _matrix_sanitize_text(body)
+        title = _matrix_sanitize_text(title)
 
         # Call the _send_ function applicable to whatever mode we're in
         # - calls _send_webhook_notification if the mode variable is set
@@ -565,7 +647,46 @@ class NotifyMatrix(NotifyBase):
                 if self.mode != MatrixWebhookMode.DISABLED
                 else "server"
             ),
-        )(body=body, title=title, notify_type=notify_type, **kwargs)
+        )(
+            body=body,
+            title=title,
+            notify_type=notify_type,
+            body_format=body_format,
+            **kwargs,
+        )
+
+    def dialect_convert(self, body, body_format=None, *args, **kwargs):
+        """Render CommonMark as HTML for Matrix's rich-text fields.
+
+        Slack webhooks keep CommonMark for Slack to render.
+        """
+        # Non-Markdown bodies need no dialect conversion.
+        if body_format != NotifyFormat.MARKDOWN:
+            return body
+
+        # Slack expects the original CommonMark source.
+        if self.mode == MatrixWebhookMode.SLACK:
+            return body
+
+        # Other Matrix paths receive rendered HTML.
+        return markdown(body)
+
+    def _matrix_plain_fallback(self, body, body_format, body_passthrough):
+        """Build Matrix's plain-text fallback.
+
+        Strip confirmed HTML or Markdown. Preserve plain and passthrough
+        content because its source format is unknown.
+        """
+        # Preserve undeclared content because its source format is unknown.
+        if body_passthrough:
+            return body
+
+        # Plain text already is its own fallback.
+        if body_format not in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
+            return body
+
+        # Strip markup for clients that cannot display formatted content.
+        return html_to_text(body)
 
     def _send_webhook_notification(
         self, body, title="", notify_type=NotifyType.INFO, **kwargs
@@ -614,7 +735,7 @@ class NotifyMatrix(NotifyBase):
                 token=access_token,
             )
 
-        # Retrieve our payload
+        # Build the payload for the configured webhook mode.
         payload = getattr(self, f"_{self.mode}_webhook_payload")(
             body=body, title=title, notify_type=notify_type, **kwargs
         )
@@ -632,7 +753,9 @@ class NotifyMatrix(NotifyBase):
         try:
             r = requests.post(
                 url,
-                data=dumps(payload),
+                # ensure_ascii=False avoids inflating multi-byte content
+                # (emoji, non-Latin text) into \uXXXX escapes.
+                data=dumps(payload, ensure_ascii=False),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -674,7 +797,12 @@ class NotifyMatrix(NotifyBase):
         return True
 
     def _slack_webhook_payload(
-        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
     ):
         """Format the payload for a Slack based message."""
 
@@ -707,11 +835,11 @@ class NotifyMatrix(NotifyBase):
             body,
         )
 
-        # prepare JSON Object
+        # Build Slack's attachment-style JSON payload.
         payload = {
             "username": self.user if self.user else self.app_id,
-            # Use Markdown language
-            "mrkdwn": self.notify_format == NotifyFormat.MARKDOWN,
+            # Slack renders the CommonMark body itself.
+            "mrkdwn": body_format == NotifyFormat.MARKDOWN,
             "attachments": [
                 {
                     "title": title,
@@ -726,19 +854,26 @@ class NotifyMatrix(NotifyBase):
         return payload
 
     def _matrix_webhook_payload(
-        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
     ):
         """Format the payload for a Matrix based message."""
 
+        # Tell the bridge whether the supplied text is plain or HTML.
         payload = {
             "displayName": self.user if self.user else self.app_id,
             "format": (
-                "plain" if self.notify_format == NotifyFormat.TEXT else "html"
+                "plain" if body_format == NotifyFormat.TEXT else "html"
             ),
             "text": "",
         }
 
-        if self.notify_format == NotifyFormat.HTML:
+        # Declared Markdown is already HTML; passthrough content is unchanged.
+        if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
             payload["text"] = "{title}{body}".format(
                 title=(
                     ""
@@ -746,16 +881,6 @@ class NotifyMatrix(NotifyBase):
                     else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
                 ),
                 body=body,
-            )
-
-        elif self.notify_format == NotifyFormat.MARKDOWN:
-            payload["text"] = "{title}{body}".format(
-                title=(
-                    ""
-                    if not title
-                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
-                ),
-                body=markdown(body),
             )
 
         else:  # NotifyFormat.TEXT
@@ -785,17 +910,31 @@ class NotifyMatrix(NotifyBase):
         return payload
 
     def _hookshot_webhook_payload(
-        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        body_passthrough=None,
+        **kwargs,
     ):
         """Format the payload for a matrix-hookshot webhook."""
 
+        # Hookshot accepts a plain fallback and optional formatted HTML.
         payload = {
             "username": self.user if self.user else self.app_id,
             "text": "",
         }
 
-        if self.notify_format == NotifyFormat.HTML:
-            payload["text"] = body if not title else f"{title}\r\n{body}"
+        # Declared Markdown is already HTML; passthrough content is unchanged.
+        if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
+            # Keep confirmed markup out of the plain-text fallback.
+            plain_body = self._matrix_plain_fallback(
+                body, body_format, body_passthrough
+            )
+            payload["text"] = (
+                plain_body if not title else f"{title}\r\n{plain_body}"
+            )
             payload["html"] = "{title}{body}".format(
                 title=(
                     ""
@@ -803,17 +942,6 @@ class NotifyMatrix(NotifyBase):
                     else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
                 ),
                 body=body,
-            )
-
-        elif self.notify_format == NotifyFormat.MARKDOWN:
-            payload["text"] = body if not title else f"{title}\r\n{body}"
-            payload["html"] = "{title}{body}".format(
-                title=(
-                    ""
-                    if not title
-                    else f"<h1>{NotifyMatrix.escape_html(title)}</h1>"
-                ),
-                body=markdown(body),
             )
 
         else:  # NotifyFormat.TEXT
@@ -830,6 +958,8 @@ class NotifyMatrix(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
+        body_passthrough=None,
         **kwargs,
     ):
         """Perform Direct Matrix Server Notification (no webhook)"""
@@ -846,16 +976,9 @@ class NotifyMatrix(NotifyBase):
             # We need to register
             return False
 
-        # Resolve user_id (and device_id / home_server as a side-effect) via
-        # /whoami whenever user_id is still absent after login/token setup.
-        # This covers all paths where the server does not return user_id:
-        #   - raw access-token auth (no /login flow at all)
-        #   - username + ?token= (password treated as token, not a login)
-        #   - servers that omit optional /login response fields
-        # Without user_id the m.direct lookup is skipped and
-        # each send creates a fresh orphan DM room instead of reusing the
-        # existing one.  home_server is recovered from user_id inside
-        # _whoami(); the fallback at handles any remaining gap.
+        # Fetch identity values omitted by raw-token or incomplete login paths.
+        # Without a user ID, direct-message lookup may create duplicate rooms.
+        # _whoami also derives the home server when possible.
         if not self.user_id:
             self._whoami()
 
@@ -928,7 +1051,12 @@ class NotifyMatrix(NotifyBase):
             if e2ee_capable and self._e2ee_room_encrypted(room_id):
                 # E2EE path: encrypt message and any attachments
                 if not self._e2ee_send_to_room(
-                    room_id, body, title, notify_type
+                    room_id,
+                    body,
+                    title,
+                    notify_type,
+                    body_format,
+                    body_passthrough,
                 ):
                     has_error = True
                     continue
@@ -1024,47 +1152,38 @@ class NotifyMatrix(NotifyBase):
                         has_error = True
                         continue
 
+            # Matrix clients use this fallback when they cannot display HTML.
+            plain_body = self._matrix_plain_fallback(
+                body, body_format, body_passthrough
+            )
+
             # Define our payload
             payload = {
                 "msgtype": f"m.{self.msgtype}",
                 "body": "{title}{body}".format(
                     title="" if not title else f"# {title}\r\n",
-                    body=body,
+                    body=plain_body,
                 ),
             }
 
-            # Update our payload advance formatting for the services that
-            # support them.
-            if self.notify_format == NotifyFormat.HTML:
-                payload.update(
-                    {
-                        "format": "org.matrix.custom.html",
-                        "formatted_body": "{title}{body}".format(
-                            title=("" if not title else f"<h1>{title}</h1>"),
-                            body=body,
-                        ),
-                    }
-                )
-
-            elif self.notify_format == NotifyFormat.MARKDOWN:
-                title_ = (
+            # HTML and rendered Markdown share a formatted body. HTML titles
+            # remain trusted, while Markdown titles are escaped.
+            if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
+                title_html = (
                     ""
                     if not title
                     else (
-                        "<h1>{}".format(
+                        f"<h1>{title}</h1>"
+                        if body_format == NotifyFormat.HTML
+                        else "<h1>{}</h1>".format(
                             NotifyMatrix.escape_html(title, whitespace=False)
                         )
-                        + "</h1>"
                     )
                 )
-
                 payload.update(
                     {
                         "format": "org.matrix.custom.html",
-                        "formatted_body": "{title}{body}".format(
-                            title=title_,
-                            body=markdown(body),
-                        ),
+                        "formatted_body": f"{title_html}{body}",
                     }
                 )
 
@@ -1336,11 +1455,8 @@ class NotifyMatrix(NotifyBase):
     def _whoami(self):
         """Resolve user_id, device_id, and home_server via GET /account/whoami.
 
-        Called when a raw access token is supplied (no login flow), so
-        the server never returned these identifiers directly.  Results
-        are cached in the persistent store for future calls.
-
-        Returns True on success, False otherwise.
+        Raw access tokens skip login, so this fetches the missing identity
+        values and caches them. Returns ``True`` on success.
         """
         ok, response, _ = self._fetch(
             "/account/whoami", payload=None, method="GET"
@@ -1852,7 +1968,13 @@ class NotifyMatrix(NotifyBase):
             try:
                 r = fn(
                     url,
-                    data=dumps(payload) if not attachment else payload,
+                    # ensure_ascii=False avoids inflating multi-byte
+                    # content (emoji, non-Latin text) into \uXXXX escapes.
+                    data=(
+                        dumps(payload, ensure_ascii=False)
+                        if not attachment
+                        else payload
+                    ),
                     params=params if params else None,
                     headers=headers,
                     verify=self.verify_certificate,
@@ -1993,12 +2115,8 @@ class NotifyMatrix(NotifyBase):
     def _e2ee_setup(self):
         """Ensure the E2EE device account exists and keys are uploaded.
 
-        Creates a new :class:`MatrixOlmAccount` if one does not yet
-        exist in the persistent store, then calls
-        :meth:`_e2ee_upload_keys` if the server has not yet received
-        our device keys for the current access token.
-
-        Returns ``True`` on success, ``False`` on failure.
+        Restores or creates the local account, then uploads device keys when
+        the current server identity has not received them. Returns a boolean.
         """
         if self._e2ee_account is None:
             acct_data = self.store.get("e2ee_account")
@@ -2633,7 +2751,15 @@ class NotifyMatrix(NotifyBase):
 
         return True
 
-    def _e2ee_send_to_room(self, room_id, body, title, notify_type):
+    def _e2ee_send_to_room(
+        self,
+        room_id,
+        body,
+        title,
+        notify_type,
+        body_format=None,
+        body_passthrough=None,
+    ):
         """Encrypt and send one message to *room_id* via MegOLM.
 
         Shares the MegOLM session key with room members when the
@@ -2678,44 +2804,38 @@ class NotifyMatrix(NotifyBase):
                 session.session_id[:12],
             )
 
+        # Matrix clients use this fallback when they cannot display HTML.
+        plain_body = self._matrix_plain_fallback(
+            body, body_format, body_passthrough
+        )
+
         # Build the inner plaintext event
         msg_content = {
             "msgtype": "m.{}".format(self.msgtype),
             "body": "{title}{body}".format(
                 title="" if not title else "# {}\r\n".format(title),
-                body=body,
+                body=plain_body,
             ),
         }
 
-        if self.notify_format == NotifyFormat.HTML:
-            msg_content.update(
-                {
-                    "format": "org.matrix.custom.html",
-                    "formatted_body": "{title}{body}".format(
-                        title=(
-                            "" if not title else "<h1>{}</h1>".format(title)
-                        ),
-                        body=body,
-                    ),
-                }
+        # HTML and rendered Markdown share a formatted body. HTML titles
+        # remain trusted, while Markdown titles are escaped.
+        if body_format in (NotifyFormat.HTML, NotifyFormat.MARKDOWN):
+            title_html = (
+                ""
+                if not title
+                else (
+                    "<h1>{}</h1>".format(title)
+                    if body_format == NotifyFormat.HTML
+                    else "<h1>{}</h1>".format(
+                        NotifyMatrix.escape_html(title, whitespace=False)
+                    )
+                )
             )
-
-        elif self.notify_format == NotifyFormat.MARKDOWN:
             msg_content.update(
                 {
                     "format": "org.matrix.custom.html",
-                    "formatted_body": "{title}{body}".format(
-                        title=(
-                            ""
-                            if not title
-                            else "<h1>{}</h1>".format(
-                                NotifyMatrix.escape_html(
-                                    title, whitespace=False
-                                )
-                            )
-                        ),
-                        body=markdown(body),
-                    ),
+                    "formatted_body": f"{title_html}{body}",
                 }
             )
 
@@ -2747,6 +2867,26 @@ class NotifyMatrix(NotifyBase):
             "session_id": session.session_id,
             "device_id": self.device_id or "",
         }
+
+        # A device ID learned after sizing may exceed the fallback.
+        # Measure the finished encrypted content before sending it.
+        encrypted_bytes = len(
+            dumps(encrypted_payload, ensure_ascii=False).encode("utf-8")
+        )
+
+        # Prepare budget
+        safe_byte_budget = MATRIX_EVENT_BYTE_LIMIT - MATRIX_EVENT_SAFETY_MARGIN
+        if encrypted_bytes > safe_byte_budget:
+            self.logger.warning(
+                "Matrix E2EE: encrypted event for room %s is %d bytes, "
+                "over the safe %d-byte budget (device_id is %d "
+                "characters); message not sent.",
+                room_id,
+                encrypted_bytes,
+                safe_byte_budget,
+                len(self.device_id or ""),
+            )
+            return False
 
         postokay, _, _ = self._fetch(
             path, payload=encrypted_payload, method="PUT"
@@ -3047,6 +3187,30 @@ class NotifyMatrix(NotifyBase):
         # Best-effort cleanup only
         with contextlib.suppress(Exception):
             self._logout()
+
+    @property
+    def body_maxlen(self):
+        """Return the body character limit for the current message.
+
+        Direct sends use the content-aware value while chunks are prepared.
+        Reads outside preparation use the normal encrypted fallback, while
+        webhook modes always retain their standard flat limit.
+        """
+        # Use the temporary content-aware value during message preparation.
+        # Context-local state isolates concurrent notification calls.
+        effective = _matrix_effective_body_maxlen_var.get()
+        if effective is not None:
+            return effective
+
+        # Webhook payloads retain their normal flat limit.
+        if self.mode != MatrixWebhookMode.DISABLED:
+            return self.body_maxlen_default
+
+        # Direct sends use the encrypted fallback only when E2EE is possible.
+        e2ee_capable = self.e2ee and self.secure and MATRIX_E2EE_SUPPORT
+        return (
+            self.body_maxlen_e2ee if e2ee_capable else self.body_maxlen_default
+        )
 
     @property
     def url_identifier(self):
