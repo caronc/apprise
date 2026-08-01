@@ -482,7 +482,7 @@ class Apprise:
         location: Optional[ContentLocation] = None,
         debug: bool = False,
         log_callback: Optional[
-            Callable[[NotifyLogEntry, NotifyBase], Any]
+            Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
     ) -> None:
         """Loads a set of server urls while applying the Asset() module to each
@@ -493,8 +493,10 @@ class Apprise:
         Optionally specify a global ContentLocation for a more strict means of
         handling Attachments.
 
-        log_callback, when given, fires on every warning/error a service
-        logs. Applies to every notify() call unless overridden per-call.
+        log_callback receives captured service warnings and errors as
+        ``log_callback(entry, service)``. It runs inline and must be a short,
+        synchronous function. Schedule async work from the callback when
+        needed.
         """
 
         # Initialize a server list of URLs
@@ -1134,7 +1136,7 @@ class Apprise:
         interpret_escapes: Optional[bool] = None,
         timeout: Union[int, float] = 0,
         log_callback: Optional[
-            Callable[[NotifyLogEntry, NotifyBase], Any]
+            Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
     ) -> AppriseResult:
         """Send a notification to all the plugins previously loaded.
@@ -1195,7 +1197,8 @@ class Apprise:
         non-numeric values raise TypeError, exactly like
         AppriseAsset(service_timeout=...) itself.
 
-        log_callback overrides the instance default for this call only.
+        log_callback overrides the instance default for this call. It must be
+        synchronous; schedule any async work from inside the callback.
         """
         timeout = _validate_timeout(timeout)
         effective_log_callback = (
@@ -1395,9 +1398,9 @@ class Apprise:
         timeout: Union[int, float] = _validate_timeout(
             kwargs.pop("timeout", 0)
         )
-        log_callback: Optional[Callable[[NotifyLogEntry, NotifyBase], Any]] = (
-            kwargs.pop("log_callback", None)
-        )
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, NotifyBase], None]
+        ] = kwargs.pop("log_callback", None)
         effective_log_callback = (
             log_callback if log_callback is not None else self._log_callback
         )
