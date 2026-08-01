@@ -669,6 +669,75 @@ def test_plugin_bark_encryption_failure_prevents_network_io(mock_post):
     assert "private-device" not in logged
 
 
+@mock.patch("requests.post")
+def test_plugin_bark_encrypted_send_http_error(mock_post, monkeypatch):
+    """NotifyBark() suppresses response details when encrypted."""
+    pytest.importorskip("cryptography")
+    monkeypatch.setattr(
+        bark_module.secrets,
+        "token_urlsafe",
+        lambda length: "fixed-iv-123",
+    )
+    response = mock.Mock()
+    response.status_code = requests.codes.internal_server_error
+    response.content = b"private response body"
+    mock_post.return_value = response
+    instance = NotifyBark(
+        host="localhost",
+        targets=("private-device",),
+        secure=True,
+        encryption_key="k" * 32,
+        include_image=False,
+    )
+    instance.logger = mock.Mock()
+
+    assert instance.send(body="private body", title="private title") is False
+    # The encrypted request still went out; it's the server's response
+    # that failed, not the encryption step
+    assert mock_post.call_count == 1
+
+    # A failure warning must still surface, just without the response
+    # body attached to it
+    instance.logger.warning.assert_called_once()
+    logged = repr(instance.logger.method_calls)
+    assert "private response body" not in logged
+    assert "private body" not in logged
+    assert "private title" not in logged
+    assert "private-device" not in logged
+
+
+@mock.patch("requests.post")
+def test_plugin_bark_encrypted_send_connection_error(mock_post, monkeypatch):
+    """NotifyBark() suppresses socket exception details when encrypted."""
+    pytest.importorskip("cryptography")
+    monkeypatch.setattr(
+        bark_module.secrets,
+        "token_urlsafe",
+        lambda length: "fixed-iv-123",
+    )
+    mock_post.side_effect = requests.RequestException("private socket detail")
+    instance = NotifyBark(
+        host="localhost",
+        targets=("private-device",),
+        secure=True,
+        encryption_key="k" * 32,
+        include_image=False,
+    )
+    instance.logger = mock.Mock()
+
+    assert instance.send(body="private body", title="private title") is False
+    assert mock_post.call_count == 1
+
+    # A failure warning must still surface, just without the raw
+    # exception text attached to it
+    instance.logger.warning.assert_called_once()
+    logged = repr(instance.logger.method_calls)
+    assert "private socket detail" not in logged
+    assert "private body" not in logged
+    assert "private title" not in logged
+    assert "private-device" not in logged
+
+
 def test_plugin_bark_runtime_dependencies():
     """NotifyBark() declares its optional cryptography dependency."""
     assert NotifyBark.runtime_deps() == ("cryptography",)

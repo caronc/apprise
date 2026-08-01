@@ -342,9 +342,12 @@ class NotifyBark(NotifyBase):
         # Call
         self.call = parse_bool(call)
 
+        # Encryption is off unless an encryption key was explicitly given
         self.encryption_key = None
         self._cipher = None
         if encryption_key:
+            # The Bark app expects a raw ASCII key, so reject anything
+            # that can't be represented as one up front
             try:
                 encryption_key_bytes = encryption_key.encode("ascii")
 
@@ -356,6 +359,7 @@ class NotifyBark(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg) from None
 
+            # AES-GCM only accepts 128/192/256-bit (16/24/32 byte) keys
             if len(encryption_key_bytes) not in BARK_AES_KEY_LENGTHS:
                 msg = (
                     "The Bark encryption key must contain exactly 16, 24, or "
@@ -364,6 +368,8 @@ class NotifyBark(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+            # Fail closed; never fall back to sending plaintext when the
+            # caller asked for encryption but the library isn't available
             if not BARK_AESGCM_SUPPORT:
                 msg = (
                     "Bark encryption requires the 'cryptography' package. "
@@ -372,6 +378,7 @@ class NotifyBark(NotifyBase):
                 self.logger.warning(msg)
                 raise TypeError(msg)
 
+            # We're ready to encrypt every outbound payload with this key
             self.encryption_key = encryption_key
             self._cipher = AESGCM(encryption_key_bytes)
 
@@ -485,8 +492,10 @@ class NotifyBark(NotifyBase):
                 safe="",
             )
 
-            request_payload = {"device_key": target, **payload}
             if self._cipher is not None:
+                # Encrypt the payload; on success this replaces the
+                # plaintext fields with a device_key/ciphertext/iv wire
+                # payload for this target
                 try:
                     ciphertext, iv = self._encrypt_payload(payload)
                     request_payload = {
@@ -496,12 +505,18 @@ class NotifyBark(NotifyBase):
                     }
 
                 except Exception as e:
+                    # Fail closed; never fall back to sending this
+                    # target's notification as plaintext
                     self.logger.warning("Failed to encrypt Bark notification.")
                     self.logger.debug(
                         "Bark encryption failed with %s.", type(e).__name__
                     )
                     has_error = True
                     continue
+
+            else:
+                # Plaintext payload; just tag on this target's device key
+                request_payload = {"device_key": target, **payload}
 
             self.logger.debug(
                 "Bark POST URL:"
@@ -510,6 +525,7 @@ class NotifyBark(NotifyBase):
                 f"encrypted={self._cipher is not None!r})"
             )
             if self._cipher is None:
+                # Never log ciphertext/iv; there's nothing readable in it
                 self.logger.debug(f"Bark Payload: {request_payload!s}")
 
             # Always call throttle before any remote server i/o is made
@@ -541,6 +557,8 @@ class NotifyBark(NotifyBase):
                     )
 
                     if self._cipher is None:
+                        # The response body is only safe to log when we
+                        # sent a plaintext request in the first place
                         self.logger.debug(
                             "Response Details:\r\n%r",
                             (r.content or b"")[:2000],
@@ -561,6 +579,8 @@ class NotifyBark(NotifyBase):
                     f"notification to {private_target}."
                 )
                 if self._cipher is None:
+                    # Suppress low-level exception text once encryption
+                    # is active; it may echo back request fragments
                     self.logger.debug(f"Socket Exception: {e!s}")
 
                 # Mark our failure
@@ -571,20 +591,30 @@ class NotifyBark(NotifyBase):
 
     def _encrypt_payload(self, payload):
         """Encrypt one Bark parameter object with a fresh AES-GCM IV."""
+
+        # Generate a fresh IV for every request; Bark's client rebuilds
+        # this string as raw bytes, so it must land on exactly 12 ASCII
+        # characters (a 96-bit GCM nonce)
         iv = secrets.token_urlsafe(BARK_GCM_IV_RANDOM_BYTES)
         if len(iv) != BARK_GCM_IV_LENGTH or not iv.isascii():
             raise ValueError("Bark generated an incompatible AES-GCM IV")
 
+        # Bark decrypts a compact JSON object back into its parameters
         plaintext = json.dumps(
             payload,
             ensure_ascii=False,
             separators=(",", ":"),
         ).encode("utf-8")
+
+        # No additional authenticated data; tag is appended to the
+        # ciphertext automatically (GCM "combined" mode)
         ciphertext = self._cipher.encrypt(
             iv.encode("ascii"),
             plaintext,
             None,
         )
+
+        # Bark expects the ciphertext base64-encoded and the IV as-is
         return base64.b64encode(ciphertext).decode("ascii"), iv
 
     @property
