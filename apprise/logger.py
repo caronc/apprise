@@ -28,7 +28,6 @@
 from __future__ import annotations
 
 import asyncio
-import concurrent.futures as cf
 import contextlib
 import contextvars
 from datetime import datetime, timezone
@@ -179,15 +178,15 @@ class NotifyLogEntry:
 class _ServiceLogCapture(logging.Handler):
     """Capture one service's warning and error messages in isolation.
 
-    It attaches one extra handler for a single attempt. ``log_callback``,
-    when provided, receives each captured (entry, service) live.
+    A temporary handler stores one attempt's entries. ``log_callback`` receives
+    them live and must return promptly; it can schedule async work if needed.
     """
 
     def __init__(
         self,
         service: NotifyBase,
         log_callback: Optional[
-            Callable[[NotifyLogEntry, NotifyBase], Any]
+            Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
     ) -> None:
         """Prepare an isolated WARNING-level handler for ``service``."""
@@ -203,14 +202,6 @@ class _ServiceLogCapture(logging.Handler):
         # Kept only so log_callback can identify the service.
         self._service = service
         self._log_callback = log_callback
-
-        # support for async log_callback.
-        try:
-            self._loop: Optional[asyncio.AbstractEventLoop] = (
-                asyncio.get_running_loop()
-            )
-        except RuntimeError:
-            self._loop = None
 
         # Set on __enter__, used to restore _active_capture on __exit__.
         self._token: Optional[contextvars.Token] = None
@@ -277,12 +268,11 @@ class _ServiceLogCapture(logging.Handler):
     def _invoke_log_callback(
         self,
         entry: NotifyLogEntry,
-        callback: Callable[[NotifyLogEntry, NotifyBase], Any],
+        callback: Callable[[NotifyLogEntry, NotifyBase], None],
     ) -> None:
-        """Call log_callback(entry, service) for one captured entry.
+        """Call ``log_callback(entry, service)``.
 
-        The returned value tells us whether it was plain sync work or an
-        async coroutine that still needs scheduling.
+        Its return value is ignored.
         """
         try:
             result = callback(entry, self._service)
@@ -292,37 +282,14 @@ class _ServiceLogCapture(logging.Handler):
             logger.debug("log_callback Exception: %s", str(e))
             return
 
-        if not asyncio.iscoroutine(result):
-            return
-
-        if self._loop is None:
-            # No loop is available; close the coroutine to avoid a warning.
+        if asyncio.iscoroutine(result):
+            # Close unsupported async callbacks without leaking a warning.
             result.close()
             logger.warning(
-                "The log_callback returned async work, but no asyncio event "
-                "loop is running; this live log update was skipped: %s",
-                entry,
+                "The log_callback function must be synchronous; its "
+                "returned coroutine was ignored. Schedule async work "
+                "from inside the callback instead."
             )
-            return
-
-        # This is safe from worker threads and the loop's own thread.
-        future = asyncio.run_coroutine_threadsafe(result, self._loop)
-        future.add_done_callback(self._log_callback_done)
-
-    @staticmethod
-    def _log_callback_done(future: cf.Future[Any]) -> None:
-        """Surface any exception from a scheduled async log_callback."""
-        if future.cancelled():
-            logger.warning(
-                "A log_callback update was cancelled before it completed. "
-                "The log entry was still saved normally."
-            )
-            return
-
-        exc = future.exception()
-        if exc is not None:
-            logger.warning("The log_callback function raised an exception.")
-            logger.debug("log_callback Exception: %s", str(exc))
 
     @property
     def entries(self) -> list[NotifyLogEntry]:
