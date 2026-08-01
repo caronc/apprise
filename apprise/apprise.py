@@ -493,24 +493,10 @@ class Apprise:
         Optionally specify a global ContentLocation for a more strict means of
         handling Attachments.
 
-        log_callback receives each service warning or error as
-        ``log_callback(entry, service)``. It runs inline, so use a short
-        synchronous function and schedule any async work from there.
-        Keep each task referenced until it finishes because the event loop
-        holds only a weak reference:
-
-            loop = asyncio.get_running_loop()
-            background_tasks = set()
-
-            def _schedule(entry, service):
-                task = loop.create_task(
-                    my_async_handler(entry, service)
-                )
-                background_tasks.add(task)
-                task.add_done_callback(background_tasks.discard)
-
-            def log_callback(entry, service):
-                loop.call_soon_threadsafe(_schedule, entry, service)
+        log_callback receives captured service warnings and errors as
+        ``log_callback(entry, service)``. It runs inline and must be a short,
+        synchronous function. Schedule async work from the callback when
+        needed.
         """
 
         # Initialize a server list of URLs
@@ -1212,7 +1198,7 @@ class Apprise:
         AppriseAsset(service_timeout=...) itself.
 
         log_callback overrides the instance default for this call. It must be
-        synchronous; see ``Apprise.__init__()`` for an async-work example.
+        synchronous; schedule any async work from inside the callback.
         """
         timeout = _validate_timeout(timeout)
         effective_log_callback = (
