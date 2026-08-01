@@ -826,7 +826,11 @@ class MatrixMegOlmSession:
 
         Reference: MegOLM spec, Section 4.
         """
-        plaintext = dumps(payload_dict).encode("utf-8")
+        # Keep Unicode compact so encryption does not carry JSON escape bloat.
+        # Replace invalid code points before converting plaintext to bytes.
+        plaintext = dumps(payload_dict, ensure_ascii=False).encode(
+            "utf-8", errors="replace"
+        )
         aes_key, mac_key, iv = self._message_keys()
 
         ct_bytes = _aes_cbc_encrypt(aes_key, iv, plaintext)
