@@ -26,11 +26,13 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from json import loads
+import logging
 from unittest import mock
 
 import requests
 
 import apprise
+from apprise import LOGGER_NAME
 
 
 @mock.patch("requests.request")
@@ -258,3 +260,49 @@ def test_apprise_escaping(mock_request):
         )
         is True
     )
+
+
+def test_apprise_escaping_non_string_inputs(caplog):
+    """Reject non-string message bodies and titles during escape handling."""
+    # Some test modules disable logging globally at import time
+    # This ensures we're correctly configured for this test.
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.ERROR, logger=LOGGER_NAME)
+
+    a = apprise.Apprise()
+
+    response = mock.Mock()
+    response.content = ""
+    response.status_code = requests.codes.ok
+
+    try:
+        with mock.patch("requests.request", return_value=response):
+            a.add("json://localhost")
+
+            result = a.notify(
+                title="valid",
+                body=["not", "a", "string"],
+                interpret_escapes=True,
+            )
+            assert bool(result) is False
+            # Like the malformed cases above, invalid input fails before
+            # dispatch.
+            assert list(result) == []
+            assert "Failed to escape message body" in caplog.text
+
+        caplog.clear()
+
+        with mock.patch("requests.request", return_value=response):
+            result = a.notify(
+                title=["not", "a", "string"],
+                body="valid",
+                interpret_escapes=True,
+            )
+            assert bool(result) is False
+            assert list(result) == []
+            # Title escaping reports the same user-facing error as body
+            # escaping.
+            assert "Failed to escape message body" in caplog.text
+
+    finally:
+        logging.disable(logging.CRITICAL)
