@@ -829,8 +829,9 @@ def test_parse_url_general():
     assert result["url"] == url
 
     # Keep commas and semicolons encoded because Apprise uses them as path/list
-    # delimiters. Otherwise path data such as a Home Assistant target list could
-    # become extra segments. Related regressions have dedicated plugin tests.
+    # delimiters. Otherwise path data such as a Home Assistant target list
+    # could become extra segments. Related regressions have dedicated plugin
+    # tests.
     result = utils.parse.parse_url("https://example.com/a,b;c/file.txt")
     assert result["fullpath"] == "/a%2Cb%3Bc/file.txt"
 

@@ -738,7 +738,8 @@ def parse_url(
     # Parse results
     result["host"] = parsed[1].strip()
     # Preserve RFC 3986 path characters used literally by some services.
-    # Keep commas and semicolons encoded because Apprise uses them as delimiters.
+    # Keep commas and semicolons encoded because Apprise uses them as
+    # delimiters.
     result["fullpath"] = quote(
         unquote(tidy_path(parsed[2].strip())), safe="/:@!$&'()*+="
     )
