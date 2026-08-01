@@ -806,121 +806,22 @@ def test_service_log_capture_callback_error():
     assert [e.message for e in cap.entries] == ["still captured"]
 
 
-def test_service_log_capture_async_callback_loop():
-    """An async log_callback is scheduled on the active event loop."""
+def test_service_log_capture_rejects_async_callback(caplog):
+    """Reject an async callback without losing the captured warning."""
+    # Older pytest releases may leave logging disabled after another test.
     logging.disable(logging.NOTSET)
-    received = []
+    caplog.set_level(logging.WARNING, logger=logger.name)
 
     async def _cb(entry, service):
-        """Record after yielding to the event loop."""
-        await asyncio.sleep(0.01)
-        received.append((service.service_name, entry.message))
-
-    async def _run():
-        """Schedule one async callback."""
-        service = _DummyNotify()
-        with _ServiceLogCapture(service, log_callback=_cb) as cap:
-            service.logger.warning("async entry")
-        # emit() schedules the callback but cannot await it.
-        await asyncio.sleep(0.1)
-        return cap
-
-    try:
-        cap = asyncio.run(_run())
-    finally:
-        logging.disable(logging.CRITICAL)
-
-    assert received == [("dummy", "async entry")]
-    assert [e.message for e in cap.entries] == ["async entry"]
-
-
-def test_service_log_capture_async_callback_no_loop():
-    """An async log_callback without an event loop is closed cleanly."""
-    logging.disable(logging.NOTSET)
-
-    async def _cb(entry, service):
-        """Callback that should be closed before it can run."""
-        pass  # pragma: no cover -- never actually runs
+        """A callback mistakenly defined as async; body never runs."""
+        pass  # pragma: no cover -- the coroutine is closed, not awaited
 
     try:
         service = _DummyNotify()
         with _ServiceLogCapture(service, log_callback=_cb) as cap:
-            service.logger.warning("no loop available")
+            service.logger.warning("service warning")
     finally:
         logging.disable(logging.CRITICAL)
 
-    assert [e.message for e in cap.entries] == ["no loop available"]
-
-
-def test_service_log_capture_async_callback_error():
-    """A scheduled async log_callback exception is logged."""
-    logging.disable(logging.NOTSET)
-
-    async def _broken_cb(entry, service):
-        """Raise inside the scheduled task."""
-        raise ValueError("boom from async callback")
-
-    async def _run():
-        """Schedule the failing callback and allow it to finish."""
-        service = _DummyNotify()
-        with _ServiceLogCapture(service, log_callback=_broken_cb) as cap:
-            service.logger.warning("still captured despite async error")
-        await asyncio.sleep(0.1)
-        return cap
-
-    try:
-        with mock.patch.object(logger, "debug") as mock_debug:
-            cap = asyncio.run(_run())
-    finally:
-        logging.disable(logging.CRITICAL)
-
-    assert [e.message for e in cap.entries] == [
-        "still captured despite async error"
-    ]
-    assert mock_debug.called
-    assert "boom from async callback" in str(mock_debug.call_args)
-
-
-def test_service_log_capture_cancelled_callback_future():
-    """_log_callback_done must swallow a cancelled callback future."""
-    future = cf.Future()
-    future.cancel()
-    assert future.cancelled()
-
-    with (
-        mock.patch.object(logger, "warning") as mock_warning,
-        mock.patch.object(logger, "debug") as mock_debug,
-    ):
-        # Must not raise.
-        _ServiceLogCapture._log_callback_done(future)
-
-    assert mock_warning.called
-    assert "cancelled" in str(mock_warning.call_args).lower()
-    assert not mock_debug.called
-
-
-def test_service_log_capture_loop_shutdown_cancel():
-    """A pending async log_callback can be cancelled at loop shutdown."""
-    logging.disable(logging.NOTSET)
-
-    async def _cb(entry, service):
-        """Remain pending until asyncio.run() teardown."""
-        # Long enough to still be pending when _run() returns.
-        await asyncio.sleep(0.2)
-
-    async def _run():
-        """Schedule one callback without waiting for it to finish."""
-        service = _DummyNotify()
-        with _ServiceLogCapture(service, log_callback=_cb) as cap:
-            service.logger.warning("cancelled before callback finishes")
-        return cap
-
-    try:
-        # No callback cancellation should propagate out of asyncio.run().
-        cap = asyncio.run(_run())
-    finally:
-        logging.disable(logging.CRITICAL)
-
-    assert [e.message for e in cap.entries] == [
-        "cancelled before callback finishes"
-    ]
+    assert [e.message for e in cap.entries] == ["service warning"]
+    assert "must be synchronous" in caplog.text
