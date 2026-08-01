@@ -50,6 +50,9 @@ from ...common import (
     NotifyType,
     PersistentStoreMode,
 )
+
+# Convert confirmed HTML into Matrix's required plain-text fallback.
+from ...conversion import html_to_text
 from ...exception import AppriseException
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
@@ -168,6 +171,21 @@ MATRIX_WEBHOOK_MODES = (
     MatrixWebhookMode.HOOKSHOT,
 )
 
+# Matrix rejects complete events larger than 65,536 bytes. This hard ceiling
+# includes message content, metadata, and federation signatures.
+# https://spec.matrix.org/v1.6/client-server-api/#size-limits
+MATRIX_EVENT_BYTE_LIMIT = 65536
+
+# Reserve 4,000 bytes for IDs, timestamps, sender details, and signatures
+# that the homeserver adds after Apprise submits the message content.
+MATRIX_EVENT_SAFETY_MARGIN = 4000
+
+# Limit Apprise-controlled JSON to the hard ceiling minus server overhead.
+# Direct and encrypted send paths both use this final safety allowance.
+MATRIX_CONTENT_BYTE_LIMIT = (
+    MATRIX_EVENT_BYTE_LIMIT - MATRIX_EVENT_SAFETY_MARGIN
+)
+
 
 class NotifyMatrix(NotifyBase):
     """A wrapper for Matrix Notifications."""
@@ -193,15 +211,22 @@ class NotifyMatrix(NotifyBase):
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_32
 
-    # The maximum allowable characters allowed in the body per message
-    # https://spec.matrix.org/v1.6/client-server-api/#size-limits
-    # The complete event MUST NOT be larger than 65536 bytes, when formatted
-    # with the federation event format, including any signatures, and encoded
-    # as Canonical JSON.
-    #
-    # To gracefully allow for some overhead' we'll define a max body length
-    # of just slighty lower then the limit of the full message itself.
-    body_maxlen = 65000
+    # These character limits let the framework split or truncate the body
+    # before Matrix builds and measures the completed JSON payload.
+    # A 60,000-character one-byte body leaves room for JSON and the title.
+    body_maxlen_default = 60000
+
+    # Two 29,000-character one-byte bodies leave room for JSON and the title.
+    body_maxlen_formatted = 29000
+
+    # Keep one-byte plaintext near 40,000 before encryption expands it.
+    body_maxlen_e2ee = 40000
+
+    # Two one-byte 19,000-character bodies leave room for encryption growth.
+    body_maxlen_e2ee_formatted = 19000
+
+    # Webhooks do not create direct room events, so retain v1's 65,000 limit.
+    body_maxlen_webhook = 65000
 
     # Throttle a wee-bit to avoid thrashing
     request_rate_per_sec = 0.5
@@ -552,9 +577,18 @@ class NotifyMatrix(NotifyBase):
                 with contextlib.suppress(Exception):
                     self._e2ee_account = MatrixOlmAccount.from_dict(acct_data)
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Matrix Notification."""
 
+        # Keep the caller's input format available to the selected sender.
+        # A value of None retains the legacy v1 pass-through behavior.
         # Call the _send_ function applicable to whatever mode we're in
         # - calls _send_webhook_notification if the mode variable is set
         # - calls _send_server_notification if the mode variable is not set
@@ -565,10 +599,80 @@ class NotifyMatrix(NotifyBase):
                 if self.mode != MatrixWebhookMode.DISABLED
                 else "server"
             ),
-        )(body=body, title=title, notify_type=notify_type, **kwargs)
+        )(
+            body=body,
+            title=title,
+            notify_type=notify_type,
+            body_format=body_format,
+            **kwargs,
+        )
+
+    def _matrix_plain_fallback(self, body, body_format=None):
+        """Build the fallback shown by clients without rich-text support."""
+        # A missing input format is v1's pass-through signal.
+        if body_format is None or self.notify_format != NotifyFormat.HTML:
+            # Preserve unknown or non-HTML content exactly as supplied.
+            return body
+
+        # Strip confirmed HTML for clients that only display plain text.
+        return html_to_text(body)
+
+    @staticmethod
+    def _matrix_enforce_byte_budget(payload, byte_budget, keys):
+        """Shrink selected fields until the JSON payload fits its byte
+        budget."""
+        # Measure after JSON encoding because escaping changes the byte count.
+        while True:
+            # Match the compact Unicode representation used for delivery.
+            encoded_len = len(
+                dumps(payload, ensure_ascii=False).encode(
+                    "utf-8", errors="replace"
+                )
+            )
+
+            # A negative or zero overage means the payload is ready to send.
+            overage = encoded_len - byte_budget
+            if overage <= 0:
+                break
+
+            # Prefer the largest body so both representations retain content.
+            target_key = max(
+                # Ignore missing and already-empty candidate fields.
+                (k for k in keys if payload.get(k)),
+                # Compare encoded size because characters have varying widths.
+                key=lambda k: len(
+                    payload[k].encode("utf-8", errors="replace")
+                ),
+                default=None,
+            )
+            if target_key is None:
+                # Fixed payload fields alone exceed the requested budget.
+                break
+
+            # Estimate how many characters account for the excess bytes.
+            text = payload[target_key]
+            bytes_per_char = len(text.encode("utf-8", errors="replace")) / len(
+                text
+            )
+
+            # Always remove at least one character so the loop progresses.
+            chars_to_drop = max(1, int(overage / bytes_per_char) + 1)
+
+            # Empty the field when the calculated reduction consumes it all.
+            payload[target_key] = (
+                text[:-chars_to_drop] if chars_to_drop < len(text) else ""
+            )
+
+        # Return the same payload object for convenient use by callers.
+        return payload
 
     def _send_webhook_notification(
-        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
     ):
         """Perform Matrix Notification as a webhook."""
 
@@ -614,9 +718,13 @@ class NotifyMatrix(NotifyBase):
                 token=access_token,
             )
 
-        # Retrieve our payload
+        # Forward the original format so webhook fallbacks remain accurate.
         payload = getattr(self, f"_{self.mode}_webhook_payload")(
-            body=body, title=title, notify_type=notify_type, **kwargs
+            body=body,
+            title=title,
+            notify_type=notify_type,
+            body_format=body_format,
+            **kwargs,
         )
 
         self.logger.debug(
@@ -632,7 +740,11 @@ class NotifyMatrix(NotifyBase):
         try:
             r = requests.post(
                 url,
-                data=dumps(payload),
+                # Keep Unicode compact instead of expanding it to \u escapes.
+                # Replace invalid code points before requests encodes the body.
+                data=dumps(payload, ensure_ascii=False)
+                .encode("utf-8", errors="replace")
+                .decode("utf-8"),
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
@@ -795,7 +907,17 @@ class NotifyMatrix(NotifyBase):
         }
 
         if self.notify_format == NotifyFormat.HTML:
-            payload["text"] = body if not title else f"{title}\r\n{body}"
+            # Build the value used by clients that ignore Hookshot's HTML.
+            plain_body = self._matrix_plain_fallback(
+                body, kwargs.get("body_format")
+            )
+
+            # Keep the title readable in the plain fallback.
+            payload["text"] = (
+                plain_body if not title else f"{title}\r\n{plain_body}"
+            )
+
+            # Place the original markup in Hookshot's rich HTML field.
             payload["html"] = "{title}{body}".format(
                 title=(
                     ""
@@ -830,6 +952,7 @@ class NotifyMatrix(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """Perform Direct Matrix Server Notification (no webhook)"""
@@ -926,9 +1049,9 @@ class NotifyMatrix(NotifyBase):
                 continue
 
             if e2ee_capable and self._e2ee_room_encrypted(room_id):
-                # E2EE path: encrypt message and any attachments
+                # Pass format provenance into the encrypted message builder.
                 if not self._e2ee_send_to_room(
-                    room_id, body, title, notify_type
+                    room_id, body, title, notify_type, body_format
                 ):
                     has_error = True
                     continue
@@ -1024,12 +1147,15 @@ class NotifyMatrix(NotifyBase):
                         has_error = True
                         continue
 
-            # Define our payload
+            # Build the fallback that Matrix clients always expect.
+            plain_body = self._matrix_plain_fallback(body, body_format)
+
+            # Start with the fields shared by every Matrix text message.
             payload = {
                 "msgtype": f"m.{self.msgtype}",
                 "body": "{title}{body}".format(
                     title="" if not title else f"# {title}\r\n",
-                    body=body,
+                    body=plain_body,
                 ),
             }
 
@@ -1068,7 +1194,15 @@ class NotifyMatrix(NotifyBase):
                     }
                 )
 
-            # Post our content
+            # Character splitting cannot predict the cost of emoji or escapes.
+            # Apply the byte limit to the completed Matrix content as a guard.
+            self._matrix_enforce_byte_budget(
+                payload,
+                MATRIX_CONTENT_BYTE_LIMIT,
+                keys=("formatted_body", "body"),
+            )
+
+            # Submit only after both character and byte limits are applied.
             postokay, _, _ = self._fetch(path, payload=payload, method="PUT")
 
             # Increment the transaction ID to avoid future messages being
@@ -1852,7 +1986,15 @@ class NotifyMatrix(NotifyBase):
             try:
                 r = fn(
                     url,
-                    data=dumps(payload) if not attachment else payload,
+                    # Keep Unicode compact instead of expanding it to escapes.
+                    # Replace invalid code points before sending JSON text.
+                    data=(
+                        dumps(payload, ensure_ascii=False)
+                        .encode("utf-8", errors="replace")
+                        .decode("utf-8")
+                        if not attachment
+                        else payload
+                    ),
                     params=params if params else None,
                     headers=headers,
                     verify=self.verify_certificate,
@@ -2633,7 +2775,9 @@ class NotifyMatrix(NotifyBase):
 
         return True
 
-    def _e2ee_send_to_room(self, room_id, body, title, notify_type):
+    def _e2ee_send_to_room(
+        self, room_id, body, title, notify_type, body_format=None
+    ):
         """Encrypt and send one message to *room_id* via MegOLM.
 
         Shares the MegOLM session key with room members when the
@@ -2678,12 +2822,15 @@ class NotifyMatrix(NotifyBase):
                 session.session_id[:12],
             )
 
-        # Build the inner plaintext event
+        # Build the fallback before placing content inside the encrypted event.
+        plain_body = self._matrix_plain_fallback(body, body_format)
+
+        # Start the plaintext content that MegOLM will encrypt.
         msg_content = {
             "msgtype": "m.{}".format(self.msgtype),
             "body": "{title}{body}".format(
                 title="" if not title else "# {}\r\n".format(title),
-                body=body,
+                body=plain_body,
             ),
         }
 
@@ -2719,13 +2866,22 @@ class NotifyMatrix(NotifyBase):
                 }
             )
 
+        # Bound the inner content before encryption increases its wire size.
+        self._matrix_enforce_byte_budget(
+            msg_content, self.body_maxlen_e2ee, keys=("formatted_body", "body")
+        )
+
+        # MegOLM encrypts a complete room event, not only the message body.
         inner_event = {
             "type": "m.room.message",
             "content": msg_content,
             "room_id": room_id,
         }
 
+        # Encrypt with the room's current outbound group session.
         ciphertext = session.encrypt(inner_event)
+
+        # Persist the advanced message counter so it is never reused.
         self._e2ee_save_megolm(room_id, session)
 
         self.logger.trace(
@@ -2740,6 +2896,7 @@ class NotifyMatrix(NotifyBase):
         path = "/rooms/{}/send/m.room.encrypted/{}".format(
             NotifyMatrix.quote(room_id), self.transaction_id
         )
+        # Wrap the ciphertext with the identifiers Matrix clients require.
         encrypted_payload = {
             "algorithm": "m.megolm.v1.aes-sha2",
             "ciphertext": ciphertext,
@@ -2748,6 +2905,23 @@ class NotifyMatrix(NotifyBase):
             "device_id": self.device_id or "",
         }
 
+        # Server-provided identifiers may be longer than our initial estimate.
+        # Measure the finished envelope because it is the actual wire content.
+        encrypted_bytes = len(
+            dumps(encrypted_payload, ensure_ascii=False).encode(
+                "utf-8", errors="replace"
+            )
+        )
+
+        # Avoid a predictable homeserver rejection when the envelope is large.
+        if encrypted_bytes > MATRIX_CONTENT_BYTE_LIMIT:
+            self.logger.warning(
+                "Matrix E2EE event for room %s exceeds the safe byte limit.",
+                room_id,
+            )
+            return False
+
+        # The completed encrypted payload is now within the safe allowance.
         postokay, _, _ = self._fetch(
             path, payload=encrypted_payload, method="PUT"
         )
@@ -3047,6 +3221,37 @@ class NotifyMatrix(NotifyBase):
         # Best-effort cleanup only
         with contextlib.suppress(Exception):
             self._logout()
+
+    @property
+    def body_maxlen(self):
+        """Return a conservative limit for the configured Matrix format."""
+        # Webhooks are not sent as direct Matrix room events.
+        if self.mode != MatrixWebhookMode.DISABLED:
+            # Preserve their historical v1 character allowance.
+            return self.body_maxlen_webhook
+
+        # Rich messages send both formatted and fallback representations.
+        is_formatted = self.notify_format in (
+            NotifyFormat.HTML,
+            NotifyFormat.MARKDOWN,
+        )
+
+        # v1 must choose a split size before inspecting individual rooms.
+        e2ee_capable = self.e2ee and self.secure and MATRIX_E2EE_SUPPORT
+        if e2ee_capable:
+            # Reserve encryption room even if a later room is unencrypted.
+            return (
+                self.body_maxlen_e2ee_formatted
+                if is_formatted
+                else self.body_maxlen_e2ee
+            )
+
+        # Unencrypted messages only need normal Matrix event headroom.
+        return (
+            self.body_maxlen_formatted
+            if is_formatted
+            else self.body_maxlen_default
+        )
 
     @property
     def url_identifier(self):
