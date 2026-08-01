@@ -821,6 +821,43 @@ def test_parse_url_general():
     assert result["fullpath"] == "/gh/Cleanuparr/Cleanuparr@main/Logo/256.png"
     assert result["url"] == url
 
+    # RFC 3986 path characters must survive a parse_url() round trip because
+    # some services distinguish literal characters from encoded ones.
+    url = "https://example.com/a:b@c!d$e&f'g(h)i*j+k=n/file.txt"
+    result = utils.parse.parse_url(url)
+    assert result["fullpath"] == "/a:b@c!d$e&f'g(h)i*j+k=n/file.txt"
+    assert result["url"] == url
+
+    # Keep commas and semicolons encoded because Apprise uses them as path/list
+    # delimiters. Otherwise path data such as a Home Assistant target list could
+    # become extra segments. Related regressions have dedicated plugin tests.
+    result = utils.parse.parse_url("https://example.com/a,b;c/file.txt")
+    assert result["fullpath"] == "/a%2Cb%3Bc/file.txt"
+
+    # Characters outside an RFC 3986 path segment must remain encoded when the
+    # safe list is expanded.
+    result = utils.parse.parse_url("https://example.com/a b/c[1]#/file.txt")
+    assert "%20" in result["fullpath"]
+    assert "[" not in result["fullpath"]
+    assert "]" not in result["fullpath"]
+
+
+def test_parse_url_path_no_redos():
+    "utils: parse_url() does not regress into slow/backtracking behavior"
+
+    # Escaping uses linear-time table lookups. This guards against a future
+    # regex-based implementation backtracking on untrusted paths.
+    segment = "%40%3A%21%24%26%27%28%29%2A%2B%2C%3B%3D-a" * 5000
+    url = f"https://example.com/{segment}/file.txt?foo=bar"
+
+    start = time.time()
+    result = utils.parse.parse_url(url)
+    elapsed = time.time() - start
+
+    assert result is not None
+    # The generous limit allows slower CI while catching nonlinear behavior.
+    assert elapsed < 5.0
+
 
 def test_parse_url_simple():
     "utils: parse_url() testing"
