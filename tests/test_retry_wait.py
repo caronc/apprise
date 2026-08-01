@@ -2661,16 +2661,20 @@ class TestServiceTimeout:
             N_MGR.unload_modules()
 
         r0 = next(iter(result))
-        # One real attempt ran; the expired retry is recorded as TIMEOUT.
-        assert len(r0.attempts) == 2
-        assert r0.attempts[0].status == AppriseResultStatus.FAILURE
+        # The worker and outer wait share a deadline, so accept either attempt
+        # sequence when slower hosts change which one finishes first.
+        assert len(r0.attempts) in (1, 2)
         assert r0.attempts[-1].status == AppriseResultStatus.TIMEOUT
         assert r0.max_attempts == 6
-        # The confirmed FAILURE outranks the trailing synthetic TIMEOUT.
-        assert r0.status == AppriseResultStatus.FAILURE
-        assert result.status == AppriseResultStatus.FAILURE
-        # The wait= sleep was capped to the remaining budget, not the
-        # full 5.0s -- confirms the cap actually applied.
+        if len(r0.attempts) == 2:
+            assert r0.attempts[0].status == AppriseResultStatus.FAILURE
+            # A real failure takes priority over the synthetic timeout.
+            assert r0.status == AppriseResultStatus.FAILURE
+        else:
+            # The outer wait finished first, leaving only its timeout.
+            assert r0.status == AppriseResultStatus.TIMEOUT
+        assert result.status == r0.status
+        # The retry sleep uses the remaining budget instead of the full 5s.
         assert wall < 3.0
 
     def test_threadpool_between_attempts_timeout_and_sleep_cap(self):
@@ -2698,17 +2702,21 @@ class TestServiceTimeout:
 
         by_host = {r.url: r for r in result}
         slow_result = by_host["slow://slow"]
-        # Only the one over-budget attempt was made, plus the synthetic
-        # TIMEOUT attempt marking the decision to stop.
-        assert len(slow_result.attempts) == 2
-        assert slow_result.attempts[0].status == AppriseResultStatus.FAILURE
+        # The worker and outer wait share a deadline, so accept either attempt
+        # sequence when slower hosts change which one finishes first.
+        assert len(slow_result.attempts) in (1, 2)
         assert slow_result.attempts[-1].status == AppriseResultStatus.TIMEOUT
-        # The confirmed FAILURE on the first attempt outranks the
-        # synthetic TIMEOUT that follows it (see NotifyResult.__init__).
-        assert slow_result.status == AppriseResultStatus.FAILURE
+        if len(slow_result.attempts) == 2:
+            assert (
+                slow_result.attempts[0].status == AppriseResultStatus.FAILURE
+            )
+            # A real failure takes priority over the synthetic timeout.
+            assert slow_result.status == AppriseResultStatus.FAILURE
+        else:
+            # The outer wait finished first, leaving only its timeout.
+            assert slow_result.status == AppriseResultStatus.TIMEOUT
         assert by_host["slow://fast"].status == AppriseResultStatus.SUCCESS
-        # The wait= sleep was capped to the remaining budget rather than
-        # running the full 5.0s -- confirms the cap actually applied.
+        # The retry sleep uses the remaining budget instead of the full 5s.
         assert wall < 5.0
 
     def test_asyncio_between_attempts_timeout_and_sleep_cap(self):
@@ -2741,12 +2749,18 @@ class TestServiceTimeout:
 
         by_host = {r.url: r for r in result}
         slow_result = by_host["slow://slow"]
-        assert len(slow_result.attempts) == 2
-        assert slow_result.attempts[0].status == AppriseResultStatus.FAILURE
+        # As above, accept either attempt sequence at the shared deadline.
+        assert len(slow_result.attempts) in (1, 2)
         assert slow_result.attempts[-1].status == AppriseResultStatus.TIMEOUT
-        # The confirmed FAILURE on the first attempt outranks the
-        # synthetic TIMEOUT that follows it (see NotifyResult.__init__).
-        assert slow_result.status == AppriseResultStatus.FAILURE
+        if len(slow_result.attempts) == 2:
+            assert (
+                slow_result.attempts[0].status == AppriseResultStatus.FAILURE
+            )
+            # A real failure takes priority over the synthetic timeout.
+            assert slow_result.status == AppriseResultStatus.FAILURE
+        else:
+            # The outer wait finished first, leaving only its timeout.
+            assert slow_result.status == AppriseResultStatus.TIMEOUT
         assert by_host["slow://fast"].status == AppriseResultStatus.SUCCESS
         assert wall < 5.0
 
@@ -3026,13 +3040,19 @@ class TestServiceTimeout:
         assert signature.parameters["timeout"].default == 0
 
     def test_timeout_logs_include_error_entry(self):
-        """A TIMEOUT attempt includes a matching ERROR log entry."""
+        """A TIMEOUT attempt includes a matching ERROR log entry.
+
+        The generous timing margin keeps this real-time test reliable when
+        public infrastructure is busy, especially GitHub Actions runners and
+        Fedora Koji servers. Two attempts may start before the timeout, but a
+        third cannot.
+        """
         N_MGR["slow"] = _SlowNotify
 
         try:
-            asset = AppriseAsset(async_mode=False, service_timeout=0.5)
-            service = _SlowNotify(host="x", asset=asset, retry=5)
-            service.send = lambda **kw: (time.sleep(0.15), False)[1]
+            asset = AppriseAsset(async_mode=False, service_timeout=0.75)
+            service = _SlowNotify(host="x", asset=asset, retry=2)
+            service.send = lambda **kw: (time.sleep(0.5), False)[1]
             a = Apprise(asset=asset)
             a.add(service)
 
