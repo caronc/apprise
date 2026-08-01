@@ -3101,24 +3101,17 @@ def test_apprise_cli_limit_option_hard_exit_when_call_still_running(
     mock_request, mock_force_exit
 ):
     """
-    CLI: the counterpart to test_apprise_cli_limit_option_times_out_
-    service above -- when the abandoned call is STILL genuinely running
-    after the full grace period (not just briefly delayed), main()
-    actually reaches _force_exit(), rather than falling through to a
-    normal ctx.exit().
+    CLI: force exit when a timed-out call outlives the grace period.
 
-    CLI_TIMEOUT_EXIT_GRACE_SECONDS is shortened here purely so this
-    test runs quickly; the service's own delay is longer than that
-    shortened window, so _wait_for_abandoned_calls() genuinely times
-    out instead of resolving on its own. _force_exit() is mocked so
-    the real os._exit() call doesn't end this test process (see the
-    sibling test's docstring for why).
+    This complements the normal timeout test. The 2-second service delay
+    safely exceeds the shortened grace periods, preventing false positives on
+    slower hosts. _force_exit() is mocked so the test process stays alive.
     """
     import time
 
     def _slow_failure(*args, **kwargs):
         """Return a delayed HTTP failure to force the CLI timeout path."""
-        time.sleep(0.5)
+        time.sleep(2.0)
         response = mock.Mock()
         response.status_code = requests.codes.internal_server_error
         response.content = b""
