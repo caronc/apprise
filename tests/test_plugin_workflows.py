@@ -875,6 +875,99 @@ def test_plugin_workflows_azure_webhooks(request_mock):
     assert obj.api_version == "2016-06-01"
 
 
+@pytest.mark.parametrize("routing_id", (123456789, 987654321))
+def test_plugin_workflows_power_automate_cu_webhooks(request_mock, routing_id):
+    """NotifyWorkflows() preserves Power Automate CU routing IDs."""
+    url = (
+        "https://default.environment.api.powerplatform.com:443"
+        f"/powerautomate/automations/direct/cu/{routing_id}"
+        "/workflows/3XXX5/triggers/manual/paths/invoke"
+        "?api-version=2022-03-01-preview&"
+        "sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=iXXXU"
+    )
+
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifyWorkflows)
+    assert obj.notify(body="body", title="title") is True
+    assert request_mock.call_args.args[0] == (
+        "https://default.environment.api.powerplatform.com:443"
+        f"/powerautomate/automations/direct/cu/{routing_id}"
+        "/workflows/3XXX5/triggers/manual/paths/invoke"
+    )
+
+    # Our routing ID is tracked and advertised in the Apprise URL
+    assert obj.routing_id == str(routing_id)
+    assert f"route={routing_id}" in obj.url()
+
+
+@pytest.mark.parametrize("key", ("route", "routeid"))
+def test_plugin_workflows_routing_id_parse_url(key):
+    """NotifyWorkflows() parses the routing ID from an Apprise URL."""
+
+    results = NotifyWorkflows.parse_url(
+        f"workflow://host/3XXX5/iXXXU/?pa=yes&{key}=123456789"
+    )
+    assert isinstance(results, dict)
+    assert results["routing_id"] == "123456789"
+
+    obj = Apprise.instantiate(
+        f"workflow://host/3XXX5/iXXXU/?pa=yes&{key}=123456789"
+    )
+    assert isinstance(obj, NotifyWorkflows)
+    assert obj.routing_id == "123456789"
+
+    # No routing ID provided; nothing is set and nothing is advertised
+    obj = Apprise.instantiate("workflow://host/3XXX5/iXXXU/?pa=yes")
+    assert isinstance(obj, NotifyWorkflows)
+    assert obj.routing_id is None
+    assert "route=" not in obj.url()
+
+
+def test_plugin_workflows_routing_id_invalid():
+    """NotifyWorkflows() rejects a non-numeric routing ID."""
+
+    with pytest.raises(TypeError):
+        NotifyWorkflows(
+            workflow="3XXX5", signature="iXXXU", routing_id="1/../evil"
+        )
+
+    # Confirmed unusable (and therefore never reflected) via a full URL too
+    assert (
+        Apprise.instantiate(
+            "workflow://host/3XXX5/iXXXU/?pa=yes&route=1/../evil"
+        )
+        is None
+    )
+
+
+def test_plugin_workflows_routing_id_round_trip(request_mock):
+    """NotifyWorkflows() round-trips the routing ID through url()."""
+
+    obj = Apprise.instantiate(
+        "https://default.environment.api.powerplatform.com:443"
+        "/powerautomate/automations/direct/cu/123456789"
+        "/workflows/3XXX5/triggers/manual/paths/invoke"
+        "?api-version=2022-03-01-preview&"
+        "sp=%2Ftriggers%2Fmanual%2Frun&sv=1.0&sig=iXXXU"
+    )
+    assert isinstance(obj, NotifyWorkflows)
+    assert obj.routing_id == "123456789"
+
+    # Re-instantiate ourselves from our own generated URL
+    obj_copy = Apprise.instantiate(obj.url())
+    assert isinstance(obj_copy, NotifyWorkflows)
+    assert obj_copy.routing_id == obj.routing_id
+    assert obj_copy.url() == obj.url()
+
+    # The routed endpoint survives the round trip
+    assert obj_copy.notify(body="body", title="title") is True
+    assert request_mock.call_args.args[0] == (
+        "https://default.environment.api.powerplatform.com:443"
+        "/powerautomate/automations/direct/cu/123456789"
+        "/workflows/3XXX5/triggers/manual/paths/invoke"
+    )
+
+
 @mock.patch("requests.post")
 def test_plugin_workflows_html_to_markdown_format(mock_post):
     """NotifyWorkflows(): HTML body is converted to Markdown."""
