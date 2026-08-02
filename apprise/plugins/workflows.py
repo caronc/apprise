@@ -270,9 +270,18 @@ class NotifyWorkflows(NotifyBase):
         )
 
         # Microsoft may provide a routing ID in native Power Automate URLs
-        self.routing_id = (
-            None if routing_id is None else str(routing_id).strip()
-        ) or None
+        self.routing_id = None
+        if routing_id is not None:
+            self.routing_id = validate_regex(
+                routing_id, *self.template_args["route"]["regex"]
+            )
+            if not self.routing_id:
+                msg = (
+                    "An invalid Workflows Routing ID"
+                    f" ({routing_id}) was specified."
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
 
         # Wrap Text
         self.wrap = bool(

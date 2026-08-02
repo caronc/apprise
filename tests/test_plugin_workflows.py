@@ -923,6 +923,23 @@ def test_plugin_workflows_routing_id_parse_url(key):
     assert "route=" not in obj.url()
 
 
+def test_plugin_workflows_routing_id_invalid():
+    """NotifyWorkflows() rejects a non-numeric routing ID."""
+
+    with pytest.raises(TypeError):
+        NotifyWorkflows(
+            workflow="3XXX5", signature="iXXXU", routing_id="1/../evil"
+        )
+
+    # Confirmed unusable (and therefore never reflected) via a full URL too
+    assert (
+        Apprise.instantiate(
+            "workflow://host/3XXX5/iXXXU/?pa=yes&route=1/../evil"
+        )
+        is None
+    )
+
+
 def test_plugin_workflows_routing_id_round_trip(request_mock):
     """NotifyWorkflows() round-trips the routing ID through url()."""
 
