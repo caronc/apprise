@@ -433,7 +433,9 @@ class NotifySplunk(NotifyBase):
             schema=self.secure_protocol[0],
             routing_key=self.routing_key,
             entity_id=(
-                "" if self.entity_id == self.routing_key else self.entity_id
+                ""
+                if self.entity_id == self.routing_key
+                else NotifySplunk.quote(self.entity_id, safe="/")
             ),
             apikey=self.pprint(self.apikey, privacy, safe=""),
             params=NotifySplunk.urlencode(params),
