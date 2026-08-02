@@ -32,6 +32,7 @@ import requests
 from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.parse import URL_PATH_SAFE_CHARS
 from .base import NotifyBase
 
 
@@ -524,7 +525,7 @@ class NotifyForm(NotifyBase):
                 else f":{self.port}"
             ),
             fullpath=(
-                NotifyForm.quote(self.fullpath, safe="/")
+                NotifyForm.quote(self.fullpath, safe=URL_PATH_SAFE_CHARS)
                 if self.fullpath
                 else "/"
             ),

@@ -39,6 +39,7 @@ from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
+    URL_PATH_SAFE_CHARS,
     is_domain_service_target,
     parse_bool,
     parse_domain_service_targets,
@@ -493,7 +494,8 @@ class NotifyHomeAssistant(NotifyBase):
                 if not self.fullpath
                 else "/{}/".format(
                     NotifyHomeAssistant.quote(
-                        self.fullpath.strip("/"), safe="/"
+                        self.fullpath.strip("/"),
+                        safe=URL_PATH_SAFE_CHARS,
                     )
                 )
             ),

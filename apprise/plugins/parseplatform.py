@@ -32,7 +32,7 @@ import requests
 
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
 from .base import NotifyBase
 
 # Used to break path apart into list of targets
@@ -314,7 +314,9 @@ class NotifyParsePlatform(NotifyBase):
                     if self.port is None or self.port == default_port
                     else f":{self.port}"
                 ),
-                fullpath=NotifyParsePlatform.quote(self.fullpath, safe="/"),
+                fullpath=NotifyParsePlatform.quote(
+                    self.fullpath, safe=URL_PATH_SAFE_CHARS
+                ),
                 params=NotifyParsePlatform.urlencode(params),
             )
         )
