@@ -32,6 +32,7 @@ import requests
 from ..common import ConfigFormat, ContentIncludeMode
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.parse import URL_PATH_SAFE_CHARS
 from .base import ConfigBase
 
 # Support YAML formats
@@ -139,7 +140,7 @@ class ConfigHTTP(ConfigBase):
                 if self.port is None or self.port == default_port
                 else f":{self.port}"
             ),
-            fullpath=self.quote(self.fullpath, safe="/"),
+            fullpath=self.quote(self.fullpath, safe=URL_PATH_SAFE_CHARS),
             params=self.urlencode(params),
         )
 

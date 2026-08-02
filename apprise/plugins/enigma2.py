@@ -40,6 +40,7 @@ import requests
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.parse import URL_PATH_SAFE_CHARS
 from .base import NotifyBase
 
 
@@ -239,7 +240,9 @@ class NotifyEnigma2(NotifyBase):
                 if self.port is None or self.port == default_port
                 else f":{self.port}"
             ),
-            fullpath=NotifyEnigma2.quote(self.fullpath, safe="/"),
+            fullpath=NotifyEnigma2.quote(
+                self.fullpath, safe=URL_PATH_SAFE_CHARS
+            ),
             params=NotifyEnigma2.urlencode(params),
         )
 

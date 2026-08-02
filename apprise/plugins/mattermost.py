@@ -64,7 +64,12 @@ import requests
 
 from ..common import NotifyImageSize, NotifyType, PersistentStoreMode
 from ..locale import gettext_lazy as _
-from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.parse import (
+    URL_PATH_SAFE_CHARS,
+    parse_bool,
+    parse_list,
+    validate_regex,
+)
 from .base import NotifyBase
 
 # Some Reference Locations:
@@ -781,7 +786,9 @@ class NotifyMattermost(NotifyBase):
                     "/"
                     if not self.fullpath
                     else "{}/".format(
-                        NotifyMattermost.quote(self.fullpath, safe="/")
+                        NotifyMattermost.quote(
+                            self.fullpath, safe=URL_PATH_SAFE_CHARS
+                        )
                     )
                 ),
                 token=self.pprint(self.token, privacy, safe=""),

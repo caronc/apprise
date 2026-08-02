@@ -34,6 +34,7 @@ from .. import exception
 from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.parse import URL_PATH_SAFE_CHARS
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
@@ -421,7 +422,7 @@ class NotifyJSON(NotifyBase):
                 else f":{self.port}"
             ),
             fullpath=(
-                NotifyJSON.quote(self.fullpath, safe="/")
+                NotifyJSON.quote(self.fullpath, safe=URL_PATH_SAFE_CHARS)
                 if self.fullpath
                 else "/"
             ),

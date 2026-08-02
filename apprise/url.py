@@ -38,6 +38,7 @@ from .locale import gettext_lazy as _
 from .logger import logger
 from .tag import AppriseTag
 from .utils.parse import (
+    URL_PATH_SAFE_CHARS,
     parse_bool,
     parse_list,
     parse_phone_no,
@@ -401,7 +402,7 @@ class URLBase:
                 else f":{self.port}"
             ),
             fullpath=(
-                URLBase.quote(self.fullpath, safe="/")
+                URLBase.quote(self.fullpath, safe=URL_PATH_SAFE_CHARS)
                 if self.fullpath
                 else "/"
             ),

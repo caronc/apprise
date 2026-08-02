@@ -35,7 +35,7 @@ from .. import exception
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
-from ..utils.parse import parse_list, validate_regex
+from ..utils.parse import URL_PATH_SAFE_CHARS, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
 from .base import NotifyBase
 
@@ -243,7 +243,11 @@ class NotifyAppriseAPI(NotifyBase):
                     else f":{self.port}"
                 ),
                 fullpath=(
-                    "/{}/".format(NotifyAppriseAPI.quote(fullpath, safe="/"))
+                    "/{}/".format(
+                        NotifyAppriseAPI.quote(
+                            fullpath, safe=URL_PATH_SAFE_CHARS
+                        )
+                    )
                     if fullpath
                     else "/"
                 ),
