@@ -107,7 +107,6 @@ The table below identifies the services this tool supports and some example serv
 | [Nextcloud](https://appriseit.com/services/nextcloud/) | ncloud:// or nclouds:// | (TCP) 80 or 443 | ncloud://adminuser:pass@host/User<br/>nclouds://adminuser:pass@host/User1/User2/UserN
 | [NextcloudTalk](https://appriseit.com/services/nextcloudtalk/) | nctalk:// or nctalks:// | (TCP) 80 or 443 | nctalk://user:pass@host/RoomId<br/>nctalks://user:pass@host/RoomId1/RoomId2/RoomIdN
 | [Notica](https://appriseit.com/services/notica/) | notica://  | (TCP) 443   | notica://Token/
-| [NotificationAPI](https://appriseit.com/services/notificationapi/) | napi://  | (TCP) 443   | napi://ClientID/ClientSecret/Target<br />napi://ClientID/ClientSecret/Target1/Target2/TargetN<br />napi://MessageType@ClientID/ClientSecret/Target
 | [Notifiarr](https://appriseit.com/services/notifiarr/) | notifiarr:// | (TCP) 443 | notifiarr://apikey/#channel<br />notifiarr://apikey/#channel1/#channel2/#channeln
 | [Notifico](https://appriseit.com/services/notifico/) | notifico:// or notificos://  | (TCP) 80 or 443   | notifico://ProjectID/MessageHook/<br />notifico://host/ProjectID/MessageHook/<br />notificos://host/ProjectID/MessageHook/
 | [ntfy](https://appriseit.com/services/ntfy/) | ntfy://  | (TCP) 80 or 443   | ntfy://topic/<br/>ntfys://topic/
@@ -118,6 +117,7 @@ The table below identifies the services this tool supports and some example serv
 | [PagerDuty](https://appriseit.com/services/pagerduty/) | pagerduty:// | (TCP) 443 | pagerduty://IntegrationKey@ApiKey<br/>pagerduty://IntegrationKey@ApiKey/Source/Component
 | [PagerTree](https://appriseit.com/services/pagertree/) | pagertree:// | (TCP) 443 | pagertree://integration_id
 | [ParsePlatform](https://appriseit.com/services/parseplatform/) | parsep:// or parseps:// | (TCP) 80 or 443 | parsep://AppID:MasterKey@Hostname<br/>parseps://AppID:MasterKey@Hostname
+| [Pingram](https://appriseit.com/services/pingram/) | pingram://  | (TCP) 443   | pingram://ApiKey/Target<br />pingram://ApiKey/Target1/Target2/TargetN<br />pingram://MessageType@ApiKey/Target
 | [Pinglet](https://appriseit.com/services/pinglet/) | pinglet:// or pinglets:// | (TCP) 80 or 443 | pinglets://apikey@hostname/namespace/topic<br/>pinglets://apikey@hostname:port/namespace/topic
 | [Postmark](https://appriseit.com/services/postmark/) | postmark://  | (TCP) 443   | postmark://APIToken:FromEmail/<br />postmark://APIToken:FromEmail/ToEmail<br />postmark://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
 | [Prowl](https://appriseit.com/services/prowl/) | prowl://   | (TCP) 443    | prowl://apikey<br />prowl://apikey/providerkey
