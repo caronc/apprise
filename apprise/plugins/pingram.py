@@ -25,15 +25,21 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Simple API Reference:
-#  - https://www.notificationapi.com/docs/reference/server#send (legacy
-#    client_id/client_secret Basic auth)
-#  - https://www.pingram.io/docs/api-reference (current; NotificationAPI
-#    was rebranded to Pingram and now issues a single Bearer API key)
+# Steps to get your API Key:
+#  1. Visit https://app.pingram.io/ and sign in (or create an account).
+#  2. Open your Environment settings and visit the "API Keys" section.
+#  3. Create a new Secret Key (server-to-server) or Public Key. It will
+#     look like: pingram_sk_AbCdEf012345 or pingram_pk_AbCdEf012345
+#
+#  Your Apprise URL should be assembled as:
+#     pingram://{apikey}/{target}
+#
+# Resources:
+# - https://www.pingram.io/docs/api-reference
+# - https://www.pingram.io/docs/api-reference/operations/keys_createapikey
 
 from __future__ import annotations
 
-import base64
 from email.utils import formataddr
 from itertools import chain
 from json import dumps, loads
@@ -53,17 +59,12 @@ from ..utils.parse import (
 )
 from .base import NotifyBase
 
-# Used to detect ID
+# Used to detect a recipient ID; pairing one with an email/phone target is
+# always optional for a Pingram API key.
 IS_VALID_ID_RE = re.compile(r"^\s*(@|%40)?(?P<id>[\w_-]+)\s*$", re.I)
 
-# NotificationAPI rebranded to Pingram. New environments only issue a single
-# Bearer-style secret/public key (no client_secret) in this format, in place
-# of the legacy client_id/client_secret pair used for HTTP Basic auth.
-# https://www.pingram.io/docs/api-reference/operations/keys_createapikey
-IS_PINGRAM_API_KEY_RE = re.compile(r"^pingram_(sk|pk)_", re.I)
 
-
-class NotificationAPIRegion:
+class PingramRegion:
     """Regions."""
 
     CA = "ca"
@@ -71,30 +72,24 @@ class NotificationAPIRegion:
     EU = "eu"
 
 
-# NotificationAPI endpoints (legacy client_id/client_secret Basic auth)
-NOTIFICATIONAPI_API_LOOKUP = {
-    NotificationAPIRegion.US: "https://api.notificationapi.com",
-    NotificationAPIRegion.CA: "https://api.ca.notificationapi.com",
-    NotificationAPIRegion.EU: "https://api.eu.notificationapi.com",
-}
-
-# Pingram endpoints (current Bearer API-key auth)
+# Pingram endpoints; the US region has no dedicated sub-domain of its own,
+# it is simply the bare/default host.
 PINGRAM_API_LOOKUP = {
-    NotificationAPIRegion.US: "https://api.pingram.io",
-    NotificationAPIRegion.CA: "https://api.ca.pingram.io",
-    NotificationAPIRegion.EU: "https://api.eu.pingram.io",
+    PingramRegion.US: "https://api.pingram.io",
+    PingramRegion.CA: "https://api.ca.pingram.io",
+    PingramRegion.EU: "https://api.eu.pingram.io",
 }
 
 # A List of our regions we can use for verification
-NOTIFICATIONAPI_REGIONS = (
-    NotificationAPIRegion.US,
-    NotificationAPIRegion.CA,
-    NotificationAPIRegion.EU,
+PINGRAM_REGIONS = (
+    PingramRegion.US,
+    PingramRegion.CA,
+    PingramRegion.EU,
 )
 
 
-class NotificationAPIChannel:
-    """Channels"""
+class PingramChannel:
+    """Channels."""
 
     EMAIL = "email"
     SMS = "sms"
@@ -102,56 +97,55 @@ class NotificationAPIChannel:
     WEB_PUSH = "web_push"
     MOBILE_PUSH = "mobile_push"
     SLACK = "slack"
+    CALL = "call"
 
 
 # A List of our channels we can use for verification
-NOTIFICATIONAPI_CHANNELS: frozenset[str] = frozenset(
+PINGRAM_CHANNELS: frozenset[str] = frozenset(
     [
-        NotificationAPIChannel.EMAIL,
-        NotificationAPIChannel.SMS,
-        NotificationAPIChannel.INAPP,
-        NotificationAPIChannel.WEB_PUSH,
-        NotificationAPIChannel.MOBILE_PUSH,
-        NotificationAPIChannel.SLACK,
+        PingramChannel.EMAIL,
+        PingramChannel.SMS,
+        PingramChannel.INAPP,
+        PingramChannel.WEB_PUSH,
+        PingramChannel.MOBILE_PUSH,
+        PingramChannel.SLACK,
+        PingramChannel.CALL,
     ]
 )
 
 
-class NotificationAPIMode:
-    """Modes"""
+class PingramMode:
+    """Modes."""
 
     TEMPLATE = "template"
     MESSAGE = "message"
 
 
-# A List of our channels we can use for verification
-NOTIFICATIONAPI_MODES: frozenset[str] = frozenset(
+# A List of our modes we can use for verification
+PINGRAM_MODES: frozenset[str] = frozenset(
     [
-        NotificationAPIMode.TEMPLATE,
-        NotificationAPIMode.MESSAGE,
+        PingramMode.TEMPLATE,
+        PingramMode.MESSAGE,
     ]
 )
 
 
-class NotifyNotificationAPI(NotifyBase):
-    """
-    A wrapper for NotificationAPI Notifications
-    """
+class NotifyPingram(NotifyBase):
+    """A wrapper for Pingram Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = "NotificationAPI"
+    service_name = "Pingram"
 
     # The services URL
-    service_url = "https://www.notificationapi.com/"
+    service_url = "https://www.pingram.io/"
 
     # The default secure protocol
-    secure_protocol = ("napi", "notificationapi")
+    secure_protocol = "pingram"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://appriseit.com/services/notificationapi/"
+    setup_url = "https://appriseit.com/services/pingram/"
 
-    # If no NotificationAPI Message Type is specified, then the following is
-    # used
+    # If no Pingram Message Type is specified, then the following is used
     default_message_type = "apprise"
 
     # Allow 300 requests per minute.
@@ -163,8 +157,8 @@ class NotifyNotificationAPI(NotifyBase):
 
     # Define object templates
     templates = (
-        "{schema}://{client_id}/{client_secret}/{targets}",
-        "{schema}://{type}@{client_id}/{client_secret}/{targets}",
+        "{schema}://{apikey}/{targets}",
+        "{schema}://{type}@{apikey}/{targets}",
     )
 
     # Explicit URL tokens we care about (all others from base are ignored)
@@ -175,20 +169,14 @@ class NotifyNotificationAPI(NotifyBase):
                 "name": _("Message Type"),
                 "type": "string",
                 "regex": (r"^[A-Z0-9_-]+$", "i"),
-                "required": True,
                 "map_to": "message_type",
             },
-            "client_id": {
-                "name": _("Client ID"),
+            "apikey": {
+                "name": _("API Key"),
                 "type": "string",
                 "required": True,
-            },
-            "client_secret": {
-                "name": _("Client Secret"),
-                "type": "string",
-                # Not required when client_id is a Pingram API key
-                "required": False,
                 "private": True,
+                "regex": (r"^pingram_(sk|pk)_[\w-]+$", "i"),
             },
             "target_email": {
                 "name": _("Target Email"),
@@ -198,6 +186,7 @@ class NotifyNotificationAPI(NotifyBase):
             "target_id": {
                 "name": _("Target ID"),
                 "type": "string",
+                "prefix": "@",
                 "map_to": "targets",
             },
             "target_sms": {
@@ -208,7 +197,6 @@ class NotifyNotificationAPI(NotifyBase):
             "targets": {
                 "name": _("Targets"),
                 "type": "list:string",
-                "required": True,
             },
         },
     )
@@ -220,21 +208,24 @@ class NotifyNotificationAPI(NotifyBase):
             "type": {
                 "alias_of": "type",
             },
+            "apikey": {
+                "alias_of": "apikey",
+            },
             "channels": {
                 "name": _("Channels"),
                 "type": "list:string",
-                "values": NOTIFICATIONAPI_CHANNELS,
+                "values": PINGRAM_CHANNELS,
             },
             "region": {
                 "name": _("Region Name"),
                 "type": "choice:string",
-                "values": NOTIFICATIONAPI_REGIONS,
-                "default": NotificationAPIRegion.US,
+                "values": PINGRAM_REGIONS,
+                "default": PingramRegion.US,
             },
             "mode": {
                 "name": _("Mode"),
                 "type": "choice:string",
-                "values": NOTIFICATIONAPI_MODES,
+                "values": PINGRAM_MODES,
             },
             "reply": {
                 "name": _("Reply To"),
@@ -245,12 +236,6 @@ class NotifyNotificationAPI(NotifyBase):
                 "name": _("From Email"),
                 "type": "string",
                 "map_to": "from_addr",
-            },
-            "id": {
-                "alias_of": "client_id",
-            },
-            "secret": {
-                "alias_of": "client_secret",
             },
             "to": {
                 "alias_of": "targets",
@@ -277,8 +262,7 @@ class NotifyNotificationAPI(NotifyBase):
 
     def __init__(
         self,
-        client_id,
-        client_secret,
+        apikey=None,
         message_type=None,
         targets=None,
         cc=None,
@@ -291,45 +275,19 @@ class NotifyNotificationAPI(NotifyBase):
         tokens=None,
         **kwargs,
     ):
-        """
-        Initialize Notify NotificationAPI Object
-        """
+        """Initialize Notify Pingram Object."""
         super().__init__(**kwargs)
 
-        # Client ID
-        self.client_id = validate_regex(client_id)
-        if not self.client_id:
-            msg = (
-                "An invalid NotificationAPI Client ID "
-                "({}) was specified.".format(client_id)
+        # Our API Key
+        self.apikey = validate_regex(
+            apikey, *self.template_tokens["apikey"]["regex"]
+        )
+        if not self.apikey:
+            msg = "An invalid Pingram API Key ({}) was specified.".format(
+                apikey
             )
             self.logger.warning(msg)
             raise TypeError(msg)
-
-        # Client Secret
-        # NotificationAPI rebranded to Pingram; new environments issue a
-        # single Bearer-style API key (pingram_sk_.../pingram_pk_...)
-        # instead of a client_id/client_secret pair. Detect that case so
-        # both credential styles work.
-        self.client_secret = validate_regex(client_secret)
-        if not self.client_secret:
-            if not IS_PINGRAM_API_KEY_RE.match(self.client_id):
-                msg = (
-                    "An invalid NotificationAPI Client Secret "
-                    "({}) was specified.".format(client_secret)
-                )
-                self.logger.warning(msg)
-                raise TypeError(msg)
-
-            # Bearer-style Pingram API key; no client_secret pairing needed
-            self.client_secret = None
-
-        else:
-            self.logger.warning(
-                "NotificationAPI client_id/client_secret Basic auth is "
-                "deprecated following the Pingram rebrand; consider "
-                "switching to a single Pingram API key instead."
-            )
 
         # For tracking our email -> name lookups
         self.names = {}
@@ -348,7 +306,7 @@ class NotifyNotificationAPI(NotifyBase):
                 # Only update the string but use the already detected info
                 from_addr_[0] = from_addr
 
-                # Store our lookup
+            # Store our lookup
             self.from_addr = from_addr_[1]
         self.names[from_addr_[1]] = from_addr_[0]
 
@@ -364,24 +322,23 @@ class NotifyNotificationAPI(NotifyBase):
                     "senderEmail": result["full_email"],
                 }
 
-        # Our Targets are delimited by found ids
-        self.targets = []
+        # Resolve our mode
         if mode and isinstance(mode, str):
             self.mode = next(
-                (a for a in NOTIFICATIONAPI_MODES if a.startswith(mode)), None
+                (a for a in PINGRAM_MODES if a.startswith(mode)), None
             )
-            if self.mode not in NOTIFICATIONAPI_MODES:
-                msg = (
-                    f"The NotificationAPI mode specified ({mode}) is invalid."
-                )
+            if self.mode not in PINGRAM_MODES:
+                msg = f"The Pingram mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
         else:
-            # Detect mode based on whether or not a message_type was provided
+            # Detect mode based on whether or not a message_type was
+            # provided
             self.mode = (
-                NotificationAPIMode.MESSAGE
+                PingramMode.MESSAGE
                 if not message_type
-                else NotificationAPIMode.TEMPLATE
+                else PingramMode.TEMPLATE
             )
 
         if not message_type:
@@ -394,25 +351,11 @@ class NotifyNotificationAPI(NotifyBase):
             )
             if not self.message_type:
                 msg = (
-                    "An invalid NotificationAPI Message Type "
+                    "An invalid Pingram Message Type "
                     "({}) was specified.".format(message_type)
                 )
                 self.logger.warning(msg)
                 raise TypeError(msg)
-
-        # Precompute auth header
-        if self.client_secret:
-            # Deprecated legacy auth: POST "/{client_id}/sender" with
-            #      Basic base64(client_id:client_secret)
-            # https://www.notificationapi.com/docs/reference/server
-            token = base64.b64encode(
-                f"{self.client_id}:{self.client_secret}".encode()
-            ).decode("ascii")
-            self.auth_header = f"Basic {token}"
-        else:
-            # Current Pingram API: POST "/send" with Bearer <api_key>
-            # https://www.pingram.io/docs/api-reference
-            self.auth_header = f"Bearer {self.client_id}"
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -428,15 +371,13 @@ class NotifyNotificationAPI(NotifyBase):
                 else region.lower()
             )
 
-            if self.region not in NOTIFICATIONAPI_REGIONS:
+            if self.region not in PINGRAM_REGIONS:
                 # allow the outer except to handle this common response
                 raise IndexError()
 
         except (AttributeError, IndexError, TypeError):
             # Invalid region specified
-            msg = (
-                f"The NotificationAPI region specified ({region}) is invalid."
-            )
+            msg = f"The Pingram region specified ({region}) is invalid."
             self.logger.warning(msg)
             raise TypeError(msg) from None
 
@@ -444,10 +385,10 @@ class NotifyNotificationAPI(NotifyBase):
         self.channels = set()
         for channel_ in parse_list(channels):
             channel = channel_.lower()
-            if channel not in NOTIFICATIONAPI_CHANNELS:
+            if channel not in PINGRAM_CHANNELS:
                 # Invalid channel specified
                 msg = (
-                    "The NotificationAPI forced channel specified "
+                    "The Pingram forced channel specified "
                     f"({channel}) is invalid."
                 )
                 self.logger.warning(msg)
@@ -457,6 +398,10 @@ class NotifyNotificationAPI(NotifyBase):
         # Used for URL generation afterwards only
         self._invalid_targets = []
 
+        # Our Targets are delimited by found ids; a recipient id is always
+        # optional for a Pingram API key, so a bare email/phone number is
+        # enough on its own to identify a new target.
+        self.targets = []
         if targets:
             current_target = {}
             for entry in parse_list(targets, sort=False):
@@ -465,30 +410,18 @@ class NotifyNotificationAPI(NotifyBase):
                     if "email" not in current_target:
                         current_target["email"] = result["full_email"]
                         if not self.channels:
-                            self.channels.add(NotificationAPIChannel.EMAIL)
+                            self.channels.add(PingramChannel.EMAIL)
                             self.logger.info(
-                                "The NotificationAPI default channel of "
-                                f"{NotificationAPIChannel.EMAIL} was set."
+                                "The Pingram default channel of "
+                                f"{PingramChannel.EMAIL} was set."
                             )
                         continue
 
-                    elif "id" in current_target or self.client_secret is None:
-                        # Store and move on. A Pingram API key (no
-                        # client_secret) doesn't require a recipient id, so
-                        # a new email alone is enough to start a new target.
-                        self.targets.append(current_target)
-                        current_target = {"email": result["full_email"]}
-                        continue
-
-                    # if we got here, we have to many emails making it now
-                    # ambiguous as to who the sender intended to notify
-                    msg = (
-                        "The NotificationAPI received too many emails "
-                        "creating an ambiguous situation; aborted at "
-                        f"'{entry}'."
-                    )
-                    self.logger.warning(msg)
-                    raise TypeError(msg) from None
+                    # Flush our current target and start a new one; a
+                    # recipient id is never required to pair with it
+                    self.targets.append(current_target)
+                    current_target = {"email": result["full_email"]}
+                    continue
 
                 result = is_phone_no(entry)
                 if result:
@@ -497,31 +430,18 @@ class NotifyNotificationAPI(NotifyBase):
                             "+" if entry[0] == "+" else ""
                         ) + result["full"]
                         if not self.channels:
-                            self.channels.add(NotificationAPIChannel.SMS)
+                            self.channels.add(PingramChannel.SMS)
                             self.logger.info(
-                                "The NotificationAPI default channel of "
-                                f"{NotificationAPIChannel.SMS} was set."
+                                "The Pingram default channel of "
+                                f"{PingramChannel.SMS} was set."
                             )
                         continue
 
-                    elif "id" in current_target or self.client_secret is None:
-                        # Store and move on. A Pingram API key (no
-                        # client_secret) doesn't require a recipient id, so
-                        # a new number alone is enough to start a new
-                        # target.
-                        self.targets.append(current_target)
-                        current_target = {"number": result["full"]}
-                        continue
-
-                    # if we got here, we have to many emails making it now
-                    # ambiguous as to who the sender intended to notify
-                    msg = (
-                        "The NotificationAPI received too many phone no's "
-                        "creating an ambiguous situation; aborted at "
-                        f"'{entry}'."
-                    )
-                    self.logger.warning(msg)
-                    raise TypeError(msg) from None
+                    # Flush our current target and start a new one; a
+                    # recipient id is never required to pair with it
+                    self.targets.append(current_target)
+                    current_target = {"number": result["full"]}
+                    continue
 
                 result = IS_VALID_ID_RE.match(entry)
                 if result:
@@ -535,30 +455,15 @@ class NotifyNotificationAPI(NotifyBase):
                     continue
 
                 self.logger.warning(
-                    "Dropped invalid NotificationAPI target "
-                    f"({entry}) specified"
+                    f"Dropped invalid Pingram target ({entry}) specified"
                 )
                 self._invalid_targets.append(entry)
                 continue
 
-            if "id" in current_target or (
-                current_target and self.client_secret is None
-            ):
-                # Store our final entry. Pingram API keys (no
-                # client_secret) don't require a recipient id.
-                self.targets.append(current_target)
-                current_target = {}
-
             if current_target:
-                # we have email or sms, but no id to go with it
-                msg = (
-                    "The NotificationAPI did not detect an id to "
-                    "correlate the following with {}".format(
-                        str(current_target)
-                    )
-                )
-                self.logger.warning(msg)
-                raise TypeError(msg) from None
+                # Flush whatever remains; an id is never required to
+                # accompany an email/phone target
+                self.targets.append(current_target)
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -598,17 +503,16 @@ class NotifyNotificationAPI(NotifyBase):
 
     @property
     def url_identifier(self):
+        """Returns all of the identifiers that make this URL unique from
+        another similar one.
+
+        Targets or end points should never be identified here.
         """
-        Returns all of the identifiers that make this URL unique from
-        another similar one. Targets or end points should never be identified
-        here.
-        """
-        return (self.secure_protocol[0], self.client_id, self.client_secret)
+        return (self.secure_protocol, self.apikey)
 
     def url(self, privacy=False, *args, **kwargs):
-        """
-        Returns the URL built dynamically based on specified arguments.
-        """
+        """Returns the URL built dynamically based on specified
+        arguments."""
 
         # Define any URL parameters
         params = {
@@ -667,14 +571,12 @@ class NotifyNotificationAPI(NotifyBase):
         if self.from_addr and self.names[self.from_addr] != self.app_id:
             params["from"] = self.names[self.from_addr]
 
-        # Extend our parameters
-        params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
         # Store any template entries if specified
         params.update({f":{k}": v for k, v in self.tokens.items()})
 
         targets = []
         for target in self.targets:
-            # ID is optional for a Pingram API key (no client_secret)
+            # A recipient id is always optional for a Pingram API key
             if "id" in target:
                 targets.append(f"@{target['id']}")
             if "number" in target:
@@ -687,42 +589,31 @@ class NotifyNotificationAPI(NotifyBase):
             if self.message_type != self.default_message_type
             else ""
         )
-        # A Pingram API key has no client_secret to pair it with, so the
-        # credential portion collapses to a single segment.
-        creds = (
-            f"{self.pprint(self.client_id, privacy, safe='')}/"
-            f"{self.pprint(self.client_secret, privacy, safe='')}"
-            if self.client_secret
-            else self.pprint(self.client_id, privacy, safe="")
-        )
-        return "{schema}://{mtype}{creds}/{targets}?{params}".format(
-            schema=self.secure_protocol[0],
+        return "{schema}://{mtype}{apikey}/{targets}?{params}".format(
+            schema=self.secure_protocol,
             mtype=mtype,
-            creds=creds,
-            targets=NotifyNotificationAPI.quote(
+            apikey=self.pprint(self.apikey, privacy, safe=""),
+            targets=NotifyPingram.quote(
                 "/".join(chain(targets, self._invalid_targets)), safe="/"
             ),
-            params=NotifyNotificationAPI.urlencode(params),
+            params=NotifyPingram.urlencode(params),
         )
 
     def __len__(self):
-        """
-        Returns the number of targets associated with this notification
-        """
+        """Returns the number of targets associated with this
+        notification."""
 
         return max(1, len(self.targets))
 
     def gen_payload(
         self, body, title="", notify_type=NotifyType.INFO, **kwargs
     ):
-        """
-        generates our NotificationAPI payload
-        """
+        """Generates our Pingram payload."""
 
         payload_ = {
             "type": self.message_type,
         }
-        if self.mode == NotificationAPIMode.TEMPLATE:
+        if self.mode == PingramMode.TEMPLATE:
             # Take a copy of our token dictionary
             parameters = self.tokens.copy()
 
@@ -752,13 +643,13 @@ class NotifyNotificationAPI(NotifyBase):
             )
 
             for channel in self.channels:
-                # Python v3.10 supports `match/case` but since Apprise aims to
-                # be compatible with Python v3.9+, we must use if/else for the
-                # time being
-                if channel == NotificationAPIChannel.SMS:
+                # Python v3.10 supports `match/case` but since Apprise aims
+                # to be compatible with Python v3.9+, we must use if/else
+                # for the time being
+                if channel == PingramChannel.SMS:
                     payload_.update(
                         {
-                            NotificationAPIChannel.SMS: {
+                            PingramChannel.SMS: {
                                 "message": (title + "\n" + text_body)
                                 if title
                                 else text_body,
@@ -766,7 +657,18 @@ class NotifyNotificationAPI(NotifyBase):
                         }
                     )
 
-                elif channel == NotificationAPIChannel.EMAIL:
+                elif channel == PingramChannel.CALL:
+                    payload_.update(
+                        {
+                            PingramChannel.CALL: {
+                                "message": (title + "\n" + text_body)
+                                if title
+                                else text_body,
+                            },
+                        }
+                    )
+
+                elif channel == PingramChannel.EMAIL:
                     html_body = (
                         convert_between(
                             NotifyFormat.TEXT, NotifyFormat.HTML, body
@@ -777,7 +679,7 @@ class NotifyNotificationAPI(NotifyBase):
 
                     payload_.update(
                         {
-                            NotificationAPIChannel.EMAIL: {
+                            PingramChannel.EMAIL: {
                                 "subject": title if title else self.app_id,
                                 "html": html_body,
                             },
@@ -785,27 +687,27 @@ class NotifyNotificationAPI(NotifyBase):
                     )
 
                     if self.from_addr:
-                        payload_[NotificationAPIChannel.EMAIL].update(
+                        payload_[PingramChannel.EMAIL].update(
                             {
                                 "senderEmail": self.from_addr,
                                 "senderName": self.names[self.from_addr],
                             }
                         )
 
-                elif channel == NotificationAPIChannel.INAPP:
+                elif channel == PingramChannel.INAPP:
                     payload_.update(
                         {
-                            NotificationAPIChannel.INAPP: {
+                            PingramChannel.INAPP: {
                                 "title": title if title else self.app_id,
                                 "image": self.image_url(notify_type),
                             },
                         }
                     )
 
-                elif channel == NotificationAPIChannel.WEB_PUSH:
+                elif channel == PingramChannel.WEB_PUSH:
                     payload_.update(
                         {
-                            NotificationAPIChannel.WEB_PUSH: {
+                            PingramChannel.WEB_PUSH: {
                                 "title": title if title else self.app_id,
                                 "message": text_body,
                                 "icon": self.image_url(notify_type),
@@ -813,20 +715,20 @@ class NotifyNotificationAPI(NotifyBase):
                         }
                     )
 
-                elif channel == NotificationAPIChannel.MOBILE_PUSH:
+                elif channel == PingramChannel.MOBILE_PUSH:
                     payload_.update(
                         {
-                            NotificationAPIChannel.MOBILE_PUSH: {
+                            PingramChannel.MOBILE_PUSH: {
                                 "title": title if title else self.app_id,
                                 "message": text_body,
                             },
                         }
                     )
 
-                else:  # channel == NotificationAPIChannel.SLACK
+                else:  # channel == PingramChannel.SLACK
                     payload_.update(
                         {
-                            NotificationAPIChannel.SLACK: {
+                            PingramChannel.SLACK: {
                                 "text": (title + "\n" + text_body)
                                 if title
                                 else text_body,
@@ -858,7 +760,7 @@ class NotifyNotificationAPI(NotifyBase):
             # Create a copy of our template
             payload = payload_.copy()
 
-            # the cc, bcc, to field must be unique or SendMail will fail,
+            # the cc, bcc, to field must be unique or the send will fail,
             # the below code prepares this by ensuring the target isn't in
             # the cc list or bcc list. It also makes sure the cc list does
             # not contain any of the bcc entries
@@ -885,42 +787,31 @@ class NotifyNotificationAPI(NotifyBase):
             yield payload
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
-        """
-        Perform NotificationAPI Notification
-        """
+        """Perform Pingram Notification."""
 
         # error tracking (used for function return)
         has_error = False
 
         if not self.targets:
-            # There is no one to email or send an sms message to; we're done
-            self.logger.warning(
-                "There are no NotificationAPI recipients to notify"
-            )
+            # There is no one to email or send an sms message to; we're
+            # done
+            self.logger.warning("There are no Pingram recipients to notify")
             return False
 
         # Prepare our URL
-        if self.client_secret:
-            # Deprecated legacy NotificationAPI endpoint
-            url = (
-                f"{NOTIFICATIONAPI_API_LOOKUP[self.region]}/"
-                f"{self.client_id}/sender"
-            )
-        else:
-            # Current Pingram endpoint
-            url = f"{PINGRAM_API_LOOKUP[self.region]}/send"
+        url = f"{PINGRAM_API_LOOKUP[self.region]}/send"
 
         headers = {
             "User-Agent": self.app_id,
             "Content-Type": "application/json",
-            "Authorization": self.auth_header,
+            "Authorization": f"Bearer {self.apikey}",
         }
 
         for payload in self.gen_payload(
             body, title=title, notify_type=notify_type, **kwargs
         ):
-            # A Pingram API key target may have no "id" (it's optional in
-            # that mode), so fall back to number/email for log messages.
+            # A target may have no "id" (it's always optional), so fall
+            # back to number/email for log messages.
             target_desc = (
                 payload["to"].get("id")
                 or payload["to"].get("number")
@@ -929,11 +820,11 @@ class NotifyNotificationAPI(NotifyBase):
 
             # Perform our post
             self.logger.debug(
-                "NotificationAPI POST URL: {} (cert_verify={!r})".format(
+                "Pingram POST URL: {} (cert_verify={!r})".format(
                     url, self.verify_certificate
                 )
             )
-            self.logger.debug("NotificationAPI Payload: %s", target_desc)
+            self.logger.debug("Pingram Payload: %s", target_desc)
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -956,7 +847,7 @@ class NotifyNotificationAPI(NotifyBase):
                     #  - TypeError = r.content is None
                     #  - AttributeError = r is None
                     self.logger.warning(
-                        "Invalid response from NotificationAPI server."
+                        "Invalid response from Pingram server."
                     )
                     self.logger.debug(
                         "Response Details:\r\n%r", (r.content or b"")[:2000]
@@ -974,14 +865,12 @@ class NotifyNotificationAPI(NotifyBase):
                     requests.codes.accepted,
                 ):
                     # We had a problem
-                    status_str = (
-                        NotifyNotificationAPI.http_response_code_lookup(
-                            status_code
-                        )
+                    status_str = NotifyPingram.http_response_code_lookup(
+                        status_code
                     )
 
                     self.logger.warning(
-                        "Failed to send NotificationAPI notification to %s: "
+                        "Failed to send Pingram notification to %s: "
                         "%s%serror=%d",
                         target_desc,
                         status_str,
@@ -998,13 +887,13 @@ class NotifyNotificationAPI(NotifyBase):
 
                 else:
                     self.logger.info(
-                        "Sent NotificationAPI notification to %s.",
+                        "Sent Pingram notification to %s.",
                         target_desc,
                     )
 
             except requests.RequestException as e:
                 self.logger.warning(
-                    "A Connection error occurred sending NotificationAPI "
+                    "A Connection error occurred sending Pingram "
                     "notification to %s.",
                     target_desc,
                 )
@@ -1017,114 +906,77 @@ class NotifyNotificationAPI(NotifyBase):
 
     @staticmethod
     def parse_url(url):
-        """
-        Parses the URL and returns enough arguments that can allow
-        us to re-instantiate this object.
-
-        """
+        """Parses the URL and returns enough arguments that can allow us
+        to re-instantiate this object."""
 
         results = NotifyBase.parse_url(url, verify_host=False)
         if not results:
             # We're done early as we couldn't load the results
             return results
 
-        # Define our minimum requirements; defining them now saves us from
-        # having to if/else all kinds of branches below...
-        results["client_id"] = None
-        results["client_secret"] = None
-
         # Prepare our targets (starting with our host)
         results["targets"] = []
         if results["host"]:
-            results["targets"].append(
-                NotifyNotificationAPI.unquote(results["host"])
-            )
+            results["targets"].append(NotifyPingram.unquote(results["host"]))
 
         # For tracking email sources
         results["from_addr"] = None
         if "from" in results["qsd"] and len(results["qsd"]["from"]):
-            results["from_addr"] = NotifyNotificationAPI.unquote(
+            results["from_addr"] = NotifyPingram.unquote(
                 results["qsd"]["from"].rstrip()
             )
 
-        # First 2 elements are the client_id and client_secret
-        # Following are targets
-        results["targets"] += NotifyNotificationAPI.split_path(
-            results["fullpath"]
-        )
-        # check for our client id
-        if "id" in results["qsd"] and len(results["qsd"]["id"]):
-            # Store our Client ID
-            results["client_id"] = NotifyNotificationAPI.unquote(
-                results["qsd"]["id"]
-            )
+        # First element is the API Key; the rest are targets
+        results["targets"] += NotifyPingram.split_path(results["fullpath"])
+
+        # check for our api key
+        if "apikey" in results["qsd"] and len(results["qsd"]["apikey"]):
+            # Store our API Key
+            results["apikey"] = NotifyPingram.unquote(results["qsd"]["apikey"])
 
         elif results["targets"]:
-            # Store our Client ID
-            results["client_id"] = results["targets"].pop(0)
-
-        if "secret" in results["qsd"] and len(results["qsd"]["secret"]):
-            # Store our Client Secret
-            results["client_secret"] = NotifyNotificationAPI.unquote(
-                results["qsd"]["secret"]
-            )
-
-        elif results["targets"] and not (
-            results["client_id"]
-            and IS_PINGRAM_API_KEY_RE.match(results["client_id"])
-        ):
-            # Store our Client Secret. Skipped for a Pingram API key (no
-            # client_secret pairing), so the next path segment is treated
-            # as the first recipient target instead.
-            results["client_secret"] = results["targets"].pop(0)
+            # Store our API Key
+            results["apikey"] = results["targets"].pop(0)
 
         if "region" in results["qsd"] and len(results["qsd"]["region"]):
-            results["region"] = NotifyNotificationAPI.unquote(
-                results["qsd"]["region"]
-            )
+            results["region"] = NotifyPingram.unquote(results["qsd"]["region"])
 
         if "channels" in results["qsd"] and len(results["qsd"]["channels"]):
-            results["channels"] = NotifyNotificationAPI.unquote(
+            results["channels"] = NotifyPingram.unquote(
                 results["qsd"]["channels"]
             )
 
         if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
-            results["mode"] = NotifyNotificationAPI.unquote(
-                results["qsd"]["mode"]
-            )
+            results["mode"] = NotifyPingram.unquote(results["qsd"]["mode"])
 
         if "reply" in results["qsd"] and len(results["qsd"]["reply"]):
-            results["reply_to"] = NotifyNotificationAPI.unquote(
+            results["reply_to"] = NotifyPingram.unquote(
                 results["qsd"]["reply"]
             )
 
         # Handling of Message Type
         if "type" in results["qsd"] and len(results["qsd"]["type"]):
-            results["message_type"] = NotifyNotificationAPI.unquote(
+            results["message_type"] = NotifyPingram.unquote(
                 results["qsd"]["type"]
             )
 
         elif results["user"]:
             # Pull from user
-            results["message_type"] = NotifyNotificationAPI.unquote(
-                results["user"]
-            )
+            results["message_type"] = NotifyPingram.unquote(results["user"])
 
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"].append(
-                NotifyNotificationAPI.unquote(results["qsd"]["to"])
+                NotifyPingram.unquote(results["qsd"]["to"])
             )
 
         # Handle Carbon Copy Addresses
         if "cc" in results["qsd"] and len(results["qsd"]["cc"]):
-            results["cc"] = NotifyNotificationAPI.unquote(results["qsd"]["cc"])
+            results["cc"] = NotifyPingram.unquote(results["qsd"]["cc"])
 
         # Handle Blind Carbon Copy Addresses
         if "bcc" in results["qsd"] and len(results["qsd"]["bcc"]):
-            results["bcc"] = NotifyNotificationAPI.unquote(
-                results["qsd"]["bcc"]
-            )
+            results["bcc"] = NotifyPingram.unquote(results["qsd"]["bcc"])
 
         # Store our tokens
         results["tokens"] = results["qsd:"]
