@@ -81,12 +81,10 @@ class AppriseResultStatus(IntEnum):
 
 
 class NotifyAttempt:
-    """The raw outcome of exactly one call to a service's notify()/
-    async_notify() -- one retry within a dispatch, or one escalation-chain
-    re-dispatch of the same service in a later priority tier.
+    """The raw outcome of one service call or retry.
 
-    Optional-service forgiveness happens later at NotifyResult. TIMEOUT means
-    Apprise stopped waiting, or skipped the next attempt after a deadline.
+    Optional handling belongs to ``NotifyResult``. TIMEOUT means Apprise
+    stopped waiting or skipped an attempt after its deadline.
     """
 
     def __init__(
@@ -100,9 +98,7 @@ class NotifyAttempt:
         # Never NOMATCH -- see the class docstring.
         self.status = status
 
-        # Wall-clock seconds this one call took.  0.0 for a TIMEOUT entry
-        # that represents a decision not to start a new call at all (as
-        # opposed to one that was abandoned mid-flight).
+        # A zero-second TIMEOUT means the deadline prevented another attempt.
         self.elapsed = elapsed
 
         # Derive start_time from end_time and elapsed so they always agree.
