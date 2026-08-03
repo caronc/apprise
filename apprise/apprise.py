@@ -206,12 +206,11 @@ def _compute_deadline(
 
     The earlier of these limits wins:
 
-    - The service's ``AppriseAsset(service_timeout=...)`` setting. Its
-      default is 60 seconds, and 0 disables it.
+    - The service's ``service_timeout`` setting.
     - The shared deadline created by ``notify(timeout=...)`` for the call.
 
-    The service timer begins when dispatch starts, so waiting for a worker
-    does not consume it. ``None`` means neither limit is enabled.
+    The caller shares this deadline with the worker so queueing does not
+    change the time limit. ``None`` means neither limit is enabled.
     """
     service_timeout = getattr(
         server.asset,
@@ -376,20 +375,18 @@ def _finalize_service_result(
 def _call_with_retry(
     service: NotifyBase,
     kwargs: dict[str, Any],
-    call_deadline: Optional[float],
+    deadline: Optional[float],
 ) -> tuple[bool, NotifyResult]:
     """Run one service with retries, waits, logging, and deadlines.
 
-    Shared by sequential and thread-pool dispatch so both paths report
-    the same NotifyResult shape.
+    Sequential and thread-pool dispatch share this path. ``deadline`` is the
+    caller's absolute time limit and must remain unchanged in the worker.
     """
     # Pop the per-call overrides so they stay internal.
     retry = _resolve_retry_count(service, kwargs)
     wait = getattr(service, "wait", 0.0)
     log_callback = kwargs.pop("_log_callback", None)
 
-    # Start the service budget when work actually begins.
-    deadline = _compute_deadline(service, call_deadline)
     attempts: list[NotifyAttempt] = []
     for attempt in range(retry + 1):
         if deadline is not None and time.monotonic() >= deadline:
@@ -1149,11 +1146,10 @@ class Apprise:
         are notified.  By default, all added services are notified
         (tag=MATCH_ALL_TAG)
 
-        This function always returns an AppriseResult. bool(result) preserves
-        the previous True/False behavior. result.status distinguishes success,
-        failure (including invalid arguments), no match, and timeout (see
-        timeout= below). Iterate the result to inspect each service actually
-        dispatched:
+        Delivery and message-validation outcomes return ``AppriseResult``.
+        ``bool(result)`` preserves the previous True/False behavior, while its
+        status distinguishes success, failure, no match, and timeout. Iterate
+        the result to inspect each service actually dispatched:
 
             result = apobj.notify(body="hello")
             for service_result in result:
@@ -1183,19 +1179,10 @@ class Apprise:
         Set interpret_escapes to True if you want to pre-escape a string such
         as turning a \n into an actual new line, etc.
 
-        timeout, when given (as a non-zero int or float), is a ceiling in
-        seconds on how long this entire notify() call is allowed to run.
-        Any service not finished by then is reported with
-        AppriseResultStatus.TIMEOUT instead of being waited on further.
-        Each service is independently also bounded by its own
-        AppriseAsset._service_timeout (default 60s, set via
-        AppriseAsset(service_timeout=...); 0 disables it) -- whichever of
-        the two limits is sooner applies to a given service.  timeout
-        defaults to 0 (no call-level override at all), deliberately
-        leaving AppriseAsset._service_timeout as the only thing that
-        controls the default behaviour; negative values raise ValueError,
-        non-numeric values raise TypeError, exactly like
-        AppriseAsset(service_timeout=...) itself.
+        ``timeout`` limits the entire call in seconds; unfinished services
+        report TIMEOUT. The earlier call or service limit applies. A value of
+        0 leaves only the service limit active. Values must be finite,
+        non-negative numbers; invalid values raise TypeError or ValueError.
 
         log_callback overrides the instance default for this call. It must be
         synchronous; schedule any async work from inside the callback.
@@ -1385,12 +1372,10 @@ class Apprise:
         )
 
     async def async_notify(self, *args: Any, **kwargs: Any) -> AppriseResult:
-        """Send a notification to all the plugins previously loaded, for
-        asynchronous callers.
+        """Asynchronously notify all loaded plugins.
 
-        The arguments and return value are identical to those of
-        Apprise.notify() -- see its docstring for the full AppriseResult
-        contract, including the timeout= and log_callback= parameters.
+        Arguments and results match :meth:`notify`, including ``timeout`` and
+        ``log_callback``.
         """
         tag = kwargs.get("tag", common.MATCH_ALL_TAG)
 
@@ -1778,9 +1763,7 @@ class Apprise:
             deadline = _compute_deadline(service, call_deadline)
 
             if deadline is None:
-                ok, notify_result = _call_with_retry(
-                    service, kwargs, call_deadline
-                )
+                ok, notify_result = _call_with_retry(service, kwargs, None)
                 success = success and ok
                 results.append(notify_result)
                 continue
@@ -1798,7 +1781,7 @@ class Apprise:
 
             executor = _get_shared_executor()
             future = executor.submit(
-                _call_with_retry, service, kwargs, call_deadline
+                _call_with_retry, service, kwargs, deadline
             )
             try:
                 # Keep a final guard for unexpected executor failures.
@@ -1894,9 +1877,7 @@ class Apprise:
             for service, kwargs in services_kwargs
         ]
         future_to_idx: dict[cf.Future, int] = {
-            executor.submit(
-                _call_with_retry, service, kwargs, call_deadline
-            ): i
+            executor.submit(_call_with_retry, service, kwargs, deadlines[i]): i
             for i, (service, kwargs) in enumerate(services_kwargs)
         }
 
@@ -1992,21 +1973,20 @@ class Apprise:
         )
 
         async def do_call(
-            service: NotifyBase, kwargs: dict[str, Any]
+            service: NotifyBase,
+            kwargs: dict[str, Any],
+            deadline: Optional[float],
         ) -> tuple[bool, NotifyResult]:
             """Run one asynchronous service with retries and waits.
 
-            Internal overrides are consumed here, and plugin exceptions become
-            failed attempts so retries can continue.
+            Plugin errors become failed attempts so retries can continue.
+            Reuse the caller's deadline so the outer wait and worker agree.
             """
             # Pop the per-call overrides so they stay internal.
             retry = _resolve_retry_count(service, kwargs)
             wait = getattr(service, "wait", 0.0)
             log_callback = kwargs.pop("_log_callback", None)
 
-            # Computed fresh as this coroutine actually starts running,
-            # same rationale as the module-level _call_with_retry().
-            deadline = _compute_deadline(service, call_deadline)
             attempts: list[NotifyAttempt] = []
             for attempt in range(retry + 1):
                 if deadline is not None and time.monotonic() >= deadline:
@@ -2122,7 +2102,7 @@ class Apprise:
                 # timeout=None makes wait_for() behave like a plain await.
                 # This keeps the bounded and unbounded paths together.
                 ok, notify_result = await asyncio.wait_for(
-                    do_call(service, kwargs), timeout=wait_for
+                    do_call(service, kwargs, deadline), timeout=wait_for
                 )
                 logger.trace(
                     "'%s' finished after %.3fs: %s.",
@@ -2149,8 +2129,8 @@ class Apprise:
                 notify_result = _timeout_result(service, wait_elapsed)
                 return bool(notify_result), notify_result
 
-        # Snapshot outer wait deadlines before launching the async workers.
-        # do_call() still computes its own deadline once it starts running.
+        # Snapshot outer wait deadlines before launching the async workers;
+        # do_call() reuses the same value instead of recomputing its own.
         deadlines: list[Optional[float]] = [
             _compute_deadline(service, call_deadline)
             for service, kwargs in services_kwargs

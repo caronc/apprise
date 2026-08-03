@@ -2882,7 +2882,7 @@ def test_adapter_keepalive_runner_finally_clears_state_when_closing(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_keepalive_runner_session_start_sets_event_even_on_exception(
+def test_adapter_keepalive_session_start_signals_on_error(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """Cover keepalive _Client._session_start() exception handling."""
@@ -3583,7 +3583,7 @@ def test_adapter_send_keepalive_async_returns_false_when_client_none(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_send_message_keepalive_exception_close_failure_suppressed(
+def test_adapter_keepalive_error_suppresses_close_failure(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_fake_slixmpp(monkeypatch)
@@ -3636,7 +3636,7 @@ def test_adapter_send_message_keepalive_exception_close_failure_suppressed(
     assert a.send_message(targets=[], subject="s", body="b") is False
 
 
-def test_adapter_send_message_keepalive_false_none_params_does_not_override(
+def test_adapter_keepalive_failure_keeps_default_params(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     install_fake_slixmpp(monkeypatch)
@@ -3704,7 +3704,7 @@ def test_adapter_send_message_keepalive_worker_failure_returns_false(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_send_message_keepalive_timeout_with_no_session_started_event(
+def test_adapter_keepalive_timeout_without_session_event(
     monkeypatch: pytest.MonkeyPatch,
     caplog: pytest.LogCaptureFixture,
 ) -> None:

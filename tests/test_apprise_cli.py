@@ -2989,15 +2989,9 @@ def test_apprise_cli_limit_option_in_help():
 
 @mock.patch("requests.request")
 def test_apprise_cli_notify_runtime_stat_log(mock_request):
-    """
-    CLI: right after notify() returns, a single DEBUG line reports how
-    long it took and how the AppriseResult broke down (success/failed/
-    timeout counts, plus the overall status by name -- PARTIAL or
-    TIMEOUT show up there without needing a separate line).
+    """CLI: log runtime, counts, and overall status after notification.
 
-    Only logger.debug itself is patched (not the whole logger object) --
-    main() also reads logger.level/setLevel() during its own verbosity
-    setup, which would break against a fully mocked logger.
+    Patch only ``logger.debug`` because setup also uses the logger's level.
     """
     response = mock.Mock()
     response.status_code = requests.codes.ok
@@ -3031,25 +3025,10 @@ def test_apprise_cli_notify_runtime_stat_log(mock_request):
 def test_apprise_cli_limit_option_times_out_service(
     mock_request, mock_force_exit
 ):
-    """
-    CLI: --limit (-L) caps how long a single notification may take,
-    reporting the service as timed out and exiting 5.
+    """CLI: ``--limit`` reports TIMEOUT without requiring a hard exit.
 
-    _force_exit() is mocked purely as a safety net: for real it calls
-    os._exit(), which would otherwise end this test process itself --
-    CliRunner.invoke() runs main() in-process, not as a subprocess, so
-    os._exit() has no SystemExit for it to catch the way ctx.exit()
-    normally provides. In practice it's never actually reached here:
-    the service's own 2s delay finishes well within the default 5s
-    grace period, so _wait_for_abandoned_calls() reports success on
-    its own and main() falls through to its normal, catchable
-    ctx.exit(status) -- see the assertion below confirming this.
-
-    The delay is kept generous (2s) against the ~0.15s abandon window
-    (--limit 0.05 plus Apprise's fixed 0.1s abandon grace) so slower or
-    heavily loaded CI hosts still reliably hit the TIMEOUT path instead
-    of racing it -- see TestServiceTimeout in tests/test_retry_wait.py
-    for the same margin convention.
+    The long service delay avoids timing races. Mock ``_force_exit`` because
+    its real ``os._exit`` would stop the in-process test runner.
     """
     import time
 
@@ -3078,20 +3057,11 @@ def test_apprise_cli_limit_option_times_out_service(
         ],
     )
 
-    # The only service dispatched timed out (no plain failure to take
-    # priority over it -- see _aggregate_status in apprise/apprise.py),
-    # so the overall result -- and thus this exit code -- is TIMEOUT (5)
-    # rather than the generic FAILURE (1).
-    # (The "timed out" diagnostic itself goes through Python logging,
-    # not click.echo, so it isn't visible in CliRunner's captured
-    # result.output -- it's covered directly in tests/test_retry_wait.py.)
+    # A lone timeout produces the TIMEOUT exit code, not generic FAILURE.
+    # Its diagnostic uses logging and is tested separately.
     assert result.exit_code == AppriseResultStatus.TIMEOUT
 
-    # The abandoned call's own 2s delay finished naturally well
-    # within the default 5s grace period, so _wait_for_abandoned_calls()
-    # already confirmed nothing was left running -- the hard-exit path
-    # was never needed. This exit code is itself unambiguous proof the
-    # TIMEOUT branch was taken (nothing else in main() produces it).
+    # The service finishes during the grace period, avoiding a hard exit.
     mock_force_exit.assert_not_called()
 
 
@@ -3233,17 +3203,9 @@ def test_wait_for_abandoned_calls_finishes_right_as_grace_period_ends():
 
 
 def test_force_exit_sequence():
-    """_force_exit() unconditionally flushes every service's
-    persistent store (AUTO mode only writes on-demand, and os._exit()
-    skips the garbage-collection that would normally trigger it),
-    flushes logging/stdio, and only then forces the process to end via
-    os._exit() with the given status -- no polling of any kind, since
-    _wait_for_abandoned_calls() having already reported "still running"
-    is a precondition for this being called at all.
+    """Flush stores and output before forcing the process to exit.
 
-    Every external effect is mocked directly (not through the CLI) so
-    this asserts the full sequence in isolation, without actually
-    ending this test process.
+    All external effects are mocked so the sequence is tested safely.
     """
     a = Apprise()
     services = [mock.Mock(spec=NotifyBase) for _ in range(3)]
@@ -3267,11 +3229,9 @@ def test_force_exit_sequence():
 
 
 def test_force_exit_flush_failure_does_not_skip_others():
-    """A failing flush_store() must never prevent the hard exit below,
-    NOR stop the remaining services from getting their own chance to
-    flush -- one bad store shouldn't cost every other one its own
-    flush. The broken service is deliberately added FIRST here so its
-    failure has to happen before the good one is ever reached.
+    """A failed store flush does not skip other stores or the hard exit.
+
+    The broken service comes first to exercise the remaining flushes.
     """
     a = Apprise()
     broken_service = mock.Mock(spec=NotifyBase)
@@ -3296,12 +3256,7 @@ def test_force_exit_flush_failure_does_not_skip_others():
 
 
 def test_force_exit_reaches_exit_despite_logging_failure():
-    """os._exit() must still run even when logging.shutdown() itself
-    raises -- there is nothing reliable left to log to at that point,
-    so the failure is swallowed rather than reported. sys.stdout/
-    stderr.flush() are independently guarded too, so logging.shutdown()
-    failing must not stop them from still being attempted.
-    """
+    """A logging shutdown failure does not prevent output flushes or exit."""
     a = Apprise()
     service = mock.Mock(spec=NotifyBase)
     a.add(service)

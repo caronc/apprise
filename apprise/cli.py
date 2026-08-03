@@ -489,19 +489,12 @@ class CustomHelpCommand(click.Command):
 
 
 def _wait_for_abandoned_calls(timeout: float) -> bool:
-    """Poll up to ``timeout`` seconds for any abandoned service call
-    (see _any_abandoned_calls_still_running()) to finish naturally.
+    """Wait up to ``timeout`` for abandoned service calls to finish.
 
-    Returns True once nothing is left running.
+    Return ``True`` once no tracked calls remain.
     """
-    # Logged once, at DEBUG only: _abandoned_call_descriptions()
-    # includes each service's url(privacy=True), so this stays out of
-    # the default log level even though the privacy mask is applied.
-    # This only reflects what Apprise itself dispatched and is still
-    # waiting on -- a plugin whose underlying library manages its own
-    # separate background resources (e.g. a persistent connection kept
-    # alive independently) is invisible here regardless of whether
-    # it's also still running.
+    # Log privacy-masked descriptions at DEBUG. Plugin-managed background
+    # resources are not tracked here.
     descriptions = _abandoned_call_descriptions()
     logger.debug(
         "One or more services timed out. Waiting up to %.1fs more for "
