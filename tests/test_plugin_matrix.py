@@ -5843,13 +5843,8 @@ def test_plugin_matrix_e2ee_long_device_id_and_title(
 def test_plugin_matrix_e2ee_rejects_late_oversize():
     """Refuse a first-login event that becomes too large after sizing.
 
-    The fallback covers normal unknown device IDs. The final check must
-    reject content that eats into the reserved MATRIX_EVENT_SAFETY_MARGIN
-    -- not just content that exceeds the full MATRIX_EVENT_BYTE_LIMIT
-    outright -- since that margin exists specifically to leave room for
-    homeserver-added event metadata this payload doesn't include.
-    Comparing against the full ceiling would let a late device ID
-    silently consume that reserved room without ever tripping the guard.
+    The final device ID must not consume the safety margin reserved for
+    homeserver-added metadata.
     """
     from apprise.common import NotifyFormat, OverflowMode
     from apprise.plugins.matrix.base import (

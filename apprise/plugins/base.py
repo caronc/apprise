@@ -742,11 +742,8 @@ class NotifyBase(URLBase):
     def _formats(self) -> tuple[NotifyFormat, ...]:
         """Supported notify formats as a tuple.
 
-        ``notify_format`` may be declared as a single ``NotifyFormat`` or
-        as a tuple/list of them. This mirrors the string-or-iterable
-        tolerance already used for protocol/secure_protocol. Index 0 is
-        the default/native format used when no override or input format
-        picks a different one.
+        ``notify_format`` accepts one format or a list. The first entry is the
+        default when no override or input format matches.
         """
         # Preserve declaration order because the first entry is the
         # default. parse_list() sorts alphabetically by default, which
