@@ -3388,13 +3388,10 @@ def test_adapter_keepalive_runner_finally_loop_none(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_keepalive_runner_finally_stop_close_exceptions_suppressed(
+def test_adapter_runner_suppresses_cleanup_errors(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Cover adapter.py where loop.stop() and loop.close() raise,
-    and exceptions are swallowed.
-    """
+    """Ensure event-loop cleanup errors do not escape the runner."""
     install_fake_slixmpp(monkeypatch)
 
     cfg = xmpp_adapter.XMPPConfig(
@@ -3429,19 +3426,20 @@ def test_adapter_keepalive_runner_finally_stop_close_exceptions_suppressed(
             loop, "run_forever", run_forever_boom, raising=True
         )
 
-        # Make stop/close raise to exercise both except blocks
-        monkeypatch.setattr(
-            loop,
-            "stop",
-            lambda: (_ for _ in ()).throw(RuntimeError("boom-stop")),
-            raising=True,
-        )
-        monkeypatch.setattr(
-            loop,
-            "close",
-            lambda: (_ for _ in ()).throw(RuntimeError("boom-close")),
-            raising=True,
-        )
+        # Raise after real cleanup so the event loop does not leak resources.
+        real_stop = loop.stop
+        real_close = loop.close
+
+        def stop_boom() -> None:
+            real_stop()
+            raise RuntimeError("boom-stop")
+
+        def close_boom() -> None:
+            real_close()
+            raise RuntimeError("boom-close")
+
+        monkeypatch.setattr(loop, "stop", stop_boom, raising=True)
+        monkeypatch.setattr(loop, "close", close_boom, raising=True)
 
         return loop
 

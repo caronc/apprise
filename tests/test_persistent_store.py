@@ -34,6 +34,7 @@ import logging
 import os
 import shutil
 import sys
+import tempfile
 import time
 from unittest import mock
 import zlib
@@ -53,6 +54,27 @@ logging.disable(logging.CRITICAL)
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
+
+
+# Keep the real close method so simulated failures do not leak file handles.
+_real_ntf_close = tempfile._TemporaryFileWrapper.close
+
+
+def _flaky_close(always=False):
+    """Mock close errors while still releasing the real file handle.
+
+    Raise on every call when ``always`` is true; otherwise, raise only once.
+    """
+    state = {"calls": 0}
+
+    def _close(self, *args, **kwargs):
+        # Perform the real close regardless of the simulated outcome
+        _real_ntf_close(self)
+        state["calls"] += 1
+        if always or state["calls"] == 1:
+            raise OSError()
+
+    return _close
 
 
 def test_persistent_storage_asset(tmpdir):
@@ -750,21 +772,25 @@ def test_persistent_storage_corruption_handling(tmpdir):
     with (
         mock.patch(
             "tempfile._TemporaryFileWrapper.close",
-            side_effect=(OSError(), None),
+            autospec=True,
+            side_effect=_flaky_close(),
         ),
         mock.patch("os.unlink", side_effect=(OSError())),
     ):
         assert not pc.flush(force=True)
 
     with mock.patch(
-        "tempfile._TemporaryFileWrapper.close", side_effect=OSError()
+        "tempfile._TemporaryFileWrapper.close",
+        autospec=True,
+        side_effect=_flaky_close(always=True),
     ):
         assert not pc.flush(force=True)
 
     with (
         mock.patch(
             "tempfile._TemporaryFileWrapper.close",
-            side_effect=(OSError(), None),
+            autospec=True,
+            side_effect=_flaky_close(),
         ),
         mock.patch("os.unlink", side_effect=OSError()),
     ):
@@ -773,7 +799,8 @@ def test_persistent_storage_corruption_handling(tmpdir):
     with (
         mock.patch(
             "tempfile._TemporaryFileWrapper.close",
-            side_effect=(OSError(), None),
+            autospec=True,
+            side_effect=_flaky_close(),
         ),
         mock.patch("os.unlink", side_effect=FileNotFoundError()),
     ):
@@ -1126,7 +1153,9 @@ def test_persistent_custom_io(tmpdir):
 
     pc.delete()
     with mock.patch(
-        "tempfile._TemporaryFileWrapper.close", side_effect=OSError()
+        "tempfile._TemporaryFileWrapper.close",
+        autospec=True,
+        side_effect=_flaky_close(always=True),
     ):
         assert pc.write(b"test") is False
 
@@ -1134,7 +1163,8 @@ def test_persistent_custom_io(tmpdir):
     with (
         mock.patch(
             "tempfile._TemporaryFileWrapper.close",
-            side_effect=(OSError(), None),
+            autospec=True,
+            side_effect=_flaky_close(),
         ),
         mock.patch("os.unlink", side_effect=OSError()),
     ):
@@ -1144,7 +1174,8 @@ def test_persistent_custom_io(tmpdir):
     with (
         mock.patch(
             "tempfile._TemporaryFileWrapper.close",
-            side_effect=(OSError(), None),
+            autospec=True,
+            side_effect=_flaky_close(),
         ),
         mock.patch("os.unlink", side_effect=FileNotFoundError()),
     ):

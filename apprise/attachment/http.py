@@ -297,7 +297,9 @@ class AttachHTTP(AttachBase):
         """Close our temporary file."""
         if self._temp_file:
             self.logger.trace("Attachment cleanup of %s", self._temp_file.name)
-            self._temp_file.close()
+            # Do not let temporary-file cleanup errors escape from __del__().
+            with contextlib.suppress(OSError):
+                self._temp_file.close()
 
             with contextlib.suppress(OSError):
                 # Ensure our file is removed (if it exists)

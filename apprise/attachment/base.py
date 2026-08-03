@@ -342,9 +342,11 @@ class AttachBase(URLBase):
           - detected_mimetype: Should identify mimetype of content
         """
 
-        # Remove all open pointers
+        # Close every tracked pointer without letting cleanup errors escape
+        # from invalidate() or __del__().
         while self.__pointers:
-            self.__pointers.pop().close()
+            with contextlib.suppress(OSError):
+                self.__pointers.pop().close()
 
         self.detected_name = None
         self.download_path = None
