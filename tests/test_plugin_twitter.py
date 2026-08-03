@@ -1139,7 +1139,7 @@ def test_plugin_twitter_tweet_attachments_bad_message_response(
 
 
 @patch("requests.post")
-def test_plugin_twitter_tweet_attachments_bad_message_response_unparseable(
+def test_plugin_twitter_unparseable_attachment_error(
     mock_post, twitter_url, good_media_response
 ):
     """Verify an unparseable tweet failure response is handled."""

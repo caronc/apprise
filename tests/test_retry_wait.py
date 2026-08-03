@@ -3042,10 +3042,8 @@ class TestServiceTimeout:
     def test_timeout_logs_include_error_entry(self):
         """A TIMEOUT attempt includes a matching ERROR log entry.
 
-        The generous timing margin keeps this real-time test reliable when
-        public infrastructure is busy, especially GitHub Actions runners and
-        Fedora Koji servers. Two attempts may start before the timeout, but a
-        third cannot.
+        Generous timing keeps this reliable on busy test hosts. Two attempts
+        may start before the timeout, but a third cannot.
         """
         N_MGR["slow"] = _SlowNotify
 
