@@ -43,6 +43,15 @@ VALID_URL_RE = re.compile(
 )
 VALID_QUERY_RE = re.compile(r"^(?P<path>.*[/\\])(?P<query>[^/\\]+)?$")
 
+# RFC 3986 path characters that are safe to leave unencoded when we
+# quote() a URL path. This is the pchar sub-delims set minus comma and
+# semicolon, which Apprise reserves as its own list delimiters. Shared by
+# parse_url() below and by every url() implementation that re-quotes a
+# previously parsed fullpath, so a literal path character (such as the
+# '@' in a jsDelivr version selector) is never re-percent-encoded when a
+# URL is reconstructed.
+URL_PATH_SAFE_CHARS = "/:@!$&'()*+="
+
 # delimiters used to separate values when content is passed in by string.
 # This is useful when turning a string into a list
 STRING_DELIMITERS = r"[\[\]\;,\s]+"
@@ -737,7 +746,12 @@ def parse_url(
 
     # Parse results
     result["host"] = parsed[1].strip()
-    result["fullpath"] = quote(unquote(tidy_path(parsed[2].strip())))
+    # Preserve RFC 3986 path characters used literally by some services.
+    # Keep commas and semicolons encoded because Apprise uses them as
+    # delimiters.
+    result["fullpath"] = quote(
+        unquote(tidy_path(parsed[2].strip())), safe=URL_PATH_SAFE_CHARS
+    )
 
     try:
         # Handle trailing slashes removed by tidy_path

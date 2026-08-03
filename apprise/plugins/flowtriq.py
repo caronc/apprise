@@ -62,7 +62,7 @@ import requests
 
 from ..common import NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
 from .base import NotifyBase
 
 # Map Apprise notification types to Flowtriq severity levels
@@ -284,7 +284,9 @@ class NotifyFlowtriq(NotifyBase):
                 if self.port is None or self.port == default_port
                 else ":{}".format(self.port)
             ),
-            path=NotifyFlowtriq.quote(self.webhook_path, safe="/"),
+            path=NotifyFlowtriq.quote(
+                self.webhook_path, safe=URL_PATH_SAFE_CHARS
+            ),
             params=NotifyFlowtriq.urlencode(params),
         )
 

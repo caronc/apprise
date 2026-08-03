@@ -41,10 +41,18 @@ from apprise import (
     Apprise,
     AppriseAsset,
     AppriseAttachment,
+    NotifyFormat,
     NotifyType,
+    OverflowMode,
     PersistentStoreMode,
 )
 from apprise.plugins.matrix import MatrixDiscoveryException, NotifyMatrix
+
+# Use Matrix's internal limit and mode names for exact boundary assertions.
+from apprise.plugins.matrix.base import (
+    MATRIX_CONTENT_BYTE_LIMIT,
+    MatrixWebhookMode,
+)
 
 logging.disable(logging.CRITICAL)
 
@@ -1810,6 +1818,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
 
     payload = loads(mock_post.call_args.kwargs["data"])
     assert payload["username"] == "apprise"
+    # An omitted input format preserves v1's pass-through behavior.
     assert payload["text"] == "Title\r\n<b>Body</b>"
     assert payload["html"] == "<h1>Title</h1><b>Body</b>"
 
@@ -5189,3 +5198,344 @@ def test_plugin_matrix_room_id_returns_none_without_home_server():
 
     result = obj._room_id("#bare_alias")
     assert result is None
+
+
+def test_plugin_matrix_enforce_byte_budget():
+    """The byte budget shrinks Unicode without looping on empty text."""
+
+    # Give both Matrix body representations the same emoji-heavy content.
+    payload = {
+        "body": "\U0001f600" * 1000,
+        "formatted_body": "\U0001f600" * 1000,
+    }
+    # Apply a deliberately small budget so both fields must shrink.
+    NotifyMatrix._matrix_enforce_byte_budget(
+        payload, 500, keys=("formatted_body", "body")
+    )
+
+    # Measure the JSON exactly as Matrix serializes it.
+    assert len(dumps(payload, ensure_ascii=False).encode("utf-8")) <= 500
+
+    # Empty candidates exercise the helper's no-progress exit path.
+    empty_payload = {"body": "", "formatted_body": ""}
+
+    # A tiny impossible budget must return instead of looping forever.
+    result = NotifyMatrix._matrix_enforce_byte_budget(
+        empty_payload, 10, keys=("formatted_body", "body")
+    )
+    assert result == {"body": "", "formatted_body": ""}
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_emoji_byte_budget(mock_post, mock_get, mock_put):
+    """Emoji-heavy messages remain within Matrix's byte limit."""
+
+    # Reuse a successful Matrix response for login, lookup, and room joins.
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    # Every mocked Matrix request receives the same successful response.
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    # Cover each HTTP verb used by the direct Matrix send path.
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    # Configure rich output so the payload contains two body fields.
+    kwargs = NotifyMatrix.parse_url(
+        "matrix://user:passwd@hostname/#abcd?format=html"
+    )
+    obj = NotifyMatrix(**kwargs)
+
+    # Send directly to exercise the byte-budget safety net.
+    assert obj.send(body="\U0001f600" * 20000) is True
+
+    # Inspect the final room event submitted through PUT.
+    payload = loads(mock_put.call_args.kwargs["data"])
+
+    # Confirm the wire representation stays inside Matrix's safe allowance.
+    encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+    assert encoded_len <= MATRIX_CONTENT_BYTE_LIMIT
+
+    # Invalid Unicode is replaced instead of raising during serialization.
+    assert obj.send(body="\ud800") is True
+    # The invalid code point becomes a valid placeholder in the JSON body.
+    wire_payload = mock_put.call_args.kwargs["data"]
+    assert loads(wire_payload)["body"] == "?"
+
+
+def test_plugin_matrix_e2ee_body_limit():
+    """Matrix selects limits for formatting, encryption, and webhooks."""
+
+    # Begin with an explicitly unencrypted direct Matrix connection.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=False,
+        secure=True,
+    )
+    # Plain output receives the larger single-body allowance.
+    assert obj.e2ee is False
+    assert obj.body_maxlen == obj.body_maxlen_default
+
+    # Rich text carries a plain fallback beside its formatted body.
+    obj.notify_format = NotifyFormat.HTML
+    assert obj.body_maxlen == obj.body_maxlen_formatted
+
+    # Non-TLS connections cannot use encryption even when requested.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        secure=False,
+    )
+    # The setting remains visible, but the normal formatted limit is used.
+    assert obj.e2ee is True
+    obj.notify_format = NotifyFormat.HTML
+    assert obj.body_maxlen == obj.body_maxlen_formatted
+
+    # A secure connection may use E2EE when crypto support is installed.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        secure=True,
+    )
+    assert obj.e2ee is True
+    obj.notify_format = NotifyFormat.HTML
+
+    # Installed crypto support activates the smaller encrypted rich limit.
+    if CRYPTOGRAPHY_AVAILABLE:
+        assert obj.body_maxlen == obj.body_maxlen_e2ee_formatted
+        assert obj.body_maxlen < obj.body_maxlen_formatted
+
+        # Plain encrypted content only needs one Matrix body field.
+        obj.notify_format = NotifyFormat.TEXT
+        assert obj.body_maxlen == obj.body_maxlen_e2ee
+    else:
+        # Encryption also requires the optional cryptography package.
+        assert obj.body_maxlen == obj.body_maxlen_formatted
+
+    # Webhooks keep the original limit regardless of output format.
+    obj.mode = MatrixWebhookMode.HOOKSHOT
+    assert obj.body_maxlen == obj.body_maxlen_webhook
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_html_plain_fallback(mock_post, mock_get, mock_put):
+    """HTML messages include plain text without repeating their markup."""
+
+    # Supply the minimum successful responses needed for a direct room send.
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    # Return success for each mocked Matrix endpoint.
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    # Select HTML as Matrix's single configured v1 output format.
+    kwargs = NotifyMatrix.parse_url(
+        "matrix://user:passwd@hostname/#abcd?format=html"
+    )
+    obj = NotifyMatrix(**kwargs)
+
+    # Known input provenance allows Matrix to build a plain fallback.
+    assert (
+        obj.send(
+            title="Title",
+            body="<b>Bold</b> text",
+            body_format=NotifyFormat.HTML,
+        )
+        is True
+    )
+
+    # Read the unencrypted Matrix event submitted to the room.
+    payload = loads(mock_put.call_args.kwargs["data"])
+
+    # Preserve the original markup in Matrix's formatted representation.
+    assert payload["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
+    # The plain-text fallback must not carry the raw markup a second time.
+    assert "<b>" not in payload["body"]
+    assert "Bold text" in payload["body"]
+
+    # No input format is v1's pass-through signal.
+    assert obj.send(body="<b>Upstream HTML</b>") is True
+
+    # Re-read the most recent PUT to verify pass-through behavior.
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["body"] == "<b>Upstream HTML</b>"
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_html_split_preserves_body(
+    mock_post, mock_get, mock_put
+):
+    """HTML overflow splits before payload sizing so content is preserved."""
+
+    # Make login, discovery, and room operations succeed for every chunk.
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    # Share one stable mock response across all Matrix HTTP methods.
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    # Disable E2EE so this test targets the unencrypted HTML tier.
+    kwargs = NotifyMatrix.parse_url(
+        "matrix://user:passwd@hostname/#abcd?format=html&e2ee=no"
+    )
+    # Build a body that requires exactly three framework chunks.
+    obj = NotifyMatrix(**kwargs)
+    body = "x" * (obj.body_maxlen * 2 + 100)
+
+    # Use the normal notification path so the framework performs the split.
+    assert (
+        obj.notify(
+            body=body,
+            body_format=NotifyFormat.HTML,
+            overflow=OverflowMode.SPLIT,
+        )
+        is True
+    )
+
+    # Every original character remains across the resulting Matrix events.
+    payloads = [loads(call.kwargs["data"]) for call in mock_put.call_args_list]
+    # The conservative formatted limit should produce three events.
+    assert len(payloads) == 3
+
+    # Joining the formatted bodies must recreate the original input.
+    assert "".join(payload["formatted_body"] for payload in payloads) == body
+
+    # Each individual room event must remain within the byte allowance.
+    assert all(
+        len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        <= MATRIX_CONTENT_BYTE_LIMIT
+        for payload in payloads
+    )
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
+    """Encrypted HTML messages also provide a plain-text fallback."""
+    from apprise.common import NotifyFormat
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    def _mk_resp(d):
+        # Build a successful Matrix response with JSON content.
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    # Room sends only need an empty successful response body here.
+    mock_put.return_value = _mk_resp({})
+
+    # Prepare a logged-in Matrix object with E2EE enabled.
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], e2ee=True
+    )
+    # Force the rich-output branch being exercised by this regression.
+    obj.notify_format = NotifyFormat.HTML
+
+    # Populate the identifiers normally learned during Matrix login.
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    # Supply an Olm account so the outer event has a sender key.
+    obj._e2ee_account = MatrixOlmAccount()
+
+    # Seed a MegOLM session that has already been shared with the room.
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
+
+    # Capture the event before encryption so its fallback can be checked.
+    captured = {}
+    # Retain the real encryption function after capturing its input.
+    original_encrypt = MatrixMegOlmSession.encrypt
+
+    def _spy_encrypt(self, event):
+        # Save the plaintext event immediately before MegOLM encryption.
+        captured["event"] = event
+        return original_encrypt(self, event)
+
+    with mock.patch.object(MatrixMegOlmSession, "encrypt", _spy_encrypt):
+        assert (
+            obj._e2ee_send_to_room(
+                "!r:h",
+                "<b>Bold</b> text",
+                "Title",
+                NotifyType.INFO,
+                NotifyFormat.HTML,
+            )
+            is True
+        )
+
+    # Inspect both representations inside the captured plaintext event.
+    msg_content = captured["event"]["content"]
+
+    # The rich representation retains all supplied HTML.
+    assert msg_content["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
+
+    # The fallback remains readable without carrying duplicate markup.
+    assert "<b>" not in msg_content["body"]
+    assert "Bold text" in msg_content["body"]
+
+    # Reject unexpected envelope growth before the homeserver returns a 413.
+    # Record network activity before introducing an oversized device ID.
+    put_count = mock_put.call_count
+
+    # Simulate unexpected server metadata that consumes the entire budget.
+    obj.device_id = "d" * MATRIX_CONTENT_BYTE_LIMIT
+    assert (
+        obj._e2ee_send_to_room(
+            "!r:h", "Body", "", NotifyType.INFO, NotifyFormat.HTML
+        )
+        is False
+    )
+    # Rejection must happen locally without another room request.
+    assert mock_put.call_count == put_count

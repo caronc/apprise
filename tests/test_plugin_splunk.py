@@ -89,6 +89,19 @@ apprise_url_tests = (
             "instance": NotifySplunk,
         },
     ),
+    (
+        # An entity_id containing characters that are reserved in a URL
+        # (?, #, %, /) must survive a url() round-trip without being
+        # truncated or corrupted.
+        "splunk://route@abc123/?entity_id=a%3Fb%23c%25d%2Fe",
+        {
+            # We're good
+            "instance": NotifySplunk,
+            # Our privacy url confirms the entity_id was quoted (not
+            # dropped) when the url() was re-assembled
+            "privacy_url": "splunk://route@a...3/a%3Fb%23c%25d/e",
+        },
+    ),
     # Support legacy URL
     (
         (
