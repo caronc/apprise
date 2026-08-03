@@ -52,11 +52,13 @@
 # Development API Reference::
 #  - https://core.telegram.org/bots/api
 from json import dumps, loads
+from json.decoder import JSONDecodeError
 import os
 import re
 
 import requests
 
+from ..apprise_attachment import AppriseAttachment
 from ..attachment.base import AttachBase
 from ..common import (
     NotifyFormat,
@@ -72,6 +74,7 @@ from ..conversion import (
 )
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
+from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
@@ -170,6 +173,10 @@ class NotifyTelegram(NotifyBase):
 
     # Telegram is limited to sending a maximum of 100 requests per second.
     request_rate_per_sec = 0.001
+
+    # There is no reason we should exceed 35KB when reading in a Rich
+    # Message template file.
+    max_telegram_template_size = 35000
 
     # Our default is to no not use persistent storage beyond in-memory
     # reference
@@ -416,8 +423,21 @@ class NotifyTelegram(NotifyBase):
                 "values": TELEGRAM_CONTENT_PLACEMENT,
                 "default": TelegramContentPlacement.BEFORE,
             },
+            "template": {
+                "name": _("Rich Message Template Path"),
+                "type": "string",
+                "private": True,
+            },
         },
     )
+
+    # Define our template kwargs
+    template_kwargs = {
+        "tokens": {
+            "name": _("Template Tokens"),
+            "prefix": ":",
+        },
+    }
 
     def __init__(
         self,
@@ -430,6 +450,8 @@ class NotifyTelegram(NotifyBase):
         topic=None,
         content=None,
         mdv=None,
+        template=None,
+        tokens=None,
         **kwargs,
     ):
         """Initialize Telegram Object."""
@@ -544,6 +566,38 @@ class NotifyTelegram(NotifyBase):
         # Track whether or not we want to send an image with our notification
         # or not.
         self.include_image = include_image
+
+        # Our Rich Message template is just an AppriseAttachment object
+        self.template = AppriseAttachment(asset=self.asset)
+        if template:
+            # Add our definition to our template
+            self.template.add(template)
+            if not len(self.template):
+                # We could not add our template; this occurs if the
+                # AppriseAttachment object could not load/parse the entry
+                # we just provided it.
+                msg = (
+                    f"The Telegram Rich Message template ({template!r})"
+                    " could not be loaded."
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+            # Enforce a maximum file size on our template
+            self.template[0].max_file_size = self.max_telegram_template_size
+
+        # Rich Message template token substitutions
+        self.tokens = {}
+        if isinstance(tokens, dict):
+            self.tokens.update(tokens)
+
+        elif tokens:
+            msg = (
+                "The specified Telegram Rich Message Template Tokens"
+                f" ({tokens}) are not identified as a dictionary."
+            )
+            self.logger.warning(msg)
+            raise TypeError(msg)
 
     def send_media(self, target, notify_type, payload=None, attach=None):
         """Sends a sticker based on the specified notify type."""
@@ -1243,6 +1297,26 @@ class NotifyTelegram(NotifyBase):
         Pending Telegram entity state is carried between generated calls.
         """
 
+        if self.template:
+            # A Rich Message template defines its own structure -- body
+            # and title are only substitution tokens for it, not text to
+            # be amalgamated, format-converted, or length-split the way a
+            # normal message is.
+            attach = kwargs.pop("attach", None)
+            if attach is not None and not isinstance(
+                attach, AppriseAttachment
+            ):
+                attach = AppriseAttachment(attach, asset=self.asset)
+
+            yield {
+                "body": body if body else "",
+                "title": title if title else "",
+                "body_format": body_format,
+                "attach": attach,
+                **kwargs,
+            }
+            return
+
         if not (
             self.notify_format == NotifyFormat.MARKDOWN
             and body_format == NotifyFormat.HTML
@@ -1297,6 +1371,13 @@ class NotifyTelegram(NotifyBase):
         if len(self.targets) == 0:
             self.logger.warning("There were not Telegram chat_ids to notify.")
             return False
+
+        if self.template:
+            # A Rich Message template bypasses our normal text/markdown/HTML
+            # handling entirely -- the template itself defines the content.
+            return self._send_rich_message(
+                body, title, notify_type=notify_type, attach=attach
+            )
 
         headers = {
             "User-Agent": self.app_id,
@@ -1530,6 +1611,214 @@ class NotifyTelegram(NotifyBase):
 
         return not has_error
 
+    def _gen_rich_payload(self, body, title, notify_type):
+        """Generates and validates our Rich Message 'blocks' content from
+        our configured template.
+
+        Returns the parsed InputRichMessage dictionary, or False if the
+        template could not be loaded, read, parsed, or validated.
+        """
+
+        # Acquire our template attachment
+        template = self.template[0]
+        if not template:
+            # We could not access the attachment
+            self.logger.warning(
+                "Could not access Telegram Rich Message template"
+                f" {template.url(privacy=True)}."
+            )
+            return False
+
+        # Take a copy of our token dictionary
+        tokens = self.tokens.copy()
+
+        # Apply some defaults template values
+        tokens["app_body"] = body
+        tokens["app_title"] = title
+        tokens["app_type"] = notify_type.value
+        tokens["app_id"] = self.app_id
+        tokens["app_desc"] = self.app_desc
+        tokens["app_color"] = self.color(notify_type)
+        # app_color_hex is an explicit alias for app_color so templates
+        # can reference the hex variant by a self-documenting name
+        tokens["app_color_hex"] = self.color(notify_type)
+        tokens["app_image_url"] = (
+            self.image_url(notify_type) if self.include_image else None
+        )
+        tokens["app_url"] = self.app_url
+
+        # Templates are always Rich Message JSON; enforce JSON escaping
+        tokens["app_mode"] = TemplateType.JSON
+
+        # Stringify substitutions before JSON escaping; preserve app_mode.
+        safe_tokens = {
+            k: (
+                v
+                if k == "app_mode" or isinstance(v, str)
+                else ("" if v is None else str(v))
+            )
+            for k, v in tokens.items()
+        }
+
+        try:
+            with open(template.path) as fp:
+                content = apply_template(fp.read(), **safe_tokens)
+
+        except OSError:
+            self.logger.warning(
+                "Telegram Rich Message template"
+                f" {template.url(privacy=True)} could not be read."
+            )
+            return False
+
+        # Parse and validate as JSON
+        try:
+            content = loads(content)
+
+        except JSONDecodeError as e:
+            self.logger.warning(
+                "Telegram Rich Message template"
+                f" {template.url(privacy=True)} contains invalid JSON."
+            )
+            self.logger.debug(f"JSONDecodeError: {e}")
+            return False
+
+        # Template must parse to a JSON object, not an array or scalar
+        if not isinstance(content, dict):
+            self.logger.warning(
+                "Telegram Rich Message template"
+                f" {template.url(privacy=True)} must be a JSON object"
+                f" (got {type(content).__name__})."
+            )
+            return False
+
+        # 'blocks' must be a non-empty list (Rich Message requirement)
+        if (
+            not isinstance(content.get("blocks"), list)
+            or not content["blocks"]
+        ):
+            self.logger.warning(
+                "Telegram Rich Message template"
+                f" {template.url(privacy=True)} must contain"
+                " a non-empty 'blocks' list."
+            )
+            return False
+
+        # Every block must be a dict with a 'type' string
+        if not all(
+            isinstance(b, dict) and isinstance(b.get("type"), str)
+            for b in content["blocks"]
+        ):
+            self.logger.warning(
+                "Telegram Rich Message template"
+                f" {template.url(privacy=True)} contains"
+                " a block missing a 'type' string."
+            )
+            return False
+
+        # Return the validated Rich Message content
+        return content
+
+    def _send_rich_message(self, body, title, notify_type, attach=None):
+        """Sends a Telegram Rich Message (built from our configured
+        template) to every target, followed by any attachments exactly as
+        they would be sent for a normal notification."""
+
+        # Generate our payload once; its content does not vary by target
+        rich_message = self._gen_rich_payload(body, title, notify_type)
+        if rich_message is False:
+            return False
+
+        headers = {
+            "User-Agent": self.app_id,
+            "Content-Type": "application/json",
+        }
+
+        url = "{}{}/{}".format(
+            self.notify_url, self.bot_token, "sendRichMessage"
+        )
+
+        has_error = False
+        for target in self.targets:
+            chat_id, topic = target
+
+            # Printable chat_id details
+            pchat_id = f"{chat_id}" if not topic else f"{chat_id}:{topic}"
+
+            payload = {"chat_id": chat_id, "rich_message": rich_message}
+            if topic:
+                payload["message_thread_id"] = topic
+            if not self.preview:
+                payload["link_preview_options"] = {"is_disabled": True}
+
+            self.throttle()
+
+            self.logger.debug(
+                f"Telegram POST URL: {url} "
+                f"(cert_verify={self.verify_certificate!r})"
+            )
+            self.logger.debug(f"Telegram Payload: {payload!s}")
+
+            try:
+                r = requests.post(
+                    url,
+                    data=dumps(payload),
+                    headers=headers,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
+                )
+
+                if r.status_code != requests.codes.ok:
+                    status_str = NotifyTelegram.http_response_code_lookup(
+                        r.status_code
+                    )
+
+                    try:
+                        error_msg = loads(r.content).get(
+                            "description", "unknown"
+                        )
+
+                    except (AttributeError, TypeError, ValueError):
+                        error_msg = None
+
+                    self.logger.warning(
+                        "Failed to send Telegram Rich Message to"
+                        f" {pchat_id}: "
+                        f"{error_msg if error_msg else status_str}, "
+                        f"error={r.status_code}."
+                    )
+                    self.logger.debug(f"Response Details:\r\n{r.content}")
+
+                    has_error = True
+                    continue
+
+            except requests.RequestException as e:
+                self.logger.warning(
+                    "A connection error occurred sending a Telegram"
+                    f" Rich Message to {pchat_id}."
+                )
+                self.logger.debug(f"Socket Exception: {e!s}")
+
+                has_error = True
+                continue
+
+            self.logger.info("Sent Telegram Rich Message.")
+
+            # Attachments are untouched by Rich Message mode -- they are
+            # always sent afterward, exactly as a normal notification
+            # would send them.
+            if (
+                attach
+                and self.attachment_support
+                and not self._send_attachments(
+                    target=target, notify_type=notify_type, attach=attach
+                )
+            ):
+                has_error = True
+
+        return not has_error
+
     @property
     def url_identifier(self):
         """Returns all of the identifiers that make this URL unique from
@@ -1555,8 +1844,16 @@ class NotifyTelegram(NotifyBase):
         if self.topic:
             params["topic"] = self.topic
 
+        if self.template:
+            params["template"] = NotifyTelegram.quote(
+                self.template[0].url(), safe=""
+            )
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
+
+        # Store any Rich Message template token entries if specified
+        params.update({f":{k}": v for k, v in self.tokens.items()})
 
         targets = []
         for chat_id, topic_ in self.targets:
@@ -1697,5 +1994,14 @@ class NotifyTelegram(NotifyBase):
         results["detect_owner"] = parse_bool(
             results["qsd"].get("detect", not results["targets"])
         )
+
+        # Rich Message Template Handling
+        if "template" in results["qsd"] and results["qsd"]["template"]:
+            results["template"] = NotifyTelegram.unquote(
+                results["qsd"]["template"]
+            )
+
+        # Store our Rich Message template tokens
+        results["tokens"] = results["qsd:"]
 
         return results
