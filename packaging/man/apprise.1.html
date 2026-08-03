@@ -467,6 +467,13 @@ configuration that you want and only specifically notify a subset of them:</p>
 <p><code>APPRISE_STORAGE_PATH</code>:
   Explicitly specify the persistent storage path to use (overriding the default).</p>
 
+<p><code>HTTP_PROXY</code>, <code>HTTPS_PROXY</code>, <code>NO_PROXY</code>:
+  Standard proxy variables honored by the underlying <code>requests</code> library (not
+  Apprise-specific). Set <code>HTTP_PROXY</code>/<code>HTTPS_PROXY</code> to route outbound
+  notifications through a proxy, and <code>NO_PROXY</code> to exempt specific hosts.
+  SOCKS proxies (<code>socks5h://...</code>) additionally require the optional
+  <code>PySocks</code> package (<code>pip install pysocks</code>) to be installed.</p>
+
 <h2 id="BUGS">BUGS</h2>
 
 <p>If you find any bugs, please make them known at:
@@ -481,7 +488,7 @@ configuration that you want and only specifically notify a subset of them:</p>
 
   <ol class='man-decor man-foot man foot'>
     <li class='tl'>Chris Caron &lt;lead2gold@gmail.com&gt;</li>
-    <li class='tc'>May 2026</li>
+    <li class='tc'>August 2026</li>
     <li class='tr'>apprise(1)</li>
   </ol>
 

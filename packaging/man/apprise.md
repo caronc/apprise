@@ -355,6 +355,13 @@ configuration that you want and only specifically notify a subset of them:
   `APPRISE_STORAGE_PATH`:
   Explicitly specify the persistent storage path to use (overriding the default).
 
+  `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`:
+  Standard proxy variables honored by the underlying `requests` library (not
+  Apprise-specific). Set `HTTP_PROXY`/`HTTPS_PROXY` to route outbound
+  notifications through a proxy, and `NO_PROXY` to exempt specific hosts.
+  SOCKS proxies (`socks5h://...`) additionally require the optional
+  `PySocks` package (`pip install pysocks`) to be installed.
+
 ## BUGS
 
 If you find any bugs, please make them known at:

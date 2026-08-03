@@ -1,6 +1,6 @@
 .\" generated with Ronn-NG/v0.10.1
 .\" http://github.com/apjanke/ronn-ng/tree/0.10.1
-.TH "APPRISE" "1" "May 2026" "Chris Caron <lead2gold@gmail.com>"
+.TH "APPRISE" "1" "August 2026" "Chris Caron <lead2gold@gmail.com>"
 .SH "NAME"
 \fBapprise\fR \- Push Notifications that work with just about every platform!
 .SH "SYNOPSIS"
@@ -315,6 +315,8 @@ $ apprise \-vv \-\-title "Will Be Late Getting Home" \e
 \fBAPPRISE_PLUGIN_PATH\fR: Explicitly specify the custom plugin search path to use (overriding the default)\. Use a semi\-colon (\fB;\fR), line\-feed (\fB\en\fR), and/or carriage return (\fB\er\fR) to delimit multiple entries\.
 .P
 \fBAPPRISE_STORAGE_PATH\fR: Explicitly specify the persistent storage path to use (overriding the default)\.
+.P
+\fBHTTP_PROXY\fR, \fBHTTPS_PROXY\fR, \fBNO_PROXY\fR: Standard proxy variables honored by the underlying \fBrequests\fR library (not Apprise\-specific)\. Set \fBHTTP_PROXY\fR/\fBHTTPS_PROXY\fR to route outbound notifications through a proxy, and \fBNO_PROXY\fR to exempt specific hosts\. SOCKS proxies (\fBsocks5h://\|\.\|\.\|\.\fR) additionally require the optional \fBPySocks\fR package (\fBpip install pysocks\fR) to be installed\.
 .SH "BUGS"
 If you find any bugs, please make them known at: \fIhttps://github\.com/caronc/apprise/issues\fR
 .SH "DONATIONS"
