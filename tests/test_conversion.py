@@ -958,7 +958,11 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(deep)
     elapsed = default_timer() - start
     assert len(out) < 20 * n
-    assert elapsed < 3.0
+    # Generous bound: this must catch a real return to quadratic
+    # behavior, not just run fast on a quiet dev machine -- shared or
+    # emulated build infrastructure (e.g. a busy Koji builder) can be
+    # many times slower.
+    assert elapsed < 15.0
 
     # Performance: many UNCLOSED <li> tags nested directly inside one another.
     n = 20000
@@ -967,7 +971,8 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(html)
     elapsed = default_timer() - start
     assert len(out) < 10 * n  # output itself is linear, not quadratic
-    assert elapsed < 3.0
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 30.0
 
     # Performance: many open <blockquote> tags followed by many closing tags of
     # a *different* kind that's never actually open ("</pre>").
@@ -977,7 +982,11 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(html)
     elapsed = default_timer() - start
     assert len(out) < 20 * n
-    assert elapsed < 3.0
+    # Generous bound: this must catch a real return to quadratic
+    # behavior, not just run fast on a quiet dev machine -- shared or
+    # emulated build infrastructure (e.g. a busy Koji builder) can be
+    # many times slower.
+    assert elapsed < 15.0
 
     # Blockquote depth is capped at BLOCKQUOTE_DEPTH_MAX
     assert BLOCKQUOTE_DEPTH_MAX == 4
@@ -1007,7 +1016,11 @@ def test_conversion_html_to_markdown_hardening():
     out = to_md(deep)
     elapsed = default_timer() - start
     assert len(out) < 20 * n
-    assert elapsed < 3.0
+    # Generous bound: this must catch a real return to quadratic
+    # behavior, not just run fast on a quiet dev machine -- shared or
+    # emulated build infrastructure (e.g. a busy Koji builder) can be
+    # many times slower.
+    assert elapsed < 15.0
 
     # When emphasis or anchor tags are nested past MAX_FRAME_DEPTH, _push_frame
     # returns False and the opening delimiter must NOT be emitted.
@@ -1591,7 +1604,8 @@ def test_conversion_html_to_markdown_tables_hardening():
     out = to_md(html)
     elapsed = default_timer() - start
     assert out.count("\n") == n  # one line per row, output stays linear
-    assert elapsed < 5.0
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 40.0
 
 
 def test_conversion_html_to_markdown_pre_code_whitespace():

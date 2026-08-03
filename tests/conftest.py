@@ -57,10 +57,15 @@ def mimetypes_always_available():
 
 
 @pytest.fixture(scope="function", autouse=True)
-def no_throttling_everywhere(session_mocker):
+def no_throttling_everywhere(mocker):
     """A pytest session fixture which disables throttling on all notifiers.
 
     It is automatically enabled.
+
+    Uses the function-scoped mocker (not session_mocker) so each test's
+    patches are torn down at the end of that same test instead of
+    accumulating across the whole suite, which otherwise makes final
+    teardown effectively O(n^2).
     """
     # Ensure we're working with a clean slate for each test
     N_MGR.unload_modules()
@@ -68,11 +73,11 @@ def no_throttling_everywhere(session_mocker):
     A_MGR.unload_modules()
 
     for plugin in N_MGR.plugins():
-        session_mocker.patch.object(plugin, "request_rate_per_sec", 0)
+        mocker.patch.object(plugin, "request_rate_per_sec", 0)
 
 
 @pytest.fixture(scope="function", autouse=True)
-def collect_all_garbage(session_mocker):
+def collect_all_garbage():
     """A pytest session fixture to ensure no __del__ cleanup call from one
     plugin will cause testing issues with another.
 
