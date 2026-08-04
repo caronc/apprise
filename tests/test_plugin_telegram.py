@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from inspect import cleandoc
 from json import dumps, loads
 
 # Disable logging for a cleaner testing output
@@ -2126,3 +2127,519 @@ def test_plugin_telegram_attach_memory(mock_post):
 
     assert obj.notify(body="Test", attach=mem) is True
     assert mock_post.call_count >= 1
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_blocks(mock_post, tmpdir):
+    """NotifyTelegram() - Rich Message template mode."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    # Write a minimal Rich Message JSON template to disk
+    template = tmpdir.join("blocks.json")
+    template.write(
+        cleandoc("""
+        {
+          "blocks": [
+            {
+              "type": "section_heading",
+              "text": "{{app_title}}"
+            },
+            {
+              "type": "paragraph",
+              "text": "{{app_body}}"
+            }
+          ]
+        }
+        """)
+    )
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/"
+        "?template={}&:mykey=myval".format(str(template))
+    )
+    assert isinstance(obj, NotifyTelegram)
+
+    # Verify tokens and template were parsed correctly
+    assert "mykey" in obj.tokens
+    assert obj.tokens["mykey"] == "myval"
+    assert obj.template
+
+    assert (
+        obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+        is True
+    )
+    assert mock_post.called is True
+
+    # Inspect the posted URL and payload
+    posted_url = mock_post.call_args_list[0][0][0]
+    assert posted_url.endswith("/sendRichMessage")
+
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    assert posted["chat_id"] == "@lead2gold"
+    assert "rich_message" in posted
+    blocks = posted["rich_message"]["blocks"]
+    assert any(b.get("type") == "section_heading" for b in blocks)
+    assert any(b.get("type") == "paragraph" for b in blocks)
+
+    heading = next(b for b in blocks if b.get("type") == "section_heading")
+    assert heading["text"] == "world"
+    paragraph = next(b for b in blocks if b.get("type") == "paragraph")
+    assert paragraph["text"] == "hello"
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_invalid_json(mock_post, tmpdir):
+    """NotifyTelegram() - Rich Message template with invalid JSON fails."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("bad.json")
+    template.write("{ not valid json }")
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_blocks_not_list(mock_post, tmpdir):
+    """NotifyTelegram() - 'blocks' missing/not-a-list/empty is rejected."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    # 'blocks' key entirely missing
+    template = tmpdir.join("missing_blocks.json")
+    template.write('{"text": "no blocks here"}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+    # 'blocks' present but not a list
+    template.write('{"blocks": "not-a-list"}')
+    obj2 = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj2, NotifyTelegram)
+    assert (
+        obj2.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+    # Empty list is also rejected
+    template.write('{"blocks": []}')
+    obj3 = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj3, NotifyTelegram)
+    assert (
+        obj3.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_block_missing_type(mock_post, tmpdir):
+    """NotifyTelegram() - a block dict without 'type' is rejected."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("no_type.json")
+    template.write('{"blocks": [{"text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_content_not_dict(mock_post, tmpdir):
+    """NotifyTelegram() - template that parses to a JSON array is
+    rejected."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("array.json")
+    template.write('[{"type": "paragraph"}]')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_block_not_dict(mock_post, tmpdir):
+    """NotifyTelegram() - non-dict entry in blocks list is rejected."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("bad_block.json")
+    template.write('{"blocks": ["not-a-dict"]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_load_error(mock_post, tmpdir):
+    """NotifyTelegram() - template OSError during read fails gracefully."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    # Write an empty file so the attachment resolves but open() can be
+    # mocked to fail
+    template = tmpdir.join("empty.json")
+    template.write("")
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+
+    with mock.patch("builtins.open", side_effect=OSError):
+        assert (
+            obj.notify(body="x", title="y", notify_type=NotifyType.INFO)
+            is False
+        )
+    assert mock_post.called is False
+
+
+def test_plugin_telegram_template_bad_tokens():
+    """NotifyTelegram() - invalid tokens type raises TypeError."""
+    with pytest.raises(TypeError):
+        NotifyTelegram(
+            bot_token="123456789:abcdefg_hijklmnop",
+            targets="lead2gold",
+            tokens="not-a-dict",
+        )
+
+
+def test_plugin_telegram_template_add_failure():
+    """NotifyTelegram() - TypeError when AppriseAttachment.add() drops
+    entry."""
+    with mock.patch("apprise.plugins.telegram.AppriseAttachment") as mock_cls:
+        inst = mock.MagicMock()
+        inst.__len__ = mock.Mock(return_value=0)
+        mock_cls.return_value = inst
+
+        with pytest.raises(TypeError):
+            NotifyTelegram(
+                bot_token="123456789:abcdefg_hijklmnop",
+                targets="lead2gold",
+                template="file:///some/template.json",
+            )
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_inaccessible(mock_post, tmpdir):
+    """NotifyTelegram() - template attachment that cannot be accessed
+    fails."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    # Point to a template file that does not exist
+    missing = str(tmpdir.join("missing.json"))
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            missing
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+    assert mock_post.called is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_none_token_value(mock_post, tmpdir):
+    """NotifyTelegram() - a None token value (e.g. app_image_url) is
+    coerced to an empty string before JSON-escaping."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    # Template references app_image_url which will be None when
+    # include_image=False
+    template = tmpdir.join("img.json")
+    template.write(
+        '{"blocks": [{"type": "paragraph",'
+        ' "text": "{{app_body}} img={{app_image_url}}"}]}'
+    )
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/"
+        "?image=no&template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="hi", title="y", notify_type=NotifyType.INFO) is True
+    )
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    paragraph = posted["rich_message"]["blocks"][0]
+    assert paragraph["text"] == "hi img="
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_url_roundtrip(mock_post, tmpdir):
+    """NotifyTelegram() - template + tokens survive url()/parse_url()
+    round-trip."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("rt.json")
+    template.write(
+        cleandoc("""
+        {
+          "blocks": [
+            {"type": "paragraph", "text": "{{app_body}}"}
+          ]
+        }
+        """)
+    )
+
+    obj1 = NotifyTelegram(
+        bot_token="123456789:abcdefg_hijklmnop",
+        targets="lead2gold",
+        template=str(template),
+        tokens={"key1": "val1", "key2": "val2"},
+    )
+
+    url = obj1.url()
+    result = NotifyTelegram.parse_url(url)
+    assert result is not None
+
+    obj2 = NotifyTelegram(**result)
+    assert isinstance(obj2, NotifyTelegram)
+
+    # Connection identity must be preserved
+    assert obj1.url_identifier == obj2.url_identifier
+
+    # Tokens must survive the round-trip
+    assert obj2.tokens.get("key1") == "val1"
+    assert obj2.tokens.get("key2") == "val2"
+
+    # Template must be present after round-trip
+    assert obj2.template
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_multi_target(mock_post, tmpdir):
+    """NotifyTelegram() - Rich Message is POSTed once per target."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("multi.json")
+    template.write('{"blocks": [{"type": "paragraph", "text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/12345/67890:55/"
+        "?template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert len(obj.targets) == 2
+
+    assert obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is True
+    assert mock_post.call_count == 2
+
+    posted_1 = loads(mock_post.call_args_list[0][1]["data"])
+    posted_2 = loads(mock_post.call_args_list[1][1]["data"])
+    assert posted_1["chat_id"] == 12345
+    assert "message_thread_id" not in posted_1
+    assert posted_2["chat_id"] == 67890
+    assert posted_2["message_thread_id"] == 55
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_with_attachment(mock_post, tmpdir):
+    """NotifyTelegram() - attachments remain untouched in template mode,
+    sent separately after the Rich Message."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("attach.json")
+    template.write('{"blocks": [{"type": "paragraph", "text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+
+    # Pass a raw (not pre-wrapped) attachment path; template mode must
+    # still normalize it into an AppriseAttachment internally.
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+
+    assert obj.notify(body="hi", title="y", attach=path) is True
+
+    # First call is the Rich Message itself
+    first_url = mock_post.call_args_list[0][0][0]
+    assert first_url.endswith("/sendRichMessage")
+
+    # Second call is the attachment, sent via the normal send_media() path
+    second_url = mock_post.call_args_list[1][0][0]
+    assert not second_url.endswith("/sendRichMessage")
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_attachment_failure(mock_post, tmpdir):
+    """NotifyTelegram() - a failed attachment send flags an overall
+    failure in Rich Message mode."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("attach_fail.json")
+    template.write('{"blocks": [{"type": "paragraph", "text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+
+    # Point to an attachment that cannot be accessed
+    attach = AppriseAttachment("file:///path/does/not/exist.gif")
+
+    assert obj.notify(body="hi", title="y", attach=attach) is False
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_preview_enabled(mock_post, tmpdir):
+    """NotifyTelegram() - preview=yes omits link_preview_options."""
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True})
+    mock_post.return_value = response
+
+    template = tmpdir.join("preview.json")
+    template.write('{"blocks": [{"type": "paragraph", "text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/"
+        "?preview=yes&template={}".format(str(template))
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is True
+    posted = loads(mock_post.call_args_list[0][1]["data"])
+    assert "link_preview_options" not in posted
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_http_error(mock_post, tmpdir):
+    """NotifyTelegram() - Rich Message HTTP error is handled gracefully."""
+    response = mock.Mock()
+    response.status_code = requests.codes.internal_server_error
+    response.content = dumps({"description": "failure"})
+    mock_post.return_value = response
+
+    template = tmpdir.join("err.json")
+    template.write('{"blocks": [{"type": "paragraph", "text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+
+    # Also cover the case where the error response body itself is not
+    # parsable JSON (falls back to the generic HTTP status string)
+    response.content = b"not-json"
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_template_request_exception(mock_post, tmpdir):
+    """NotifyTelegram() - Rich Message RequestException is handled
+    gracefully."""
+    mock_post.side_effect = requests.RequestException()
+
+    template = tmpdir.join("exc.json")
+    template.write('{"blocks": [{"type": "paragraph", "text": "hi"}]}')
+
+    obj = Apprise.instantiate(
+        "tgram://123456789:abcdefg_hijklmnop/lead2gold/?template={}".format(
+            str(template)
+        )
+    )
+    assert isinstance(obj, NotifyTelegram)
+    assert (
+        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+    )
