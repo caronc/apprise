@@ -56,7 +56,7 @@ jobs:
             tox_env: minimal
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Install tox for isolated environment and plugin test orchestration
       - name: Install tox
@@ -68,7 +68,7 @@ jobs:
 
       - name: Upload coverage report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.tox_env }}
           path: .coverage
@@ -81,10 +81,10 @@ jobs:
     if: always()  # Even if a test fails, still attempt to upload what we have
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Download all coverage reports
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           path: coverage-artifacts
 
@@ -112,7 +112,7 @@ jobs:
 
       # Upload merged coverage results to Codecov for visualization
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage.xml
