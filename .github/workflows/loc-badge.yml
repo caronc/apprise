@@ -14,7 +14,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Generate LoC badge (Apprise library only)
         uses: alexispurslane/GHA-LoC-Badge@v2.0.0
@@ -34,7 +34,7 @@ jobs:
           echo "Line Count: ${{ steps.badge.outputs.total_lines }}";
 
       - name: Create PR (if changed)
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "Update Lines of Code (LoC) badge"
           title: "Update LoC badge"

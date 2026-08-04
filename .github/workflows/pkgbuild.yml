@@ -27,7 +27,7 @@ jobs:
 
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build RPMs
         run: ./bin/build-rpm.sh
@@ -42,7 +42,7 @@ jobs:
           find dist/${{ matrix.dist }} -type f -name '*.rpm'
 
       - name: Upload RPM Artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: built-rpms-${{ matrix.dist }}
           path: ./dist/${{ matrix.dist }}
@@ -50,7 +50,7 @@ jobs:
           retention-days: 5
 
       - name: Upload rpmlint config files
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           # Upload the specific files needed for verification
           name: rpmlint-config-${{ matrix.dist }}
@@ -73,13 +73,13 @@ jobs:
 
     steps:
       - name: Download built RPMs
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: built-rpms-${{ matrix.dist }}
           path: ./dist
 
       - name: Download rpmlint config files
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: rpmlint-config-${{ matrix.dist }}
           # Download files directly into the correct directory
