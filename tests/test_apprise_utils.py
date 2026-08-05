@@ -843,6 +843,21 @@ def test_parse_url_general():
     assert "]" not in result["fullpath"]
 
 
+def test_parse_url_markdown_content():
+    """
+    utils: parse_url() with unmatched-bracket content (GH#1693)
+    """
+    # Content whose host portion carries an unmatched '[' (for example from
+    # Markdown link syntax) makes the underlying urlparse() raise
+    # "Invalid IPv6 URL". parse_url() documents that it returns None when
+    # content cannot be extracted, so that ValueError must not propagate.
+    assert (
+        utils.parse.parse_url("**bold** and [link](https://example.com)")
+        is None
+    )
+    assert utils.parse.parse_url("text with [unclosed bracket") is None
+
+
 def test_parse_url_path_no_redos():
     "utils: parse_url() does not regress into slow/backtracking behavior"
 
