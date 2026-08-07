@@ -49,7 +49,7 @@ from apprise import (
     PersistentStoreMode,
     utils,
 )
-from apprise.attachment import AttachMemory
+from apprise.attachment.memory import AttachMemory
 from apprise.config import ConfigBase
 from apprise.exception import AppriseException
 from apprise.plugins import email
