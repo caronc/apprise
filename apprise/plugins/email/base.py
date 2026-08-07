@@ -1416,7 +1416,7 @@ class NotifyEmail(NotifyBase):
                         )
                     )
 
-                    with open(attachment.path, "rb") as abody:
+                    with attachment.open() as abody:
                         app = MIMEApplication(abody.read())
                         app.set_type(attachment.mimetype)
 
