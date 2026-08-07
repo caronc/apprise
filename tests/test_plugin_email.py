@@ -872,7 +872,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
 
     # test using an Apprise in memory attachement object
     am = AttachMemory(
-            contents="attachment",
+            content="attachment",
             name="attached.txt",
             mimetype="text/plain",
         )
