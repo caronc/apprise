@@ -49,6 +49,7 @@ from apprise import (
     PersistentStoreMode,
     utils,
 )
+from apprise.attachment.memory import AttachMemory
 from apprise.config import ConfigBase
 from apprise.exception import AppriseException
 from apprise.plugins import email
@@ -868,6 +869,28 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
         a.notify(body="body", title="test", attach=AppriseAttachment(attach))
         is True
     )
+
+    # test using an Apprise in memory attachement object
+    attachment = AppriseAttachment()
+    attachment.add(
+        AttachMemory(
+            content="attachment",
+            name="attached.txt",
+            mimetype="text/plain",
+        )
+    )
+    assert (
+        obj.notify(
+            body="body",
+            title="test",
+            notify_type=NotifyType.INFO,
+            attach=attachment,
+        )
+        is True
+    )
+
+    # same results happen from our Apprise object
+    assert a.notify(body="body", title="test", attach=attachment) is True
 
     max_file_size = AttachBase.max_file_size
     # Now do a case where the file can't be sent
