@@ -33,6 +33,7 @@ import concurrent.futures as cf
 from functools import partial
 from itertools import chain
 import json
+import logging
 import math
 import os
 import threading
@@ -386,6 +387,7 @@ def _call_with_retry(
     retry = _resolve_retry_count(service, kwargs)
     wait = getattr(service, "wait", 0.0)
     log_callback = kwargs.pop("_log_callback", None)
+    log_level = kwargs.pop("_log_level", None)
 
     attempts: list[NotifyAttempt] = []
     for attempt in range(retry + 1):
@@ -408,7 +410,11 @@ def _call_with_retry(
             service.service_name,
         )
         # Treat validation errors and plugin crashes as retriable failures.
-        with _ServiceLogCapture(service, log_callback=log_callback) as capture:
+        with _ServiceLogCapture(
+            service,
+            log_callback=log_callback,
+            level=log_level if log_level is not None else logging.WARNING,
+        ) as capture:
             try:
                 result = service.notify(**kwargs)
             except TypeError:
@@ -481,6 +487,7 @@ class Apprise:
         log_callback: Optional[
             Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
+        log_level: Optional[int] = None,
     ) -> None:
         """Loads a set of server urls while applying the Asset() module to each
         if specified.
@@ -494,6 +501,11 @@ class Apprise:
         ``log_callback(entry, service)``. It runs inline and must be a short,
         synchronous function. Schedule async work from the callback when
         needed.
+
+        log_level sets the minimum severity captured per service attempt
+        (as NotifyLogEntry objects on each NotifyAttempt). Defaults to
+        logging.WARNING; pass a finer level such as logging.INFO or
+        logging.DEBUG to also capture informational/debug chatter..
         """
 
         # Initialize a server list of URLs
@@ -525,6 +537,11 @@ class Apprise:
         # Default log_callback for every notify()/async_notify() call made
         # with this instance, unless overridden per-call.
         self._log_callback = log_callback
+
+        # Default log_level for every notify()/async_notify() call made
+        # with this instance, unless overridden per-call. None defers to
+        # _ServiceLogCapture's own WARNING default.
+        self._log_level = log_level
 
     @staticmethod
     def instantiate(
@@ -941,6 +958,17 @@ class Apprise:
         ]
 
     @staticmethod
+    def _inject_log_level(all_calls, log_level):
+        """Inject _log_level into every call's kwargs. No-op if
+        log_level is None."""
+        if log_level is None:
+            return all_calls
+        return [
+            (service, dict(kwargs, _log_level=log_level))
+            for service, kwargs in all_calls
+        ]
+
+    @staticmethod
     def _build_tag_chains(all_calls, tag):
         """Group *all_calls* into per-OR-token escalation chains.
 
@@ -1135,6 +1163,7 @@ class Apprise:
         log_callback: Optional[
             Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
+        log_level: Optional[int] = None,
     ) -> AppriseResult:
         """Send a notification to all the plugins previously loaded.
 
@@ -1186,10 +1215,20 @@ class Apprise:
 
         log_callback overrides the instance default for this call. It must be
         synchronous; schedule any async work from inside the callback.
+
+        log_level overrides the instance default for this call, setting the
+        minimum severity captured per service attempt (as NotifyLogEntry
+        objects on each NotifyAttempt). Defaults to logging.WARNING, the
+        level at which plugins themselves report delivery failures; pass a
+        finer level such as logging.INFO or logging.DEBUG to also capture
+        informational/debug chatter the same way command-line verbosity does.
         """
         timeout = _validate_timeout(timeout)
         effective_log_callback = (
             log_callback if log_callback is not None else self._log_callback
+        )
+        effective_log_level = (
+            log_level if log_level is not None else self._log_level
         )
 
         # Wall-clock start for AppriseResult.elapsed -- covers the entire
@@ -1238,6 +1277,7 @@ class Apprise:
         all_calls = Apprise._inject_log_callback(
             all_calls, effective_log_callback
         )
+        all_calls = Apprise._inject_log_level(all_calls, effective_log_level)
 
         if Apprise._filter_has_explicit_priority(tag):
             # An explicit priority sends one flat batch without escalation.
@@ -1374,12 +1414,12 @@ class Apprise:
     async def async_notify(self, *args: Any, **kwargs: Any) -> AppriseResult:
         """Asynchronously notify all loaded plugins.
 
-        Arguments and results match :meth:`notify`, including ``timeout`` and
-        ``log_callback``.
+        Arguments and results match :meth:`notify`, including ``timeout``,
+        ``log_callback``, and ``log_level``.
         """
         tag = kwargs.get("tag", common.MATCH_ALL_TAG)
 
-        # Pop both -- neither is a _create_notify_gen() parameter.
+        # Pop these -- none is a _create_notify_gen() parameter.
         timeout: Union[int, float] = _validate_timeout(
             kwargs.pop("timeout", 0)
         )
@@ -1388,6 +1428,10 @@ class Apprise:
         ] = kwargs.pop("log_callback", None)
         effective_log_callback = (
             log_callback if log_callback is not None else self._log_callback
+        )
+        log_level: Optional[int] = kwargs.pop("log_level", None)
+        effective_log_level = (
+            log_level if log_level is not None else self._log_level
         )
 
         # Wall-clock start for AppriseResult.elapsed -- see notify().
@@ -1422,6 +1466,7 @@ class Apprise:
         all_calls = Apprise._inject_log_callback(
             all_calls, effective_log_callback
         )
+        all_calls = Apprise._inject_log_level(all_calls, effective_log_level)
 
         if Apprise._filter_has_explicit_priority(tag):
             # Explicit priority prefix: flat dispatch, no escalation.
@@ -1986,6 +2031,7 @@ class Apprise:
             retry = _resolve_retry_count(service, kwargs)
             wait = getattr(service, "wait", 0.0)
             log_callback = kwargs.pop("_log_callback", None)
+            log_level = kwargs.pop("_log_level", None)
 
             attempts: list[NotifyAttempt] = []
             for attempt in range(retry + 1):
@@ -2016,7 +2062,11 @@ class Apprise:
                 # Treat validation and plugin exceptions as failed attempts.
                 # The retry loop can still continue for this service.
                 with _ServiceLogCapture(
-                    service, log_callback=log_callback
+                    service,
+                    log_callback=log_callback,
+                    level=(
+                        log_level if log_level is not None else logging.WARNING
+                    ),
                 ) as capture:
                     try:
                         result = await service.async_notify(**kwargs)
