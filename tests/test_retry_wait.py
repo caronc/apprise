@@ -3239,6 +3239,152 @@ class TestServiceTimeout:
         assert default_received == []
         assert override_received == ["overridden call"]
 
+    def test_notify_log_level_default_is_warning(self):
+        """Without an explicit log_level, captured entries still stop at
+        WARNING -- INFO chatter from the service is not recorded."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _info_then_warn(**kw):
+                """Log at both INFO and WARNING, then report failure."""
+                service.logger.info("delivery attempt starting")
+                service.logger.warning("HTTP 429 Too Many Requests")
+                return False
+
+            service.send = _info_then_warn
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            logging.disable(logging.NOTSET)
+            try:
+                result = a.notify(body="test")
+            finally:
+                logging.disable(logging.CRITICAL)
+        finally:
+            N_MGR.unload_modules()
+
+        service_result = next(iter(result))
+        messages = [e.message for e in service_result.logs()]
+        assert messages == ["HTTP 429 Too Many Requests"]
+
+    def test_notify_log_level_call_override(self):
+        """log_level passed directly to notify() captures finer entries
+        for that one call, overriding the Apprise instance's default."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _info_then_warn(**kw):
+                """Log at both INFO and WARNING, then report failure."""
+                service.logger.info("delivery attempt starting")
+                service.logger.warning("HTTP 429 Too Many Requests")
+                return False
+
+            service.send = _info_then_warn
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            # log_level only widens what the capture handler keeps; the
+            # 'apprise' logger's own effective level must independently
+            # permit INFO records through before any handler sees them.
+            apprise_logger = logging.getLogger("apprise")
+            restore_level = apprise_logger.level
+            apprise_logger.setLevel(logging.INFO)
+            logging.disable(logging.NOTSET)
+            try:
+                result = a.notify(body="test", log_level=logging.INFO)
+            finally:
+                logging.disable(logging.CRITICAL)
+                apprise_logger.setLevel(restore_level)
+        finally:
+            N_MGR.unload_modules()
+
+        service_result = next(iter(result))
+        messages = [e.message for e in service_result.logs()]
+        assert messages == [
+            "delivery attempt starting",
+            "HTTP 429 Too Many Requests",
+        ]
+
+    def test_notify_log_level_default_from_apprise_instance(self):
+        """A log_level given to Apprise() applies to every notify() call
+        made with that instance, the same way log_callback does."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _info_then_warn(**kw):
+                """Log at both INFO and WARNING, then report failure."""
+                service.logger.info("delivery attempt starting")
+                service.logger.warning("HTTP 429 Too Many Requests")
+                return False
+
+            service.send = _info_then_warn
+            a = Apprise(asset=asset, log_level=logging.INFO)
+            a.add(service)
+
+            apprise_logger = logging.getLogger("apprise")
+            restore_level = apprise_logger.level
+            apprise_logger.setLevel(logging.INFO)
+            logging.disable(logging.NOTSET)
+            try:
+                result = a.notify(body="test")
+            finally:
+                logging.disable(logging.CRITICAL)
+                apprise_logger.setLevel(restore_level)
+        finally:
+            N_MGR.unload_modules()
+
+        service_result = next(iter(result))
+        messages = [e.message for e in service_result.logs()]
+        assert messages == [
+            "delivery attempt starting",
+            "HTTP 429 Too Many Requests",
+        ]
+
+    def test_async_notify_log_level(self):
+        """log_level works for a plugin's native async_notify() path."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            async def _info_then_warn(**kw):
+                """Log at both INFO and WARNING, then report failure."""
+                service.logger.info("async attempt starting")
+                service.logger.warning("async 429")
+                return False
+
+            service.async_notify = _info_then_warn
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            apprise_logger = logging.getLogger("apprise")
+            restore_level = apprise_logger.level
+            apprise_logger.setLevel(logging.INFO)
+            logging.disable(logging.NOTSET)
+            try:
+                result = asyncio.run(
+                    a.async_notify(body="test", log_level=logging.INFO)
+                )
+            finally:
+                logging.disable(logging.CRITICAL)
+                apprise_logger.setLevel(restore_level)
+        finally:
+            N_MGR.unload_modules()
+
+        service_result = next(iter(result))
+        messages = [e.message for e in service_result.logs()]
+        assert messages == ["async attempt starting", "async 429"]
+
     def test_async_notify_log_callback(self):
         """log_callback works for a plugin's native async_notify()."""
         N_MGR["slow"] = _SlowNotify

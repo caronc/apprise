@@ -176,7 +176,7 @@ class NotifyLogEntry:
 
 
 class _ServiceLogCapture(logging.Handler):
-    """Capture one service's warning and error messages in isolation.
+    """Capture one service's log messages in isolation.
 
     A temporary handler stores one attempt's entries. ``log_callback`` receives
     them live and must return promptly; it can schedule async work if needed.
@@ -188,12 +188,10 @@ class _ServiceLogCapture(logging.Handler):
         log_callback: Optional[
             Callable[[NotifyLogEntry, NotifyBase], None]
         ] = None,
+        level: int = logging.WARNING,
     ) -> None:
-        """Prepare an isolated WARNING-level handler for ``service``."""
-        # Only capture WARNING and above -- this mirrors the level at
-        # which plugins themselves report delivery failures (HTTP errors,
-        # rate limits, etc.); INFO/DEBUG chatter is not useful here.
-        super().__init__(level=logging.WARNING)
+        """Prepare an isolated handler for ``service``."""
+        super().__init__(level=level)
         self._entries: list[NotifyLogEntry] = []
 
         # Reuse the service's logger; this capture is just another listener.
