@@ -31,6 +31,7 @@ import json
 import logging
 from random import choice
 from string import ascii_uppercase as str_alpha, digits as str_num
+from timeit import default_timer
 from unittest import mock
 
 import pytest
@@ -3706,6 +3707,133 @@ def test_notify_overflow_split_no_amalgamation_force_title_once():
         )
 
 
+def test_notify_dialect_overflow_repeat_title():
+    """NotifyBase(): Preserve repeated titles after dialect splitting."""
+
+    class GrowingDialect(NotifyBase):
+        # Small enough that a tripled chunk needs a further dialect split.
+        body_maxlen = 8
+        title_maxlen = 10
+        overflow_amalgamate_title = False
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            # Record every piece that would have gone out over the wire.
+            self.sent = []
+
+        def dialect_convert(self, body, body_format=None, *args, **kwargs):
+            # Triple every character so a chunk that fit before conversion
+            # overflows body_maxlen after conversion, forcing a re-split.
+            return "".join(c * 3 for c in body)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            self.sent.append((body, title))
+            return True
+
+    # Repeat mode keeps the title on every dialect-resplit piece.
+    obj = GrowingDialect(overflow=OverflowMode.SPLIT)
+    obj.overflow_display_title_once = False
+    # Declaring the format enables dialect conversion.
+    assert (
+        obj.notify(
+            body="abcdefghijklmnop",
+            title="Alert",
+            body_format=NotifyFormat.TEXT,
+        )
+        is True
+    )
+    # Tripling forces another split after the initial overflow split.
+    assert len(obj.sent) > 2
+    assert all(title == "Alert" for _, title in obj.sent)
+
+    # Show-once mode keeps the title only on the first physical piece.
+    obj = GrowingDialect(overflow=OverflowMode.SPLIT)
+    obj.overflow_display_title_once = True
+    # Declaring the format enables dialect conversion.
+    assert (
+        obj.notify(
+            body="abcdefghijklmnop",
+            title="Alert",
+            body_format=NotifyFormat.TEXT,
+        )
+        is True
+    )
+    assert len(obj.sent) > 2
+    assert obj.sent[0][1] == "Alert"
+    assert all(title == "" for _, title in obj.sent[1:])
+
+
+def test_notify_overflow_payload_max_size():
+    """NotifyBase(): Apply the optional payload cap before overflow."""
+
+    class TestNotification(NotifyBase):
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+
+        def notify(self, *args, **kwargs):
+            return True
+
+    body = "x" * 100
+
+    # The default cap is disabled in every overflow mode.
+    obj = TestNotification(overflow=OverflowMode.UPSTREAM)
+    chunks = obj._apply_overflow(body=body, title="")
+    assert chunks[0].get("body") == body
+
+    # Turn the cap on and set it smaller than the combined title + body.
+    asset = AppriseAsset(payload_max_size=20)
+    obj = TestNotification(asset=asset, overflow=OverflowMode.UPSTREAM)
+    chunks = obj._apply_overflow(body=body, title="")
+    assert len(chunks[0].get("body")) == 20
+
+    # The configured cap also applies in UPSTREAM mode.
+    assert chunks[0].get("body") == body[:20]
+
+    # Keep a short title whole when the body minimum still fits.
+    guarantee_asset = AppriseAsset(payload_max_size=40)
+    title = "T" * 9
+    obj = TestNotification(
+        asset=guarantee_asset, overflow=OverflowMode.UPSTREAM
+    )
+    chunks = obj._apply_overflow(body=body, title=title)
+    assert chunks[0].get("title") == title
+    assert len(chunks[0].get("body")) == 31
+
+    # Otherwise, share the cap proportionally.
+    title = "T" * 20
+    obj = TestNotification(asset=asset, overflow=OverflowMode.UPSTREAM)
+    chunks = obj._apply_overflow(body="B" * 18, title=title)
+    assert len(chunks[0].get("title")) == 10
+    assert len(chunks[0].get("body")) == 10
+
+    # Long title and body values share the cap proportionally.
+    long_body = "x" * 950
+    proportional_asset = AppriseAsset(payload_max_size=100)
+    title = "T" * 50
+    obj = TestNotification(
+        asset=proportional_asset, overflow=OverflowMode.UPSTREAM
+    )
+    chunks = obj._apply_overflow(body=long_body, title=title)
+    assert len(chunks[0].get("title")) == 5
+    assert len(chunks[0].get("body")) == 95
+
+    # A proportional split keeps at least one title character when its
+    # share would otherwise round down to zero.
+    title = "T" * 11
+    obj = TestNotification(
+        asset=proportional_asset, overflow=OverflowMode.UPSTREAM
+    )
+    chunks = obj._apply_overflow(body="x" * 2200, title=title)
+    assert chunks[0].get("title") == "T"
+    assert len(chunks[0].get("body")) == 99
+
+    # A body that already fits within the cap is left untouched.
+    small_asset = AppriseAsset(payload_max_size=1000)
+    obj = TestNotification(asset=small_asset, overflow=OverflowMode.UPSTREAM)
+    chunks = obj._apply_overflow(body=body, title="")
+    assert chunks[0].get("body") == body
+
+
 def test_notify_markdown_general():
     """
     API: Markdown General Testing
@@ -3762,6 +3890,60 @@ def test_notify_markdown_general():
     assert body.lstrip("\r\n\x0b\x0c").rstrip() == chunks[0].get("body")
     assert chunks[0].get("title") == ""
 
+    # Declared Markdown turns a real title into a heading.
+    real_title = "My Title"
+    chunks = obj._apply_overflow(
+        body=body,
+        title=real_title,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == f"# {real_title}\n{body}"
+    assert chunks[0].get("title") == ""
+
+    # Undeclared input keeps the title literal.
+    chunks = obj._apply_overflow(body=body, title=real_title)
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == f"{real_title}\r\n{body}"
+    assert chunks[0].get("title") == ""
+
+    # Repair a bold span left open by Markdown truncation.
+    obj.body_maxlen = 6
+    chunks = obj._apply_overflow(
+        body="**bold text**",
+        title="",
+        overflow=OverflowMode.TRUNCATE,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == "**bold**"
+
+    # Escape an unmatched opener when the discarded tail has no closer.
+    obj.body_maxlen = 4
+    chunks = obj._apply_overflow(
+        body="*_a_ and a literal * elsewhere",
+        title="",
+        overflow=OverflowMode.TRUNCATE,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    assert len(chunks) == 1
+    assert chunks[0].get("body") == "\\*_a_"
+
+    # Truncating a large body must use bounded lookahead.
+    obj.body_maxlen = 100
+    huge_body = "hello world " * 200000
+    start = default_timer()
+    chunks = obj._apply_overflow(
+        body=huge_body,
+        title="",
+        overflow=OverflowMode.TRUNCATE,
+        body_format=NotifyFormat.MARKDOWN,
+    )
+    elapsed = default_timer() - start
+    assert len(chunks) == 1
+    assert len(chunks[0].get("body")) <= 100
+    assert elapsed < 10.0
+
 
 @mock.patch("requests.request")
 def test_notify_emoji_general(mock_request):
@@ -3793,7 +3975,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3815,7 +3997,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=no")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3837,7 +4019,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=yes")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3859,7 +4041,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=no")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3886,7 +4068,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3910,7 +4092,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=no")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3934,7 +4116,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=yes")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3961,7 +4143,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]
@@ -3988,7 +4170,7 @@ def test_notify_emoji_general(mock_request):
     ap_obj.add("json://localhost?emojis=yes")
     assert len(ap_obj) == 1
 
-    assert ap_obj.notify(title=title, body=body) is True
+    assert bool(ap_obj.notify(title=title, body=body)) is True
     assert mock_request.call_count == 1
 
     details = mock_request.call_args_list[0]

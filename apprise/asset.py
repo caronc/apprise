@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 from datetime import datetime, tzinfo
+import math
 from os.path import abspath, dirname, isfile, join
 import re
 from typing import Any, Optional, Union
@@ -45,12 +46,11 @@ N_MGR = NotificationManager()
 
 
 class AppriseAsset:
-    """Provides a supplimentary class that can be used to provide extra
-    information and details that can be used by Apprise such as providing an
-    alternate location to where images/icons can be found and the URL masks.
+    """Provide shared application settings, paths, and delivery limits.
 
-    Any variable that starts with an underscore (_) can only be initialized by
-    this class manually and will/can not be parsed from a configuration file.
+    Private attributes are excluded from configuration. Callers use their
+    public constructor arguments; ``_uid`` and ``_recursion`` remain internal
+    compatibility exceptions.
     """
 
     # Application Identifier
@@ -217,27 +217,45 @@ class AppriseAsset:
     # Set storage to auto
     __storage_mode = PersistentStoreMode.AUTO
 
-    # All internal/system flags are prefixed with an underscore (_)
-    # These can only be initialized using Python libraries and are not picked
-    # up from (yaml) configuration files (if set)
+    # Internal settings are not loaded from YAML configuration.
 
-    # An internal counter that is used by AppriseAPI
-    # (https://github.com/caronc/apprise-api). The idea is to allow one
-    # instance of AppriseAPI to call another, but to track how many times
-    # this occurs. It's intent is to prevent a loop where an AppriseAPI
-    # Server calls itself (or loops indefinitely)
+    # AppriseAPI passes this internal counter between chained servers to
+    # prevent notification loops. Its constructor support is retained for
+    # compatibility with https://github.com/caronc/apprise-api.
     _recursion = 0
 
-    # A unique identifer we can use to associate our calling source
+    # AppriseAPI preserves this internal source identifier across chained
+    # requests. Its constructor support is retained for compatibility.
     _uid = str(uuid4())
+
+    # AppriseAPI still passes these private arguments. All other internal
+    # settings must use their validated public constructor arguments.
+    _KWARGS_INTERNAL_ALLOWLIST = frozenset({"_recursion", "_uid"})
 
     # Default timezone to use (pass in timezone value)
     # A list of timezones can be found here:
     # https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     # You can specify things such as 'America/Montreal'
     # If no timezone is specified, then the one detected on the system
-    # is uzed
+    # is used
     _tzinfo = None
+
+    # Default budget for one service, including retries and waits. Apprise
+    # reports TIMEOUT after this many seconds; 0 disables the service limit.
+    _service_timeout = 60.0
+
+    # A safety ceiling on the combined title + body character count, checked
+    # before any format conversion or splitting begins. 0 disables the check
+    # entirely, which is the default.
+    _payload_max_size = 0
+
+    # A title or body at or below this length may remain whole when the other
+    # side can retain its minimum.
+    _payload_buffer_threshold = 10
+
+    # Minimum reserved for the other side. If it cannot fit, title and body
+    # share the cap proportionally.
+    _payload_min_buffer = 25
 
     def __init__(
         self,
@@ -247,14 +265,33 @@ class AppriseAsset:
         storage_salt: Optional[Union[str, bytes]] = None,
         storage_idlen: Optional[int] = None,
         timezone: Optional[Union[str, tzinfo]] = None,
+        service_timeout: Optional[Union[int, float]] = None,
+        payload_max_size: Optional[int] = None,
+        payload_buffer_threshold: Optional[int] = None,
+        payload_min_buffer: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
-        """Asset Initialization."""
+        """Initialize shared settings and delivery limits.
+
+        Zero disables ``service_timeout`` and ``payload_max_size``.
+        ``payload_buffer_threshold`` and ``payload_min_buffer`` control how a
+        capped payload is shared between title and body; see
+        ``enforce_payload_max_size()``. ``None`` keeps the class default for
+        each setting.
+        """
         # Assign default arguments if specified
         for key, value in kwargs.items():
             if not hasattr(AppriseAsset, key):
                 raise AttributeError(
                     f"AppriseAsset init(): An invalid key {key} was specified."
+                )
+
+            if key.startswith("_") and (
+                key not in self._KWARGS_INTERNAL_ALLOWLIST
+            ):
+                raise AttributeError(
+                    f"AppriseAsset init(): {key} can not be set directly; "
+                    "use its dedicated keyword argument instead."
                 )
 
             setattr(self, key, value)
@@ -309,6 +346,73 @@ class AppriseAsset:
             # Default our timezone to what is detected on the system
             self._tzinfo = datetime.now().astimezone().tzinfo
 
+        if service_timeout is not None:
+            # Store all durations as floats and reject bool values.
+            if not isinstance(service_timeout, (int, float)) or isinstance(
+                service_timeout, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset service_timeout must be an int or float."
+                )
+
+            if not math.isfinite(service_timeout) or service_timeout < 0:
+                # Use 0 for no timeout; infinity is unsafe on some platforms.
+                raise ValueError(
+                    "AppriseAsset service_timeout must be >= 0 and "
+                    "finite (0 disables the timeout entirely)."
+                )
+
+            self._service_timeout = float(service_timeout)
+
+        if payload_max_size is not None:
+            # Reject booleans even though ``bool`` subclasses ``int``.
+            if not isinstance(payload_max_size, int) or isinstance(
+                payload_max_size, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset payload_max_size must be an int."
+                )
+
+            if payload_max_size < 0:
+                raise ValueError(
+                    "AppriseAsset payload_max_size must be >= 0 "
+                    "(0 disables the cap entirely)."
+                )
+
+            self._payload_max_size = payload_max_size
+
+        if payload_buffer_threshold is not None:
+            # Reject booleans even though ``bool`` subclasses ``int``.
+            if not isinstance(payload_buffer_threshold, int) or isinstance(
+                payload_buffer_threshold, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset payload_buffer_threshold must be an int."
+                )
+
+            if payload_buffer_threshold < 0:
+                raise ValueError(
+                    "AppriseAsset payload_buffer_threshold must be >= 0."
+                )
+
+            self._payload_buffer_threshold = payload_buffer_threshold
+
+        if payload_min_buffer is not None:
+            # Reject booleans even though ``bool`` subclasses ``int``.
+            if not isinstance(payload_min_buffer, int) or isinstance(
+                payload_min_buffer, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset payload_min_buffer must be an int."
+                )
+
+            if payload_min_buffer < 0:
+                raise ValueError(
+                    "AppriseAsset payload_min_buffer must be >= 0."
+                )
+
+            self._payload_min_buffer = payload_min_buffer
+
         if storage_salt is not None:
             # Define the number of characters utilized from our namespace lengh
 
@@ -331,6 +435,69 @@ class AppriseAsset:
                     "AppriseAsset namespace_salt(): Value provided must be "
                     "string or bytes object"
                 )
+
+    def enforce_payload_max_size(
+        self, title: str, body: str
+    ) -> tuple[str, str]:
+        """Apply the configured input cap to ``title`` and ``body``.
+
+        Checked in order, the first match decides the split:
+
+        1. An absent side never competes for room: an empty title leaves
+           the whole cap for the body, and vice versa.
+        2. A short side (length <= ``payload_buffer_threshold``) is shown
+           whole if the other side can still keep at least
+           ``payload_min_buffer`` characters (or its own full length, if
+           shorter) out of what remains. This is checked for the title
+           first, then the body.
+        3. Otherwise, title and body share the cap in proportion to their
+           original lengths. When the cap allows, each nonempty side keeps
+           at least one character.
+
+        Very small caps may produce short fragments, but proportional sharing
+        avoids dropping one side when space is available for both.
+        """
+        if not self._payload_max_size:
+            return title, body
+
+        cap = self._payload_max_size
+        total = len(title) + len(body)
+        if total <= cap:
+            return title, body
+
+        if not title:
+            return "", body[:cap]
+
+        if not body:
+            return title[:cap], ""
+
+        threshold = self._payload_buffer_threshold
+        min_buffer = self._payload_min_buffer
+
+        if len(title) <= threshold:
+            # A short title is worth showing whole, but only if the body
+            # can still keep its own minimum out of what's left.
+            body_reserve = min(len(body), min_buffer)
+            if len(title) + body_reserve <= cap:
+                return title, body[: cap - len(title)]
+
+        if len(body) <= threshold:
+            # Same guarantee, mirrored for a short body.
+            title_reserve = min(len(title), min_buffer)
+            if len(body) + title_reserve <= cap:
+                return title[: cap - len(body)], body
+
+        # If neither guarantee applies, share the cap proportionally.
+        title_budget = (len(title) * cap) // total
+        body_budget = cap - title_budget
+
+        # Rounding can zero out a small, nonempty title entirely; borrow
+        # one character from body's share when it can spare it.
+        if not title_budget and body_budget > 0:
+            title_budget = 1
+            body_budget -= 1
+
+        return title[:title_budget], body[:body_budget]
 
     def color(
         self,

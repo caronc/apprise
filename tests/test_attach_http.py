@@ -480,9 +480,11 @@ def test_attach_http(mock_get, mock_request):
     assert apobj.add("xml://localhost")
     assert len(apobj) == 3
     assert (
-        apobj.notify(
-            body="one attachment split 3 times",
-            attach="http://localhost/test.gif",
+        bool(
+            apobj.notify(
+                body="one attachment split 3 times",
+                attach="http://localhost/test.gif",
+            )
         )
         is True
     )
@@ -501,9 +503,11 @@ def test_attach_http(mock_get, mock_request):
         assert apobj.add(f"xml://localhost?:entry={n}&method=post")
 
     assert (
-        apobj.notify(
-            body="one attachment split 30 times",
-            attach="http://localhost/test.gif",
+        bool(
+            apobj.notify(
+                body="one attachment split 30 times",
+                attach="http://localhost/test.gif",
+            )
         )
         is True
     )

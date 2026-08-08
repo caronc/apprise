@@ -190,7 +190,11 @@ def test_plugin_smpp_edge_case():
 
         # Well fail to establish a connection
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )
 
@@ -203,6 +207,10 @@ def test_plugin_smpp_edge_case():
 
         # Well fail to deliver our message
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )

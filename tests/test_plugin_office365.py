@@ -412,7 +412,7 @@ def test_plugin_office365_general(mock_get, mock_post):
     assert isinstance(obj.url(), str)
 
     # Test our notification
-    assert obj.notify(title="title", body="test") is True
+    assert bool(obj.notify(title="title", body="test")) is True
 
     # Instantiate our object
     obj = Apprise.instantiate(
@@ -435,7 +435,7 @@ def test_plugin_office365_general(mock_get, mock_post):
     assert isinstance(obj.url(), str)
 
     # Test our notification
-    assert obj.notify(title="title", body="test") is True
+    assert bool(obj.notify(title="title", body="test")) is True
 
     with pytest.raises(TypeError):
         # No secret
@@ -456,7 +456,7 @@ def test_plugin_office365_general(mock_get, mock_post):
         targets=("Management abc@gmail.com", "garbage"),
     )
     # Test our notification (this will work and only notify abc@gmail.com)
-    assert obj.notify(title="title", body="test") is True
+    assert bool(obj.notify(title="title", body="test")) is True
 
     # all of the targets are invalid
     obj = NotifyOffice365(
@@ -468,7 +468,7 @@ def test_plugin_office365_general(mock_get, mock_post):
     )
 
     # Test our notification (which will fail because of no entries)
-    assert obj.notify(title="title", body="test") is False
+    assert bool(obj.notify(title="title", body="test")) is False
 
 
 @mock.patch("requests.get")
@@ -526,7 +526,7 @@ def test_plugin_office365_authentication(mock_get, mock_post):
     response.status_code = 400
 
     # We'll fail to send a notification now...
-    assert obj.notify(title="title", body="test") is False
+    assert bool(obj.notify(title="title", body="test")) is False
 
     # Expire our token
     obj.token_expiry = datetime.now()
@@ -538,7 +538,7 @@ def test_plugin_office365_authentication(mock_get, mock_post):
     assert obj.authenticate() is False
 
     # Notifications will also fail in this case
-    assert obj.notify(title="title", body="test") is False
+    assert bool(obj.notify(title="title", body="test")) is False
 
     # We will fail to authenticate with invalid data
 
@@ -627,7 +627,9 @@ def test_plugin_office365_queries(mock_post, mock_get, mock_put):
 
     # Notify must exit early since the source Object ID could not be resolved
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -651,7 +653,9 @@ def test_plugin_office365_queries(mock_post, mock_get, mock_put):
 
     # We can still send a notification even if we can't look up the email
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -706,7 +710,9 @@ def test_plugin_office365_queries(mock_post, mock_get, mock_put):
 
     # We can still send a notification even if we can't look up the email
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -754,11 +760,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -801,8 +809,10 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyOffice365)
     # Authentication will fail
     assert (
-        obj.notify(
-            body="auth-fail", title="title", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body="auth-fail", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -827,11 +837,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     mock_post.return_value = okay_response
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -841,11 +853,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     with mock.patch("base64.b64encode", side_effect=OSError()):
         # We can't send the message if we fail to parse the data
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -933,11 +947,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
 
     # We now have to prepare sepparate session attachments using draft emails
     assert (
-        obj.notify(
-            body="body",
-            title="title-test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title-test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -979,11 +995,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     mock_post.return_value = None
     mock_post.side_effect = (okay_response, okay_response, bad_response)
     assert (
-        obj.notify(
-            body="body",
-            title="title-test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title-test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1014,11 +1032,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
 
     # We now have to prepare sepparate session attachments using draft emails
     assert (
-        obj.notify(
-            body="body",
-            title="title-no-chunk",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title-no-chunk",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1055,11 +1075,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     # We could not acquire an attachment id, so we'll fail to send our
     # notification
     assert (
-        obj.notify(
-            body="body",
-            title="title-test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title-test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -1076,11 +1098,13 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
     # Reset attachment size
     obj.outlook_attachment_inline_max = 50 * 1024 * 1024
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1136,7 +1160,7 @@ def test_plugin_office365_reply_to(mock_post, mock_get):
     assert "reply_to=" in url
 
     # send() adds replyTo with name to the payload
-    assert obj.notify(title="title", body="test") is True
+    assert bool(obj.notify(title="title", body="test")) is True
     assert mock_post.call_count == 2
     sent_payload = loads(mock_post.call_args_list[1][1]["data"])
     assert "replyTo" in sent_payload["message"]
@@ -1163,7 +1187,7 @@ def test_plugin_office365_reply_to(mock_post, mock_get):
     )
 
     assert isinstance(obj2, NotifyOffice365)
-    assert obj2.notify(title="t", body="b") is True
+    assert bool(obj2.notify(title="t", body="b")) is True
     sent_payload = loads(mock_post.call_args_list[1][1]["data"])
     assert "replyTo" in sent_payload["message"]
     assert "name" not in sent_payload["message"]["replyTo"][0]["emailAddress"]
@@ -1181,7 +1205,7 @@ def test_plugin_office365_reply_to(mock_post, mock_get):
     assert isinstance(obj3, NotifyOffice365)
     assert len(obj3.reply_to) == 0
     # No replyTo in payload when reply_to is empty
-    assert obj3.notify(title="t", body="b") is True
+    assert bool(obj3.notify(title="t", body="b")) is True
     sent_payload = loads(mock_post.call_args_list[1][1]["data"])
     assert "replyTo" not in sent_payload["message"]
     mock_post.reset_mock()
@@ -1312,7 +1336,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
         targets=["target@example.com"],
     )
     assert obj.mode == Office365Mode.PERSONAL
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # POST 0: token refresh  POST 1: sendMail
     assert mock_post.call_count == 2
@@ -1351,7 +1375,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
         client_id=client_id,
         secret=seed_token,
     )
-    assert obj2.notify(title="t", body="b") is False
+    assert bool(obj2.notify(title="t", body="b")) is False
     mock_post.reset_mock()
     mock_post.return_value = okay_response
 
@@ -1368,7 +1392,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
         client_id=client_id,
         secret=seed_token,
     )
-    assert obj3.notify(title="t", body="b") is False
+    assert bool(obj3.notify(title="t", body="b")) is False
     mock_post.reset_mock()
     mock_post.return_value = okay_response
 
@@ -1467,7 +1491,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
     assert "bcc=Blind%20Copy%3Abcc%40example.com" in personal_url
     assert "reply_to=Reply%20Person%3Areply%40example.org" in personal_url
 
-    assert obj7.notify(title="title", body="body") is True
+    assert bool(obj7.notify(title="title", body="body")) is True
     assert mock_post.call_count == 2
     assert (
         mock_post.call_args_list[1][0][0]
@@ -1511,7 +1535,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
         secret=seed_token,
         targets=["target@example.com"],
     )
-    assert obj_nr.notify(title="t", body="b") is True
+    assert bool(obj_nr.notify(title="t", body="b")) is True
     # No new token stored — seed_token still in url()
     assert obj_nr.store.get("refresh_token") is None
     mock_post.reset_mock()
@@ -1564,11 +1588,13 @@ def test_plugin_office365_personal_large_attachment(
     obj.outlook_attachment_inline_max = 50
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

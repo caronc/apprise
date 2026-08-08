@@ -25,15 +25,19 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import asyncio
 from datetime import datetime, timedelta
+import glob
 
 # Disable logging for a cleaner testing output
 import logging
+import time
 from timeit import default_timer
 
 import pytest
 
-from apprise import AppriseAsset, NotifyImageSize, NotifyType
+from apprise import AppriseAsset, NotifyFormat, NotifyImageSize, NotifyType
+from apprise.common import OverflowMode
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -386,6 +390,101 @@ def test_notify_base_runtime_deps():
     assert isinstance(NotifyBase.runtime_deps(), tuple)
 
 
+def test_notify_base_dialect_convert_default_noop():
+    """The default dialect hook leaves content unchanged.
+
+    Framework conversion only calls plugin overrides, so test the base hook
+    directly.
+    """
+
+    class PlainNotification(NotifyBase):
+        protocol = "plain"
+
+        def notify(self, *args, **kwargs):
+            return True
+
+        def url(self, **kwargs):
+            return "plain://"
+
+    instance = PlainNotification(host="localhost")
+    body = "**not markdown-converted**"
+    assert instance.dialect_convert(body) == body
+    assert instance.dialect_convert(body, NotifyFormat.MARKDOWN) == body
+    assert (
+        instance.dialect_convert(body, NotifyFormat.HTML, "extra", flag=True)
+        == body
+    )
+
+
+def test_notify_base_notify_type_normalization():
+    """A direct plugin notify() call normalizes a recognized string
+    notify_type into a real NotifyType, exactly like format= and overflow=
+    already do for their own values.
+    """
+
+    class RecordingNotification(NotifyBase):
+        protocol = "recording"
+
+        # Exercise the same notify_type.value path used by
+        # AppriseAsset.image_url()/image_path().
+        image_size = NotifyImageSize.XY_256
+
+        received = []
+
+        def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+            self.received.append(notify_type)
+            # Raises AttributeError if notify_type is still a bare string
+            # instead of a real NotifyType.
+            self.image_url(notify_type=notify_type)
+            return True
+
+        def url(self, **kwargs):
+            return "recording://"
+
+    instance = RecordingNotification(host="localhost")
+
+    # A raw string is normalized to the matching NotifyType member.
+    instance.received.clear()
+    assert instance.notify(body="hi", notify_type="warning") is True
+    assert instance.received == [NotifyType.WARNING]
+    assert isinstance(instance.received[0], NotifyType)
+
+    # An actual NotifyType instance passes through unchanged.
+    instance.received.clear()
+    assert instance.notify(body="hi", notify_type=NotifyType.FAILURE) is True
+    assert instance.received == [NotifyType.FAILURE]
+
+    # The same normalization applies to async_notify().
+    instance.received.clear()
+    assert (
+        asyncio.run(instance.async_notify(body="hi", notify_type="success"))
+        is True
+    )
+    assert instance.received == [NotifyType.SUCCESS]
+
+
+def test_notify_base_notify_type_unrecognized_string_passthrough():
+    """An unrecognized notify_type string is left exactly as provided,"""
+
+    class ToleratingNotification(NotifyBase):
+        protocol = "tolerating"
+
+        received = []
+
+        def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+            # No notify_type.value access here -- mirrors a plugin like
+            # Notifico that only ever compares notify_type by equality.
+            self.received.append(notify_type)
+            return True
+
+    instance = ToleratingNotification(host="localhost")
+
+    instance.received.clear()
+    assert instance.notify(body="hi", notify_type="not-a-type") is True
+    assert instance.received == ["not-a-type"]
+    assert not isinstance(instance.received[0], NotifyType)
+
+
 def test_notify_base_enable_disable():
     """NotifyBase.enable() and disable() toggle the enabled flag."""
 
@@ -476,3 +575,75 @@ def test_notify_base_runtime_deps_override():
     assert deps == ("fakelibA", "fakelibB")
     assert deps[0] == "fakelibA"
     assert deps[1] == "fakelibB"
+
+
+def test_notify_base_flush_store_noop_when_unused(tmpdir):
+    """flush_store() is a silent no-op when self.store was never
+    accessed -- it must not create a PersistentStore (or its on-disk
+    directory structure) just to immediately flush nothing."""
+    asset = AppriseAsset(storage_path=str(tmpdir))
+    obj = NotifyBase(asset=asset)
+
+    # Nothing touched .store yet -- flush_store() must not crash, and
+    # must not create any on-disk content for this service.
+    obj.flush_store()
+
+    assert len(tmpdir.listdir()) == 0
+
+
+def test_notify_base_flush_store_writes_pending_auto_mode_changes(tmpdir):
+    """Write pending automatic-store changes before the process exits.
+
+    Normally these changes remain cached until the store is collected. An
+    immediate process exit must flush them first.
+    """
+    asset = AppriseAsset(storage_path=str(tmpdir))
+    obj = NotifyBase(asset=asset)
+
+    # Accessing .store alone already creates its namespace directory
+    # structure (independent of whether anything is written), so the
+    # cache file itself -- not "any file at all" -- is what actually
+    # indicates a flush occurred.
+    cache_glob = str(tmpdir.join("**", "*.psdata"))
+
+    obj.store.set("token", "abc123")
+
+    # AUTO mode: the cached change has not been written to disk yet.
+    assert glob.glob(cache_glob, recursive=True) == []
+
+    obj.flush_store()
+
+    # The cache file now exists, and the value survives a fresh
+    # PersistentStore instance reading from the same path/namespace.
+    assert glob.glob(cache_glob, recursive=True) != []
+    assert obj.store.get("token") == "abc123"
+
+
+def test_notify_base_async_notify_preserves_send_order():
+    """async_notify() dispatches each plugin's split pieces in order."""
+
+    call_order = []
+
+    class OrderedNotification(NotifyBase):
+        protocol = "ordered"
+        body_maxlen = 10
+        title_maxlen = 0
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            # Delay the first piece so concurrent dispatch would reorder it.
+            time.sleep(0.05 if kwargs.get("index") == 0 else 0)
+            call_order.append(kwargs.get("index"))
+            return True
+
+        def url(self, **kwargs):
+            return "ordered://"
+
+    instance = OrderedNotification(host="localhost")
+
+    # 50 characters split at a 10-character limit produces 5 pieces.
+    body = "0123456789" * 5
+    result = asyncio.run(
+        instance.async_notify(body=body, overflow=OverflowMode.SPLIT)
+    )
+    assert result is True
+    assert call_order == [0, 1, 2, 3, 4]
