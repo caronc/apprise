@@ -245,7 +245,11 @@ def _compute_deadline(
     return deadline
 
 
-def _timeout_result(server: NotifyBase, elapsed: float) -> NotifyResult:
+def _timeout_result(
+    server: NotifyBase,
+    elapsed: float,
+    max_attempts: int,
+) -> NotifyResult:
     """Build the result for a service that exceeded the outer wait.
 
     The worker may still be running. Record only what Apprise knows here:
@@ -260,7 +264,8 @@ def _timeout_result(server: NotifyBase, elapsed: float) -> NotifyResult:
         tag=tag,
         optional=getattr(server, "optional", False),
         weight=weight,
-        max_attempts=1,
+        # Preserve the configured retry count even when the outer wait wins.
+        max_attempts=max_attempts,
         attempts=[
             NotifyAttempt(
                 status=AppriseResultStatus.TIMEOUT,
@@ -335,6 +340,19 @@ def _resolve_retry_count(service: NotifyBase, kwargs: dict[str, Any]) -> int:
         # Not a usable number; treat it the same as "no override".
         retry = getattr(service, "retry", 0)
     return max(0, min(retry, APPRISE_MAX_SERVICE_RETRY))
+
+
+def _configured_max_attempts(
+    service: NotifyBase, kwargs: dict[str, Any]
+) -> int:
+    """Return the attempt limit without consuming a call override."""
+    try:
+        # Resolve a copy so the worker receives the original private override.
+        return _resolve_retry_count(service, dict(kwargs)) + 1
+
+    except Exception:
+        # Let the worker's safety net report invalid plugin metadata.
+        return 1
 
 
 def _attempt_status(success: bool) -> AppriseResultStatus:
@@ -1868,6 +1886,9 @@ class Apprise:
             # The outer wait needs a deadline before submission.
             deadline = _compute_deadline(service, call_deadline)
 
+            # Preserve retry metadata before the worker consumes its override.
+            max_attempts = _configured_max_attempts(service, kwargs)
+
             if deadline is None:
                 ok, notify_result = _call_with_retry(service, kwargs, None)
                 success = success and ok
@@ -1917,7 +1938,11 @@ class Apprise:
                     else "its worker thread may still be running in the "
                     "background",
                 )
-                notify_result = _timeout_result(service, wait_elapsed)
+                notify_result = _timeout_result(
+                    service,
+                    wait_elapsed,
+                    max_attempts,
+                )
                 ok = bool(notify_result)
 
             except Exception as e:
@@ -1982,6 +2007,12 @@ class Apprise:
             _compute_deadline(service, call_deadline)
             for service, kwargs in services_kwargs
         ]
+
+        # Preserve retry metadata before workers consume private overrides.
+        max_attempts = [
+            _configured_max_attempts(service, kwargs)
+            for service, kwargs in services_kwargs
+        ]
         future_to_idx: dict[cf.Future, int] = {
             _submit_with_context(
                 executor, _call_with_retry, service, kwargs, deadlines[i]
@@ -2040,7 +2071,11 @@ class Apprise:
                     else "its worker thread may still be running in the "
                     "background",
                 )
-                notify_result = _timeout_result(service, wait_elapsed)
+                notify_result = _timeout_result(
+                    service,
+                    wait_elapsed,
+                    max_attempts[idx],
+                )
                 ok = bool(notify_result)
 
             except Exception as e:
@@ -2187,6 +2222,7 @@ class Apprise:
             service: NotifyBase,
             kwargs: dict[str, Any],
             deadline: Optional[float],
+            max_attempts: int,
         ) -> tuple[bool, NotifyResult]:
             """Apply an outer asyncio timeout to one service call.
 
@@ -2239,7 +2275,11 @@ class Apprise:
                     service.service_name,
                     wait_elapsed,
                 )
-                notify_result = _timeout_result(service, wait_elapsed)
+                notify_result = _timeout_result(
+                    service,
+                    wait_elapsed,
+                    max_attempts,
+                )
                 return bool(notify_result), notify_result
 
         # Snapshot outer wait deadlines before launching the async workers;
@@ -2249,10 +2289,21 @@ class Apprise:
             for service, kwargs in services_kwargs
         ]
 
+        # Preserve retry metadata before coroutines consume private overrides.
+        max_attempts = [
+            _configured_max_attempts(service, kwargs)
+            for service, kwargs in services_kwargs
+        ]
+
         # Run all coroutines concurrently.  return_exceptions=True ensures
         # one escaped exception is reported without cancelling other services.
         cors = (
-            do_call_bounded(service, kwargs, deadlines[i])
+            do_call_bounded(
+                service,
+                kwargs,
+                deadlines[i],
+                max_attempts[i],
+            )
             for i, (service, kwargs) in enumerate(services_kwargs)
         )
         gathered = await asyncio.gather(*cors, return_exceptions=True)

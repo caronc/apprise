@@ -786,6 +786,30 @@ class TestStaticHelpers:
         service.retry = 2
         assert _resolve_retry_count(service, {"_retry_override": "x"}) == 2
 
+    def test_configured_max_attempts_preserves_override(self):
+        """Read timeout metadata without consuming the worker's override."""
+        from apprise.apprise import _configured_max_attempts
+
+        service = mock.Mock()
+        service.retry = 1
+
+        # The timeout result and worker must see the same retry limit.
+        kwargs = {"_retry_override": 3}
+        assert _configured_max_attempts(service, kwargs) == 4
+        assert kwargs == {"_retry_override": 3}
+
+    def test_configured_max_attempts_handles_bad_metadata(self):
+        """Leave invalid plugin metadata for the worker safety net."""
+        from apprise.apprise import _configured_max_attempts
+
+        class BrokenRetry:
+            @property
+            def retry(self):
+                # A plugin property may fail before its worker starts.
+                raise RuntimeError("bad retry metadata")
+
+        assert _configured_max_attempts(BrokenRetry(), {}) == 1
+
     def test_retry_override_end_to_end_is_bounded(self):
         """Prevent a huge tag retry suffix from creating an unbounded loop."""
         from apprise.common import APPRISE_MAX_SERVICE_RETRY
@@ -2710,6 +2734,7 @@ class TestServiceTimeout:
         # sequence when slower hosts change which one finishes first.
         assert len(slow_result.attempts) in (1, 2)
         assert slow_result.attempts[-1].status == AppriseResultStatus.TIMEOUT
+        assert slow_result.max_attempts == 4
         if len(slow_result.attempts) == 2:
             assert (
                 slow_result.attempts[0].status == AppriseResultStatus.FAILURE
@@ -2756,6 +2781,7 @@ class TestServiceTimeout:
         # As above, accept either attempt sequence at the shared deadline.
         assert len(slow_result.attempts) in (1, 2)
         assert slow_result.attempts[-1].status == AppriseResultStatus.TIMEOUT
+        assert slow_result.max_attempts == 4
         if len(slow_result.attempts) == 2:
             assert (
                 slow_result.attempts[0].status == AppriseResultStatus.FAILURE
