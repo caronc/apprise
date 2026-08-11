@@ -257,6 +257,14 @@ class AppriseAsset:
     # share the cap proportionally.
     _payload_min_buffer = 25
 
+    # Keep result logs in memory unless disk-backed capture is configured.
+    # Apprise reads this setting from its existing asset when it notifies.
+    _result_log_memory_size = 0
+
+    # A zero disk allowance preserves the existing memory-only behavior.
+    # When enabled, both limits cover the complete notification call.
+    _result_log_disk_size = 0
+
     def __init__(
         self,
         plugin_paths: Optional[list[str]] = None,
@@ -269,6 +277,8 @@ class AppriseAsset:
         payload_max_size: Optional[int] = None,
         payload_buffer_threshold: Optional[int] = None,
         payload_min_buffer: Optional[int] = None,
+        result_log_memory_size: Optional[int] = None,
+        result_log_disk_size: Optional[int] = None,
         **kwargs: Any,
     ) -> None:
         """Initialize shared settings and delivery limits.
@@ -276,8 +286,9 @@ class AppriseAsset:
         Zero disables ``service_timeout`` and ``payload_max_size``.
         ``payload_buffer_threshold`` and ``payload_min_buffer`` control how a
         capped payload is shared between title and body; see
-        ``enforce_payload_max_size()``. ``None`` keeps the class default for
-        each setting.
+        ``enforce_payload_max_size()``. Result logs use disk after their memory
+        allowance; a zero disk size keeps them in memory. ``None`` keeps each
+        class default.
         """
         # Assign default arguments if specified
         for key, value in kwargs.items():
@@ -412,6 +423,38 @@ class AppriseAsset:
                 )
 
             self._payload_min_buffer = payload_min_buffer
+
+        if result_log_memory_size is not None:
+            # Booleans are integers in Python, but are not valid byte limits.
+            if not isinstance(result_log_memory_size, int) or isinstance(
+                result_log_memory_size, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset result_log_memory_size must be an int."
+                )
+
+            if result_log_memory_size < 0:
+                raise ValueError(
+                    "AppriseAsset result_log_memory_size must be >= 0."
+                )
+
+            self._result_log_memory_size = result_log_memory_size
+
+        if result_log_disk_size is not None:
+            # Keep this strict so later storage calculations are predictable.
+            if not isinstance(result_log_disk_size, int) or isinstance(
+                result_log_disk_size, bool
+            ):
+                raise TypeError(
+                    "AppriseAsset result_log_disk_size must be an int."
+                )
+
+            if result_log_disk_size < 0:
+                raise ValueError(
+                    "AppriseAsset result_log_disk_size must be >= 0."
+                )
+
+            self._result_log_disk_size = result_log_disk_size
 
         if storage_salt is not None:
             # Define the number of characters utilized from our namespace lengh
@@ -699,6 +742,16 @@ class AppriseAsset:
         """Return the persistent storage id length."""
 
         return self.__storage_idlen
+
+    @property
+    def result_log_memory_size(self) -> int:
+        """Return the result-log memory allowance in bytes."""
+        return self._result_log_memory_size
+
+    @property
+    def result_log_disk_size(self) -> int:
+        """Return the result-log disk allowance in bytes."""
+        return self._result_log_disk_size
 
     @property
     def tzinfo(self) -> tzinfo:
