@@ -29,6 +29,7 @@ import asyncio
 import concurrent.futures as cf
 import contextvars
 from datetime import datetime, timezone
+from importlib import import_module
 import io
 import json
 import os
@@ -57,6 +58,10 @@ from apprise.logger import (
     logging,
 )
 from apprise.plugins import NotifyBase
+
+# Import the module directly because ``apprise.logger`` is also a public
+# package attribute containing the shared Logger instance.
+_LOGGER_MODULE = import_module("apprise.logger")
 
 
 def test_apprise_logger():
@@ -691,8 +696,9 @@ def test_result_log_store_handles_disk_failure(caplog):
     store = _NotifyLogStore(_LogCaptureBudget(memory_size=0, disk_size=1024))
 
     try:
-        with mock.patch(
-            "apprise.logger.tempfile.TemporaryFile",
+        with mock.patch.object(
+            _LOGGER_MODULE.tempfile,
+            "TemporaryFile",
             side_effect=OSError("no space"),
         ):
             store.append(NotifyLogEntry("ERROR", "delivery failed"))
@@ -710,8 +716,9 @@ def test_result_log_store_contains_logging_failure_on_write():
     store = _NotifyLogStore(_LogCaptureBudget(memory_size=0, disk_size=1024))
 
     with (
-        mock.patch(
-            "apprise.logger.tempfile.TemporaryFile",
+        mock.patch.object(
+            _LOGGER_MODULE.tempfile,
+            "TemporaryFile",
             side_effect=OSError("no space"),
         ),
         mock.patch.object(
@@ -749,8 +756,9 @@ def test_result_log_store_handles_short_writes(failed_write):
 
     budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
     store = _NotifyLogStore(budget)
-    with mock.patch(
-        "apprise.logger.tempfile.TemporaryFile",
+    with mock.patch.object(
+        _LOGGER_MODULE.tempfile,
+        "TemporaryFile",
         return_value=ShortWriteFile(),
     ):
         # The first record covers header and payload writes.
@@ -844,8 +852,10 @@ def test_result_log_store_handles_close_failure(caplog):
     caplog.set_level(logging.DEBUG, logger=logger.name)
     budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
     store = _NotifyLogStore(budget)
-    with mock.patch(
-        "apprise.logger.tempfile.TemporaryFile", return_value=CloseFailFile()
+    with mock.patch.object(
+        _LOGGER_MODULE.tempfile,
+        "TemporaryFile",
+        return_value=CloseFailFile(),
     ):
         store.append(NotifyLogEntry("WARNING", "entry"))
 
@@ -878,8 +888,9 @@ def test_result_log_store_contains_logging_failure_on_close():
     budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
     store = _NotifyLogStore(budget)
 
-    with mock.patch(
-        "apprise.logger.tempfile.TemporaryFile",
+    with mock.patch.object(
+        _LOGGER_MODULE.tempfile,
+        "TemporaryFile",
         return_value=CloseFailFile(),
     ):
         store.append(NotifyLogEntry("WARNING", "entry"))
@@ -924,8 +935,9 @@ def test_result_log_store_sequence_and_repeat_failure_paths():
     budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
     store = _NotifyLogStore(budget)
     budget.claim_warning(_NotifyLogStore._DISK_MESSAGE)
-    with mock.patch(
-        "apprise.logger.tempfile.TemporaryFile",
+    with mock.patch.object(
+        _LOGGER_MODULE.tempfile,
+        "TemporaryFile",
         return_value=ConcurrentFailFile(),
     ):
         store.append(entry)
