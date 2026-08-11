@@ -27,12 +27,14 @@
 
 import asyncio
 import concurrent.futures as cf
+import contextvars
 from datetime import datetime, timezone
-import importlib
+import io
 import json
 import os
 import re
 import sys
+import threading
 import time
 from unittest import mock
 
@@ -46,6 +48,10 @@ from apprise.common import AWARE_DATE_ISO_FORMAT
 from apprise.logger import (
     LogCapture,
     NotifyLogEntry,
+    _active_call_capture,
+    _active_capture,
+    _LogCaptureBudget,
+    _NotifyLogStore,
     _ServiceLogCapture,
     logger,
     logging,
@@ -581,33 +587,397 @@ def test_notify_log_entry_asdict_json_repr():
     )
 
 
-def test_service_log_capture_max_entries_cap():
-    """Once _MAX_CAPTURED_LOG_ENTRIES is reached, further entries are
-    dropped instead of growing the buffer without bound."""
+def test_service_log_capture_keeps_all_entries():
+    """Captures remain complete beyond the former 5,000-entry boundary."""
+    service = _DummyNotify()
+    with _ServiceLogCapture(service) as cap:
+        for index in range(5001):
+            record = logging.LogRecord(
+                "apprise",
+                logging.WARNING,
+                __file__,
+                0,
+                "entry %d",
+                (index,),
+                None,
+            )
+            cap.handle(record)
+
+    assert len(cap.entries) == 5001
+    assert cap.entries[-1].message == "entry 5000"
+
+
+def test_result_log_store_spills_to_disk_in_order():
+    """A bounded capture reads disk-backed entries in their original order."""
+    budget = _LogCaptureBudget(memory_size=1, disk_size=4096)
+    store = _NotifyLogStore(budget)
+    entries = [
+        NotifyLogEntry("WARNING", "first"),
+        NotifyLogEntry("ERROR", "second"),
+    ]
+
+    for entry in entries:
+        store.append(entry)
+
+    assert store._memory == []
+    assert store._disk_count == 2
+    assert len(store) == 2
+    assert store == entries
+    assert store[0] == entries[0]
+    assert store[:] == entries
+    store.close()
+    assert budget._disk is None
+
+
+def test_result_log_store_uses_unbounded_memory_without_disk():
+    """The library default retains all logs in memory without a temp file."""
+    store = _NotifyLogStore(_LogCaptureBudget(memory_size=1, disk_size=0))
+    entry = NotifyLogEntry("WARNING", "kept in memory")
+
+    store.append(entry)
+
+    assert list(store) == [entry]
+    assert store._budget._disk is None
+
+
+def test_result_log_stores_share_one_temporary_file():
+    """All captures in one notification share a single temporary file."""
+    budget = _LogCaptureBudget(memory_size=4096, disk_size=4096)
+    memory_store = _NotifyLogStore(budget)
+    disk_store = _NotifyLogStore(budget)
+
+    memory_store.append(NotifyLogEntry("WARNING", "memory"))
+    budget.memory_used = budget.memory_size
+    disk_store.append(NotifyLogEntry("WARNING", "disk"))
+
+    assert len(memory_store._memory) == 1
+    assert disk_store._disk_count == 1
+    disk = budget._disk
+    memory_store.close()
+    assert budget._disk is disk
+    disk_store.close()
+    assert budget._disk is None
+
+
+def test_result_log_store_reports_capacity_once(caplog):
+    """A full store adds one warning while live callbacks remain unaffected."""
     logging.disable(logging.NOTSET)
+    caplog.set_level(logging.WARNING, logger=logger.name)
+    received = []
 
     try:
-        service = _DummyNotify()
-        # apprise.__init__ imports the "logger" object out of the
-        # apprise.logger submodule under the same name, which shadows
-        # the submodule reference on the apprise package. Resolve the
-        # real submodule via importlib rather than a dotted string
-        # path, since older unittest.mock versions (Python 3.9) walk
-        # that path with getattr() and land on the shadowed Logger
-        # instance instead of the module.
-        logger_module = importlib.import_module("apprise.logger")
-        with (
-            mock.patch.object(logger_module, "_MAX_CAPTURED_LOG_ENTRIES", 2),
-            _ServiceLogCapture(service) as cap,
-        ):
-            service.logger.warning("one")
-            service.logger.warning("two")
-            # Dropped -- the cap was already reached.
-            service.logger.warning("three")
+        with _ServiceLogCapture(
+            service=None,
+            log_callback=lambda entry, service: received.append(entry),
+            memory_size=0,
+            disk_size=1,
+        ) as cap:
+            logger.warning("first")
+            logger.warning("second")
     finally:
         logging.disable(logging.CRITICAL)
 
-    assert [e.message for e in cap.entries] == ["one", "two"]
+    assert [entry.message for entry in received] == ["first", "second"]
+    assert [entry.message for entry in cap.entries] == [
+        _NotifyLogStore._LIMIT_MESSAGE
+    ]
+    assert caplog.text.count(_NotifyLogStore._LIMIT_MESSAGE) == 1
+
+
+def test_result_log_store_handles_disk_failure(caplog):
+    """Temporary-file failures are logged and contained."""
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.DEBUG, logger=logger.name)
+    store = _NotifyLogStore(_LogCaptureBudget(memory_size=0, disk_size=1024))
+
+    try:
+        with mock.patch(
+            "apprise.logger.tempfile.TemporaryFile",
+            side_effect=OSError("no space"),
+        ):
+            store.append(NotifyLogEntry("ERROR", "delivery failed"))
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert [entry.message for entry in store] == [
+        _NotifyLogStore._DISK_MESSAGE
+    ]
+    assert "no space" in caplog.text
+
+
+def test_result_log_store_contains_logging_failure_on_write():
+    """A broken handler cannot expose a result-log write failure."""
+    store = _NotifyLogStore(_LogCaptureBudget(memory_size=0, disk_size=1024))
+
+    with (
+        mock.patch(
+            "apprise.logger.tempfile.TemporaryFile",
+            side_effect=OSError("no space"),
+        ),
+        mock.patch.object(
+            logger,
+            "log",
+            side_effect=RuntimeError("broken handler"),
+        ),
+    ):
+        # The storage warning remains available even when it cannot be logged.
+        store.append(NotifyLogEntry("ERROR", "delivery failed"))
+
+    assert [entry.message for entry in store] == [
+        _NotifyLogStore._DISK_MESSAGE
+    ]
+    store.close()
+
+
+@pytest.mark.parametrize("failed_write", (1, 2, 5))
+def test_result_log_store_handles_short_writes(failed_write):
+    """Short header, entry, and link writes are contained."""
+
+    class ShortWriteFile(io.BytesIO):
+        """Return one short write at the requested call."""
+
+        def __init__(self):
+            super().__init__()
+            self.calls = 0
+
+        def write(self, value):
+            self.calls += 1
+            if self.calls == failed_write:
+                super().write(value[:-1])
+                return len(value) - 1
+            return super().write(value)
+
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    store = _NotifyLogStore(budget)
+    with mock.patch(
+        "apprise.logger.tempfile.TemporaryFile",
+        return_value=ShortWriteFile(),
+    ):
+        # The first record covers header and payload writes.
+        store.append(NotifyLogEntry("WARNING", "first"))
+        if failed_write == 5:
+            # A second record reaches the write that links both records.
+            store.append(NotifyLogEntry("WARNING", "second"))
+
+    assert store._notice.message == _NotifyLogStore._DISK_MESSAGE
+    assert budget.disk_failed is True
+    store.close()
+
+
+@pytest.mark.parametrize("corruption", ("header", "size", "payload", "chain"))
+def test_result_log_store_handles_unreadable_data(corruption, caplog):
+    """Corrupt temporary data is logged instead of escaping iteration."""
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.WARNING, logger=logger.name)
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    store = _NotifyLogStore(budget)
+    store.append(NotifyLogEntry("WARNING", "first"))
+    if corruption == "chain":
+        store.append(NotifyLogEntry("WARNING", "second"))
+
+    disk = budget._disk
+    if corruption == "header":
+        # Leave too few bytes to form a complete record header.
+        disk.seek(0)
+        disk.truncate(1)
+    elif corruption == "size":
+        # Claim a size that can never fit within this capture's limit.
+        disk.seek(0)
+        disk.write(budget._HEADER.pack(budget.disk_size + 1, budget._END))
+    elif corruption == "payload":
+        # Keep the header but remove most of the promised content.
+        disk.seek(0)
+        disk.truncate(budget._HEADER.size + 1)
+    else:
+        # End the chain while the store still expects another record.
+        disk.seek(budget._LINK.size)
+        disk.write(budget._LINK.pack(budget._END))
+
+    try:
+        list(store)
+    finally:
+        logging.disable(logging.CRITICAL)
+        store.close()
+
+    assert "could not be read" in caplog.text
+
+
+def test_result_log_store_contains_logging_failure_on_read():
+    """A broken handler cannot expose a result-log read failure."""
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    store = _NotifyLogStore(budget)
+    store.append(NotifyLogEntry("WARNING", "first"))
+
+    # Leave too little data for a complete disk record.
+    budget._disk.seek(0)
+    budget._disk.truncate(1)
+
+    with mock.patch.object(
+        logger,
+        "log",
+        side_effect=RuntimeError("broken handler"),
+    ):
+        entries = list(store)
+
+    # Iteration still returns a useful warning to the caller.
+    assert [entry.message for entry in entries] == [
+        _NotifyLogStore._READ_MESSAGE
+    ]
+    store.close()
+
+
+def test_result_log_store_handles_close_failure(caplog):
+    """Temporary-file close failures are logged and contained."""
+
+    class CloseFailFile(io.BytesIO):
+        """Raise when temporary storage is closed."""
+
+        failed = False
+
+        def close(self):
+            if not self.failed:
+                self.failed = True
+                raise OSError("close failed")
+            super().close()
+
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.DEBUG, logger=logger.name)
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    store = _NotifyLogStore(budget)
+    with mock.patch(
+        "apprise.logger.tempfile.TemporaryFile", return_value=CloseFailFile()
+    ):
+        store.append(NotifyLogEntry("WARNING", "entry"))
+
+    try:
+        store.close()
+        store.append(NotifyLogEntry("WARNING", "ignored after close"))
+        with pytest.raises(OSError):
+            budget.read(0)
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert "close failed" in caplog.text
+
+
+def test_result_log_store_contains_logging_failure_on_close():
+    """A broken handler cannot expose a result-log cleanup failure."""
+
+    class CloseFailFile(io.BytesIO):
+        """Fail the first close request, like a temporary-file error."""
+
+        failed = False
+
+        def close(self):
+            if not self.failed:
+                self.failed = True
+                raise OSError("close failed")
+
+            super().close()
+
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    store = _NotifyLogStore(budget)
+
+    with mock.patch(
+        "apprise.logger.tempfile.TemporaryFile",
+        return_value=CloseFailFile(),
+    ):
+        store.append(NotifyLogEntry("WARNING", "entry"))
+
+    with mock.patch.object(
+        logger,
+        "log",
+        side_effect=RuntimeError("broken handler"),
+    ):
+        # Cleanup remains safe even when its warning cannot be logged.
+        store.close()
+
+    assert budget._disk is None
+
+
+def test_result_log_store_sequence_and_repeat_failure_paths():
+    """Sequence comparisons and repeated storage failures stay safe."""
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    first = _NotifyLogStore(budget)
+    second = _NotifyLogStore(budget)
+    entry = NotifyLogEntry("WARNING", "entry")
+    first.append(entry)
+    second.append(entry)
+
+    assert budget.claim_warning("one warning") is True
+    assert budget.claim_warning("one warning") is False
+    assert first == second
+    assert first.__eq__(object()) is NotImplemented
+    first._set_notice("first warning", log=False)
+    first._set_notice("ignored warning", log=False)
+    assert first._notice.message == "first warning"
+    first.close()
+    second.close()
+
+    class ConcurrentFailFile(io.BytesIO):
+        """Simulate another writer reporting the same disk failure first."""
+
+        def write(self, value):
+            budget.disk_failed = True
+            raise OSError("shared failure")
+
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    store = _NotifyLogStore(budget)
+    budget.claim_warning(_NotifyLogStore._DISK_MESSAGE)
+    with mock.patch(
+        "apprise.logger.tempfile.TemporaryFile",
+        return_value=ConcurrentFailFile(),
+    ):
+        store.append(entry)
+    assert store._notice.message == _NotifyLogStore._DISK_MESSAGE
+    store.close()
+
+
+def test_service_captures_share_call_log_budget():
+    """Service captures draw from their enclosing call's storage budget."""
+    service = _DummyNotify()
+    with (
+        _ServiceLogCapture(
+            service=None, memory_size=0, disk_size=4096
+        ) as call_cap,
+        _ServiceLogCapture(service) as service_cap,
+    ):
+        assert service_cap._budget is call_cap._budget
+
+
+def test_notify_uses_asset_result_log_limits():
+    """Sync and async notifications apply their asset's shared log limits."""
+    logging.disable(logging.NOTSET)
+
+    class _WarnNotify(_DummyNotify):
+        """Emit one retained warning during delivery."""
+
+        def send(self, *args, **kwargs):
+            """Log a warning and report success."""
+            self.logger.warning("stored on disk")
+            return True
+
+    try:
+        for use_async in (False, True):
+            asset = AppriseAsset(
+                result_log_memory_size=0, result_log_disk_size=4096
+            )
+            instance = Apprise(asset=asset)
+            assert instance.add(_WarnNotify(asset=asset))
+
+            result = (
+                asyncio.run(instance.async_notify("body"))
+                if use_async
+                else instance.notify("body")
+            )
+            attempt_logs = result.results[0].attempts[0].logs
+            assert attempt_logs._disk_count == 1
+            assert [entry.message for entry in result.logs()] == [
+                "stored on disk"
+            ]
+            result.close()
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 def test_service_log_capture_exit_without_enter():
@@ -761,6 +1131,181 @@ def test_service_log_capture_thread_isolation():
 
     assert result_a == ["warning from A"]
     assert result_b == ["warning from B"]
+
+
+def test_call_capture_uses_separate_context():
+    """Call and service captures use separate context markers."""
+    with _ServiceLogCapture(service=None) as cap:
+        assert _active_capture.get() is None
+        assert _active_call_capture.get() is cap
+        assert cap._token is None
+
+
+def test_call_capture_records_shared_logs():
+    """A call capture stores unclaimed shared-logger records."""
+    logging.disable(logging.NOTSET)
+
+    try:
+        with _ServiceLogCapture(service=None) as cap:
+            logger.warning("no services to notify")
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert [e.message for e in cap.entries] == ["no services to notify"]
+
+
+def test_call_capture_defers_to_service():
+    """A call capture ignores records owned by a service capture."""
+    logging.disable(logging.NOTSET)
+    service = _DummyNotify()
+
+    try:
+        with _ServiceLogCapture(service=None) as call_cap:
+            logger.warning("before service window")
+
+            with _ServiceLogCapture(service) as svc_cap:
+                service.logger.warning("during service window")
+
+            logger.warning("after service window")
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert [e.message for e in call_cap.entries] == [
+        "before service window",
+        "after service window",
+    ]
+    assert [e.message for e in svc_cap.entries] == ["during service window"]
+
+
+def test_call_capture_callback_has_no_service():
+    """Call-level callbacks receive ``service=None``."""
+    logging.disable(logging.NOTSET)
+    received = []
+
+    def _cb(entry, service):
+        """Record the (message, service) pair delivered live."""
+        received.append((entry.message, service))
+
+    try:
+        with _ServiceLogCapture(service=None, log_callback=_cb) as cap:
+            logger.warning("orchestration message")
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert received == [("orchestration message", None)]
+    assert [e.message for e in cap.entries] == ["orchestration message"]
+
+
+def test_call_capture_keeps_concurrent_logs():
+    """A call capture keeps concurrent entries without loss."""
+    logging.disable(logging.NOTSET)
+
+    n_per_thread = 200
+    barrier = threading.Barrier(4)
+
+    def _hammer(tag):
+        """Log many messages from one thread, all starting together."""
+        barrier.wait()
+        for i in range(n_per_thread):
+            logger.warning("%s-%d", tag, i)
+
+    try:
+        with (
+            _ServiceLogCapture(service=None) as cap,
+            cf.ThreadPoolExecutor(max_workers=4) as ex,
+        ):
+            futures = [
+                ex.submit(contextvars.copy_context().run, _hammer, tag)
+                for tag in ("A", "B", "C", "D")
+            ]
+            for future in futures:
+                future.result()
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    messages = sorted(e.message for e in cap.entries)
+    expected = sorted(
+        f"{tag}-{i}"
+        for tag in ("A", "B", "C", "D")
+        for i in range(n_per_thread)
+    )
+    assert messages == expected
+
+
+def test_call_capture_blocks_recursive_callback():
+    """A callback cannot recursively capture its own log message."""
+    logging.disable(logging.NOTSET)
+    received = []
+
+    def _reentrant_cb(entry, service):
+        """Try to log again through the same handler while still
+        inside the first entry's own callback."""
+        received.append(entry.message)
+        if entry.message == "first":
+            logger.warning("triggered from callback")
+
+    try:
+        with _ServiceLogCapture(
+            service=None, log_callback=_reentrant_cb
+        ) as cap:
+            logger.warning("first")
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    # The reentrant call is swallowed by _in_emit, not processed as a
+    # second entry or a second callback invocation.
+    assert [e.message for e in cap.entries] == ["first"]
+    assert received == ["first"]
+
+
+def test_callback_error_contains_logging_failure():
+    """A broken handler cannot expose a callback failure."""
+    logging.disable(logging.NOTSET)
+
+    def _broken_callback(_entry, _service):
+        """Represent application callback code that unexpectedly fails."""
+        raise RuntimeError("callback failed")
+
+    try:
+        with (
+            mock.patch.object(
+                logger,
+                "log",
+                side_effect=RuntimeError("broken handler"),
+            ),
+            _ServiceLogCapture(
+                service=None,
+                log_callback=_broken_callback,
+            ) as cap,
+        ):
+            # The original log call and notification flow both continue.
+            logger.warning("first")
+
+    finally:
+        logging.disable(logging.CRITICAL)
+
+    assert [entry.message for entry in cap.entries] == ["first"]
+
+
+def test_call_captures_are_thread_isolated():
+    """Concurrent call captures do not receive each other's entries."""
+    logging.disable(logging.NOTSET)
+    barrier = threading.Barrier(2)
+
+    def _capture(message):
+        with _ServiceLogCapture(service=None) as cap:
+            barrier.wait()
+            logger.warning(message)
+            return [entry.message for entry in cap.entries]
+
+    try:
+        with cf.ThreadPoolExecutor(max_workers=2) as executor:
+            first = executor.submit(_capture, "first")
+            second = executor.submit(_capture, "second")
+            assert first.result() == ["first"]
+            assert second.result() == ["second"]
+    finally:
+        logging.disable(logging.CRITICAL)
 
 
 def test_service_log_capture_sync_log_callback():
