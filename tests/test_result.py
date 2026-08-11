@@ -27,6 +27,7 @@
 
 # Disable logging for a cleaner testing output
 from datetime import datetime, timezone
+from io import StringIO
 from json import loads
 import logging
 
@@ -40,6 +41,11 @@ from apprise.result import (
 )
 
 logging.disable(logging.CRITICAL)
+
+
+def _json_data(value):
+    """Decode one result object's bounded JSON iterator for assertions."""
+    return loads("".join(value.iter_json()))
 
 
 def test_notify_log_entry():
@@ -126,7 +132,7 @@ def test_notify_attempt_start_end_time_match_elapsed():
     assert (attempt.end_time - attempt.start_time).total_seconds() == 3.5
     assert before <= attempt.end_time <= after
     parsed = datetime.strptime(
-        attempt.asdict()["start_time"], AWARE_DATE_ISO_FORMAT
+        _json_data(attempt)["start_time"], AWARE_DATE_ISO_FORMAT
     )
     assert parsed == attempt.start_time
 
@@ -148,8 +154,8 @@ def test_notify_attempt_iterates_logs():
     assert " - ERROR - invalid token" in messages[1]
 
 
-def test_notify_attempt_asdict_and_json():
-    """NotifyAttempt.asdict()/json() serialize every field, logs included."""
+def test_notify_attempt_iter_json_and_write_json():
+    """Attempt JSON streams every field and can write to a text stream."""
 
     logs = [NotifyLogEntry(level="WARNING", message="HTTP 429")]
     attempt = NotifyAttempt(
@@ -163,10 +169,47 @@ def test_notify_attempt_asdict_and_json():
         "end_time": attempt.end_time.strftime(AWARE_DATE_ISO_FORMAT),
         "logs": [logs[0].asdict()],
     }
-    assert attempt.asdict() == expected
-    assert loads(attempt.json()) == expected
-    assert ", " not in attempt.json()
-    assert ": " not in attempt.json()
+    output = "".join(attempt.iter_json())
+    assert loads(output) == expected
+    assert ", " not in output
+    assert ": " not in output
+
+    # write_json consumes the same bounded chunks without joining them first.
+    stream = StringIO()
+    attempt.write_json(stream)
+    assert stream.getvalue() == output
+
+
+def test_notify_attempt_json_reads_disk_logs_lazily():
+    """Creating and starting JSON output does not preload disk-backed logs."""
+    from apprise.logger import _LogCaptureBudget, _NotifyLogStore
+
+    budget = _LogCaptureBudget(memory_size=0, disk_size=4096)
+    logs = _NotifyLogStore(budget)
+    logs.append(NotifyLogEntry(level="WARNING", message="from disk"))
+
+    reads = 0
+    original_read = budget.read
+
+    def tracked_read(offset):
+        """Count actual disk reads while preserving normal behavior."""
+        nonlocal reads
+        reads += 1
+        return original_read(offset)
+
+    budget.read = tracked_read
+    attempt = NotifyAttempt(AppriseResultStatus.FAILURE, logs=logs)
+    chunks = attempt.iter_json()
+
+    # Fixed fields are emitted before iteration reaches the disk log array.
+    first_chunk = next(chunks)
+    assert first_chunk.startswith('{"status":')
+    assert reads == 0
+
+    output = first_chunk + "".join(chunks)
+    assert loads(output)["logs"][0]["message"] == "from disk"
+    assert reads == 1
+    logs.close()
 
 
 def test_notify_attempt_repr():
@@ -453,9 +496,8 @@ def test_notify_result_optional_and_tag():
     assert bool(result) is True
 
 
-def test_notify_result_asdict_and_json():
-    """NotifyResult.asdict()/json() serialize every field, with nested
-    per-attempt detail (including each attempt's own logs)."""
+def test_notify_result_iter_json_and_write_json():
+    """Service JSON streams every field and its nested attempts."""
 
     logs = [NotifyLogEntry(level="WARNING", message="HTTP 429")]
     attempt = NotifyAttempt(
@@ -484,13 +526,16 @@ def test_notify_result_asdict_and_json():
         "elapsed": result.elapsed,
         "start_time": result.start_time.strftime(AWARE_DATE_ISO_FORMAT),
         "end_time": result.end_time.strftime(AWARE_DATE_ISO_FORMAT),
-        "attempts": [attempt.asdict()],
+        "attempts": [_json_data(attempt)],
     }
-    assert result.asdict() == expected
-    assert loads(result.json()) == expected
-    # json() is compact -- no space after "," or ":".
-    assert ", " not in result.json()
-    assert ": " not in result.json()
+    output = "".join(result.iter_json())
+    assert loads(output) == expected
+    assert ", " not in output
+    assert ": " not in output
+
+    stream = StringIO()
+    result.write_json(stream)
+    assert stream.getvalue() == output
 
 
 def test_notify_result_repr():
@@ -522,6 +567,7 @@ def test_apprise_result_defaults():
     assert result.timeout_count == 0
     assert result.elapsed == 0.0
     assert bool(result) is False
+    assert list(result.call_logs()) == []
 
 
 def test_apprise_result_elapsed_custom():
@@ -541,7 +587,7 @@ def test_apprise_result_start_end_time_match_elapsed():
     assert result.end_time.tzinfo is not None
     assert (result.end_time - result.start_time).total_seconds() == 4.0
     parsed = datetime.strptime(
-        result.asdict()["end_time"], AWARE_DATE_ISO_FORMAT
+        _json_data(result)["end_time"], AWARE_DATE_ISO_FORMAT
     )
     assert parsed == result.end_time
 
@@ -688,9 +734,71 @@ def test_apprise_result_logs_merges_and_sorts_across_services():
     assert messages == ["from slack", "from slack, later", "from discord"]
 
 
-def test_apprise_result_asdict_and_json():
-    """AppriseResult.asdict()/json() serialize status, counts, and every
-    NotifyResult entry."""
+def test_apprise_result_call_logs():
+    """Call logs expose a read-only snapshot of orchestration entries."""
+
+    t = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    entries = [
+        NotifyLogEntry(
+            level="WARNING", message="no services to notify", time=t
+        )
+    ]
+    result = AppriseResult(
+        status=AppriseResultStatus.NOMATCH, call_logs=entries
+    )
+
+    assert list(result.call_logs()) == entries
+    # Mutating the input list afterwards must not affect the snapshot.
+    entries.append(
+        NotifyLogEntry(level="WARNING", message="late addition", time=t)
+    )
+    assert len(list(result.call_logs())) == 1
+
+
+def test_result_logs_merge_call_logs():
+    """Combined logs merge call and service entries by time."""
+
+    early = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    middle = datetime(2026, 1, 1, 12, 0, 1, tzinfo=timezone.utc)
+    late = datetime(2026, 1, 1, 12, 0, 2, tzinfo=timezone.utc)
+
+    slack = NotifyResult(
+        name="Slack",
+        url="slack://t/ch",
+        attempts=[
+            NotifyAttempt(
+                status=AppriseResultStatus.SUCCESS,
+                logs=[
+                    NotifyLogEntry(
+                        level="WARNING", message="from slack", time=middle
+                    )
+                ],
+            )
+        ],
+    )
+    call_logs = [
+        NotifyLogEntry(
+            level="TRACE", message="starting attempt 1/1", time=early
+        ),
+        NotifyLogEntry(level="TRACE", message="attempt finished", time=late),
+    ]
+
+    result = AppriseResult(
+        status=AppriseResultStatus.SUCCESS,
+        results=[slack],
+        call_logs=call_logs,
+    )
+
+    messages = [entry.message for entry in result.logs()]
+    assert messages == [
+        "starting attempt 1/1",
+        "from slack",
+        "attempt finished",
+    ]
+
+
+def test_apprise_result_iter_json_and_write_json():
+    """Overall JSON streams summary fields and every service result."""
 
     results = [
         _notify_result("Slack", "slack://t/ch", AppriseResultStatus.SUCCESS),
@@ -709,12 +817,29 @@ def test_apprise_result_asdict_and_json():
         "elapsed": 0.75,
         "start_time": result.start_time.strftime(AWARE_DATE_ISO_FORMAT),
         "end_time": result.end_time.strftime(AWARE_DATE_ISO_FORMAT),
-        "results": [r.asdict() for r in results],
+        "results": [_json_data(item) for item in results],
+        "call_logs": [],
     }
-    assert result.asdict() == expected
-    assert loads(result.json()) == expected
-    assert ", " not in result.json()
-    assert ": " not in result.json()
+    output = "".join(result.iter_json())
+    assert loads(output) == expected
+    assert ", " not in output
+    assert ": " not in output
+
+    stream = StringIO()
+    result.write_json(stream)
+    assert stream.getvalue() == output
+
+
+def test_result_json_includes_call_logs():
+    """Bounded result JSON includes call-level logs."""
+
+    t = datetime(2026, 1, 1, 12, 0, 0, tzinfo=timezone.utc)
+    entries = [NotifyLogEntry(level="WARNING", message="no services", time=t)]
+    result = AppriseResult(
+        status=AppriseResultStatus.NOMATCH, call_logs=entries
+    )
+
+    assert _json_data(result)["call_logs"] == [e.asdict() for e in entries]
 
 
 def test_apprise_result_repr():
@@ -749,3 +874,50 @@ def test_apprise_result_results_is_read_only_view():
 
     assert len(result) == 1
     assert len(result.results) == 1
+
+
+def test_apprise_result_closes_disk_backed_logs():
+    """Closing a result releases temporary files held by its log stores."""
+    from apprise.logger import _LogCaptureBudget, _NotifyLogStore
+
+    call_logs = _NotifyLogStore(
+        _LogCaptureBudget(memory_size=0, disk_size=4096)
+    )
+    attempt_logs = _NotifyLogStore(
+        _LogCaptureBudget(memory_size=0, disk_size=4096)
+    )
+    call_logs.append(NotifyLogEntry("WARNING", "call"))
+    attempt_logs.append(NotifyLogEntry("WARNING", "attempt"))
+    service = NotifyResult(
+        name="Slack",
+        url="slack://t/ch",
+        attempts=[
+            NotifyAttempt(
+                status=AppriseResultStatus.SUCCESS, logs=attempt_logs
+            )
+        ],
+    )
+
+    with AppriseResult(
+        status=AppriseResultStatus.SUCCESS,
+        results=[service],
+        call_logs=call_logs,
+    ) as result:
+        assert [entry.message for entry in result.logs()] == [
+            "call",
+            "attempt",
+        ]
+
+    assert call_logs._budget._disk is None
+    assert attempt_logs._budget._disk is None
+
+    # Closing ordinary list-backed results is also a safe no-op.
+    AppriseResult(
+        results=[
+            NotifyResult(
+                name="Slack",
+                url="slack://t/ch",
+                attempts=[NotifyAttempt(AppriseResultStatus.SUCCESS)],
+            )
+        ]
+    ).close()
