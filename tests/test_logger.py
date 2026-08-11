@@ -634,6 +634,31 @@ def test_result_log_store_spills_to_disk_in_order():
     assert budget._disk is None
 
 
+def test_result_log_store_stays_on_disk_after_large_entry():
+    """A smaller entry cannot move ahead of one already stored on disk."""
+    entries = [
+        NotifyLogEntry("WARNING", "first " + ("x" * 256)),
+        NotifyLogEntry("ERROR", "second"),
+    ]
+
+    # Only the second entry fits in memory when considered by itself.
+    memory_size = _LogCaptureBudget._HEADER.size + len(
+        entries[1].json().encode("utf-8")
+    )
+    budget = _LogCaptureBudget(memory_size=memory_size, disk_size=4096)
+    store = _NotifyLogStore(budget)
+
+    for entry in entries:
+        store.append(entry)
+
+    # Once the first entry spills, later entries remain behind it on disk.
+    assert store._memory == []
+    assert store._disk_count == 2
+    assert list(store) == entries
+    store.close()
+    assert budget._disk is None
+
+
 def test_result_log_store_uses_unbounded_memory_without_disk():
     """The library default retains all logs in memory without a temp file."""
     store = _NotifyLogStore(_LogCaptureBudget(memory_size=1, disk_size=0))

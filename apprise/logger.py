@@ -488,7 +488,10 @@ class _NotifyLogStore:
             if self._notice is not None:
                 return
 
-            if self._budget.reserve_memory(size):
+            # Once this store spills, keep every later entry behind it on disk.
+            if self._first_offset is None and self._budget.reserve_memory(
+                size
+            ):
                 # Fill memory before using slower disk storage.
                 self._memory.append(entry)
 
