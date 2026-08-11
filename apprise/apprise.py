@@ -1989,9 +1989,7 @@ class Apprise:
                 )
 
         logger.debug("Threaded notification mode")
-        logger.info(
-            "Notifying %d service(s).", len(services_kwargs)
-        )
+        logger.info("Notifying %d service(s).", len(services_kwargs))
 
         # Keep output ordered by input, though threads finish out of order.
         # This is the shared, process-wide pool (see _get_shared_executor()),
@@ -2113,9 +2111,7 @@ class Apprise:
             return True, []
 
         logger.debug("Asynchronous notification mode")
-        logger.info(
-            "Notifying %d service(s).", len(services_kwargs)
-        )
+        logger.info("Notifying %d service(s).", len(services_kwargs))
 
         async def do_call(
             service: NotifyBase,
