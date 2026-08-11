@@ -1988,8 +1988,9 @@ class Apprise:
                     services_kwargs[0], call_deadline=call_deadline
                 )
 
+        logger.debug("Threaded notification mode")
         logger.info(
-            "Notifying %d service(s) with threads.", len(services_kwargs)
+            "Notifying %d service(s).", len(services_kwargs)
         )
 
         # Keep output ordered by input, though threads finish out of order.
@@ -2111,8 +2112,9 @@ class Apprise:
         if n_calls == 0:
             return True, []
 
+        logger.debug("Asynchronous notification mode")
         logger.info(
-            "Notifying %d service(s) asynchronously.", len(services_kwargs)
+            "Notifying %d service(s).", len(services_kwargs)
         )
 
         async def do_call(
