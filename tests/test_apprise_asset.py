@@ -203,6 +203,28 @@ def test_payload_buffer_threshold_and_min_buffer():
         AppriseAsset(_payload_min_buffer=7)
 
 
+def test_result_log_storage_sizes():
+    """Result-log storage accepts non-negative byte limits."""
+    asset = AppriseAsset()
+    assert asset.result_log_memory_size == 0
+    assert asset.result_log_disk_size == 0
+
+    asset = AppriseAsset(
+        result_log_memory_size=2048, result_log_disk_size=4096
+    )
+    assert asset.result_log_memory_size == 2048
+    assert asset.result_log_disk_size == 4096
+
+    for name in ("result_log_memory_size", "result_log_disk_size"):
+        with pytest.raises(ValueError):
+            AppriseAsset(**{name: -1})
+        for value in (True, 1.5, "1024"):
+            with pytest.raises(TypeError):
+                AppriseAsset(**{name: value})
+        with pytest.raises(AttributeError):
+            AppriseAsset(**{"_{}".format(name): 1})
+
+
 def test_enforce_payload_max_size():
     "asset: enforce_payload_max_size() testing"
 
