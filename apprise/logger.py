@@ -28,6 +28,7 @@
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Iterator
 import contextlib
 import contextvars
 from datetime import datetime, timezone
@@ -35,7 +36,10 @@ from io import StringIO
 import json
 import logging
 import os
-from typing import TYPE_CHECKING, Any, Callable, Optional
+import struct
+import tempfile
+import threading
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from .common import AWARE_DATE_ISO_FORMAT, JSON_COMPACT_SEPARATORS
 
@@ -47,14 +51,14 @@ if TYPE_CHECKING:
 # The root identifier needed to monitor 'apprise' logging
 LOGGER_NAME = "apprise"
 
-# Upper bound on WARNING+ entries captured for one attempt.
-# This caps memory use if a plugin logs repeatedly in a large batch.
-_MAX_CAPTURED_LOG_ENTRIES = 5000
-
-# Tracks which capture owns logs from the current execution context.
-# ContextVar also survives async-to-thread handoffs when copied explicitly.
+# Tracks the service capture active in the current execution context.
 _active_capture: contextvars.ContextVar[Optional[_ServiceLogCapture]] = (
     contextvars.ContextVar("apprise_active_log_capture", default=None)
+)
+
+# Keeps call-level logs isolated when notifications run concurrently.
+_active_call_capture: contextvars.ContextVar[Optional[_ServiceLogCapture]] = (
+    contextvars.ContextVar("apprise_active_call_log_capture", default=None)
 )
 
 
@@ -92,8 +96,17 @@ logging.Logger.deprecate = deprecate
 logger = logging.getLogger(LOGGER_NAME)
 
 
+def _safe_internal_log(level: int, message: str, *args: Any) -> None:
+    """Report a capture problem without letting logging handlers raise."""
+    # Logging is best-effort while the original notification continues.
+    with contextlib.suppress(Exception):
+        # Capture handlers already block their own re-entry. This guard also
+        # contains failures raised by application-provided handlers.
+        logger.log(level, message, *args)
+
+
 class NotifyLogEntry:
-    """A single log line captured while one service was being notified."""
+    """A log entry captured during notification processing."""
 
     def __init__(
         self, level: str, message: str, time: Optional[datetime] = None
@@ -175,136 +188,614 @@ class NotifyLogEntry:
         )
 
 
-class _ServiceLogCapture(logging.Handler):
-    """Capture one service's log messages in isolation.
+class _LogCaptureBudget:
+    """Share result-log memory and disk limits across one notify call."""
 
-    A temporary handler stores one attempt's entries. ``log_callback`` receives
-    them live and must return promptly; it can schedule async work if needed.
+    # Store each entry's size and the next entry in this capture.
+    _HEADER = struct.Struct("!QQ")
+
+    # Update only the next-entry location when linking records.
+    _LINK = struct.Struct("!Q")
+
+    # This value marks the last record in one capture's disk chain.
+    _END = (1 << 64) - 1
+
+    # This message is retained when the configured disk allowance is full.
+    _LIMIT_MESSAGE = (
+        "Result log storage is full; additional entries were not retained."
+    )
+
+    # This message is retained when temporary storage stops working.
+    _DISK_MESSAGE = (
+        "Result log disk storage failed; additional entries may be missing."
+    )
+
+    def __init__(self, memory_size: int = 0, disk_size: int = 0) -> None:
+        """Set byte limits; a zero disk limit keeps memory unbounded."""
+        # Maximum memory shared by all captures in this notification call.
+        self.memory_size = memory_size
+
+        # Maximum temporary disk space shared by the same captures.
+        self.disk_size = disk_size
+
+        # Memory currently reserved by captured entries.
+        self.memory_used = 0
+
+        # Disk space currently reserved by captured entries.
+        self.disk_used = 0
+
+        # Stop further writes after the first disk error.
+        self.disk_failed = False
+
+        # Open the temporary file only when an entry spills to disk.
+        self._disk: Optional[Any] = None
+
+        # The final store to close releases the shared temporary file.
+        self._store_count = 0
+
+        # Report each storage problem once per notification call.
+        self._reported_warnings: set[str] = set()
+
+        # Protect shared limits and disk access across service threads.
+        self._lock = threading.RLock()
+
+    def register_store(self) -> None:
+        """Keep shared disk storage open for one capture store."""
+        with self._lock:
+            # Every active store receives one ownership count.
+            self._store_count += 1
+
+    def reserve_memory(self, size: int) -> bool:
+        """Reserve memory for one entry before it spills to disk."""
+        with self._lock:
+            # No disk allowance preserves the original all-memory behavior.
+            if not self.disk_size:
+                return True
+
+            # Spill the complete entry rather than splitting it across stores.
+            if self.memory_used + size > self.memory_size:
+                return False
+
+            # Reserve the entry's bytes before another thread can claim them.
+            self.memory_used += size
+
+            return True
+
+    def claim_warning(self, message: str) -> bool:
+        """Return true once for each storage warning in this notify call."""
+        with self._lock:
+            # A warning already claimed by another capture is not repeated.
+            if message in self._reported_warnings:
+                return False
+
+            # Remember the warning before its caller writes to the logger.
+            self._reported_warnings.add(message)
+
+            return True
+
+    def write(
+        self, payload: bytes, previous: Optional[int]
+    ) -> tuple[Optional[int], Optional[str]]:
+        """Write one entry and return its offset or a safe warning."""
+        # Disk accounting includes the record header and its log content.
+        size = self._HEADER.size + len(payload)
+
+        with self._lock:
+            # A failed or full disk store cannot accept another record.
+            if self.disk_failed or self.disk_used + size > self.disk_size:
+                return (
+                    None,
+                    self._DISK_MESSAGE
+                    if self.disk_failed
+                    else self._LIMIT_MESSAGE,
+                )
+
+            # Reserve space first so parallel captures cannot exceed the cap.
+            self.disk_used += size
+
+            try:
+                if self._disk is None:
+                    # Share one anonymous file across this notification.
+                    self._disk = tempfile.TemporaryFile(  # noqa: SIM115
+                        mode="w+b"
+                    )
+
+                # Append new content without disturbing earlier records.
+                self._disk.seek(0, os.SEEK_END)
+
+                # New records always begin at the current end of the file.
+                offset = self._disk.tell()
+
+                # New records begin as the final item in their capture.
+                header = self._HEADER.pack(len(payload), self._END)
+
+                # A short write means the record cannot be trusted later.
+                if self._disk.write(header) != len(header):
+                    raise OSError("short result log header write")
+
+                # Write the complete log entry immediately after its header.
+                if self._disk.write(payload) != len(payload):
+                    raise OSError("short result log entry write")
+
+                if previous is not None:
+                    # Link this capture's entries across the shared file.
+                    self._disk.seek(previous + self._LINK.size)
+
+                    # Point the prior record at the new record's location.
+                    link = self._LINK.pack(offset)
+
+                    if self._disk.write(link) != len(link):
+                        raise OSError("short result log link write")
+
+                # Make completed writes available to result readers.
+                self._disk.flush()
+
+                return offset, None
+
+            except Exception as e:
+                # Return unused space after a failed write.
+                self.disk_used -= size
+
+                if self.claim_warning(self._DISK_MESSAGE):
+                    # Keep the main warning concise and details at debug level.
+                    _safe_internal_log(logging.WARNING, self._DISK_MESSAGE)
+                    _safe_internal_log(
+                        logging.DEBUG,
+                        "Result log storage exception: %s",
+                        str(e),
+                    )
+
+                # Future entries skip disk instead of repeating the failure.
+                self.disk_failed = True
+
+                return None, self._DISK_MESSAGE
+
+    def read(self, offset: int) -> tuple[bytes, int]:
+        """Read and validate one serialized entry at an owned offset."""
+        with self._lock:
+            # A closed result no longer has disk content to replay.
+            if self._disk is None:
+                raise OSError("result log storage is closed")
+
+            # Move directly to the record owned by this capture.
+            self._disk.seek(offset)
+
+            # Read the fixed-size details that describe the stored entry.
+            header = self._disk.read(self._HEADER.size)
+
+            # Reject partial records before decoding their content.
+            if len(header) != self._HEADER.size:
+                raise OSError("truncated result log header")
+
+            # Recover the content length and the next record location.
+            size, next_offset = self._HEADER.unpack(header)
+
+            # A record cannot be larger than the complete disk allowance.
+            if size > self.disk_size:
+                raise OSError("invalid result log entry size")
+
+            # Read only the number of bytes declared by this record.
+            payload = self._disk.read(size)
+
+            # Do not pass incomplete content to the JSON decoder.
+            if len(payload) != size:
+                raise OSError("truncated result log entry")
+
+            return payload, next_offset
+
+    def release_store(self) -> None:
+        """Close shared disk storage after its final capture is released."""
+        with self._lock:
+            # This store no longer needs access to the shared file.
+            self._store_count -= 1
+
+            # Another store still needs the file, or no file was opened.
+            if self._store_count or self._disk is None:
+                return
+
+            try:
+                # The last store owns final cleanup of temporary storage.
+                self._disk.close()
+
+            except Exception as e:
+                # Report cleanup errors while still clearing the file below.
+                _safe_internal_log(
+                    logging.WARNING,
+                    "Result log storage could not be closed.",
+                )
+                _safe_internal_log(
+                    logging.DEBUG,
+                    "Result log close exception: %s",
+                    str(e),
+                )
+
+            finally:
+                # Never leave a closed or failed handle available for reuse.
+                self._disk = None
+
+
+class _NotifyLogStore:
+    """Keep captured entries in memory, spilling later entries to disk."""
+
+    # Reuse the shared message when the configured allowance is full.
+    _LIMIT_MESSAGE = _LogCaptureBudget._LIMIT_MESSAGE
+
+    # Reuse the shared message when temporary storage stops working.
+    _DISK_MESSAGE = _LogCaptureBudget._DISK_MESSAGE
+
+    # Return a safe entry when retained disk content cannot be replayed.
+    _READ_MESSAGE = "Stored result logs could not be read."
+
+    def __init__(self, budget: _LogCaptureBudget) -> None:
+        """Create an empty store using the call's shared byte budget."""
+        # Register first so the shared file stays open for this store.
+        self._budget = budget
+        self._budget.register_store()
+
+        # Memory always holds the oldest retained entries.
+        self._memory: list[NotifyLogEntry] = []
+
+        # This is where the first disk-backed entry can be found.
+        self._first_offset: Optional[int] = None
+
+        # This is where the newest disk-backed entry can be found.
+        self._last_offset: Optional[int] = None
+
+        # Count the disk entries this store can read.
+        self._disk_count = 0
+
+        # A final notice explains why later entries are missing.
+        self._notice: Optional[NotifyLogEntry] = None
+
+        # Closed stores ignore late entries and no longer read from disk.
+        self._closed = False
+
+        # Iteration and appends can occur from different worker threads.
+        self._lock = threading.RLock()
+
+    @staticmethod
+    def _encode(entry: NotifyLogEntry) -> bytes:
+        """Serialize an entry for length-prefixed disk storage."""
+        return entry.json().encode("utf-8")
+
+    @staticmethod
+    def _decode(payload: bytes) -> NotifyLogEntry:
+        """Restore an entry read from disk."""
+        # Convert the stored JSON text back into its plain fields.
+        data = json.loads(payload.decode("utf-8"))
+
+        # Rebuild the same public entry type used by in-memory logs.
+        return NotifyLogEntry(
+            level=data["level"],
+            message=data["message"],
+            time=datetime.strptime(data["time"], AWARE_DATE_ISO_FORMAT),
+        )
+
+    def append(self, entry: NotifyLogEntry) -> None:
+        """Append an entry without allowing storage errors to escape."""
+        # Measure the encoded entry before choosing memory or disk.
+        payload = self._encode(entry)
+
+        # Include the small disk header in all shared byte accounting.
+        size = self._budget._HEADER.size + len(payload)
+
+        with self._lock:
+            # Late messages cannot reopen a completed result.
+            if self._closed:
+                return
+
+            # After data is lost, keep its warning as the final entry.
+            if self._notice is not None:
+                return
+
+            # Once this store spills, keep every later entry behind it on disk.
+            if self._first_offset is None and self._budget.reserve_memory(
+                size
+            ):
+                # Fill memory before using slower disk storage.
+                self._memory.append(entry)
+
+                return
+
+            # The last offset joins this entry to only this store's chain.
+            offset, warning = self._budget.write(payload, self._last_offset)
+
+            if offset is None:
+                # Keep a readable explanation in place of discarded entries.
+                self._set_notice(
+                    warning or self._DISK_MESSAGE,
+                    log=self._budget.claim_warning(
+                        warning or self._DISK_MESSAGE
+                    ),
+                )
+
+                return
+
+            if self._first_offset is None:
+                # Remember where replay for this store begins.
+                self._first_offset = offset
+
+            # This entry is now the final item in this store's disk chain.
+            self._last_offset = offset
+
+            # Count only entries that completed their disk write.
+            self._disk_count += 1
+
+    def _set_notice(self, message: str, log: bool = True) -> None:
+        """Retain one bounded warning when entries must be discarded."""
+        if self._notice is None:
+            # The notice becomes the final entry returned to the caller.
+            self._notice = NotifyLogEntry("WARNING", message)
+
+            if log:
+                # Also tell the application when this warning is first owned.
+                _safe_internal_log(logging.WARNING, message)
+
+    def __iter__(self) -> Iterator[NotifyLogEntry]:
+        """Yield retained entries in capture order."""
+        with self._lock:
+            # Memory comes first because it contains the oldest entries.
+            yield from self._memory
+
+            if self._first_offset is not None:
+                try:
+                    # Follow only this store's entries in the shared file.
+                    offset = self._first_offset
+
+                    for index in range(self._disk_count):
+                        # Read and restore one entry at its known location.
+                        payload, next_offset = self._budget.read(offset)
+                        yield self._decode(payload)
+
+                        if (
+                            next_offset == self._budget._END
+                            and index + 1 < self._disk_count
+                        ):
+                            # The entry chain ended sooner than expected.
+                            raise OSError("truncated result log chain")
+
+                        # Continue from the location saved in this record.
+                        offset = next_offset
+
+                except Exception as e:
+                    # Replace unreadable content with one useful warning.
+                    _safe_internal_log(logging.WARNING, self._READ_MESSAGE)
+                    _safe_internal_log(
+                        logging.DEBUG,
+                        "Result log read exception: %s",
+                        str(e),
+                    )
+                    yield NotifyLogEntry("WARNING", self._READ_MESSAGE)
+
+            if self._notice is not None:
+                # This stays last because later entries were discarded.
+                yield self._notice
+
+    def __len__(self) -> int:
+        """Return the number of retained entries and any storage warning."""
+        with self._lock:
+            return (
+                len(self._memory)
+                + self._disk_count
+                + (self._notice is not None)
+            )
+
+    def __getitem__(
+        self, index: Union[int, slice]
+    ) -> Union[NotifyLogEntry, list[NotifyLogEntry]]:
+        """Return an entry or slice using normal sequence behavior."""
+        return list(self)[index]
+
+    def __eq__(self, other: object) -> bool:
+        """Compare retained entries with another iterable."""
+        if isinstance(other, _NotifyLogStore):
+            return list(self) == list(other)
+
+        if isinstance(other, (list, tuple)):
+            return list(self) == list(other)
+
+        return NotImplemented
+
+    def close(self) -> None:
+        """Release any temporary file owned by this store."""
+        with self._lock:
+            if not self._closed:
+                # Clear locations so a closed store cannot replay disk data.
+                self._closed = True
+
+                self._first_offset = None
+
+                self._last_offset = None
+
+                self._disk_count = 0
+
+                # Release this store's ownership of shared temporary storage.
+                self._budget.release_store()
+
+    def __del__(self) -> None:
+        """Best-effort cleanup when callers do not close the result."""
+        with contextlib.suppress(Exception):
+            # Interpreter shutdown may already have cleared module globals.
+            self.close()
+
+
+class _ServiceLogCapture(logging.Handler):
+    """Capture logs for one service or one notification call.
+
+    The capture mode depends on ``service``:
+
+    - A service captures entries from its current notification attempt.
+    - ``service=None`` captures orchestration entries for the whole call.
+
+    ``log_callback`` receives entries live and should return promptly.
     """
 
     def __init__(
         self,
-        service: NotifyBase,
+        service: Optional[NotifyBase] = None,
         log_callback: Optional[
-            Callable[[NotifyLogEntry, NotifyBase], None]
+            Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
         ] = None,
         level: int = logging.WARNING,
+        memory_size: int = 0,
+        disk_size: int = 0,
     ) -> None:
-        """Prepare an isolated handler for ``service``."""
+        """Prepare a service-level or call-level log handler."""
         super().__init__(level=level)
-        self._entries: list[NotifyLogEntry] = []
 
-        # Reuse the service's logger; this capture is just another listener.
+        # A service capture can reuse the budget owned by its enclosing call.
+        call_capture = _active_call_capture.get()
+
+        # Standalone and call-level captures create their own shared budget.
+        self._budget = (
+            call_capture._budget
+            if service is not None and call_capture is not None
+            else _LogCaptureBudget(memory_size, disk_size)
+        )
+
+        # Each handler owns one ordered view into that shared budget.
+        self._entries = _NotifyLogStore(self._budget)
+
+        # Call-level orchestration messages use the shared logger.
         self._logger = getattr(service, "logger", logger)
 
-        # Kept only so log_callback can identify the service.
+        # None identifies a call-level entry to the callback.
         self._service = service
+
+        # The optional callback receives entries as they are captured.
         self._log_callback = log_callback
 
-        # Set on __enter__, used to restore _active_capture on __exit__.
+        # This token restores an enclosing service capture on exit.
         self._token: Optional[contextvars.Token] = None
 
-        # prevent reoccurrance of emit() calls from the same thread.
+        # This token restores an enclosing call capture on exit.
+        self._call_token: Optional[contextvars.Token] = None
+
+        # Prevent a callback from logging recursively through this handler.
         self._in_emit = False
 
     def emit(self, record: logging.LogRecord) -> None:
-        """Wrap and store one captured logging.LogRecord.
-
-        Ignores any record produced on behalf of another service
-        dispatched concurrently -- see _active_capture's own docstring.
-        """
+        """Store a record owned by this capture."""
+        # Ignore logging triggered by this handler's own callback or warnings.
         if self._in_emit:
             return
+
+        # Set the guard before formatting or invoking user callback code.
         self._in_emit = True
+
         try:
             self._emit(record)
+
         finally:
+            # Always allow the next independent record through.
             self._in_emit = False
 
     def _emit(self, record: logging.LogRecord) -> None:
-        """The actual body of emit(), guarded against re-entrancy by the
-        wrapper above."""
+        """Process a record after the reentrancy check."""
         try:
-            if _active_capture.get() is not self:
-                return
+            if self._service is not None:
+                # Per-service: only the exact active capture accepts.
+                if _active_capture.get() is not self:
+                    return
 
-            if len(self._entries) >= _MAX_CAPTURED_LOG_ENTRIES:
-                # A plugin can log once per item while processing a large
-                # or malformed batch (bulk recipients, malformed config
-                # entries, etc.) -- cap growth instead of buffering an
-                # unbounded number of entries for the lifetime of the
-                # result.
-                return
+            else:
+                # Accept only unclaimed records from this notification call.
+                if (
+                    _active_call_capture.get() is not self
+                    or _active_capture.get() is not None
+                ):
+                    return
 
             entry = NotifyLogEntry(
                 level=record.levelname,
-                # record.getMessage() re-applies %-style formatting
-                # (msg % args) every time it's called, so a plugin's
-                # own malformed logging call (e.g. too few args for
-                # its format string) raises here, exactly as it would
-                # for any other handler -- self.handleError() is the
-                # standard library's own convention for this (see
-                # logging.StreamHandler.emit()), so the caller's
-                # original self.logger.warning(...) call still
-                # returns normally instead of raising through it.
+                # Preserve normal logging behavior for formatted messages.
+                # The outer handler catches malformed format strings.
                 message=record.getMessage(),
-                # record.created is a Unix timestamp (seconds since
-                # the epoch); logging itself is timezone-agnostic,
-                # but every other timestamp Apprise reports is an
-                # aware UTC datetime, so this is converted to match.
+                # Match the UTC-aware timestamps used by other results.
                 time=datetime.fromtimestamp(record.created, tz=timezone.utc),
             )
+
+            # Retain the entry before notifying a live callback.
             self._entries.append(entry)
 
+            # Copy the reference in case application code later replaces it.
             callback = self._log_callback
+
             if callback is not None:
                 self._invoke_log_callback(entry, callback)
 
         except Exception:
+            # Use logging's normal error path for formatting or storage errors.
             self.handleError(record)
 
     def _invoke_log_callback(
         self,
         entry: NotifyLogEntry,
-        callback: Callable[[NotifyLogEntry, NotifyBase], None],
+        callback: Callable[[NotifyLogEntry, Optional[NotifyBase]], None],
     ) -> None:
         """Call ``log_callback(entry, service)``.
 
-        Its return value is ignored.
+        ``service`` is ``None`` for call-level entries. The return value is
+        ignored.
         """
         try:
             result = callback(entry, self._service)
 
         except Exception as e:
-            logger.warning("The log_callback function raised an exception.")
-            logger.debug("log_callback Exception: %s", str(e))
+            _safe_internal_log(
+                logging.WARNING,
+                "The log_callback function raised an exception.",
+            )
+            _safe_internal_log(
+                logging.DEBUG,
+                "log_callback Exception: %s",
+                str(e),
+            )
             return
 
         if asyncio.iscoroutine(result):
             # Close unsupported async callbacks without leaking a warning.
             result.close()
-            logger.warning(
+
+            _safe_internal_log(
+                logging.WARNING,
                 "The log_callback function must be synchronous; its "
                 "returned coroutine was ignored. Schedule async work "
-                "from inside the callback instead."
+                "from inside the callback instead.",
             )
 
     @property
-    def entries(self) -> list[NotifyLogEntry]:
-        """Return every WARNING+ entry captured during this attempt."""
+    def entries(self) -> _NotifyLogStore:
+        """Return entries captured at or above this handler's level."""
         return self._entries
 
     def __enter__(self) -> _ServiceLogCapture:
-        """Attach as an extra handler without disturbing existing ones."""
+        """Attach the handler and mark its capture context."""
+        # Begin receiving records from the logger owned by this capture.
         self._logger.addHandler(self)
-        self._token = _active_capture.set(self)
+
+        if self._service is not None:
+            # Mark this as the active capture for one service attempt.
+            self._token = _active_capture.set(self)
+
+        else:
+            # Mark this as the active capture for the complete notify call.
+            self._call_token = _active_call_capture.set(self)
+
         return self
 
     def __exit__(self, *_: object) -> None:
-        """Detach the handler."""
+        """Detach the handler and restore the enclosing capture."""
+        # Stop receiving records before changing the active context.
         self._logger.removeHandler(self)
+
         if self._token is not None:
+            # Restore any service capture that surrounded this one.
             _active_capture.reset(self._token)
+
+        if self._call_token is not None:
+            # Restore any call capture that surrounded this one.
+            _active_call_capture.reset(self._call_token)
 
 
 class LogCapture:

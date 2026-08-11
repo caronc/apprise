@@ -43,14 +43,21 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from datetime import datetime, timedelta, timezone
 from enum import IntEnum
+import heapq
 import json
-from typing import Any, Optional
+from typing import Optional, TextIO
 
 from .common import AWARE_DATE_ISO_FORMAT, JSON_COMPACT_SEPARATORS
-from .logger import NotifyLogEntry
+from .logger import NotifyLogEntry, _NotifyLogStore
+
+
+def _write_json(stream: TextIO, chunks: Iterable[str]) -> None:
+    """Write JSON chunks immediately without joining them in memory."""
+    for chunk in chunks:
+        stream.write(chunk)
 
 
 class AppriseResultStatus(IntEnum):
@@ -91,7 +98,7 @@ class NotifyAttempt:
         self,
         status: AppriseResultStatus,
         elapsed: float = 0.0,
-        logs: Optional[list[NotifyLogEntry]] = None,
+        logs: Optional[Iterable[NotifyLogEntry]] = None,
     ) -> None:
         """Initialize the outcome, duration, and logs for one attempt."""
         # The raw outcome of this one call: SUCCESS, FAILURE, or TIMEOUT.
@@ -105,22 +112,59 @@ class NotifyAttempt:
         self.end_time = datetime.now(timezone.utc)
         self.start_time = self.end_time - timedelta(seconds=self.elapsed)
 
-        # Every WARNING+ message the plugin logged during this one call.
-        self.logs = list(logs) if logs else []
+        # Read disk-backed logs as needed; copy ordinary iterables.
+        self.logs = (
+            logs
+            if isinstance(logs, _NotifyLogStore)
+            else list(logs)
+            if logs is not None
+            else []
+        )
 
-    def asdict(self) -> dict[str, Any]:
-        """Return this attempt as a plain, JSON-serializable dict."""
-        return {
-            "status": self.status.name,
-            "elapsed": self.elapsed,
-            "start_time": self.start_time.strftime(AWARE_DATE_ISO_FORMAT),
-            "end_time": self.end_time.strftime(AWARE_DATE_ISO_FORMAT),
-            "logs": [entry.asdict() for entry in self.logs],
-        }
+    def iter_json(self) -> Iterator[str]:
+        """Yield this attempt as bounded JSON chunks.
 
-    def json(self) -> str:
-        """Return this attempt as a JSON string."""
-        return json.dumps(self.asdict(), separators=JSON_COMPACT_SEPARATORS)
+        Logs are read one at a time, including entries retained on disk.
+        """
+        # Write the small fixed fields before walking captured logs.
+        yield '{{"status":{}'.format(
+            json.dumps(self.status.name, separators=JSON_COMPACT_SEPARATORS)
+        )
+
+        yield ',"elapsed":{}'.format(
+            json.dumps(self.elapsed, separators=JSON_COMPACT_SEPARATORS)
+        )
+
+        yield ',"start_time":{}'.format(
+            json.dumps(
+                self.start_time.strftime(AWARE_DATE_ISO_FORMAT),
+                separators=JSON_COMPACT_SEPARATORS,
+            )
+        )
+
+        yield ',"end_time":{}'.format(
+            json.dumps(
+                self.end_time.strftime(AWARE_DATE_ISO_FORMAT),
+                separators=JSON_COMPACT_SEPARATORS,
+            )
+        )
+
+        # Open the log array without first copying its entries into a list.
+        yield ',"logs":['
+
+        separator = ""
+        for entry in self.logs:
+            # Prefix every entry after the first with the JSON separator.
+            yield separator
+            yield entry.json()
+            separator = ","
+
+        # Close both the log array and this attempt object.
+        yield "]}"
+
+    def write_json(self, stream: TextIO) -> None:
+        """Write this attempt to a text stream without joining its logs."""
+        _write_json(stream, self.iter_json())
 
     def __bool__(self) -> bool:
         """Return ``True`` only when this attempt succeeded."""
@@ -230,26 +274,50 @@ class NotifyResult:
         for attempt in self._attempts:
             yield from attempt.logs
 
-    def asdict(self) -> dict[str, Any]:
-        """Return this result as a plain, JSON-serializable dict."""
-        return {
-            "name": self.name,
-            "url": self.url,
-            "url_id": self.url_id,
-            "tag": list(self.tag),
-            "status": self.status.name,
-            "optional": self.optional,
-            "weight": self.weight,
-            "max_attempts": self.max_attempts,
-            "elapsed": self.elapsed,
-            "start_time": self.start_time.strftime(AWARE_DATE_ISO_FORMAT),
-            "end_time": self.end_time.strftime(AWARE_DATE_ISO_FORMAT),
-            "attempts": [a.asdict() for a in self._attempts],
-        }
+    def iter_json(self) -> Iterator[str]:
+        """Yield this service result as bounded JSON chunks."""
+        # Service details are small and safe to encode one field at a time.
+        fields = (
+            ("name", self.name),
+            ("url", self.url),
+            ("url_id", self.url_id),
+            ("tag", list(self.tag)),
+            ("status", self.status.name),
+            ("optional", self.optional),
+            ("weight", self.weight),
+            ("max_attempts", self.max_attempts),
+            ("elapsed", self.elapsed),
+            ("start_time", self.start_time.strftime(AWARE_DATE_ISO_FORMAT)),
+            ("end_time", self.end_time.strftime(AWARE_DATE_ISO_FORMAT)),
+        )
 
-    def json(self) -> str:
-        """Return this result as a JSON string."""
-        return json.dumps(self.asdict(), separators=JSON_COMPACT_SEPARATORS)
+        yield "{"
+
+        separator = ""
+        for name, value in fields:
+            # Encode both names and values so escaping follows normal JSON.
+            yield "{}{}:{}".format(
+                separator,
+                json.dumps(name, separators=JSON_COMPACT_SEPARATORS),
+                json.dumps(value, separators=JSON_COMPACT_SEPARATORS),
+            )
+            separator = ","
+
+        # Attempts can contain disk-backed logs, so stream each nested object.
+        yield ',"attempts":['
+
+        separator = ""
+        for attempt in self._attempts:
+            yield separator
+            yield from attempt.iter_json()
+            separator = ","
+
+        # Close both the attempts array and this service object.
+        yield "]}"
+
+    def write_json(self, stream: TextIO) -> None:
+        """Write this service result to a text stream in bounded chunks."""
+        _write_json(stream, self.iter_json())
 
     def __bool__(self) -> bool:
         """Return ``True`` when this service result is successful."""
@@ -271,6 +339,13 @@ class NotifyResult:
             self.name, self.url, self.status.name
         )
 
+    def close(self) -> None:
+        """Release temporary log storage held by this service result."""
+        for attempt in self._attempts:
+            # List-backed attempts have no temporary resource to release.
+            if isinstance(attempt.logs, _NotifyLogStore):
+                attempt.logs.close()
+
 
 class AppriseResult:
     """The overall outcome of one Apprise.notify() / async_notify() call.
@@ -284,6 +359,7 @@ class AppriseResult:
         status: AppriseResultStatus = AppriseResultStatus.NOMATCH,
         results: Optional[list[NotifyResult]] = None,
         elapsed: float = 0.0,
+        call_logs: Optional[Iterable[NotifyLogEntry]] = None,
     ) -> None:
         """Initialize the overall status and ordered service results."""
         # Dispatch computes this because priority escalation affects outcome.
@@ -297,6 +373,15 @@ class AppriseResult:
         # priority group, escalation round, and chain.
         self.elapsed = elapsed
 
+        # Read disk-backed call logs as needed; copy ordinary iterables.
+        self._call_logs = (
+            call_logs
+            if isinstance(call_logs, _NotifyLogStore)
+            else list(call_logs)
+            if call_logs is not None
+            else []
+        )
+
         # Derive start_time from end_time and elapsed so they always agree.
         self.end_time = datetime.now(timezone.utc)
         self.start_time = self.end_time - timedelta(seconds=self.elapsed)
@@ -305,6 +390,10 @@ class AppriseResult:
     def results(self) -> tuple[NotifyResult, ...]:
         """Read-only view of every NotifyResult collected this call."""
         return tuple(self._results)
+
+    def call_logs(self) -> Iterator[NotifyLogEntry]:
+        """Yield orchestration logs without loading disk entries at once."""
+        yield from self._call_logs
 
     @property
     def success_count(self) -> int:
@@ -330,31 +419,67 @@ class AppriseResult:
         )
 
     def logs(self) -> Iterator[NotifyLogEntry]:
-        """Yield every log entry captured across every service and every
-        attempt made this call, in chronological order.
+        """Yield all service and call-level logs in chronological order.
 
-        Concurrent service logs are sorted back into one timeline.
+        Each capture is already ordered, so merge them without copying every
+        entry into a second list.
         """
-        all_entries = (
-            entry for result in self._results for entry in result.logs()
+        # Merge the already ordered sources without building another list.
+        streams = [result.logs() for result in self._results]
+        # Call entries belong in the same timeline as service entries.
+        streams.append(iter(self._call_logs))
+        yield from heapq.merge(*streams)
+
+    def iter_json(self) -> Iterator[str]:
+        """Yield the complete result as bounded JSON chunks.
+
+        Service and call logs remain lazy while the iterator is consumed.
+        Keep the result open until iteration finishes.
+        """
+        # Encode the fixed summary without touching any captured logs.
+        fields = (
+            ("status", self.status.name),
+            ("success_count", self.success_count),
+            ("failed_count", self.failed_count),
+            ("elapsed", self.elapsed),
+            ("start_time", self.start_time.strftime(AWARE_DATE_ISO_FORMAT)),
+            ("end_time", self.end_time.strftime(AWARE_DATE_ISO_FORMAT)),
         )
-        yield from sorted(all_entries)
 
-    def asdict(self) -> dict[str, Any]:
-        """Return this result as a plain, JSON-serializable dict."""
-        return {
-            "status": self.status.name,
-            "success_count": self.success_count,
-            "failed_count": self.failed_count,
-            "elapsed": self.elapsed,
-            "start_time": self.start_time.strftime(AWARE_DATE_ISO_FORMAT),
-            "end_time": self.end_time.strftime(AWARE_DATE_ISO_FORMAT),
-            "results": [r.asdict() for r in self._results],
-        }
+        yield "{"
 
-    def json(self) -> str:
-        """Return this result as a JSON string."""
-        return json.dumps(self.asdict(), separators=JSON_COMPACT_SEPARATORS)
+        separator = ""
+        for name, value in fields:
+            yield "{}{}:{}".format(
+                separator,
+                json.dumps(name, separators=JSON_COMPACT_SEPARATORS),
+                json.dumps(value, separators=JSON_COMPACT_SEPARATORS),
+            )
+            separator = ","
+
+        # Stream each service and its attempts before moving to call logs.
+        yield ',"results":['
+
+        separator = ""
+        for result in self._results:
+            yield separator
+            yield from result.iter_json()
+            separator = ","
+
+        yield '],"call_logs":['
+
+        separator = ""
+        for entry in self._call_logs:
+            yield separator
+            yield entry.json()
+            separator = ","
+
+        # Close the call-log array and the overall result object.
+        yield "]}"
+
+    def write_json(self, stream: TextIO) -> None:
+        """Write the complete result to a text stream in bounded chunks."""
+        _write_json(stream, self.iter_json())
 
     def __bool__(self) -> bool:
         """Return ``True`` only when the overall notification succeeded."""
@@ -374,3 +499,20 @@ class AppriseResult:
         return "<AppriseResult status={!r} count={}>".format(
             self.status.name, len(self._results)
         )
+
+    def close(self) -> None:
+        """Release temporary files used by captured result logs."""
+        # Each service closes the stores owned by its attempts.
+        for result in self._results:
+            result.close()
+        # The call capture can share the same temporary file.
+        if isinstance(self._call_logs, _NotifyLogStore):
+            self._call_logs.close()
+
+    def __enter__(self) -> AppriseResult:
+        """Return this result for use as a context manager."""
+        return self
+
+    def __exit__(self, *_: object) -> None:
+        """Release temporary result-log files on context exit."""
+        self.close()
