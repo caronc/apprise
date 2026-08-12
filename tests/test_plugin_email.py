@@ -846,6 +846,7 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     # Create an apprise object to work with as well
     a = Apprise()
     assert a.add("mailto://user:pass@gmail.com?format=text")
+    assert a.add("mailto://other:pass@gmail.com?format=text")
 
     # Send Attachment with success
     attach = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
@@ -907,7 +908,9 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attachment) is True
+    result = a.notify(body="body", title="test", attach=attachment)
+    assert bool(result) is True
+    assert len(result) == 2
 
     max_file_size = AttachBase.max_file_size
     # Now do a case where the file can't be sent
