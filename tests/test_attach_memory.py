@@ -78,9 +78,27 @@ def test_attach_memory_parse_url():
         # garbage in, garbage out
         AttachMemory(content=3)
 
-    # pointer to our data
-    pointer = mem.open()
-    assert pointer.read() == b"<html/>"
+    # Each open call returns an independent pointer to our data.
+    first = mem.open()
+    second = mem.open()
+    assert first is not second
+    assert first.read(1) == b"<"
+    assert second.read() == b"<html/>"
+
+    # Closing one pointer does not affect another or the attachment.
+    with first:
+        assert first.read() == b"html/>"
+    assert first.closed is True
+    assert second.closed is False
+    assert second.read() == b""
+
+    # The attachment remains readable after its prior pointers are closed.
+    second.close()
+    with mem.open() as pointer:
+        assert pointer.read() == b"<html/>"
+    assert pointer.closed is True
+    with mem.open() as pointer:
+        assert pointer.read() == b"<html/>"
 
     # pass our content in as a string
     mem = AttachMemory(content=b"binary-data", name="raw.dat")
