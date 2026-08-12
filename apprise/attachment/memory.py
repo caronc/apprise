@@ -29,6 +29,7 @@ import base64
 import io
 import os
 import re
+from typing import Any
 import uuid
 
 from .. import exception
@@ -110,11 +111,10 @@ class AttachMemory(AttachBase):
             params=self.urlencode(params, safe="/"),
         )
 
-    def open(self, *args, **kwargs):
-        """Return our memory object."""
-        # Return our object
-        self._data.seek(0, 0)
-        return self._data
+    def open(self, *args: Any, **kwargs: Any) -> io.BytesIO:
+        """Return an independent handle to our memory object."""
+        # Return a new handle that callers can safely close.
+        return io.BytesIO(self._data.getvalue())
 
     def __enter__(self):
         """Support with clause."""
