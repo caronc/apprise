@@ -26,6 +26,7 @@ System Administrators and DevOps who wish to send a notification now no longer n
 [![Lines of Code](https://raw.githubusercontent.com/caronc/apprise/master/.github/badges/loc.svg)](https://github.com/caronc/apprise/actions/workflows/loc-badge.yml)
 [![CodeCov Status](https://codecov.io/github/caronc/apprise/branch/master/graph/badge.svg)](https://codecov.io/github/caronc/apprise)
 [![PyPi Downloads](https://img.shields.io/pepy/dt/apprise.svg?style=flat-square)](https://pypi.org/project/apprise/)
+[![inspect.software](https://raw.githubusercontent.com/inspect-software/badges/main/v1/c/caronc/apprise.svg)](https://inspect.software/software/caronc/apprise)
 
 Visit the [Official Documentation](https://appriseit.com/getting-started/) site for more information on Apprise.
 
