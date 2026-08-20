@@ -34,7 +34,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.custom_xml import NotifyXML
 
 logging.disable(logging.CRITICAL)
@@ -264,6 +264,43 @@ def test_plugin_custom_xml_urls():
 
 
 @mock.patch("requests.request")
+def test_plugin_custom_xml_multi_format(mock_request):
+    """NotifyXML() supports all 3 notify formats as a pass-through."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    assert NotifyXML.notify_format == (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
+    a = Apprise()
+    assert a.add("xml://localhost") is True
+
+    # Markdown input aligns directly to the pass-through Markdown path,
+    # so no conversion should alter it.
+    assert (
+        bool(a.notify(body="# hello", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
+    payload = mock_request.call_args_list[-1][1]["data"]
+    assert "# hello" in payload
+
+    # ?format=html forces the resolved target regardless of input format.
+    a = Apprise()
+    assert a.add("xml://localhost/?format=html") is True
+    assert bool(a.notify(body="a < b", body_format=NotifyFormat.TEXT)) is True
+    payload = mock_request.call_args_list[-1][1]["data"]
+    # The body was HTML-converted first (< -> &lt;), then XML-escaped a
+    # second time on top (& -> &amp;), proving format=html was honored
+    # rather than the plain-text default.
+    assert "&amp;lt;" in payload
+
+
+@mock.patch("requests.request")
 def test_notify_xml_plugin_attachments(mock_request):
     """NotifyXML() Attachments."""
 
@@ -281,11 +318,13 @@ def test_notify_xml_plugin_attachments(mock_request):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -293,11 +332,13 @@ def test_notify_xml_plugin_attachments(mock_request):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -316,11 +357,13 @@ def test_notify_xml_plugin_attachments(mock_request):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -332,11 +375,13 @@ def test_notify_xml_plugin_attachments(mock_request):
     # Now send an attachment normally without issues
     mock_request.reset_mock()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

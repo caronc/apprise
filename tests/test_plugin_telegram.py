@@ -458,16 +458,22 @@ def test_plugin_telegram_general(mock_post):
 
     # This tests erroneous messages involving multiple chat ids
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert (
-        nimg_obj.notify(
-            body="body", title="title", notify_type=NotifyType.INFO
+        bool(
+            nimg_obj.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -478,12 +484,16 @@ def test_plugin_telegram_general(mock_post):
     nimg_obj.asset = AppriseAsset(image_path_mask=False, image_url_mask=False)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
     assert (
-        nimg_obj.notify(
-            body="body", title="title", notify_type=NotifyType.INFO
+        bool(
+            nimg_obj.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -565,8 +575,12 @@ def test_plugin_telegram_general(mock_post):
     mock_post.reset_mock()
     body = "<p>'\"This can't\t\r\nfail&nbsp;us\"'</p>"
     assert (
-        obj.notify(
-            body=body, title="special characters", notify_type=NotifyType.INFO
+        bool(
+            obj.notify(
+                body=body,
+                title="special characters",
+                notify_type=NotifyType.INFO,
+            )
         )
         is True
     )
@@ -591,22 +605,26 @@ def test_plugin_telegram_general(mock_post):
             os.path.join(TEST_VAR_DIR, "apprise-test.gif")
         )
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
 
         # Test large messages
         assert (
-            obj.notify(
-                body="a" * (obj.telegram_caption_maxlen + 1),
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="a" * (obj.telegram_caption_maxlen + 1),
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
@@ -617,22 +635,26 @@ def test_plugin_telegram_general(mock_post):
         )
         attach = AppriseAttachment(path)
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=path,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=path,
+                )
             )
             is False
         )
 
         # Test large messages
         assert (
-            obj.notify(
-                body="a" * (obj.telegram_caption_maxlen + 1),
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=path,
+            bool(
+                obj.notify(
+                    body="a" * (obj.telegram_caption_maxlen + 1),
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=path,
+                )
             )
             is False
         )
@@ -641,7 +663,7 @@ def test_plugin_telegram_general(mock_post):
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
 
-    assert obj.notify(title="hello", body="world") is True
+    assert bool(obj.notify(title="hello", body="world")) is True
     assert len(obj.targets) == 1
     assert obj.targets[0] == ("532389719", None)
 
@@ -657,7 +679,7 @@ def test_plugin_telegram_general(mock_post):
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Do the test again, but with ok not set to True
@@ -699,7 +721,7 @@ def test_plugin_telegram_general(mock_post):
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # An edge case where no results were provided; this will probably never
@@ -714,7 +736,7 @@ def test_plugin_telegram_general(mock_post):
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     # No user detected; this happens after our firsst notification
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
     # Detect the bot with a bad response
     mock_post.return_value.content = dumps({})
@@ -726,29 +748,31 @@ def test_plugin_telegram_general(mock_post):
     # internal server error prevents notification from being sent
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Test our bot detection with an unmappable html error
     mock_post.return_value.status_code = 999
     NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message
     mock_post.return_value.content = dumps({"description": "Failure Message"})
     NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Do it again but this time provide a failure message and perform a
     # notification without a bot detection by providing at least 1 chat id
     obj = NotifyTelegram(bot_token=bot_token, targets=["@abcd"])
     assert (
-        nimg_obj.notify(
-            body="body", title="title", notify_type=NotifyType.INFO
+        bool(
+            nimg_obj.notify(
+                body="body", title="title", notify_type=NotifyType.INFO
+            )
         )
         is False
     )
@@ -759,7 +783,7 @@ def test_plugin_telegram_general(mock_post):
     # No chat_ids specified
     obj = NotifyTelegram(bot_token=bot_token, targets=None)
     assert len(obj.targets) == 0
-    assert obj.notify(title="hello", body="world") is False
+    assert bool(obj.notify(title="hello", body="world")) is False
     assert len(obj.targets) == 0
 
     # Test Telegram Group
@@ -938,9 +962,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
+    # MarkdownV2 renders the merged title heading as bold.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "*🚨 Change detected for _Apprise Test Title_*\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -977,9 +1001,9 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
+    # Telegram v1 renders the heading as bold and drops nested italic markers.
     assert (
-        payload["text"] == "# 🚨 Change detected for _Apprise Test Title_\r\n"
+        payload["text"] == "*🚨 Change detected for Apprise Test Title*\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.1)"
     )
@@ -1064,8 +1088,12 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert payload["text"] == body
+    # The merged ``# #`` heading renders its literal hash as bold.
+    assert payload["text"] == (
+        "*#*\n"
+        r"\_\[Apprise Body Title\](http://localhost)\_"
+        r" had \[a change\](http://127.0.0.2)"
+    )
 
     # Reset our values
     mock_post.reset_mock()
@@ -1093,11 +1121,11 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert (
-        payload["text"]
-        == "\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had \\"
-        "[a change\\]\\(http://127\\.0\\.0\\.2\\)"
+    # MarkdownV2 also escapes the literal hash inside the bold heading.
+    assert payload["text"] == (
+        "*\\#*\n"
+        r"\_\[Apprise Body Title\]\(http://localhost\)\_"
+        r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
 
     # Reset our values
@@ -1133,11 +1161,13 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert (
-        payload["text"] == "# A Great Title\n"
-        "_[Apprise Body Title](http://localhost)_ had "
-        "[a change](http://127.0.0.2)"
+    # v1's narrower escape set un-escapes what the framework's baseline
+    # text-to-markdown pass added, since v1 does not require it. The merged
+    # "# # A Great Title" line is itself a heading, so it renders as bold.
+    assert payload["text"] == (
+        "*# A Great Title*\n"
+        r"\_\[Apprise Body Title\](http://localhost)\_"
+        r" had \[a change\](http://127.0.0.2)"
     )
 
     # Reset our values
@@ -1166,18 +1196,19 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Test that everything is escaped properly in a MARKDOWN mode
-    assert (
-        payload["text"] == "\\# A Great Title\n"
-        "\\_\\[Apprise Body Title\\]\\(http://localhost\\)\\_ had "
-        "\\[a change\\]\\(http://127\\.0\\.0\\.2\\)"
+    # MarkdownV2 runs its completion pass over the already-amalgamated
+    # title+body; the merged heading line renders as bold, and its
+    # literal leading hash still needs its own reserved-character escape.
+    assert payload["text"] == (
+        "*\\# A Great Title*\n"
+        r"\_\[Apprise Body Title\]\(http://localhost\)\_"
+        r" had \[a change\]\(http://127\.0\.0\.2\)"
     )
 
     # Reset our values
     mock_post.reset_mock()
 
-    # If input is markdown and output is v2, it is expected the user knows
-    # what he is doing... no esaping takes place
+    # Declared Markdown gets MarkdownV2 dialect completion.
     assert aobj.notify(
         title=title, body=body, body_format=NotifyFormat.MARKDOWN
     )
@@ -1192,9 +1223,10 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # No escaping in this circumstance
-    assert (
-        payload["text"] == "# A Great Title\r\n"
+    # The declared heading renders as bold. Link destinations only need
+    # "(" and ")" escaped, not the full reserved-character set.
+    assert payload["text"] == (
+        "*A Great Title*\n"
         "_[Apprise Body Title](http://localhost)_ had "
         "[a change](http://127.0.0.2)"
     )
@@ -1227,7 +1259,8 @@ def test_plugin_telegram_formatting(mock_post):
     mock_post.reset_mock()
 
     #
-    # Now test that <br/> is correctly escaped
+    # Markdown input aligns directly, then gets title merging and v1
+    # dialect completion without an HTML round trip.
     #
     title = "Test Message Title"
     body = "Test Message Body <br/> ok</br>"
@@ -1250,10 +1283,10 @@ def test_plugin_telegram_formatting(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
-    # Test that everything is escaped properly in a HTML mode
-    assert (
-        payload["text"]
-        == "<b>Test Message Title\r\n</b>\r\nTest Message Body\r\nok\r\n"
+    # The merged heading renders as bold; v1 keeps HTML-looking body text
+    # unescaped.
+    assert payload["text"] == (
+        "*Test Message Title*\nTest Message Body <br/> ok</br>"
     )
 
     # Reset our values
@@ -1431,6 +1464,33 @@ def test_plugin_telegram_html_formatting(mock_post):
 
 
 @mock.patch("requests.post")
+def test_plugin_telegram_html_heading_padding_needs_source(
+    mock_post,
+):
+    """HTML heading padding requires a declared source format."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = "{}"
+
+    body = "<h1>Heading</h1>Body text here"
+
+    aobj = Apprise()
+    assert aobj.add("tgram://123456789:abcdefg_hijklmnop/12345678")
+
+    # Declared HTML: heading gets padded on both sides.
+    assert aobj.notify(body=body, body_format=NotifyFormat.HTML)
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "\r\n<b>Heading</b>\r\nBody text here"
+    mock_post.reset_mock()
+
+    # Undeclared input resolves to HTML but remains unpadded.
+    assert aobj.notify(body=body)
+    payload = loads(mock_post.call_args_list[-1][1]["data"])
+    assert payload["text"] == "<b>Heading</b>Body text here"
+
+
+@mock.patch("requests.post")
 def test_plugin_telegram_html_to_markdown_format(mock_post):
     """Test HTML delivery to Telegram Markdown targets."""
 
@@ -1526,8 +1586,9 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
 
     mock_post.reset_mock()
 
-    # A heading has no MarkdownV2 entity -- its '#' must be escaped (not left
-    # bare), or Telegram rejects the entire message outright rather than just.
+    # A heading has no MarkdownV2 entity, so it renders as bold instead of
+    # a literal, escaped "#" -- either way Telegram never sees a bare '#'
+    # that would make it reject the whole message.
     aobj = Apprise()
     aobj.add("tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=2")
     assert len(aobj) == 1
@@ -1540,7 +1601,7 @@ def test_plugin_telegram_html_to_markdown_format(mock_post):
     payload = loads(mock_post.call_args_list[0][1]["data"])
 
     assert payload["parse_mode"] == "MarkdownV2"
-    assert payload["text"] == "\\# Title\n\nbody text"
+    assert payload["text"] == "*Title*\n\nbody text"
 
     mock_post.reset_mock()
 
@@ -1648,18 +1709,16 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     assert notify("<code>a\\b</code>") == "`a\\\\b`"
     assert notify("<code>a`b</code>") == "`a\\`b`"
 
-    # Immediately-adjacent nested emphasis (no text between the outer and inner
-    # tag's open) must stay correctly nested ("*_x_*"), not cross ("*_x*_").
-    assert notify("<b><i>x</i></b>") == "*_x_*"
-    assert notify("<i><b>x</b></i>") == "*_x_*"
+    # Either adjacent nesting order flattens to italic around bold.
+    assert notify("<b><i>x</i></b>") == "_*x*_"
+    assert notify("<i><b>x</b></i>") == "_*x*_"
 
     # Legacy Markdown (v1) doesn't support nested entities at all.
     assert notify("<b>a <i>b</i> c</b>", mdv="1") == "*a b c*"
-    assert notify("<b><i>x</i></b>", mdv="1") == "*x*"
 
-    # <i><b>x</b></i> and <b><i>x</i></b> both flatten to the identical
-    # CommonMark "***x***" (html_to_markdown has no separating text to anchor
-    assert notify("<i><b>x</b></i>", mdv="1") == "*x*"
+    # Telegram v1 keeps only the outer span from nested CommonMark.
+    assert notify("<b><i>x</i></b>", mdv="1") == "_x_"
+    assert notify("<i><b>x</b></i>", mdv="1") == "_x_"
 
     # Legacy Markdown only recognizes a backslash escape in front of
     # '`'/'*'/'_'/'['.
@@ -1676,7 +1735,8 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
     assert notify("<b>bold <i>italic</i> still bold</b>") == (
         "*bold _italic_ still bold*"
     )
-    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+    # Adjacent bold tags retain and escape ambiguous middle markers.
+    assert notify("<b>A</b><b>B</b>") == "*A\\*\\*\\*\\*B*"
 
     # A nested bold opening *while italic is already open, with real text in
     # between* (so the two opening delimiters aren't touching) is a completely.
@@ -1723,27 +1783,247 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         )
         == "text \\`\\`unterminated"
     )
+    # "](<" with no preceding "[" (so not a real link) and no closing ">)"
+    # either: every reserved bracket/paren is escaped as stray punctuation.
     assert (
         NotifyTelegram._commonmark_to_telegram(
             "a](<https://incomplete no close", strict=True
         )
-        == "a](\\<https://incomplete no close"
+        == "a\\]\\(\\<https://incomplete no close"
     )
 
-    # Empty adjacent entities collapse without affecting following text.
-    assert NotifyTelegram._commonmark_to_telegram("****x") == "x"
+    # Always escape stray MarkdownV2 brackets and parentheses.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "literal (value) and [bracket] text", strict=True
+        )
+        == "literal \\(value\\) and \\[bracket\\] text"
+    )
 
-    # Cascade close that pops an open span whose delimiter was the LAST item
-    # in the output buffer (empty entity) -- the delimiter is dropped.
-    assert NotifyTelegram._commonmark_to_telegram("******") == ""
+    # Prevent an orphaned "[" from matching a later unrelated link.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("[a] b (c) ](d)", strict=True)
+        == "\\[a\\] b \\(c\\) \\]\\(d\\)"
+    )
 
-    # Unclosed spans at the end of the V1 input are force-closed by the cleanup
-    # loop.
+    # An invalid inner angle link must not reuse or consume its outer label.
+    # Telegram returns the unresolved structure as escaped literal text.
+    body = "[OUTER [INNER](<badstuff)](https://example.com)"
+    assert NotifyTelegram._commonmark_to_telegram(body, strict=True) == (
+        "\\[OUTER \\[INNER\\]\\(\\<badstuff\\)\\]\\(https://example\\.com\\)"
+    )
+
+    # A "]" with no "(" must retire its "[" in both Markdown modes,
+    # instead of leaving it pending for a later, unrelated link to reuse.
+    stray_body = "[label] and ](http://x.com/a(b)c) end"
+    assert (
+        NotifyTelegram._commonmark_to_telegram(stray_body, strict=False)
+        == "[label] and ](http://x.com/a(b)c) end"
+    )
+    assert NotifyTelegram._commonmark_to_telegram(stray_body, strict=True) == (
+        "\\[label\\] and \\]\\(http://x\\.com/a\\(b\\)c\\) end"
+    )
+
+    # An invalid destination becomes fully escaped literal text in v2.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](has space)", strict=True
+        )
+        == "\\[label\\]\\(has space\\)"
+    )
+
+    # An unfinished destination follows the same literal-text path.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](unterminated", strict=True
+        )
+        == "\\[label\\]\\(unterminated"
+    )
+
+    # Telegram v1 leaves the rejected destination literal.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](has space)", strict=False
+        )
+        == "[label](has space)"
+    )
+
+    # An unfinished angle destination follows the same v2 fallback.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](<https://unterminated", strict=True
+        )
+        == "\\[label\\]\\(\\<https://unterminated"
+    )
+
+    # Telegram v1 also leaves the unfinished angle destination literal.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](<https://unterminated", strict=False
+        )
+        == "[label](<https://unterminated"
+    )
+
+    # Escape a dangling "[" during end-of-scan cleanup.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "text [dangling forever", strict=True
+        )
+        == "text \\[dangling forever"
+    )
+
+    # Preserve plain Markdown links; only "(" and ")" need escaping inside
+    # a destination, not the full MarkdownV2 reserved-character set.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[a link](https://example.com/x.y)", strict=True
+        )
+        == "[a link](https://example.com/x.y)"
+    )
+
+    # Preserve an escaped parenthesis inside a plain link destination.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](http://example.com/a\\)b)", strict=True
+        )
+        == "[label](http://example.com/a\\)b)"
+    )
+
+    # Preserve balanced parentheses inside a plain link destination.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](https://example.com/a_(b))", strict=True
+        )
+        == "[label](https://example.com/a_\\(b\\))"
+    )
+
+    # Apply the same parenthesis balancing in Telegram V1.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "[label](https://example.com/a_(b))", strict=False
+        )
+        == "[label](https://example.com/a_\\(b\\))"
+    )
+
+    # Preserve an opener with no closer.
+    assert NotifyTelegram._commonmark_to_telegram("****x") == "****x"
+
+    # Preserve a run that is neither left- nor right-flanking.
+    assert NotifyTelegram._commonmark_to_telegram("******") == "******"
+
+    # Preserve unmatched markers in a complete body.
     f1 = NotifyTelegram._commonmark_to_telegram
-    assert f1("***italic text") == "*italic text*"
-    assert f1("**text") == "*text*"
-    # An unterminated open with no content at all collapses to nothing.
-    assert f1("**") == ""
+    assert f1("***italic text") == "***italic text"
+    assert f1("**text") == "**text"
+    assert f1("**") == "**"
+
+    # User-provided Private Use text must not collide in either Markdown mode.
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+    assert f1(attack, strict=False) == attack
+    assert f1(attack, strict=True) == attack
+    assert f1(f"*italic* {attack}", strict=False) == f"_italic_ {attack}"
+
+    # Strict MarkdownV2 escapes literal emphasis markers.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("a" * 9 + "_", strict=True)
+        == "a" * 9 + "\\_"
+    )
+    assert (
+        NotifyTelegram._commonmark_to_telegram("a" * 9 + "*", strict=True)
+        == "a" * 9 + "\\*"
+    )
+    # Legacy v1 does not enforce universal escaping.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("a" * 9 + "_", strict=False)
+        == "a" * 9 + "_"
+    )
+
+    # Preserve genuine underscore-based italics.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("_italic_", strict=True)
+        == "_italic_"
+    )
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "**bold** _italic_", strict=True
+        )
+        == "*bold* _italic_"
+    )
+    # Escape intraword underscores instead of treating them as emphasis.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("foo_bar_baz", strict=True)
+        == "foo\\_bar\\_baz"
+    )
+    # Keep intraword double underscores literal, not underlined.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("a__b__c", strict=True)
+        == "a\\_\\_b\\_\\_c"
+    )
+    # Render valid double-underscore CommonMark as Telegram bold.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("__bold__", strict=True)
+        == "*bold*"
+    )
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "before __bold__ after", strict=True
+        )
+        == "before *bold* after"
+    )
+
+    # Keep adjacent asterisk and underscore families independent.
+    assert NotifyTelegram._commonmark_to_telegram("*_", strict=True) == (
+        "\\*\\_"
+    )
+
+    # Preserve unrelated unmatched delimiter families.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("**_a", strict=False) == "**_a"
+    )
+
+    # Do not close asterisk emphasis with an underscore.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("***_", strict=True)
+        == "\\*\\*\\*\\_"
+    )
+
+    # Match underscores across an unrelated literal asterisk run.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("_***_", strict=True)
+        == "_\\*\\*\\*_"
+    )
+
+    # Leave unmatched width literal beside a valid italic span.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("__a_", strict=True) == "\\__a_"
+    )
+
+    # Preserve an unmatched underscore opener.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("____a", strict=True)
+        == "\\_\\_\\_\\_a"
+    )
+
+    # Preserve leftover width after closing bold.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("__a___", strict=True)
+        == "*a*\\_"
+    )
+
+    # Preserve unmatched mixed delimiter families.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("*__a", strict=False) == "*__a"
+    )
+
+    # A run wide enough to supply both kinds of emphasis nests regular
+    # emphasis outermost and bold innermost, the same as for asterisks.
+    assert (
+        NotifyTelegram._commonmark_to_telegram("___a___", strict=True)
+        == "_*a*_"
+    )
+
+    # Opening requires content, so empty trailing bold is unreachable.
 
     # A link destination containing a backslash-escaped '>' in V1 mode:
     # the scan skips escaped characters and still finds the '>)' terminator.
@@ -1752,8 +2032,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         == r"[click](https://example.com/x\\>y)"
     )
 
-    # HTML body with a title in V1 mode: _build_send_calls merges the title
-    # as a heading before dialect conversion (covers the title-merge branch).
+    # Telegram v1 renders the merged title heading as bold.
     aobj_v1 = Apprise()
     aobj_v1.add(
         "tgram://123456789:abcdefg_hijklmnop/12345?format=markdown&mdv=1"
@@ -1762,7 +2041,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
         body="<b>hello</b>", title="My Title", body_format=NotifyFormat.HTML
     )
     payload = loads(mock_post.call_args_list[-1][1]["data"])
-    assert payload["text"] == "# My Title\n*hello*"
+    assert payload["text"] == "*My Title*\n*hello*"
     mock_post.reset_mock()
 
     # Title that reduces to an empty string after stripping leading heading and
@@ -1777,11 +2056,7 @@ def test_plugin_telegram_html_to_markdown_hardening(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_telegram_overflow_split_repair(mock_post):
-    """Test that overflow=split can't break entity boundaries across
-    messages: _build_send_calls() adapts the whole body to Telegram's
-    dialect before splitting (not per-chunk after), and
-    _repair_split_chunk() patches up whatever the split itself still cuts
-    in half across two messages."""
+    """Test generic split repair before Telegram dialect conversion."""
 
     # Prepare Mock
     mock_post.return_value = requests.Request()
@@ -1835,60 +2110,165 @@ def test_plugin_telegram_overflow_split_repair(mock_post):
     texts = notify_split("<b>short</b> <i>text</i>")
     assert texts == ["*short* _text_"]
 
-    # A continuation chunk where the carried-over destination *does* close
-    # within this same chunk (not needing yet another one), even with an.
-    assert NotifyTelegram._repair_split_chunk(
-        "a\\)b)more text\\.", True, {"in_link_dest": True}
-    ) == ("a\\)b\\)more text\\.", {})
+    # Conversion tests cover the repair primitive used indirectly here.
 
-    # A carried-over code span closing within this chunk, same idea.
-    assert NotifyTelegram._repair_split_chunk(
-        "code```more text\\.", True, {"in_code": 3}
-    ) == ("codemore text\\.", {})
 
-    # A carried-over destination that doesn't end in *this* chunk either.
-    assert NotifyTelegram._repair_split_chunk(
-        "still no close here", True, {"in_link_dest": True}
-    ) == ("still no close here", {"in_link_dest": True})
+@mock.patch("requests.post")
+def test_plugin_telegram_declared_markdown_split_repair(mock_post):
+    """Declared Markdown uses the same split repair as converted HTML."""
 
-    repair = NotifyTelegram._repair_split_chunk
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
 
-    # V1 (non-strict) with an unmatched backtick: the backtick run has no
-    # closing partner, so the `if strict:` branch is NOT taken.
-    assert repair("`code no close", False, {}) == ("`code no close", {})
+    def notify_split(body, body_format):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            "?format=markdown&mdv=2&overflow=split"
+        )
+        assert len(aobj) == 1
+        assert aobj.notify(body=body, body_format=body_format)
+        texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+        mock_post.reset_mock()
+        return texts
 
-    # A pending close count for '*' in strict mode: the matching close
-    # delimiter in this chunk is discarded (the open was already dropped).
-    assert repair("*text", True, {"*": 1}) == ("text", {"*": 0})
+    # Force a split after a long bold span.
+    body = "**" + ("x" * 4990) + "**" + "TAIL SHOULD NOT BE BOLD"
+    texts_html = notify_split(
+        "<b>" + ("x" * 4990) + "</b>" + "TAIL SHOULD NOT BE BOLD",
+        NotifyFormat.HTML,
+    )
+    texts_md = notify_split(body, NotifyFormat.MARKDOWN)
 
-    # Same for '_'.
-    assert repair("_text", True, {"_": 1}) == ("text", {"_": 0})
+    # Declared Markdown matches HTML-derived Markdown chunk repair.
+    assert texts_md == texts_html
 
-    # Strict mode: '](url)' with NO matching '[' on the link stack escapes
-    # the construct rather than emitting it verbatim.
-    assert repair("](https://e.com)", True, {}) == (
-        "\\]\\(https://e\\.com\\)",
-        {},
+    # Short declared Markdown still gets dialect completion.
+    texts = notify_split("**short** _text_", NotifyFormat.MARKDOWN)
+    assert texts == ["*short* _text_"]
+
+    # Undeclared input skips dialect completion and repair.
+    texts = notify_split("**short** _text_", None)
+    assert texts == ["**short** _text_"]
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_dialect_overflow(mock_post):
+    """Apply the selected overflow mode after MarkdownV2 escaping
+    grows text."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    def notify(overflow):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            f"?format=markdown&mdv=2&overflow={overflow}"
+        )
+        assert len(aobj) == 1
+        # Escaping periods makes this body exceed the converted limit.
+        assert aobj.notify(body="." * 5000, body_format=NotifyFormat.MARKDOWN)
+        texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+        mock_post.reset_mock()
+        return texts
+
+    # UPSTREAM: exactly one message, sent oversized rather than split.
+    texts = notify("upstream")
+    assert len(texts) == 1
+    assert len(texts[0]) > NotifyTelegram.body_maxlen
+
+    # TRUNCATE: exactly one message, clipped to fit.
+    texts = notify("truncate")
+    assert len(texts) == 1
+    assert len(texts[0]) <= NotifyTelegram.body_maxlen
+
+    # SPLIT: as many messages as needed, each one within the limit.
+    texts = notify("split")
+    assert len(texts) > 1
+    for text in texts:
+        assert len(text) <= NotifyTelegram.body_maxlen
+
+
+@mock.patch("requests.post")
+def test_plugin_telegram_dialect_attachment_order(mock_post):
+    """Place one attachment before or after dialect-split text pieces."""
+    from apprise.attachment.memory import AttachMemory
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = dumps({"ok": True, "result": True})
+    mock_post.return_value = response
+
+    mem = AttachMemory(
+        content=b"hello world", name="test.txt", mimetype="text/plain"
     )
 
-    # Strict mode: '](url' with no closing ')' sets in_link_dest pending.
-    assert repair("](https://e.com no-close", True, {}) == (
-        "\\]\\(https://e\\.com no\\-close",
-        {"in_link_dest": True},
-    )
+    def notify(content_mode):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            f"?format=markdown&mdv=2&overflow=split&content={content_mode}"
+        )
+        assert len(aobj) == 1
+        # Escaping doubles this initially valid body and forces dialect
+        # splitting.
+        assert aobj.notify(
+            body="." * 3000, attach=mem, body_format=NotifyFormat.MARKDOWN
+        )
+        # Classify each call as a text message or an attachment upload.
+        kinds = [
+            "text" if "sendMessage" in c[0][0] else "attach"
+            for c in mock_post.call_args_list
+        ]
+        mock_post.reset_mock()
+        return kinds
 
-    # Strict mode: opening and immediately closing the same delimiter with no
-    # content in between -- the empty span is dropped from the output.
-    assert repair("**", True, {}) == ("", {})
+    # content=before: every text piece goes out, then the attachment.
+    kinds = notify("before")
+    assert kinds.count("text") > 1
+    assert kinds.count("attach") == 1
+    assert kinds == ["text"] * kinds.count("text") + ["attach"]
 
-    # Strict mode: a stray ']', '(', or ')' outside any complete link entity
-    # is backslash-escaped rather than passed through verbatim.
-    assert repair("]text", True, {}) == ("\\]text", {})
-    assert repair("(text)", True, {}) == ("\\(text\\)", {})
+    # content=after: the attachment goes out first, then every piece.
+    kinds = notify("after")
+    assert kinds.count("text") > 1
+    assert kinds.count("attach") == 1
+    assert kinds == ["attach"] + ["text"] * (len(kinds) - 1)
 
-    # Strict mode: a dangling open at the end of the chunk with no content
-    # after it is removed as an empty span (not propagated as pending).
-    assert repair("text*", True, {}) == ("text", {})
+
+@mock.patch("requests.post")
+def test_plugin_telegram_overflow_no_invented_emphasis(mock_post):
+    """Do not invent emphasis for an unmatched literal delimiter."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = dumps({"ok": True, "result": True})
+
+    def notify(overflow):
+        aobj = Apprise()
+        aobj.add(
+            "tgram://123456789:abcdefg_hijklmnop/12345"
+            f"?format=markdown&mdv=2&overflow={overflow}"
+        )
+        assert len(aobj) == 1
+        # Keep spacing after valid emphasis so its closer is not intraword.
+        body = "*_a_ test " + ("x" * 5000)
+        assert aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN)
+        texts = [loads(c[1]["data"])["text"] for c in mock_post.call_args_list]
+        mock_post.reset_mock()
+        return texts
+
+    # SPLIT preserves both the escaped literal and valid emphasis.
+    texts = notify("split")
+    assert texts[0].startswith("\\*_a_")
+
+    # TRUNCATE preserves the same prefix in one message.
+    texts = notify("truncate")
+    assert len(texts) == 1
+    assert texts[0].startswith("\\*_a_")
 
 
 @mock.patch("requests.post")
@@ -2058,10 +2438,10 @@ def test_plugin_telegram_markdown_v2(mock_post):
     assert mock_post.call_count == 2
     payload = loads(mock_post.call_args_list[1][1]["data"])
 
-    # Our content is escapped properly
+    # Literal backslashes are escaped along with MarkdownV2 syntax.
     assert (
         payload["text"] == "\\# my message\r\n"
-        "\\#\\# more content\r\n\\# already escaped hashtag"
+        "\\#\\# more content\r\n\\\\\\# already escaped hashtag"
     )
 
     mock_post.reset_mock()
@@ -2096,13 +2476,41 @@ def test_plugin_telegram_markdown_v2(mock_post):
         assert mock_post.call_count == 1
         payload = loads(mock_post.call_args_list[0][1]["data"])
 
-        # Our content is escapped properly
+        # The literal backslash before the second occurrence is escaped too.
         assert (
             payload["text"]
-            == f"bad character: \\{c}, and already escapped \\{c}"
+            == f"bad character: \\{c}, and already escapped \\\\\\{c}"
         )
 
         mock_post.reset_mock()
+
+
+def test_plugin_telegram_standalone_autolink_dialect():
+    """A complete standalone autolink converts safely in both modes."""
+
+    # Telegram auto-links the URL after its brackets are removed.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "see <https://a*b> now", strict=False
+        )
+        == "see https://a*b now"
+    )
+
+    # Escape reserved markup characters inside a MarkdownV2 autolink.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "see <https://a*b-c> now", strict=True
+        )
+        == "see https://a\\*b\\-c now"
+    )
+
+    # Strict mode also escapes every other reserved autolink character.
+    assert (
+        NotifyTelegram._commonmark_to_telegram(
+            "see <https://x.example/*a*_b_[c](d)`e`> now", strict=True
+        )
+        == "see https://x\\.example/\\*a\\*\\_b\\_\\[c\\]\\(d\\)\\`e\\` now"
+    )
 
 
 @mock.patch("requests.post")
@@ -2125,7 +2533,7 @@ def test_plugin_telegram_attach_memory(mock_post):
         mimetype="text/html",
     )
 
-    assert obj.notify(body="Test", attach=mem) is True
+    assert bool(obj.notify(body="Test", attach=mem)) is True
     assert mock_post.call_count >= 1
 
 

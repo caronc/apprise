@@ -27,10 +27,13 @@
 
 import asyncio
 from collections.abc import Generator
+import contextlib
+import contextvars
 from datetime import tzinfo
 from functools import partial
 import math
 import re
+import time
 from typing import Any, ClassVar, Optional, TypedDict, Union
 from zoneinfo import ZoneInfo
 
@@ -46,11 +49,16 @@ from ..common import (
     OverflowMode,
     PersistentStoreMode,
 )
+from ..conversion import (
+    commonmark_repair_chunk,
+    split_dialect_chunk,
+    truncate_dialect_chunk,
+)
 from ..locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
 from ..utils.format import smart_split
-from ..utils.parse import parse_bool
+from ..utils.parse import parse_bool, parse_list
 from ..utils.time import zoneinfo
 
 
@@ -60,6 +68,17 @@ class RequirementsSpec(TypedDict, total=False):
     packages_required: Optional[Union[str, list[str]]]
     packages_recommended: Optional[Union[str, list[str]]]
     details: Optional[Translatable]
+
+
+class _PayloadPrecappedToken:
+    """Prove that ``Apprise.notify()`` capped the source before conversion.
+
+    Only this token skips a second cap; truthy values from direct plugin
+    callers do not bypass ``payload_max_size``.
+    """
+
+
+_PAYLOAD_PRECAPPED = _PayloadPrecappedToken()
 
 
 class NotifyBase(URLBase):
@@ -319,6 +338,12 @@ class NotifyBase(URLBase):
             "format": {
                 "name": _("Notify Format"),
                 "type": "choice:string",
+                # ?format= is accepted for any of the 3 values on every
+                # plugin. Single-format plugins force the requested
+                # value directly; multi-format plugins decide later
+                # whether to honor it. plugins.details() exposes the
+                # plugin's native subset through the additive
+                # format.supported field.
                 "values": NOTIFY_FORMATS,
                 # Provide a default
                 "default": notify_format,
@@ -574,10 +599,17 @@ class NotifyBase(URLBase):
                 )
             )
 
+        # Store an explicit ?format= request for multi-format plugins.
+        # Those plugins keep their declared notify_format tuple intact,
+        # then resolve the one active destination later for each send.
+        # Single-format plugins still force self.notify_format directly,
+        # preserving the established URL override behavior.
+        self._format_override: Optional[NotifyFormat] = None
+
         if "format" in kwargs:
             value = kwargs["format"]
             try:
-                self.notify_format = (
+                requested = (
                     value
                     if isinstance(value, NotifyFormat)
                     else NotifyFormat(value.lower())
@@ -589,6 +621,16 @@ class NotifyBase(URLBase):
                 )
                 self.logger.warning(err)
                 raise TypeError(err) from None
+
+            if len(self._formats()) == 1:
+                # Single-format plugin: force the requested destination
+                # directly onto self.notify_format.
+                self.notify_format = requested
+
+            else:
+                # Multi-format plugin: remember the request and validate
+                # it during per-send resolution.
+                self._format_override = requested
 
         if "tz" in kwargs:
             value = kwargs["tz"]
@@ -697,6 +739,81 @@ class NotifyBase(URLBase):
             notify_type=notify_type,
         )
 
+    def _formats(self) -> tuple[NotifyFormat, ...]:
+        """Supported notify formats as a tuple.
+
+        ``notify_format`` accepts one format or a list. The first entry is the
+        default when no override or input format matches.
+        """
+        # Preserve declaration order because the first entry is the
+        # default. parse_list() sorts alphabetically by default, which
+        # would silently choose the wrong fallback format here.
+        return tuple(
+            NotifyFormat(f) for f in parse_list(self.notify_format, sort=False)
+        )
+
+    def resolve_format(
+        self, body_format: Optional[Union[str, NotifyFormat]] = None
+    ) -> NotifyFormat:
+        """Resolve which format this send should actually render as.
+
+        Resolution order:
+        - A single-format plugin always uses its one declared format.
+        - A multi-format plugin honors an explicit ?format= override,
+          when that override is one of its declared formats.
+        - Otherwise, if the caller's body_format matches a declared
+          format, align to it directly (no conversion needed).
+        - Otherwise, fall back to the plugin's default, formats[0].
+        """
+        formats = self._formats()
+        if len(formats) == 1:
+            return formats[0]
+
+        if self._format_override is not None:
+            if self._format_override in formats:
+                return self._format_override
+
+            # The requested destination is not one this plugin declared.
+            # Fall through to input alignment/default instead of failing
+            # delivery. The actual fallback (input alignment vs
+            # formats[0]) is decided below, so it is not named here.
+            if body_format is not None:
+                self.logger.debug(
+                    "%s does not support format %s; ignoring override.",
+                    self.service_name,
+                    self._format_override.value,
+                )
+
+        if body_format in formats:
+            # body_format may arrive as a plain string (e.g. from the
+            # CLI) rather than a NotifyFormat; normalize to the actual
+            # matched member so callers can always rely on .value etc.
+            return (
+                body_format
+                if isinstance(body_format, NotifyFormat)
+                else NotifyFormat(body_format)
+            )
+
+        return formats[0]
+
+    def _timed_send(self, **kwargs2: Any) -> bool:
+        """Send one prepared call and log its duration at DEBUG.
+
+        Prefer a format-specific sender when available, otherwise use send().
+        """
+        resolved = kwargs2.get("body_format")
+        fn = getattr(self, f"send_{resolved.value}", None)
+        send_fn = fn if callable(fn) else self.send
+
+        send_start = time.monotonic()
+        result = send_fn(**kwargs2)
+        self.logger.debug(
+            "%s send() completed in %.2fs.",
+            self.service_name,
+            time.monotonic() - send_start,
+        )
+        return result
+
     def notify(self, *args: Any, **kwargs: Any) -> bool:
         """Performs notification."""
         try:
@@ -710,7 +827,7 @@ class NotifyBase(URLBase):
         else:
             # Loop through each call, one at a time. (Use a list rather than a
             # generator to call all the partials, even in case of a failure.)
-            the_calls = [self.send(**kwargs2) for kwargs2 in send_calls]
+            the_calls = [self._timed_send(**kwargs2) for kwargs2 in send_calls]
             return all(the_calls)
 
     async def async_notify(self, *args: Any, **kwargs: Any) -> bool:
@@ -724,32 +841,90 @@ class NotifyBase(URLBase):
             return False
 
         else:
-            loop = asyncio.get_event_loop()
+            # Deferred import to dodge a circular import (apprise.apprise
+            # loads this module first). Fine by call time.
+            from ..apprise import _get_shared_executor
 
-            # Wrap each call in a coroutine that uses the default executor.
-            # TODO: In the future, allow plugins to supply a native
-            # async_send() method.
+            # Use Apprise's own shared pool, not the loop's default one --
+            # keeps a stuck send() from starving unrelated executor work.
+            # TODO: let plugins supply a native async_send() instead.
+            executor = _get_shared_executor()
+
             async def do_send(**kwargs2):
-                send = partial(self.send, **kwargs2)
-                result = await loop.run_in_executor(None, send)
+                """Run one prepared send() call in the executor."""
+                send = partial(self._timed_send, **kwargs2)
+                # Carries our log-capture ContextVar into the worker
+                # thread -- run_in_executor() doesn't do this on its own.
+                ctx = contextvars.copy_context()
+                # Submit directly so cancellation still leaves access to the
+                # worker future. A running send cannot be interrupted, so its
+                # future is needed until the background work finishes.
+                cf_future = executor.submit(ctx.run, send)
+                try:
+                    result = await asyncio.wrap_future(cf_future)
+
+                except asyncio.CancelledError:
+                    if cf_future.running():
+                        # Import here to avoid a circular import. The shared
+                        # helper also protects this cancellation path from
+                        # plugin metadata errors.
+                        from ..apprise import (
+                            _service_metadata,
+                            _track_abandoned_future,
+                        )
+
+                        name, url, _, _, _ = _service_metadata(self)
+                        _track_abandoned_future(cf_future, name, url)
+                    raise
+
                 return result
 
-            # gather() all calls in parallel.
-            the_cors = (do_send(**kwargs2) for kwargs2 in send_calls)
-            return all(await asyncio.gather(*the_cors))
+            # Await this plugin's pieces in order so split text and attachments
+            # arrive predictably. Services still run concurrently one level up,
+            # and each blocking send remains in the shared executor.
+            results = []
+            for kwargs2 in send_calls:
+                results.append(await do_send(**kwargs2))
+            return all(results)
 
     def _build_send_calls(
         self,
         body: Optional[str] = None,
         title: Optional[str] = None,
-        notify_type: NotifyType = NotifyType.INFO,
+        notify_type: Union[str, NotifyType] = NotifyType.INFO,
         overflow: Optional[Union[str, OverflowMode]] = None,
         attach: Optional[Union[list[str], AppriseAttachment]] = None,
-        body_format: Optional[NotifyFormat] = None,
+        body_format: Optional[Union[str, NotifyFormat]] = None,
+        body_passthrough: Optional[bool] = None,
+        _payload_precapped: object = None,
         **kwargs: Any,
     ) -> Generator[dict[str, Any], None, None]:
-        """Get a list of dictionaries that can be used to call send() or (in
-        the future) async_send()."""
+        """Prepare the arguments for each ``send()`` call.
+
+        Parameters:
+          - ``body`` and ``title`` provide the message content.
+          - ``notify_type`` identifies the message severity.
+          - ``overflow`` controls upstream, truncation, or splitting.
+          - ``attach`` supplies one or more attachments.
+          - ``body_format`` identifies the source or resolved format.
+          - ``body_passthrough`` preserves content with no declared format.
+          - ``_payload_precapped`` confirms Apprise already applied its cap.
+          - Extra keyword arguments are accepted for caller compatibility.
+
+        Yields one mapping per final ``send()`` call, including its zero-based
+        ``index`` and the total number of calls.
+        """
+
+        # Normalization of notify_type before it ever reaches a plugin.
+        if not isinstance(notify_type, NotifyType):
+            with contextlib.suppress(AttributeError, ValueError):
+                notify_type = NotifyType(notify_type.lower())
+
+        # Direct plugin calls bypass Apprise's per-server resolution, so
+        # resolve here and remember whether a source format was declared.
+        if body_passthrough is None:
+            body_passthrough = body_format is None
+            body_format = self.resolve_format(body_format)
 
         if not self.enabled:
             # Deny notifications issued to services that are disabled
@@ -793,31 +968,64 @@ class NotifyBase(URLBase):
         # Handle situations where the title is None
         title = title if title else ""
 
-        # Truncate flag set with attachments ensures that only 1
-        # attachment passes through. In the event there could be many
-        # services specified, we only want to do this logic once.
-        # The logic is only applicable if ther was more then 1 attachment
-        # specified
+        # Truncate mode keeps only the first of multiple attachments.
+        # Prepare it once for all calls made by this service.
         overflow = self.overflow_mode if overflow is None else overflow
         if attach and len(attach) > 1 and overflow == OverflowMode.TRUNCATE:
-            # Save first attachment
+            # Save the first attachment.
             attach_ = AppriseAttachment(attach[0], asset=self.asset)
         else:
-            # reference same attachment
+            # Reuse the original attachment collection.
             attach_ = attach
 
-        # Apply our overflow (if defined)
-        for chunk in self._apply_overflow(
-            body=body, title=title, overflow=overflow, body_format=body_format
-        ):
-            # Send notification
-            yield {
-                "body": chunk["body"],
-                "title": chunk["title"],
-                "notify_type": notify_type,
-                "attach": attach_,
-                "body_format": body_format,
-            }
+        # Apply overflow and dialect resizing to every chunk first so plugins
+        # receive the final call count before delivery begins.
+        all_pieces = [
+            self._apply_dialect_overflow(
+                chunk, overflow, body_format, body_passthrough
+            )
+            for chunk in self._apply_overflow(
+                body=body,
+                title=title,
+                overflow=overflow,
+                body_format=body_format,
+                body_passthrough=body_passthrough,
+                _payload_precapped=_payload_precapped,
+            )
+        ]
+        total = sum(len(pieces) for pieces in all_pieces)
+
+        # Select one attachment-bearing call before split delivery begins.
+        # This avoids duplicates and shared state during concurrent sends.
+        attach_index = self._attachment_send_index(total) if attach_ else None
+
+        # Track each call's position across all chunks so plugins can place
+        # attachments relative to the first or last delivery.
+        index = 0
+        for pieces in all_pieces:
+            for piece in pieces:
+                # Send notification
+                yield {
+                    "body": piece["body"],
+                    "title": piece["title"],
+                    "notify_type": notify_type,
+                    # Attach only on the one call chosen above; never repeat
+                    # it across overflow chunks or dialect-split pieces.
+                    "attach": attach_ if index == attach_index else None,
+                    "body_format": body_format,
+                    "body_passthrough": body_passthrough,
+                    "index": index,
+                    "total": total,
+                }
+                index += 1
+
+    def _attachment_send_index(self, total: int) -> int:
+        """Return the flat call index that should carry an attachment.
+
+        The default is the first call. Plugins may use ``total`` to select a
+        later call when their delivery order requires it.
+        """
+        return 0
 
     def _apply_overflow(
         self,
@@ -825,16 +1033,16 @@ class NotifyBase(URLBase):
         title: Optional[str] = None,
         overflow: Optional[Union[str, OverflowMode]] = None,
         body_format: Optional[NotifyFormat] = None,
+        body_passthrough: Optional[bool] = None,
+        _payload_precapped: object = None,
     ) -> list[dict[str, str]]:
-        """
-        Apply overflow behaviour (UPSTREAM, TRUNCATE, SPLIT) to title/body.
+        """Apply upstream, truncation, or split overflow rules.
 
-        Takes the message body and title as input.  This function then
-        applies any defined overflow restrictions associated with the
-        notification service and may alter the message if/as required.
+        The title may be merged into the body when the service has no title
+        field. ``body_format`` guides splitting and Markdown repair, while
+        ``body_passthrough`` skips format conversion for an undeclared source.
 
-        The function will always return a list object in the following
-        structure:
+        Returns one or more independently deliverable title/body mappings:
             [
                 {
                     title: 'the title goes here',
@@ -852,33 +1060,39 @@ class NotifyBase(URLBase):
         title = "" if not title else title.strip()
         body = "" if not body else body.rstrip()
 
+        # Direct plugin calls still need the source-size cap. Only Apprise's
+        # private token confirms it was already applied before conversion.
+        if _payload_precapped is not _PAYLOAD_PRECAPPED:
+            original_len = len(title) + len(body)
+            title, body = self.asset.enforce_payload_max_size(title, body)
+            if len(title) + len(body) < original_len:
+                self.logger.warning(
+                    "%s payload trimmed to stay within the configured "
+                    "payload_max_size of %d characters.",
+                    self.service_name,
+                    self.asset._payload_max_size,
+                )
+
         # Default overflow mode
         if overflow is None:
             overflow = self.overflow_mode
 
-        # Default effective body format
-        if body_format is None:
-            body_format = self.notify_format
+        if body_passthrough is None:
+            body_passthrough = body_format is None
+            body_format = self.resolve_format(body_format)
 
         # If the service does not support a title, amalgamate into body
         if self.title_maxlen <= 0 and len(title) > 0:
-            if self.notify_format == NotifyFormat.HTML:
+            if body_format == NotifyFormat.HTML:
                 body = (
                     f"<{self.default_html_tag_id}>{title}"
                     f"</{self.default_html_tag_id}>"
                     f"<br />\r\n{body}"
                 )
 
-            elif (
-                self.notify_format == NotifyFormat.MARKDOWN
-                and body_format
-                in (
-                    NotifyFormat.TEXT,
-                    NotifyFormat.HTML,
-                )
-            ):
-                # Body was plain text or HTML converted to CommonMark;
-                # render the title as a Markdown heading.
+            elif body_format == NotifyFormat.MARKDOWN and not body_passthrough:
+                # Declared Markdown/CommonMark can receive a heading.
+                # Undeclared content uses the normal plain-text title layout.
                 title = title.lstrip("\r\n \t\v\f#-")
                 if title:
                     body = f"# {title}\n{body}"
@@ -950,12 +1164,22 @@ class NotifyBase(URLBase):
 
         # TRUNCATE mode: hard truncation (no smart-splitting)
         if overflow == OverflowMode.TRUNCATE:
-            response.append(
-                {
-                    "body": body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip(),
-                    "title": title,
-                }
-            )
+            truncated = body[:body_maxlen].lstrip("\r\n\x0b\x0c").rstrip()
+            if body_format == NotifyFormat.MARKDOWN and not body_passthrough:
+                # Repair truncated constructs before dialect conversion.
+                # Bounded discarded text can identify a possible closer.
+                lookahead_end = body_maxlen + body_maxlen * 8
+                lookahead = body[body_maxlen:lookahead_end]
+                boundary_next_ch = (
+                    body[lookahead_end : lookahead_end + 1] or None
+                )
+                truncated, _ = commonmark_repair_chunk(
+                    truncated,
+                    {},
+                    next_chunk=lookahead or None,
+                    next_chunk_boundary_ch=boundary_next_ch,
+                )
+            response.append({"body": truncated, "title": title})
             return response
 
         #
@@ -1040,6 +1264,9 @@ class NotifyBase(URLBase):
                     {
                         "body": chunk_body.lstrip("\r\n\x0b\x0c").rstrip(),
                         "title": f"{title}{suffix}",
+                        # Preserve this repeated title if dialect conversion
+                        # splits the chunk again.
+                        "repeat_title": True,
                     }
                 )
 
@@ -1099,7 +1326,82 @@ class NotifyBase(URLBase):
                         }
                     )
 
+        if body_format == NotifyFormat.MARKDOWN and not body_passthrough:
+            # Repair chunks before dialect conversion. Raw lookahead classifies
+            # a trailing delimiter against its real neighbor.
+            pending = {}
+            for idx, chunk in enumerate(response):
+                next_body = (
+                    response[idx + 1]["body"]
+                    if idx + 1 < len(response)
+                    else None
+                )
+                chunk["body"], pending = commonmark_repair_chunk(
+                    chunk["body"], pending, next_chunk=next_body
+                )
+
         return response
+
+    def _apply_dialect_overflow(
+        self,
+        chunk: dict[str, str],
+        overflow: Union[str, OverflowMode],
+        body_format: Optional[NotifyFormat],
+        body_passthrough: bool,
+    ) -> list[dict[str, str]]:
+        """Re-split or re-truncate one chunk after ``dialect_convert()``.
+
+        Passthrough bodies and plugins without an override remain unchanged.
+        The first piece keeps its title. Later pieces keep it only when the
+        source chunk requested a repeated title.
+        """
+        has_dialect = (
+            type(self).dialect_convert is not NotifyBase.dialect_convert
+        )
+        if not has_dialect or body_passthrough:
+            return [chunk]
+
+        def convert_fn(body: str) -> str:
+            return self.dialect_convert(body, body_format)
+
+        if overflow == OverflowMode.SPLIT:
+            bodies = split_dialect_chunk(
+                chunk["body"], self.body_maxlen, convert_fn
+            )
+        elif overflow == OverflowMode.TRUNCATE:
+            bodies = [
+                truncate_dialect_chunk(
+                    chunk["body"], self.body_maxlen, convert_fn
+                )
+            ]
+        else:
+            # UPSTREAM: convert without splitting and let the service
+            # itself handle an oversized payload.
+            bodies = [convert_fn(chunk["body"])]
+
+        # Repeated titles follow every new piece; one-time titles stay first.
+        repeat_title = chunk.get("repeat_title", False)
+        return [
+            {
+                "body": body,
+                "title": chunk["title"] if (idx == 0 or repeat_title) else "",
+            }
+            for idx, body in enumerate(bodies)
+        ]
+
+    def dialect_convert(
+        self,
+        body: str,
+        body_format: Optional[NotifyFormat] = None,
+        *args: Any,
+        **kwargs: Any,
+    ) -> str:
+        """Convert one chunk to the service's final markup dialect.
+
+        Keep overrides stateless, accept ``*args, **kwargs``, and return
+        unsupported formats unchanged. The framework reapplies size limits.
+        """
+        return body
 
     def send(
         self,
@@ -1134,10 +1436,18 @@ class NotifyBase(URLBase):
         function in all defined plugin services.
         """
 
-        params = {
-            "format": self.notify_format.value,
-            "overflow": self.overflow_mode.value,
-        }
+        params = {"overflow": self.overflow_mode.value}
+
+        # Single-format plugins always serialize their effective format.
+        # Multi-format plugins only serialize format= when the user asked
+        # for an explicit override. Omitting it keeps plain multi-format
+        # URLs flexible on a round trip, so the next send can still align
+        # to that call's body_format.
+        formats = self._formats()
+        if len(formats) == 1:
+            params["format"] = formats[0].value
+        elif self._format_override is not None:
+            params["format"] = self._format_override.value
 
         # Timezone Information (if ZoneInfo)
         if self.__tzinfo and isinstance(self.__tzinfo, ZoneInfo):
@@ -1314,6 +1624,11 @@ class NotifyBase(URLBase):
             )
 
         return self.__store
+
+    def flush_store(self) -> None:
+        """Write this service's persistent store to disk if it was used."""
+        if self.__store is not None:
+            self.__store.flush()
 
     @property
     def tzinfo(self) -> tzinfo:

@@ -41,18 +41,10 @@ from apprise import (
     Apprise,
     AppriseAsset,
     AppriseAttachment,
-    NotifyFormat,
     NotifyType,
-    OverflowMode,
     PersistentStoreMode,
 )
 from apprise.plugins.matrix import MatrixDiscoveryException, NotifyMatrix
-
-# Use Matrix's internal limit and mode names for exact boundary assertions.
-from apprise.plugins.matrix.base import (
-    MATRIX_CONTENT_BYTE_LIMIT,
-    MatrixWebhookMode,
-)
 
 logging.disable(logging.CRITICAL)
 
@@ -1154,7 +1146,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
     # Notification was successful, however we could not post image and since
     # we had post errors (of any kind) we still report a failure.
-    assert obj.notify("test", "test") is False
+    assert bool(obj.notify("test", "test")) is False
     del obj
 
     obj = NotifyMatrix(host="host", include_image=False, version="2")
@@ -1163,7 +1155,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
     # We didn't post an image (which was set to fail) and therefore our
     # post was okay
-    assert obj.notify("test", "test") is True
+    assert bool(obj.notify("test", "test")) is True
 
     # Force a object removal (thus a logout call)
     del obj
@@ -1192,14 +1184,14 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
     assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
-    assert obj.notify("test", "test") is True
+    assert bool(obj.notify("test", "test")) is True
     del obj
 
     obj = NotifyMatrix(host="host", include_image=False)
     assert isinstance(obj, NotifyMatrix) is True
     assert obj.access_token is None
 
-    assert obj.notify("test", "test") is True
+    assert bool(obj.notify("test", "test")) is True
 
     # Force a object removal (thus a logout call)
     del obj
@@ -1230,11 +1222,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1272,11 +1266,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
         os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
     )
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1285,11 +1281,13 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1358,7 +1356,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     obj = Apprise.instantiate(
         "matrixs://user:pass@example.com/#general?v=2&discovery=yes"
     )
-    assert obj.notify("body") is True
+    assert bool(obj.notify("body")) is True
 
     response = mock.Mock()
     response.status_code = requests.codes.unavailable
@@ -1401,7 +1399,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     assert NotifyMatrix.discovery_identity_key not in obj.store
 
     # We fail our discovery and therefore can't send our notification
-    assert obj.notify("hello world") is False
+    assert bool(obj.notify("hello world")) is False
 
     # bad key
     resp["m.homeserver"] = {}
@@ -1429,7 +1427,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     assert NotifyMatrix.discovery_identity_key in obj.store
 
     # Discovery passes so notifications work too
-    assert obj.notify("hello world") is True
+    assert bool(obj.notify("hello world")) is True
 
     # bad data
     resp["m.identity_server"] = "!garbage!:303"
@@ -1487,7 +1485,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
 
     # Discovery passes so notifications work too
     response.status_code = requests.codes.ok
-    assert obj.notify("hello world") is True
+    assert bool(obj.notify("hello world")) is True
 
     response.status_code = requests.codes.ok
     mock_get.return_value = None
@@ -1564,11 +1562,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1593,11 +1593,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     mock_put.reset_mock()
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1634,11 +1636,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
         os.path.join(TEST_VAR_DIR, "apprise-archive.zip")
     )
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1647,11 +1651,13 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -1714,7 +1720,9 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 
     # image attachment didn't succeed
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -1748,7 +1756,7 @@ def test_plugin_matrix_v2_compliance(mock_post, mock_put):
     obj = Apprise.instantiate("matrix://user:pass@localhost/#general?v=2")
 
     # Send a standard notification
-    assert obj.notify(body="test message") is True
+    assert bool(obj.notify(body="test message")) is True
 
     # Confirm the fix:
     # 1. Path contains the transaction ID '0'
@@ -1780,7 +1788,7 @@ def test_plugin_matrix_v2_token_mode_no_txn_increment(
     assert obj is not None
 
     # Send with image inline enabled
-    assert obj.notify(body="token mode image test") is True
+    assert bool(obj.notify(body="token mode image test")) is True
 
     # Send with an attachment
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
@@ -1810,7 +1818,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
     )
     assert obj is not None
 
-    assert obj.notify(title="Title", body="<b>Body</b>") is True
+    assert bool(obj.notify(title="Title", body="<b>Body</b>")) is True
 
     assert mock_post.call_args.args[0] == (
         "https://hookshot.example/public-hooks/supersecret"
@@ -1818,7 +1826,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
 
     payload = loads(mock_post.call_args.kwargs["data"])
     assert payload["username"] == "apprise"
-    # An omitted input format preserves v1's pass-through behavior.
+    # Undeclared passthrough content remains untouched.
     assert payload["text"] == "Title\r\n<b>Body</b>"
     assert payload["html"] == "<h1>Title</h1><b>Body</b>"
 
@@ -1826,6 +1834,7 @@ def test_plugin_matrix_hookshot_webhook(mock_post):
 @mock.patch("requests.post")
 def test_plugin_matrix_hookshot_webhook_empty_title(mock_post):
     """Hookshot webhook mode avoids extra separators for empty titles."""
+    from apprise.common import NotifyFormat
 
     response = mock.Mock()
     response.status_code = requests.codes.ok
@@ -1838,12 +1847,43 @@ def test_plugin_matrix_hookshot_webhook_empty_title(mock_post):
     )
     assert obj is not None
 
-    assert obj.notify(body="**Body**") is True
+    # Declaring Markdown enables HTML rendering.
+    assert (
+        bool(obj.notify(body="**Body**", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
 
     payload = loads(mock_post.call_args.kwargs["data"])
     assert payload["username"] == "apprise"
-    assert payload["text"] == "**Body**"
+    # The text fallback comes from the rendered HTML.
+    assert payload["text"] == "Body"
     assert payload["html"] == "<p><strong>Body</strong></p>"
+
+
+@mock.patch("requests.post")
+def test_plugin_matrix_slack_webhook_markdown_untouched(mock_post):
+    """Slack webhooks forward CommonMark for Slack to render."""
+    from apprise.common import NotifyFormat
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b"{}"
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://apprise:supersecret@slack.example?mode=slack&format=markdown"
+    )
+    assert obj is not None
+
+    assert (
+        bool(obj.notify(body="**Body**", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
+
+    payload = loads(mock_post.call_args.kwargs["data"])
+    assert payload["mrkdwn"] is True
+    # Slack receives the original CommonMark.
+    assert payload["attachments"][0]["text"] == "**Body**"
 
 
 def test_plugin_matrix_hookshot_path_normalization():
@@ -1871,7 +1911,7 @@ def test_plugin_matrix_hookshot_root_path_text(mock_post):
         "?mode=hookshot&format=text&path=%2F"
     )
     assert obj is not None
-    assert obj.notify(body="<b>Body</b>") is True
+    assert bool(obj.notify(body="<b>Body</b>")) is True
 
     assert mock_post.call_args.args[0] == (
         "https://hookshot.example/supersecret"
@@ -1916,7 +1956,11 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
 
         # Performs a login
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is True
         )
         assert mock_get.call_count == 0
@@ -1943,8 +1987,10 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
             mock_put.reset_mock()
 
             assert (
-                obj.notify(
-                    body="body", title="title", notify_type=NotifyType.INFO
+                bool(
+                    obj.notify(
+                        body="body", title="title", notify_type=NotifyType.INFO
+                    )
                 )
                 is True
             )
@@ -2024,7 +2070,11 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
 
         # Performs a login
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is True
         )
         assert mock_get.call_count == 0
@@ -2054,8 +2104,10 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
             mock_put.reset_mock()
 
             assert (
-                obj.notify(
-                    body="body", title="title", notify_type=NotifyType.INFO
+                bool(
+                    obj.notify(
+                        body="body", title="title", notify_type=NotifyType.INFO
+                    )
                 )
                 is True
             )
@@ -2117,7 +2169,9 @@ def test_plugin_matrix_v3_url_with_port_assembly(
     )
     # Performs a login
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -2220,7 +2274,7 @@ def test_plugin_matrix_no_room_create_on_non_not_found_join(
     ap = Apprise()
     ap.add("matrixs://user:pass@matrix.vip/#backup?discovery=no")
 
-    assert ap.notify(title="t", body="b") is False
+    assert bool(ap.notify(title="t", body="b")) is False
 
     # Cleanup explicitly to ensure __del__ executes while mocks are active.
     import gc
@@ -2295,7 +2349,7 @@ def test_plugin_matrix_room_create_on_not_found_join(
     ap = Apprise()
     ap.add("matrixs://user:pass@matrix.vip/#backup?discovery=no")
 
-    assert ap.notify(title="t", body="b") is True
+    assert bool(ap.notify(title="t", body="b")) is True
 
     import gc
 
@@ -2553,15 +2607,9 @@ def test_plugin_matrix_e2ee_olm_session():
 def test_plugin_matrix_e2ee_olm_roundtrip():
     """Full Olm round-trip: Alice encrypts, Bob manually decrypts.
 
-    This test implements the Bob (inbound) side of the Olm X3DH and
-    message-decryption protocol using the same cryptography primitives,
-    verifying that our Alice-side implementation produces wire bytes that
-    a conformant receiver can decrypt.
-
-    Critical invariant verified: the outer base-key (pre-key field 2)
-    equals the inner ratchet-key (normal-message field 1).  They MUST be
-    the same ephemeral key E_A or the receiver cannot reconstruct the
-    session and decryption fails.
+    The receiver-side reconstruction verifies compatible X3DH output.
+    It also confirms the outer base key matches the inner ratchet key,
+    which receivers need to reconstruct the session.
     """
     import hmac as _hmac_stdlib
 
@@ -5078,8 +5126,7 @@ def test_plugin_matrix_init_recovers_home_server_from_user_id(tmpdir):
     obj.store.flush()
 
     # Second instance with the same credentials (same url_id) reads the store.
-    # The recovery branch (lines 506-509) should derive home_server from
-    # the stored user_id.
+    # The recovery path should derive home_server from the stored user_id.
     obj2 = NotifyMatrix(
         host="h", user="u", password="pass", targets=["#r"], asset=asset
     )
@@ -5200,149 +5247,13 @@ def test_plugin_matrix_room_id_returns_none_without_home_server():
     assert result is None
 
 
-def test_plugin_matrix_enforce_byte_budget():
-    """The byte budget shrinks Unicode without looping on empty text."""
-
-    # Give both Matrix body representations the same emoji-heavy content.
-    payload = {
-        "body": "\U0001f600" * 1000,
-        "formatted_body": "\U0001f600" * 1000,
-    }
-    # Apply a deliberately small budget so both fields must shrink.
-    NotifyMatrix._matrix_enforce_byte_budget(
-        payload, 500, keys=("formatted_body", "body")
-    )
-
-    # Measure the JSON exactly as Matrix serializes it.
-    assert len(dumps(payload, ensure_ascii=False).encode("utf-8")) <= 500
-
-    # Empty candidates exercise the helper's no-progress exit path.
-    empty_payload = {"body": "", "formatted_body": ""}
-
-    # A tiny impossible budget must return instead of looping forever.
-    result = NotifyMatrix._matrix_enforce_byte_budget(
-        empty_payload, 10, keys=("formatted_body", "body")
-    )
-    assert result == {"body": "", "formatted_body": ""}
-
-
-@mock.patch("requests.put")
-@mock.patch("requests.get")
-@mock.patch("requests.post")
-def test_plugin_matrix_emoji_byte_budget(mock_post, mock_get, mock_put):
-    """Emoji-heavy messages remain within Matrix's byte limit."""
-
-    # Reuse a successful Matrix response for login, lookup, and room joins.
-    response_obj = {
-        "room_id": "!abc123:localhost",
-        "room_alias": "#abc123:localhost",
-        "joined_rooms": ["!abc123:localhost"],
-        "access_token": "abcd1234",
-        "home_server": "localhost",
-    }
-    # Every mocked Matrix request receives the same successful response.
-    request = mock.Mock()
-    request.content = dumps(response_obj)
-    request.status_code = requests.codes.ok
-
-    # Cover each HTTP verb used by the direct Matrix send path.
-    mock_get.return_value = request
-    mock_post.return_value = request
-    mock_put.return_value = request
-
-    # Configure rich output so the payload contains two body fields.
-    kwargs = NotifyMatrix.parse_url(
-        "matrix://user:passwd@hostname/#abcd?format=html"
-    )
-    obj = NotifyMatrix(**kwargs)
-
-    # Send directly to exercise the byte-budget safety net.
-    assert obj.send(body="\U0001f600" * 20000) is True
-
-    # Inspect the final room event submitted through PUT.
-    payload = loads(mock_put.call_args.kwargs["data"])
-
-    # Confirm the wire representation stays inside Matrix's safe allowance.
-    encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
-    assert encoded_len <= MATRIX_CONTENT_BYTE_LIMIT
-
-    # Invalid Unicode is replaced instead of raising during serialization.
-    assert obj.send(body="\ud800") is True
-    # The invalid code point becomes a valid placeholder in the JSON body.
-    wire_payload = mock_put.call_args.kwargs["data"]
-    assert loads(wire_payload)["body"] == "?"
-
-
-def test_plugin_matrix_e2ee_body_limit():
-    """Matrix selects limits for formatting, encryption, and webhooks."""
-
-    # Begin with an explicitly unencrypted direct Matrix connection.
-    obj = NotifyMatrix(
-        host="h",
-        user="u",
-        password="pass",
-        targets=["#r"],
-        e2ee=False,
-        secure=True,
-    )
-    # Plain output receives the larger single-body allowance.
-    assert obj.e2ee is False
-    assert obj.body_maxlen == obj.body_maxlen_default
-
-    # Rich text carries a plain fallback beside its formatted body.
-    obj.notify_format = NotifyFormat.HTML
-    assert obj.body_maxlen == obj.body_maxlen_formatted
-
-    # Non-TLS connections cannot use encryption even when requested.
-    obj = NotifyMatrix(
-        host="h",
-        user="u",
-        password="pass",
-        targets=["#r"],
-        e2ee=True,
-        secure=False,
-    )
-    # The setting remains visible, but the normal formatted limit is used.
-    assert obj.e2ee is True
-    obj.notify_format = NotifyFormat.HTML
-    assert obj.body_maxlen == obj.body_maxlen_formatted
-
-    # A secure connection may use E2EE when crypto support is installed.
-    obj = NotifyMatrix(
-        host="h",
-        user="u",
-        password="pass",
-        targets=["#r"],
-        e2ee=True,
-        secure=True,
-    )
-    assert obj.e2ee is True
-    obj.notify_format = NotifyFormat.HTML
-
-    # Installed crypto support activates the smaller encrypted rich limit.
-    if CRYPTOGRAPHY_AVAILABLE:
-        assert obj.body_maxlen == obj.body_maxlen_e2ee_formatted
-        assert obj.body_maxlen < obj.body_maxlen_formatted
-
-        # Plain encrypted content only needs one Matrix body field.
-        obj.notify_format = NotifyFormat.TEXT
-        assert obj.body_maxlen == obj.body_maxlen_e2ee
-    else:
-        # Encryption also requires the optional cryptography package.
-        assert obj.body_maxlen == obj.body_maxlen_formatted
-
-    # Webhooks keep the original limit regardless of output format.
-    obj.mode = MatrixWebhookMode.HOOKSHOT
-    assert obj.body_maxlen == obj.body_maxlen_webhook
-
-
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_matrix_html_plain_fallback(mock_post, mock_get, mock_put):
-    """HTML messages include plain text without repeating their markup."""
+    """Declared HTML receives a plain-text fallback."""
+    from apprise.common import NotifyFormat
 
-    # Supply the minimum successful responses needed for a direct room send.
     response_obj = {
         "room_id": "!abc123:localhost",
         "room_alias": "#abc123:localhost",
@@ -5350,7 +5261,6 @@ def test_plugin_matrix_html_plain_fallback(mock_post, mock_get, mock_put):
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    # Return success for each mocked Matrix endpoint.
     request = mock.Mock()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
@@ -5359,48 +5269,38 @@ def test_plugin_matrix_html_plain_fallback(mock_post, mock_get, mock_put):
     mock_post.return_value = request
     mock_put.return_value = request
 
-    # Select HTML as Matrix's single configured v1 output format.
     kwargs = NotifyMatrix.parse_url(
         "matrix://user:passwd@hostname/#abcd?format=html"
     )
     obj = NotifyMatrix(**kwargs)
 
-    # Known input provenance allows Matrix to build a plain fallback.
+    # Declaring the source confirms that the content is HTML.
     assert (
-        obj.send(
-            title="Title",
-            body="<b>Bold</b> text",
-            body_format=NotifyFormat.HTML,
+        bool(
+            obj.notify(
+                title="Title",
+                body="<b>Bold</b> text",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
 
-    # Read the unencrypted Matrix event submitted to the room.
     payload = loads(mock_put.call_args.kwargs["data"])
-
-    # Preserve the original markup in Matrix's formatted representation.
     assert payload["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
     # The plain-text fallback must not carry the raw markup a second time.
     assert "<b>" not in payload["body"]
     assert "Bold text" in payload["body"]
 
-    # No input format is v1's pass-through signal.
-    assert obj.send(body="<b>Upstream HTML</b>") is True
-
-    # Re-read the most recent PUT to verify pass-through behavior.
-    payload = loads(mock_put.call_args.kwargs["data"])
-    assert payload["body"] == "<b>Upstream HTML</b>"
-
 
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
-def test_plugin_matrix_html_split_preserves_body(
+def test_plugin_matrix_html_passthrough_untouched(
     mock_post, mock_get, mock_put
 ):
-    """HTML overflow splits before payload sizing so content is preserved."""
+    """Undeclared content remains unchanged when routed as rich text."""
 
-    # Make login, discovery, and room operations succeed for every chunk.
     response_obj = {
         "room_id": "!abc123:localhost",
         "room_alias": "#abc123:localhost",
@@ -5408,7 +5308,6 @@ def test_plugin_matrix_html_split_preserves_body(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    # Share one stable mock response across all Matrix HTTP methods.
     request = mock.Mock()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
@@ -5417,38 +5316,18 @@ def test_plugin_matrix_html_split_preserves_body(
     mock_post.return_value = request
     mock_put.return_value = request
 
-    # Disable E2EE so this test targets the unencrypted HTML tier.
     kwargs = NotifyMatrix.parse_url(
-        "matrix://user:passwd@hostname/#abcd?format=html&e2ee=no"
+        "matrix://user:passwd@hostname/#abcd?format=html"
     )
-    # Build a body that requires exactly three framework chunks.
     obj = NotifyMatrix(**kwargs)
-    body = "x" * (obj.body_maxlen * 2 + 100)
 
-    # Use the normal notification path so the framework performs the split.
-    assert (
-        obj.notify(
-            body=body,
-            body_format=NotifyFormat.HTML,
-            overflow=OverflowMode.SPLIT,
-        )
-        is True
-    )
+    # No body_format declared: a passthrough source.
+    assert bool(obj.notify(title="Title", body="<b>Bold</b> text")) is True
 
-    # Every original character remains across the resulting Matrix events.
-    payloads = [loads(call.kwargs["data"]) for call in mock_put.call_args_list]
-    # The conservative formatted limit should produce three events.
-    assert len(payloads) == 3
-
-    # Joining the formatted bodies must recreate the original input.
-    assert "".join(payload["formatted_body"] for payload in payloads) == body
-
-    # Each individual room event must remain within the byte allowance.
-    assert all(
-        len(dumps(payload, ensure_ascii=False).encode("utf-8"))
-        <= MATRIX_CONTENT_BYTE_LIMIT
-        for payload in payloads
-    )
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert payload["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
+    # Preserve the source when its format is unknown.
+    assert payload["body"] == "# Title\r\n<b>Bold</b> text"
 
 
 @mock.patch("requests.put")
@@ -5456,7 +5335,7 @@ def test_plugin_matrix_html_split_preserves_body(
 @mock.patch("requests.post")
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
-    """Encrypted HTML messages also provide a plain-text fallback."""
+    """Encrypted HTML also receives a plain-text fallback."""
     from apprise.common import NotifyFormat
     from apprise.plugins.matrix.e2ee import (
         MatrixMegOlmSession,
@@ -5464,42 +5343,31 @@ def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
     )
 
     def _mk_resp(d):
-        # Build a successful Matrix response with JSON content.
         r = mock.Mock()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
 
-    # Room sends only need an empty successful response body here.
     mock_put.return_value = _mk_resp({})
 
-    # Prepare a logged-in Matrix object with E2EE enabled.
     obj = NotifyMatrix(
         host="h", user="u", password="pass", targets=["#r"], e2ee=True
     )
-    # Force the rich-output branch being exercised by this regression.
-    obj.notify_format = NotifyFormat.HTML
-
-    # Populate the identifiers normally learned during Matrix login.
     obj.access_token = "tok"
     obj.home_server = "h"
     obj.user_id = "@u:h"
     obj.device_id = "DEV"
-    # Supply an Olm account so the outer event has a sender key.
     obj._e2ee_account = MatrixOlmAccount()
 
-    # Seed a MegOLM session that has already been shared with the room.
     session = MatrixMegOlmSession()
     obj.store.set("e2ee_megolm_!r:h", session.to_dict())
     obj.store.set("e2ee_key_shared_!r:h", session.session_id)
 
-    # Capture the event before encryption so its fallback can be checked.
+    # Capture the event before encryption.
     captured = {}
-    # Retain the real encryption function after capturing its input.
     original_encrypt = MatrixMegOlmSession.encrypt
 
     def _spy_encrypt(self, event):
-        # Save the plaintext event immediately before MegOLM encryption.
         captured["event"] = event
         return original_encrypt(self, event)
 
@@ -5510,32 +5378,1035 @@ def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
                 "<b>Bold</b> text",
                 "Title",
                 NotifyType.INFO,
-                NotifyFormat.HTML,
+                body_format=NotifyFormat.HTML,
+                body_passthrough=False,
             )
             is True
         )
 
-    # Inspect both representations inside the captured plaintext event.
     msg_content = captured["event"]["content"]
-
-    # The rich representation retains all supplied HTML.
     assert msg_content["formatted_body"] == "<h1>Title</h1><b>Bold</b> text"
-
-    # The fallback remains readable without carrying duplicate markup.
     assert "<b>" not in msg_content["body"]
     assert "Bold text" in msg_content["body"]
 
-    # Reject unexpected envelope growth before the homeserver returns a 413.
-    # Record network activity before introducing an oversized device ID.
-    put_count = mock_put.call_count
 
-    # Simulate unexpected server metadata that consumes the entire budget.
-    obj.device_id = "d" * MATRIX_CONTENT_BYTE_LIMIT
-    assert (
-        obj._e2ee_send_to_room(
-            "!r:h", "Body", "", NotifyType.INFO, NotifyFormat.HTML
-        )
-        is False
+def test_plugin_matrix_e2ee_body_limit():
+    """Encrypted messages use a smaller limit when E2EE is available."""
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=False,
+        secure=True,
     )
-    # Rejection must happen locally without another room request.
-    assert mock_put.call_count == put_count
+    assert obj.e2ee is False
+    assert obj.body_maxlen == obj.body_maxlen_default
+
+    # Non-TLS connections cannot use encryption.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        secure=False,
+    )
+    assert obj.e2ee is True
+    assert obj.body_maxlen == obj.body_maxlen_default
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        secure=True,
+    )
+    assert obj.e2ee is True
+
+    if CRYPTOGRAPHY_AVAILABLE:
+        assert obj.body_maxlen == obj.body_maxlen_e2ee
+        assert obj.body_maxlen < obj.body_maxlen_default
+    else:
+        # Encryption also requires the optional cryptography package.
+        assert obj.body_maxlen == obj.body_maxlen_default
+
+
+def test_plugin_matrix_webhook_mode_body_maxlen_unaffected():
+    """Webhook modes keep their flat limit for their distinct payloads."""
+    from apprise.common import NotifyFormat, OverflowMode
+    from apprise.plugins.matrix import base as matrix_base
+    from apprise.plugins.matrix.base import MatrixWebhookMode
+
+    for mode in (
+        MatrixWebhookMode.SLACK,
+        MatrixWebhookMode.MATRIX,
+        MatrixWebhookMode.HOOKSHOT,
+    ):
+        obj = NotifyMatrix(
+            host="h", user="u", token="tok", mode=mode, secure=True
+        )
+        # Webhooks ignore the default E2EE setting.
+        assert obj.e2ee is True
+        assert obj.body_maxlen == obj.body_maxlen_default
+
+        list(
+            obj._build_send_calls(
+                body="hello world " * 20,
+                title="",
+                body_format=NotifyFormat.HTML,
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+        # Webhook preparation does not activate content-aware sizing.
+        assert matrix_base._matrix_effective_body_maxlen_var.get() is None
+        assert obj.body_maxlen == obj.body_maxlen_default
+
+
+def test_plugin_matrix_body_maxlen_content_aware():
+    """Direct sends choose a content-aware limit while preparing chunks."""
+    from apprise.common import OverflowMode
+    from apprise.plugins.matrix import base as matrix_base
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        secure=True,
+        e2ee=False,
+    )
+
+    # No send in progress: fall back to the flat default.
+    assert matrix_base._matrix_effective_body_maxlen_var.get() is None
+    assert obj.body_maxlen == obj.body_maxlen_default
+
+    observed = {}
+
+    # Capture the computed limit while the generator is active.
+    original_property = NotifyMatrix.body_maxlen.fget
+
+    def _spy_body_maxlen(self):
+        observed["body_maxlen"] = (
+            matrix_base._matrix_effective_body_maxlen_var.get()
+        )
+        return original_property(self)
+
+    with mock.patch.object(
+        NotifyMatrix, "body_maxlen", property(_spy_body_maxlen)
+    ):
+        list(
+            obj._build_send_calls(
+                # This length makes UTF-8 density determine the limit.
+                body="\U0001f600" * 20000,
+                title="",
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+
+    # Emoji require four UTF-8 bytes and therefore a smaller limit.
+    emoji_limit = observed["body_maxlen"]
+    assert emoji_limit < obj.body_maxlen_default
+
+    # Restored after the call completes.
+    assert matrix_base._matrix_effective_body_maxlen_var.get() is None
+
+    with mock.patch.object(
+        NotifyMatrix, "body_maxlen", property(_spy_body_maxlen)
+    ):
+        list(
+            obj._build_send_calls(
+                body="hello world " * 10000,
+                title="",
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+
+    # Plain ASCII content allows a much larger character limit.
+    assert observed["body_maxlen"] > emoji_limit
+    assert matrix_base._matrix_effective_body_maxlen_var.get() is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_concentrated_density_split(
+    mock_post, mock_get, mock_put
+):
+    """Dense Unicode regions must fit even when ASCII lowers the average."""
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+
+    original_body = ("\U0001f600" * 20000) + ("a" * 80000)
+    assert (
+        bool(obj.notify(body=original_body, overflow=OverflowMode.SPLIT))
+        is True
+    )
+
+    assert mock_put.call_count > 1
+    reconstructed = ""
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+        reconstructed += payload["body"]
+
+    # No content was dropped or duplicated across the split events.
+    assert reconstructed == original_body
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_json_escape_heavy_split(mock_post, mock_get, mock_put):
+    """Backslash-heavy bodies must fit after JSON escape expansion."""
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+
+    original_body = "\\" * 70000
+    assert (
+        bool(obj.notify(body=original_body, overflow=OverflowMode.SPLIT))
+        is True
+    )
+
+    assert mock_put.call_count > 1
+    reconstructed = ""
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+        reconstructed += payload["body"]
+
+    assert reconstructed == original_body
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_mixed_escape_and_unicode_split(
+    mock_post, mock_get, mock_put
+):
+    """Mixed JSON escapes and Unicode must remain within the byte limit."""
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+
+    # Include escapes, a non-whitespace control, CJK, and emoji characters.
+    # Whitespace controls are avoided because chunk splitting may trim them.
+    cluster = '"\\\x01中\U0001f600'
+    original_body = cluster * 15000
+    assert (
+        bool(obj.notify(body=original_body, overflow=OverflowMode.SPLIT))
+        is True
+    )
+
+    assert mock_put.call_count > 1
+    reconstructed = ""
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+        reconstructed += payload["body"]
+
+    assert reconstructed == original_body
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_html_dual_representation_split(
+    mock_post, mock_get, mock_put
+):
+    """HTML events fit with both plain and formatted representations."""
+    from apprise.common import NotifyFormat, OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+
+    body = ("word " * 12999) + "end"
+    assert (
+        bool(
+            obj.notify(
+                body=body,
+                body_format=NotifyFormat.HTML,
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+        is True
+    )
+
+    assert mock_put.call_count > 1
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        assert "formatted_body" in payload
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_e2ee_html_split(mock_post, mock_get, mock_put):
+    """Encrypted HTML chunks fit after formatting and MegOLM expansion."""
+    from apprise.common import NotifyFormat, OverflowMode
+    from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    login_resp = {
+        "access_token": "tok",
+        "user_id": "@u:h",
+        "home_server": "h",
+        "device_id": "DEV",
+    }
+    mock_post.side_effect = [
+        _mk_resp(login_resp),
+        _mk_resp({}),  # keys/upload
+        _mk_resp({"room_id": "!r:h"}),  # join
+        _mk_resp({}),  # logout
+    ]
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    # Pre-seed encryption state so the test only sends message events.
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
+
+    body = ("<b>hello world this is a test</b> " * 2000).strip()
+    assert (
+        bool(
+            obj.notify(
+                body=body,
+                body_format=NotifyFormat.HTML,
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+        is True
+    )
+
+    assert mock_put.call_count > 1
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        assert payload["algorithm"] == "m.megolm.v1.aes-sha2"
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+@pytest.mark.parametrize("device_id_len", [3, 128, 255, 1000])
+def test_plugin_matrix_e2ee_long_device_id_and_title(
+    mock_post, mock_get, mock_put, device_id_len
+):
+    """Long device IDs and escaped titles must fit encrypted events.
+
+    Both values are measured because neither raw character counts nor a
+    fixed envelope estimate represent their final JSON byte cost.
+    """
+    from apprise.common import NotifyFormat, OverflowMode
+    from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+    mock_post.return_value = _mk_resp({})
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    # A known device_id (as if cached from a prior login) is measured
+    # exactly rather than falling back to the generous default.
+    obj.device_id = "D" * device_id_len
+
+    title = "\x01" * 250  # near title_maxlen, maximal 6-byte JSON escape
+    body = "\x01" * 200000
+
+    assert (
+        bool(
+            obj.notify(
+                body=body,
+                title=title,
+                body_format=NotifyFormat.HTML,
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+        is True
+    )
+
+    assert mock_put.call_count > 1
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        assert payload["algorithm"] == "m.megolm.v1.aes-sha2"
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_e2ee_rejects_late_oversize():
+    """Refuse a first-login event that becomes too large after sizing.
+
+    The final device ID must not consume the safety margin reserved for
+    homeserver-added metadata.
+    """
+    from apprise.common import NotifyFormat, OverflowMode
+    from apprise.plugins.matrix.base import (
+        MATRIX_EVENT_BYTE_LIMIT,
+        MATRIX_EVENT_SAFETY_MARGIN,
+    )
+    from apprise.plugins.matrix.e2ee import (
+        MatrixMegOlmSession,
+        MatrixOlmAccount,
+    )
+
+    safe_byte_budget = MATRIX_EVENT_BYTE_LIMIT - MATRIX_EVENT_SAFETY_MARGIN
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    # Unknown at sizing time: _build_send_calls() uses the fallback.
+    obj.device_id = None
+    obj._e2ee_account = MatrixOlmAccount()
+
+    # A small, fixed body/title: content isn't what's under test here,
+    # device_id's contribution is. device_id sits outside the encrypted
+    # ciphertext (a plain sibling JSON field), so every extra character
+    # added to it adds exactly one byte to the final encrypted payload,
+    # letting the boundary below be targeted precisely.
+    calls = list(
+        obj._build_send_calls(
+            body="hello", title="", overflow=OverflowMode.SPLIT
+        )
+    )
+    first = calls[0]
+
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
+
+    def send_with_device_id(device_id_len):
+        # The real device_id becomes known only now, as if login
+        # happened after sizing already ran.
+        obj.device_id = "D" * device_id_len
+        with (
+            mock.patch.object(obj, "_e2ee_share_room_key", return_value=True),
+            mock.patch.object(
+                obj, "_fetch", return_value=(True, {}, 200)
+            ) as mock_fetch,
+        ):
+            result = obj._e2ee_send_to_room(
+                "!r:h",
+                first["body"],
+                first["title"],
+                NotifyType.INFO,
+                NotifyFormat.HTML,
+                False,
+            )
+        sent = mock_fetch.call_count > 0
+        assert result is sent
+        if sent:
+            payload = mock_fetch.call_args.kwargs["payload"]
+            return len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        return None
+
+    # Measure this content's baseline (device_id excluded) once.
+    baseline_bytes = send_with_device_id(0)
+
+    # Exactly at the safe budget: still accepted.
+    at_budget_len = safe_byte_budget - baseline_bytes
+    assert send_with_device_id(at_budget_len) == safe_byte_budget
+
+    # One byte into the reserved margin -- between the safe budget and
+    # the hard ceiling, previously accepted by mistake -- must now be
+    # refused.
+    past_budget_len = at_budget_len + 1
+    assert send_with_device_id(past_budget_len) is None
+
+    # Comfortably past the full ceiling: also refused.
+    assert send_with_device_id(MATRIX_EVENT_BYTE_LIMIT) is None
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_surrogate_sanitized_end_to_end(
+    mock_post, mock_get, mock_put
+):
+    """A lone UTF-16 surrogate in the body/title must not crash delivery
+    on any send path -- direct-server, E2EE, or webhook."""
+    from apprise.common import NotifyFormat
+    from apprise.plugins.matrix.base import MatrixWebhookMode
+    from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
+
+    def _mk_resp(d):
+        r = mock.Mock()
+        r.status_code = requests.codes.ok
+        r.content = dumps(d).encode()
+        return r
+
+    lone_surrogate_body = "hello " + chr(0xD800) + " world"
+    lone_surrogate_title = "t" + chr(0xDC00) + "t"
+
+    # Direct-server plaintext path.
+    response_obj = {
+        "room_id": "!abc:localhost",
+        "room_alias": "#abc:localhost",
+        "joined_rooms": ["!abc:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    mock_get.return_value = _mk_resp(response_obj)
+    mock_post.return_value = _mk_resp(response_obj)
+    mock_put.return_value = _mk_resp({})
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+    assert bool(obj.notify(body=lone_surrogate_body)) is True
+    payload = loads(mock_put.call_args.kwargs["data"])
+    # The lone surrogate is replaced, never crashing serialization.
+    payload["body"].encode("utf-8")
+
+    # E2EE path.
+    mock_get.return_value = _mk_resp({})
+    mock_put.return_value = _mk_resp({})
+    mock_post.return_value = _mk_resp({})
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["!r:h"],
+        e2ee=True,
+        secure=True,
+        discovery=False,
+    )
+    session = MatrixMegOlmSession()
+    obj.store.set("e2ee_room_enc_!r:h", True)
+    obj.store.set("e2ee_megolm_!r:h", session.to_dict())
+    obj.store.set("e2ee_key_shared_!r:h", session.session_id)
+    obj.access_token = "tok"
+    obj.home_server = "h"
+    obj.user_id = "@u:h"
+    obj.device_id = "DEV"
+    assert (
+        bool(
+            obj.notify(
+                body="hello",
+                title=lone_surrogate_title,
+                body_format=NotifyFormat.HTML,
+            )
+        )
+        is True
+    )
+
+    # Webhook (Slack-compatible) path.
+    mock_post.return_value = _mk_resp({})
+    obj = NotifyMatrix(
+        host="h", user="u", token="tok", mode=MatrixWebhookMode.SLACK
+    )
+    assert bool(obj.notify(body=lone_surrogate_body)) is True
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_caps_before_scanning_density(
+    mock_post, mock_get, mock_put
+):
+    """The payload cap is applied before UTF-8 density is scanned."""
+    from apprise.asset import AppriseAsset
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    asset = AppriseAsset(payload_max_size=100)
+    obj = NotifyMatrix(
+        host="hostname", user="user", password="passwd", asset=asset
+    )
+
+    # Only the capped 100 characters should be scanned.
+    huge_body = "a" * 10_000_000
+    assert (
+        bool(obj.notify(body=huge_body, overflow=OverflowMode.SPLIT)) is True
+    )
+
+    # Capped to 100 characters up front, so a single small event is sent.
+    assert mock_put.call_count == 1
+    payload = loads(mock_put.call_args.kwargs["data"])
+    assert len(payload["body"]) <= 100
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_caps_before_sanitizing(mock_post, mock_get, mock_put):
+    """Apply the payload cap before scanning text for invalid surrogates.
+
+    Webhook mode isolates the cap performed by ``_build_send_calls()``.
+    """
+    from apprise.asset import AppriseAsset
+    from apprise.plugins.matrix.base import MatrixWebhookMode
+
+    request = mock.Mock()
+    request.content = dumps({})
+    request.status_code = requests.codes.ok
+    mock_post.return_value = request
+
+    asset = AppriseAsset(payload_max_size=100)
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        token="tok",
+        mode=MatrixWebhookMode.SLACK,
+        asset=asset,
+    )
+
+    seen_lengths = []
+    from apprise.plugins.matrix import (
+        base as matrix_base,
+        sizing as matrix_sizing,
+    )
+
+    real_sanitize_fn = matrix_sizing.sanitize_text
+
+    def spy_sanitize(text):
+        seen_lengths.append(len(text) if text else 0)
+        return real_sanitize_fn(text)
+
+    huge_body = "a" * 10_000_000
+    with (
+        mock.patch.object(matrix_sizing, "sanitize_text", spy_sanitize),
+        mock.patch.object(matrix_base, "_matrix_sanitize_text", spy_sanitize),
+    ):
+        assert bool(obj.notify(body=huge_body)) is True
+
+    # Every call into the sanitizer saw only the already-capped text, never
+    # the original 10,000,000-character body.
+    assert seen_lengths
+    assert max(seen_lengths) <= 100
+
+
+def test_plugin_matrix_preview_avoids_extra_full_strip():
+    """Avoid stripping and copying a large input during sizing.
+
+    The framework performs the one required full-input strip. The sizing
+    preview finds trim boundaries without making another full-size copy.
+    """
+    from apprise.asset import AppriseAsset
+    from apprise.common import OverflowMode
+
+    calls = []
+
+    class _TrackingStr(str):
+        def rstrip(self, *args, **kwargs):
+            calls.append(("rstrip", len(self)))
+            return super().rstrip(*args, **kwargs)
+
+        def strip(self, *args, **kwargs):
+            calls.append(("strip", len(self)))
+            return super().strip(*args, **kwargs)
+
+    asset = AppriseAsset(payload_max_size=100)
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], asset=asset
+    )
+
+    huge_body = _TrackingStr("a" * 10_000_000 + " ")
+    huge_title = _TrackingStr(" " * 10_000_000 + "hi")
+
+    list(
+        obj._build_send_calls(
+            body=huge_body,
+            title=huge_title,
+            overflow=OverflowMode.SPLIT,
+        )
+    )
+
+    full_length_rstrip_calls = [
+        c for c in calls if c == ("rstrip", len(huge_body))
+    ]
+    full_length_strip_calls = [
+        c for c in calls if c == ("strip", len(huge_title))
+    ]
+    assert len(full_length_rstrip_calls) == 1
+    assert len(full_length_strip_calls) == 1
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_whitespace_title_does_not_steal_cap(
+    mock_post, mock_get, mock_put
+):
+    """Whitespace-only titles must not consume the payload cap.
+
+    The sizing preview follows the framework's strip-then-cap order so the
+    useful body receives the space vacated by the title.
+    """
+    from apprise.asset import AppriseAsset
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    asset = AppriseAsset(payload_max_size=300)
+    obj = NotifyMatrix(
+        host="hostname", user="user", password="passwd", asset=asset
+    )
+
+    title = " " * 250
+    body = "x" * 300
+
+    assert bool(
+        obj.notify(body=body, title=title, overflow=OverflowMode.SPLIT)
+    )
+    payload = loads(mock_put.call_args_list[0].kwargs["data"])
+    # The whitespace-only title contributes nothing once stripped, so the
+    # full body -- not a truncated fragment -- fits within the cap.
+    assert payload["body"] == body
+
+
+def test_plugin_matrix_title_leading_whitespace_past_cap():
+    """Keep meaningful title text beyond leading whitespace.
+
+    The preview must follow the framework's trim-then-cap behavior so title
+    overhead is measured correctly.
+    """
+    from apprise.asset import AppriseAsset
+    from apprise.common import NotifyFormat, OverflowMode
+
+    asset = AppriseAsset(payload_max_size=100)
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], asset=asset
+    )
+
+    # More leading whitespace than the cap, followed by an escape-heavy
+    # meaningful title (each char costs 6 JSON-escaped bytes).
+    title = (" " * 150) + ("\x01" * 50)
+    body = "hello world"
+
+    from apprise.plugins.matrix import sizing as matrix_sizing
+
+    observed = {}
+    real_overhead_fn = matrix_sizing.title_overhead_bytes
+
+    def spy_title_overhead(title_arg, body_format, escape_html):
+        observed["title_arg"] = title_arg
+        return real_overhead_fn(title_arg, body_format, escape_html)
+
+    with mock.patch.object(
+        matrix_sizing, "title_overhead_bytes", spy_title_overhead
+    ):
+        list(
+            obj._build_send_calls(
+                body=body,
+                title=title,
+                body_format=NotifyFormat.HTML,
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+
+    # The preview must have seen the real, meaningful title content --
+    # not an empty string produced by slicing into the leading whitespace.
+    assert observed["title_arg"] == "\x01" * 50
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_truncation_warning_fires(mock_post, mock_get, mock_put):
+    """A genuinely oversized payload must still log the framework's normal
+    truncation warning -- sizing this content-aware must not suppress it
+    by pre-trimming before the framework's own check ever runs."""
+    from apprise.asset import AppriseAsset
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    asset = AppriseAsset(payload_max_size=100)
+    obj = NotifyMatrix(
+        host="hostname", user="user", password="passwd", asset=asset
+    )
+
+    with mock.patch.object(obj, "logger") as mock_logger:
+        assert bool(
+            obj.notify(
+                body="x" * 300, title="Alert", overflow=OverflowMode.SPLIT
+            )
+        )
+        assert any(
+            "trimmed" in call.args[0]
+            for call in mock_logger.warning.call_args_list
+        )
+
+
+def test_plugin_matrix_body_limit_thread_isolation():
+    """Keep content-aware body limits isolated across threads.
+
+    The context variable is exercised directly so the test is deterministic
+    and does not depend on reproducing a timing-sensitive race.
+    """
+    import threading
+
+    from apprise.plugins.matrix import base as matrix_base
+
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], secure=True
+    )
+
+    # Sizing state lives in a context var, not on the instance itself.
+    assert "_matrix_effective_body_maxlen" not in obj.__dict__
+
+    var = matrix_base._matrix_effective_body_maxlen_var
+    seen_in_other_thread = {}
+
+    def set_and_check_from_other_thread():
+        token = var.set(999)
+        try:
+            seen_in_other_thread["value"] = var.get()
+        finally:
+            var.reset(token)
+
+    token = var.set(111)
+    try:
+        t = threading.Thread(target=set_and_check_from_other_thread)
+        t.start()
+        t.join(timeout=5)
+
+        # The other thread's write must not have leaked into this one.
+        assert var.get() == 111
+    finally:
+        var.reset(token)
+
+    # And this thread's write must not have leaked into the other one.
+    assert seen_in_other_thread["value"] == 999
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_emoji_split_preserves_content(
+    mock_post, mock_get, mock_put
+):
+    """Emoji splitting preserves content within the byte limit."""
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+
+    original_body = "\U0001f600" * 20000
+    assert (
+        bool(obj.notify(body=original_body, overflow=OverflowMode.SPLIT))
+        is True
+    )
+
+    # Each event must independently fit Matrix's byte limit.
+    assert mock_put.call_count > 1
+    reconstructed = ""
+    for call in mock_put.call_args_list:
+        payload = loads(call.kwargs["data"])
+        encoded_len = len(dumps(payload, ensure_ascii=False).encode("utf-8"))
+        assert encoded_len <= 65536
+        reconstructed += payload["body"]
+
+    # No emoji was dropped or duplicated across the split events.
+    assert reconstructed == original_body
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_emoji_split_counters(mock_post, mock_get, mock_put):
+    """Emoji split counters match the number of events sent."""
+    from apprise.common import OverflowMode
+
+    response_obj = {
+        "room_id": "!abc123:localhost",
+        "room_alias": "#abc123:localhost",
+        "joined_rooms": ["!abc123:localhost"],
+        "access_token": "abcd1234",
+        "home_server": "localhost",
+    }
+    request = mock.Mock()
+    request.content = dumps(response_obj)
+    request.status_code = requests.codes.ok
+
+    mock_get.return_value = request
+    mock_post.return_value = request
+    mock_put.return_value = request
+
+    obj = NotifyMatrix(host="hostname", user="user", password="passwd")
+
+    assert (
+        bool(
+            obj.notify(
+                title="Title",
+                body="\U0001f600" * 20000,
+                overflow=OverflowMode.SPLIT,
+            )
+        )
+        is True
+    )
+
+    total = mock_put.call_count
+    assert total > 1
+
+    # Counters use the framework's zero-padded width.
+    digits = len(str(total))
+    last_payload = loads(mock_put.call_args_list[-1].kwargs["data"])
+    assert f"[{total:0{digits}d}/{total:0{digits}d}]" in last_payload["body"]

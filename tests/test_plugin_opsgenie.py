@@ -464,11 +464,11 @@ def test_plugin_opsgenie_edge_case(mock_post):
     assert isinstance(instance, NotifyOpsgenie)
 
     assert len(instance.store.keys()) == 0
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
 
     # Again just causes same index to get over-written
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
     assert "a62f2225bf" in instance.store
 
@@ -477,9 +477,9 @@ def test_plugin_opsgenie_edge_case(mock_post):
     # This causes an internal check to fail where the keys are expected to be
     # as a list (this one is now a string)
     # content self corrects and things are fine
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
 
     # new key is new index
-    assert instance.notify("test", "key2", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key2", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 2
