@@ -2021,7 +2021,7 @@ msgid "Force Home Server on Room IDs"
 msgstr "Forza Home Server sugli ID delle stanze"
 
 #: apprise/plugins/matrix/base.py:346
-msgid "Matrix API Verion"
+msgid "Matrix API Version"
 msgstr "Versione API Matrix"
 
 #: apprise/plugins/matrix/base.py:358
