@@ -2226,7 +2226,7 @@ msgid "Force Home Server on Room IDs"
 msgstr ""
 
 #: apprise/plugins/matrix/base.py:371
-msgid "Matrix API Verion"
+msgid "Matrix API Version"
 msgstr ""
 
 #: apprise/plugins/matrix/base.py:383
