@@ -368,7 +368,7 @@ class NotifyMatrix(NotifyBase):
                 "default": "/webhook",
             },
             "version": {
-                "name": _("Matrix API Verion"),
+                "name": _("Matrix API Version"),
                 "type": "choice:string",
                 "values": MATRIX_VERSIONS,
                 "default": MatrixVersion.V3,
