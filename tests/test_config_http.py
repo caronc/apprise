@@ -121,6 +121,14 @@ def test_config_http(mock_post):
     # one entry added
     assert len(ch) == 1
 
+    # Password-only administrator credentials preserve the empty username.
+    results = ConfigHTTP.parse_url("http://:pass@localhost/path/")
+    assert isinstance(results, dict)
+    ch = ConfigHTTP(**results)
+    assert ch.url(privacy=False).startswith("http://:pass@localhost/path/")
+    assert isinstance(ch.read(), str) is True
+    assert mock_post.call_args.kwargs["auth"] == ("", "pass")
+
     results = ConfigHTTP.parse_url("http://localhost:8080/path/")
     assert isinstance(results, dict)
     ch = ConfigHTTP(**results)
