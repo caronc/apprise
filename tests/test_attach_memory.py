@@ -216,3 +216,42 @@ def test_attach_memory():
     response.invalidate()
     with pytest.raises(exception.AppriseFileNotFound):
         response.base64()
+
+
+def test_attach_memory_open_reusable():
+    """
+    API: AttachMemory().open() returns a reusable handle
+
+    """
+    mem = AttachMemory(content=b"content")
+
+    # Closing a handle returned by open() (as a `with` block does)
+    # must not affect the attachment itself
+    with mem.open() as fp:
+        assert fp.read() == b"content"
+
+    # The attachment is still usable afterwards
+    assert bool(mem) is True
+    assert len(mem) == len(b"content")
+    assert mem.exists() is True
+
+    # A second open() call still works and returns the full content
+    with mem.open() as fp:
+        assert fp.read() == b"content"
+
+    # Each call to open() hands back an independent object
+    assert mem.open() is not mem.open()
+
+
+def test_attach_memory_invalidate_closed_buffer():
+    """
+    API: AttachMemory().invalidate() on an already-closed buffer
+
+    """
+    mem = AttachMemory(content=b"content")
+
+    # Simulate our internal buffer already being closed
+    mem._data.close()
+
+    # invalidate() must not attempt to truncate a closed buffer
+    mem.invalidate()
