@@ -118,9 +118,9 @@ class ConfigHTTP(ConfigBase):
 
         # Determine Authentication
         auth = ""
-        if self.user and self.password:
+        if self.password:
             auth = "{user}:{password}@".format(
-                user=self.quote(self.user, safe=""),
+                user=self.quote(self.user or "", safe=""),
                 password=self.pprint(
                     self.password, privacy, mode=PrivacyMode.Secret, safe=""
                 ),
@@ -157,8 +157,9 @@ class ConfigHTTP(ConfigBase):
         headers.update(self.headers)
 
         auth = None
-        if self.user:
-            auth = (self.user, self.password)
+        if self.user or self.password:
+            # Basic Auth also permits a password with an empty username.
+            auth = (self.user or "", self.password)
 
         url = f"{self.schema}://{self.host}"
         if isinstance(self.port, int):
