@@ -241,3 +241,17 @@ def test_attach_memory_open_reusable():
 
     # Each call to open() hands back an independent object
     assert mem.open() is not mem.open()
+
+
+def test_attach_memory_invalidate_closed_buffer():
+    """
+    API: AttachMemory().invalidate() on an already-closed buffer
+
+    """
+    mem = AttachMemory(content=b"content")
+
+    # Simulate our internal buffer already being closed
+    mem._data.close()
+
+    # invalidate() must not attempt to truncate a closed buffer
+    mem.invalidate()
