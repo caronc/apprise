@@ -111,10 +111,9 @@ class AttachMemory(AttachBase):
         )
 
     def open(self, *args, **kwargs):
-        """Return our memory object."""
-        # Return our object
+        """Return an independent handle to our memory object."""
         self._data.seek(0, 0)
-        return self._data
+        return io.BytesIO(self._data.getvalue())
 
     def __enter__(self):
         """Support with clause."""
