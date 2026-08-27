@@ -141,7 +141,7 @@ class NotifyZulip(NotifyBase):
             },
             "target_user": {
                 "name": _("Target User"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "target_stream": {
