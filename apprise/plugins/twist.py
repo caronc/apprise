@@ -105,7 +105,7 @@ class NotifyTwist(NotifyBase):
             },
             "email": {
                 "name": _("Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "target_channel": {

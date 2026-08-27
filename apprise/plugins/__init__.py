@@ -166,10 +166,14 @@ def details(plugin):
     #       # templates list.
     #       'token_name': {
     #
-    #            # types can be 'string', 'int', 'choice', 'list, 'float'
-    #            # both choice and list may additionally have a : identify
-    #            # what the list/choice type is comprised of; the default
-    #            # is string.
+    #            # Types include 'string', 'int', 'choice', 'list', 'float',
+    #            # and 'email'.
+    #
+    #            # 'choice' and 'list' may identify their value type after a
+    #            # colon; the default is 'string'.
+    #
+    #            # 'email' is one address (local-part@domain). URL builders
+    #            # keep its '@' unescaped, matching plugin URLs.
     #            'type': 'choice:string',
     #
     #            # values will only exist the type must be a fixed

@@ -128,7 +128,7 @@ class NotifyOctopush(NotifyBase):
         **{
             "api_login": {
                 "name": _("API Login"),
-                "type": "string",
+                "type": "email",
                 "private": True,
                 "required": True,
             },

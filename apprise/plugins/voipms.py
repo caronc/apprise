@@ -81,7 +81,7 @@ class NotifyVoipms(NotifyBase):
         **{
             "email": {
                 "name": _("User Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "password": {
