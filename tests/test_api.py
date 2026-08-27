@@ -2394,7 +2394,9 @@ def test_apprise_details_plugin_verification():
 
     # Valid Type Regular Expression Checker
     # Case Sensitive and MUST match the following:
-    is_valid_type_re = re.compile(r"((choice|list):)?(string|bool|int|float)")
+    is_valid_type_re = re.compile(
+        r"((choice|list):)?(string|bool|int|float|email)"
+    )
 
     # match tokens found in templates so we can cross reference them back
     # to see if they have a matching argument
@@ -2765,10 +2767,10 @@ def test_apprise_details_plugin_raw_template_tokens():
     declarations first.
     """
 
-    # Valid Type Regular Expression Checker -- mirrors the one used by
-    # test_apprise_details_plugin_verification so both tests agree on what
-    # constitutes a valid type.
-    is_valid_type_re = re.compile(r"((choice|list):)?(string|bool|int|float)")
+    # Use the same valid token types as the plugin verification test.
+    is_valid_type_re = re.compile(
+        r"((choice|list):)?(string|bool|int|float|email)"
+    )
 
     for plugin in N_MGR.plugins():
         label = plugin.__name__
@@ -2797,6 +2799,72 @@ def test_apprise_details_plugin_raw_template_tokens():
                     f" {token['type']!r} is not a valid type string."
                     " Expected one of: string, bool, int, float,"
                     " choice:string, list:string, etc."
+                )
+
+
+def test_apprise_details_email_token_types():
+    """Ensure URL email fields declare their token type as ``email``.
+
+    Code that builds URLs from this metadata must leave ``@`` unescaped.
+    Add fields only after confirming that behavior in the plugin's ``url()``
+    method; a field name alone is not enough.
+    """
+    # (plugin class name, template_tokens key)
+    expected_email_tokens = {
+        ("NotifySES", "from_email"),
+        ("NotifyPostmark", "from_email"),
+        ("NotifyPostmark", "target_email"),
+        ("NotifyResend", "from_addr"),
+        ("NotifyResend", "target_email"),
+        ("NotifyMailerSend", "from_email"),
+        ("NotifyMailerSend", "target_email"),
+        ("NotifyOffice365", "target_email"),
+        ("NotifyOctopush", "api_login"),
+        ("NotifyThreema", "target_email"),
+        ("NotifyBrevo", "from_email"),
+        ("NotifyBrevo", "target_email"),
+        ("NotifySendGrid", "from_email"),
+        ("NotifySendGrid", "target_email"),
+        ("NotifyMailgun", "target_email"),
+        ("NotifyOneSignal", "target_email"),
+        ("NotifyPingram", "target_email"),
+        ("NotifyPushBullet", "target_email"),
+        ("NotifySendPulse", "target_email"),
+        ("NotifySlack", "target_email"),
+        ("NotifyTwist", "email"),
+        ("NotifyVoipms", "email"),
+        ("NotifyZulip", "target_user"),
+    }
+
+    plugins_by_name = {plugin.__name__: plugin for plugin in N_MGR.plugins()}
+    found = set()
+    for plugin_name, token_key in expected_email_tokens:
+        assert plugin_name in plugins_by_name, (
+            f"{plugin_name} was not found -- has it been renamed/removed?"
+            " Update expected_email_tokens to match."
+        )
+        plugin = plugins_by_name[plugin_name]
+        assert token_key in plugin.template_tokens, (
+            f"{plugin_name}.template_tokens no longer defines"
+            f" {token_key!r} -- update expected_email_tokens to match."
+        )
+        assert plugin.template_tokens[token_key]["type"] == "email", (
+            f"{plugin_name}.template_tokens[{token_key!r}]['type'] must"
+            " stay 'email' -- this field's own url() preserves a literal"
+            " '@' when rebuilding the URL, so a client keying off this"
+            " metadata needs the same signal."
+        )
+        found.add((plugin_name, token_key))
+
+    # Scan all declared email tokens so new fields must join the allowlist.
+    for plugin in N_MGR.plugins():
+        for key, token in plugin.template_tokens.items():
+            if token.get("type") == "email":
+                assert (plugin.__name__, key) in found, (
+                    f"{plugin.__name__}.template_tokens[{key!r}] is tagged"
+                    " 'email' but isn't listed in expected_email_tokens --"
+                    " add it there (after confirming this field's own"
+                    " url() actually needs it, per this test's docstring)."
                 )
 
 

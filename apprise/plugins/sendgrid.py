@@ -121,12 +121,12 @@ class NotifySendGrid(NotifyBase):
             },
             "from_email": {
                 "name": _("Source Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {

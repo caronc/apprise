@@ -161,7 +161,7 @@ class NotifySES(NotifyBase):
             },
             "from_email": {
                 "name": _("From Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "from_addr",
                 "required": True,
             },

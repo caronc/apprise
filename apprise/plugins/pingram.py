@@ -186,7 +186,7 @@ class NotifyPingram(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "target_id": {
