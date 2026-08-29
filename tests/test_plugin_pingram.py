@@ -138,6 +138,24 @@ apprise_url_tests = (
         },
     ),
     (
+        "pingram://pingram_sk_aaaa.bbbb.cccc/+15551235553",
+        {
+            # Newer keys embed a JWT after the prefix, so the key itself
+            # contains periods
+            "instance": NotifyPingram,
+            "requests_response_text": PINGRAM_GOOD_RESPONSE,
+        },
+    ),
+    (
+        "pingram://pingram_pk_aaaa.bbbb.cccc-dd_ee/user@example.ca",
+        {
+            # JWTs are base64url encoded, so - and _ show up alongside the
+            # period delimiters
+            "instance": NotifyPingram,
+            "requests_response_text": PINGRAM_GOOD_RESPONSE,
+        },
+    ),
+    (
         "pingram://pingram_sk_abc123/+15551235553/+15551235554",
         {
             # Multiple id-less phone numbers become separate targets
