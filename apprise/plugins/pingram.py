@@ -30,6 +30,8 @@
 #  2. Open your Environment settings and visit the "API Keys" section.
 #  3. Create a new Secret Key (server-to-server) or Public Key. It will
 #     look like: pingram_sk_AbCdEf012345 or pingram_pk_AbCdEf012345
+#     Newer keys carry a JWT after the prefix, so they additionally
+#     contain periods, e.g. pingram_sk_aaaa.bbbb.cccc
 #
 #  Your Apprise URL should be assembled as:
 #     pingram://{apikey}/{target}
@@ -176,7 +178,7 @@ class NotifyPingram(NotifyBase):
                 "type": "string",
                 "required": True,
                 "private": True,
-                "regex": (r"^pingram_(sk|pk)_[\w-]+$", "i"),
+                "regex": (r"^pingram_(sk|pk)_[\w.-]+$", "i"),
             },
             "target_email": {
                 "name": _("Target Email"),
