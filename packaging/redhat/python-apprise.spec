@@ -84,7 +84,7 @@ notification services. It supports sending alerts to platforms such as: \
 `RSyslog`, `SendGrid`, \
 `SendPulse`, `ServerChan`, `SerwerSMS`, `Session Open Group Server`, \
 `Seven`, `SFR`, \
-`Signal`, `SIGNL4`, `SimplePush`, \
+`Signal`, `Signalgrid`, `SIGNL4`, `SimplePush`, \
 `Sinch`, `Slack`, `SMPP`, `SMSC`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, \
 `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Stackfield`, `Super Toasty`, \
 `Streamlabs`, `Stride`, \

@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import os
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -35,6 +36,9 @@ import apprise
 from apprise.plugins.signalgrid import NotifySignalgrid
 
 logging.disable(logging.CRITICAL)
+
+# Attachment Directory
+TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 
 apprise_url_tests = (
@@ -48,12 +52,34 @@ apprise_url_tests = (
         "signalgrid://CLIENTKEY/CHANNEL",
         {
             "instance": NotifySignalgrid,
+            "privacy_url": "signalgrid://C...Y/CHANNEL/",
+        },
+    ),
+    (
+        "signalgrid://CLIENTKEY/CHANNEL1/CHANNEL2",
+        {
+            "instance": NotifySignalgrid,
         },
     ),
     (
         "signalgrid://CLIENTKEY/CHANNEL?critical=yes",
         {
             "instance": NotifySignalgrid,
+        },
+    ),
+    (
+        "signalgrid://CLIENTKEY/CHANNEL?to=CHANNEL2,CHANNEL3",
+        {
+            "instance": NotifySignalgrid,
+        },
+    ),
+    (
+        # No channels specified at all; the plugin still loads, but has
+        # nothing to notify
+        "signalgrid://CLIENTKEY",
+        {
+            "instance": NotifySignalgrid,
+            "notify_response": False,
         },
     ),
     (
@@ -90,7 +116,7 @@ def test_plugin_signalgrid_payload(mock_post):
 
     obj = NotifySignalgrid(
         client_key="CLIENTKEY",
-        channel="CHANNEL",
+        targets=["CHANNEL"],
         critical=True,
     )
 
@@ -126,7 +152,7 @@ def test_plugin_signalgrid_type_mapping(mock_post):
 
     obj = NotifySignalgrid(
         client_key="CLIENTKEY",
-        channel="CHANNEL",
+        targets=["CHANNEL"],
     )
 
     mappings = (
@@ -152,12 +178,68 @@ def test_plugin_signalgrid_type_mapping(mock_post):
         assert mock_post.call_args.kwargs["data"]["critical"] == "false"
 
 
+@mock.patch("requests.post")
+def test_plugin_signalgrid_multi_channel(mock_post):
+    """Test Signalgrid sends one request per channel."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = NotifySignalgrid(
+        client_key="CLIENTKEY",
+        targets=["CHANNEL1", "CHANNEL2"],
+    )
+
+    assert len(obj) == 2
+
+    assert obj.notify(title="Test", body="Test") is True
+    assert mock_post.call_count == 2
+
+    sent_channels = {
+        call.kwargs["data"]["channel"] for call in mock_post.call_args_list
+    }
+    assert sent_channels == {"CHANNEL1", "CHANNEL2"}
+
+
+@mock.patch("requests.post")
+def test_plugin_signalgrid_multi_channel_partial_failure(mock_post):
+    """Test one failed channel still notifies the rest and reports False."""
+
+    ok_response = mock.Mock()
+    ok_response.status_code = requests.codes.ok
+
+    error_response = mock.Mock()
+    error_response.status_code = requests.codes.internal_server_error
+    error_response.content = b"error"
+
+    mock_post.side_effect = [error_response, ok_response]
+
+    obj = NotifySignalgrid(
+        client_key="CLIENTKEY",
+        targets=["CHANNEL1", "CHANNEL2"],
+    )
+
+    assert obj.notify(title="Test", body="Test") is False
+    assert mock_post.call_count == 2
+
+
+def test_plugin_signalgrid_no_targets():
+    """Test that a Signalgrid object with no channels loads but has
+    nothing to notify."""
+
+    obj = NotifySignalgrid(client_key="CLIENTKEY")
+
+    assert len(obj) == 1
+    assert obj.notify(title="Test", body="Test") is False
+
+
 def test_plugin_signalgrid_url_roundtrip():
     """Test Signalgrid URL parsing and reconstruction."""
 
     obj = NotifySignalgrid(
         client_key="CLIENTKEY",
-        channel="CHANNEL",
+        targets=["CHANNEL1", "CHANNEL2"],
         critical=True,
     )
 
@@ -166,11 +248,45 @@ def test_plugin_signalgrid_url_roundtrip():
 
     assert parsed is not None
     assert parsed["client_key"] == "CLIENTKEY"
-    assert parsed["channel"] == "CHANNEL"
+    assert parsed["targets"] == ["CHANNEL1", "CHANNEL2"]
     assert parsed["critical"] is True
 
     obj2 = NotifySignalgrid(**parsed)
 
     assert obj2.client_key == "CLIENTKEY"
-    assert obj2.channel == "CHANNEL"
+    assert obj2.targets == ["CHANNEL1", "CHANNEL2"]
     assert obj2.critical is True
+
+    # Two connections that share a client key differ only in the channels
+    # they notify, so they still identify as the same connection.
+    assert obj.url_identifier == obj2.url_identifier
+
+
+def test_plugin_signalgrid_client_key_override():
+    """Test that ?client_key= overrides the hostname-derived value."""
+
+    parsed = NotifySignalgrid.parse_url(
+        "signalgrid://IGNOREME/CHANNEL?client_key=REALKEY"
+    )
+
+    assert parsed is not None
+    assert parsed["client_key"] == "REALKEY"
+
+
+@mock.patch("requests.post")
+def test_plugin_signalgrid_attach_warning(mock_post):
+    """Test that attachments are ignored with a warning."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = NotifySignalgrid(client_key="CLIENTKEY", targets=["CHANNEL"])
+
+    attach = apprise.AppriseAttachment(
+        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    )
+
+    with mock.patch.object(obj, "logger") as mock_logger:
+        assert obj.notify(title="Test", body="Test", attach=attach) is True
+        assert mock_logger.warning.called
