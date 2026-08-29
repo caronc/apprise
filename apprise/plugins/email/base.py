@@ -581,7 +581,7 @@ class NotifyEmail(NotifyBase):
 
             match = templates.EMAIL_TEMPLATES[i][1].match(from_addr)
             if match:
-                self.logger.info(
+                self.logger.debug(
                     f"Applying {templates.EMAIL_TEMPLATES[i][0]} Defaults"
                 )
 

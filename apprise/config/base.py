@@ -347,7 +347,7 @@ class ConfigBase(URLBase):
                 )
 
         if self._cached_servers:
-            self.logger.info(
+            self.logger.debug(
                 f"Loaded {len(self._cached_servers)} entries from"
                 f" {self.url(privacy=asset.secure_logging)}"
             )
