@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import gc
 from json import dumps, loads
 
 # Disable logging for a cleaner testing output
@@ -75,6 +76,16 @@ MATRIX_GOOD_RESPONSE = dumps(
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
+
+
+def _force_del_cleanup():
+    """Run a garbage collection pass right after `del obj`.
+
+    This is required otherwise the timing of the systems garbage collection
+    can cause issues with the testing
+    """
+    gc.collect()
+
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -1075,6 +1086,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
 
     # Force a object removal (thus a logout call)
     del obj
+    _force_del_cleanup()
 
 
 def test_plugin_matrix_url_parsing():
@@ -1167,6 +1179,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
     # Force a object removal (thus a logout call)
     del obj
+    _force_del_cleanup()
 
     def mock_function_handing(url, data, **kwargs):
         """Dummy function for handling image posts (successfully)"""
@@ -1203,6 +1216,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
 
     # Force a object removal (thus a logout call)
     del obj
+    _force_del_cleanup()
 
 
 @mock.patch("requests.put")
@@ -1331,6 +1345,7 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
 
     # Force a object removal (thus a logout call)
     del obj
+    _force_del_cleanup()
 
 
 @mock.patch("requests.put")
@@ -1583,6 +1598,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 
     # Force a object removal (thus a logout call)
     del obj
+    _force_del_cleanup()
 
     # Instantiate our object
     obj = Apprise.instantiate("matrixs://user:pass@localhost/#general?v=2")
@@ -1696,6 +1712,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 
     # Force a object removal (thus a logout call)
     del obj
+    _force_del_cleanup()
 
     # Instantiate our object (no discovery required)
     obj = Apprise.instantiate(
@@ -1964,6 +1981,7 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
 
         # Force a object removal (thus a logout call)
         del obj
+        _force_del_cleanup()
 
         assert mock_get.call_count == 0
         assert mock_post.call_count == 1
