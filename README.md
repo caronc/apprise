@@ -95,6 +95,7 @@ The table below identifies the services this tool supports and some example serv
 | [Kumulos](https://appriseit.com/services/kumulos/) | kumulos:// | (TCP) 443 | kumulos://apikey/serverkey
 | [LaMetric Time](https://appriseit.com/services/lametric/) | lametric:// | (TCP) 443 | lametric://apikey@device_ipaddr<br/>lametric://apikey@hostname:port<br/>lametric://client_id@client_secret
 | [Lark](https://appriseit.com/services/lark/) | lark://  | (TCP) 443   | lark://BotToken
+| [Lauther](https://appriseit.com/services/lauther/) | lauther:// | (TCP) 443 | lauther://Token
 | [Line](https://appriseit.com/services/line/) | line:// | (TCP) 443 | line://Token@User<br/>line://Token/User1/User2/UserN
 | [Mailgun](https://appriseit.com/services/mailgun/) | mailgun:// | (TCP) 443 | mailgun://user@hostname/apikey<br />mailgun://user@hostname/apikey/email<br />mailgun://user@hostname/apikey/email1/email2/emailN<br />mailgun://user@hostname/apikey/?name="From%20User"
 | [MailerSend](https://appriseit.com/services/mailersend/) | mailersend://  | (TCP) 443   | mailersend://APIToken:FromEmail/<br />mailersend://APIToken:FromEmail/ToEmail<br />mailersend://APIToken:FromEmail/ToEmail1/ToEmail2/ToEmailN/
