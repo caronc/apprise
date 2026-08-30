@@ -25,7 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-# Lauther — notifications & anonymous identity
+# Lauther - notifications and anonymous identity
 #   1. Install the Lauther app (https://lauther.app/)
 #   2. In the app: Apps -> + -> New token
 #   3. Your token looks like: lpt_AbCdEf...
@@ -34,6 +34,8 @@
 #   lauther://{token}
 #   lauther://{token}?priority=high&sound=default
 #
+# Resources:
+# - https://lauther.app/docs.html
 
 import requests
 
@@ -79,7 +81,7 @@ class NotifyLauther(NotifyBase):
     """A wrapper for Lauther Notifications."""
 
     # The default descriptive name associated with the Notification
-    service_name = _("Lauther")
+    service_name = "Lauther"
 
     # The services URL
     service_url = "https://lauther.app/"
@@ -88,15 +90,23 @@ class NotifyLauther(NotifyBase):
     secure_protocol = "lauther"
 
     # A URL that takes you to the setup/help of the specific protocol
-    setup_url = "https://lauther.app/docs.html"
+    setup_url = "https://appriseit.com/services/lauther/"
 
     # Notification URL
     notify_url = "https://api.lauther.id/v1/push"
 
+    # The Lauther API has no endpoint for uploading files, so there is
+    # nothing to wire up here; attachment_support stays at its False
+    # default.
+
+    # The maximum allowable characters allowed in the body per message as
+    # documented by the Lauther API
+    body_maxlen = 2000
+
     # Define object templates
     templates = ("{schema}://{token}",)
 
-    # Define our tokens; these are the minimum tokens required required to
+    # Define our tokens; these are the minimum tokens required to
     # be passed into this function (as arguments).
     template_tokens = dict(
         NotifyBase.template_tokens,
@@ -132,10 +142,44 @@ class NotifyLauther(NotifyBase):
                 "name": _("Click URL"),
                 "type": "string",
             },
+            "icon": {
+                "name": _("Icon URL"),
+                "type": "string",
+            },
+            "color": {
+                "name": _("Color"),
+                "type": "string",
+            },
+            # Named "group" (not "tag") since "tag" is already claimed by
+            # Apprise's own notification tagging system (see ?tag= in the
+            # CLI/API docs); the value is still sent to Lauther as "tag".
+            "group": {
+                "name": _("Group"),
+                "type": "string",
+            },
+            # Named "route" (not "path") since "path" is already the
+            # reserved key Apprise's URL parser uses for the URL's own
+            # path component; the value is still sent to Lauther as
+            # "path".
+            "route": {
+                "name": _("Route"),
+                "type": "string",
+            },
         },
     )
 
-    def __init__(self, token, priority=None, sound=None, click=None, **kwargs):
+    def __init__(
+        self,
+        token,
+        priority=None,
+        sound=None,
+        click=None,
+        icon=None,
+        color=None,
+        group=None,
+        route=None,
+        **kwargs,
+    ):
         """Initialize Lauther Object."""
         super().__init__(**kwargs)
 
@@ -157,7 +201,7 @@ class NotifyLauther(NotifyBase):
                     # Longest key first: "lowest" and "low" share a prefix, so
                     # a shortest-first scan resolves "low" to LOWEST. Upstream
                     # Pushover avoids this with single-letter keys, which is
-                    # not available here — its scale has no "lowest".
+                    # not available here since its scale has no "lowest".
                     for k, v in sorted(
                         LAUTHER_PRIORITY_MAP.items(),
                         key=lambda kv: -len(kv[0]),
@@ -176,9 +220,13 @@ class NotifyLauther(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # An optional sound and click-through URL
+        # Optional appearance overrides and metadata
         self.sound = sound
         self.click = click
+        self.icon = icon
+        self.color = color
+        self.group = group
+        self.route = route
 
         return
 
@@ -200,6 +248,14 @@ class NotifyLauther(NotifyBase):
             payload["sound"] = self.sound
         if self.click:
             payload["url"] = self.click
+        if self.icon:
+            payload["icon"] = self.icon
+        if self.color:
+            payload["color"] = self.color
+        if self.group:
+            payload["tag"] = self.group
+        if self.route:
+            payload["path"] = self.route
 
         self.logger.debug(
             "Lauther POST URL:"
@@ -264,6 +320,14 @@ class NotifyLauther(NotifyBase):
             params["sound"] = self.sound
         if self.click:
             params["click"] = self.click
+        if self.icon:
+            params["icon"] = self.icon
+        if self.color:
+            params["color"] = self.color
+        if self.group:
+            params["group"] = self.group
+        if self.route:
+            params["route"] = self.route
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -314,5 +378,21 @@ class NotifyLauther(NotifyBase):
         # Get our click-through URL (if defined)
         if "click" in results["qsd"] and len(results["qsd"]["click"]):
             results["click"] = NotifyLauther.unquote(results["qsd"]["click"])
+
+        # Get our icon URL (if defined)
+        if "icon" in results["qsd"] and len(results["qsd"]["icon"]):
+            results["icon"] = NotifyLauther.unquote(results["qsd"]["icon"])
+
+        # Get our color (if defined)
+        if "color" in results["qsd"] and len(results["qsd"]["color"]):
+            results["color"] = NotifyLauther.unquote(results["qsd"]["color"])
+
+        # Get our grouping/collapse key (if defined)
+        if "group" in results["qsd"] and len(results["qsd"]["group"]):
+            results["group"] = NotifyLauther.unquote(results["qsd"]["group"])
+
+        # Get our paired-site route (if defined)
+        if "route" in results["qsd"] and len(results["qsd"]["route"]):
+            results["route"] = NotifyLauther.unquote(results["qsd"]["route"])
 
         return results

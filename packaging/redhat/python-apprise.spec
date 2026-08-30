@@ -68,7 +68,8 @@ notification services. It supports sending alerts to platforms such as: \
 `Gotify`, `GroupMe`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, \
 `HumHub`, \
 `IFTTT`, `IRC`, `Jellyfin`, `Jira`, `Join`, `Kavenegar`, `KODI`, `Kook`, \
-`Kumulos`, `LaMetric`, `Lark`, `Line`, `MacOSX`, `Mailgun`, `MailerSend`, \
+`Kumulos`, `LaMetric`, `Lark`, `Lauther`, `Line`, `MacOSX`, `Mailgun`, \
+`MailerSend`, \
 `Mastodon`, \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
 `Microsoft Teams`, `Misskey`, \

@@ -118,6 +118,15 @@ apprise_url_tests = (
         },
     ),
     (
+        "lauther://lpt_abc123"
+        "?icon=https://example.ca/icon.png&color=%23D9EF00"
+        "&group=orders&route=/orders/123",
+        {
+            # Icon, color, group, and paired-site route overrides
+            "instance": NotifyLauther,
+        },
+    ),
+    (
         "lauther://lpt_abc123",
         {
             "instance": NotifyLauther,
