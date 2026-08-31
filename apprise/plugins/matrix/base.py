@@ -1246,7 +1246,18 @@ class NotifyMatrix(NotifyBase):
                 has_error = True
                 continue
 
-        return not has_error
+        successful = not has_error
+        if (
+            successful
+            and e2ee_capable
+            and self.autoverify
+            and not self._e2ee_refresh_verified_state()
+        ):
+            self.logger.warning(
+                "Matrix E2EE verified device state could not be refreshed."
+            )
+
+        return successful
 
     def _send_attachments(self, attach):
         """Posts all of the provided attachments."""
@@ -2206,6 +2217,62 @@ class NotifyMatrix(NotifyBase):
         binding = self.store.get("e2ee_device_binding")
         if not binding:
             return False
+        return self.store.set(
+            "e2ee_verified_binding",
+            binding,
+            expires=self.default_cache_expiry_sec,
+        )
+
+    def _e2ee_refresh_verified_state(self):
+        """Extend only the state required to retain SAS verification.
+
+        The Matrix device ID and custom E2EE account are part of the verified
+        binding.  They must remain stable with the two binding records or a
+        future login would create a new identity that requires another SAS
+        verification.  Unrelated Matrix and E2EE cache entries are deliberately
+        left untouched.
+        """
+        binding = self.store.get("e2ee_device_binding")
+        if (
+            not binding
+            or self.store.get("e2ee_verified_binding") != binding
+            or not self.user_id
+            or not self.device_id
+            or not self._e2ee_account
+        ):
+            return False
+
+        current_binding = "{}|{}|{}|{}".format(
+            self.user_id,
+            self.device_id,
+            self._e2ee_account.identity_key,
+            self._e2ee_account.signing_key,
+        )
+        if binding != current_binding:
+            return False
+
+        refreshed = (
+            self.store.set(
+                "device_id",
+                self.device_id,
+                expires=self.default_cache_expiry_sec,
+            ),
+            self.store.set(
+                "e2ee_account",
+                self._e2ee_account.to_dict(),
+                expires=self.default_cache_expiry_sec,
+            ),
+            self.store.set(
+                "e2ee_device_binding",
+                binding,
+                expires=self.default_cache_expiry_sec,
+            ),
+        )
+        if not all(refreshed):
+            return False
+
+        # Write the trust marker last.  A partial refresh must fail closed
+        # instead of extending trust without its complete bound identity.
         return self.store.set(
             "e2ee_verified_binding",
             binding,

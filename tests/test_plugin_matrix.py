@@ -2718,6 +2718,81 @@ def test_plugin_matrix_sas_auto_verify_flow():
     assert obj.store.get("e2ee_verified_binding") == binding
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_verified_state_refresh_is_minimal():
+    """Only identity state required to retain SAS trust is refreshed."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        autoverify=True,
+        secure=True,
+    )
+    obj.user_id = "@u:h"
+    obj.device_id = "APPRISE"
+    obj._e2ee_account = MatrixOlmAccount()
+    binding = "{}|{}|{}|{}".format(
+        obj.user_id,
+        obj.device_id,
+        obj._e2ee_account.identity_key,
+        obj._e2ee_account.signing_key,
+    )
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+    obj.store.set("e2ee_verified_binding", binding, expires=60)
+
+    with mock.patch.object(obj.store, "set", wraps=obj.store.set) as store_set:
+        assert obj._e2ee_refresh_verified_state() is True
+
+    assert [call.args[0] for call in store_set.call_args_list] == [
+        "device_id",
+        "e2ee_account",
+        "e2ee_device_binding",
+        "e2ee_verified_binding",
+    ]
+    assert all(
+        call.kwargs["expires"] == obj.default_cache_expiry_sec
+        for call in store_set.call_args_list
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+@pytest.mark.parametrize("delivery_ok", [True, False])
+def test_plugin_matrix_sas_refresh_only_after_success(delivery_ok):
+    """A failed Matrix delivery must not extend SAS trust."""
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        autoverify=True,
+        secure=True,
+    )
+    obj.access_token = "token"
+    obj.user_id = "@u:h"
+    obj.device_id = "APPRISE"
+
+    with (
+        mock.patch.object(obj, "_e2ee_setup", return_value=True),
+        mock.patch.object(obj, "_e2ee_auto_verify", return_value=True),
+        mock.patch.object(obj, "_room_join", return_value="!r:h"),
+        mock.patch.object(obj, "_e2ee_room_encrypted", return_value=True),
+        mock.patch.object(
+            obj, "_e2ee_send_to_room", return_value=delivery_ok
+        ),
+        mock.patch.object(
+            obj, "_e2ee_refresh_verified_state", return_value=True
+        ) as refresh,
+    ):
+        assert obj._send_server_notification(body="test") is delivery_ok
+
+    assert refresh.call_count == (1 if delivery_ok else 0)
+
+
 def test_plugin_matrix_e2ee_no_cryptography():
     """MATRIX_E2EE_SUPPORT is False when cryptography is unavailable."""
     import importlib
