@@ -7,7 +7,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: apprise 1.11.0\n"
 "Report-Msgid-Bugs-To: lead2gold@gmail.com\n"
-"POT-Creation-Date: 2026-08-20 09:55-0400\n"
+"POT-Creation-Date: 2026-08-30 22:08-0400\n"
 "PO-Revision-Date: 2019-05-24 20:00-0400\n"
 "Last-Translator: Chris Caron <lead2gold@gmail.com>\n"
 "Language: es\n"
@@ -92,7 +92,7 @@ msgstr "Nombre de Usuario de la Aplicacion"
 #: apprise/plugins/messagebird.py:78 apprise/plugins/notifyre.py:130
 #: apprise/plugins/octopush.py:136 apprise/plugins/one_signal.py:113
 #: apprise/plugins/opsgenie.py:228 apprise/plugins/pagerduty.py:131
-#: apprise/plugins/pinglet.py:137 apprise/plugins/pingram.py:175
+#: apprise/plugins/pinglet.py:137 apprise/plugins/pingram.py:177
 #: apprise/plugins/postmark.py:117 apprise/plugins/prowl.py:121
 #: apprise/plugins/resend.py:107 apprise/plugins/resend.py:145
 #: apprise/plugins/sendgrid.py:116 apprise/plugins/seven.py:75
@@ -130,7 +130,7 @@ msgstr "Telefono de Destino"
 #: apprise/plugins/nextcloudtalk.py:101 apprise/plugins/notifiarr.py:103
 #: apprise/plugins/notifyre.py:143 apprise/plugins/ntfy.py:241
 #: apprise/plugins/octopush.py:153 apprise/plugins/office365.py:287
-#: apprise/plugins/one_signal.py:141 apprise/plugins/pingram.py:198
+#: apprise/plugins/one_signal.py:141 apprise/plugins/pingram.py:200
 #: apprise/plugins/plivo.py:114 apprise/plugins/postmark.py:133
 #: apprise/plugins/pushbullet.py:105 apprise/plugins/pushed.py:107
 #: apprise/plugins/pushover.py:252 apprise/plugins/pushsafer.py:376
@@ -267,12 +267,12 @@ msgstr "Contrasena"
 #: apprise/plugins/apprise_api.py:122 apprise/plugins/chanify.py:74
 #: apprise/plugins/dingtalk.py:93 apprise/plugins/exotel.py:166
 #: apprise/plugins/feishu.py:80 apprise/plugins/gotify.py:123
-#: apprise/plugins/kook.py:170 apprise/plugins/mattermost.py:166
-#: apprise/plugins/notica.py:119 apprise/plugins/notifiarr.py:91
-#: apprise/plugins/ntfy.py:230 apprise/plugins/pushme.py:62
-#: apprise/plugins/ryver.py:99 apprise/plugins/serverchan.py:70
-#: apprise/plugins/slack.py:331 apprise/plugins/synology.py:104
-#: apprise/plugins/zulip.py:136
+#: apprise/plugins/kook.py:170 apprise/plugins/lauther.py:115
+#: apprise/plugins/mattermost.py:166 apprise/plugins/notica.py:119
+#: apprise/plugins/notifiarr.py:91 apprise/plugins/ntfy.py:230
+#: apprise/plugins/pushme.py:62 apprise/plugins/ryver.py:99
+#: apprise/plugins/serverchan.py:70 apprise/plugins/slack.py:331
+#: apprise/plugins/synology.py:104 apprise/plugins/zulip.py:136
 msgid "Token"
 msgstr "Token"
 
@@ -326,8 +326,9 @@ msgid "Target Device"
 msgstr "Dispositivo de Destino"
 
 #: apprise/plugins/bark.py:191 apprise/plugins/lametric.py:516
-#: apprise/plugins/macosx.py:124 apprise/plugins/pushover.py:269
-#: apprise/plugins/pushsafer.py:392 apprise/plugins/pushy.py:110
+#: apprise/plugins/lauther.py:138 apprise/plugins/macosx.py:124
+#: apprise/plugins/pushover.py:269 apprise/plugins/pushsafer.py:392
+#: apprise/plugins/pushy.py:110
 msgid "Sound"
 msgstr "Sonido"
 
@@ -353,7 +354,7 @@ msgid "Category"
 msgstr "Categoria"
 
 #: apprise/plugins/bark.py:220 apprise/plugins/join.py:158
-#: apprise/plugins/pagerduty.py:163
+#: apprise/plugins/lauther.py:157 apprise/plugins/pagerduty.py:163
 msgid "Group"
 msgstr "Grupo"
 
@@ -373,8 +374,8 @@ msgstr "Grupo"
 msgid "Include Image"
 msgstr "Incluir Imagen"
 
-#: apprise/plugins/bark.py:230 apprise/plugins/mattermost.py:213
-#: apprise/plugins/revolt.py:129
+#: apprise/plugins/bark.py:230 apprise/plugins/lauther.py:146
+#: apprise/plugins/mattermost.py:213 apprise/plugins/revolt.py:129
 msgid "Icon URL"
 msgstr "URL del Icono"
 
@@ -457,7 +458,7 @@ msgstr "Correo de Origen"
 #: apprise/plugins/brevo.py:169 apprise/plugins/email/base.py:163
 #: apprise/plugins/mailersend.py:138 apprise/plugins/mailgun.py:152
 #: apprise/plugins/office365.py:282 apprise/plugins/one_signal.py:124
-#: apprise/plugins/pingram.py:182 apprise/plugins/postmark.py:128
+#: apprise/plugins/pingram.py:184 apprise/plugins/postmark.py:128
 #: apprise/plugins/pushbullet.py:100 apprise/plugins/pushsafer.py:371
 #: apprise/plugins/resend.py:119 apprise/plugins/sendgrid.py:128
 #: apprise/plugins/sendpulse.py:134 apprise/plugins/slack.py:264
@@ -473,7 +474,7 @@ msgstr "Responder a Correo"
 
 #: apprise/plugins/brevo.py:193 apprise/plugins/email/base.py:249
 #: apprise/plugins/mailersend.py:157 apprise/plugins/mailgun.py:186
-#: apprise/plugins/office365.py:307 apprise/plugins/pingram.py:245
+#: apprise/plugins/office365.py:307 apprise/plugins/pingram.py:247
 #: apprise/plugins/postmark.py:157 apprise/plugins/resend.py:158
 #: apprise/plugins/sendgrid.py:153 apprise/plugins/sendpulse.py:169
 #: apprise/plugins/ses.py:232 apprise/plugins/smtp2go.py:143
@@ -483,7 +484,7 @@ msgstr "Copia de Carbono"
 
 #: apprise/plugins/brevo.py:197 apprise/plugins/email/base.py:253
 #: apprise/plugins/mailersend.py:161 apprise/plugins/mailgun.py:190
-#: apprise/plugins/office365.py:311 apprise/plugins/pingram.py:249
+#: apprise/plugins/office365.py:311 apprise/plugins/pingram.py:251
 #: apprise/plugins/postmark.py:161 apprise/plugins/resend.py:162
 #: apprise/plugins/sendgrid.py:157 apprise/plugins/sendpulse.py:173
 #: apprise/plugins/ses.py:236 apprise/plugins/smtp2go.py:147
@@ -614,10 +615,11 @@ msgstr "Direccion de Origen"
 #: apprise/plugins/dapnet.py:150 apprise/plugins/exotel.py:240
 #: apprise/plugins/gotify.py:153 apprise/plugins/growl.py:163
 #: apprise/plugins/jira.py:287 apprise/plugins/join.py:189
-#: apprise/plugins/lametric.py:494 apprise/plugins/ntfy.py:283
-#: apprise/plugins/opsgenie.py:280 apprise/plugins/pinglet.py:177
-#: apprise/plugins/prowl.py:141 apprise/plugins/pushover.py:263
-#: apprise/plugins/pushsafer.py:387 apprise/plugins/smseagle.py:187
+#: apprise/plugins/lametric.py:494 apprise/plugins/lauther.py:132
+#: apprise/plugins/ntfy.py:283 apprise/plugins/opsgenie.py:280
+#: apprise/plugins/pinglet.py:177 apprise/plugins/prowl.py:141
+#: apprise/plugins/pushover.py:263 apprise/plugins/pushsafer.py:387
+#: apprise/plugins/smseagle.py:187
 msgid "Priority"
 msgstr "Prioridad"
 
@@ -714,7 +716,7 @@ msgid "Batch Attachments"
 msgstr "Archivos Adjuntos Sensibles"
 
 #: apprise/plugins/discord.py:241 apprise/plugins/mailgun.py:208
-#: apprise/plugins/pingram.py:258 apprise/plugins/slack.py:348
+#: apprise/plugins/pingram.py:260 apprise/plugins/slack.py:348
 #: apprise/plugins/sparkpost.py:223 apprise/plugins/telegram.py:437
 #: apprise/plugins/workflows.py:221
 #, fuzzy
@@ -800,7 +802,7 @@ msgstr "Numero de Telefono de Origen"
 
 #: apprise/plugins/exotel.py:233 apprise/plugins/jira.py:275
 #: apprise/plugins/mailgun.py:176 apprise/plugins/opsgenie.py:273
-#: apprise/plugins/pagerduty.py:176 apprise/plugins/pingram.py:220
+#: apprise/plugins/pagerduty.py:176 apprise/plugins/pingram.py:222
 #: apprise/plugins/sparkpost.py:191
 msgid "Region Name"
 msgstr "Nombre de Region"
@@ -830,7 +832,7 @@ msgstr "Webhook"
 #: apprise/plugins/fluxer.py:195 apprise/plugins/kook.py:196
 #: apprise/plugins/lametric.py:510 apprise/plugins/mattermost.py:229
 #: apprise/plugins/notifyre.py:157 apprise/plugins/ntfy.py:297
-#: apprise/plugins/office365.py:319 apprise/plugins/pingram.py:226
+#: apprise/plugins/office365.py:319 apprise/plugins/pingram.py:228
 #: apprise/plugins/sns.py:202 apprise/plugins/vapid/__init__.py:169
 #: apprise/plugins/webexteams.py:197 apprise/plugins/zoom.py:158
 #, fuzzy
@@ -1066,6 +1068,21 @@ msgstr "Lark (Feishu)"
 msgid "Bot Token"
 msgstr "Token del Bot"
 
+#: apprise/plugins/lauther.py:142
+#, fuzzy
+msgid "Click URL"
+msgstr "URL de Apertura/Clic"
+
+#: apprise/plugins/lauther.py:150
+#, fuzzy
+msgid "Color"
+msgstr "Colores IRC"
+
+#: apprise/plugins/lauther.py:165
+#, fuzzy
+msgid "Route"
+msgstr "Grupo de Enrutamiento"
+
 #: apprise/plugins/macosx.py:65
 msgid ""
 "Only works with Mac OS X 10.8 and higher. Additionally  requires that /usr/"
@@ -1081,7 +1098,7 @@ msgid "Open/Click URL"
 msgstr "URL de Apertura/Clic"
 
 #: apprise/plugins/email/base.py:200 apprise/plugins/mailersend.py:165
-#: apprise/plugins/office365.py:315 apprise/plugins/pingram.py:231
+#: apprise/plugins/office365.py:315 apprise/plugins/pingram.py:233
 #: apprise/plugins/resend.py:150
 msgid "Reply To"
 msgstr "Responder A"
@@ -1429,25 +1446,25 @@ msgstr "Insignia"
 msgid "Metadata"
 msgstr "Extras de Meta"
 
-#: apprise/plugins/matrix/base.py:377 apprise/plugins/pingram.py:169
+#: apprise/plugins/matrix/base.py:377 apprise/plugins/pingram.py:171
 msgid "Message Type"
 msgstr "Tipo de Mensaje"
 
-#: apprise/plugins/pingram.py:187
+#: apprise/plugins/pingram.py:189
 #, fuzzy
 msgid "Target ID"
 msgstr "ID de Destino"
 
-#: apprise/plugins/pingram.py:193
+#: apprise/plugins/pingram.py:195
 #, fuzzy
 msgid "Target SMS"
 msgstr "SMS de Destino"
 
-#: apprise/plugins/pingram.py:215
+#: apprise/plugins/pingram.py:217 apprise/plugins/signalgrid.py:101
 msgid "Channels"
 msgstr "Canales"
 
-#: apprise/plugins/email/base.py:178 apprise/plugins/pingram.py:236
+#: apprise/plugins/email/base.py:178 apprise/plugins/pingram.py:238
 #: apprise/plugins/sendpulse.py:150 apprise/plugins/ses.py:163
 msgid "From Email"
 msgstr "Correo de Origen"
@@ -1755,6 +1772,16 @@ msgstr "Tiempo de Espera"
 #, fuzzy
 msgid "TTS Voice"
 msgstr "Voz TTS"
+
+#: apprise/plugins/signalgrid.py:95
+#, fuzzy
+msgid "Client Key"
+msgstr "ID del Cliente"
+
+#: apprise/plugins/signalgrid.py:118
+#, fuzzy
+msgid "Critical Notification"
+msgstr "Notificacion Silenciosa"
 
 #: apprise/plugins/signl4.py:89
 #, fuzzy
