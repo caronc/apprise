@@ -2455,6 +2455,269 @@ def test_plugin_matrix_e2ee_helpers():
     assert out.startswith(b'{"a"')
 
 
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_responder_roundtrip():
+    """The custom SAS responder interoperates without libolm."""
+    import hashlib
+
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+        X25519PublicKey,
+    )
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from apprise.plugins.matrix.e2ee import (
+        MatrixOlmAccount,
+        MatrixSASVerification,
+        _b64dec,
+        _b64enc,
+        _canonical_json,
+        _hkdf_sha256,
+        _hmac_sha256,
+    )
+
+    own_user = peer_user = "@u:h"
+    own_device = "APPRISE"
+    peer_device = "ELEMENT"
+    transaction_id = "sas-transaction"
+    start = {
+        "from_device": peer_device,
+        "transaction_id": transaction_id,
+        "method": "m.sas.v1",
+        "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+        "hashes": ["sha256"],
+        "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+        "short_authentication_string": ["decimal", "emoji"],
+    }
+    sas = MatrixSASVerification(
+        own_user,
+        own_device,
+        peer_user,
+        peer_device,
+        start,
+    )
+    accept = sas.accept_content()
+    commitment = hashlib.sha256(
+        sas.public_key.encode("ascii") + _canonical_json(start)
+    ).digest()
+    assert accept["commitment"] == _b64enc(commitment)
+    assert accept["message_authentication_code"] == ("hkdf-hmac-sha256.v2")
+
+    peer_private = X25519PrivateKey.generate()
+    peer_public = _b64enc(
+        peer_private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+    sas.receive_key(peer_public)
+    assert sas.key_content()["key"] == sas.public_key
+    shared_secret = peer_private.exchange(
+        X25519PublicKey.from_public_bytes(_b64dec(sas.public_key))
+    )
+
+    def peer_mac(value, key_id):
+        info = (
+            "MATRIX_KEY_VERIFICATION_MAC"
+            + peer_user
+            + peer_device
+            + own_user
+            + own_device
+            + transaction_id
+            + key_id
+        ).encode("utf-8")
+        key = _hkdf_sha256(shared_secret, 32, salt=None, info=info)
+        return _b64enc(_hmac_sha256(key, value.encode("utf-8")))
+
+    own_account = MatrixOlmAccount()
+    own_mac = sas.mac_content(own_account.signing_key)
+    assert "ed25519:APPRISE" in own_mac["mac"]
+
+    peer_account = MatrixOlmAccount()
+    peer_key_id = "ed25519:{}".format(peer_device)
+    peer_content = {
+        "transaction_id": transaction_id,
+        "mac": {peer_key_id: peer_mac(peer_account.signing_key, peer_key_id)},
+        "keys": peer_mac(peer_key_id, "KEY_IDS"),
+    }
+    tampered = dict(peer_content)
+    tampered["keys"] = "invalid"
+    with pytest.raises(ValueError, match="key list MAC"):
+        sas.verify_peer_mac(tampered, {peer_key_id: peer_account.signing_key})
+    assert sas.verify_peer_mac(
+        peer_content, {peer_key_id: peer_account.signing_key}
+    )
+    assert sas.state == "verified"
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_auto_verify_flow():
+    """The Matrix plugin drives the same-user SAS to-device flow."""
+    from time import time
+
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+        X25519PublicKey,
+    )
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from apprise.plugins.matrix.e2ee import (
+        MatrixOlmAccount,
+        _b64dec,
+        _b64enc,
+        _hkdf_sha256,
+        _hmac_sha256,
+    )
+
+    user_id = "@u:h"
+    own_device = "APPRISE"
+    peer_device = "ELEMENT"
+    transaction_id = "sas-flow"
+    own_account = MatrixOlmAccount()
+    peer_account = MatrixOlmAccount()
+    peer_private = X25519PrivateKey.generate()
+    peer_public = _b64enc(
+        peer_private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+    peer_device_keys = peer_account.device_keys_payload(user_id, peer_device)
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        autoverify=True,
+    )
+    obj.user_id = user_id
+    obj.device_id = own_device
+    obj._e2ee_account = own_account
+    binding = "{}|{}|{}|{}".format(
+        user_id,
+        own_device,
+        own_account.identity_key,
+        own_account.signing_key,
+    )
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+
+    sent = []
+
+    def send_event(event_type, event_user, event_device, content):
+        sent.append((event_type, event_user, event_device, content))
+        return True
+
+    sync_index = 0
+
+    def fake_fetch(path, payload=None, params=None, method="POST", **kwargs):
+        nonlocal sync_index
+        if path == "/keys/query":
+            return (
+                True,
+                {"device_keys": {user_id: {peer_device: peer_device_keys}}},
+                requests.codes.ok,
+            )
+        assert path == "/sync"
+        if sync_index == 0:
+            event_type = "m.key.verification.request"
+            content = {
+                "from_device": peer_device,
+                "transaction_id": transaction_id,
+                "methods": ["m.sas.v1"],
+                "timestamp": int(time() * 1000),
+            }
+        elif sync_index == 1:
+            event_type = "m.key.verification.start"
+            content = {
+                "from_device": peer_device,
+                "transaction_id": transaction_id,
+                "method": "m.sas.v1",
+                "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+                "hashes": ["sha256"],
+                "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+                "short_authentication_string": ["decimal", "emoji"],
+            }
+        elif sync_index == 2:
+            event_type = "m.key.verification.key"
+            content = {
+                "transaction_id": transaction_id,
+                "key": peer_public,
+            }
+        elif sync_index == 3:
+            event_type = "m.key.verification.mac"
+            own_key_event = next(
+                item for item in sent if item[0] == "m.key.verification.key"
+            )
+            own_public = own_key_event[3]["key"]
+            shared_secret = peer_private.exchange(
+                X25519PublicKey.from_public_bytes(_b64dec(own_public))
+            )
+            key_id = "ed25519:{}".format(peer_device)
+
+            def calculate_mac(value, info_key_id):
+                info = (
+                    "MATRIX_KEY_VERIFICATION_MAC"
+                    + user_id
+                    + peer_device
+                    + user_id
+                    + own_device
+                    + transaction_id
+                    + info_key_id
+                ).encode("utf-8")
+                key = _hkdf_sha256(shared_secret, 32, salt=None, info=info)
+                return _b64enc(_hmac_sha256(key, value.encode("utf-8")))
+
+            content = {
+                "transaction_id": transaction_id,
+                "mac": {
+                    key_id: calculate_mac(peer_account.signing_key, key_id)
+                },
+                "keys": calculate_mac(key_id, "KEY_IDS"),
+            }
+        else:
+            event_type = "m.key.verification.done"
+            content = {"transaction_id": transaction_id}
+
+        sync_index += 1
+        return (
+            True,
+            {
+                "next_batch": "sync-{}".format(sync_index),
+                "to_device": {
+                    "events": [
+                        {
+                            "type": event_type,
+                            "sender": user_id,
+                            "content": content,
+                        }
+                    ]
+                },
+            },
+            requests.codes.ok,
+        )
+
+    with (
+        mock.patch.object(obj, "_fetch", side_effect=fake_fetch),
+        mock.patch.object(
+            obj,
+            "_e2ee_send_verification_event",
+            side_effect=send_event,
+        ),
+    ):
+        assert obj._e2ee_auto_verify() is True
+
+    assert [item[0] for item in sent] == [
+        "m.key.verification.ready",
+        "m.key.verification.accept",
+        "m.key.verification.key",
+        "m.key.verification.mac",
+        "m.key.verification.done",
+    ]
+    assert obj.store.get("e2ee_verified_binding") == binding
+
+
 def test_plugin_matrix_e2ee_no_cryptography():
     """MATRIX_E2EE_SUPPORT is False when cryptography is unavailable."""
     import importlib
@@ -2967,6 +3230,21 @@ def test_plugin_matrix_e2ee_url_roundtrip():
         "no",
         "0",
     )
+
+    # Automatic verification is opt-in and survives URL round-trip.
+    obj3 = NotifyMatrix(
+        host="matrix.example.com",
+        user="user",
+        password="pass",
+        targets=["#room"],
+        autoverify=True,
+    )
+    assert obj3.autoverify is True
+    u3 = obj3.url()
+    assert "autoverify=yes" in u3
+    result = NotifyMatrix.parse_url(u3)
+    assert result is not None
+    assert result.get("autoverify") is True
 
 
 @mock.patch("requests.put")

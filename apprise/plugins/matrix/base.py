@@ -67,6 +67,7 @@ from .e2ee import (
     MATRIX_E2EE_SUPPORT,
     MatrixMegOlmSession,
     MatrixOlmAccount,
+    MatrixSASVerification,
     encrypt_attachment,
     verify_device_keys,
     verify_signed_otk,
@@ -256,6 +257,9 @@ class NotifyMatrix(NotifyBase):
     # key-shares skip devices that have no OTK available.
     default_e2ee_otk_replenish_threshold = 5
 
+    # Maximum time an opt-in verification bootstrap waits for SAS events.
+    default_autoverify_timeout_sec = 120
+
     # Used for server discovery
     discovery_base_key = "__discovery_base"
     discovery_identity_key = "__discovery_identity"
@@ -384,6 +388,11 @@ class NotifyMatrix(NotifyBase):
                 "type": "bool",
                 "default": True,
             },
+            "autoverify": {
+                "name": _("Automatic Device Verification"),
+                "type": "bool",
+                "default": False,
+            },
             "token": {
                 "alias_of": "token",
             },
@@ -404,6 +413,7 @@ class NotifyMatrix(NotifyBase):
         hsreq=None,
         webhook_path=None,
         e2ee=None,
+        autoverify=None,
         **kwargs,
     ):
         """Initialize Matrix Object."""
@@ -473,6 +483,11 @@ class NotifyMatrix(NotifyBase):
             self.template_args["e2ee"]["default"]
             if e2ee is None
             else parse_bool(e2ee)
+        )
+        self.autoverify = (
+            self.template_args["autoverify"]["default"]
+            if autoverify is None
+            else parse_bool(autoverify)
         )
 
         # Setup our mode
@@ -1027,6 +1042,12 @@ class NotifyMatrix(NotifyBase):
                     "Matrix E2EE setup failed; "
                     "messages will be sent unencrypted."
                 )
+
+        if e2ee_capable and self.autoverify and not self._e2ee_auto_verify():
+            self.logger.warning(
+                "Matrix E2EE automatic device verification did not complete."
+            )
+            return False
 
         # Plaintext attachment payloads for unencrypted rooms.
         # Lazy-initialized on the first unencrypted room so that purely
@@ -2131,6 +2152,266 @@ class NotifyMatrix(NotifyBase):
             expires=self.default_cache_expiry_sec,
         )
         return result
+
+    def _e2ee_send_verification_event(
+        self, event_type, user_id, device_id, content
+    ):
+        """Send one unencrypted SAS event to a specific Matrix device."""
+        path = "/sendToDevice/{}/{}".format(event_type, uuid.uuid4().hex)
+        ok, _, _ = self._fetch(
+            path,
+            payload={"messages": {user_id: {device_id: content}}},
+            method="PUT",
+        )
+        return ok
+
+    def _e2ee_verification_cancel(self, active, code, reason):
+        """Cancel an active SAS transaction on the peer device."""
+        if not active:
+            return False
+        return self._e2ee_send_verification_event(
+            "m.key.verification.cancel",
+            active["user_id"],
+            active["device_id"],
+            {
+                "transaction_id": active["transaction_id"],
+                "code": code,
+                "reason": reason,
+            },
+        )
+
+    def _e2ee_verification_peer_keys(self, user_id, device_id):
+        """Return verified device and advertised cross-signing keys."""
+        ok, response, _ = self._fetch(
+            "/keys/query",
+            payload={"device_keys": {user_id: [device_id]}},
+        )
+        if not ok or not isinstance(response, dict):
+            return None
+
+        device = (
+            response.get("device_keys", {}).get(user_id, {}).get(device_id)
+        )
+        if not device or not verify_device_keys(device, user_id, device_id):
+            return None
+
+        keys = dict(device.get("keys", {}))
+        master_key = response.get("master_keys", {}).get(user_id, {})
+        if isinstance(master_key, dict):
+            keys.update(master_key.get("keys", {}))
+        return keys
+
+    def _e2ee_store_verified_binding(self):
+        """Remember that the current custom E2EE identity completed SAS."""
+        binding = self.store.get("e2ee_device_binding")
+        if not binding:
+            return False
+        return self.store.set(
+            "e2ee_verified_binding",
+            binding,
+            expires=self.default_cache_expiry_sec,
+        )
+
+    def _e2ee_auto_verify(self):
+        """Automatically complete one same-user SAS verification.
+
+        This is an explicit bootstrap operation enabled by ``autoverify=yes``.
+        It consumes only unencrypted verification events from ``/sync`` and
+        does not introduce libolm or another Matrix device identity.
+        """
+        binding = self.store.get("e2ee_device_binding")
+        if binding and self.store.get("e2ee_verified_binding") == binding:
+            return True
+        if not self.user_id or not self.device_id or not self._e2ee_account:
+            return False
+
+        self.logger.info(
+            "Matrix E2EE: waiting up to %d seconds for a same-user "
+            "SAS verification request.",
+            self.default_autoverify_timeout_sec,
+        )
+        active = None
+        since = None
+        deadline = time() + self.default_autoverify_timeout_sec
+
+        while time() < deadline:
+            params = {"timeout": 3000}
+            if since:
+                params["since"] = since
+            ok, response, _ = self._fetch("/sync", params=params, method="GET")
+            if not ok or not isinstance(response, dict):
+                return False
+            since = response.get("next_batch") or since
+
+            events = response.get("to_device", {}).get("events", [])
+            for event in events if isinstance(events, list) else []:
+                if not isinstance(event, dict):
+                    continue
+                event_type = event.get("type")
+                sender = event.get("sender")
+                content = event.get("content", {})
+                if sender != self.user_id or not isinstance(content, dict):
+                    # Auto-verification is intentionally same-user only.
+                    continue
+
+                transaction_id = content.get("transaction_id")
+                from_device = content.get("from_device")
+
+                if event_type == "m.key.verification.request":
+                    timestamp = content.get("timestamp")
+                    now_ms = int(time() * 1000)
+                    if (
+                        not isinstance(timestamp, int)
+                        or timestamp < now_ms - 10 * 60 * 1000
+                        or timestamp > now_ms + 5 * 60 * 1000
+                        or not transaction_id
+                        or not from_device
+                        or "m.sas.v1" not in content.get("methods", [])
+                    ):
+                        continue
+                    if active:
+                        self._e2ee_verification_cancel(
+                            active,
+                            "m.unexpected_message",
+                            "Another verification is already active",
+                        )
+                        return False
+
+                    peer_keys = self._e2ee_verification_peer_keys(
+                        sender, from_device
+                    )
+                    if not peer_keys:
+                        return False
+                    active = {
+                        "transaction_id": transaction_id,
+                        "user_id": sender,
+                        "device_id": from_device,
+                        "peer_keys": peer_keys,
+                        "sas": None,
+                        "peer_done": False,
+                    }
+                    if not self._e2ee_send_verification_event(
+                        "m.key.verification.ready",
+                        sender,
+                        from_device,
+                        {
+                            "transaction_id": transaction_id,
+                            "from_device": self.device_id,
+                            "methods": ["m.sas.v1"],
+                        },
+                    ):
+                        return False
+                    continue
+
+                if not active or transaction_id != active["transaction_id"]:
+                    continue
+                if sender != active["user_id"]:
+                    continue
+
+                if event_type == "m.key.verification.cancel":
+                    self.logger.warning(
+                        "Matrix E2EE SAS verification was cancelled: %s",
+                        content.get("reason", "unspecified reason"),
+                    )
+                    return False
+
+                if event_type == "m.key.verification.start":
+                    try:
+                        sas = MatrixSASVerification(
+                            self.user_id,
+                            self.device_id,
+                            sender,
+                            active["device_id"],
+                            content,
+                        )
+                        accept = sas.accept_content()
+                    except (TypeError, ValueError):
+                        self._e2ee_verification_cancel(
+                            active,
+                            "m.unknown_method",
+                            "Unsupported SAS verification parameters",
+                        )
+                        return False
+                    active["sas"] = sas
+                    if not self._e2ee_send_verification_event(
+                        "m.key.verification.accept",
+                        sender,
+                        active["device_id"],
+                        accept,
+                    ):
+                        return False
+                    continue
+
+                sas = active.get("sas")
+                if sas is None:
+                    self._e2ee_verification_cancel(
+                        active,
+                        "m.unexpected_message",
+                        "SAS verification has not started",
+                    )
+                    return False
+
+                if event_type == "m.key.verification.key":
+                    try:
+                        sas.receive_key(content.get("key", ""))
+                        key_content = sas.key_content()
+                        mac_content = sas.mac_content(
+                            self._e2ee_account.signing_key
+                        )
+                    except (TypeError, ValueError):
+                        self._e2ee_verification_cancel(
+                            active,
+                            "m.invalid_message",
+                            "Invalid SAS public key",
+                        )
+                        return False
+                    if not self._e2ee_send_verification_event(
+                        "m.key.verification.key",
+                        sender,
+                        active["device_id"],
+                        key_content,
+                    ) or not self._e2ee_send_verification_event(
+                        "m.key.verification.mac",
+                        sender,
+                        active["device_id"],
+                        mac_content,
+                    ):
+                        return False
+                    continue
+
+                if event_type == "m.key.verification.mac":
+                    try:
+                        sas.verify_peer_mac(content, active["peer_keys"])
+                    except (TypeError, ValueError):
+                        self._e2ee_verification_cancel(
+                            active,
+                            "m.key_mismatch",
+                            "SAS device key MAC did not match",
+                        )
+                        return False
+                    if not self._e2ee_send_verification_event(
+                        "m.key.verification.done",
+                        sender,
+                        active["device_id"],
+                        {"transaction_id": transaction_id},
+                    ):
+                        return False
+                    if active["peer_done"]:
+                        self._e2ee_store_verified_binding()
+                        return True
+                    continue
+
+                if event_type == "m.key.verification.done":
+                    active["peer_done"] = True
+                    if sas.state == "verified":
+                        self._e2ee_store_verified_binding()
+                        return True
+
+        if active:
+            self._e2ee_verification_cancel(
+                active, "m.timeout", "SAS verification timed out"
+            )
+        return False
 
     def _e2ee_setup(self):
         """Ensure the E2EE device account exists and keys are uploaded.
@@ -3305,6 +3586,8 @@ class NotifyMatrix(NotifyBase):
 
         if not self.e2ee:
             params["e2ee"] = "no"
+        if self.autoverify:
+            params["autoverify"] = "yes"
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
@@ -3401,6 +3684,9 @@ class NotifyMatrix(NotifyBase):
         # E2EE flag
         if "e2ee" in results["qsd"]:
             results["e2ee"] = parse_bool(results["qsd"]["e2ee"])
+
+        if "autoverify" in results["qsd"]:
+            results["autoverify"] = parse_bool(results["qsd"]["autoverify"])
 
         # Get our mode
         results["mode"] = results["qsd"].get("mode")
