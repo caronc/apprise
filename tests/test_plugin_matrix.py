@@ -2781,9 +2781,7 @@ def test_plugin_matrix_sas_refresh_only_after_success(delivery_ok):
         mock.patch.object(obj, "_e2ee_auto_verify", return_value=True),
         mock.patch.object(obj, "_room_join", return_value="!r:h"),
         mock.patch.object(obj, "_e2ee_room_encrypted", return_value=True),
-        mock.patch.object(
-            obj, "_e2ee_send_to_room", return_value=delivery_ok
-        ),
+        mock.patch.object(obj, "_e2ee_send_to_room", return_value=delivery_ok),
         mock.patch.object(
             obj, "_e2ee_refresh_verified_state", return_value=True
         ) as refresh,
