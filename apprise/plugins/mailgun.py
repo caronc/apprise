@@ -275,7 +275,7 @@ class NotifyMailgun(NotifyBase):
             if self.region_name not in MAILGUN_REGIONS:
                 # allow the outer except to handle this common response
                 raise
-        except:
+        except Exception:
             # Invalid region specified
             msg = f"The Mailgun region specified ({region_name}) is invalid."
             self.logger.warning(msg)

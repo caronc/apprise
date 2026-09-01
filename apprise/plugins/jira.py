@@ -377,7 +377,7 @@ class NotifyJira(NotifyBase):
             if self.region_name not in JIRA_REGIONS:
                 # allow the outer except to handle this common response
                 raise
-        except:
+        except Exception:
             # Invalid region specified
             msg = "The Jira region specified ({}) is invalid.".format(
                 region_name
