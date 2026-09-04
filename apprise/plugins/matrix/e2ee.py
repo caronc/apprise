@@ -43,6 +43,7 @@
 import base64
 from json import dumps
 import os
+import secrets
 import struct
 import time as _time
 import uuid
@@ -317,6 +318,209 @@ def encrypt_attachment(data):
     }
 
     return ciphertext, file_info
+
+
+class MatrixSASVerification:
+    """Minimal responder-side Matrix SAS verification state machine.
+
+    This uses the same ``cryptography`` primitives and device signing key as
+    Apprise's custom E2EE implementation. It only implements the responder
+    path needed for opt-in, automatic same-user verification; it creates no
+    second Olm account or device identity.
+    """
+
+    METHOD = "m.sas.v1"
+    KEY_AGREEMENT = "curve25519-hkdf-sha256"
+    HASH = "sha256"
+    MAC = "hkdf-hmac-sha256.v2"
+    SAS_METHODS = ("decimal", "emoji")
+
+    def __init__(
+        self,
+        own_user_id,
+        own_device_id,
+        peer_user_id,
+        peer_device_id,
+        start_content,
+    ):
+        """Create a responder for a validation start event."""
+        self.own_user_id = own_user_id
+        self.own_device_id = own_device_id
+        self.peer_user_id = peer_user_id
+        self.peer_device_id = peer_device_id
+        self.start_content = dict(start_content)
+        self.transaction_id = self.start_content.get("transaction_id")
+
+        if not self.transaction_id or not self.peer_device_id:
+            raise ValueError("Missing SAS transaction or peer device ID")
+        if self.start_content.get("from_device") != self.peer_device_id:
+            raise ValueError("SAS start device does not match request device")
+        if self.start_content.get("method") != self.METHOD:
+            raise ValueError("Unsupported SAS verification method")
+        if self.KEY_AGREEMENT not in self.start_content.get(
+            "key_agreement_protocols", []
+        ):
+            raise ValueError("Unsupported SAS key agreement")
+        if self.HASH not in self.start_content.get("hashes", []):
+            raise ValueError("Unsupported SAS hash")
+        if self.MAC not in self.start_content.get(
+            "message_authentication_codes", []
+        ):
+            raise ValueError("Unsupported SAS MAC")
+
+        offered_sas = self.start_content.get("short_authentication_string", [])
+        self.sas_methods = [
+            method for method in self.SAS_METHODS if method in offered_sas
+        ]
+        if "decimal" not in self.sas_methods:
+            raise ValueError("SAS start does not offer decimal verification")
+
+        self._private_key = X25519PrivateKey.generate()
+        self.public_key = _b64enc(
+            self._private_key.public_key().public_bytes(
+                Encoding.Raw, PublicFormat.Raw
+            )
+        )
+        self._shared_secret = None
+        self.state = "started"
+
+    def accept_content(self):
+        """Build ``m.key.verification.accept`` content."""
+        if self.state != "started":
+            raise ValueError("SAS verification start was already accepted")
+
+        digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
+        digest.update(self.public_key.encode("ascii"))
+        digest.update(_canonical_json(self.start_content))
+        commitment = _b64enc(digest.finalize())
+        self.state = "accepted"
+        return {
+            "transaction_id": self.transaction_id,
+            "key_agreement_protocol": self.KEY_AGREEMENT,
+            "hash": self.HASH,
+            "message_authentication_code": self.MAC,
+            "short_authentication_string": self.sas_methods,
+            "commitment": commitment,
+        }
+
+    def receive_key(self, peer_public_key):
+        """Accept the initiator's ephemeral key and establish the SAS."""
+        if self.state != "accepted":
+            raise ValueError("Unexpected SAS key event")
+        peer_key = X25519PublicKey.from_public_bytes(_b64dec(peer_public_key))
+        self._shared_secret = self._private_key.exchange(peer_key)
+        self.state = "key_received"
+
+    def key_content(self):
+        """Build our ``m.key.verification.key`` content."""
+        if self.state != "key_received":
+            raise ValueError("SAS peer key has not been received")
+        return {
+            "transaction_id": self.transaction_id,
+            "key": self.public_key,
+        }
+
+    def _calculate_mac(
+        self,
+        value,
+        key_id,
+        sender_user_id,
+        sender_device_id,
+        receiver_user_id,
+        receiver_device_id,
+    ):
+        """Calculate an ``hkdf-hmac-sha256.v2`` SAS MAC."""
+        if self._shared_secret is None:
+            raise ValueError("SAS shared secret has not been established")
+
+        info = (
+            "MATRIX_KEY_VERIFICATION_MAC"
+            + sender_user_id
+            + sender_device_id
+            + receiver_user_id
+            + receiver_device_id
+            + self.transaction_id
+            + key_id
+        ).encode("utf-8")
+        mac_key = _hkdf_sha256(self._shared_secret, 32, salt=None, info=info)
+        return _b64enc(_hmac_sha256(mac_key, value.encode("utf-8")))
+
+    def mac_content(self, own_signing_key):
+        """Build the MAC proving possession of Apprise's device key."""
+        if self.state != "key_received":
+            raise ValueError("SAS peer key has not been received")
+
+        key_id = "ed25519:{}".format(self.own_device_id)
+        content = {
+            "transaction_id": self.transaction_id,
+            "mac": {
+                key_id: self._calculate_mac(
+                    own_signing_key,
+                    key_id,
+                    self.own_user_id,
+                    self.own_device_id,
+                    self.peer_user_id,
+                    self.peer_device_id,
+                )
+            },
+            "keys": self._calculate_mac(
+                key_id,
+                "KEY_IDS",
+                self.own_user_id,
+                self.own_device_id,
+                self.peer_user_id,
+                self.peer_device_id,
+            ),
+        }
+        self.state = "mac_sent"
+        return content
+
+    def verify_peer_mac(self, content, peer_keys):
+        """Validate the initiator's key MACs from a trusted keys query."""
+        if self.state != "mac_sent":
+            raise ValueError("Unexpected SAS MAC event")
+        if content.get("transaction_id") != self.transaction_id:
+            raise ValueError("SAS MAC transaction does not match")
+
+        macs = content.get("mac")
+        if not isinstance(macs, dict) or not macs:
+            raise ValueError("SAS MAC event contains no keys")
+        device_key_id = "ed25519:{}".format(self.peer_device_id)
+        if device_key_id not in macs:
+            raise ValueError("SAS MAC omits the peer device key")
+
+        key_ids = ",".join(sorted(macs))
+        expected_keys_mac = self._calculate_mac(
+            key_ids,
+            "KEY_IDS",
+            self.peer_user_id,
+            self.peer_device_id,
+            self.own_user_id,
+            self.own_device_id,
+        )
+        if not secrets.compare_digest(
+            content.get("keys", ""), expected_keys_mac
+        ):
+            raise ValueError("SAS key list MAC does not match")
+
+        for key_id, received_mac in macs.items():
+            try:
+                public_key = peer_keys[key_id]
+            except (KeyError, TypeError):
+                raise ValueError("SAS MAC references an unknown key") from None
+            expected_mac = self._calculate_mac(
+                public_key,
+                key_id,
+                self.peer_user_id,
+                self.peer_device_id,
+                self.own_user_id,
+                self.own_device_id,
+            )
+            if not secrets.compare_digest(received_mac, expected_mac):
+                raise ValueError("SAS device key MAC does not match")
+
+        self.state = "verified"
+        return True
 
 
 # -----------------------------------------------------------------------
