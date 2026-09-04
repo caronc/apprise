@@ -264,11 +264,10 @@ You can also check out the [Graphical version of Apprise](https://github.com/car
 
 # Command Line Usage
 
-A small command line interface (CLI) tool is also provided with this package called *apprise*. If you know the server urls you wish to notify, you can simply provide them all on the command line and send your notifications that way:
+A command line tool named *apprise* is included. Provide one or more service URLs to send a notification:
+
 ```bash
-# Send a notification to as many servers as you want
-# as you can easily chain one after another (the -vv provides some
-# additional verbosity to help let you know what is going on):
+# Send to several services. The -vv option shows additional details.
 apprise -vv -t 'my title' -b 'my notification body' \
    'mailto://myemail:mypass@gmail.com' \
    'pbul://o.gn5kj6nfhv736I7jC3cj3QLRiyhgl98b'
@@ -463,7 +462,7 @@ import apprise
 # Create an Apprise instance
 apobj = apprise.Apprise()
 
-# Add all of the notification services by their server url.
+# Add notification services by URL.
 # A sample email notification:
 apobj.add('mailto://myuserid:mypass@gmail.com')
 

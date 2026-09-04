@@ -75,7 +75,7 @@ class AppriseResultStatus(IntEnum):
     # NOTE: 2 is intentionally unused because Click reserves it for invalid
     # command-line arguments.
 
-    # No service was attempted: no loaded servers or no tag match.
+    # No service was attempted: no loaded services or no tag match.
     # Only AppriseResult.status uses NOMATCH.
     NOMATCH = 3
 

@@ -427,11 +427,11 @@ def test_plugin_jira_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 9 servers from that
+    # We should be able to read our 9 services from that
     # 4x low
     # 4x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 9
+    assert len(ac.services()) == 9
     assert len(aobj) == 9
     assert len(list(aobj.find(tag="low"))) == 4
     for s in aobj.find(tag="low"):

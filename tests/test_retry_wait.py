@@ -708,7 +708,7 @@ class TestStaticHelpers:
         """Returns 0 when no tag in service.tags matches tag_name."""
         service = mock.Mock()
         service.tags = {AppriseTag("alerts", priority=3, has_priority=True)}
-        assert Apprise._server_priority_for_tag_name(service, "backup") == 0
+        assert Apprise._service_priority_for_tag_name(service, "backup") == 0
 
     def test_match_service_retry_plain_string_tag(self):
         """Plain string in service.tags matched by a priority-prefixed token.

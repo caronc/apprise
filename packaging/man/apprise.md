@@ -195,8 +195,7 @@ provide the default set of URLs you wish to notify if none are otherwise specifi
 
 ## EXAMPLES
 
-Send a notification to as many servers as you want to specify as you can
-easily chain them together:
+Send a notification to multiple services by chaining their URLs:
 
     $ apprise -vv -t "my title" -b "my notification body" \
        "mailto://myemail:mypass@gmail.com" \

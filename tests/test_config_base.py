@@ -107,8 +107,8 @@ def test_config_base():
     # read is not supported in the base object; only the children
     assert cb.read() is None
 
-    # There are no servers loaded on a freshly created object
-    assert len(cb.servers()) == 0
+    # There are no services loaded on a freshly created object
+    assert len(cb.services()) == 0
 
     # Unsupported URLs are not parsed
     assert ConfigBase.parse_url(url="invalid://") is None
@@ -1296,7 +1296,7 @@ include:
     assert "http://localhost/apprise/cfg03" in config
 
 
-def test_config_base_config_parse_yaml_includes(
+def test_config_base_yaml_includes(
     requests_remote_config: Mock,
 ) -> None:
     """
@@ -1325,13 +1325,13 @@ def test_config_base_config_parse_yaml_includes(
     )
 
     # Force a fresh parse and get the loaded plugin
-    servers = ac.servers()
+    services = ac.services()
 
     # the following will return
-    assert len(servers) == 3
+    assert len(services) == 3
 
     # representation for NotifyBase subclasses.
-    urls = {n.url() for n in servers}
+    urls = {n.url() for n in services}
 
     # The *exact* URL string may include extra params depending on defaults,
     # so we check using containment instead of strict equality.
@@ -1709,10 +1709,10 @@ urls:
 
     ac = AppriseConfig(paths=str(cfg))
     # Force a fresh parse and get the loaded plugin
-    servers = ac.servers()
-    assert len(servers) == 1
+    services = ac.services()
+    assert len(services) == 1
 
-    plugin = servers[0]
+    plugin = services[0]
     asset = plugin.asset
 
     # tz was accepted and normalised
@@ -1747,10 +1747,10 @@ urls:
 
     base_asset = AppriseAsset(timezone="UTC")
     ac = AppriseConfig(paths=str(cfg))
-    servers = ac.servers(asset=base_asset)
-    assert len(servers) == 1
+    services = ac.services(asset=base_asset)
+    assert len(services) == 1
 
-    tzinfo = servers[0].asset.tzinfo
+    tzinfo = services[0].asset.tzinfo
 
     # The key assertion: 'tz' MUST NOT have been applied
     assert getattr(tzinfo, "key", "").lower() != "europe/london"
@@ -1790,10 +1790,10 @@ urls:
 
     base_asset = AppriseAsset(timezone="UTC")
     ac = AppriseConfig(paths=str(cfg))
-    servers = ac.servers(asset=base_asset)
-    assert len(servers) == 1
+    services = ac.services(asset=base_asset)
+    assert len(services) == 1
 
-    tzinfo = servers[0].asset.tzinfo
+    tzinfo = services[0].asset.tzinfo
 
     # 1) Did not “accidentally” become a valid IANA from elsewhere.
     assert getattr(tzinfo, "key", "").lower() != "europe/london"
@@ -1805,7 +1805,7 @@ urls:
     assert isinstance(tzinfo.tzname(dt), str)
 
 
-def test_config_base_parse_yaml_file05_tags_alias_dict_form(tmpdir):
+def test_config_base_yaml_tag_alias_dict(tmpdir):
     """
     API: ConfigBase.parse_yaml_file (#5)
 
@@ -1832,10 +1832,10 @@ def test_config_base_parse_yaml_file05_tags_alias_dict_form(tmpdir):
     assert len(ac) == 1
 
     # All entries should load
-    assert len(ac.servers()) == 3
+    assert len(ac.services()) == 3
 
     a = Apprise()
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
     assert len(a) == 3
 
     # Verify tag matching works
@@ -1847,7 +1847,7 @@ def test_config_base_parse_yaml_file05_tags_alias_dict_form(tmpdir):
     assert sum(1 for _ in a.find("test1, test3")) == 2
 
 
-def test_config_base_parse_yaml_file06_tags_alias_list_form(tmpdir):
+def test_config_base_yaml_tag_alias_list(tmpdir):
     """
     API: ConfigBase.parse_yaml_file (#6)
 
@@ -1874,10 +1874,10 @@ def test_config_base_parse_yaml_file06_tags_alias_list_form(tmpdir):
     assert len(ac) == 1
 
     # First URL expands to 2, second expands to 1
-    assert len(ac.servers()) == 3
+    assert len(ac.services()) == 3
 
     a = Apprise()
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
     assert len(a) == 3
 
     # Verify tag matching works across expanded entries
@@ -1887,7 +1887,7 @@ def test_config_base_parse_yaml_file06_tags_alias_list_form(tmpdir):
     assert sum(1 for _ in a.find("test1, test2")) == 2
 
 
-def test_config_base_parse_yaml_file07_tag_priority_over_tags(tmpdir):
+def test_config_base_yaml_tag_priority(tmpdir):
     """
     API: ConfigBase.parse_yaml_file (#7)
 
@@ -1908,10 +1908,10 @@ def test_config_base_parse_yaml_file07_tag_priority_over_tags(tmpdir):
     assert len(ac) == 1
 
     # Entry should load successfully
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
     a = Apprise()
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
     assert len(a) == 1
 
     # Tag priority check

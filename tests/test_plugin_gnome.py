@@ -325,11 +325,11 @@ def test_plugin_gnome_parse_configuration(obj):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 14 servers from that
+    # We should be able to read our 14 services from that
     # 6x low
     # 6x high
     # 2x invalid (so takes on normal urgency)
-    assert len(ac.servers()) == 14
+    assert len(ac.services()) == 14
     assert len(aobj) == 14
     assert len(list(aobj.find(tag="low"))) == 6
     for s in aobj.find(tag="low"):

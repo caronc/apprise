@@ -62,53 +62,15 @@ class AppriseConfig:
         insecure_includes: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Loads all of the paths specified (if any).
+        """Load one or more configuration sources.
 
-        The path can either be a single string identifying one explicit
-        location, otherwise you can pass in a series of locations to scan
-        via a list.
-
-        If no path is specified then a default list is used.
-
-        By default we cache our responses so that subsiquent calls does not
-        cause the content to be retrieved again. Setting this to False does
-        mean more then one call can be made to retrieve the (same) data.  This
-        method can be somewhat inefficient if disabled and you're set up to
-        make remote calls.  Only disable caching if you understand the
-        consequences.
-
-        You can alternatively set the cache value to an int identifying the
-        number of seconds the previously retrieved can exist for before it
-        should be considered expired.
-
-        It's also worth nothing that the cache value is only set to elements
-        that are not already of subclass ConfigBase()
-
-        recursion defines how deep we recursively handle entries that use the
-        `import` keyword. This keyword requires us to fetch more configuration
-        from another source and add it to our existing compilation. If the
-        file we remotely retrieve also has an `import` reference, we will only
-        advance through it if recursion is set to 2 deep.  If set to zero
-        it is off.  There is no limit to how high you set this value. It would
-        be recommended to keep it low if you do intend to use it.
-
-        insecure includes by default are disabled. When set to True, all
-        Apprise Config files marked to be in STRICT mode are treated as being
-        in ALWAYS mode.
-
-        Take a file:// based configuration for example, only a file:// based
-        configuration can import another file:// based one. because it is set
-        to STRICT mode. If an http:// based configuration file attempted to
-        import a file:// one it woul fail. However this import would be
-        possible if insecure_includes is set to True.
-
-        There are cases where a self hosting apprise developer may wish to load
-        configuration from memory (in a string format) that contains import
-        entries (even file:// based ones).  In these circumstances if you want
-        these includes to be honored, this value must be set to True.
+        ``cache`` may be a boolean or a lifetime in seconds. ``recursion``
+        limits nested ``include`` entries; zero disables them. Enabling
+        ``insecure_includes`` permits includes that normal source security
+        rules would reject.
         """
 
-        # Initialize a server list of URLs
+        # Store the configuration sources used to discover services.
         self.configs = []
 
         # Prepare our Asset Object
@@ -140,30 +102,11 @@ class AppriseConfig:
         recursion: int | None = None,
         insecure_includes: bool | None = None,
     ) -> bool:
-        """Adds one or more config URLs into our list.
+        """Add one or more configuration URLs or sources.
 
-        You can override the global asset if you wish by including it with the
-        config(s) that you add.
-
-        By default we cache our responses so that subsiquent calls does not
-        cause the content to be retrieved again. Setting this to False does
-        mean more then one call can be made to retrieve the (same) data.  This
-        method can be somewhat inefficient if disabled and you're set up to
-        make remote calls.  Only disable caching if you understand the
-        consequences.
-
-        You can alternatively set the cache value to an int identifying the
-        number of seconds the previously retrieved can exist for before it
-        should be considered expired.
-
-        It's also worth nothing that the cache value is only set to elements
-        that are not already of subclass ConfigBase()
-
-        Optionally override the default recursion value.
-
-        Optionally override the insecure_includes flag. if insecure_includes is
-        set to True then all plugins that are set to a STRICT mode will be a
-        treated as ALWAYS.
+        ``asset``, ``cache``, ``recursion``, and ``insecure_includes`` override
+        this object's defaults for newly created sources. Existing
+        ``ConfigBase`` objects keep their own settings.
         """
 
         # Initialize our return status
@@ -233,7 +176,7 @@ class AppriseConfig:
                 return_status = False
                 continue
 
-            # Add our initialized plugin to our server listings
+            # Keep the initialized configuration source.
             self.configs.append(instance)
 
         # Return our status
@@ -248,19 +191,11 @@ class AppriseConfig:
         recursion: int | None = None,
         insecure_includes: bool | None = None,
     ) -> bool:
-        """Adds one configuration file in it's raw format. Content gets loaded
-        as a memory based object and only exists for the life of this
-        AppriseConfig object it was loaded into.
+        """Add raw configuration content as an in-memory source.
 
-        If you know the format ('yaml' or 'text') you can specify it for
-        slightly less overhead during this call.  Otherwise the configuration
-        is auto-detected.
-
-        Optionally override the default recursion value.
-
-        Optionally override the insecure_includes flag. if insecure_includes is
-        set to True then all plugins that are set to a STRICT mode will be a
-        treated as ALWAYS.
+        Set ``format`` to ``yaml`` or ``text`` to skip automatic detection.
+        ``recursion`` and ``insecure_includes`` override this object's defaults
+        for the new source.
         """
 
         # Initialize our default recursion value
@@ -305,29 +240,24 @@ class AppriseConfig:
             )
             return False
 
-        # Add our initialized plugin to our server listings
+        # Keep the initialized in-memory configuration source.
         self.configs.append(instance)
 
         # Return our status
         return True
 
-    def servers(
+    def services(
         self,
         tag: str | list[str] = common.MATCH_ALL_TAG,
         match_always: bool = True,
         *args: Any,
         **kwargs: Any,
     ) -> list[NotifyBase]:
-        """Returns all of our servers dynamically build based on parsed
-        configuration.
+        """Build services from matching configuration sources.
 
-        If a tag is specified, it applies to the configuration sources
-        themselves and not the notification services inside them.
-
-        This is for filtering the configuration files polled for results.
-
-        If the anytag is set, then any notification that is found set with that
-        tag are included in the response.
+        ``tag`` filters the configuration sources, not the services they
+        contain. Services tagged ``always`` are included when ``match_always``
+        is enabled.
         """
 
         # A match_always flag allows us to pick up on our 'any' keyword
@@ -354,9 +284,8 @@ class AppriseConfig:
                 match_all=common.MATCH_ALL_TAG,
                 match_always=match_always,
             ):
-                # Build ourselves a list of services dynamically and return the
-                # as a list
-                response.extend(entry.servers())
+                # Add services discovered in this configuration source.
+                response.extend(entry.services())
 
         return response
 
@@ -392,12 +321,11 @@ class AppriseConfig:
                 logger.error(f"Unsupported schema {schema}.")
                 return None
 
-        # Parse our url details of the server object as dictionary containing
-        # all of the information parsed from our URL
+        # Parse the configuration URL into constructor arguments.
         results = C_MGR[schema].parse_url(url)
 
         if not results:
-            # Failed to parse the server URL
+            # The configuration URL could not be parsed.
             # CWE-312 (Secure Logging) Handling
             secure_logging = (
                 asset.secure_logging
@@ -454,18 +382,18 @@ class AppriseConfig:
         """Empties our configuration list."""
         self.configs[:] = []
 
-    def server_pop(self, index: int) -> NotifyBase:
-        """Removes an indexed Apprise Notification from the servers."""
+    def service_pop(self, index: int) -> NotifyBase:
+        """Remove and return the notification service at ``index``."""
 
         # Tracking variables
         prev_offset = -1
         offset = prev_offset
 
         for entry in self.configs:
-            servers = entry.servers(cache=True)
-            if len(servers) > 0:
+            services = entry.services(cache=True)
+            if len(services) > 0:
                 # Acquire a new maximum offset to work with
-                offset = prev_offset + len(servers)
+                offset = prev_offset + len(services)
 
                 if offset >= index:
                     # we can pop an notification from our config stack

@@ -278,12 +278,7 @@ class WebPushSubscriptionManager:
         return bool(self.__subscriptions)
 
     def __len__(self) -> int:
-        """Returns the number of servers loaded; this includes those found
-        within loaded configuration.
-
-        This funtion nnever actually counts the Config entry themselves (if
-        they exist), only what they contain.
-        """
+        """Return the number of loaded Web Push subscriptions."""
         return len(self.__subscriptions)
 
     def __iadd__(
@@ -300,7 +295,7 @@ class WebPushSubscriptionManager:
         return key.lower() in self.__subscriptions
 
     def clear(self) -> None:
-        """Empties our server list."""
+        """Remove all Web Push subscriptions."""
         self.__subscriptions.clear()
 
     @property

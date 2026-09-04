@@ -201,11 +201,11 @@ def test_plugin_gotify_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 8 servers from that
+    # We should be able to read our 8 services from that
     # 4x low
     # 3x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 8
+    assert len(ac.services()) == 8
     assert len(aobj) == 8
     assert len(list(aobj.find(tag="low"))) == 4
     for s in aobj.find(tag="low"):
