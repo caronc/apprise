@@ -228,7 +228,7 @@ class AppriseAttachment:
                 return_status = False
                 continue
 
-            # Add our initialized plugin to our server listings
+            # Add the initialized plugin to our attachment list.
             if isinstance(instance, list):
                 self.attachments.extend(instance)
 
@@ -268,12 +268,11 @@ class AppriseAttachment:
                 logger.warning(f"Unsupported schema {schema}.")
                 return None
 
-        # Parse our url details of the server object as dictionary containing
-        # all of the information parsed from our URL
+        # Parse the attachment URL into constructor arguments.
         results = A_MGR[schema].parse_url(url)
 
         if not results:
-            # Failed to parse the server URL
+            # The attachment URL could not be parsed.
             logger.warning(f"Unparseable URL {url}.")
             return None
 

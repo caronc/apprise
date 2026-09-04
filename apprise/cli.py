@@ -363,8 +363,7 @@ class CustomHelpCommand(click.Command):
         formatter.write_text("")
         content = (
             (
-                "Send a notification to all of the specified servers "
-                "identified by their URLs"
+                "Send a notification to the services identified by their URLs"
             ),
             (
                 "the content provided within the title, body and "
@@ -790,7 +789,7 @@ def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
 @click.argument(
     "urls",
     nargs=-1,
-    metavar="SERVER_URL [SERVER_URL2 [SERVER_URL3]]",
+    metavar="SERVICE_URL [SERVICE_URL2 [SERVICE_URL3]]",
 )
 @click.pass_context
 def main(
@@ -821,8 +820,7 @@ def main(
     debug,
     version,
 ):
-    """Send a notification to all of the specified servers identified by their
-    URLs the content provided within the title, body and notification-type.
+    """Send a notification to the services identified by the given URLs.
 
     For a list of all of the supported services and information on how to use
     them, check out https://github.com/caronc/apprise
@@ -1190,7 +1188,7 @@ def main(
 
     if not dry_run and not (a or storage_action):
         click.echo(
-            "You must specify at least one server URL or populated "
+            "You must specify at least one service URL or populated "
             "configuration file."
         )
         click.echo("Try 'apprise --help' for more information.")
@@ -1454,8 +1452,8 @@ def main(
         # we iterated at least once in the loop.
         url = None
 
-        for idx, server in enumerate(a.find(tag=tags)):
-            url = server.url(privacy=True)
+        for idx, service in enumerate(a.find(tag=tags)):
+            url = service.url(privacy=True)
             click.echo(
                 "{: 4d}. {}".format(
                     idx + 1,
@@ -1471,15 +1469,15 @@ def main(
             click.echo(
                 "{:>10}: {}".format(
                     "uid",
-                    "- n/a -" if not server.url_id() else server.url_id(),
+                    "- n/a -" if not service.url_id() else service.url_id(),
                 )
             )
 
-            if server.tags:
+            if service.tags:
                 click.echo(
                     "{:>10}: {}".format(
                         "tags",
-                        ", ".join(sorted(str(t) for t in server.tags)),
+                        ", ".join(sorted(str(t) for t in service.tags)),
                     )
                 )
 

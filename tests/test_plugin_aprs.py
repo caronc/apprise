@@ -390,5 +390,5 @@ def test_plugin_aprs_config_files():
     # Add our configuration
     aobj.add(ac)
 
-    assert len(ac.servers()) == 6
+    assert len(ac.services()) == 6
     assert len(aobj) == 6

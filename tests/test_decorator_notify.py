@@ -691,7 +691,7 @@ def test_notify_multi_instance_decoration(tmpdir):
     assert len(ac) == 1
 
     # 2 notification endpoints are loaded
-    assert len(ac.servers()) == 2
+    assert len(ac.services()) == 2
 
     # Nothing stored yet in our object
     assert len(verify_obj) == 0

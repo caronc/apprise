@@ -256,10 +256,10 @@ def test_plugin_dapnet_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
+    # We should be able to read our 7 services from that
     # 4x normal (invalid + 3 exclusivly specified to be so)
     # 3x emerg
-    assert len(ac.servers()) == 7
+    assert len(ac.services()) == 7
     assert len(aobj) == 7
     assert len(list(aobj.find(tag="normal"))) == 3
     for s in aobj.find(tag="normal"):

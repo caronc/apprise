@@ -401,10 +401,10 @@ def test_apprise_secure_logging(mock_request):
     a = Apprise(asset=asset)
 
     with LogCapture(level=logging.DEBUG) as stream:
-        # add a test server
+        # add a test service
         assert a.add("json://user:pass1$-3!@localhost") is True
 
-        # Our servers should carry this flag
+        # Our services should carry this flag
         assert a[0].asset.secure_logging is True
 
         logs = re.split(r"\r*\n", stream.getvalue().rstrip())
@@ -436,10 +436,10 @@ def test_apprise_secure_logging(mock_request):
     a = Apprise(asset=asset)
 
     with LogCapture(level=logging.DEBUG) as stream:
-        # add a test server
+        # add a test service
         assert a.add("json://user:pass1$-3!@localhost") is True
 
-        # Our servers should carry this flag
+        # Our services should carry this flag
         assert a[0].asset.secure_logging is False
 
         logs = re.split(r"\r*\n", stream.getvalue().rstrip())

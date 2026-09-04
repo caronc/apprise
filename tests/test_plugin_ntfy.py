@@ -695,11 +695,11 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 8 servers from that
+    # We should be able to read our 8 services from that
     # 3x min
     # 4x max
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 8
+    assert len(ac.services()) == 8
     assert len(aobj) == 8
     assert len(list(aobj.find(tag="min"))) == 3
     for s in aobj.find(tag="min"):
@@ -850,9 +850,9 @@ def test_plugin_ntfy_xtags_no_apprise_tag_collision():
     )
     a = apprise.Apprise()
     a.add(cfg)
-    servers = list(cfg.servers())
-    assert len(servers) == 1
-    s = servers[0]
+    services = list(cfg.services())
+    assert len(services) == 1
+    s = services[0]
     # X-Tags must be preserved
     assert s._NotifyNtfy__tags == ["warning"]
     # No Apprise routing tag should have been created

@@ -693,11 +693,11 @@ def test_plugin_pushover_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
+    # We should be able to read our 7 services from that
     # 3x low
     # 3x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 7
+    assert len(ac.services()) == 7
     assert len(aobj) == 7
     assert len(list(aobj.find(tag="low"))) == 3
     for s in aobj.find(tag="low"):

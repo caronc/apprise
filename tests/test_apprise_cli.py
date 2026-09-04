@@ -101,7 +101,7 @@ def test_apprise_cli_nux_env(tmpdir):
 
     runner = CliRunner()
     result = runner.invoke(cli.main)
-    # no servers specified; we return 1 (non-zero)
+    # no services specified; we return 1 (non-zero)
     assert result.exit_code == 1
 
     result = runner.invoke(cli.main, ["-v"])
