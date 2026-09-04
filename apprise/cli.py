@@ -362,9 +362,7 @@ class CustomHelpCommand(click.Command):
         # Custom help message
         formatter.write_text("")
         content = (
-            (
-                "Send a notification to the services identified by their URLs"
-            ),
+            ("Send a notification to the services identified by their URLs"),
             (
                 "the content provided within the title, body and "
                 "notification-type."
