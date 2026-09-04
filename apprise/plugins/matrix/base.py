@@ -2372,8 +2372,6 @@ class NotifyMatrix(NotifyBase):
 
                 if not active or transaction_id != active["transaction_id"]:
                     continue
-                if sender != active["user_id"]:
-                    continue
 
                 if event_type == "m.key.verification.cancel":
                     self.logger.warning(
