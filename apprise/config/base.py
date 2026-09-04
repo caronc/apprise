@@ -106,12 +106,43 @@ class ConfigBase(URLBase):
         insecure_includes: bool = False,
         **kwargs: object,
     ) -> None:
-        """Initialize settings shared by all configuration sources.
+        """Initialize some general logging and common service arguments that
+        will keep things consistent when working with the configurations that
+        inherit this class.
 
-        ``cache`` may be a boolean or a lifetime in seconds. ``recursion``
-        limits nested ``include`` entries; zero disables them. Enabling
-        ``insecure_includes`` allows includes that a source's normal security
-        policy would reject, including file URLs from remote configurations.
+        By default we cache our responses so that subsiquent calls does not
+        cause the content to be retrieved again.  For local file references
+        this makes no difference at all.  But for remote content, this does
+        mean more then one call can be made to retrieve the (same) data.  This
+        method can be somewhat inefficient if disabled.  Only disable caching
+        if you understand the consequences.
+
+        You can alternatively set the cache value to an int identifying the
+        number of seconds the previously retrieved can exist for before it
+        should be considered expired.
+
+        recursion defines how deep we recursively handle entries that use the
+        `include` keyword. This keyword requires us to fetch more configuration
+        from another source and add it to our existing compilation. If the
+        file we remotely retrieve also has an `include` reference, we will only
+        advance through it if recursion is set to 2 deep.  If set to zero
+        it is off.  There is no limit to how high you set this value. It would
+        be recommended to keep it low if you do intend to use it.
+
+        insecure_include by default are disabled. When set to True, all
+        Apprise Config files marked to be in STRICT mode are treated as being
+        in ALWAYS mode.
+
+        Take a file:// based configuration for example, only a file:// based
+        configuration can include another file:// based one. because it is set
+        to STRICT mode. If an http:// based configuration file attempted to
+        include a file:// one it woul fail. However this include would be
+        possible if insecure_includes is set to True.
+
+        There are cases where a self hosting apprise developer may wish to load
+        configuration from memory (in a string format) that contains 'include'
+        entries (even file:// based ones).  In these circumstances if you want
+        these 'include' entries to be honored, this value must be set to True.
         """
 
         super().__init__(**kwargs)
