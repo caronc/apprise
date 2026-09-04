@@ -45,6 +45,7 @@ from apprise import (
     AppriseAttachment,
     AttachBase,
     NotifyBase,
+    NotifyFormat,
     NotifyType,
     PersistentStoreMode,
     utils,
@@ -790,14 +791,18 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib):
     mock_smtplib.side_effect = RuntimeError("Test")
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
     # A handled and expected exception
     mock_smtplib.side_effect = smtplib.SMTPException("Test")
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -819,7 +824,9 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     mock_smtplib.quit.return_value = True
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -830,43 +837,54 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
     # Create an apprise object to work with as well
     a = Apprise()
     assert a.add("mailto://user:pass@gmail.com?format=text")
+    assert a.add("mailto://other:pass@gmail.com?format=text")
 
     # Send Attachment with success
     attach = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     assert (
-        obj.notify(
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attach) is True
+    assert bool(a.notify(body="body", title="test", attach=attach)) is True
 
     # test using an Apprise Attachment object
     assert (
-        obj.notify(
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=AppriseAttachment(attach),
+        bool(
+            obj.notify(
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=AppriseAttachment(attach),
+            )
         )
         is True
     )
 
     # same results happen from our Apprise object
     assert (
-        a.notify(body="body", title="test", attach=AppriseAttachment(attach))
+        bool(
+            a.notify(
+                body="body", title="test", attach=AppriseAttachment(attach)
+            )
+        )
         is True
     )
 
@@ -890,24 +908,28 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attachment) is True
+    result = a.notify(body="body", title="test", attach=attachment)
+    assert bool(result) is True
+    assert len(result) == 2
 
     max_file_size = AttachBase.max_file_size
     # Now do a case where the file can't be sent
 
     AttachBase.max_file_size = 1
     assert (
-        obj.notify(
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attach) is False
+    assert bool(a.notify(body="body", title="test", attach=attach)) is False
 
     # Restore value
     AttachBase.max_file_size = max_file_size
@@ -928,7 +950,9 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -1108,13 +1132,15 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
 
     # Further test encoding through the message content as well
     assert (
-        obj.notify(
-            # Google Translated to Arabic:
-            #  "Let's make the world a better place."
-            title="دعونا نجعل العالم مكانا أفضل.",
-            # Google Translated to Hungarian: "One line of code at a time.'
-            body="Egy sor kódot egyszerre.",
-            notify_type=NotifyType.INFO,
+        bool(
+            obj.notify(
+                # Google Translated to Arabic:
+                #  "Let's make the world a better place."
+                title="دعونا نجعل العالم مكانا أفضل.",
+                # Google Translated to Hungarian: "One line of code at a time.'
+                body="Egy sor kódot egyszerre.",
+                notify_type=NotifyType.INFO,
+            )
         )
         is True
     )
@@ -1363,7 +1389,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1413,7 +1439,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1463,7 +1489,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1488,7 +1514,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1515,7 +1541,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1546,7 +1572,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj1.notify("test") is True
+    assert bool(obj1.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1573,7 +1599,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj2.notify("test") is True
+    assert bool(obj2.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1600,7 +1626,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1624,7 +1650,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1648,7 +1674,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1696,7 +1722,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1730,7 +1756,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1765,7 +1791,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1800,7 +1826,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1841,7 +1867,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1897,7 +1923,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1949,7 +1975,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -2005,7 +2031,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert response.starttls.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2062,7 +2088,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -2107,7 +2133,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -2151,7 +2177,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -2309,7 +2335,7 @@ def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2369,7 +2395,7 @@ def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2410,7 +2436,7 @@ def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2458,7 +2484,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2512,7 +2538,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2589,7 +2615,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2672,7 +2698,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # no PGP
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
     # No PGP Support and set enabled
-    assert obj.notify("test body") is False
+    assert bool(obj.notify("test body")) is False
 
     # Return the PGP status for remaining checks
     utils.pgp.PGP_SUPPORT = True
@@ -2825,7 +2851,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     assert obj.pgp.public_keyfile().endswith("chris-pub.asc")
 
-    assert obj.notify("test body") is True
+    assert bool(obj.notify("test body")) is True
 
     # The private key is not needed for sending the encrypted messages
     os.unlink(os.path.join(obj.store.path, "chris-prv.asc"))
@@ -2934,7 +2960,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     with mock.patch("pgpy.PGPMessage.new", side_effect=NameError):
         assert obj.pgp.encrypt("message") is None
         # Attempts to encrypt a message
-        assert obj.notify("test-encrypt") is False
+        assert bool(obj.notify("test-encrypt")) is False
 
     # Create new keys
     assert obj.pgp.keygen() is True
@@ -2998,7 +3024,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     )
 
     # Key is corrupted
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
     shutil.copyfile(
         os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
@@ -3006,7 +3032,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     )
 
     # Key is a binary image; definitely not a valid key
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -3214,7 +3240,7 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
 
     # Patch WKD fetch to return our generated public key
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     # Clear the parsed-key cache so the second block cannot reuse the
     # key loaded above -- we need the fetch mock to be the sole source
@@ -3223,7 +3249,7 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     # WKD returning None with autogen disabled falls through gracefully
     asset.pgp_autogen = False
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
-        assert obj.notify("test body") is False
+        assert bool(obj.notify("test body")) is False
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -3324,7 +3350,7 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
     assert obj is not None
 
     # Notification should succeed and sendmail should be called once
-    assert obj.notify("test body") is True
+    assert bool(obj.notify("test body")) is True
     assert mock_socket.sendmail.call_count == 1
 
     # The emitted email must contain the multipart/signed structure
@@ -3432,7 +3458,7 @@ def test_plugin_email_pgp_sign_wire_content_crlf(
     with mock.patch.object(
         utils.pgp.ApprisePGPController, "sign", capturing_sign
     ):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     # Confirm send actually happened and our interceptor was triggered
     assert mock_socket.sendmail.call_count == 1
@@ -3473,7 +3499,7 @@ def test_plugin_email_pgp_sign_no_privkey_fails(
         asset=asset,
     )
     assert obj is not None
-    assert obj.notify("test body") is False
+    assert bool(obj.notify("test body")) is False
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
@@ -3524,7 +3550,7 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
 
     # With WKD returning a public key: sign + encrypt
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     raw = mock_socket.sendmail.call_args[0][2]
     # The outer structure is multipart/encrypted (the signed body is inside)
@@ -3536,7 +3562,7 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
 
     # With WKD returning nothing: sign only, no failure
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     raw = mock_socket.sendmail.call_args[0][2]
     # No encryption this time; just a signed message
@@ -3569,7 +3595,7 @@ def test_plugin_email_pgp_sign_no_pgp_support(mock_smtp, mock_smtpssl):
     real_support = pgp_utils.PGP_SUPPORT
     pgp_utils.PGP_SUPPORT = False
     try:
-        assert obj.notify("test body") is False
+        assert bool(obj.notify("test body")) is False
     finally:
         pgp_utils.PGP_SUPPORT = real_support
 
@@ -3602,7 +3628,7 @@ def test_plugin_email_pgp_sign_encrypt_none_mode(
         asset=asset,
     )
     assert obj is not None
-    assert obj.notify("test body") is True
+    assert bool(obj.notify("test body")) is True
 
     # The email must not contain any PGP markers
     raw = mock_socket.sendmail.call_args[0][2]
@@ -3638,7 +3664,47 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     # Now send -- the auto-generated private key must be discovered.
     # With both keys present the message is sign+encrypted; the signing
     # step is the behavior under test, so we only assert success here.
-    assert obj.notify("test body") is True
+    assert bool(obj.notify("test body")) is True
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_multi_format(mock_smtp):
+    """NotifyEmail() declares HTML+TEXT and resolves per-call."""
+
+    assert email.NotifyEmail.notify_format == (
+        NotifyFormat.HTML,
+        NotifyFormat.TEXT,
+    )
+
+    instance = mock_smtp.return_value
+
+    aobj = Apprise()
+    assert aobj.add("mailto://user:pass@example.com") is True
+
+    # Default (no body_format): still builds a multipart/alternative
+    # message with both an HTML and a derived plain-text part.
+    assert bool(aobj.notify(body="<b>Bold HTML</b> body")) is True
+    msg = instance.sendmail.call_args_list[-1][0][2]
+    assert "multipart" in msg
+    assert "text/plain" in msg
+    assert "text/html" in msg
+
+    # body_format=TEXT aligns directly to TEXT mode (no HTML round
+    # trip); the exact original text is sent, unescaped and unchanged.
+    assert (
+        bool(
+            aobj.notify(
+                body="Plain text with <literal> angle brackets.",
+                body_format=NotifyFormat.TEXT,
+            )
+        )
+        is True
+    )
+    msg = instance.sendmail.call_args_list[-1][0][2]
+    assert "multipart" not in msg
+    assert "text/plain" in msg
+    assert "text/html" not in msg
+    assert "Plain text with <literal> angle brackets." in msg
 
 
 def test_plugin_email_prepare():
@@ -3757,7 +3823,7 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
         assert obj.secure is True
 
         # Send once to trigger SMTP/login behaviour
-        assert obj.notify("body", "title") is True
+        assert bool(obj.notify("body", "title")) is True
 
         # STARTTLS used
         assert response.starttls.call_count == 1
@@ -3794,7 +3860,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
     )
     assert isinstance(obj, email.NotifyEmail)
     assert obj.verify_certificate is True
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert mock_smtpssl.call_count == 1
     context = mock_smtpssl.call_args.kwargs.get("context")
@@ -3812,7 +3878,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
         suppress_exceptions=False,
     )
     assert obj.verify_certificate is False
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert mock_smtpssl.call_count == 1
     context = mock_smtpssl.call_args.kwargs.get("context")
@@ -3830,7 +3896,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
         suppress_exceptions=False,
     )
     assert obj.verify_certificate is True
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert response.starttls.call_count == 1
     context = response.starttls.call_args.kwargs.get("context")
@@ -3846,7 +3912,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
         suppress_exceptions=False,
     )
     assert obj.verify_certificate is False
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert response.starttls.call_count == 1
     context = response.starttls.call_args.kwargs.get("context")
@@ -3874,7 +3940,7 @@ def test_plugin_email_starttls_certificate_failure_handling(mock_smtp):
     )
     assert isinstance(obj, email.NotifyEmail)
 
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     response.login.assert_not_called()
     response.sendmail.assert_not_called()
 
@@ -3918,11 +3984,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>hello</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj.notify(
+                body="<p>hello</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -3945,11 +4013,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # the attachment is embedded inline
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>no cid ref here</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj.notify(
+                body="<p>no cid ref here</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -3968,11 +4038,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body=html_with_ref,
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj.notify(
+                body=html_with_ref,
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -3992,11 +4064,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body=html_one_ref,
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=AppriseAttachment([img, img2]),
+        bool(
+            obj.notify(
+                body=html_one_ref,
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=AppriseAttachment([img, img2]),
+            )
         )
         is True
     )
@@ -4022,11 +4096,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>body</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa,
+        bool(
+            obj.notify(
+                body="<p>body</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa,
+            )
         )
         is True
     )
@@ -4049,11 +4125,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain text body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj_txt.notify(
+                body="plain text body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -4069,11 +4147,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # inline=True, TEXT format, non-image attachment
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain text body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa,  # application/pdf override -- not an image
+        bool(
+            obj_txt.notify(
+                body="plain text body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa,  # application/pdf override -- not an image
+            )
         )
         is True
     )
@@ -4092,11 +4172,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>no cid</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_upper,
+        bool(
+            obj.notify(
+                body="<p>no cid</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_upper,
+            )
         )
         is True
     )
@@ -4111,11 +4193,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # also appear, proving the case-insensitive check works in the text path
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_upper,
+        bool(
+            obj_txt.notify(
+                body="plain body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_upper,
+            )
         )
         is True
     )
@@ -4127,11 +4211,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # warning is logged so the user can debug the mismatch
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
-            obj.notify(
-                body='<img src="cid:missing-file.jpg">',
-                title="test",
-                notify_type=NotifyType.INFO,
-                attach=img,
+            bool(
+                obj.notify(
+                    body='<img src="cid:missing-file.jpg">',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    attach=img,
+                )
             )
             is True
         )
@@ -4148,12 +4234,14 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger"):
         assert (
-            obj.notify(
-                body='<p>body <img src="cid:ghost.jpg"></p>',
-                title="test",
-                notify_type=NotifyType.INFO,
-                # application/pdf -- not an image, not named ghost.jpg
-                attach=aa,
+            bool(
+                obj.notify(
+                    body='<p>body <img src="cid:ghost.jpg"></p>',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    # application/pdf -- not an image, not named ghost.jpg
+                    attach=aa,
+                )
             )
             is True
         )
@@ -4173,12 +4261,14 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
-            obj.notify(
-                body=f'<p>body <embed src="cid:{pdf_attach.name}"></p>',
-                title="test",
-                notify_type=NotifyType.INFO,
-                # same PDF attachment as earlier tests
-                attach=aa,
+            bool(
+                obj.notify(
+                    body=f'<p>body <embed src="cid:{pdf_attach.name}"></p>',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    # same PDF attachment as earlier tests
+                    attach=aa,
+                )
             )
             is True
         )
@@ -4203,11 +4293,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
-            obj.notify(
-                body='<img src="cid:my%20photo.gif">',
-                title="test",
-                notify_type=NotifyType.INFO,
-                attach=aa_spaced,
+            bool(
+                obj.notify(
+                    body='<img src="cid:my%20photo.gif">',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    attach=aa_spaced,
+                )
             )
             is True
         )
@@ -4233,11 +4325,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>body</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_bad,
+        bool(
+            obj.notify(
+                body="<p>body</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_bad,
+            )
         )
         is False  # bad attachment detected by the main loop
     )
@@ -4247,11 +4341,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # inline=True, TEXT format, inaccessible attachment
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_bad,
+        bool(
+            obj_txt.notify(
+                body="plain body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_bad,
+            )
         )
         is False
     )

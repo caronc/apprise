@@ -98,7 +98,7 @@ class NotifyPushBullet(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {

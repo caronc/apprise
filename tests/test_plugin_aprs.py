@@ -78,7 +78,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     assert instance.url(privacy=True).startswith(
         "aprs://DF1JSL-15:****@D...C?"
     )
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     # 1N3 callsigns
     instance = apprise.Apprise.instantiate("aprs://D1JSL-15:12345@D1ABC")
@@ -112,7 +112,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     assert instance.url(privacy=True).startswith(
         "aprs://DF1JSL-15:****@D...C/D...F?"
     )
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC-1/DF1ABC/DF1ABC-15"
@@ -121,7 +121,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     assert instance.url(privacy=True).startswith(
         "aprs://DF1JSL-15:****@D...1/D...C/D...5?"
     )
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@?to=DF1ABC,DF1DEF"
@@ -130,7 +130,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     assert instance.url(privacy=True).startswith(
         "aprs://DF1JSL-15:****@D...C/D...F?"
     )
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     # Test Locale settings
     instance = apprise.Apprise.instantiate(
@@ -142,7 +142,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     )
     # we used the default locale, so no setting
     assert "locale=" not in instance.url(privacy=True)
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     instance = apprise.Apprise.instantiate(
         "aprs://DF1JSL-15:12345@DF1ABC?locale=NOAM"
@@ -153,7 +153,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     )
     # locale is set in URL
     assert "locale=NOAM" in instance.url(privacy=True)
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     # Invalid locale
     assert (
@@ -177,7 +177,7 @@ def test_plugin_aprs_urls(mock_create_connection):
     )
 
     # But with only bad entries, we have nothing to notify
-    assert instance.notify("test") is False
+    assert bool(instance.notify("test")) is False
 
     # Enforces a close
     del instance
@@ -216,23 +216,23 @@ def test_plugin_aprs_edge_cases(mock_create_connection):
 
     # Bad data
     sobj.recv.return_value = "one line".encode("latin-1")
-    assert instance.notify(body="body", title="title") is False
+    assert bool(instance.notify(body="body", title="title")) is False
     sobj.recv.return_value = "\n\n\n".encode("latin-1")
-    assert instance.notify(body="body", title="title") is False
+    assert bool(instance.notify(body="body", title="title")) is False
     sobj.recv.return_value = "".encode("latin-1")
-    assert instance.notify(body="body", title="title") is False
+    assert bool(instance.notify(body="body", title="title")) is False
     sobj.recv.return_value = "\ndata".encode("latin-1")
-    assert instance.notify(body="body", title="title") is False
+    assert bool(instance.notify(body="body", title="title")) is False
     # Different Call-Sign then what we logged in as
     sobj.recv.return_value = "ping\npong pong DF1JSL-14 verified, pong".encode(
         "latin-1"
     )
-    assert instance.notify(body="body", title="title") is False
+    assert bool(instance.notify(body="body", title="title")) is False
     # Unverified
     sobj.recv.return_value = (
         "ping\npong pong DF1JSL-15 unverified, pong".encode("latin-1")
     )
-    assert instance.notify(body="body", title="title") is False
+    assert bool(instance.notify(body="body", title="title")) is False
 
     #
     # Test Login edge cases
@@ -293,16 +293,16 @@ def test_plugin_aprs_edge_cases(mock_create_connection):
     mock_create_connection.return_value = None
     mock_create_connection.side_effect = socket.gaierror("gaierror")
     assert instance.socket_open() is False
-    assert instance.notify("test") is False
+    assert bool(instance.notify("test")) is False
     mock_create_connection.side_effect = socket.timeout("timeout")
     assert instance.socket_open() is False
-    assert instance.notify("test") is False
+    assert bool(instance.notify("test")) is False
     mock_create_connection.side_effect = OSError("error")
     assert instance.socket_open() is False
-    assert instance.notify("test") is False
+    assert bool(instance.notify("test")) is False
     mock_create_connection.side_effect = ConnectionError("ConnectionError")
     assert instance.socket_open() is False
-    assert instance.notify("test") is False
+    assert bool(instance.notify("test")) is False
 
     # Restore our good connection
     mock_create_connection.return_value = sobj
@@ -343,11 +343,11 @@ def test_plugin_aprs_edge_cases(mock_create_connection):
     # To do this we need to have a login succeed, but the second call to send
     # to fail
     sobj.sendall.return_value = True
-    assert instance.notify("test") is True
+    assert bool(instance.notify("test")) is True
 
     sobj.sendall.return_value = None
     sobj.sendall.side_effect = (True, socket.gaierror("gaierror"))
-    assert instance.notify("test") is False
+    assert bool(instance.notify("test")) is False
 
     sobj.sendall.return_value = True
     sobj.sendall.side_effect = None

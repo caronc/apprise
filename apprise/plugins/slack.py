@@ -82,12 +82,17 @@ import requests
 from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..conversion import (
-    build_backtick_run_index,
     commonmark_emphasis_run,
     commonmark_escape_link_url,
-    commonmark_force_close_spans,
+    commonmark_find_backtick_run,
+    commonmark_headings_to_bold,
+    commonmark_index_backtick_runs,
+    commonmark_new_scan_budget,
+    commonmark_pick_emphasis_sentinel,
+    commonmark_render_emphasis_markers,
     commonmark_scan_angle_dest,
-    find_unescaped_run,
+    commonmark_scan_autolink_dest,
+    commonmark_scan_paren_dest,
 )
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_bool, parse_list, validate_regex
@@ -189,8 +194,8 @@ class NotifySlack(NotifyBase):
     # If it is more than this, then it is not accepted
     max_slack_template_size = 35000
 
-    # Default Notification Format
-    notify_format = NotifyFormat.MARKDOWN
+    # Slack supports mrkdwn and plain text. mrkdwn remains the default.
+    notify_format = (NotifyFormat.MARKDOWN, NotifyFormat.TEXT)
 
     # Bot's do not have default channels to notify; so #general
     # becomes the default channel in BOT mode
@@ -262,7 +267,7 @@ class NotifySlack(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "target_user": {
@@ -390,12 +395,21 @@ class NotifySlack(NotifyBase):
         re.IGNORECASE,
     )
 
+    def dialect_convert(self, body, body_format=None, *args, **kwargs):
+        """Translate declared CommonMark to Slack ``mrkdwn``."""
+        if body_format != NotifyFormat.MARKDOWN:
+            # Slack's other declared format (TEXT) needs no dialect
+            # completion of its own -- only Markdown does.
+            return body
+        return self._commonmark_to_slack(body)
+
     @classmethod
     def _commonmark_to_slack(cls, body):
         """Translate CommonMark to Slack ``mrkdwn``.
 
         CommonMark          Slack mrkdwn
         ------------------  -----------------
+        # heading           *heading* (Slack has no heading syntax)
         **bold**            *bold*
         *italic*            _italic_
         `code`              `code`
@@ -405,12 +419,13 @@ class NotifySlack(NotifyBase):
         Slack retains supported backslash escapes and uses its native anchor
         syntax for labeled links.
         """
+        # Slack represents headings as bold text.
+        body = commonmark_headings_to_bold(body)
 
         # Accumulate translated characters one item at a time.
         out = []
-        # Each entry is (delimiter, index-in-out) for an open emphasis span,
-        # innermost last, so we can close spans in LIFO order.
-        stack = []
+        # Record ``*`` and ``_`` markup in order, then match it after the scan.
+        delimiters = []
         # Each entry is the out-index of the opening "[" for a pending link,
         # innermost last; used to splice the label text out when we find "]".
         link_stack = []
@@ -418,7 +433,11 @@ class NotifySlack(NotifyBase):
         n = len(body)
         # Pre-scan all unescaped backtick run positions indexed by run length
         # so code-span open/close matching is O(log n) rather than O(n^2).
-        backtick_runs = build_backtick_run_index(body)
+        backtick_runs = commonmark_index_backtick_runs(body)
+        # Pick a temporary marker that does not occur in the message.
+        sentinel = commonmark_pick_emphasis_sentinel(body)
+        # Bound the total work spent scanning labeled-link destinations.
+        scan_budget = commonmark_new_scan_budget(body)
 
         while i < n:
             ch = body[i]
@@ -462,7 +481,7 @@ class NotifySlack(NotifyBase):
                 run = j - i
                 # Search the pre-built index for the next run of the same
                 # length after the opening run ends.
-                close = find_unescaped_run(backtick_runs, j, run)
+                close = commonmark_find_backtick_run(backtick_runs, j, run)
 
                 if close is not None:
                     # Matched code span: entity-escape its content so Slack
@@ -498,7 +517,9 @@ class NotifySlack(NotifyBase):
             if body.startswith("](<", i) and link_stack:
                 # We are at the "](<" that closes a pending link label.
                 # Scan forward with escape awareness for the ">)" terminator.
-                close = commonmark_scan_angle_dest(body, i, n)
+                close = commonmark_scan_angle_dest(
+                    body, i, n, budget=scan_budget
+                )
 
                 if close is not None:
                     # Decode CommonMark escapes in the URL and re-encode
@@ -515,21 +536,58 @@ class NotifySlack(NotifyBase):
                     i = close + 2
                     continue
 
+                # Let the bare-link check handle this failed angle form.
+
+            # Convert bare destinations without scanning their URL as emphasis.
+            if body.startswith("](", i) and link_stack:
+                close = commonmark_scan_paren_dest(
+                    body, i + 1, n, budget=scan_budget
+                )
+
+                if close is not None:
+                    url = commonmark_escape_link_url(body[i + 2 : close])
+                    open_index = link_stack.pop()
+                    text = "".join(out[open_index + 1 :])
+                    del out[open_index:]
+                    out.append(f"<{url}|{text}>")
+                    # Skip past the closing ")".
+                    i = close + 1
+                    continue
+
+                # Same reasoning as the angle-dest case above.
+                link_stack.pop()
+
+            # A "]" that never forms "](" cannot close a link. Retire the
+            # innermost pending "[" so a later, unrelated "](" cannot
+            # incorrectly reuse it as its own opener.
+            if ch == "]" and link_stack and not body.startswith("](", i):
+                link_stack.pop()
+
+            # Convert complete autolinks; other "<" characters remain literal.
+            if ch == "<":
+                close, _ = commonmark_scan_autolink_dest(body, i, n)
+                if close is not None:
+                    url = commonmark_escape_link_url(body[i + 1 : close])
+                    out.append(f"<{url}>")
+                    i = close + 1
+                    continue
+
             # Emphasis: CommonMark uses * for bold (**) and italic (*).
-            # Convert to Slack mrkdwn using the shared LIFO helper.
+            # Record this markup now and match it after the full scan.
             if ch == "*":
-                i = commonmark_emphasis_run(body, i, n, stack, out)
+                i = commonmark_emphasis_run(
+                    body, i, n, delimiters, out, sentinel
+                )
                 continue
 
             # All other characters pass through unchanged.
             out.append(ch)
             i += 1
 
-        # Force-close any spans still open so each chunk of output is
-        # independently valid Slack mrkdwn even if the input was malformed.
-        commonmark_force_close_spans(out, stack)
-
-        return "".join(out)
+        # Replace temporary markers with Slack bold and italic markup.
+        return commonmark_render_emphasis_markers(
+            "".join(out), delimiters, ("*", "*"), ("_", "_"), sentinel
+        )
 
     def __init__(
         self,
@@ -863,38 +921,6 @@ class NotifySlack(NotifyBase):
         # Return the validated attachment content dict
         return content
 
-    def _build_send_calls(
-        self, body=None, title=None, body_format=None, **kwargs
-    ):
-        """Split HTML-derived CommonMark before Slack conversion.
-
-        Markdown-aware splitting protects links; ``send()`` then converts each
-        chunk to independently valid ``mrkdwn``.
-        """
-
-        # Only adapt HTML-derived Markdown; pass other formats through.
-        if not (
-            self.notify_format == NotifyFormat.MARKDOWN
-            and body_format == NotifyFormat.HTML
-        ):
-            yield from super()._build_send_calls(
-                body=body,
-                title=title,
-                body_format=body_format,
-                **kwargs,
-            )
-            return
-
-        # Split as Markdown to protect links, then restore HTML provenance.
-        # Each resulting chunk is converted independently by ``send()``.
-        for chunk in super()._build_send_calls(
-            body=body,
-            title=title,
-            body_format=NotifyFormat.MARKDOWN,
-            **kwargs,
-        ):
-            yield {**chunk, "body_format": NotifyFormat.HTML}
-
     def send(
         self,
         body,
@@ -902,6 +928,7 @@ class NotifySlack(NotifyBase):
         notify_type=NotifyType.INFO,
         attach=None,
         body_format=None,
+        body_passthrough=None,
         **kwargs,
     ):
         """Perform Slack Notification."""
@@ -909,11 +936,7 @@ class NotifySlack(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        if self.notify_format == NotifyFormat.MARKDOWN and (
-            body_format == NotifyFormat.HTML
-        ):
-            # Adapt converted CommonMark; direct mrkdwn input is unchanged.
-            body = self._commonmark_to_slack(body)
+        # The framework has already converted and resized the final body.
 
         #
         # Workflow Builder mode: fixed endpoint, no channel iteration
@@ -966,7 +989,7 @@ class NotifySlack(NotifyBase):
                 # Our slack format
                 slack_format = (
                     "mrkdwn"
-                    if self.notify_format == NotifyFormat.MARKDOWN
+                    if body_format == NotifyFormat.MARKDOWN
                     else "plain_text"
                 )
 
@@ -1036,10 +1059,8 @@ class NotifySlack(NotifyBase):
             #
             # Legacy API Formatting
             #
-            # Apply legacy formatting only to direct Slack mrkdwn input.
-            if self.notify_format == NotifyFormat.MARKDOWN and (
-                body_format != NotifyFormat.HTML
-            ):
+            # Declared input is already escaped; only escape passthrough text.
+            if body_format == NotifyFormat.MARKDOWN and body_passthrough:
                 body = self._re_formatting_rules.sub(  # pragma: no branch
                     lambda x: self._re_formatting_map[x.group()],
                     body,
@@ -1097,7 +1118,7 @@ class NotifySlack(NotifyBase):
             # Prepare JSON Object (applicable to both WEBHOOK and BOT mode)
             payload = {
                 # Use Markdown language
-                "mrkdwn": self.notify_format == NotifyFormat.MARKDOWN,
+                "mrkdwn": body_format == NotifyFormat.MARKDOWN,
                 "attachments": [
                     {
                         "title": title,

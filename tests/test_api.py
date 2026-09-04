@@ -43,9 +43,12 @@ import pytest
 import requests
 
 from apprise import (
+    LOGGER_NAME,
+    NOTIFY_FORMATS,
     Apprise,
     AppriseAsset,
     AppriseAttachment,
+    AppriseResultStatus,
     NotificationManager,
     NotifyBase,
     NotifyFormat,
@@ -54,6 +57,7 @@ from apprise import (
     PrivacyMode,
     URLBase,
     __version__,
+    plugins,
 )
 from apprise.locale import LazyTranslation, gettext_lazy as _
 from apprise.plugins.base import RequirementsSpec
@@ -96,6 +100,7 @@ def test_apprise_async():
 
 
 def apprise_test(do_notify):
+    """Exercise the core Apprise container and notification behavior."""
     a = Apprise()
 
     # no items
@@ -191,7 +196,7 @@ def apprise_test(do_notify):
     assert len(a) == 0
 
     # No servers to notify
-    assert do_notify(a, title="my title", body="my body") is False
+    assert bool(do_notify(a, title="my title", body="my body")) is False
 
     # More Variations of Multiple Adding of URLs
     a = Apprise()
@@ -278,7 +283,7 @@ def apprise_test(do_notify):
     assert len(a) == 0
 
     # We'll fail because we've got nothing to notify
-    assert do_notify(a, title="my title", body="my body") is False
+    assert bool(do_notify(a, title="my title", body="my body")) is False
 
     # Clear our server listings again
     a.clear()
@@ -288,87 +293,110 @@ def apprise_test(do_notify):
 
     # Bad Notification Types are not accepted
     assert (
-        do_notify(a, title="my title", body="my body", notify_type="bad")
+        bool(do_notify(a, title="my title", body="my body", notify_type="bad"))
         is False
     )
 
     # Notifications of string type are accepted
     assert (
-        do_notify(a, title="my title", body="my body", notify_type="warning")
+        bool(
+            do_notify(
+                a, title="my title", body="my body", notify_type="warning"
+            )
+        )
         is True
     )
 
     # Notifications of string type are accepted
     assert (
-        do_notify(a, title="my title", body="my body", notify_type="warning")
+        bool(
+            do_notify(
+                a, title="my title", body="my body", notify_type="warning"
+            )
+        )
         is True
     )
 
     # Notifications of string type are accepted
     assert (
-        do_notify(a, title="my title", body="my body", notify_type="warning")
+        bool(
+            do_notify(
+                a, title="my title", body="my body", notify_type="warning"
+            )
+        )
         is True
     )
 
     # Notifications where notify_type is of the NotifyType object is the
     # preferred choice
     assert (
-        do_notify(
-            a, title="my title", body="my body", notify_type=NotifyType.WARNING
+        bool(
+            do_notify(
+                a,
+                title="my title",
+                body="my body",
+                notify_type=NotifyType.WARNING,
+            )
         )
         is True
     )
 
     # No Title/Body combo's
-    assert do_notify(a, title=None, body=None) is False
-    assert do_notify(a, title="", body=None) is False
-    assert do_notify(a, title=None, body="") is False
+    assert bool(do_notify(a, title=None, body=None)) is False
+    assert bool(do_notify(a, title="", body=None)) is False
+    assert bool(do_notify(a, title=None, body="")) is False
 
-    assert do_notify(a, title=5, body=b"bytes") is False
-    assert do_notify(a, title=b"bytes", body=10) is False
-    assert do_notify(a, title=object(), body=b"bytes") is False
-    assert do_notify(a, title=b"bytes", body=object()) is False
+    assert bool(do_notify(a, title=5, body=b"bytes")) is False
+    assert bool(do_notify(a, title=b"bytes", body=10)) is False
+    assert bool(do_notify(a, title=object(), body=b"bytes")) is False
+    assert bool(do_notify(a, title=b"bytes", body=object())) is False
 
     # A Body must be present
-    assert do_notify(a, title="present", body=None) is False
+    assert bool(do_notify(a, title="present", body=None)) is False
 
     # Other combinations work fine
-    assert do_notify(a, title=None, body="present") is True
-    assert do_notify(a, title="present", body="present") is True
+    assert bool(do_notify(a, title=None, body="present")) is True
+    assert bool(do_notify(a, title="present", body="present")) is True
 
     # Send Attachment with success
     attach = join(TEST_VAR_DIR, "apprise-test.gif")
     assert (
-        do_notify(
-            a,
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            do_notify(
+                a,
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
 
     # Send the attachment as an AppriseAttachment object
     assert (
-        do_notify(
-            a,
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=AppriseAttachment(attach),
+        bool(
+            do_notify(
+                a,
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=AppriseAttachment(attach),
+            )
         )
         is True
     )
 
     # test a invalid attachment
     assert (
-        do_notify(
-            a,
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach="invalid://",
+        bool(
+            do_notify(
+                a,
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach="invalid://",
+            )
         )
         is False
     )
@@ -377,36 +405,42 @@ def apprise_test(do_notify):
     # however do it by directly accessing the object; this grants the similar
     # results:
     assert (
-        do_notify(
-            a[0],
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            do_notify(
+                a[0],
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
 
     # Send the attachment as an AppriseAttachment object
     assert (
-        do_notify(
-            a[0],
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=AppriseAttachment(attach),
+        bool(
+            do_notify(
+                a[0],
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=AppriseAttachment(attach),
+            )
         )
         is True
     )
 
     # test a invalid attachment
     assert (
-        do_notify(
-            a[0],
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach="invalid://",
+        bool(
+            do_notify(
+                a[0],
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach="invalid://",
+            )
         )
         is False
     )
@@ -461,7 +495,7 @@ def apprise_test(do_notify):
 
         # Test when our notify both throws an exception and or just
         # simply returns False
-        assert do_notify(a, title="present", body="present") is False
+        assert bool(do_notify(a, title="present", body="present")) is False
 
     # Create a Notification that throws an unexected exception
     class ThrowInstantiateNotification(NotifyBase):
@@ -692,6 +726,7 @@ def test_apprise_tagging_async(mock_request):
 
 
 def apprise_tagging_test(mock_request, do_notify):
+    """Exercise tag filtering and grouped notification behavior."""
     # A request
     robj = mock.Mock()
     robj.raw = mock.Mock()
@@ -733,23 +768,27 @@ def apprise_tagging_test(mock_request, do_notify):
     # notify the awesome tag; this would notify both services behind the
     # scenes
     assert (
-        do_notify(a, title="my title", body="my body", tag="awesome") is True
+        bool(do_notify(a, title="my title", body="my body", tag="awesome"))
+        is True
     )
 
     # notify all of the tags
     assert (
-        do_notify(
-            a, title="my title", body="my body", tag=["awesome", "mmost"]
+        bool(
+            do_notify(
+                a, title="my title", body="my body", tag=["awesome", "mmost"]
+            )
         )
         is True
     )
 
     # When we query against our loaded notifications for a tag that simply
-    # isn't assigned to anything, we return None.  None (different then False)
-    # tells us that we litterally had nothing to query.  We didn't fail...
-    # but we also didn't do anything...
+    # isn't assigned to anything, we return NOMATCH.  NOMATCH (different
+    # then FAILURE) tells us that we litterally had nothing to query.  We
+    # didn't fail... but we also didn't do anything...
     assert (
-        do_notify(a, title="my title", body="my body", tag="missing") is None
+        do_notify(a, title="my title", body="my body", tag="missing").status
+        == AppriseResultStatus.NOMATCH
     )
 
     # Now to test the ability to and and/or notifications
@@ -777,25 +816,37 @@ def apprise_tagging_test(mock_request, do_notify):
     #   - json://localhost/tagCD/
     #   - json://localhost/tagCDE/
     assert (
-        do_notify(a, title="my title", body="my body", tag=[("TagC", "TagD")])
+        bool(
+            do_notify(
+                a,
+                title="my title",
+                body="my body",
+                tag=[("TagC", "TagD")],
+            )
+        )
         is True
     )
 
     # Expression: (TagY and TagZ) or TagX
-    # Matches nothing, None is returned in this case
+    # Matches nothing, NOMATCH is returned in this case
     assert (
         do_notify(
             a, title="my title", body="my body", tag=[("TagY", "TagZ"), "TagX"]
-        )
-        is None
+        ).status
+        == AppriseResultStatus.NOMATCH
     )
 
     # Expression: (TagY and TagZ) or TagA
     # Matches the following only:
     #   - json://localhost/tagAB/
     assert (
-        do_notify(
-            a, title="my title", body="my body", tag=[("TagY", "TagZ"), "TagA"]
+        bool(
+            do_notify(
+                a,
+                title="my title",
+                body="my body",
+                tag=[("TagY", "TagZ"), "TagA"],
+            )
         )
         is True
     )
@@ -806,8 +857,13 @@ def apprise_tagging_test(mock_request, do_notify):
     #   - json://localhost/tagAB/
     #   - json://localhost/tagB/
     assert (
-        do_notify(
-            a, title="my title", body="my body", tag=[("TagE", "TagD"), "TagB"]
+        bool(
+            do_notify(
+                a,
+                title="my title",
+                body="my body",
+                tag=[("TagE", "TagD"), "TagB"],
+            )
         )
         is True
     )
@@ -815,7 +871,7 @@ def apprise_tagging_test(mock_request, do_notify):
     # Garbage Entries in tag field just get stripped out. the below
     # is the same as notifying no tags at all. Since we have not added
     # any entries that do not have tags (that we can match against)
-    # we fail.  None is returned as a way of letting us know that we
+    # we fail.  NOMATCH is returned as a way of letting us know that we
     # had Notifications to notify, but since none of them matched our tag
     # none were notified.
     assert (
@@ -826,8 +882,8 @@ def apprise_tagging_test(mock_request, do_notify):
             tag=[
                 (object,),
             ],
-        )
-        is None
+        ).status
+        == AppriseResultStatus.NOMATCH
     )
 
 
@@ -1253,27 +1309,486 @@ def test_apprise_notify_formats():
     assert len(a) == 9
 
     assert (
-        a.notify(
-            title="markdown",
-            body="## Testing Markdown",
-            body_format=NotifyFormat.MARKDOWN,
+        bool(
+            a.notify(
+                title="markdown",
+                body="## Testing Markdown",
+                body_format=NotifyFormat.MARKDOWN,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(
-            title="text", body="Testing Text", body_format=NotifyFormat.TEXT
+        bool(
+            a.notify(
+                title="text",
+                body="Testing Text",
+                body_format=NotifyFormat.TEXT,
+            )
         )
         is True
     )
 
     assert (
-        a.notify(
-            title="html", body="<b>HTML</b>", body_format=NotifyFormat.HTML
+        bool(
+            a.notify(
+                title="html", body="<b>HTML</b>", body_format=NotifyFormat.HTML
+            )
         )
         is True
     )
+
+
+def test_apprise_multi_format_resolution(caplog):
+    """
+    API: multi-format notify_format resolution
+
+    """
+    # Older pytest releases (e.g. the one shipped with EL9) do not
+    # un-disable logging on our behalf when caplog.set_level() is
+    # called, so a prior module-level logging.disable(logging.CRITICAL)
+    # call would otherwise silently swallow this debug message. Clear
+    # it explicitly and restore it once we're done.
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.DEBUG, logger=LOGGER_NAME)
+
+    try:
+
+        class SingleFormatNotification(NotifyBase):
+            """Test plugin that resolves to one fixed format."""
+
+            # Single-format plugins always use their declared format.
+            notify_format = NotifyFormat.HTML
+
+            def send(self, body, title="", notify_type=None, **kwargs):
+                """Accept the prepared body without doing network work."""
+                return True
+
+        class MultiFormatNotification(NotifyBase):
+            """Test plugin that can render either HTML or Markdown."""
+
+            # Declares more than one supported format, index[0] is default
+            notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+
+            received = []
+
+            def send(self, body, title="", notify_type=None, **kwargs):
+                """Record fallback sends with no format-specific hook."""
+                self.received.append(("send", body))
+                return True
+
+            def send_markdown(
+                self, body, title="", notify_type=None, **kwargs
+            ):
+                """Record Markdown-specific dispatch."""
+                self.received.append(("send_markdown", body))
+                return True
+
+        # Single-format plugin: _formats()/resolve_format() resolve to the
+        # one declared format no matter what is passed in.
+        single = SingleFormatNotification(host="localhost")
+        assert single._formats() == (NotifyFormat.HTML,)
+        assert single.resolve_format(None) == NotifyFormat.HTML
+        assert single.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
+        assert (
+            single.resolve_format(NotifyFormat.MARKDOWN) == NotifyFormat.HTML
+        )
+
+        # A plain string is accepted
+        assert single.resolve_format("text") == NotifyFormat.HTML
+
+        # Multi-format plugin, no override, no matching input: default wins
+        multi = MultiFormatNotification(host="localhost")
+        assert multi._formats() == (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+        assert multi.resolve_format(None) == NotifyFormat.HTML
+        assert multi.resolve_format(NotifyFormat.TEXT) == NotifyFormat.HTML
+
+        # Multi-format plugin, no override, input aligns to a declared format
+        assert (
+            multi.resolve_format(NotifyFormat.MARKDOWN)
+            == NotifyFormat.MARKDOWN
+        )
+
+        # A plain string is supported
+        resolved = multi.resolve_format("markdown")
+        assert resolved == NotifyFormat.MARKDOWN
+        assert isinstance(resolved, NotifyFormat)
+
+        # Multi-format plugin, explicit ?format= override in the declared set
+        multi_override = MultiFormatNotification(
+            host="localhost", format="markdown"
+        )
+        assert multi_override._format_override == NotifyFormat.MARKDOWN
+        assert multi_override.resolve_format(NotifyFormat.HTML) == (
+            NotifyFormat.MARKDOWN
+        )
+
+        # Multi-format plugin, ?format= override NOT in the declared set falls
+        # back through to input alignment, then default, with a debug message.
+        multi_bad_override = MultiFormatNotification(
+            host="localhost", format="text"
+        )
+        assert multi_bad_override._format_override == NotifyFormat.TEXT
+        caplog.clear()
+        assert multi_bad_override.resolve_format(NotifyFormat.MARKDOWN) == (
+            NotifyFormat.MARKDOWN
+        )
+        assert "does not support format" in caplog.text
+        assert "DEBUG" in caplog.text
+
+        # No declared source format: same fallback, but silent -- matches
+        # the historical no-noise conversion behavior.
+        caplog.clear()
+        assert multi_bad_override.resolve_format(None) == NotifyFormat.HTML
+        assert "does not support format" not in caplog.text
+
+        # send_{type}() dispatch: send_markdown() defined, used when resolved
+        multi.received.clear()
+        assert (
+            multi.notify(body="# hi", body_format=NotifyFormat.MARKDOWN)
+            is True
+        )
+        assert multi.received == [("send_markdown", "# hi")]
+
+        # send_{type}() dispatch: no send_html() defined, falls back to send()
+        multi.received.clear()
+        assert multi.notify(body="hi", body_format=NotifyFormat.HTML) is True
+        assert multi.received == [("send", "hi")]
+    finally:
+        logging.disable(logging.CRITICAL)
+
+
+def test_apprise_multi_format_conversion_cache():
+    """
+    API: multi-format resolution reuses one converted body per resolved
+    target, same as the existing single-format conversion cache.
+
+    """
+    asset = AppriseAsset(async_mode=False)
+    a = Apprise(asset=asset)
+
+    class HtmlOnlyNotification(NotifyBase):
+        """Test plugin that resolves to HTML."""
+
+        notify_format = NotifyFormat.HTML
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    class MultiFormatNotification(NotifyBase):
+        """Test plugin that also resolves to HTML by default."""
+
+        # Resolves to HTML by default, same target as HtmlOnlyNotification
+        notify_format = (NotifyFormat.HTML, NotifyFormat.MARKDOWN)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    N_MGR["htmlonly"] = HtmlOnlyNotification
+    N_MGR["multi"] = MultiFormatNotification
+
+    assert a.add("htmlonly://localhost") is True
+    assert a.add("multi://localhost") is True
+    assert len(a) == 2
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda *a, **k: "converted",
+    ) as mock_convert:
+        assert (
+            bool(a.notify(body="hello", body_format=NotifyFormat.TEXT)) is True
+        )
+        # Both servers resolve to HTML; the body should only be converted
+        # once and reused, exactly like the single-format cache today.
+        assert mock_convert.call_count == 1
+
+
+def test_apprise_payload_max_size_enforced_before_conversion():
+    """API: Apply the payload cap before conversion and title merging."""
+    asset = AppriseAsset(async_mode=False, payload_max_size=20)
+    a = Apprise(asset=asset)
+
+    class TitlelessNotification(NotifyBase):
+        """Test plugin with no native title field."""
+
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["titleless"] = TitlelessNotification
+
+    obj = TitlelessNotification(host="localhost", asset=asset)
+    assert a.add(obj) is True
+
+    title = "T" * 100
+    body = "B" * 1000
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda src, dst, content: content,
+    ) as mock_convert:
+        assert bool(a.notify(title=title, body=body)) is True
+
+        # Conversion only receives content that already fits the input cap.
+        for call in mock_convert.call_args_list:
+            assert len(call.kwargs["content"]) <= 20
+
+    # Title markup may add a few characters after the input cap is applied.
+    assert len(obj.sent) == 1
+    delivered_title, delivered_body = obj.sent[0]
+    assert delivered_title == ""
+    assert len(delivered_body) < 30
+
+
+def test_apprise_payload_max_size_not_reapplied_after_conversion():
+    """API: Cap source text once without truncating converted markup."""
+
+    class HTMLNotification(NotifyBase):
+        """Test plugin whose declared format is HTML."""
+
+        notify_format = NotifyFormat.HTML
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["htmltest"] = HTMLNotification
+
+    # The five-character source fits, although its HTML conversion is longer.
+    asset = AppriseAsset(async_mode=False, payload_max_size=5)
+    a = Apprise(asset=asset)
+    obj = HTMLNotification(host="localhost", asset=asset)
+    assert a.add(obj) is True
+
+    result = a.notify(
+        title="", body="**x**", body_format=NotifyFormat.MARKDOWN
+    )
+    assert bool(result) is True
+
+    assert len(obj.sent) == 1
+    _, delivered_body = obj.sent[0]
+    assert delivered_body == "<p><strong>x</strong></p>"
+
+    # Direct plugin calls still enforce the cap because no earlier step did.
+    obj.sent.clear()
+    assert obj.notify(title="", body="B" * 100) is True
+    assert len(obj.sent) == 1
+    _, direct_body = obj.sent[0]
+    assert len(direct_body) <= 5
+
+    # The old public keyword is ignored, so direct callers cannot use it to
+    # bypass the cap.
+    obj.sent.clear()
+    assert obj.notify(title="", body="B" * 100, payload_precapped=True) is True
+    assert len(obj.sent) == 1
+    _, guessed_kwarg_body = obj.sent[0]
+    assert len(guessed_kwarg_body) <= 5
+
+
+def test_apprise_payload_max_size_uses_service_asset_limit():
+    """API: Apply each service's asset cap before conversion.
+
+    The service limit still applies when the top-level asset has no cap.
+    """
+
+    class TitlelessNotification(NotifyBase):
+        """Test plugin with no native title field."""
+
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["titleless"] = TitlelessNotification
+
+    # The top-level asset used by Apprise() itself has the cap disabled.
+    global_asset = AppriseAsset(async_mode=False, payload_max_size=0)
+    a = Apprise(asset=global_asset)
+
+    # Give this service a separate asset with its own cap.
+    service_asset = AppriseAsset(async_mode=False, payload_max_size=20)
+    obj = TitlelessNotification(host="localhost", asset=service_asset)
+    assert a.add(obj) is True
+
+    title = "T" * 100
+    body = "B" * 1000
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda src, dst, content: content,
+    ) as mock_convert:
+        assert bool(a.notify(title=title, body=body)) is True
+
+        # Conversion receives content trimmed to the service's own cap.
+        for call in mock_convert.call_args_list:
+            assert len(call.kwargs["content"]) <= 20
+
+    assert len(obj.sent) == 1
+    delivered_title, delivered_body = obj.sent[0]
+    assert len(delivered_title) + len(delivered_body) < 30
+
+
+def test_apprise_payload_max_size_cache_key_includes_buffer_settings():
+    """API: Services with different payload settings use separate caches."""
+
+    class TitlelessNotification(NotifyBase):
+        """Test plugin with no native title field."""
+
+        title_maxlen = 0
+
+        def __init__(self, *args, **kwargs):
+            super().__init__(**kwargs)
+            self.sent = []
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Record what would have gone out over the wire."""
+            self.sent.append((title, body))
+            return True
+
+    N_MGR["titleless"] = TitlelessNotification
+
+    global_asset = AppriseAsset(async_mode=False)
+    a = Apprise(asset=global_asset)
+
+    # The second service disables the short-side rule.
+    asset1 = AppriseAsset(async_mode=False, payload_max_size=35)
+    obj1 = TitlelessNotification(host="host1", asset=asset1)
+    assert a.add(obj1) is True
+
+    asset2 = AppriseAsset(
+        async_mode=False, payload_max_size=35, payload_buffer_threshold=0
+    )
+    obj2 = TitlelessNotification(host="host2", asset=asset2)
+    assert a.add(obj2) is True
+
+    title = "T" * 9
+    body = "B" * 33
+
+    with mock.patch(
+        "apprise.apprise.convert_between",
+        side_effect=lambda src, dst, content: content,
+    ):
+        assert bool(a.notify(title=title, body=body)) is True
+
+    assert len(obj1.sent) == 1
+    assert len(obj2.sent) == 1
+
+    # With no title field, the different allocations appear in each body.
+    delivered1 = obj1.sent[0][1]
+    delivered2 = obj2.sent[0][1]
+    assert delivered1 != delivered2
+
+
+def test_apprise_payload_max_size_warns_when_trimming(caplog):
+    """API: Log a warning only when a service cap trims the input."""
+    # Older pytest releases (e.g. the one shipped with EL9) do not
+    # un-disable logging on our behalf when caplog.set_level() is
+    # called, so a prior module-level logging.disable(logging.CRITICAL)
+    # call would otherwise silently swallow this warning. Clear it
+    # explicitly and restore it once we're done.
+    logging.disable(logging.NOTSET)
+    caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
+
+    try:
+
+        class PlainNotification(NotifyBase):
+            title_maxlen = 10
+
+            def send(self, body, title="", notify_type=None, **kwargs):
+                return True
+
+        N_MGR["plain"] = PlainNotification
+
+        asset = AppriseAsset(async_mode=False, payload_max_size=5)
+        a = Apprise(asset=asset)
+        obj = PlainNotification(host="localhost", asset=asset)
+        assert a.add(obj) is True
+
+        caplog.clear()
+        assert bool(a.notify(title="", body="x" * 100)) is True
+        assert "payload_max_size" in caplog.text
+
+        # A body that already fits the cap logs no warning at all.
+        caplog.clear()
+        assert bool(a.notify(title="", body="x")) is True
+        assert "payload_max_size" not in caplog.text
+    finally:
+        logging.disable(logging.CRITICAL)
+
+
+def test_apprise_multi_format_details():
+    """
+    API: Apprise() Details reflect a plugin's real supported formats
+
+    """
+
+    class SingleFormatNotification(NotifyBase):
+        """Test plugin whose public details should stay broad."""
+
+        service_name = "Single Format Testing"
+        protocol = "singlefmt"
+        notify_format = NotifyFormat.HTML
+
+        templates = ("{schema}://{host}",)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    class MultiFormatNotification(NotifyBase):
+        """Test plugin whose public details expose supported formats."""
+
+        service_name = "Multi Format Testing"
+        protocol = "multifmtdetails"
+        # Declaration order matters: markdown is the default (index[0])
+        notify_format = (NotifyFormat.MARKDOWN, NotifyFormat.HTML)
+
+        templates = ("{schema}://{host}",)
+
+        def send(self, body, title="", notify_type=None, **kwargs):
+            """Accept the prepared body without doing network work."""
+            return True
+
+    # values/default remain broad for every plugin so consumers that only
+    # know those fields keep seeing the standard Apprise ?format= choices.
+    # The additive `supported` field carries the narrower native subset.
+    single_details = plugins.details(SingleFormatNotification)
+    assert single_details["args"]["format"]["values"] == NOTIFY_FORMATS
+    assert single_details["args"]["format"]["default"] == "html"
+    # `supported` names the subset this plugin actually renders natively:
+    # one entry for a single-format plugin.
+    assert single_details["args"]["format"]["supported"] == ["html"]
+
+    multi_details = plugins.details(MultiFormatNotification)
+    assert multi_details["args"]["format"]["values"] == NOTIFY_FORMATS
+    assert multi_details["args"]["format"]["default"] == "markdown"
+    # Declaration order preserved, not alphabetically re-sorted
+    assert multi_details["args"]["format"]["supported"] == [
+        "markdown",
+        "html",
+    ]
 
 
 def test_apprise_asset(tmpdir):
@@ -1554,13 +2069,13 @@ def test_apprise_disabled_plugins():
     plugin.enabled = False
 
     # As a result, we can now no longer send a notification:
-    assert plugin.notify("My Message") is False
+    assert bool(plugin.notify("My Message")) is False
 
     # As just a proof of how you can toggle the state back:
     plugin.enabled = True
 
     # our notifications will go okay now
-    assert plugin.notify("My Message") is True
+    assert bool(plugin.notify("My Message")) is True
 
     # Restore our modules
     N_MGR.unload_modules()
@@ -1879,7 +2394,9 @@ def test_apprise_details_plugin_verification():
 
     # Valid Type Regular Expression Checker
     # Case Sensitive and MUST match the following:
-    is_valid_type_re = re.compile(r"((choice|list):)?(string|bool|int|float)")
+    is_valid_type_re = re.compile(
+        r"((choice|list):)?(string|bool|int|float|email)"
+    )
 
     # match tokens found in templates so we can cross reference them back
     # to see if they have a matching argument
@@ -1918,6 +2435,10 @@ def test_apprise_details_plugin_verification():
         "required",
         "type",
         "values",
+        # The subset of `values` this specific plugin actually renders
+        # natively; only meaningfully narrower than `values` for a
+        # multi-format plugin. See NotifyBase.resolve_format().
+        "supported",
         "min",
         "max",
         "regex",
@@ -2240,20 +2761,16 @@ def test_apprise_details_plugin_verification():
 
 
 def test_apprise_details_plugin_raw_template_tokens():
-    """
-    API: Apprise() Raw Template Token Verification
+    """Require an explicit type in every raw plugin template token.
 
-    Checks that every plugin's template_tokens and template_args declare
-    an explicit 'type' field before _sanitize_token can silently back-fill
-    a default.  _sanitize_token adds 'type': 'string' when the field is
-    missing, so the post-processed details() output always passes -- this
-    test catches the gap at the source.
+    Sanitizing supplies a missing ``string`` default, so this checks the raw
+    declarations first.
     """
 
-    # Valid Type Regular Expression Checker -- mirrors the one used by
-    # test_apprise_details_plugin_verification so both tests agree on what
-    # constitutes a valid type.
-    is_valid_type_re = re.compile(r"((choice|list):)?(string|bool|int|float)")
+    # Use the same valid token types as the plugin verification test.
+    is_valid_type_re = re.compile(
+        r"((choice|list):)?(string|bool|int|float|email)"
+    )
 
     for plugin in N_MGR.plugins():
         label = plugin.__name__
@@ -2285,6 +2802,133 @@ def test_apprise_details_plugin_raw_template_tokens():
                 )
 
 
+def test_apprise_details_email_token_types():
+    """Ensure URL email fields declare their token type as ``email``.
+
+    Code that builds URLs from this metadata must leave ``@`` unescaped.
+    Add fields only after confirming that behavior in the plugin's ``url()``
+    method; a field name alone is not enough.
+    """
+    # (plugin class name, template_tokens key)
+    expected_email_tokens = {
+        ("NotifySES", "from_email"),
+        ("NotifyPostmark", "from_email"),
+        ("NotifyPostmark", "target_email"),
+        ("NotifyResend", "from_addr"),
+        ("NotifyResend", "target_email"),
+        ("NotifyMailerSend", "from_email"),
+        ("NotifyMailerSend", "target_email"),
+        ("NotifyOffice365", "target_email"),
+        ("NotifyOctopush", "api_login"),
+        ("NotifyThreema", "target_email"),
+        ("NotifyBrevo", "from_email"),
+        ("NotifyBrevo", "target_email"),
+        ("NotifySendGrid", "from_email"),
+        ("NotifySendGrid", "target_email"),
+        ("NotifyMailgun", "target_email"),
+        ("NotifyOneSignal", "target_email"),
+        ("NotifyPingram", "target_email"),
+        ("NotifyPushBullet", "target_email"),
+        ("NotifySendPulse", "target_email"),
+        ("NotifySlack", "target_email"),
+        ("NotifyTwist", "email"),
+        ("NotifyVoipms", "email"),
+        ("NotifyZulip", "target_user"),
+    }
+
+    plugins_by_name = {plugin.__name__: plugin for plugin in N_MGR.plugins()}
+    found = set()
+    for plugin_name, token_key in expected_email_tokens:
+        assert plugin_name in plugins_by_name, (
+            f"{plugin_name} was not found -- has it been renamed/removed?"
+            " Update expected_email_tokens to match."
+        )
+        plugin = plugins_by_name[plugin_name]
+        assert token_key in plugin.template_tokens, (
+            f"{plugin_name}.template_tokens no longer defines"
+            f" {token_key!r} -- update expected_email_tokens to match."
+        )
+        assert plugin.template_tokens[token_key]["type"] == "email", (
+            f"{plugin_name}.template_tokens[{token_key!r}]['type'] must"
+            " stay 'email' -- this field's own url() preserves a literal"
+            " '@' when rebuilding the URL, so a client keying off this"
+            " metadata needs the same signal."
+        )
+        found.add((plugin_name, token_key))
+
+    # Scan all declared email tokens so new fields must join the allowlist.
+    for plugin in N_MGR.plugins():
+        for key, token in plugin.template_tokens.items():
+            if token.get("type") == "email":
+                assert (plugin.__name__, key) in found, (
+                    f"{plugin.__name__}.template_tokens[{key!r}] is tagged"
+                    " 'email' but isn't listed in expected_email_tokens --"
+                    " add it there (after confirming this field's own"
+                    " url() actually needs it, per this test's docstring)."
+                )
+
+
+def test_apprise_send_format_handlers_match_notify_format():
+    """
+    API: send_text()/send_html()/send_markdown() vs notify_format sanity
+
+    A format-specific send_<format>() method must be reachable through
+    the plugin's notify_format declaration.
+    """
+
+    for plugin in N_MGR.plugins():
+        label = plugin.__name__
+
+        # Only consider format-specific methods defined directly on this
+        # class (not merely inherited), so a subclass that narrows
+        # notify_format isn't blamed for a handler its parent defined.
+        declared_handlers = {
+            fmt for fmt in NOTIFY_FORMATS if f"send_{fmt}" in vars(plugin)
+        }
+
+        if not declared_handlers:
+            continue
+
+        # notify_format may be a single NotifyFormat or a tuple; resolve
+        # it the same way NotifyBase._formats() does.
+        supported = set(parse_list(plugin.notify_format, sort=False))
+
+        missing = declared_handlers - supported
+        assert not missing, (
+            f"{label} defines send_{next(iter(missing))}() but "
+            f"{next(iter(missing))!r} is not declared in its "
+            f"notify_format {plugin.notify_format!r}; the handler can "
+            "never be reached."
+        )
+
+
+def test_apprise_multi_format_plugins_no_scalar_comparison():
+    """Multi-format plugins must resolve before scalar comparisons."""
+
+    scalar_compare_re = re.compile(r"self\.notify_format\s*==")
+
+    for plugin in N_MGR.plugins():
+        formats = parse_list(plugin.notify_format, sort=False)
+        if len(formats) <= 1:
+            # Single-format plugins can compare their scalar directly.
+            continue
+
+        try:
+            source = inspect.getsource(plugin)
+        except (OSError, TypeError):
+            # Dynamic plugins have no source file to inspect.
+            continue
+
+        assert not scalar_compare_re.search(source), (
+            f"{plugin.__name__} declares a multi-format notify_format "
+            f"{plugin.notify_format!r} but compares self.notify_format "
+            "directly somewhere in its source; use "
+            "self.resolve_format(body_format) instead, since a tuple "
+            "never equals a scalar and the comparison can never be "
+            "True."
+        )
+
+
 @mock.patch("requests.request")
 @mock.patch("asyncio.gather", wraps=asyncio.gather)
 @mock.patch(
@@ -2298,8 +2942,8 @@ def test_apprise_async_mode(mock_threadpool, mock_gather, mock_request):
     """
     mock_request.return_value.status_code = requests.codes.ok
 
-    # Define some servers
-    servers = [
+    # Define some services
+    services = [
         "xml://localhost",
         "json://localhost",
     ]
@@ -2311,71 +2955,102 @@ def test_apprise_async_mode(mock_threadpool, mock_gather, mock_request):
     # Load our asset
     a = Apprise(asset=asset)
 
-    # add our servers
-    a.add(servers=servers)
+    # add our services
+    a.add(servers=services)
 
-    # 2 servers loaded
+    # 2 services loaded
     assert len(a) == 2
 
-    # Our servers should carry this flag
-    for server in a:
-        assert server.asset.async_mode is True
+    # Our services should carry this flag
+    for service in a:
+        assert service.asset.async_mode is True
 
-    # Send Notifications Asyncronously
-    assert a.notify("async") is True
+    # _notify_parallel_threadpool() shares one ThreadPoolExecutor across
+    # every call for the life of the process (apprise.py's
+    # _get_shared_executor()) rather than creating a new one each time,
+    # so it can only ever be *constructed* once here regardless of how
+    # many dispatches follow. Reset to None so this test observes that
+    # first construction deterministically rather than possibly reusing
+    # one an earlier test already created; mock.patch restores whatever
+    # was actually there once this block exits.
+    with mock.patch("apprise.apprise._shared_executor", None):
+        # Send Notifications Asyncronously
+        assert bool(a.notify("async")) is True
 
-    # Verify our thread pool was created
-    assert mock_threadpool.call_count == 1
-    mock_threadpool.reset_mock()
+        # Verify our thread pool was created
+        assert mock_threadpool.call_count == 1
+        mock_threadpool.reset_mock()
 
-    # Provide an over-ride now
-    asset = AppriseAsset(async_mode=False)
-    assert asset.async_mode is False
+        # Provide an over-ride now
+        asset = AppriseAsset(async_mode=False)
+        assert asset.async_mode is False
 
-    # Load our asset
-    a = Apprise(asset=asset)
+        # Load our asset
+        a = Apprise(asset=asset)
 
-    # Verify our configuration kept
-    assert a.asset.async_mode is False
+        # Verify our configuration kept
+        assert a.asset.async_mode is False
 
-    # add our servers
-    a.add(servers=servers)
+        # add our services
+        a.add(servers=services)
 
-    # 2 servers loaded
-    assert len(a) == 2
+        # 2 services loaded
+        assert len(a) == 2
 
-    # Our servers should carry this flag
-    for server in a:
-        assert server.asset.async_mode is False
+        # Our services should carry this flag
+        for service in a:
+            assert service.asset.async_mode is False
 
-    # Send Notifications Syncronously
-    assert a.notify("sync") is True
-    # Sequential send doesn't require a gather
-    assert mock_gather.call_count == 0
-    mock_gather.reset_mock()
+        # Send Notifications Syncronously
+        assert bool(a.notify("sync")) is True
+        # Sequential send doesn't require a gather
+        assert mock_gather.call_count == 0
+        mock_gather.reset_mock()
 
-    # another way of looking a our false set asset configuration
-    assert a[0].asset.async_mode is False
-    assert a[1].asset.async_mode is False
+        # another way of looking a our false set asset configuration
+        assert a[0].asset.async_mode is False
+        assert a[1].asset.async_mode is False
 
-    # Adjust 1 of the servers async_mode settings
-    a[0].asset.async_mode = True
-    assert a[0].asset.async_mode is True
+        # Adjust 1 of the services async_mode settings
+        a[0].asset.async_mode = True
+        assert a[0].asset.async_mode is True
 
-    # They all share the same object, so this gets toggled too
-    assert a[1].asset.async_mode is True
+        # They all share the same object, so this gets toggled too
+        assert a[1].asset.async_mode is True
 
-    # We'll just change this one
-    a[1].asset = AppriseAsset(async_mode=False)
-    assert a[0].asset.async_mode is True
-    assert a[1].asset.async_mode is False
+        # We'll just change this one
+        a[1].asset = AppriseAsset(async_mode=False)
+        assert a[0].asset.async_mode is True
+        assert a[1].asset.async_mode is False
 
-    # Send 1 Notification Syncronously, the other Asyncronously
-    assert a.notify("a mixed batch") is True
+        # Send 1 Notification Syncronously, the other Asyncronously
+        assert bool(a.notify("a mixed batch")) is True
 
-    # Verify we didn't use a thread pool for a single notification
-    assert mock_threadpool.call_count == 0
-    mock_threadpool.reset_mock()
+        # The single async-mode service still goes through the thread
+        # pool even though it's alone in its batch: AppriseAsset.
+        # service_timeout defaults to 60s, so a deadline applies, and
+        # only a thread-pool dispatch can abandon a service that runs
+        # past its deadline. No NEW executor is constructed though --
+        # the one from the first dispatch above is shared and reused.
+        assert mock_threadpool.call_count == 0
+
+        # Disable this service's own timeout budget entirely -- with no
+        # deadline of any kind in effect, a single async-mode service has
+        # nothing that could ever need abandoning, so the thread-pool
+        # shortcut applies again (no executor use at all, shared or not).
+        a[0].asset = AppriseAsset(async_mode=True, service_timeout=0)
+        a[1].asset = AppriseAsset(async_mode=False)
+        assert bool(a.notify("a mixed batch, no timeout")) is True
+        assert mock_threadpool.call_count == 0
+
+        # Shut down the executor constructed inside this patched block
+        # before it's discarded -- otherwise its worker threads would
+        # sit idle forever with nothing left referencing them once
+        # mock.patch restores apprise.apprise._shared_executor below.
+        import apprise.apprise as apprise_module
+
+        if apprise_module._shared_executor is not None:
+            apprise_module._shared_executor.shutdown(wait=False)
 
 
 def test_notify_matrix_dynamic_importing(tmpdir):

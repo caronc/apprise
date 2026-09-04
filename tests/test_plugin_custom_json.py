@@ -35,7 +35,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.plugins.custom_json import NotifyJSON
 
 logging.disable(logging.CRITICAL)
@@ -232,6 +232,41 @@ def test_plugin_custom_json_urls():
 
 
 @mock.patch("requests.request")
+def test_plugin_custom_json_multi_format(mock_request):
+    """NotifyJSON() supports all 3 notify formats as a pass-through."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    mock_request.return_value = response
+
+    assert NotifyJSON.notify_format == (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
+
+    a = Apprise()
+    assert a.add("json://localhost") is True
+
+    # Markdown input aligns directly to the plugin's supported markdown
+    # format; no conversion should alter the content.
+    assert (
+        bool(a.notify(body="# hello", body_format=NotifyFormat.MARKDOWN))
+        is True
+    )
+    payload = json.loads(mock_request.call_args_list[-1][1]["data"])
+    assert payload["message"] == "# hello"
+
+    # ?format=html forces the resolved target regardless of the caller's
+    # input format.
+    a = Apprise()
+    assert a.add("json://localhost/?format=html") is True
+    assert bool(a.notify(body="a < b", body_format=NotifyFormat.TEXT)) is True
+    payload = json.loads(mock_request.call_args_list[-1][1]["data"])
+    assert payload["message"] == "a&nbsp;&lt;&nbsp;b"
+
+
+@mock.patch("requests.request")
 def test_plugin_custom_json_edge_cases(mock_request):
     """NotifyJSON() Edge Cases."""
 
@@ -365,11 +400,13 @@ def test_notify_json_plugin_attachments(mock_request):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -377,11 +414,13 @@ def test_notify_json_plugin_attachments(mock_request):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -400,11 +439,13 @@ def test_notify_json_plugin_attachments(mock_request):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -416,11 +457,13 @@ def test_notify_json_plugin_attachments(mock_request):
     # Now send an attachment normally without issues
     mock_request.reset_mock()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

@@ -72,10 +72,14 @@ class CustomNotifyPlugin(NotifyBase):
         return f"{self.secure_protocol}://"
 
     @staticmethod
-    def instantiate_plugin(url, send_func, name=None):
+    def instantiate_plugin(url, send_func, name=None, body_format=None):
         """The function used to add a new notification plugin based on the
         schema parsed from the provided URL into our supported matrix
-        structure."""
+        structure.
+
+        ``body_format`` declares the destination format(s) this wrapper
+        accepts. When omitted, the wrapper passes every format through.
+        """
 
         if not isinstance(url, str):
             msg = (
@@ -130,6 +134,18 @@ class CustomNotifyPlugin(NotifyBase):
             # Store our matched schema
             secure_protocol = schema
 
+            # Explicit body_format= declares this wrapper's destination.
+            # Without one, accept every format as pass-through input.
+            notify_format = (
+                body_format
+                if body_format is not None
+                else (
+                    common.NotifyFormat.TEXT,
+                    common.NotifyFormat.HTML,
+                    common.NotifyFormat.MARKDOWN,
+                )
+            )
+
             requirements = {
                 # Define our required packaging in order to work
                 "details": f"Source: {inspect.getfile(send_func)}"
@@ -168,6 +184,12 @@ class CustomNotifyPlugin(NotifyBase):
                 **kwargs,
             ):
                 """Our send() call which triggers our hook."""
+
+                # The decorator does not support split/truncate overflow, so
+                # every delivery is index 0 of 1. Drop them rather than pass
+                # along values that never carry any real meaning here.
+                kwargs.pop("index", None)
+                kwargs.pop("total", None)
 
                 response = False
                 try:

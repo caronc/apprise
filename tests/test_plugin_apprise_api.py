@@ -34,8 +34,8 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
-from apprise import Apprise, AppriseAttachment, NotifyType
-from apprise.plugins.apprise_api import NotifyAppriseAPI
+from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.plugins.apprise_api import AppriseAPIVersion, NotifyAppriseAPI
 
 logging.disable(logging.CRITICAL)
 
@@ -173,6 +173,20 @@ apprise_url_tests = (
             "privacy_url": "apprise://user@localhost/m...1/",
         },
     ),
+    # Version 1 keeps the configuration ID in the request path.
+    (
+        "apprise://localhost/mytoken1/?v=1",
+        {
+            "instance": NotifyAppriseAPI,
+        },
+    ),
+    # Invalid versions are rejected.
+    (
+        "apprise://localhost/mytoken1/?version=3",
+        {
+            "instance": TypeError,
+        },
+    ),
     (
         "apprise://localhost:8080/mytoken/",
         {
@@ -294,34 +308,41 @@ def test_notify_apprise_api_payload_check(mock_post):
     # Assign our mock object our return value
     mock_post.return_value = okay_response
 
-    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/?method=form")
+    obj = Apprise.instantiate(
+        "apprise://user@localhost/mytoken1/"
+        "?method=form&+X-Apprise-Config-ID=wrong"
+    )
     assert isinstance(obj, NotifyAppriseAPI)
 
     # Test URL with Attachment
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
 
     details = mock_post.call_args_list[0]
-    assert details[0][0] == "http://localhost/notify/mytoken1"
+    assert details[0][0] == "http://localhost/notify"
+    # Undeclared input relays no format; the downstream server chooses.
     assert details[1]["data"] == {
         "title": "title",
         "body": "body",
         "type": "info",
-        "format": "text",
     }
     assert "X-Apprise-ID" in details[1]["headers"]
     assert details[1]["headers"].get("User-Agent") == "Apprise"
     assert details[1]["headers"].get("Accept") == "application/json"
     assert details[1]["headers"].get("X-Apprise-Recursion-Count") == "1"
+    # The plugin token remains authoritative over a custom header.
+    assert details[1]["headers"].get("X-Apprise-Config-ID") == "mytoken1"
 
     mock_post.reset_mock()
 
@@ -329,17 +350,19 @@ def test_notify_apprise_api_payload_check(mock_post):
     assert isinstance(obj, NotifyAppriseAPI)
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
 
     details = mock_post.call_args_list[0]
-    assert details[0][0] == "http://localhost/notify/mytoken1"
+    assert details[0][0] == "http://localhost/notify"
     data = loads(details[1]["data"])
     assert "attachments" in data
     assert isinstance(data["attachments"], list)
@@ -347,16 +370,161 @@ def test_notify_apprise_api_payload_check(mock_post):
 
     # Remove our attachment to make the next assert easier
     del data["attachments"]
+    # Undeclared input relays no format.
     assert data == {
         "title": "title",
         "body": "body",
         "type": "info",
-        "format": "text",
     }
     assert "X-Apprise-ID" in details[1]["headers"]
     assert details[1]["headers"].get("User-Agent") == "Apprise"
     assert details[1]["headers"].get("Accept") == "application/json"
     assert details[1]["headers"].get("X-Apprise-Recursion-Count") == "1"
+    assert details[1]["headers"].get("X-Apprise-Config-ID") == "mytoken1"
+
+    mock_post.reset_mock()
+
+    # Version 1 retains the original keyed endpoint for older servers.
+    obj = Apprise.instantiate(
+        "apprise://user@localhost/mytoken1/?method=form&v=1"
+    )
+    assert isinstance(obj, NotifyAppriseAPI)
+    assert bool(obj.notify(body="body", title="title")) is True
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://localhost/notify/mytoken1"
+    assert "X-Apprise-Config-ID" not in details[1]["headers"]
+    assert "version=1" in obj.url(privacy=False)
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_password_only_auth(mock_post):
+    """Password-only Apprise API URLs send valid Basic Auth."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate("apprise://:secret@localhost/mytoken1/")
+    assert isinstance(obj, NotifyAppriseAPI)
+    assert bool(obj.notify(body="body", title="title")) is True
+
+    details = mock_post.call_args_list[0]
+    assert details[1]["auth"] == ("", "secret")
+    assert details[0][0] == "http://localhost/notify"
+    assert details[1]["headers"]["X-Apprise-Config-ID"] == "mytoken1"
+    assert obj.url(privacy=False).startswith(
+        "apprise://:secret@localhost/mytoken1/"
+    )
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_native_url_version(mock_post):
+    """Native /notify/{token} URLs default to Version 1 for old servers."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    # A bare native URL reflects the classic path-based endpoint, so it
+    # should keep talking to the server that shape, not switch to the
+    # newer header-based one.
+    obj = Apprise.instantiate("http://example.com/notify/" + "d" * 32)
+    assert isinstance(obj, NotifyAppriseAPI)
+    assert obj.version == AppriseAPIVersion.V1
+    assert bool(obj.notify(body="body", title="title")) is True
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://example.com/notify/" + "d" * 32
+    assert "X-Apprise-Config-ID" not in details[1]["headers"]
+
+    mock_post.reset_mock()
+
+    # A version carried on the native URL itself is honored as-is.
+    obj = Apprise.instantiate(
+        "http://example.com/notify/" + "d" * 32 + "?version=2"
+    )
+    assert isinstance(obj, NotifyAppriseAPI)
+    assert obj.version == AppriseAPIVersion.V2
+    assert bool(obj.notify(body="body", title="title")) is True
+
+    details = mock_post.call_args_list[0]
+    assert details[0][0] == "http://example.com/notify"
+    assert details[1]["headers"]["X-Apprise-Config-ID"] == "d" * 32
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_relays_declared_format(mock_post):
+    """NotifyAppriseAPI() relays only caller-declared formats."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/")
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # A declared source is relayed onward as-is
+    assert (
+        bool(
+            obj.notify(
+                body="# hi",
+                title="title",
+                notify_type=NotifyType.INFO,
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+
+    details = mock_post.call_args_list[0]
+    assert details[1]["data"] == {
+        "title": "title",
+        "body": "# hi",
+        "type": "info",
+        "format": "markdown",
+    }
+
+    mock_post.reset_mock()
+
+    # Undeclared input relays no format, despite the internal default.
+    assert (
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+            )
+        )
+        is True
+    )
+
+    details = mock_post.call_args_list[0]
+    assert details[1]["data"] == {
+        "title": "title",
+        "body": "body",
+        "type": "info",
+    }
+
+
+@mock.patch("requests.post")
+def test_notify_apprise_api_direct_send_defaults(mock_post):
+    """Direct send() calls safely accept their default format arguments."""
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    obj = Apprise.instantiate("apprise://user@localhost/mytoken1/")
+    assert isinstance(obj, NotifyAppriseAPI)
+
+    # Omit both format arguments to exercise their defaults.
+    assert bool(obj.send(body="body", title="title")) is True
+
+    details = mock_post.call_args_list[0]
+    # No format was declared, so none is relayed onward.
+    assert "format" not in details[1]["data"]
 
 
 @mock.patch("requests.post")
@@ -381,11 +549,13 @@ def test_notify_apprise_api_attachments(mock_post):
         path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
         attach = AppriseAttachment(path)
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
@@ -395,11 +565,13 @@ def test_notify_apprise_api_attachments(mock_post):
             TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg"
         )
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=path,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=path,
+                )
             )
             is False
         )
@@ -419,11 +591,13 @@ def test_notify_apprise_api_attachments(mock_post):
             # We can't send the message we can't open the attachment for
             # reading
             assert (
-                obj.notify(
-                    body="body",
-                    title="title",
-                    notify_type=NotifyType.INFO,
-                    attach=attach,
+                bool(
+                    obj.notify(
+                        body="body",
+                        title="title",
+                        notify_type=NotifyType.INFO,
+                        attach=attach,
+                    )
                 )
                 is False
             )
@@ -431,11 +605,13 @@ def test_notify_apprise_api_attachments(mock_post):
         with mock.patch("requests.post", side_effect=OSError()):
             # Attachment issue
             assert (
-                obj.notify(
-                    body="body",
-                    title="title",
-                    notify_type=NotifyType.INFO,
-                    attach=attach,
+                bool(
+                    obj.notify(
+                        body="body",
+                        title="title",
+                        notify_type=NotifyType.INFO,
+                        attach=attach,
+                    )
                 )
                 is False
             )
@@ -448,18 +624,21 @@ def test_notify_apprise_api_attachments(mock_post):
         mock_post.reset_mock()
 
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is True
         )
         assert mock_post.call_count == 1
 
         details = mock_post.call_args_list[0]
-        assert details[0][0] == "http://localhost/notify/mytoken1"
+        assert details[0][0] == "http://localhost/notify"
+        assert details[1]["headers"]["X-Apprise-Config-ID"] == "mytoken1"
         assert obj.url(privacy=False).startswith(
             "apprise://user@localhost/mytoken1/"
         )
