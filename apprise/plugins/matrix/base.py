@@ -486,16 +486,24 @@ class NotifyMatrix(NotifyBase):
             self.webhook_path = f"/{self.webhook_path}"
         self.webhook_path = self.webhook_path.rstrip("/") or "/"
 
-        # End-to-end encryption (server mode only; requires cryptography)
-        self.e2ee = (
-            self.template_args["e2ee"]["default"]
-            if e2ee is None
-            else parse_bool(e2ee)
-        )
+        # Resolve autoverify first: requesting it implies e2ee=yes unless
+        # e2ee was explicitly supplied, so turning on automatic device
+        # verification never also requires spelling out e2ee=yes.
         self.autoverify = (
             self.template_args["autoverify"]["default"]
             if autoverify is None
             else parse_bool(autoverify)
+        )
+
+        # End-to-end encryption (server mode only; requires cryptography)
+        self.e2ee = (
+            parse_bool(e2ee)
+            if e2ee is not None
+            else (
+                True
+                if self.autoverify
+                else self.template_args["e2ee"]["default"]
+            )
         )
 
         # Let only one notification poll for a verification request at a time.

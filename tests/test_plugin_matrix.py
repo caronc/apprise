@@ -3217,6 +3217,75 @@ def test_plugin_matrix_e2ee_binding_key():
     )
 
 
+def test_plugin_matrix_autoverify_implies_e2ee():
+    """autoverify=yes implies e2ee=yes unless e2ee is set explicitly."""
+
+    # autoverify alone turns e2ee on without spelling it out.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        secure=True,
+        autoverify=True,
+    )
+    assert obj.autoverify is True
+    assert obj.e2ee is True
+
+    # An explicit e2ee=no is still honored even with autoverify=yes.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        secure=True,
+        autoverify=True,
+        e2ee=False,
+    )
+    assert obj.autoverify is True
+    assert obj.e2ee is False
+
+    # An explicit e2ee=yes alongside autoverify=yes is unaffected.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        secure=True,
+        autoverify=True,
+        e2ee=True,
+    )
+    assert obj.autoverify is True
+    assert obj.e2ee is True
+
+    # Without autoverify, e2ee keeps its own (already-True) default.
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], secure=True
+    )
+    assert obj.autoverify is False
+    assert obj.e2ee is True
+
+    # The implied e2ee=yes survives a URL round trip: autoverify=yes is
+    # emitted, e2ee=no is not, and re-parsing yields the same identity.
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        secure=True,
+        autoverify=True,
+    )
+    url = obj.url()
+    assert "autoverify=yes" in url
+    assert "e2ee=no" not in url
+
+    results = NotifyMatrix.parse_url(url)
+    obj2 = NotifyMatrix(**results)
+    assert obj2.autoverify is True
+    assert obj2.e2ee is True
+    assert obj.url_identifier == obj2.url_identifier
+
+
 def _matrix_sas_plugin(user_id="@u:h", device_id="APPRISE"):
     """A NotifyMatrix instance with a ready-to-use E2EE identity."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
