@@ -844,8 +844,14 @@ class MatrixOlmAccount:
             _b64dec(their_one_time_key_b64)
         )
 
-        # Olm uses the same temporary key as its base and first ratchet key.
-        # Using different keys would prevent the recipient from decrypting.
+        # E_A is Alice's ephemeral key.  It serves BOTH as the Base-Key
+        # (outer pre-key field 2) AND as the initial Ratchet-Key (inner
+        # field 1).  The Olm spec Section 5.1 is explicit:
+        #   "E_A^pub is also the ratchet key for the first message."
+        # libolm passes the same keypair to both the X3DH and the ratchet
+        # initialisation (ratchet.cpp: initialise_as_alice receives base_key
+        # and uses it as the initial sender ratchet key).  Using two
+        # different keys here breaks decryption.
         eph = X25519PrivateKey.generate()
         eph_pub = eph.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
 
@@ -857,8 +863,18 @@ class MatrixOlmAccount:
         dh2 = eph.exchange(their_ik)
         dh3 = eph.exchange(their_otk)
 
-        # Derive matching root and chain keys from the three shared secrets.
-        # Olm uses their 96 bytes directly, without an added prefix.
+        # Root-key derivation (libolm ratchet.cpp initialise_as_alice /
+        # vodozemac shared_secret.rs Shared3DHSecret::expand):
+        #   IKM  = DH1 || DH2 || DH3  (96 bytes -- no zero prefix)
+        #   salt = nullptr / 0x00*32   (RFC 5869: missing salt = HashLen zeros)
+        #   info = "OLM_ROOT"
+        #
+        # libolm passes the 96-byte secret directly
+        # (session.cpp: secret[3 * CURVE25519_SHARED_SECRET_LENGTH]).
+        # vodozemac does the same (Shared3DHSecret is Box<[u8; 96]>).
+        # Adding any prefix produces a different PRK and therefore
+        # different root/chain keys, causing the recipient to fail to
+        # decrypt the Olm pre-key message that carries the MegOLM room key.
         ikm = dh1 + dh2 + dh3
         keys = _hkdf_sha256(ikm, 64, salt=None, info=b"OLM_ROOT")
         root_key = keys[:32]
@@ -964,7 +980,12 @@ class MatrixOlmSession:
         #   0x1A = field 3 (bytes) -> Identity-Key (Alice's identity key)
         #   0x22 = field 4 (bytes) -> Message (inner message + inner MAC)
         #
-        # The outer message has no trailing MAC; adding one breaks decoding.
+        # The outer pre-key message has NO trailing MAC of its own.
+        # libolm session.cpp allocates exactly
+        # encode_one_time_key_message_length() bytes -- no extra space for an
+        # outer MAC.  vodozemac decodes the outer payload with prost (strict
+        # protobuf) so extra bytes after the last field cause a DecodeError
+        # and the session fails to establish.
         outer = (
             b"\x03"
             + _pb_bytes(1, self._their_otk_pub)

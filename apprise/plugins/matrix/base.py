@@ -252,7 +252,10 @@ class NotifyMatrix(NotifyBase):
     # per batch (both on initial device registration and replenishment).
     default_e2ee_otk_count = 10
 
-    # Replenish one-time keys before too few remain for other devices.
+    # Replenish the server-side OTK pool when the estimated remaining
+    # count drops below this value.  /keys/claim consumes one OTK per
+    # device; without replenishment the pool runs dry and subsequent
+    # key-shares skip devices that have no OTK available.
     default_e2ee_otk_replenish_threshold = 5
 
     # Maximum time an opt-in verification bootstrap waits for SAS events.
@@ -993,8 +996,16 @@ class NotifyMatrix(NotifyBase):
             # We need to register
             return False
 
-        # Resolve identity details omitted by token login or the server.
-        # Direct-message room reuse depends on knowing the user ID.
+        # Resolve user_id (and device_id / home_server as a side-effect) via
+        # /whoami whenever user_id is still absent after login/token setup.
+        # This covers all paths where the server does not return user_id:
+        #   - raw access-token auth (no /login flow at all)
+        #   - username + ?token= (password treated as token, not a login)
+        #   - servers that omit optional /login response fields
+        # Without user_id the m.direct lookup is skipped and
+        # each send creates a fresh orphan DM room instead of reusing the
+        # existing one.  home_server is recovered from user_id inside
+        # _whoami(); the fallback at handles any remaining gap.
         if not self.user_id:
             self._whoami()
 
@@ -2236,7 +2247,11 @@ class NotifyMatrix(NotifyBase):
     def _e2ee_binding_key(self):
         """Return the identity shared by this device and E2EE account.
 
-        A changed user, device, or account key must not reuse cached trust.
+        Keys uploaded status must match the current Matrix device identity
+        and the account keys we are about to use. This lets us recover from
+        cached state where the homeserver assigned a different device_id or
+        where the local E2EE account changed.  A changed user, device, or
+        account key must not reuse cached trust.
         """
         if self._e2ee_account is None:
             # No account means there is no reusable encrypted identity.
@@ -2606,7 +2621,10 @@ class NotifyMatrix(NotifyBase):
             total_devices,
         )
 
-        # Request the signed one-time keys supported by current Matrix clients.
+        # Build the claim request for all member devices.
+        # "signed_curve25519" is the algorithm Matrix clients publish and
+        # servers are required to support; "curve25519" (unsigned) is
+        # deprecated and usually yields no keys on current servers.
         otk_request = {}
         for uid, devs in members.items():
             otk_request[uid] = dict.fromkeys(devs, "signed_curve25519")
@@ -2681,7 +2699,12 @@ class NotifyMatrix(NotifyBase):
                     )
                     continue
 
-                # Accept only signed one-time-key objects for this device.
+                # Locate and verify the OTK for this device.
+                # Servers return signed_curve25519 keys (the algorithm we
+                # requested) as {"key": ..., "signatures": ...} dicts.
+                # signed_curve25519 OTKs are always KeyObjects
+                # {"key": ..., "signatures": ...}; plain-string values
+                # are not valid for this algorithm and are rejected.
                 their_otk = None
                 otk_entry = otk_keys.get(uid, {}).get(dev_id, {})
                 self.logger.trace(
@@ -2772,9 +2795,19 @@ class NotifyMatrix(NotifyBase):
                     )
                     continue
 
-                # Use only standard room-key fields. Device-key extensions
-                # add overhead, may confuse strict clients, and carry unsigned
-                # keys that recipients should query directly.
+                # Build the m.room_key inner plaintext per Matrix spec:
+                #   https://spec.matrix.org/v1.11/client-server-api/#mroomkey
+                #
+                # Required fields only; non-standard extension fields
+                # (sender_device_keys, org.matrix.msc4147.device_keys) have
+                # been removed because they:
+                #   - Add ~930 bytes to an otherwise ~400-byte payload,
+                #     bloating the Olm ciphertext from ~400B to ~1640B.
+                #   - Are not part of the spec and may confuse strict
+                #     implementations (Element/matrix-sdk-crypto warns on
+                #     unknown fields in to-device events in some builds).
+                #   - Contain unsigned device-key material that recipients
+                #     should instead fetch via /keys/query for authenticity.
                 inner = dumps(
                     {
                         "type": "m.room_key",
@@ -2856,7 +2889,13 @@ class NotifyMatrix(NotifyBase):
             self.transaction_id,
         )
 
-        # Refill one-time keys when this share consumed or could not find them.
+        # Check whether the OTK pool needs topping up.  Pass the number of
+        # OTKs consumed (built_count) and any devices skipped because the
+        # server had no OTK for them so _e2ee_replenish_otks can log the
+        # right diagnostic and decide whether an upload is needed.
+        # We always reach here with built_count >= 1 (the any() guard above
+        # returns early when no messages were built), so the call is never
+        # redundant -- _e2ee_replenish_otks itself decides whether to upload.
         self._e2ee_replenish_otks(
             claimed_count=built_count,
             skipped_no_otk=skipped_no_otk,

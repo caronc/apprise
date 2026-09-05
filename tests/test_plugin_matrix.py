@@ -4414,7 +4414,7 @@ def test_plugin_matrix_sas_auto_verify_concurrency():
             calls += 1
         # Long enough that a blocking wait for this call would make the
         # elapsed-time assertion below fail.
-        _time.sleep(0.1)
+        _time.sleep(0.5)
         with state_lock:
             active -= 1
         return True
@@ -4436,7 +4436,7 @@ def test_plugin_matrix_sas_auto_verify_concurrency():
         elapsed = _time.monotonic() - start
 
     # The group finishes near the single verifier's running time.
-    assert elapsed < 0.3
+    assert elapsed < 1.0
     assert calls == 1
     assert max_concurrent == 1
     assert results.count(True) == 1
