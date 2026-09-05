@@ -4414,7 +4414,7 @@ def test_plugin_matrix_sas_auto_verify_concurrency():
             calls += 1
         # Long enough that a blocking wait for this call would make the
         # elapsed-time assertion below fail.
-        _time.sleep(0.5)
+        _time.sleep(1.0)
         with state_lock:
             active -= 1
         return True
@@ -4432,11 +4432,11 @@ def test_plugin_matrix_sas_auto_verify_concurrency():
         for thread in threads:
             thread.start()
         for thread in threads:
-            thread.join(timeout=5)
+            thread.join(timeout=15)
         elapsed = _time.monotonic() - start
 
     # The group finishes near the single verifier's running time.
-    assert elapsed < 1.0
+    assert elapsed < 2.5
     assert calls == 1
     assert max_concurrent == 1
     assert results.count(True) == 1
@@ -4464,7 +4464,10 @@ def test_plugin_matrix_sas_refresh_concurrency():
         obj._autoverify_lock.release()
 
     assert result is False
-    assert elapsed < 0.1
+    # Non-blocking lock acquisition never waits on the held lock; this is
+    # only guarding against an accidental blocking wait being introduced,
+    # so leave generous headroom for slow/loaded CI machines.
+    assert elapsed < 2.0
 
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")

@@ -264,7 +264,12 @@ class MatrixSASAutoVerifier:
         ``bound_sec`` can shorten a call. ``best_effort`` allows the final
         cancellation request after the deadline.
         """
-        remaining = max(0.0, self.deadline - monotonic())
+        # Clamp to the configured budget and the remaining time in this
+        # verification attempt.
+        remaining = min(
+            self.plugin.default_autoverify_timeout_sec,
+            max(0.0, self.deadline - monotonic()),
+        )
         if remaining <= 0 and not best_effort:
             # Do not start another request after the deadline.
             return (False, {}, None)
