@@ -212,6 +212,10 @@ def verify_device_keys(dev_info, user_id, device_id):
     - ``dev_info["device_id"] == device_id``
     - The Ed25519 self-signature over the canonical payload is valid.
     """
+    # Reject malformed server data before reading the device fields.
+    if not isinstance(dev_info, dict):
+        return False
+
     # Identity binding: payload fields must match who we think we're
     # verifying.  Without this a server could swap key objects across
     # users/devices and the signature would still verify.
@@ -221,11 +225,16 @@ def verify_device_keys(dev_info, user_id, device_id):
         return False
 
     sig_key = "ed25519:{}".format(device_id)
-    ed25519_pub = dev_info.get("keys", {}).get(sig_key, "")
+    keys = dev_info.get("keys")
+    ed25519_pub = keys.get(sig_key, "") if isinstance(keys, dict) else ""
     if not ed25519_pub:
         return False
 
-    sig = dev_info.get("signatures", {}).get(user_id, {}).get(sig_key, "")
+    signatures = dev_info.get("signatures")
+    user_sigs = (
+        signatures.get(user_id) if isinstance(signatures, dict) else None
+    )
+    sig = user_sigs.get(sig_key, "") if isinstance(user_sigs, dict) else ""
     if not sig:
         return False
 
@@ -321,19 +330,23 @@ def encrypt_attachment(data):
 
 
 class MatrixSASVerification:
-    """Minimal responder-side Matrix SAS verification state machine.
+    """Verify another session for the same user with Matrix SAS.
 
-    This uses the same ``cryptography`` primitives and device signing key as
-    Apprise's custom E2EE implementation. It only implements the responder
-    path needed for opt-in, automatic same-user verification; it creates no
-    second Olm account or device identity.
+    The exchange reuses Apprise's existing encrypted device identity.
     """
+
+    # Allow a generous margin beyond the device and master keys normally sent.
+    MAX_MAC_KEYS = 10
+
+    # Bound incoming key and MAC fields before processing them.
+    MAX_FIELD_LEN = 512
 
     METHOD = "m.sas.v1"
     KEY_AGREEMENT = "curve25519-hkdf-sha256"
     HASH = "sha256"
     MAC = "hkdf-hmac-sha256.v2"
-    SAS_METHODS = ("decimal", "emoji")
+    # Advertise only decimal because it is the format Apprise displays.
+    SAS_METHODS = ("decimal",)
 
     def __init__(
         self,
@@ -344,13 +357,17 @@ class MatrixSASVerification:
         start_content,
     ):
         """Create a responder for a validation start event."""
+        # Retain both identities because their order affects every SAS MAC.
         self.own_user_id = own_user_id
         self.own_device_id = own_device_id
         self.peer_user_id = peer_user_id
         self.peer_device_id = peer_device_id
+        # Copy the proposal so its commitment cannot change during
+        # verification.
         self.start_content = dict(start_content)
         self.transaction_id = self.start_content.get("transaction_id")
 
+        # Reject proposals that do not belong to the expected transaction.
         if not self.transaction_id or not self.peer_device_id:
             raise ValueError("Missing SAS transaction or peer device ID")
         if self.start_content.get("from_device") != self.peer_device_id:
@@ -368,6 +385,7 @@ class MatrixSASVerification:
         ):
             raise ValueError("Unsupported SAS MAC")
 
+        # Preserve only the display methods supported by both devices.
         offered_sas = self.start_content.get("short_authentication_string", [])
         self.sas_methods = [
             method for method in self.SAS_METHODS if method in offered_sas
@@ -375,13 +393,16 @@ class MatrixSASVerification:
         if "decimal" not in self.sas_methods:
             raise ValueError("SAS start does not offer decimal verification")
 
+        # Create a fresh temporary key for this verification attempt.
         self._private_key = X25519PrivateKey.generate()
         self.public_key = _b64enc(
             self._private_key.public_key().public_bytes(
                 Encoding.Raw, PublicFormat.Raw
             )
         )
+        # The shared secret is available only after the peer key arrives.
         self._shared_secret = None
+        self._peer_public_key = None
         self.state = "started"
 
     def accept_content(self):
@@ -389,10 +410,12 @@ class MatrixSASVerification:
         if self.state != "started":
             raise ValueError("SAS verification start was already accepted")
 
+        # Commit to our public key and the exact proposal being accepted.
         digest = hashes.Hash(hashes.SHA256(), backend=default_backend())
         digest.update(self.public_key.encode("ascii"))
         digest.update(_canonical_json(self.start_content))
         commitment = _b64enc(digest.finalize())
+        # The next valid event is the peer's temporary public key.
         self.state = "accepted"
         return {
             "transaction_id": self.transaction_id,
@@ -407,8 +430,17 @@ class MatrixSASVerification:
         """Accept the initiator's ephemeral key and establish the SAS."""
         if self.state != "accepted":
             raise ValueError("Unexpected SAS key event")
+        if (
+            not isinstance(peer_public_key, str)
+            or not 0 < len(peer_public_key) <= self.MAX_FIELD_LEN
+        ):
+            raise ValueError("SAS peer key is missing or malformed")
+
+        # Derive the secret shared only by the two temporary keys.
         peer_key = X25519PublicKey.from_public_bytes(_b64dec(peer_public_key))
         self._shared_secret = self._private_key.exchange(peer_key)
+        # The displayed SAS also binds both temporary public keys.
+        self._peer_public_key = peer_public_key
         self.state = "key_received"
 
     def key_content(self):
@@ -419,6 +451,44 @@ class MatrixSASVerification:
             "transaction_id": self.transaction_id,
             "key": self.public_key,
         }
+
+    def decimal_sas(self):
+        """Derive the decimal Short Authentication String.
+
+        Both devices derive three numbers from the shared secret. Comparing
+        those numbers outside Matrix detects an intercepted exchange.
+        """
+        if self._shared_secret is None or self._peer_public_key is None:
+            raise ValueError("SAS shared secret has not been established")
+
+        # The peer initiated this exchange, so its identity and key come first.
+        # This SAS context separates fields with "|"; the MAC context does not.
+        info = (
+            "MATRIX_KEY_VERIFICATION_SAS|"
+            + self.peer_user_id
+            + "|"
+            + self.peer_device_id
+            + "|"
+            + self._peer_public_key
+            + "|"
+            + self.own_user_id
+            + "|"
+            + self.own_device_id
+            + "|"
+            + self.public_key
+            + "|"
+            + self.transaction_id
+        ).encode("utf-8")
+        sas_bytes = _hkdf_sha256(self._shared_secret, 5, salt=None, info=info)
+
+        # The spec takes the top 39 of these 40 bits and splits them into
+        # three 13-bit groups, each shown as a number from 1000 to 9191.
+        value = int.from_bytes(sas_bytes, "big") >> 1
+        return (
+            ((value >> 26) & 0x1FFF) + 1000,
+            ((value >> 13) & 0x1FFF) + 1000,
+            (value & 0x1FFF) + 1000,
+        )
 
     def _calculate_mac(
         self,
@@ -433,6 +503,7 @@ class MatrixSASVerification:
         if self._shared_secret is None:
             raise ValueError("SAS shared secret has not been established")
 
+        # Bind the proof to both devices, this transaction, and this key.
         info = (
             "MATRIX_KEY_VERIFICATION_MAC"
             + sender_user_id
@@ -442,6 +513,7 @@ class MatrixSASVerification:
             + self.transaction_id
             + key_id
         ).encode("utf-8")
+        # Derive a separate MAC key for each value being proven.
         mac_key = _hkdf_sha256(self._shared_secret, 32, salt=None, info=info)
         return _b64enc(_hmac_sha256(mac_key, value.encode("utf-8")))
 
@@ -450,6 +522,7 @@ class MatrixSASVerification:
         if self.state != "key_received":
             raise ValueError("SAS peer key has not been received")
 
+        # Prove ownership of this device's long-term signing key.
         key_id = "ed25519:{}".format(self.own_device_id)
         content = {
             "transaction_id": self.transaction_id,
@@ -472,23 +545,47 @@ class MatrixSASVerification:
                 self.peer_device_id,
             ),
         }
+        # The responder now waits for the peer's matching proof.
         self.state = "mac_sent"
         return content
 
     def verify_peer_mac(self, content, peer_keys):
-        """Validate the initiator's key MACs from a trusted keys query."""
+        """Validate the initiator's MACs against the queried keys."""
         if self.state != "mac_sent":
             raise ValueError("Unexpected SAS MAC event")
         if content.get("transaction_id") != self.transaction_id:
             raise ValueError("SAS MAC transaction does not match")
 
+        # The peer must prove at least its own device signing key.
         macs = content.get("mac")
         if not isinstance(macs, dict) or not macs:
             raise ValueError("SAS MAC event contains no keys")
+        if len(macs) > self.MAX_MAC_KEYS:
+            # Reject oversized key lists before sorting or hashing them.
+            raise ValueError("SAS MAC event carries too many keys")
+
+        # Validate each bounded key ID and MAC before processing it.
+        for key_id, mac_value in macs.items():
+            if (
+                not isinstance(key_id, str)
+                or not 0 < len(key_id) <= self.MAX_FIELD_LEN
+                or not isinstance(mac_value, str)
+                or not 0 < len(mac_value) <= self.MAX_FIELD_LEN
+            ):
+                raise ValueError("SAS MAC event carries a malformed entry")
+
         device_key_id = "ed25519:{}".format(self.peer_device_id)
         if device_key_id not in macs:
             raise ValueError("SAS MAC omits the peer device key")
 
+        keys_mac = content.get("keys", "")
+        if (
+            not isinstance(keys_mac, str)
+            or not 0 < len(keys_mac) <= self.MAX_FIELD_LEN
+        ):
+            raise ValueError("SAS MAC event carries a malformed key list MAC")
+
+        # First verify that the advertised key list was not changed in transit.
         key_ids = ",".join(sorted(macs))
         expected_keys_mac = self._calculate_mac(
             key_ids,
@@ -498,16 +595,20 @@ class MatrixSASVerification:
             self.own_user_id,
             self.own_device_id,
         )
-        if not secrets.compare_digest(
-            content.get("keys", ""), expected_keys_mac
-        ):
+        if not secrets.compare_digest(keys_mac, expected_keys_mac):
             raise ValueError("SAS key list MAC does not match")
 
+        # Then validate the proof for every key named by the peer.
         for key_id, received_mac in macs.items():
             try:
                 public_key = peer_keys[key_id]
             except (KeyError, TypeError):
                 raise ValueError("SAS MAC references an unknown key") from None
+            if (
+                not isinstance(public_key, str)
+                or not 0 < len(public_key) <= self.MAX_FIELD_LEN
+            ):
+                raise ValueError("SAS MAC references a malformed key")
             expected_mac = self._calculate_mac(
                 public_key,
                 key_id,
@@ -519,6 +620,7 @@ class MatrixSASVerification:
             if not secrets.compare_digest(received_mac, expected_mac):
                 raise ValueError("SAS device key MAC does not match")
 
+        # Every advertised proof matched the queried keys.
         self.state = "verified"
         return True
 
@@ -742,14 +844,8 @@ class MatrixOlmAccount:
             _b64dec(their_one_time_key_b64)
         )
 
-        # E_A is Alice's ephemeral key.  It serves BOTH as the Base-Key
-        # (outer pre-key field 2) AND as the initial Ratchet-Key (inner
-        # field 1).  The Olm spec Section 5.1 is explicit:
-        #   "E_A^pub is also the ratchet key for the first message."
-        # libolm passes the same keypair to both the X3DH and the ratchet
-        # initialisation (ratchet.cpp: initialise_as_alice receives base_key
-        # and uses it as the initial sender ratchet key).  Using two
-        # different keys here breaks decryption.
+        # Olm uses the same temporary key as its base and first ratchet key.
+        # Using different keys would prevent the recipient from decrypting.
         eph = X25519PrivateKey.generate()
         eph_pub = eph.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
 
@@ -761,18 +857,8 @@ class MatrixOlmAccount:
         dh2 = eph.exchange(their_ik)
         dh3 = eph.exchange(their_otk)
 
-        # Root-key derivation (libolm ratchet.cpp initialise_as_alice /
-        # vodozemac shared_secret.rs Shared3DHSecret::expand):
-        #   IKM  = DH1 || DH2 || DH3  (96 bytes — no zero prefix)
-        #   salt = nullptr / 0x00*32   (RFC 5869: missing salt = HashLen zeros)
-        #   info = "OLM_ROOT"
-        #
-        # libolm passes the 96-byte secret directly
-        # (session.cpp: secret[3 * CURVE25519_SHARED_SECRET_LENGTH]).
-        # vodozemac does the same (Shared3DHSecret is Box<[u8; 96]>).
-        # Adding any prefix produces a different PRK and therefore
-        # different root/chain keys, causing the recipient to fail to
-        # decrypt the Olm pre-key message that carries the MegOLM room key.
+        # Derive matching root and chain keys from the three shared secrets.
+        # Olm uses their 96 bytes directly, without an added prefix.
         ikm = dh1 + dh2 + dh3
         keys = _hkdf_sha256(ikm, 64, salt=None, info=b"OLM_ROOT")
         root_key = keys[:32]
@@ -878,12 +964,7 @@ class MatrixOlmSession:
         #   0x1A = field 3 (bytes) -> Identity-Key (Alice's identity key)
         #   0x22 = field 4 (bytes) -> Message (inner message + inner MAC)
         #
-        # The outer pre-key message has NO trailing MAC of its own.
-        # libolm session.cpp allocates exactly
-        # encode_one_time_key_message_length() bytes — no extra space for an
-        # outer MAC.  vodozemac decodes the outer payload with prost (strict
-        # protobuf) so extra bytes after the last field cause a DecodeError
-        # and the session fails to establish.
+        # The outer message has no trailing MAC; adding one breaks decoding.
         outer = (
             b"\x03"
             + _pb_bytes(1, self._their_otk_pub)

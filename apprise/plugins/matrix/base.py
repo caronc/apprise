@@ -38,7 +38,8 @@
 import contextlib
 from json import dumps, loads
 import re
-from time import time
+import threading
+from time import monotonic, time
 import uuid
 
 from markdown import markdown
@@ -63,11 +64,11 @@ from ...utils.parse import (
     validate_regex,
 )
 from ..base import NotifyBase
+from . import sas
 from .e2ee import (
     MATRIX_E2EE_SUPPORT,
     MatrixMegOlmSession,
     MatrixOlmAccount,
-    MatrixSASVerification,
     encrypt_attachment,
     verify_device_keys,
     verify_signed_otk,
@@ -251,14 +252,18 @@ class NotifyMatrix(NotifyBase):
     # per batch (both on initial device registration and replenishment).
     default_e2ee_otk_count = 10
 
-    # Replenish the server-side OTK pool when the estimated remaining
-    # count drops below this value.  /keys/claim consumes one OTK per
-    # device; without replenishment the pool runs dry and subsequent
-    # key-shares skip devices that have no OTK available.
+    # Replenish one-time keys before too few remain for other devices.
     default_e2ee_otk_replenish_threshold = 5
 
     # Maximum time an opt-in verification bootstrap waits for SAS events.
     default_autoverify_timeout_sec = 120
+
+    # Delay retries so each send does not repeat the full verification timeout.
+    default_autoverify_retry_cooldown_sec = 60 * 15
+
+    # Refresh trust daily instead of rewriting private identity data after
+    # every successful notification.
+    default_autoverify_refresh_interval_sec = 60 * 60 * 24
 
     # Used for server discovery
     discovery_base_key = "__discovery_base"
@@ -489,6 +494,10 @@ class NotifyMatrix(NotifyBase):
             if autoverify is None
             else parse_bool(autoverify)
         )
+
+        # Let only one notification poll for a verification request at a time.
+        # This prevents concurrent calls from accepting the same request.
+        self._autoverify_lock = threading.Lock()
 
         # Setup our mode
         self.mode = (
@@ -984,16 +993,8 @@ class NotifyMatrix(NotifyBase):
             # We need to register
             return False
 
-        # Resolve user_id (and device_id / home_server as a side-effect) via
-        # /whoami whenever user_id is still absent after login/token setup.
-        # This covers all paths where the server does not return user_id:
-        #   - raw access-token auth (no /login flow at all)
-        #   - username + ?token= (password treated as token, not a login)
-        #   - servers that omit optional /login response fields
-        # Without user_id the m.direct lookup is skipped and
-        # each send creates a fresh orphan DM room instead of reusing the
-        # existing one.  home_server is recovered from user_id inside
-        # _whoami(); the fallback at handles any remaining gap.
+        # Resolve identity details omitted by token login or the server.
+        # Direct-message room reuse depends on knowing the user ID.
         if not self.user_id:
             self._whoami()
 
@@ -1043,11 +1044,13 @@ class NotifyMatrix(NotifyBase):
                     "messages will be sent unencrypted."
                 )
 
+        # Automatic verification is best-effort and does not decide delivery.
+        # Failed attempts remain unverified and retry on a later send.
         if e2ee_capable and self.autoverify and not self._e2ee_auto_verify():
             self.logger.warning(
-                "Matrix E2EE automatic device verification did not complete."
+                "Matrix E2EE automatic device verification did not "
+                "complete; continuing without confirming device trust."
             )
-            return False
 
         # Plaintext attachment payloads for unencrypted rooms.
         # Lazy-initialized on the first unencrypted room so that purely
@@ -1906,6 +1909,28 @@ class NotifyMatrix(NotifyBase):
 
         return None
 
+    @staticmethod
+    def _truncated_content(content):
+        """Return enough response content for a useful debug log entry."""
+        return (content or b"")[:2000]
+
+    @staticmethod
+    def _read_bounded(r, max_bytes):
+        """Read and close a response, returning ``None`` if it is too large."""
+        chunks = []
+        total = 0
+        try:
+            for chunk in r.iter_content(chunk_size=65536):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > max_bytes:
+                    return None
+                chunks.append(chunk)
+            return b"".join(chunks)
+        finally:
+            r.close()
+
     def _fetch(
         self,
         path,
@@ -1915,20 +1940,15 @@ class NotifyMatrix(NotifyBase):
         method="POST",
         url_override=None,
         ok_status=None,
+        timeout=None,
+        max_retry_wait=None,
+        max_response_bytes=None,
     ):
-        """Wrapper to request.post() to manage it's response better and
-        make the send() function cleaner and easier to maintain.
+        """Send a Matrix HTTP request and normalize its result.
 
-        This function always returns a 3-tuple:
-            (success, response, status_code)
-
-        The response is a dict when JSON is parseable, otherwise an empty
-        dict. The status_code defaults to 500 on local failures.
-
-        *ok_status* is an optional collection of additional HTTP status codes
-        to treat as success (no warning logged).  Use it for calls where a
-        non-200 response is expected and meaningful, e.g. 404 on a state-event
-        probe that returns "not found" = "feature not enabled".
+        Returns ``(success, response, status_code)``. Invalid JSON uses an
+        empty response. Optional arguments accept expected status codes and
+        limit request time, retry delays, or response size.
         """
 
         # Define our headers
@@ -1995,6 +2015,14 @@ class NotifyMatrix(NotifyBase):
         # Define how many attempts we'll make if we get caught in a
         # throttle event
         retries = self.default_retries if self.default_retries > 0 else 1
+
+        # Share one retry-wait budget across every 429 response in this call.
+        retry_deadline = (
+            monotonic() + max_retry_wait
+            if max_retry_wait is not None
+            else None
+        )
+
         while retries > 0:
             # Decrement our throttle retry count
             retries -= 1
@@ -2014,6 +2042,7 @@ class NotifyMatrix(NotifyBase):
 
             # Initialize our response object
             r = None
+            content = b""
 
             try:
                 r = fn(
@@ -2030,19 +2059,36 @@ class NotifyMatrix(NotifyBase):
                     params=params if params else None,
                     headers=headers,
                     verify=self.verify_certificate,
-                    timeout=self.request_timeout,
+                    timeout=(
+                        timeout
+                        if timeout is not None
+                        else self.request_timeout
+                    ),
                     allow_redirects=self.redirects,
+                    stream=max_response_bytes is not None,
                 )
 
                 # Store status code
                 status_code = r.status_code
 
+                if max_response_bytes is not None:
+                    content = self._read_bounded(r, max_response_bytes)
+                    if content is None:
+                        self.logger.warning(
+                            "Matrix response exceeded %d bytes; "
+                            "discarding it.",
+                            max_response_bytes,
+                        )
+                        return (False, {}, status_code)
+                else:
+                    content = r.content
+
                 self.logger.debug(
-                    "Matrix Response: code={}, {}".format(
-                        r.status_code, r.content
-                    )
+                    "Matrix Response: code=%s, %s",
+                    r.status_code,
+                    self._truncated_content(content),
                 )
-                response = loads(r.content)
+                response = loads(content)
 
                 if r.status_code == requests.codes.too_many_requests:
                     wait_ms = self.default_wait_ms
@@ -2056,14 +2102,37 @@ class NotifyMatrix(NotifyBase):
                         except KeyError:
                             pass
 
+                    if retry_deadline is not None:
+                        # Subtract earlier waits from the shared budget.
+                        remaining_wait = max(0.0, retry_deadline - monotonic())
+                        if remaining_wait <= 0:
+                            # Stop before another request when the budget ends.
+                            self.logger.warning(
+                                "Matrix server requested we throttle "
+                                "back, but our retry budget is "
+                                "exhausted; giving up."
+                            )
+                            return (False, response, status_code)
+                        wait_ms = min(wait_ms, remaining_wait * 1000)
+
                     self.logger.warning(
                         "Matrix server requested we throttle back "
                         "{}ms; retries left {}.".format(wait_ms, retries)
                     )
-                    self.logger.debug(f"Response Details:\r\n{r.content}")
+                    self.logger.debug(
+                        "Response Details:\r\n%r",
+                        (content or b"")[:2000],
+                    )
 
                     # Throttle for specified wait
                     self.throttle(wait=wait_ms / 1000)
+
+                    if (
+                        retry_deadline is not None
+                        and monotonic() >= retry_deadline
+                    ):
+                        # Do not retry when the wait consumed the budget.
+                        return (False, response, status_code)
 
                     # Try again
                     continue
@@ -2089,20 +2158,20 @@ class NotifyMatrix(NotifyBase):
                         )
                     )
 
-                    self.logger.debug(f"Response Details:\r\n{r.content}")
+                    self.logger.debug(
+                        "Response Details:\r\n%r",
+                        (content or b"")[:2000],
+                    )
 
                     # Return; we're done
                     return (False, response, status_code)
 
             except (AttributeError, TypeError, ValueError):
-                # This gets thrown if we can't parse our JSON Response
-                #  - ValueError = r.content is Unparsable
-                #  - TypeError = r.content is None
-                #  - AttributeError = r is None
+                # Reject missing or invalid JSON responses.
                 self.logger.warning("Invalid response from Matrix server.")
                 self.logger.debug(
                     "Response Details:\r\n%r",
-                    b"" if not r else (r.content or b""),
+                    content or b"",
                 )
                 return (False, {}, status_code)
 
@@ -2164,339 +2233,55 @@ class NotifyMatrix(NotifyBase):
         )
         return result
 
-    def _e2ee_send_verification_event(
-        self, event_type, user_id, device_id, content
-    ):
-        """Send one unencrypted SAS event to a specific Matrix device."""
-        path = "/sendToDevice/{}/{}".format(event_type, uuid.uuid4().hex)
-        ok, _, _ = self._fetch(
-            path,
-            payload={"messages": {user_id: {device_id: content}}},
-            method="PUT",
-        )
-        return ok
+    def _e2ee_binding_key(self):
+        """Return the identity shared by this device and E2EE account.
 
-    def _e2ee_verification_cancel(self, active, code, reason):
-        """Cancel an active SAS transaction on the peer device."""
-        if not active:
-            return False
-        return self._e2ee_send_verification_event(
-            "m.key.verification.cancel",
-            active["user_id"],
-            active["device_id"],
-            {
-                "transaction_id": active["transaction_id"],
-                "code": code,
-                "reason": reason,
-            },
-        )
-
-    def _e2ee_verification_peer_keys(self, user_id, device_id):
-        """Return verified device and advertised cross-signing keys."""
-        ok, response, _ = self._fetch(
-            "/keys/query",
-            payload={"device_keys": {user_id: [device_id]}},
-        )
-        if not ok or not isinstance(response, dict):
-            return None
-
-        device = (
-            response.get("device_keys", {}).get(user_id, {}).get(device_id)
-        )
-        if not device or not verify_device_keys(device, user_id, device_id):
-            return None
-
-        keys = dict(device.get("keys", {}))
-        master_key = response.get("master_keys", {}).get(user_id, {})
-        if isinstance(master_key, dict):
-            keys.update(master_key.get("keys", {}))
-        return keys
-
-    def _e2ee_store_verified_binding(self):
-        """Remember that the current custom E2EE identity completed SAS."""
-        binding = self.store.get("e2ee_device_binding")
-        if not binding:
-            return False
-        return self.store.set(
-            "e2ee_verified_binding",
-            binding,
-            expires=self.default_cache_expiry_sec,
-        )
-
-    def _e2ee_refresh_verified_state(self):
-        """Extend only the state required to retain SAS verification.
-
-        The Matrix device ID and custom E2EE account are part of the verified
-        binding.  They must remain stable with the two binding records or a
-        future login would create a new identity that requires another SAS
-        verification.  Unrelated Matrix and E2EE cache entries are deliberately
-        left untouched.
+        A changed user, device, or account key must not reuse cached trust.
         """
-        binding = self.store.get("e2ee_device_binding")
-        if (
-            not binding
-            or self.store.get("e2ee_verified_binding") != binding
-            or not self.user_id
-            or not self.device_id
-            or not self._e2ee_account
-        ):
-            return False
+        if self._e2ee_account is None:
+            # No account means there is no reusable encrypted identity.
+            return ""
 
-        current_binding = "{}|{}|{}|{}".format(
-            self.user_id,
-            self.device_id,
+        # Include every value that must stay stable for cached trust.
+        return "{}|{}|{}|{}".format(
+            self.user_id or "",
+            self.device_id or "",
             self._e2ee_account.identity_key,
             self._e2ee_account.signing_key,
-        )
-        if binding != current_binding:
-            return False
-
-        refreshed = (
-            self.store.set(
-                "device_id",
-                self.device_id,
-                expires=self.default_cache_expiry_sec,
-            ),
-            self.store.set(
-                "e2ee_account",
-                self._e2ee_account.to_dict(),
-                expires=self.default_cache_expiry_sec,
-            ),
-            self.store.set(
-                "e2ee_device_binding",
-                binding,
-                expires=self.default_cache_expiry_sec,
-            ),
-        )
-        if not all(refreshed):
-            return False
-
-        # Write the trust marker last.  A partial refresh must fail closed
-        # instead of extending trust without its complete bound identity.
-        return self.store.set(
-            "e2ee_verified_binding",
-            binding,
-            expires=self.default_cache_expiry_sec,
         )
 
     def _e2ee_auto_verify(self):
         """Automatically complete one same-user SAS verification.
 
-        This is an explicit bootstrap operation enabled by ``autoverify=yes``.
-        It consumes only unencrypted verification events from ``/sync`` and
-        does not introduce libolm or another Matrix device identity.
+        This delegates the opt-in bootstrap to the Matrix SAS helper.
         """
-        binding = self.store.get("e2ee_device_binding")
-        if binding and self.store.get("e2ee_verified_binding") == binding:
-            return True
-        if not self.user_id or not self.device_id or not self._e2ee_account:
-            return False
+        return sas.auto_verify(self)
 
-        self.logger.info(
-            "Matrix E2EE: waiting up to %d seconds for a same-user "
-            "SAS verification request.",
-            self.default_autoverify_timeout_sec,
-        )
-        active = None
-        since = None
-        deadline = time() + self.default_autoverify_timeout_sec
+    def _e2ee_refresh_verified_state(self):
+        """Extend SAS verification trust after a successful send.
 
-        while time() < deadline:
-            params = {"timeout": 3000}
-            if since:
-                params["since"] = since
-            ok, response, _ = self._fetch("/sync", params=params, method="GET")
-            if not ok or not isinstance(response, dict):
-                return False
-            since = response.get("next_batch") or since
-
-            events = response.get("to_device", {}).get("events", [])
-            for event in events if isinstance(events, list) else []:
-                if not isinstance(event, dict):
-                    continue
-                event_type = event.get("type")
-                sender = event.get("sender")
-                content = event.get("content", {})
-                if sender != self.user_id or not isinstance(content, dict):
-                    # Auto-verification is intentionally same-user only.
-                    continue
-
-                transaction_id = content.get("transaction_id")
-                from_device = content.get("from_device")
-
-                if event_type == "m.key.verification.request":
-                    timestamp = content.get("timestamp")
-                    now_ms = int(time() * 1000)
-                    if (
-                        not isinstance(timestamp, int)
-                        or timestamp < now_ms - 10 * 60 * 1000
-                        or timestamp > now_ms + 5 * 60 * 1000
-                        or not transaction_id
-                        or not from_device
-                        or "m.sas.v1" not in content.get("methods", [])
-                    ):
-                        continue
-                    if active:
-                        self._e2ee_verification_cancel(
-                            active,
-                            "m.unexpected_message",
-                            "Another verification is already active",
-                        )
-                        return False
-
-                    peer_keys = self._e2ee_verification_peer_keys(
-                        sender, from_device
-                    )
-                    if not peer_keys:
-                        return False
-                    active = {
-                        "transaction_id": transaction_id,
-                        "user_id": sender,
-                        "device_id": from_device,
-                        "peer_keys": peer_keys,
-                        "sas": None,
-                        "peer_done": False,
-                    }
-                    if not self._e2ee_send_verification_event(
-                        "m.key.verification.ready",
-                        sender,
-                        from_device,
-                        {
-                            "transaction_id": transaction_id,
-                            "from_device": self.device_id,
-                            "methods": ["m.sas.v1"],
-                        },
-                    ):
-                        return False
-                    continue
-
-                if not active or transaction_id != active["transaction_id"]:
-                    continue
-
-                if event_type == "m.key.verification.cancel":
-                    self.logger.warning(
-                        "Matrix E2EE SAS verification was cancelled: %s",
-                        content.get("reason", "unspecified reason"),
-                    )
-                    return False
-
-                if event_type == "m.key.verification.start":
-                    try:
-                        sas = MatrixSASVerification(
-                            self.user_id,
-                            self.device_id,
-                            sender,
-                            active["device_id"],
-                            content,
-                        )
-                        accept = sas.accept_content()
-                    except (TypeError, ValueError):
-                        self._e2ee_verification_cancel(
-                            active,
-                            "m.unknown_method",
-                            "Unsupported SAS verification parameters",
-                        )
-                        return False
-                    active["sas"] = sas
-                    if not self._e2ee_send_verification_event(
-                        "m.key.verification.accept",
-                        sender,
-                        active["device_id"],
-                        accept,
-                    ):
-                        return False
-                    continue
-
-                sas = active.get("sas")
-                if sas is None:
-                    self._e2ee_verification_cancel(
-                        active,
-                        "m.unexpected_message",
-                        "SAS verification has not started",
-                    )
-                    return False
-
-                if event_type == "m.key.verification.key":
-                    try:
-                        sas.receive_key(content.get("key", ""))
-                        key_content = sas.key_content()
-                        mac_content = sas.mac_content(
-                            self._e2ee_account.signing_key
-                        )
-                    except (TypeError, ValueError):
-                        self._e2ee_verification_cancel(
-                            active,
-                            "m.invalid_message",
-                            "Invalid SAS public key",
-                        )
-                        return False
-                    if not self._e2ee_send_verification_event(
-                        "m.key.verification.key",
-                        sender,
-                        active["device_id"],
-                        key_content,
-                    ) or not self._e2ee_send_verification_event(
-                        "m.key.verification.mac",
-                        sender,
-                        active["device_id"],
-                        mac_content,
-                    ):
-                        return False
-                    continue
-
-                if event_type == "m.key.verification.mac":
-                    try:
-                        sas.verify_peer_mac(content, active["peer_keys"])
-                    except (TypeError, ValueError):
-                        self._e2ee_verification_cancel(
-                            active,
-                            "m.key_mismatch",
-                            "SAS device key MAC did not match",
-                        )
-                        return False
-                    if not self._e2ee_send_verification_event(
-                        "m.key.verification.done",
-                        sender,
-                        active["device_id"],
-                        {"transaction_id": transaction_id},
-                    ):
-                        return False
-                    if active["peer_done"]:
-                        self._e2ee_store_verified_binding()
-                        return True
-                    continue
-
-                if event_type == "m.key.verification.done":
-                    active["peer_done"] = True
-                    if sas.state == "verified":
-                        self._e2ee_store_verified_binding()
-                        return True
-
-        if active:
-            self._e2ee_verification_cancel(
-                active, "m.timeout", "SAS verification timed out"
-            )
-        return False
+        The Matrix SAS helper refreshes only identity-related state.
+        """
+        return sas.refresh_verified_state(self)
 
     def _e2ee_setup(self):
         """Ensure the E2EE device account exists and keys are uploaded.
 
-        Creates a new :class:`MatrixOlmAccount` if one does not yet
-        exist in the persistent store, then calls
-        :meth:`_e2ee_upload_keys` if the server has not yet received
-        our device keys for the current access token.
-
-        Returns ``True`` on success, ``False`` on failure.
+        Restores or creates an account, then uploads any missing keys.
+        Returns ``True`` when the account is ready.
         """
         if self._e2ee_account is None:
+            # Prefer a saved identity so Matrix sees the same device again.
             acct_data = self.store.get("e2ee_account")
             if acct_data:
                 try:
                     self._e2ee_account = MatrixOlmAccount.from_dict(acct_data)
                 except Exception:
+                    # Invalid saved keys are replaced during normal setup.
                     self._e2ee_account = None
 
             if self._e2ee_account is None:
+                # First use or invalid storage requires a fresh local identity.
                 self._e2ee_account = MatrixOlmAccount()
                 self.store.set(
                     "e2ee_account",
@@ -2504,21 +2289,8 @@ class NotifyMatrix(NotifyBase):
                     expires=self.default_cache_expiry_sec,
                 )
 
-        # Keys uploaded status must match the current Matrix device identity
-        # and the account keys we are about to use. This lets us recover from
-        # cached state where the homeserver assigned a different device_id or
-        # where the local E2EE account changed.
-        current_binding = (
-            "{}|{}|{}|{}".format(
-                self.user_id or "",
-                self.device_id or "",
-                self._e2ee_account.identity_key,
-                self._e2ee_account.signing_key,
-            )
-            if self._e2ee_account is not None
-            else ""
-        )
-        if self.store.get("e2ee_device_binding") != current_binding:
+        # Discard upload state when the server device or local account changes.
+        if self.store.get("e2ee_device_binding") != self._e2ee_binding_key():
             self.store.clear("e2ee_keys_uploaded")
 
         if not self.store.get("e2ee_keys_uploaded"):
@@ -2570,12 +2342,7 @@ class NotifyMatrix(NotifyBase):
         )
         self.store.set(
             "e2ee_device_binding",
-            "{}|{}|{}|{}".format(
-                self.user_id,
-                self.device_id,
-                self._e2ee_account.identity_key,
-                self._e2ee_account.signing_key,
-            ),
+            self._e2ee_binding_key(),
             expires=self.default_cache_expiry_sec,
         )
 
@@ -2839,10 +2606,7 @@ class NotifyMatrix(NotifyBase):
             total_devices,
         )
 
-        # Build the claim request for all member devices.
-        # "signed_curve25519" is the algorithm Matrix clients publish and
-        # servers are required to support; "curve25519" (unsigned) is
-        # deprecated and usually yields no keys on current servers.
+        # Request the signed one-time keys supported by current Matrix clients.
         otk_request = {}
         for uid, devs in members.items():
             otk_request[uid] = dict.fromkeys(devs, "signed_curve25519")
@@ -2917,12 +2681,7 @@ class NotifyMatrix(NotifyBase):
                     )
                     continue
 
-                # Locate and verify the OTK for this device.
-                # Servers return signed_curve25519 keys (the algorithm we
-                # requested) as {"key": ..., "signatures": ...} dicts.
-                # signed_curve25519 OTKs are always KeyObjects
-                # {"key": ..., "signatures": ...}; plain-string values
-                # are not valid for this algorithm and are rejected.
+                # Accept only signed one-time-key objects for this device.
                 their_otk = None
                 otk_entry = otk_keys.get(uid, {}).get(dev_id, {})
                 self.logger.trace(
@@ -3013,19 +2772,9 @@ class NotifyMatrix(NotifyBase):
                     )
                     continue
 
-                # Build the m.room_key inner plaintext per Matrix spec:
-                #   https://spec.matrix.org/v1.11/client-server-api/#mroomkey
-                #
-                # Required fields only; non-standard extension fields
-                # (sender_device_keys, org.matrix.msc4147.device_keys) have
-                # been removed because they:
-                #   - Add ~930 bytes to an otherwise ~400-byte payload,
-                #     bloating the Olm ciphertext from ~400B to ~1640B.
-                #   - Are not part of the spec and may confuse strict
-                #     implementations (Element/matrix-sdk-crypto warns on
-                #     unknown fields in to-device events in some builds).
-                #   - Contain unsigned device-key material that recipients
-                #     should instead fetch via /keys/query for authenticity.
+                # Use only standard room-key fields. Device-key extensions
+                # add overhead, may confuse strict clients, and carry unsigned
+                # keys that recipients should query directly.
                 inner = dumps(
                     {
                         "type": "m.room_key",
@@ -3107,13 +2856,7 @@ class NotifyMatrix(NotifyBase):
             self.transaction_id,
         )
 
-        # Check whether the OTK pool needs topping up.  Pass the number of
-        # OTKs consumed (built_count) and any devices skipped because the
-        # server had no OTK for them so _e2ee_replenish_otks can log the
-        # right diagnostic and decide whether an upload is needed.
-        # We always reach here with built_count >= 1 (the any() guard above
-        # returns early when no messages were built), so the call is never
-        # redundant -- _e2ee_replenish_otks itself decides whether to upload.
+        # Refill one-time keys when this share consumed or could not find them.
         self._e2ee_replenish_otks(
             claimed_count=built_count,
             skipped_no_otk=skipped_no_otk,

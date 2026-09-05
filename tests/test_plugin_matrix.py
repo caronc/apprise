@@ -47,7 +47,11 @@ from apprise import (
     OverflowMode,
     PersistentStoreMode,
 )
-from apprise.plugins.matrix import MatrixDiscoveryException, NotifyMatrix
+from apprise.plugins.matrix import (
+    MatrixDiscoveryException,
+    NotifyMatrix,
+    sas as matrix_sas,
+)
 
 # Use Matrix's internal limit and mode names for exact boundary assertions.
 from apprise.plugins.matrix.base import (
@@ -656,6 +660,261 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
     request.content = dumps({"error": {}})
     postokay, _response, _ = obj._fetch("/retry/apprise/unit/test")
     assert postokay is False
+
+    # A caller with its own tight time budget can cap how long a 429's
+    # own server-requested wait is allowed to throttle for.
+    request.content = dumps({"retry_after_ms": 999999})
+    with mock.patch.object(obj, "throttle") as throttle:
+        postokay, _response, _ = obj._fetch(
+            "/retry/apprise/unit/test", max_retry_wait=1
+        )
+    assert postokay is False
+    # The second throttle uses the remaining shared 429 budget.
+    second_call_wait = throttle.call_args_list[1].kwargs["wait"]
+    assert second_call_wait == pytest.approx(1.0, abs=0.1)
+
+    # Restore success so object cleanup does not honor the mocked long retry.
+    request.status_code = requests.codes.ok
+    request.content = dumps(response_obj)
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_shared_retry_budget(mock_post, mock_get, mock_put):
+    """Every 429 response draws from one shared retry-wait budget."""
+    request = mock.Mock()
+    request.status_code = 429
+    request.content = dumps({"retry_after_ms": 999999})
+    mock_post.return_value = request
+
+    obj = NotifyMatrix(host="host", user="user", password="passwd")
+    obj.access_token = "token"
+
+    waits = []
+
+    def fake_throttle(wait=None):
+        if wait is not None:
+            waits.append(wait)
+
+    with (
+        mock.patch.object(obj, "throttle", side_effect=fake_throttle),
+        mock.patch(
+            "apprise.plugins.matrix.base.monotonic",
+            # retry_deadline anchor, then each 429 draws a remaining-wait
+            # check before sleeping and a deadline recheck right after.
+            side_effect=[0, 0.5, 0.6, 1.8, 1.9],
+        ),
+    ):
+        postokay, _response, _ = obj._fetch(
+            "/retry/apprise/unit/test", max_retry_wait=2
+        )
+    assert postokay is False
+    # The two waits use the remaining portions of the same two-second budget.
+    assert waits[0] == pytest.approx(1.5)
+    assert waits[1] == pytest.approx(0.2)
+
+    # Restore success so object cleanup does not honor the mocked long retry.
+    request.status_code = requests.codes.ok
+    request.content = dumps(
+        {
+            "access_token": "abcd1234",
+            "user_id": "@apprise:localhost",
+            "home_server": "localhost",
+        }
+    )
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_exhausted_retry_budget(mock_post, mock_get, mock_put):
+    """An exhausted retry-wait budget ends the attempt without a new request.
+
+    Once no time remains, a 429 must not be followed by another sleep and
+    another request; it must give up immediately instead.
+    """
+    request = mock.Mock()
+    request.status_code = 429
+    request.content = dumps({"retry_after_ms": 999999})
+    mock_post.return_value = request
+
+    obj = NotifyMatrix(host="host", user="user", password="passwd")
+    obj.access_token = "token"
+
+    with (
+        mock.patch.object(obj, "throttle") as throttle,
+        mock.patch(
+            "apprise.plugins.matrix.base.monotonic",
+            # retry_deadline anchor, then the very first remaining-wait
+            # check already finds the budget spent.
+            side_effect=[0, 2.0],
+        ),
+    ):
+        postokay, _response, _ = obj._fetch(
+            "/retry/apprise/unit/test", max_retry_wait=2
+        )
+
+    assert postokay is False
+    # throttle() is always called once before the initial request; giving
+    # up on the exhausted budget must not add a second, 429-driven wait.
+    throttle.assert_called_once_with()
+    assert mock_post.call_count == 1
+
+    # Restore success so object cleanup does not honor the mocked long retry.
+    request.status_code = requests.codes.ok
+    request.content = dumps(
+        {
+            "access_token": "abcd1234",
+            "user_id": "@apprise:localhost",
+            "home_server": "localhost",
+        }
+    )
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_retry_sleep_exhausts_budget(
+    mock_post, mock_get, mock_put
+):
+    """A budget consumed by the sleep itself also stops the retry loop.
+
+    The deadline is checked before sleeping and again right after -- a
+    wait that lands exactly on (or past) the deadline must not be
+    followed by one more request.
+    """
+    request = mock.Mock()
+    request.status_code = 429
+    request.content = dumps({"retry_after_ms": 999999})
+    mock_post.return_value = request
+
+    obj = NotifyMatrix(host="host", user="user", password="passwd")
+    obj.access_token = "token"
+
+    with (
+        mock.patch.object(obj, "throttle") as throttle,
+        mock.patch(
+            "apprise.plugins.matrix.base.monotonic",
+            # retry_deadline anchor, a remaining-wait check that is still
+            # positive (so the wait proceeds), then the post-sleep
+            # recheck lands exactly on the deadline.
+            side_effect=[0, 0.5, 1.0],
+        ),
+    ):
+        postokay, _response, _ = obj._fetch(
+            "/retry/apprise/unit/test", max_retry_wait=1
+        )
+
+    assert postokay is False
+    # The 429 wait happens once; no second request follows it.
+    assert throttle.call_args_list[-1] == mock.call(wait=0.5)
+    assert mock_post.call_count == 1
+
+    # Restore success so object cleanup does not honor the mocked long retry.
+    request.status_code = requests.codes.ok
+    request.content = dumps(
+        {
+            "access_token": "abcd1234",
+            "user_id": "@apprise:localhost",
+            "home_server": "localhost",
+        }
+    )
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_fetch_response_limit(mock_post, mock_get, mock_put):
+    """A response larger than max_response_bytes is discarded, not parsed.
+
+    The connection is closed instead of reading (and buffering) the rest
+    of a response that has already exceeded the caller's limit.
+    """
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+    request.iter_content.return_value = iter([b"x" * 1000, b"x" * 1001])
+    mock_post.return_value = request
+
+    obj = NotifyMatrix(host="host", user="user", password="passwd")
+    obj.access_token = "token"
+
+    postokay, response, status_code = obj._fetch(
+        "/some/path", max_response_bytes=2000
+    )
+
+    assert postokay is False
+    assert response == {}
+    assert status_code == requests.codes.ok
+    request.close.assert_called_once()
+
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_fetch_response_within_limit(
+    mock_post, mock_get, mock_put
+):
+    """A response at or under max_response_bytes is parsed normally.
+
+    An empty chunk (which a real stream can yield) is skipped rather
+    than counted or appended.
+    """
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+    request.iter_content.return_value = iter(
+        [b"", dumps({"ok": True}).encode()]
+    )
+    mock_post.return_value = request
+
+    obj = NotifyMatrix(host="host", user="user", password="passwd")
+    obj.access_token = "token"
+
+    postokay, response, _status_code = obj._fetch(
+        "/some/path", max_response_bytes=2000
+    )
+
+    assert postokay is True
+    assert response == {"ok": True}
+    # The stream is closed either way, not just on the oversized path.
+    request.close.assert_called_once()
+
+    del obj
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_fetch_stream_error(mock_post, mock_get, mock_put):
+    """Handle streamed download errors and close the response."""
+    request = mock.Mock()
+    request.status_code = requests.codes.ok
+
+    def broken_iter_content(chunk_size=None):
+        yield b"partial"
+        raise requests.exceptions.ChunkedEncodingError("broken transfer")
+
+    request.iter_content.side_effect = broken_iter_content
+    mock_post.return_value = request
+
+    obj = NotifyMatrix(host="host", user="user", password="passwd")
+    obj.access_token = "token"
+
+    postokay, response, status_code = obj._fetch(
+        "/some/path", max_response_bytes=2000
+    )
+
+    assert postokay is False
+    assert response == {}
+    assert status_code == requests.codes.ok
+    request.close.assert_called_once()
+
     del obj
 
 
@@ -2455,155 +2714,6 @@ def test_plugin_matrix_e2ee_helpers():
     assert out.startswith(b'{"a"')
 
 
-def _matrix_sas_start(peer_device="ELEMENT", transaction_id="sas-transaction"):
-    """Return a valid Matrix SAS start payload."""
-    return {
-        "from_device": peer_device,
-        "transaction_id": transaction_id,
-        "method": "m.sas.v1",
-        "key_agreement_protocols": ["curve25519-hkdf-sha256"],
-        "hashes": ["sha256"],
-        "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
-        "short_authentication_string": ["decimal", "emoji"],
-    }
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-@pytest.mark.parametrize(
-    ("peer_device", "updates", "match"),
-    (
-        ("ELEMENT", {"transaction_id": None}, "Missing SAS transaction"),
-        (None, {}, "Missing SAS transaction"),
-        ("ELEMENT", {"from_device": "OTHER"}, "does not match"),
-        ("ELEMENT", {"method": "unsupported"}, "Unsupported SAS verification"),
-        ("ELEMENT", {"key_agreement_protocols": []}, "key agreement"),
-        ("ELEMENT", {"hashes": []}, "Unsupported SAS hash"),
-        (
-            "ELEMENT",
-            {"message_authentication_codes": []},
-            "Unsupported SAS MAC",
-        ),
-        ("ELEMENT", {"short_authentication_string": ["emoji"]}, "decimal"),
-    ),
-)
-def test_plugin_matrix_sas_rejects_invalid_start(peer_device, updates, match):
-    """SAS negotiation rejects incomplete or unsupported parameters."""
-    from apprise.plugins.matrix.e2ee import MatrixSASVerification
-
-    start = _matrix_sas_start(peer_device=peer_device)
-    start.update(updates)
-    with pytest.raises(ValueError, match=match):
-        MatrixSASVerification("@u:h", "APPRISE", "@u:h", peer_device, start)
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_rejects_invalid_state_transitions():
-    """SAS operations fail closed when received out of order."""
-    from apprise.plugins.matrix.e2ee import MatrixSASVerification
-
-    def sas():
-        return MatrixSASVerification(
-            "@u:h", "APPRISE", "@u:h", "ELEMENT", _matrix_sas_start()
-        )
-
-    obj = sas()
-    obj.accept_content()
-    with pytest.raises(ValueError, match="already accepted"):
-        obj.accept_content()
-    with pytest.raises(ValueError, match="peer key has not been received"):
-        obj.key_content()
-    with pytest.raises(ValueError, match="peer key has not been received"):
-        obj.mac_content("key")
-
-    obj = sas()
-    with pytest.raises(ValueError, match="Unexpected SAS key"):
-        obj.receive_key("invalid")
-    with pytest.raises(ValueError, match="shared secret"):
-        obj._calculate_mac("value", "id", "a", "b", "c", "d")
-    with pytest.raises(ValueError, match="Unexpected SAS MAC"):
-        obj.verify_peer_mac({}, {})
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_rejects_invalid_peer_mac():
-    """Every peer MAC and key-list validation failure is rejected."""
-    from cryptography.hazmat.primitives.asymmetric.x25519 import (
-        X25519PrivateKey,
-    )
-    from cryptography.hazmat.primitives.serialization import (
-        Encoding,
-        PublicFormat,
-    )
-
-    from apprise.plugins.matrix.e2ee import (
-        MatrixSASVerification,
-        _b64enc,
-    )
-
-    obj = MatrixSASVerification(
-        "@u:h", "APPRISE", "@u:h", "ELEMENT", _matrix_sas_start()
-    )
-    obj.accept_content()
-    peer_private = X25519PrivateKey.generate()
-    obj.receive_key(
-        _b64enc(
-            peer_private.public_key().public_bytes(
-                Encoding.Raw, PublicFormat.Raw
-            )
-        )
-    )
-    obj.mac_content("own-signing-key")
-
-    peer_key_id = "ed25519:ELEMENT"
-
-    def peer_mac(value, key_id):
-        return obj._calculate_mac(
-            value,
-            key_id,
-            "@u:h",
-            "ELEMENT",
-            "@u:h",
-            "APPRISE",
-        )
-
-    with pytest.raises(ValueError, match="transaction does not match"):
-        obj.verify_peer_mac({"transaction_id": "other"}, {})
-    with pytest.raises(ValueError, match="contains no keys"):
-        obj.verify_peer_mac({"transaction_id": "sas-transaction"}, {})
-    with pytest.raises(ValueError, match="omits the peer device"):
-        obj.verify_peer_mac(
-            {
-                "transaction_id": "sas-transaction",
-                "mac": {"ed25519:OTHER": "mac"},
-            },
-            {},
-        )
-
-    unknown_macs = {
-        "ed25519:UNKNOWN": "unknown",
-        peer_key_id: peer_mac("peer-signing-key", peer_key_id),
-    }
-    with pytest.raises(ValueError, match="unknown key"):
-        obj.verify_peer_mac(
-            {
-                "transaction_id": "sas-transaction",
-                "mac": unknown_macs,
-                "keys": peer_mac(",".join(sorted(unknown_macs)), "KEY_IDS"),
-            },
-            {peer_key_id: "peer-signing-key"},
-        )
-
-    with pytest.raises(ValueError, match="device key MAC"):
-        obj.verify_peer_mac(
-            {
-                "transaction_id": "sas-transaction",
-                "mac": {peer_key_id: "invalid"},
-                "keys": peer_mac(peer_key_id, "KEY_IDS"),
-            },
-            {peer_key_id: "peer-signing-key"},
-        )
-
-
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_sas_responder_roundtrip():
     """The custom SAS responder interoperates without libolm."""
@@ -2632,7 +2742,15 @@ def test_plugin_matrix_sas_responder_roundtrip():
     own_device = "APPRISE"
     peer_device = "ELEMENT"
     transaction_id = "sas-transaction"
-    start = _matrix_sas_start(peer_device, transaction_id)
+    start = {
+        "from_device": peer_device,
+        "transaction_id": transaction_id,
+        "method": "m.sas.v1",
+        "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+        "hashes": ["sha256"],
+        "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+        "short_authentication_string": ["decimal", "emoji"],
+    }
     sas = MatrixSASVerification(
         own_user,
         own_device,
@@ -2692,8 +2810,1702 @@ def test_plugin_matrix_sas_responder_roundtrip():
 
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_init_validation():
+    """MatrixSASVerification rejects malformed SAS start content."""
+    from apprise.plugins.matrix.e2ee import MatrixSASVerification
+
+    own_user = peer_user = "@u:h"
+    own_device, peer_device = "APPRISE", "ELEMENT"
+    base_start = {
+        "from_device": peer_device,
+        "transaction_id": "tx",
+        "method": "m.sas.v1",
+        "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+        "hashes": ["sha256"],
+        "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+        "short_authentication_string": ["decimal", "emoji"],
+    }
+
+    def build(**overrides):
+        content = dict(base_start)
+        content.update(overrides)
+        return content
+
+    cases = (
+        ({"transaction_id": ""}, "Missing SAS transaction"),
+        ({"from_device": "OTHER"}, "does not match request device"),
+        ({"method": "m.other.v1"}, "Unsupported SAS verification method"),
+        (
+            {"key_agreement_protocols": ["other"]},
+            "Unsupported SAS key agreement",
+        ),
+        ({"hashes": ["sha1"]}, "Unsupported SAS hash"),
+        (
+            {"message_authentication_codes": ["other"]},
+            "Unsupported SAS MAC",
+        ),
+        (
+            {"short_authentication_string": ["emoji"]},
+            "does not offer decimal",
+        ),
+    )
+    for overrides, match in cases:
+        with pytest.raises(ValueError, match=match):
+            MatrixSASVerification(
+                own_user,
+                own_device,
+                peer_user,
+                peer_device,
+                build(**overrides),
+            )
+
+    # A peer device ID is required with the transaction ID.
+    with pytest.raises(ValueError, match="Missing SAS transaction"):
+        MatrixSASVerification(own_user, own_device, peer_user, "", base_start)
+
+
+def _make_sas(own_user, own_device, peer_user, peer_device, transaction_id):
+    """Build a fresh MatrixSASVerification responder for *transaction_id*."""
+    from apprise.plugins.matrix.e2ee import MatrixSASVerification
+
+    start = {
+        "from_device": peer_device,
+        "transaction_id": transaction_id,
+        "method": "m.sas.v1",
+        "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+        "hashes": ["sha256"],
+        "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+        "short_authentication_string": ["decimal", "emoji"],
+    }
+    return MatrixSASVerification(
+        own_user, own_device, peer_user, peer_device, start
+    )
+
+
+def _completed_sas_pair(
+    own_user,
+    own_device,
+    peer_user,
+    peer_device,
+    transaction_id,
+    own_account,
+    peer_account,
+):
+    """Build a responder and matching peer at the MAC stage.
+
+    The returned helper creates additional valid MAC values for edge cases.
+    """
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+        X25519PublicKey,
+    )
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from apprise.plugins.matrix.e2ee import (
+        _b64dec,
+        _b64enc,
+        _hkdf_sha256,
+        _hmac_sha256,
+    )
+
+    sas = _make_sas(
+        own_user, own_device, peer_user, peer_device, transaction_id
+    )
+    sas.accept_content()
+
+    peer_private = X25519PrivateKey.generate()
+    peer_public = _b64enc(
+        peer_private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+    sas.receive_key(peer_public)
+    sas.mac_content(own_account.signing_key)
+
+    shared_secret = peer_private.exchange(
+        X25519PublicKey.from_public_bytes(_b64dec(sas.public_key))
+    )
+
+    def peer_mac(value, key_id):
+        info = (
+            "MATRIX_KEY_VERIFICATION_MAC"
+            + peer_user
+            + peer_device
+            + own_user
+            + own_device
+            + transaction_id
+            + key_id
+        ).encode("utf-8")
+        key = _hkdf_sha256(shared_secret, 32, salt=None, info=info)
+        return _b64enc(_hmac_sha256(key, value.encode("utf-8")))
+
+    key_id = "ed25519:{}".format(peer_device)
+    content = {
+        "transaction_id": transaction_id,
+        "mac": {key_id: peer_mac(peer_account.signing_key, key_id)},
+        "keys": peer_mac(key_id, "KEY_IDS"),
+    }
+    peer_keys = {key_id: peer_account.signing_key}
+    return sas, content, peer_keys, peer_mac
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_verification_state_guards():
+    """Out-of-order calls against MatrixSASVerification are rejected."""
+    own_user = peer_user = "@u:h"
+    own_device, peer_device = "APPRISE", "ELEMENT"
+
+    sas = _make_sas(own_user, own_device, peer_user, peer_device, "tx")
+    with pytest.raises(ValueError, match="peer key has not been received"):
+        sas.key_content()
+    with pytest.raises(ValueError, match="peer key has not been received"):
+        sas.mac_content("sig")
+    with pytest.raises(ValueError, match="Unexpected SAS key event"):
+        sas.receive_key("AAAA")
+
+    sas.accept_content()
+    with pytest.raises(ValueError, match="already accepted"):
+        sas.accept_content()
+    with pytest.raises(ValueError, match="Unexpected SAS MAC event"):
+        sas.verify_peer_mac({}, {})
+
+    with pytest.raises(
+        ValueError, match="shared secret has not been established"
+    ):
+        sas.decimal_sas()
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_invalid_peer_key():
+    """Reject malformed peer keys before decoding them."""
+    own_user = peer_user = "@u:h"
+    own_device, peer_device = "APPRISE", "ELEMENT"
+
+    for bad_key in ("", "A" * 513, None, 12345):
+        sas = _make_sas(own_user, own_device, peer_user, peer_device, "tx")
+        sas.accept_content()
+        with pytest.raises(ValueError, match="missing or malformed"):
+            sas.receive_key(bad_key)
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_mac_requires_secret():
+    """_calculate_mac refuses to run before the SAS key exchange."""
+    sas = _make_sas("@u:h", "APPRISE", "@u:h", "ELEMENT", "tx")
+    # Reach the MAC guard without creating a shared secret.
+    sas.state = "key_received"
+    with pytest.raises(
+        ValueError, match="shared secret has not been established"
+    ):
+        sas._calculate_mac("v", "kid", "@u:h", "APPRISE", "@u:h", "ELEMENT")
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_decimal_sas():
+    """decimal_sas derives the 3-number code the Matrix spec defines."""
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+    )
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from apprise.plugins.matrix.e2ee import _b64enc
+
+    sas = _make_sas("@u:h", "APPRISE", "@u:h", "ELEMENT", "tx")
+    sas.accept_content()
+    peer_private = X25519PrivateKey.generate()
+    peer_public = _b64enc(
+        peer_private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+    sas.receive_key(peer_public)
+
+    # Check the decimal bit splitting independently with five known bytes.
+    with mock.patch(
+        "apprise.plugins.matrix.e2ee._hkdf_sha256",
+        return_value=bytes([0xFF] * 5),
+    ) as hkdf:
+        # All 40 bits set -> each 13-bit group is 8191 -> +1000 = 9191.
+        assert sas.decimal_sas() == (9191, 9191, 9191)
+    assert hkdf.call_args.args[1] == 5
+
+    with mock.patch(
+        "apprise.plugins.matrix.e2ee._hkdf_sha256",
+        return_value=bytes(5),
+    ):
+        # All bits clear -> each 13-bit group is 0 -> +1000 = 1000.
+        assert sas.decimal_sas() == (1000, 1000, 1000)
+
+    with mock.patch(
+        "apprise.plugins.matrix.e2ee._hkdf_sha256",
+        return_value=b"\x00\x01\x00\x00\x00",
+    ) as hkdf:
+        # Cross-check against the spec's byte-by-byte formula.
+        b0, b1, b2, b3, b4 = b"\x00\x01\x00\x00\x00"
+        expected = (
+            ((b0 << 5) | (b1 >> 3)) + 1000,
+            (((b1 & 0x7) << 10) | (b2 << 2) | (b3 >> 6)) + 1000,
+            (((b3 & 0x3F) << 7) | (b4 >> 1)) + 1000,
+        )
+        assert sas.decimal_sas() == expected
+
+    # Require the spec's exact separators and initiator-first field order.
+    info = hkdf.call_args.kwargs["info"]
+    assert info == (
+        "MATRIX_KEY_VERIFICATION_SAS|"
+        "@u:h|ELEMENT|" + peer_public + "|"
+        "@u:h|APPRISE|" + sas.public_key + "|"
+        "tx"
+    ).encode("utf-8")
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_verify_peer_mac_errors():
+    """verify_peer_mac rejects tampered or incomplete MAC content."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    own_user = peer_user = "@u:h"
+    own_device, peer_device = "APPRISE", "ELEMENT"
+    own_account = MatrixOlmAccount()
+    peer_account = MatrixOlmAccount()
+
+    def build():
+        return _completed_sas_pair(
+            own_user,
+            own_device,
+            peer_user,
+            peer_device,
+            "tx",
+            own_account,
+            peer_account,
+        )
+
+    # Wrong transaction id
+    sas, content, peer_keys, _mac = build()
+    content["transaction_id"] = "other"
+    with pytest.raises(ValueError, match="transaction does not match"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # Missing/empty mac dict
+    sas, content, peer_keys, _mac = build()
+    content["mac"] = {}
+    with pytest.raises(ValueError, match="contains no keys"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # mac dict present but missing the peer's own device key id
+    sas, content, peer_keys, _mac = build()
+    content["mac"] = {"ed25519:someone-else": "AAAA"}
+    with pytest.raises(ValueError, match="omits the peer device key"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # An oversized key list is rejected before it is ever sorted/hashed.
+    sas, content, peer_keys, _mac = build()
+    device_key_id = next(iter(content["mac"]))
+    content["mac"] = {
+        device_key_id: content["mac"][device_key_id],
+        **{
+            f"ed25519:junk-{i}": "AAAA"
+            for i in range(matrix_sas.MatrixSASVerification.MAX_MAC_KEYS)
+        },
+    }
+    with pytest.raises(ValueError, match="too many keys"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # peer_keys is not a mapping at all (TypeError branch)
+    sas, content, peer_keys, _mac = build()
+    with pytest.raises(ValueError, match="unknown key"):
+        sas.verify_peer_mac(content, None)
+
+    # Reference an unknown key while keeping the key-list MAC valid.
+    sas, content, peer_keys, peer_mac = build()
+    device_key_id = next(iter(content["mac"]))
+    unknown_key_id = "ed25519:unknown-device"
+    macs = {
+        device_key_id: content["mac"][device_key_id],
+        unknown_key_id: peer_mac("garbage", unknown_key_id),
+    }
+    tampered = {
+        "transaction_id": "tx",
+        "mac": macs,
+        "keys": peer_mac(",".join(sorted(macs)), "KEY_IDS"),
+    }
+    with pytest.raises(ValueError, match="unknown key"):
+        sas.verify_peer_mac(tampered, peer_keys)
+
+    # Tampered per-device MAC value
+    sas, content, peer_keys, _mac = build()
+    content["mac"][device_key_id] = "tampered-value"
+    with pytest.raises(ValueError, match="device key MAC does not match"):
+        sas.verify_peer_mac(content, peer_keys)
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_mac_field_limits():
+    """Reject oversized MAC fields before processing them."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    own_user = peer_user = "@u:h"
+    own_device, peer_device = "APPRISE", "ELEMENT"
+    own_account = MatrixOlmAccount()
+    peer_account = MatrixOlmAccount()
+
+    def build():
+        return _completed_sas_pair(
+            own_user,
+            own_device,
+            peer_user,
+            peer_device,
+            "tx",
+            own_account,
+            peer_account,
+        )
+
+    # Oversized MAC value for an otherwise-valid key ID.
+    sas, content, peer_keys, _mac = build()
+    device_key_id = next(iter(content["mac"]))
+    content["mac"][device_key_id] = "A" * 513
+    with pytest.raises(ValueError, match="malformed entry"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # Oversized key ID replacing the real one.
+    sas, content, peer_keys, _mac = build()
+    device_key_id = next(iter(content["mac"]))
+    content["mac"] = {"ed25519:" + "A" * 513: content["mac"][device_key_id]}
+    with pytest.raises(ValueError, match="malformed entry"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # Oversized aggregate key-list MAC.
+    sas, content, peer_keys, _mac = build()
+    content["keys"] = "A" * 513
+    with pytest.raises(ValueError, match="malformed key list MAC"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # Missing key-list MAC.
+    sas, content, peer_keys, _mac = build()
+    del content["keys"]
+    with pytest.raises(ValueError, match="malformed key list MAC"):
+        sas.verify_peer_mac(content, peer_keys)
+
+    # An oversized public key returned for the peer's device.
+    sas, content, peer_keys, _mac = build()
+    device_key_id = next(iter(content["mac"]))
+    peer_keys = dict(peer_keys, **{device_key_id: "A" * 513})
+    with pytest.raises(ValueError, match="malformed key"):
+        sas.verify_peer_mac(content, peer_keys)
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_e2ee_binding_key():
+    """_e2ee_binding_key reflects the current device/account identity."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    obj = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], secure=True
+    )
+    assert obj._e2ee_binding_key() == ""
+
+    obj._e2ee_account = MatrixOlmAccount()
+    obj.user_id = "@u:h"
+    obj.device_id = "APPRISE"
+    assert obj._e2ee_binding_key() == "{}|{}|{}|{}".format(
+        "@u:h",
+        "APPRISE",
+        obj._e2ee_account.identity_key,
+        obj._e2ee_account.signing_key,
+    )
+
+
+def _matrix_sas_plugin(user_id="@u:h", device_id="APPRISE"):
+    """A NotifyMatrix instance with a ready-to-use E2EE identity."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        autoverify=True,
+        secure=True,
+    )
+    obj.user_id = user_id
+    obj.device_id = device_id
+    obj._e2ee_account = MatrixOlmAccount()
+    return obj
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_send_event_and_cancel():
+    """_send_event builds the /sendToDevice request; _cancel/_fail no-op
+    without an active transaction."""
+    import re
+
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+
+    assert verifier._cancel("m.timeout", "x") is False
+    assert verifier._fail("m.timeout", "x") is False
+
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, {}, requests.codes.ok)
+    ) as fetch:
+        assert (
+            verifier._send_event(
+                "m.key.verification.ready", "@peer:h", "DEV", {"a": 1}
+            )
+            is True
+        )
+    args, kwargs = fetch.call_args
+    assert re.match(r"^/sendToDevice/[^/]+/[0-9a-f]{32}$", args[0])
+    assert kwargs["method"] == "PUT"
+    assert kwargs["payload"] == {"messages": {"@peer:h": {"DEV": {"a": 1}}}}
+    # To-device sends use the same bounded verification budget as sync.
+    assert kwargs["timeout"][0] > 0
+    assert kwargs["timeout"][1] > 0
+    assert 0 < kwargs["max_retry_wait"] <= obj.default_autoverify_timeout_sec
+
+    with mock.patch.object(obj, "_fetch", return_value=(False, {}, 500)):
+        assert (
+            verifier._send_event("m.key.verification.ready", "u", "d", {})
+            is False
+        )
+
+    verifier.active = {
+        "transaction_id": "tx",
+        "user_id": "@peer:h",
+        "device_id": "DEV",
+    }
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, {}, requests.codes.ok)
+    ) as fetch:
+        assert verifier._cancel("m.timeout", "reason") is True
+    _, kwargs = fetch.call_args
+    assert kwargs["payload"] == {
+        "messages": {
+            "@peer:h": {
+                "DEV": {
+                    "transaction_id": "tx",
+                    "code": "m.timeout",
+                    "reason": "reason",
+                }
+            }
+        }
+    }
+    assert verifier._fail("m.timeout", "reason") is False
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_peer_keys_branches():
+    """_peer_keys covers every failure and success path."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+
+    with mock.patch.object(
+        obj, "_fetch", return_value=(False, {}, 500)
+    ) as fetch:
+        assert verifier._peer_keys("@peer:h", "DEV") is None
+    # Key queries use the same bounded verification budget.
+    kwargs = fetch.call_args.kwargs
+    assert kwargs["timeout"][0] > 0
+    assert kwargs["timeout"][1] > 0
+    assert 0 < kwargs["max_retry_wait"] <= obj.default_autoverify_timeout_sec
+
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, [], requests.codes.ok)
+    ):
+        assert verifier._peer_keys("@peer:h", "DEV") is None
+
+    with mock.patch.object(
+        obj,
+        "_fetch",
+        return_value=(True, {"device_keys": {}}, requests.codes.ok),
+    ):
+        assert verifier._peer_keys("@peer:h", "DEV") is None
+
+    # Null server fields are malformed but must not crash verification.
+    for malformed_response in (
+        {"device_keys": None},
+        {"device_keys": {"@peer:h": None}},
+        {"device_keys": "not-a-dict"},
+    ):
+        with mock.patch.object(
+            obj,
+            "_fetch",
+            return_value=(True, malformed_response, requests.codes.ok),
+        ):
+            assert verifier._peer_keys("@peer:h", "DEV") is None
+
+    bad_device = {
+        "user_id": "@peer:h",
+        "device_id": "DEV",
+        "keys": {},
+        "signatures": {},
+    }
+    with mock.patch.object(
+        obj,
+        "_fetch",
+        return_value=(
+            True,
+            {"device_keys": {"@peer:h": {"DEV": bad_device}}},
+            requests.codes.ok,
+        ),
+    ):
+        assert verifier._peer_keys("@peer:h", "DEV") is None
+
+    peer_account = MatrixOlmAccount()
+    device = peer_account.device_keys_payload("@peer:h", "DEV")
+    response = {
+        "device_keys": {"@peer:h": {"DEV": device}},
+        "master_keys": {"@peer:h": {"keys": {"ed25519:master": "abc"}}},
+    }
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, response, requests.codes.ok)
+    ):
+        keys = verifier._peer_keys("@peer:h", "DEV")
+    assert keys["ed25519:master"] == "abc"
+    assert "ed25519:DEV" in keys
+
+    # An implausibly large keys map is rejected rather than copied; a real
+    # device or master-key object only ever advertises a couple of keys.
+    oversized_keys = {
+        f"curve25519:{i}": "k" for i in range(matrix_sas.MAX_DEVICE_KEYS + 1)
+    }
+    oversized_device = dict(device, keys=oversized_keys)
+    with (
+        mock.patch.object(matrix_sas, "verify_device_keys", return_value=True),
+        mock.patch.object(
+            obj,
+            "_fetch",
+            return_value=(
+                True,
+                {"device_keys": {"@peer:h": {"DEV": oversized_device}}},
+                requests.codes.ok,
+            ),
+        ),
+    ):
+        keys = verifier._peer_keys("@peer:h", "DEV")
+    assert keys == {}
+
+    oversized_master = dict(
+        response,
+        master_keys={"@peer:h": {"keys": oversized_keys}},
+    )
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, oversized_master, requests.codes.ok)
+    ):
+        keys = verifier._peer_keys("@peer:h", "DEV")
+    assert "curve25519:0" not in keys
+    assert "ed25519:DEV" in keys
+
+    malformed = dict(response, master_keys={"@peer:h": "not-a-dict"})
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, malformed, requests.codes.ok)
+    ):
+        keys = verifier._peer_keys("@peer:h", "DEV")
+    assert "ed25519:master" not in keys
+
+    # Treat null or malformed optional master keys as absent.
+    for master_keys_value in (None, {"@peer:h": {"keys": None}}):
+        with mock.patch.object(
+            obj,
+            "_fetch",
+            return_value=(
+                True,
+                dict(response, master_keys=master_keys_value),
+                requests.codes.ok,
+            ),
+        ):
+            keys = verifier._peer_keys("@peer:h", "DEV")
+        assert "ed25519:master" not in keys
+        assert "ed25519:DEV" in keys
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_request_branches():
+    """_handle_request covers ignore/fail/success outcomes."""
+    from time import time
+
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    now_ms = int(time() * 1000)
+
+    assert verifier._handle_request("@u:h", {"timestamp": "nope"}) is None
+
+    stale = {
+        "timestamp": now_ms - 20 * 60 * 1000,
+        "transaction_id": "tx",
+        "from_device": "DEV",
+        "methods": ["m.sas.v1"],
+    }
+    assert verifier._handle_request("@u:h", stale) is None
+
+    future = dict(stale, timestamp=now_ms + 20 * 60 * 1000)
+    assert verifier._handle_request("@u:h", future) is None
+
+    missing_tx = {
+        "timestamp": now_ms,
+        "from_device": "DEV",
+        "methods": ["m.sas.v1"],
+    }
+    assert verifier._handle_request("@u:h", missing_tx) is None
+
+    missing_device = {
+        "timestamp": now_ms,
+        "transaction_id": "tx",
+        "methods": ["m.sas.v1"],
+    }
+    assert verifier._handle_request("@u:h", missing_device) is None
+
+    wrong_method = {
+        "timestamp": now_ms,
+        "transaction_id": "tx",
+        "from_device": "DEV",
+        "methods": ["other"],
+    }
+    assert verifier._handle_request("@u:h", wrong_method) is None
+
+    # A present-but-null "methods" field must not crash the "in" check.
+    null_methods = {
+        "timestamp": now_ms,
+        "transaction_id": "tx",
+        "from_device": "DEV",
+        "methods": None,
+    }
+    assert verifier._handle_request("@u:h", null_methods) is None
+
+    # Identifiers are validated by type and length, not just truthiness.
+    for bad_transaction_id, bad_from_device in (
+        (["tx"], "DEV"),
+        ("x" * (matrix_sas.MAX_ID_LEN + 1), "DEV"),
+        ("tx", 12345),
+        ("tx", "x" * (matrix_sas.MAX_ID_LEN + 1)),
+    ):
+        bad_ids = {
+            "timestamp": now_ms,
+            "transaction_id": bad_transaction_id,
+            "from_device": bad_from_device,
+            "methods": ["m.sas.v1"],
+        }
+        assert verifier._handle_request("@u:h", bad_ids) is None
+    assert verifier.active is None
+
+    valid = {
+        "timestamp": now_ms,
+        "transaction_id": "tx",
+        "from_device": "DEV",
+        "methods": ["m.sas.v1"],
+    }
+
+    with mock.patch.object(verifier, "_peer_keys", return_value=None):
+        assert verifier._handle_request("@u:h", valid) is False
+    assert verifier.active is None
+
+    # Reject a new request without changing the active transaction.
+    active = {
+        "transaction_id": "other",
+        "user_id": "@u:h",
+        "device_id": "OLD",
+    }
+    verifier.active = active
+    with mock.patch.object(verifier, "_send_event", return_value=True) as se:
+        assert verifier._handle_request("@u:h", valid) is None
+    se.assert_called_once_with(
+        matrix_sas.EVENT_CANCEL,
+        "@u:h",
+        "DEV",
+        {
+            "transaction_id": "tx",
+            "code": "m.unexpected_message",
+            "reason": "Another verification is already active",
+        },
+    )
+    assert verifier.active is active
+    verifier.active = None
+
+    # An exact replay of the request that started the active transaction
+    # is ignored silently -- it must not cancel our own exchange.
+    active = {
+        "transaction_id": "tx",
+        "user_id": "@u:h",
+        "device_id": "DEV",
+    }
+    verifier.active = active
+    with mock.patch.object(verifier, "_send_event") as se:
+        assert verifier._handle_request("@u:h", valid) is None
+    se.assert_not_called()
+    assert verifier.active is active
+    verifier.active = None
+
+    # A second transaction from the same device cancels both attempts.
+    active = {
+        "transaction_id": "other",
+        "user_id": "@u:h",
+        "device_id": "DEV",
+    }
+    verifier.active = active
+    with (
+        mock.patch.object(verifier, "_cancel", return_value=True) as cancel,
+        mock.patch.object(verifier, "_send_event", return_value=True) as se,
+    ):
+        assert verifier._handle_request("@u:h", valid) is None
+    cancel.assert_called_once_with(
+        "m.unexpected_message",
+        "A newer verification request superseded this one",
+    )
+    se.assert_called_once_with(
+        matrix_sas.EVENT_CANCEL,
+        "@u:h",
+        "DEV",
+        {
+            "transaction_id": "tx",
+            "code": "m.unexpected_message",
+            "reason": "Another verification is already active",
+        },
+    )
+    assert verifier.active is None
+
+    with (
+        mock.patch.object(
+            verifier, "_peer_keys", return_value={"ed25519:DEV": "k"}
+        ),
+        mock.patch.object(verifier, "_send_event", return_value=False) as se,
+    ):
+        assert verifier._handle_request("@u:h", valid) is False
+    se.assert_called_once()
+    verifier.active = None
+
+    with (
+        mock.patch.object(
+            verifier, "_peer_keys", return_value={"ed25519:DEV": "k"}
+        ),
+        mock.patch.object(verifier, "_send_event", return_value=True),
+    ):
+        assert verifier._handle_request("@u:h", valid) is None
+    assert verifier.active["transaction_id"] == "tx"
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_cancel():
+    """_handle_cancel always reports failure."""
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    assert verifier._handle_cancel({"reason": "user declined"}) is False
+    assert verifier._handle_cancel({}) is False
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_start_branches():
+    """_handle_start covers the invalid-params, send-failure, and success
+    outcomes."""
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    verifier.active = {
+        "transaction_id": "tx",
+        "user_id": "@peer:h",
+        "device_id": "DEV",
+    }
+
+    with mock.patch.object(verifier, "_cancel", return_value=True) as cancel:
+        assert (
+            verifier._handle_start("@peer:h", {"transaction_id": "tx"})
+            is False
+        )
+    cancel.assert_called_once_with(
+        "m.unknown_method", "Unsupported SAS verification parameters"
+    )
+
+    valid_start = {
+        "from_device": "DEV",
+        "transaction_id": "tx",
+        "method": "m.sas.v1",
+        "key_agreement_protocols": ["curve25519-hkdf-sha256"],
+        "hashes": ["sha256"],
+        "message_authentication_codes": ["hkdf-hmac-sha256.v2"],
+        "short_authentication_string": ["decimal", "emoji"],
+    }
+
+    with mock.patch.object(verifier, "_send_event", return_value=False):
+        assert verifier._handle_start("@peer:h", valid_start) is False
+    assert verifier.active["sas"] is not None
+
+    verifier.active["sas"] = None
+    with mock.patch.object(verifier, "_send_event", return_value=True):
+        assert verifier._handle_start("@peer:h", valid_start) is None
+    assert verifier.active["sas"] is not None
+    first_sas = verifier.active["sas"]
+
+    # A second start must not replace an already committed temporary key.
+    with mock.patch.object(verifier, "_cancel", return_value=True) as cancel:
+        assert verifier._handle_start("@peer:h", valid_start) is False
+    cancel.assert_called_once_with(
+        "m.unexpected_message", "SAS verification was already started"
+    )
+    assert verifier.active["sas"] is first_sas
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_key_branches():
+    """_handle_key covers the invalid-key and send-failure/success paths."""
+    from cryptography.hazmat.primitives.asymmetric.x25519 import (
+        X25519PrivateKey,
+    )
+    from cryptography.hazmat.primitives.serialization import (
+        Encoding,
+        PublicFormat,
+    )
+
+    from apprise.plugins.matrix.e2ee import _b64enc
+
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    verifier.active = {
+        "transaction_id": "tx",
+        "user_id": "@peer:h",
+        "device_id": "DEV",
+    }
+
+    invalid_sas = _make_sas(obj.user_id, obj.device_id, "@peer:h", "DEV", "tx")
+    invalid_sas.accept_content()
+    with mock.patch.object(verifier, "_cancel", return_value=True) as cancel:
+        assert (
+            verifier._handle_key(
+                invalid_sas, "@peer:h", {"key": "not-valid-base64!!"}
+            )
+            is False
+        )
+    cancel.assert_called_once_with(
+        "m.invalid_message", "Invalid SAS public key"
+    )
+
+    # A present-but-null "key" field must not crash before it is rejected
+    # as an invalid public key.
+    null_key_sas = _make_sas(
+        obj.user_id, obj.device_id, "@peer:h", "DEV", "tx"
+    )
+    null_key_sas.accept_content()
+    with mock.patch.object(verifier, "_cancel", return_value=True):
+        assert (
+            verifier._handle_key(null_key_sas, "@peer:h", {"key": None})
+            is False
+        )
+
+    peer_private = X25519PrivateKey.generate()
+    peer_public = _b64enc(
+        peer_private.public_key().public_bytes(Encoding.Raw, PublicFormat.Raw)
+    )
+
+    key_fail_sas = _make_sas(
+        obj.user_id, obj.device_id, "@peer:h", "DEV", "tx"
+    )
+    key_fail_sas.accept_content()
+    with mock.patch.object(verifier, "_send_event", return_value=False):
+        assert (
+            verifier._handle_key(key_fail_sas, "@peer:h", {"key": peer_public})
+            is False
+        )
+
+    mac_fail_sas = _make_sas(
+        obj.user_id, obj.device_id, "@peer:h", "DEV", "tx"
+    )
+    mac_fail_sas.accept_content()
+    with mock.patch.object(verifier, "_send_event", side_effect=[True, False]):
+        assert (
+            verifier._handle_key(mac_fail_sas, "@peer:h", {"key": peer_public})
+            is False
+        )
+
+    ok_sas = _make_sas(obj.user_id, obj.device_id, "@peer:h", "DEV", "tx")
+    ok_sas.accept_content()
+    with (
+        mock.patch.object(verifier, "_send_event", return_value=True),
+        mock.patch.object(obj.logger, "info") as log_info,
+    ):
+        assert (
+            verifier._handle_key(ok_sas, "@peer:h", {"key": peer_public})
+            is None
+        )
+    assert any(
+        "SAS code" in str(call.args[0]) for call in log_info.call_args_list
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_mac_branches():
+    """_handle_mac covers the mismatch, send-failure, and completion
+    outcomes."""
+    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
+
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    own_account = obj._e2ee_account
+    peer_account = MatrixOlmAccount()
+
+    def build_active(peer_done):
+        sas, content, peer_keys, _mac = _completed_sas_pair(
+            obj.user_id,
+            obj.device_id,
+            "@peer:h",
+            "DEV",
+            "tx",
+            own_account,
+            peer_account,
+        )
+        verifier.active = {
+            "transaction_id": "tx",
+            "user_id": "@peer:h",
+            "device_id": "DEV",
+            "peer_keys": peer_keys,
+            "peer_done": peer_done,
+        }
+        return sas, content
+
+    sas, _content = build_active(False)
+    with mock.patch.object(verifier, "_cancel", return_value=True) as cancel:
+        assert (
+            verifier._handle_mac(sas, {"transaction_id": "tx", "mac": {}})
+            is False
+        )
+    cancel.assert_called_once_with(
+        "m.key_mismatch", "SAS device key MAC did not match"
+    )
+
+    sas, content = build_active(False)
+    with mock.patch.object(verifier, "_send_event", return_value=False):
+        assert verifier._handle_mac(sas, content) is False
+
+    sas, content = build_active(True)
+    with (
+        mock.patch.object(verifier, "_send_event", return_value=True),
+        mock.patch.object(
+            matrix_sas, "store_verified_binding", return_value=True
+        ) as store,
+    ):
+        assert verifier._handle_mac(sas, content) is True
+    store.assert_called_once_with(obj)
+
+    # A failed persistence write must not be reported as success.
+    sas, content = build_active(True)
+    with (
+        mock.patch.object(verifier, "_send_event", return_value=True),
+        mock.patch.object(
+            matrix_sas, "store_verified_binding", return_value=False
+        ),
+    ):
+        assert verifier._handle_mac(sas, content) is False
+
+    sas, content = build_active(False)
+    with mock.patch.object(verifier, "_send_event", return_value=True):
+        assert verifier._handle_mac(sas, content) is None
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_done_branches():
+    """_handle_done only reports success once the local SAS is verified."""
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    verifier.active = {"peer_done": False}
+
+    class _FakeSAS:
+        state = "mac_sent"
+
+    fake = _FakeSAS()
+    assert verifier._handle_done(fake) is None
+    assert verifier.active["peer_done"] is True
+
+    fake.state = "verified"
+    verifier.active["peer_done"] = False
+    with mock.patch.object(
+        matrix_sas, "store_verified_binding", return_value=True
+    ) as store:
+        assert verifier._handle_done(fake) is True
+    store.assert_called_once_with(obj)
+
+    # A failed persistence write must not be reported as success.
+    verifier.active["peer_done"] = False
+    with mock.patch.object(
+        matrix_sas, "store_verified_binding", return_value=False
+    ):
+        assert verifier._handle_done(fake) is False
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_handle_event_dispatch():
+    """_handle_event routes every to-device event type correctly."""
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+
+    assert verifier._handle_event("not-a-dict") is None
+    assert verifier._handle_event({"type": "x", "sender": "@other:h"}) is None
+    assert (
+        verifier._handle_event(
+            {"type": "x", "sender": obj.user_id, "content": "nope"}
+        )
+        is None
+    )
+
+    with mock.patch.object(verifier, "_handle_request", return_value="R") as h:
+        result = verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_REQUEST,
+                "sender": obj.user_id,
+                "content": {"a": 1},
+            }
+        )
+    assert result == "R"
+    h.assert_called_once_with(obj.user_id, {"a": 1})
+
+    # No active transaction yet -- every non-request event is ignored.
+    assert (
+        verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_START,
+                "sender": obj.user_id,
+                "content": {"transaction_id": "tx"},
+            }
+        )
+        is None
+    )
+
+    verifier.active = {
+        "transaction_id": "tx",
+        "user_id": obj.user_id,
+        "sas": None,
+    }
+
+    assert (
+        verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_START,
+                "sender": obj.user_id,
+                "content": {"transaction_id": "other"},
+            }
+        )
+        is None
+    )
+
+    # Defensive same-transaction-owner check.
+    verifier.active["user_id"] = "@different:h"
+    assert (
+        verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_START,
+                "sender": obj.user_id,
+                "content": {"transaction_id": "tx"},
+            }
+        )
+        is None
+    )
+    verifier.active["user_id"] = obj.user_id
+
+    with mock.patch.object(
+        verifier, "_handle_cancel", return_value=False
+    ) as h:
+        result = verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_CANCEL,
+                "sender": obj.user_id,
+                "content": {"transaction_id": "tx"},
+            }
+        )
+    assert result is False
+    h.assert_called_once()
+
+    with mock.patch.object(verifier, "_handle_start", return_value=None) as h:
+        result = verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_START,
+                "sender": obj.user_id,
+                "content": {"transaction_id": "tx"},
+            }
+        )
+    assert result is None
+    h.assert_called_once()
+
+    with mock.patch.object(verifier, "_cancel", return_value=True) as cancel:
+        result = verifier._handle_event(
+            {
+                "type": matrix_sas.EVENT_KEY,
+                "sender": obj.user_id,
+                "content": {"transaction_id": "tx"},
+            }
+        )
+    assert result is False
+    cancel.assert_called_once_with(
+        "m.unexpected_message", "SAS verification has not started"
+    )
+
+    verifier.active["sas"] = mock.Mock()
+    for event_type, method in (
+        (matrix_sas.EVENT_KEY, "_handle_key"),
+        (matrix_sas.EVENT_MAC, "_handle_mac"),
+        (matrix_sas.EVENT_DONE, "_handle_done"),
+    ):
+        with mock.patch.object(verifier, method, return_value=None) as h:
+            result = verifier._handle_event(
+                {
+                    "type": event_type,
+                    "sender": obj.user_id,
+                    "content": {"transaction_id": "tx"},
+                }
+            )
+        assert result is None
+        h.assert_called_once()
+
+    assert (
+        verifier._handle_event(
+            {
+                "type": "m.some.other.event",
+                "sender": obj.user_id,
+                "content": {"transaction_id": "tx"},
+            }
+        )
+        is None
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_run_loop_mechanics():
+    """run() covers sync failure, malformed responses, the since token,
+    early termination, and timeout handling."""
+    obj = _matrix_sas_plugin()
+
+    # Sync itself fails outright.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    with mock.patch.object(obj, "_fetch", return_value=(False, {}, 500)):
+        assert verifier.run() is False
+
+    # Sync succeeds but returns a non-dict body.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, [], requests.codes.ok)
+    ):
+        assert verifier.run() is False
+
+    # Reject missing or invalid sync tokens instead of polling repeatedly.
+    for bad_batch_response in (
+        {"to_device": {"events": []}},
+        {"next_batch": None, "to_device": {"events": []}},
+        {"next_batch": "", "to_device": {"events": []}},
+        {"next_batch": 123, "to_device": {"events": []}},
+    ):
+        verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+        with mock.patch.object(
+            obj,
+            "_fetch",
+            return_value=(True, bad_batch_response, requests.codes.ok),
+        ):
+            assert verifier.run() is False
+
+    # A non-list "events" value is treated as empty rather than crashing.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    responses = iter(
+        [
+            (
+                True,
+                {
+                    "next_batch": "1",
+                    "to_device": {"events": "not-a-list"},
+                },
+                requests.codes.ok,
+            ),
+            (False, {}, 500),
+        ]
+    )
+    with mock.patch.object(
+        obj, "_fetch", side_effect=lambda *a, **k: next(responses)
+    ):
+        assert verifier.run() is False
+
+    # A present-but-null "to_device" field is treated the same way.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    responses = iter(
+        [
+            (True, {"next_batch": "1", "to_device": None}, requests.codes.ok),
+            (False, {}, 500),
+        ]
+    )
+    with mock.patch.object(
+        obj, "_fetch", side_effect=lambda *a, **k: next(responses)
+    ):
+        assert verifier.run() is False
+
+    # Skip malformed events and continue polling.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    responses = iter(
+        [
+            (
+                True,
+                {
+                    "next_batch": "1",
+                    "to_device": {"events": [{"type": "x"}]},
+                },
+                requests.codes.ok,
+            ),
+            (False, {}, 500),
+        ]
+    )
+    with (
+        mock.patch.object(
+            obj, "_fetch", side_effect=lambda *a, **k: next(responses)
+        ),
+        mock.patch.object(
+            verifier, "_handle_event", side_effect=AttributeError("boom")
+        ),
+    ):
+        assert verifier.run() is False
+
+    # Stop processing an oversized event batch at the deadline.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    # Set the construction-time deadline directly for this mocked clock.
+    verifier.deadline = 100
+    with (
+        mock.patch.object(
+            obj,
+            "_fetch",
+            return_value=(
+                True,
+                {
+                    "next_batch": "1",
+                    "to_device": {"events": [{"type": "a"}, {"type": "b"}]},
+                },
+                requests.codes.ok,
+            ),
+        ),
+        mock.patch.object(verifier, "_handle_event", return_value=None) as h,
+        mock.patch(
+            "apprise.plugins.matrix.sas.monotonic",
+            # while-check, remaining_ms, _bounded_fetch's own check,
+            # post-event-1 check, post-event-2 check (breaks), while
+            # re-check (exits).
+            side_effect=[1, 1, 1, 50, 150, 200],
+        ),
+    ):
+        assert verifier.run() is False
+    # The expired batch must not trigger another sync.
+    assert h.call_count == 2
+
+    # A terminal per-event result short-circuits the loop.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    with (
+        mock.patch.object(
+            obj,
+            "_fetch",
+            return_value=(
+                True,
+                {
+                    "next_batch": "1",
+                    "to_device": {"events": [{"type": "x"}]},
+                },
+                requests.codes.ok,
+            ),
+        ),
+        mock.patch.object(verifier, "_handle_event", return_value=True),
+    ):
+        assert verifier.run() is True
+
+    # The since token from one iteration is threaded into the next, and
+    # the reduced long-poll timeout is what actually gets sent.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    calls = []
+
+    def fake_fetch(path, params=None, method="GET", **kwargs):
+        calls.append(params)
+        if len(calls) == 1:
+            return (
+                True,
+                {"next_batch": "abc", "to_device": {"events": []}},
+                requests.codes.ok,
+            )
+        return (False, {}, 500)
+
+    with mock.patch.object(obj, "_fetch", side_effect=fake_fetch):
+        assert verifier.run() is False
+    assert "since" not in calls[0]
+    assert calls[0]["timeout"] == int(obj.socket_read_timeout * 1000 / 2)
+    assert calls[1]["since"] == "abc"
+
+    # Deadline reached with no active transaction -- fails closed with no
+    # network call for the no-op cancellation. Configure it before creation.
+    obj.default_autoverify_timeout_sec = 0
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    with mock.patch.object(obj, "_fetch") as fetch:
+        assert verifier.run() is False
+    fetch.assert_not_called()
+
+    # Deadline reached with an active transaction -- the peer is told.
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    verifier.active = {
+        "transaction_id": "tx",
+        "user_id": "@peer:h",
+        "device_id": "DEV",
+    }
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, {}, requests.codes.ok)
+    ) as fetch:
+        assert verifier.run() is False
+    assert fetch.call_args[0][0].startswith(
+        "/sendToDevice/m.key.verification.cancel/"
+    )
+    obj.default_autoverify_timeout_sec = (
+        NotifyMatrix.default_autoverify_timeout_sec
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_poll_timeout_margin():
+    """Sync uses bounded timeouts and does not mark the account online."""
+    import json
+
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+
+    with mock.patch.object(
+        obj, "_fetch", return_value=(False, {}, 500)
+    ) as fetch:
+        assert verifier.run() is False
+    sent_params = fetch.call_args.kwargs["params"]
+    assert sent_params["timeout"] == int(obj.socket_read_timeout * 1000 / 2)
+    assert sent_params["timeout"] < obj.socket_read_timeout * 1000
+    assert sent_params["set_presence"] == "offline"
+
+    # Both HTTP timeouts use the sanitized polling budget.
+    fetch_timeout = fetch.call_args.kwargs["timeout"]
+    expected = pytest.approx(sent_params["timeout"] / 1000 + 2)
+    assert fetch_timeout[0] == expected
+    assert fetch_timeout[1] == expected
+    assert fetch_timeout[1] < obj.socket_read_timeout * 10  # sane, not huge
+
+    # A 429 mid-poll must not be allowed to wait out the server's own
+    # arbitrary requested delay past what remains of this attempt.
+    assert fetch.call_args.kwargs["max_retry_wait"] == pytest.approx(
+        obj.default_autoverify_timeout_sec, abs=1
+    )
+
+    # Check filter behavior, including that any limits are positive.
+    parsed_filter = json.loads(sent_params["filter"])
+    assert parsed_filter["room"]["rooms"] == []
+    assert parsed_filter["presence"]["types"] == []
+    assert parsed_filter["account_data"]["types"] == []
+
+    def _walk_limits(node):
+        if isinstance(node, dict):
+            if "limit" in node:
+                yield node["limit"]
+            for value in node.values():
+                yield from _walk_limits(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from _walk_limits(value)
+
+    assert all(limit > 0 for limit in _walk_limits(parsed_filter))
+
+    # A custom ?rto= override scales the poll with it.
+    custom = NotifyMatrix(
+        host="h", user="u", password="pass", targets=["#r"], rto=10.0
+    )
+    custom.user_id = obj.user_id
+    custom.device_id = obj.device_id
+    custom._e2ee_account = obj._e2ee_account
+    custom_verifier = matrix_sas.MatrixSASAutoVerifier(custom)
+    with mock.patch.object(
+        custom, "_fetch", return_value=(False, {}, 500)
+    ) as fetch:
+        assert custom_verifier.run() is False
+    assert fetch.call_args.kwargs["params"]["timeout"] == 5000
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_expired_fetch():
+    """Do not start helper requests after the attempt deadline."""
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    verifier.deadline = 0  # already expired relative to real monotonic time
+
+    with mock.patch.object(obj, "_fetch") as fetch:
+        result = verifier._bounded_fetch("/keys/query", payload={})
+
+    fetch.assert_not_called()
+    assert result == (False, {}, None)
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_expired_best_effort_fetch():
+    """A best-effort call still fires once the deadline has passed.
+
+    The terminal cancellation notice is deliberately sent past the
+    deadline -- that is exactly why the attempt is ending.
+    """
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    verifier.deadline = 0  # already expired relative to real monotonic time
+
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, {}, requests.codes.ok)
+    ) as fetch:
+        result = verifier._bounded_fetch(
+            "/keys/query", payload={}, best_effort=True
+        )
+
+    fetch.assert_called_once()
+    assert result == (True, {}, requests.codes.ok)
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_fetch_response_limit():
+    """Every SAS request bounds how large a response it will accept."""
+    obj = _matrix_sas_plugin()
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+
+    with mock.patch.object(
+        obj, "_fetch", return_value=(True, {}, requests.codes.ok)
+    ) as fetch:
+        verifier._bounded_fetch("/keys/query", payload={})
+
+    assert (
+        fetch.call_args.kwargs["max_response_bytes"]
+        == matrix_sas.MAX_RESPONSE_BYTES
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_invalid_read_timeout():
+    """Invalid read timeouts use the safe polling fallback."""
+    obj = _matrix_sas_plugin()
+
+    for bad_value in (
+        float("nan"),
+        float("inf"),
+        float("-inf"),
+        0.0,
+        -5.0,
+        # Finite on its own, but 1e306 * 1000 overflows to inf -- this
+        # must be caught too, not just outright non-finite input.
+        1e306,
+    ):
+        obj.socket_read_timeout = bad_value
+        assert (
+            matrix_sas._sync_poll_ms(obj) == matrix_sas.FALLBACK_SYNC_POLL_MS
+        )
+
+    obj.socket_read_timeout = 8.0
+    assert matrix_sas._sync_poll_ms(obj) == 4000
+
+    # A tiny-but-valid timeout floors to a usable minimum poll rather
+    # than truncating toward a near-zero, busy-looping value.
+    obj.socket_read_timeout = 0.0001
+    assert matrix_sas._sync_poll_ms(obj) == matrix_sas.MIN_SYNC_POLL_MS
+
+    # The full run() loop must not raise either.
+    obj.socket_read_timeout = float("nan")
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    with mock.patch.object(
+        obj, "_fetch", return_value=(False, {}, 500)
+    ) as fetch:
+        assert verifier.run() is False
+    assert (
+        fetch.call_args.kwargs["params"]["timeout"]
+        == matrix_sas.FALLBACK_SYNC_POLL_MS
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_poll_capped_by_deadline():
+    """The verification deadline also caps each poll request."""
+    obj = _matrix_sas_plugin()
+    obj.socket_read_timeout = 600.0  # would otherwise poll for 300s
+    obj.default_autoverify_timeout_sec = 5
+
+    verifier = matrix_sas.MatrixSASAutoVerifier(obj)
+    with mock.patch.object(
+        obj, "_fetch", return_value=(False, {}, 500)
+    ) as fetch:
+        assert verifier.run() is False
+    sent_timeout = fetch.call_args.kwargs["params"]["timeout"]
+    assert sent_timeout <= 5000
+    assert sent_timeout < int(obj.socket_read_timeout * 1000 / 2)
+    obj.default_autoverify_timeout_sec = (
+        NotifyMatrix.default_autoverify_timeout_sec
+    )
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_auto_verify_fast_paths():
+    """auto_verify() short-circuits when already verified or when the
+    plugin identity is not ready yet."""
+    obj = _matrix_sas_plugin()
+    binding = obj._e2ee_binding_key()
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+    obj.store.set("e2ee_verified_binding", binding, expires=60)
+    with mock.patch.object(obj, "_fetch") as fetch:
+        assert matrix_sas.auto_verify(obj) is True
+    fetch.assert_not_called()
+
+    obj2 = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#r"],
+        e2ee=True,
+        autoverify=True,
+    )
+    assert matrix_sas.auto_verify(obj2) is False
+
+    obj3 = _matrix_sas_plugin()
+    obj3.store.set("e2ee_device_binding", "unverified", expires=60)
+    with mock.patch.object(
+        matrix_sas.MatrixSASAutoVerifier, "run", return_value=True
+    ) as run:
+        assert matrix_sas.auto_verify(obj3) is True
+    run.assert_called_once()
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_auto_verify_cooldown():
+    """A failed attempt sets a cooldown so every later send is not
+    blocked for the full timeout until it expires."""
+    obj = _matrix_sas_plugin()
+    binding = obj._e2ee_binding_key()
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+
+    with mock.patch.object(
+        matrix_sas.MatrixSASAutoVerifier, "run", return_value=False
+    ) as run:
+        assert matrix_sas.auto_verify(obj) is False
+    run.assert_called_once()
+
+    # The next call in the cooldown window returns immediately -- no new
+    # attempt, no network call.
+    with mock.patch.object(matrix_sas.MatrixSASAutoVerifier, "run") as run:
+        assert matrix_sas.auto_verify(obj) is False
+    run.assert_not_called()
+
+    # A changed identity is not blocked by another identity's cooldown.
+    obj.store.set("e2ee_device_binding", "a-different-binding", expires=60)
+    with mock.patch.object(
+        matrix_sas.MatrixSASAutoVerifier, "run", return_value=True
+    ) as run:
+        assert matrix_sas.auto_verify(obj) is True
+    run.assert_called_once()
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_auto_verify_concurrency():
+    """Let concurrent callers deliver while one caller verifies."""
+    import threading as _threading
+    import time as _time
+
+    obj = _matrix_sas_plugin()
+    obj.store.set("e2ee_device_binding", obj._e2ee_binding_key(), expires=60)
+
+    state_lock = _threading.Lock()
+    active = 0
+    max_concurrent = 0
+    calls = 0
+
+    def fake_run(_self):
+        nonlocal active, max_concurrent, calls
+        with state_lock:
+            active += 1
+            max_concurrent = max(max_concurrent, active)
+            calls += 1
+        # Long enough that a blocking wait for this call would make the
+        # elapsed-time assertion below fail.
+        _time.sleep(0.1)
+        with state_lock:
+            active -= 1
+        return True
+
+    results = []
+
+    def call_auto_verify():
+        results.append(matrix_sas.auto_verify(obj))
+
+    with mock.patch.object(matrix_sas.MatrixSASAutoVerifier, "run", fake_run):
+        threads = [
+            _threading.Thread(target=call_auto_verify) for _ in range(4)
+        ]
+        start = _time.monotonic()
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(timeout=5)
+        elapsed = _time.monotonic() - start
+
+    # The group finishes near the single verifier's running time.
+    assert elapsed < 0.3
+    assert calls == 1
+    assert max_concurrent == 1
+    assert results.count(True) == 1
+    assert results.count(False) == 3
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_refresh_concurrency():
+    """A concurrent refresh does not wait on an in-progress verification.
+
+    The verification lock can be held by a live SAS exchange for up to the
+    full attempt timeout; refreshing trust must not block behind it.
+    """
+    import time as _time
+
+    obj = _matrix_sas_plugin()
+
+    # Simulate a verification attempt already holding the lock.
+    obj._autoverify_lock.acquire()
+    try:
+        start = _time.monotonic()
+        result = matrix_sas.refresh_verified_state(obj)
+        elapsed = _time.monotonic() - start
+    finally:
+        obj._autoverify_lock.release()
+
+    assert result is False
+    assert elapsed < 0.1
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_store_verified_binding():
+    """store_verified_binding no-ops without a device binding to trust."""
+    obj = _matrix_sas_plugin()
+    assert matrix_sas.store_verified_binding(obj) is False
+
+    obj.store.set("e2ee_device_binding", "B", expires=60)
+    assert matrix_sas.store_verified_binding(obj) is True
+    assert obj.store.get("e2ee_verified_binding") == "B"
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_refresh_state():
+    """Trust refresh requires matching identities and successful writes."""
+    obj = _matrix_sas_plugin()
+    assert matrix_sas.refresh_verified_state(obj) is False
+
+    binding = obj._e2ee_binding_key()
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+    assert matrix_sas.refresh_verified_state(obj) is False
+
+    obj.store.set("e2ee_verified_binding", binding, expires=60)
+
+    obj.device_id = "OTHERDEV"
+    assert matrix_sas.refresh_verified_state(obj) is False
+    obj.device_id = "APPRISE"
+
+    with mock.patch.object(
+        obj.store, "set", side_effect=[True, False, True, True]
+    ):
+        assert matrix_sas.refresh_verified_state(obj) is False
+
+    assert matrix_sas.refresh_verified_state(obj) is True
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_sas_auto_verify_flow():
-    """The Matrix plugin drives the same-user SAS to-device flow."""
+    """Exercise the full same-user SAS event flow."""
+    import re
     from time import time
 
     from cryptography.hazmat.primitives.asymmetric.x25519 import (
@@ -2736,20 +4548,10 @@ def test_plugin_matrix_sas_auto_verify_flow():
     obj.user_id = user_id
     obj.device_id = own_device
     obj._e2ee_account = own_account
-    binding = "{}|{}|{}|{}".format(
-        user_id,
-        own_device,
-        own_account.identity_key,
-        own_account.signing_key,
-    )
+    binding = obj._e2ee_binding_key()
     obj.store.set("e2ee_device_binding", binding, expires=60)
 
     sent = []
-
-    def send_event(event_type, event_user, event_device, content):
-        sent.append((event_type, event_user, event_device, content))
-        return True
-
     sync_index = 0
 
     def fake_fetch(path, payload=None, params=None, method="POST", **kwargs):
@@ -2760,6 +4562,14 @@ def test_plugin_matrix_sas_auto_verify_flow():
                 {"device_keys": {user_id: {peer_device: peer_device_keys}}},
                 requests.codes.ok,
             )
+        if path.startswith("/sendToDevice/"):
+            assert re.match(r"^/sendToDevice/[^/]+/[0-9a-f]{32}$", path)
+            event_type = path.split("/")[2]
+            target_user, devices = next(iter(payload["messages"].items()))
+            _target_device, content = next(iter(devices.items()))
+            sent.append((event_type, target_user, content))
+            return (True, {}, requests.codes.ok)
+
         assert path == "/sync"
         if sync_index == 0:
             event_type = "m.key.verification.request"
@@ -2791,7 +4601,7 @@ def test_plugin_matrix_sas_auto_verify_flow():
             own_key_event = next(
                 item for item in sent if item[0] == "m.key.verification.key"
             )
-            own_public = own_key_event[3]["key"]
+            own_public = own_key_event[2]["key"]
             shared_secret = peer_private.exchange(
                 X25519PublicKey.from_public_bytes(_b64dec(own_public))
             )
@@ -2839,14 +4649,7 @@ def test_plugin_matrix_sas_auto_verify_flow():
             requests.codes.ok,
         )
 
-    with (
-        mock.patch.object(obj, "_fetch", side_effect=fake_fetch),
-        mock.patch.object(
-            obj,
-            "_e2ee_send_verification_event",
-            side_effect=send_event,
-        ),
-    ):
+    with mock.patch.object(obj, "_fetch", side_effect=fake_fetch):
         assert obj._e2ee_auto_verify() is True
 
     assert [item[0] for item in sent] == [
@@ -2860,10 +4663,8 @@ def test_plugin_matrix_sas_auto_verify_flow():
 
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_transport_and_persistence_guards():
-    """SAS transport and persistent binding helpers fail closed."""
-    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
-
+def test_plugin_matrix_sas_failure_allows_send():
+    """A failed SAS bootstrap does not prevent message delivery."""
     obj = NotifyMatrix(
         host="h",
         user="u",
@@ -2873,461 +4674,33 @@ def test_plugin_matrix_sas_transport_and_persistence_guards():
         autoverify=True,
         secure=True,
     )
+    obj.access_token = "token"
     obj.user_id = "@u:h"
     obj.device_id = "APPRISE"
-    obj._e2ee_account = MatrixOlmAccount()
-
-    with mock.patch.object(
-        obj, "_fetch", return_value=(True, {}, requests.codes.ok)
-    ) as fetch:
-        assert obj._e2ee_send_verification_event(
-            "m.key.verification.ready", "@u:h", "ELEMENT", {"x": 1}
-        )
-    assert fetch.call_args.args[0].startswith(
-        "/sendToDevice/m.key.verification.ready/"
-    )
-    assert fetch.call_args.kwargs["method"] == "PUT"
-
-    assert obj._e2ee_verification_cancel(None, "m.timeout", "timeout") is False
-    active = {
-        "user_id": "@u:h",
-        "device_id": "ELEMENT",
-        "transaction_id": "txn",
-    }
-    with mock.patch.object(
-        obj, "_e2ee_send_verification_event", return_value=True
-    ) as send:
-        assert obj._e2ee_verification_cancel(active, "m.timeout", "timeout")
-    assert send.call_args.args[0] == "m.key.verification.cancel"
-
-    with mock.patch.object(
-        obj, "_fetch", return_value=(False, None, requests.codes.bad_request)
-    ):
-        assert obj._e2ee_verification_peer_keys("@u:h", "ELEMENT") is None
-
-    with mock.patch.object(
-        obj,
-        "_fetch",
-        return_value=(
-            True,
-            {"device_keys": {"@u:h": {"ELEMENT": {}}}},
-            requests.codes.ok,
-        ),
-    ):
-        assert obj._e2ee_verification_peer_keys("@u:h", "ELEMENT") is None
-
-    peer = MatrixOlmAccount()
-    peer_device = peer.device_keys_payload("@u:h", "ELEMENT")
-    with mock.patch.object(
-        obj,
-        "_fetch",
-        return_value=(
-            True,
-            {
-                "device_keys": {"@u:h": {"ELEMENT": peer_device}},
-                "master_keys": {"@u:h": "invalid"},
-            },
-            requests.codes.ok,
-        ),
-    ):
-        assert obj._e2ee_verification_peer_keys("@u:h", "ELEMENT") == dict(
-            peer_device["keys"]
-        )
-
-    with mock.patch.object(obj.store, "get", return_value=None):
-        assert obj._e2ee_store_verified_binding() is False
-        assert obj._e2ee_refresh_verified_state() is False
-
-    current_binding = "{}|{}|{}|{}".format(
-        obj.user_id,
-        obj.device_id,
-        obj._e2ee_account.identity_key,
-        obj._e2ee_account.signing_key,
-    )
-    with mock.patch.object(
-        obj.store,
-        "get",
-        side_effect=lambda key: "wrong-binding",
-    ):
-        assert obj._e2ee_refresh_verified_state() is False
 
     with (
+        mock.patch.object(obj, "_e2ee_setup", return_value=True),
         mock.patch.object(
-            obj.store,
-            "get",
-            side_effect=lambda key: current_binding,
-        ),
-        mock.patch.object(obj.store, "set", return_value=False),
-    ):
-        assert obj._e2ee_refresh_verified_state() is False
-
-    with mock.patch.object(
-        obj.store,
-        "get",
-        side_effect=lambda key: current_binding,
-    ):
-        assert obj._e2ee_auto_verify() is True
-
-    obj.device_id = None
-    with mock.patch.object(obj.store, "get", return_value=None):
-        assert obj._e2ee_auto_verify() is False
-
-
-def _matrix_sas_event(event_type, content, sender="@u:h"):
-    """Build one to-device SAS event for state-machine tests."""
-    return {"type": event_type, "sender": sender, "content": content}
-
-
-def _matrix_sas_request(timestamp, transaction_id="txn"):
-    """Build one valid SAS request event."""
-    return _matrix_sas_event(
-        "m.key.verification.request",
-        {
-            "from_device": "ELEMENT",
-            "transaction_id": transaction_id,
-            "methods": ["m.sas.v1"],
-            "timestamp": timestamp,
-        },
-    )
-
-
-def _matrix_sas_start_event(transaction_id="txn", **updates):
-    """Build one SAS start event."""
-    content = _matrix_sas_start("ELEMENT", transaction_id)
-    content.update(updates)
-    return _matrix_sas_event("m.key.verification.start", content)
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_auto_verify_rejects_bad_events():
-    """Malformed, foreign, duplicate, and cancelled flows are rejected."""
-    from time import time
-
-    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
-
-    def run(events, peer_keys=True, send=True):
-        obj = NotifyMatrix(
-            host="h",
-            user="u",
-            password="pass",
-            targets=["#r"],
-            e2ee=True,
-            autoverify=True,
-            secure=True,
-        )
-        obj.user_id = "@u:h"
-        obj.device_id = "APPRISE"
-        obj._e2ee_account = MatrixOlmAccount()
-        sync_calls = 0
-
-        def fetch(path, **kwargs):
-            nonlocal sync_calls
-            assert path == "/sync"
-            sync_calls += 1
-            if sync_calls == 1:
-                return (
-                    True,
-                    {
-                        "next_batch": "next",
-                        "to_device": {"events": events},
-                    },
-                    requests.codes.ok,
-                )
-            return False, None, requests.codes.bad_request
-
-        with (
-            mock.patch.object(obj, "_fetch", side_effect=fetch),
-            mock.patch.object(
-                obj, "_e2ee_verification_peer_keys", return_value=peer_keys
-            ),
-            mock.patch.object(
-                obj, "_e2ee_send_verification_event", return_value=send
-            ) as sender,
-        ):
-            result = obj._e2ee_auto_verify()
-        return result, sender
-
-    now_ms = int(time() * 1000)
-    noise = [
-        "invalid",
-        _matrix_sas_event("unknown", {}, sender="@other:h"),
-        _matrix_sas_event("unknown", "invalid"),
-        _matrix_sas_request(None),
-        _matrix_sas_event(
-            "m.key.verification.key",
-            {"transaction_id": "unrelated", "key": "invalid"},
-        ),
-    ]
-    assert run(noise)[0] is False
-    assert run([_matrix_sas_request(now_ms)], peer_keys=None)[0] is False
-
-    result, sender = run(
-        [_matrix_sas_request(now_ms), _matrix_sas_request(now_ms)]
-    )
-    assert result is False
-    assert sender.call_args.args[0] == "m.key.verification.cancel"
-
-    assert run([_matrix_sas_request(now_ms)], send=False)[0] is False
-    result, _ = run(
-        [
-            _matrix_sas_request(now_ms),
-            _matrix_sas_event(
-                "m.key.verification.cancel",
-                {"transaction_id": "txn", "reason": "cancelled"},
-            ),
-        ]
-    )
-    assert result is False
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_auto_verify_rejects_protocol_failures():
-    """Protocol ordering, crypto, and send failures cancel verification."""
-    from time import time
-
-    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
-
-    now_ms = int(time() * 1000)
-
-    def run(events, send_results=True, sas=None):
-        obj = NotifyMatrix(
-            host="h",
-            user="u",
-            password="pass",
-            targets=["#r"],
-            e2ee=True,
-            autoverify=True,
-            secure=True,
-        )
-        obj.user_id = "@u:h"
-        obj.device_id = "APPRISE"
-        obj._e2ee_account = MatrixOlmAccount()
-        fetch = mock.Mock(
-            side_effect=[
-                (
-                    True,
-                    {"to_device": {"events": events}},
-                    requests.codes.ok,
-                ),
-                (False, None, requests.codes.bad_request),
-            ]
-        )
-        patches = [
-            mock.patch.object(obj, "_fetch", fetch),
-            mock.patch.object(
-                obj, "_e2ee_verification_peer_keys", return_value={"key": "x"}
-            ),
-            mock.patch.object(
-                obj,
-                "_e2ee_send_verification_event",
-                side_effect=(
-                    send_results if isinstance(send_results, list) else None
-                ),
-                return_value=(
-                    send_results if isinstance(send_results, bool) else True
-                ),
-            ),
-        ]
-        if sas is not None:
-            patches.append(
-                mock.patch(
-                    "apprise.plugins.matrix.base.MatrixSASVerification",
-                    return_value=sas,
-                )
-            )
-        with patches[0], patches[1], patches[2]:
-            if len(patches) == 4:
-                with patches[3]:
-                    return obj._e2ee_auto_verify()
-            return obj._e2ee_auto_verify()
-
-    request = _matrix_sas_request(now_ms)
-    assert run([request, _matrix_sas_start_event(method="invalid")]) is False
-    assert run([request, _matrix_sas_start_event()], [True, False]) is False
-    assert (
-        run(
-            [
-                request,
-                _matrix_sas_event(
-                    "m.key.verification.key",
-                    {"transaction_id": "txn", "key": "invalid"},
-                ),
-            ]
-        )
-        is False
-    )
-    assert (
-        run(
-            [
-                request,
-                _matrix_sas_start_event(),
-                _matrix_sas_event(
-                    "m.key.verification.key",
-                    {"transaction_id": "txn", "key": "invalid"},
-                ),
-            ]
-        )
-        is False
-    )
-
-    fake_sas = mock.Mock(state="mac_sent")
-    fake_sas.accept_content.return_value = {"transaction_id": "txn"}
-    fake_sas.key_content.return_value = {"transaction_id": "txn", "key": "k"}
-    fake_sas.mac_content.return_value = {"transaction_id": "txn", "mac": {}}
-    key_event = _matrix_sas_event(
-        "m.key.verification.key",
-        {"transaction_id": "txn", "key": "key"},
-    )
-    assert (
-        run(
-            [request, _matrix_sas_start_event(), key_event],
-            [True, True, False],
-            fake_sas,
-        )
-        is False
-    )
-    assert (
-        run(
-            [request, _matrix_sas_start_event(), key_event],
-            [True, True, True, False],
-            fake_sas,
-        )
-        is False
-    )
-
-    failing_mac_sas = mock.Mock(state="mac_sent")
-    failing_mac_sas.accept_content.return_value = {"transaction_id": "txn"}
-    failing_mac_sas.verify_peer_mac.side_effect = ValueError("bad MAC")
-    mac_event = _matrix_sas_event(
-        "m.key.verification.mac",
-        {"transaction_id": "txn", "mac": {}},
-    )
-    assert (
-        run(
-            [request, _matrix_sas_start_event(), mac_event],
-            True,
-            failing_mac_sas,
-        )
-        is False
-    )
-
-    valid_mac_sas = mock.Mock(state="mac_sent")
-    valid_mac_sas.accept_content.return_value = {"transaction_id": "txn"}
-    assert (
-        run(
-            [request, _matrix_sas_start_event(), mac_event],
-            [True, True, False],
-            valid_mac_sas,
-        )
-        is False
-    )
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_auto_verify_peer_done_and_timeout():
-    """Peer-first completion is accepted and active timeouts are cancelled."""
-    from apprise.plugins.matrix.e2ee import MatrixOlmAccount
-
-    obj = NotifyMatrix(
-        host="h",
-        user="u",
-        password="pass",
-        targets=["#r"],
-        e2ee=True,
-        autoverify=True,
-        secure=True,
-    )
-    obj.user_id = "@u:h"
-    obj.device_id = "APPRISE"
-    obj._e2ee_account = MatrixOlmAccount()
-    binding = "{}|{}|{}|{}".format(
-        obj.user_id,
-        obj.device_id,
-        obj._e2ee_account.identity_key,
-        obj._e2ee_account.signing_key,
-    )
-    obj.store.set("e2ee_device_binding", binding, expires=60)
-
-    fake_sas = mock.Mock(state="mac_sent")
-    fake_sas.accept_content.return_value = {"transaction_id": "txn"}
-    events = [
-        _matrix_sas_request(0),
-        _matrix_sas_start_event(),
-        _matrix_sas_event(
-            "m.key.verification.done", {"transaction_id": "txn"}
-        ),
-        _matrix_sas_event("unknown", {"transaction_id": "txn"}),
-        _matrix_sas_event("m.key.verification.mac", {"transaction_id": "txn"}),
-    ]
-    with (
-        mock.patch("apprise.plugins.matrix.base.time", return_value=0),
+            obj, "_e2ee_auto_verify", return_value=False
+        ) as verify,
+        mock.patch.object(obj, "_room_join", return_value="!r:h") as join,
+        mock.patch.object(obj, "_e2ee_room_encrypted", return_value=True),
         mock.patch.object(
-            obj,
-            "_fetch",
-            return_value=(
-                True,
-                {"to_device": {"events": events}},
-                requests.codes.ok,
-            ),
-        ),
-        mock.patch.object(
-            obj, "_e2ee_verification_peer_keys", return_value={"key": "x"}
-        ),
-        mock.patch.object(
-            obj, "_e2ee_send_verification_event", return_value=True
-        ),
-        mock.patch(
-            "apprise.plugins.matrix.base.MatrixSASVerification",
-            return_value=fake_sas,
-        ),
-    ):
-        assert obj._e2ee_auto_verify() is True
-
-    timeout_obj = NotifyMatrix(
-        host="h",
-        user="u",
-        password="pass",
-        targets=["#r"],
-        e2ee=True,
-        autoverify=True,
-        secure=True,
-    )
-    timeout_obj.user_id = "@u:h"
-    timeout_obj.device_id = "APPRISE"
-    timeout_obj._e2ee_account = MatrixOlmAccount()
-    timeout_obj.default_autoverify_timeout_sec = 1
-    with (
-        mock.patch(
-            "apprise.plugins.matrix.base.time", side_effect=[0, 0, 0, 2]
-        ),
-        mock.patch.object(
-            timeout_obj,
-            "_fetch",
-            return_value=(
-                True,
-                {"to_device": {"events": [_matrix_sas_request(0)]}},
-                requests.codes.ok,
-            ),
-        ),
-        mock.patch.object(
-            timeout_obj,
-            "_e2ee_verification_peer_keys",
-            return_value={"key": "x"},
-        ),
-        mock.patch.object(
-            timeout_obj, "_e2ee_send_verification_event", return_value=True
+            obj, "_e2ee_send_to_room", return_value=True
         ) as send,
+        mock.patch.object(
+            obj, "_e2ee_refresh_verified_state", return_value=False
+        ),
     ):
-        assert timeout_obj._e2ee_auto_verify() is False
-    assert send.call_args.args[0] == "m.key.verification.cancel"
+        assert obj._send_server_notification(body="test") is True
 
-    timeout_obj.default_autoverify_timeout_sec = 0
-    with mock.patch("apprise.plugins.matrix.base.time", return_value=0):
-        assert timeout_obj._e2ee_auto_verify() is False
+    verify.assert_called_once()
+    join.assert_called_once()
+    send.assert_called_once()
 
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_verified_state_refresh_is_minimal():
+def test_plugin_matrix_sas_refresh_is_minimal():
     """Only identity state required to retain SAS trust is refreshed."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
 
@@ -3360,6 +4733,7 @@ def test_plugin_matrix_sas_verified_state_refresh_is_minimal():
         "e2ee_account",
         "e2ee_device_binding",
         "e2ee_verified_binding",
+        "e2ee_autoverify_refreshed_at",
     ]
     assert all(
         call.kwargs["expires"] == obj.default_cache_expiry_sec
@@ -3368,8 +4742,107 @@ def test_plugin_matrix_sas_verified_state_refresh_is_minimal():
 
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_refresh_throttled():
+    """A recent refresh is skipped entirely -- no rewrite of the
+    serialized E2EE account (or anything else) on every single send."""
+    from time import time as _time
+
+    obj = _matrix_sas_plugin()
+    binding = obj._e2ee_binding_key()
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+    obj.store.set("e2ee_verified_binding", binding, expires=60)
+    obj.store.set("e2ee_autoverify_refreshed_at", _time(), expires=60)
+
+    with mock.patch.object(obj.store, "set") as store_set:
+        assert matrix_sas.refresh_verified_state(obj) is True
+    store_set.assert_not_called()
+
+    # Once the interval has genuinely elapsed, it refreshes normally.
+    obj.store.set(
+        "e2ee_autoverify_refreshed_at",
+        _time() - obj.default_autoverify_refresh_interval_sec - 1,
+        expires=60,
+    )
+    with mock.patch.object(obj.store, "set", wraps=obj.store.set) as store_set:
+        assert matrix_sas.refresh_verified_state(obj) is True
+    assert store_set.call_count == 5
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_refresh_trust_write_failure():
+    """A failed write of the trust marker itself must not be reported as
+    success, and must not go on to touch the refresh bookkeeping key."""
+    obj = _matrix_sas_plugin()
+    binding = obj._e2ee_binding_key()
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+    obj.store.set("e2ee_verified_binding", binding, expires=60)
+
+    real_set = obj.store.set
+
+    def flaky_set(key, *args, **kwargs):
+        if key == "e2ee_verified_binding":
+            return False
+        return real_set(key, *args, **kwargs)
+
+    with mock.patch.object(
+        obj.store, "set", side_effect=flaky_set
+    ) as store_set:
+        assert matrix_sas.refresh_verified_state(obj) is False
+    assert "e2ee_autoverify_refreshed_at" not in [
+        call.args[0] for call in store_set.call_args_list
+    ]
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_refresh_invalid_timestamp():
+    """A malformed refresh timestamp is treated as missing."""
+    obj = _matrix_sas_plugin()
+    binding = obj._e2ee_binding_key()
+    obj.store.set("e2ee_device_binding", binding, expires=60)
+    obj.store.set("e2ee_verified_binding", binding, expires=60)
+    obj.store.set("e2ee_autoverify_refreshed_at", "not-a-number", expires=60)
+
+    assert matrix_sas.refresh_verified_state(obj) is True
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
+def test_plugin_matrix_sas_refresh_writes_short_circuit():
+    """A failure partway through the identity refresh stops immediately
+    instead of continuing to write (and serialize) the rest regardless."""
+    obj = _matrix_sas_plugin()
+    binding = obj._e2ee_binding_key()
+
+    write_order = [
+        "device_id",
+        "e2ee_account",
+        "e2ee_device_binding",
+        "e2ee_verified_binding",
+    ]
+    for fail_at in write_order:
+        obj.store.set("e2ee_device_binding", binding, expires=60)
+        obj.store.set("e2ee_verified_binding", binding, expires=60)
+
+        def flaky_set(
+            key, *args, _fail_at=fail_at, _real_set=obj.store.set, **kwargs
+        ):
+            if key == _fail_at:
+                return False
+            return _real_set(key, *args, **kwargs)
+
+        with mock.patch.object(
+            obj.store, "set", side_effect=flaky_set
+        ) as store_set:
+            assert matrix_sas.refresh_verified_state(obj) is False
+
+        called_keys = [call.args[0] for call in store_set.call_args_list]
+        # Every key up to and including the failed one was attempted, in
+        # order, and nothing after it was.
+        assert called_keys == write_order[: write_order.index(fail_at) + 1]
+
+
+@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 @pytest.mark.parametrize("delivery_ok", [True, False])
-def test_plugin_matrix_sas_refresh_only_after_success(delivery_ok):
+def test_plugin_matrix_sas_refresh_after_success(delivery_ok):
     """A failed Matrix delivery must not extend SAS trust."""
     obj = NotifyMatrix(
         host="h",
@@ -3397,41 +4870,6 @@ def test_plugin_matrix_sas_refresh_only_after_success(delivery_ok):
         assert obj._send_server_notification(body="test") is delivery_ok
 
     assert refresh.call_count == (1 if delivery_ok else 0)
-
-
-@pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
-def test_plugin_matrix_sas_send_handles_verify_and_refresh_failures():
-    """Verification blocks delivery, while a refresh failure does not."""
-    obj = NotifyMatrix(
-        host="h",
-        user="u",
-        password="pass",
-        targets=["#r"],
-        e2ee=True,
-        autoverify=True,
-        secure=True,
-    )
-    obj.access_token = "token"
-    obj.user_id = "@u:h"
-    obj.device_id = "APPRISE"
-
-    with (
-        mock.patch.object(obj, "_e2ee_setup", return_value=True),
-        mock.patch.object(obj, "_e2ee_auto_verify", return_value=False),
-    ):
-        assert obj._send_server_notification(body="test") is False
-
-    with (
-        mock.patch.object(obj, "_e2ee_setup", return_value=True),
-        mock.patch.object(obj, "_e2ee_auto_verify", return_value=True),
-        mock.patch.object(obj, "_room_join", return_value="!r:h"),
-        mock.patch.object(obj, "_e2ee_room_encrypted", return_value=True),
-        mock.patch.object(obj, "_e2ee_send_to_room", return_value=True),
-        mock.patch.object(
-            obj, "_e2ee_refresh_verified_state", return_value=False
-        ),
-    ):
-        assert obj._send_server_notification(body="test") is True
 
 
 def test_plugin_matrix_e2ee_no_cryptography():
@@ -3530,7 +4968,7 @@ def test_plugin_matrix_e2ee_olm_session():
 
     # Decode and check the outer pre-key wire format.
     # Outer: version(0x03) | field1(OTK) | field2(EK) | field3(IK) |
-    #        field4(inner+mac) | outer_mac(8)
+    #        field4(inner+mac)
     # Inner (in field 4): version(0x03) | field1(ratchet_key) |
     #        field2(chain_index) | field4(ciphertext,tag=0x22) | inner_mac(8)
     raw = _b64dec(result["body"])
@@ -3548,17 +4986,10 @@ def test_plugin_matrix_e2ee_olm_session():
 
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_olm_roundtrip():
-    """Full Olm round-trip: Alice encrypts, Bob manually decrypts.
+    """Confirm that Bob can decrypt an Olm message from Alice.
 
-    This test implements the Bob (inbound) side of the Olm X3DH and
-    message-decryption protocol using the same cryptography primitives,
-    verifying that our Alice-side implementation produces wire bytes that
-    a conformant receiver can decrypt.
-
-    Critical invariant verified: the outer base-key (pre-key field 2)
-    equals the inner ratchet-key (normal-message field 1).  They MUST be
-    the same ephemeral key E_A or the receiver cannot reconstruct the
-    session and decryption fails.
+    The test also checks that the outer base key and inner ratchet key use
+    the same temporary key, as required for session setup.
     """
     import hmac as _hmac_stdlib
 
@@ -3669,15 +5100,8 @@ def test_plugin_matrix_e2ee_olm_roundtrip():
 
     raw = _b64dec(result["body"])
 
-    # Outer pre-key message format (Olm spec Section 5.2):
-    #   version(1) | protobuf(field1=OTK, field2=base_key,
-    #                          field3=IK, field4=inner_message)
-    #
-    # There is NO outer MAC on the pre-key message.  Only the inner
-    # normal-message (field 4) has its own 8-byte MAC appended.
-    # Reference: olm.md Section 5.2; libolm session.cpp
-    # encode_one_time_key_message_length() (no MAC bytes allocated);
-    # vodozemac src/olm/messages/pre_key.rs decode() (no MAC consumed).
+    # The outer message contains the one-time, base, identity, and inner
+    # message fields. Only the inner message has a MAC.
     assert raw[0:1] == b"\x03", "outer version must be 0x03"
 
     # Parse the full outer protobuf body (all bytes after the version byte)
@@ -3807,6 +5231,18 @@ def test_plugin_matrix_e2ee_verify_keys():
     # Missing ed25519 key entry -> False
     no_keys = {**dk, "keys": {f"curve25519:{dev}": acct.identity_key}}
     assert verify_device_keys(no_keys, uid, dev) is False
+
+    # Malformed homeserver keys must fail closed.
+    assert verify_device_keys(None, uid, dev) is False
+    assert verify_device_keys("not-a-dict", uid, dev) is False
+    assert verify_device_keys({**dk, "keys": None}, uid, dev) is False
+    assert verify_device_keys({**dk, "keys": "not-a-dict"}, uid, dev) is False
+    assert verify_device_keys({**dk, "signatures": None}, uid, dev) is False
+    assert verify_device_keys({**dk, "signatures": [1, 2]}, uid, dev) is False
+    assert (
+        verify_device_keys({**dk, "signatures": {uid: None}}, uid, dev)
+        is False
+    )
 
     # --- verify_signed_otk ---
 
@@ -6089,9 +7525,7 @@ def test_plugin_matrix_init_recovers_home_server_from_user_id(tmpdir):
     # Flush to disk before the second instance reads it.
     obj.store.flush()
 
-    # Second instance with the same credentials (same url_id) reads the store.
-    # The recovery branch (lines 506-509) should derive home_server from
-    # the stored user_id.
+    # The matching instance recovers its home server from the stored user ID.
     obj2 = NotifyMatrix(
         host="h", user="u", password="pass", targets=["#r"], asset=asset
     )
