@@ -148,8 +148,23 @@ apprise_url_tests = (
     (
         "onesignal://appid@apikey/playerid/?lang=es&subtitle=Sub",
         {
-            # Test Language and Subtitle Over-ride
+            # Test Language and Subtitle Over-ride (lang= alias)
             "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/playerid/?language=es&subtitle=Sub",
+        {
+            # Test Language and Subtitle Over-ride (language= as declared
+            # in template_args)
+            "instance": NotifyOneSignal,
+        },
+    ),
+    (
+        "onesignal://appid@apikey/playerid/?language=X",
+        {
+            # invalid language id (must be 2 characters)
+            "instance": TypeError,
         },
     ),
     (
@@ -366,6 +381,71 @@ def test_plugin_onesignal_url_round_trip():
     assert reloaded.targets["include_external_user_ids"] == ["@user"]
     assert reloaded.targets["included_segments"] == ["#segment"]
     assert reloaded.url() == url
+
+
+@mock.patch("requests.post")
+def test_plugin_onesignal_language_and_subtitle(mock_post):
+    """NotifyOneSignal() language= and subtitle= handling."""
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # language= is the argument declared in template_args; it must be honored
+    obj = Apprise.instantiate("onesignal://appid@apikey/player/?language=fr")
+    assert isinstance(obj, NotifyOneSignal)
+    assert obj.language == "fr"
+
+    # lang= remains supported as an alias
+    obj = Apprise.instantiate("onesignal://appid@apikey/player/?lang=fr")
+    assert isinstance(obj, NotifyOneSignal)
+    assert obj.language == "fr"
+
+    # When both are provided, the declared language= entry wins
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/player/?language=fr&lang=de"
+    )
+    assert isinstance(obj, NotifyOneSignal)
+    assert obj.language == "fr"
+
+    # An invalid language= is rejected the same way lang= is
+    with pytest.raises(TypeError):
+        Apprise.instantiate(
+            "onesignal://appid@apikey/player/?language=X",
+            suppress_exceptions=False,
+        )
+
+    # Both settings must survive a url() reload; previously neither was
+    # emitted, so a saved configuration silently reverted to the 'en'
+    # default and dropped the subtitle entirely.
+    obj = Apprise.instantiate(
+        "onesignal://appid@apikey/player/?language=fr&subtitle=Heads%20Up"
+    )
+    assert isinstance(obj, NotifyOneSignal)
+
+    url = obj.url()
+    assert "language=fr" in url
+    assert "subtitle=Heads%20Up" in url
+
+    reloaded = Apprise.instantiate(url)
+    assert isinstance(reloaded, NotifyOneSignal)
+    assert reloaded.language == "fr"
+    assert reloaded.subtitle == "Heads Up"
+    assert reloaded.url() == url
+
+    # The default language is not emitted, and no subtitle means no entry
+    obj = Apprise.instantiate("onesignal://appid@apikey/player")
+    assert isinstance(obj, NotifyOneSignal)
+    assert obj.language == "en"
+    assert "language=" not in obj.url()
+    assert "subtitle=" not in obj.url()
+
+    # The language keys the payload OneSignal is sent, so losing it changed
+    # what was actually delivered
+    assert reloaded.notify(title="Title", body="Body") is True
+    assert mock_post.call_count == 1
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["headings"] == {"fr": "Title"}
+    assert payload["contents"] == {"fr": "Body"}
+    assert payload["subtitle"] == {"fr": "Heads Up"}
 
 
 @mock.patch("requests.post")

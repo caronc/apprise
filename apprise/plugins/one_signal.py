@@ -160,6 +160,9 @@ class NotifyOneSignal(NotifyBase):
                 "type": "string",
                 "default": "en",
             },
+            "lang": {
+                "alias_of": "language",
+            },
             "image": {
                 "name": _("Include Image"),
                 "type": "bool",
@@ -564,6 +567,14 @@ class NotifyOneSignal(NotifyBase):
                 "yes" if (self.decode_tpl_args or needs_decoding) else "no"
             )
 
+        if self.subtitle:
+            # Our Subtitle if one was specified
+            params["subtitle"] = self.subtitle
+
+        if self.language != self.template_args["language"]["default"]:
+            # Only present our language if it differs from the default
+            params["language"] = self.language
+
         return "{schema}://{tp_id}{app}@{apikey}/{targets}?{params}".format(
             schema=self.secure_protocol,
             tp_id=(
@@ -697,7 +708,14 @@ class NotifyOneSignal(NotifyBase):
                 results["qsd"]["subtitle"]
             )
 
-        if "lang" in results["qsd"] and len(results["qsd"]["lang"]):
+        # language= is the argument declared in template_args (and the one
+        # documented); lang= is kept as an alias for backwards compatibility.
+        if "language" in results["qsd"] and len(results["qsd"]["language"]):
+            results["language"] = NotifyOneSignal.unquote(
+                results["qsd"]["language"]
+            )
+
+        elif "lang" in results["qsd"] and len(results["qsd"]["lang"]):
             results["language"] = NotifyOneSignal.unquote(
                 results["qsd"]["lang"]
             )
