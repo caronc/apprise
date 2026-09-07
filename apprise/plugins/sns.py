@@ -36,6 +36,7 @@ from xml.etree import ElementTree
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_list, validate_regex
@@ -228,7 +229,7 @@ class NotifySNS(NotifyBase):
         if not self.aws_access_key_id:
             msg = "An invalid AWS Access Key ID was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our AWS API Secret Access key
         self.aws_secret_access_key = validate_regex(secret_access_key)
@@ -238,7 +239,7 @@ class NotifySNS(NotifyBase):
                 f"({secret_access_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire our AWS Region Name:
         # eg. us-east-1, cn-north-1, us-west-2, ...
@@ -248,7 +249,7 @@ class NotifySNS(NotifyBase):
         if not self.aws_region_name:
             msg = f"An invalid AWS Region ({region_name}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Initialize topic list
         self.topics = []
@@ -297,7 +298,7 @@ class NotifySNS(NotifyBase):
             if self.mode not in SNS_MODES:
                 msg = f"The AWS SNS mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Auto-detect: topic mode when all targets are SNS topics

@@ -40,6 +40,7 @@ import requests
 
 from apprise import Apprise
 from apprise.common import NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.wechat import (
     WECHAT_ERROR_CODES,
     WECHAT_TOKEN_ERROR_CODES,
@@ -77,28 +78,28 @@ apprise_url_tests = (
         "wechat://",
         {
             # No credentials at all
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Missing corpsecret and agentid
         "wechat://{}".format(CORPID),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Missing agentid (non-numeric host provided as port only)
         "wechat://{}:{}@".format(CORPID, CORPSECRET),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Non-numeric agentid
         "wechat://{}:{}@notanumber".format(CORPID, CORPSECRET),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # ----------------------------------------------------------------
@@ -259,20 +260,20 @@ def test_plugin_wechat_init():
     with (
         mock.patch("apprise.plugins.wechat.validate_regex", return_value=None),
         mock.patch.object(NotifyWeChat, "logger"),
-        pytest.raises(TypeError),
+        pytest.raises(AppriseImproperlyConfigured),
     ):
         NotifyWeChat(corpid="", corpsecret=CORPSECRET, agentid=AGENTID)
 
     # corpsecret is required
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWeChat(corpid=CORPID, corpsecret="", agentid=AGENTID)
 
     # agentid must be numeric
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWeChat(corpid=CORPID, corpsecret=CORPSECRET, agentid="notnum")
 
     # agentid=None must be rejected
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWeChat(corpid=CORPID, corpsecret=CORPSECRET, agentid=None)
 
     # Invalid targets are silently dropped; valid ones are kept

@@ -36,6 +36,7 @@ from itertools import chain
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, is_phone_no, parse_list, validate_regex
@@ -147,20 +148,20 @@ class NotifyThreema(NotifyBase):
         if not self.user:
             msg = "Threema Gateway ID must be specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Verify our Gateway ID
         if len(self.user) != 8:
             msg = "Threema Gateway ID must be 8 characters in length"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Verify our secret
         self.secret = validate_regex(secret)
         if not self.secret:
             msg = f"An invalid Threema API Secret ({secret}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets
         self.targets = []

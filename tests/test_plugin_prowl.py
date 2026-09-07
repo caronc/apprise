@@ -34,6 +34,7 @@ import pytest
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.prowl import NotifyProwl, ProwlPriority
 
 logging.disable(logging.CRITICAL)
@@ -43,21 +44,21 @@ apprise_url_tests = (
     (
         "prowl://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # bad url
     (
         "prowl://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid API Key
     (
         "prowl://%s" % ("a" * 20),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provider Key
@@ -71,7 +72,7 @@ apprise_url_tests = (
     (
         "prowl://{}/{}".format("a" * 40, "b" * 20),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no device
@@ -176,16 +177,16 @@ def test_plugin_prowl():
 def test_plugin_prowl_edge_cases():
     """NotifyProwl() Edge Cases."""
     # Initializes the plugin with an invalid apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyProwl(apikey=None)
     # Whitespace also acts as an invalid apikey value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyProwl(apikey="  ")
 
     # Whitespace also acts as an invalid provider key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyProwl(apikey="abcd", providerkey=object())
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyProwl(apikey="abcd", providerkey="  ")
 
 

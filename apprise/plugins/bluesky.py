@@ -40,6 +40,7 @@ import requests
 
 from ..attachment.base import AttachBase
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from .base import NotifyBase
@@ -142,7 +143,7 @@ class NotifyBlueSky(NotifyBase):
         if not self.user:
             msg = "A BlueSky UserID/Handle must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Set our default host
         self.host = self.bluesky_default_host

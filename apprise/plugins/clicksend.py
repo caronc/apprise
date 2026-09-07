@@ -43,6 +43,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
@@ -147,7 +148,7 @@ class NotifyClickSend(NotifyBase):
         if not (self.user and self.password):
             msg = "A ClickSend user/pass was not provided."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         for target in parse_phone_no(targets):
             # Validate targets and drop bad ones:

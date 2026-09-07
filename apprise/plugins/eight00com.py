@@ -53,6 +53,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from .base import NotifyBase
@@ -158,14 +159,14 @@ class NotifyEight00com(NotifyBase):
         if not self.token:
             msg = "An 800.com Personal Access Token must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate the from (source) phone number
         result = is_phone_no(source)
         if not result:
             msg = "The 800.com from phone # ({}) is invalid.".format(source)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our source number as digits only
         self.source = result["full"]

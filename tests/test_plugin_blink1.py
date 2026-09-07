@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.blink1 import (
     BLINK1_DEFAULT_DURATION_MS,
     BLINK1_DEFAULT_FADE_MS,
@@ -121,46 +122,46 @@ apprise_url_tests = (
             "instance": NotifyBlink1,
         },
     ),
-    # Non-numeric duration -> TypeError
+    # Non-numeric duration
     (
         "blink1://?duration=abc",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
-    # Negative duration -> TypeError
+    # Negative duration
     (
         "blink1://?duration=-1",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
-    # Duration exceeds maximum -> TypeError
+    # Duration above the maximum
     (
         f"blink1://?duration={BLINK1_MAX_DURATION_MS + 1}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
-    # Non-numeric fade -> TypeError
+    # Non-numeric fade
     (
         "blink1://?fade=abc",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
-    # Negative fade -> TypeError
+    # Negative fade
     (
         "blink1://?fade=-1",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
-    # Fade exceeds maximum -> TypeError
+    # Fade above the maximum
     (
         f"blink1://?fade={BLINK1_MAX_FADE_MS + 1}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )

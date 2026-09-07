@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.zoom import (
     ZOOM_MODE_DEFAULT,
     NotifyZoom,
@@ -52,21 +53,21 @@ apprise_url_tests = (
     (
         "zoom://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Empty user/host segment
     (
         "zoom://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing token (webhook_id present but no path segment)
     (
         "zoom://{}".format(WEBHOOK_ID),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid full-mode (default)
@@ -97,7 +98,7 @@ apprise_url_tests = (
     (
         "zoom://{}/{}?mode=invalid".format(WEBHOOK_ID, TOKEN),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Native URL with ?token= query param
@@ -173,35 +174,35 @@ def test_plugin_zoom_init():
     """Test NotifyZoom initialization and validation."""
 
     # Missing webhook_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id=None, token=TOKEN)
 
     # Empty webhook_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id="", token=TOKEN)
 
     # Webhook ID with invalid characters (slash)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id="bad/id", token=TOKEN)
 
     # Missing token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id=WEBHOOK_ID, token=None)
 
     # Empty token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id=WEBHOOK_ID, token="")
 
     # Invalid mode
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="bogus")
 
     # Empty string mode is also invalid (must not silently resolve to simple)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="")
 
     # Whitespace-only mode is also invalid
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZoom(webhook_id=WEBHOOK_ID, token=TOKEN, mode="   ")
 
     # Valid: default mode

@@ -40,6 +40,7 @@ import yaml
 
 from apprise import Apprise, AppriseAsset, AppriseConfig, ConfigFormat
 from apprise.config import ConfigBase
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.email import NotifyEmail
 from apprise.utils.time import zoneinfo
 
@@ -87,11 +88,11 @@ def test_config_base():
     """
 
     # invalid types throw exceptions
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         ConfigBase(**{"format": "invalid"})
 
     # Config format types are not the same as ConfigBase ones
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         ConfigBase(**{"format": "markdown"})
 
     cb = ConfigBase(**{"format": "yaml"})

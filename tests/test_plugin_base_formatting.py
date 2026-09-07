@@ -44,6 +44,7 @@ from apprise import (
     NotifyFormat,
     OverflowMode,
 )
+from apprise.exception import AppriseImproperlyConfigured
 
 logging.disable(logging.CRITICAL)
 
@@ -116,7 +117,7 @@ def test_notify_overflow_truncate_with_amalgamation():
             return True
 
     # We should throw an exception because our specified overflow is wrong.
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # Load our object
         obj = TestNotification(overflow="invalid")
 
@@ -347,7 +348,7 @@ def test_notify_overflow_truncate_no_amalgamation():
             return True
 
     # We should throw an exception because our specified overflow is wrong.
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # Load our object
         obj = TestNotification(overflow="invalid")
 

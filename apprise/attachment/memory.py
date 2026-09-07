@@ -34,6 +34,7 @@ import uuid
 
 from .. import exception
 from ..common import ContentLocation
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from .base import AttachBase
 
@@ -77,7 +78,7 @@ class AttachMemory(AttachBase):
                 name = str(uuid.uuid4()) + ".txt"
 
         elif not isinstance(content, bytes):
-            raise TypeError(
+            raise AppriseImproperlyConfigured(
                 "Provided content for memory attachment is invalid"
             )
 

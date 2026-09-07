@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sinch import NotifySinch
 
 logging.disable(logging.CRITICAL)
@@ -45,28 +46,28 @@ apprise_url_tests = (
         "sinch://",
         {
             # No Account SID specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sinch://:@/",
         {
             # invalid Auth token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sinch://{}@12345678".format("a" * 32),
         {
             # Just spi provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sinch://{}:{}@_".format("a" * 32, "b" * 32),
         {
             # spi and token provided but invalid from
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -83,7 +84,7 @@ apprise_url_tests = (
         "sinch://{}:{}@{}".format("a" * 32, "b" * 32, "3" * 9),
         {
             # spi and token provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -130,7 +131,7 @@ apprise_url_tests = (
         "sinch://{}:{}@{}?region=invalid".format("a" * 32, "b" * 32, "5" * 11),
         {
             # Invalid region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -206,11 +207,11 @@ def test_plugin_sinch_edge_cases(mock_post):
     source = "+1 (555) 123-3456"
 
     # No service_plan_id specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySinch(service_plan_id=None, api_token=api_token, source=source)
 
     # No api_token specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySinch(
             service_plan_id=service_plan_id, api_token=None, source=source
         )

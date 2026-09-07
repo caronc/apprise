@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise.common import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.notifico import NotificoMode, NotifyNotifico
 
 logging.disable(logging.CRITICAL)
@@ -44,27 +45,27 @@ apprise_url_tests = (
     (
         "notifico://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "notifico://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "notifico://1234",
         {
             # Just a project id provided (no message token)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "notifico://abcd/ckhrjW8w672m6HG",
         {
             # an invalid project id provided (not all digits)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -178,7 +179,7 @@ apprise_url_tests = (
     (
         "notifico://example.com/abcd/ckhrjW8w672m6HG",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -368,22 +369,22 @@ def test_plugin_notifico_selfhosted_https(mock_get):
 
 @mock.patch("requests.get")
 def test_plugin_notifico_invalid_params(mock_get):
-    """NotifyNotifico() invalid init parameters raise TypeError."""
+    """NotifyNotifico() rejects invalid initialization parameters."""
 
     # Invalid project_id (not all digits)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifico(project_id="abc", msghook="validhook")
 
     # Invalid msghook (contains special characters)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifico(project_id="1234", msghook="bad hook!")
 
     # None project_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifico(project_id=None, msghook="validhook")
 
     # None msghook
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifico(project_id="1234", msghook=None)
 
     # No HTTP calls should have been made

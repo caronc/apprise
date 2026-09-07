@@ -47,6 +47,7 @@ from typing import Any, Optional
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import validate_regex
@@ -215,21 +216,21 @@ class NotifyPinglet(NotifyBase):
         if not self.token:
             msg = f"An invalid Pinglet API Key ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Namespace the topic resides in
         self.namespace = validate_regex(namespace)
         if not self.namespace:
             msg = f"An invalid Pinglet Namespace ({namespace}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Topic to publish to (auto-created on first publish)
         self.topic = validate_regex(topic)
         if not self.topic:
             msg = f"An invalid Pinglet Topic ({topic}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # prepare our fullpath
         self.fullpath = kwargs.get("fullpath")

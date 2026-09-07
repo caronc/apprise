@@ -30,6 +30,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS
@@ -222,7 +223,7 @@ class NotifyForm(NotifyBase):
         if self.method not in METHODS:
             msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Custom File Attachment Over-Ride Support
         if not isinstance(attach_as, str):
@@ -235,7 +236,7 @@ class NotifyForm(NotifyBase):
             if not result:
                 msg = f"The attach-as specified ({attach_as}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.attach_as = ""
             self.attach_multi_support = False

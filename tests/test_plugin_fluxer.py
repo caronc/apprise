@@ -42,6 +42,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.common import OverflowMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.fluxer import NotifyFluxer
 
 logging.disable(logging.CRITICAL)
@@ -63,21 +64,21 @@ apprise_url_tests = (
     (
         "fluxer://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "fluxer://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No webhook_token specified
     (
         "fluxer://%s" % ("0" * 10),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide both a webhook id and a webhook token
@@ -161,7 +162,7 @@ apprise_url_tests = (
         # Invalid Mode
         "fluxer://jack@{}/{}?mode=invalid".format(*_tokens()),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -214,14 +215,14 @@ apprise_url_tests = (
         "fluxer://{}/{}?flags=-1".format(*_tokens()),
         {
             # invalid flags specified (variation 1)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "fluxer://{}/{}?flags=invalid".format(*_tokens()),
         {
             # invalid flags specified (variation 2)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # different format support
@@ -456,14 +457,14 @@ def test_plugin_fluxer_429(
     webhook_id, webhook_token = _tokens()
 
     # Basic construction checks (keep these, they match plugin validation)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=None, webhook_token=webhook_token)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id="  ", webhook_token=webhook_token)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=webhook_id, webhook_token=None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=webhook_id, webhook_token="   ")
 
     obj = NotifyFluxer(
@@ -638,18 +639,18 @@ def test_plugin_fluxer_general(
     mock_post.return_value.content = ""
 
     # Invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(webhook_id=webhook_id, webhook_token=None)
 
     # Private mode but no hostname provided
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFluxer(
             webhook_id=webhook_id,
             webhook_token=webhook_token,

@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.webexteams import (
     NotifyWebexTeams,
     WebexTeamsMode,
@@ -65,7 +66,7 @@ apprise_url_tests = (
         "wxteams://",
         {
             # Token missing
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -74,7 +75,7 @@ apprise_url_tests = (
             # We don't have strict host checking on for wxteams, so this
             # URL actually becomes parseable and :@ becomes a hostname.
             # The below errors because a second token wasn't found
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -158,7 +159,7 @@ apprise_url_tests = (
     (
         "wxteams://{}?mode=invalid".format("a" * 80),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Webhook mode: HTTP 500 response
@@ -274,12 +275,12 @@ def test_plugin_webex_teams_webhook_mode():
     assert obj_long.mode == WebexTeamsMode.BOT
     assert obj_long.send(body="test") is False
 
-    # No token -> TypeError (no candidate at all)
-    with pytest.raises(TypeError):
+    # No token candidate is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWebexTeams(token=None)
 
-    # Empty token -> TypeError
-    with pytest.raises(TypeError):
+    # An empty token is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWebexTeams(token="")
 
     # Non-alphanumeric chars -> falls to bot mode (no targets)
@@ -330,12 +331,12 @@ def test_plugin_webex_teams_bot_mode():
     assert isinstance(obj_no_rooms, NotifyWebexTeams)
     assert obj_no_rooms.send(body="test") is False
 
-    # No access_token -> TypeError
-    with pytest.raises(TypeError):
+    # An access token is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWebexTeams(access_token=None, targets=[ROOM_ID])
 
-    # Explicit bot mode with neither token nor access_token -> TypeError
-    with pytest.raises(TypeError):
+    # Bot mode requires a token or access token.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWebexTeams(mode="bot", targets=[ROOM_ID])
 
     # Explicit mode=bot on a short (webhook-style) token
@@ -345,7 +346,7 @@ def test_plugin_webex_teams_bot_mode():
     assert obj4.access_token == "a" * 80
 
     # Invalid mode
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWebexTeams(
             access_token=BOT_TOKEN,
             targets=[ROOM_ID],

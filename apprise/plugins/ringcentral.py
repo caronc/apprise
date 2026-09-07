@@ -68,6 +68,7 @@ from time import time
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
@@ -296,7 +297,7 @@ class NotifyRingCentral(NotifyBase):
                     "({}) was specified.".format(mode)
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Store resolved mode
             self.mode = match
@@ -316,7 +317,7 @@ class NotifyRingCentral(NotifyBase):
                 )
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate Client Secret
         self.client_secret = validate_regex(
@@ -328,7 +329,7 @@ class NotifyRingCentral(NotifyBase):
                 "({}) was specified.".format(client_secret)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate JWT token (only strict regex check in JWT mode)
         if self.mode == RingCentralAuthMode.JWT:
@@ -339,7 +340,7 @@ class NotifyRingCentral(NotifyBase):
                     "({}) was specified.".format(token)
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             # BASIC mode -- token holds the user password (not validated)
             self.token = token
@@ -352,7 +353,7 @@ class NotifyRingCentral(NotifyBase):
                 "({}) is invalid.".format(source)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store normalised source digits only
         self.source = result["full"]
@@ -381,7 +382,7 @@ class NotifyRingCentral(NotifyBase):
                 "({}) was specified.".format(environment)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store resolved environment
         self.environment = match

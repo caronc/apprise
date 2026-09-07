@@ -32,6 +32,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS
@@ -205,7 +206,7 @@ class NotifyXML(NotifyBase):
         if self.method not in METHODS:
             msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # A payload map allows users to over-ride the default mapping if
         # they're detected with the :overide=value.  Normally this would

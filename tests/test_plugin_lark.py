@@ -4,6 +4,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.lark import NotifyLark
 
 logging.disable(logging.CRITICAL)
@@ -14,7 +15,7 @@ apprise_url_tests = (
         "lark://",
         {
             # Teams Token missing
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -23,7 +24,7 @@ apprise_url_tests = (
             # We don't have strict host checking on for lark, so this URL
             # actually becomes parseable and :@ becomes a hostname.
             # The below errors because a second token wasn't found
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

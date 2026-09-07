@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAsset, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushward import NotifyPushWard, pushward_level
 
 logging.disable(logging.CRITICAL)
@@ -46,14 +47,14 @@ apprise_url_tests = (
         "pushward://",
         {
             # No API Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushward://invalid",
         {
             # API Key does not match the hlk_ pattern
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -93,28 +94,28 @@ apprise_url_tests = (
         "pushward://hlk_abc123?info=bogus",
         {
             # An invalid per-type level
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushward://hlk_abc123?level=invalid",
         {
             # Invalid level provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushward://hlk_abc123?volume=2.0",
         {
             # Volume out of range
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushward://hlk_abc123?volume=invalid",
         {
             # Volume that cannot be parsed as a float
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -157,31 +158,31 @@ def test_plugin_pushward_edge_cases():
     """NotifyPushWard() Edge Cases."""
 
     # No API Key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey=None)
 
     # Whitespace only API Key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey="  ")
 
     # API Key that does not match the hlk_ pattern
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey="invalid")
 
     # Invalid level
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey="hlk_abc123", level="invalid")
 
     # Volume above the allowable range
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey="hlk_abc123", volume=2.0)
 
     # Volume below the allowable range
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey="hlk_abc123", volume=-0.5)
 
     # Volume that cannot be coerced to a float
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushWard(apikey="hlk_abc123", volume="invalid")
 
 

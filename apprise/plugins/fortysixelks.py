@@ -42,6 +42,7 @@ from typing import Any, Optional
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -147,12 +148,12 @@ class Notify46Elks(NotifyBase):
         if not self.password:
             msg = "No 46elks password was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         elif not self.user:
             msg = "No 46elks user was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets
         self.targets = []

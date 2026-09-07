@@ -56,6 +56,7 @@ import requests
 from ..apprise_attachment import AppriseAttachment
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -277,7 +278,7 @@ class NotifyDiscord(NotifyBase):
                 f"An invalid Discord Webhook ID ({webhook_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Webhook Token (associated with project)
         self.webhook_token = validate_regex(webhook_token)
@@ -287,7 +288,7 @@ class NotifyDiscord(NotifyBase):
                 f"({webhook_token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Text To Speech
         self.tts = tts
@@ -331,7 +332,7 @@ class NotifyDiscord(NotifyBase):
                     "specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
         else:
             self.flags = None
 
@@ -364,7 +365,7 @@ class NotifyDiscord(NotifyBase):
                 # add() failed (unsupported schema, unparseable URL, etc.)
                 msg = "The Discord template specified could not be loaded."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Enforce maximum file size
             self.template[0].max_file_size = self.max_discord_template_size
@@ -380,7 +381,7 @@ class NotifyDiscord(NotifyBase):
                 f"({tokens}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # else: NoneType - this is okay
 

@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.nextcloudtalk import NotifyNextcloudTalk
 
 logging.disable(logging.CRITICAL)
@@ -64,21 +65,21 @@ apprise_url_tests = (
         "nctalk://localhost",
         {
             # No user and password and roomid specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nctalk://localhost/roomid",
         {
             # No user and password specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nctalk://user@localhost/roomid",
         {
             # No password specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

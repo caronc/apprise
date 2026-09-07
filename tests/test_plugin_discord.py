@@ -41,6 +41,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.common import OverflowMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.discord import NotifyDiscord
 
 logging.disable(logging.CRITICAL)
@@ -53,21 +54,21 @@ apprise_url_tests = (
     (
         "discord://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "discord://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No webhook_token specified
     (
         "discord://%s" % ("i" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide both an webhook id and a webhook token
@@ -177,14 +178,14 @@ apprise_url_tests = (
         "discord://{}/{}?flags=-1".format("i" * 24, "t" * 64),
         {
             # invalid flags specified (variation 1)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "discord://{}/{}?flags=invalid".format("i" * 24, "t" * 64),
         {
             # invalid flags specified (variation 2)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # different format support
@@ -543,17 +544,17 @@ def test_plugin_discord_general(mock_sleep, mock_post):
     }
 
     # Invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id=webhook_id, webhook_token=None)
     # Invalid webhook token (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(webhook_id=webhook_id, webhook_token="   ")
 
     obj = NotifyDiscord(
@@ -1431,12 +1432,12 @@ def test_plugin_discord_template_tokens(tmpdir):
 
 
 def test_plugin_discord_template_token_invalid():
-    """NotifyDiscord() non-dict tokens raises TypeError."""
+    """NotifyDiscord() rejects template tokens that are not a dictionary."""
 
     webhook_id = "A" * 24
     webhook_token = "B" * 64
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDiscord(
             webhook_id=webhook_id,
             webhook_token=webhook_token,
@@ -1445,7 +1446,7 @@ def test_plugin_discord_template_token_invalid():
 
 
 def test_plugin_discord_template_add_failure():
-    """NotifyDiscord() template add() failure raises TypeError."""
+    """NotifyDiscord() rejects a template attachment it cannot add."""
 
     webhook_id = "A" * 24
     webhook_token = "B" * 64
@@ -1456,7 +1457,7 @@ def test_plugin_discord_template_add_failure():
             "apprise.plugins.discord.AppriseAttachment.add",
             return_value=False,
         ),
-        pytest.raises(TypeError),
+        pytest.raises(AppriseImproperlyConfigured),
     ):
         NotifyDiscord(
             webhook_id=webhook_id,
