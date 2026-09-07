@@ -36,6 +36,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -221,13 +222,13 @@ class NotifyBrevo(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Brevo API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_email(from_email)
         if not result:
             msg = f"Invalid ~From~ email specified: {from_email}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store email address
         self.from_email = result["full_email"]
@@ -241,7 +242,7 @@ class NotifyBrevo(NotifyBase):
                     f"{reply_to}"
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.reply_to = (
                 result["name"] if result["name"] else False,

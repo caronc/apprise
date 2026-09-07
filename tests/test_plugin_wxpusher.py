@@ -36,6 +36,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.wxpusher import NotifyWxPusher
 
 logging.disable(logging.CRITICAL)
@@ -53,21 +54,21 @@ apprise_url_tests = (
         "wxpusher://",
         {
             # No token specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "wxpusher://:@/",
         {
             # invalid url
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "wxpusher://invalid",
         {
             # invalid app token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

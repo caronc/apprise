@@ -36,6 +36,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.custom_json import NotifyJSON
 
 logging.disable(logging.CRITICAL)
@@ -72,7 +73,7 @@ apprise_url_tests = (
     (
         "json://user@localhost?method=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

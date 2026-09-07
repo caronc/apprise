@@ -33,6 +33,7 @@
 import time
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from .base import NotifyBase
 
@@ -234,7 +235,7 @@ class NotifyBlink1(NotifyBase):
                 <= self.duration
                 <= BLINK1_MAX_DURATION_MS
             ):
-                raise ValueError("out of range")
+                raise AppriseImproperlyConfigured("out of range")
 
         except (TypeError, ValueError):
             msg = (
@@ -243,13 +244,13 @@ class NotifyBlink1(NotifyBase):
                 f" {BLINK1_MAX_DURATION_MS} ms."
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Fade transition time (ms)
         try:
             self.fade = int(BLINK1_DEFAULT_FADE_MS if fade is None else fade)
             if not (BLINK1_MIN_FADE_MS <= self.fade <= BLINK1_MAX_FADE_MS):
-                raise ValueError("out of range")
+                raise AppriseImproperlyConfigured("out of range")
 
         except (TypeError, ValueError):
             msg = (
@@ -257,7 +258,7 @@ class NotifyBlink1(NotifyBase):
                 f" {BLINK1_MIN_FADE_MS} and {BLINK1_MAX_FADE_MS} ms."
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # LED selector; unrecognised values silently fall back to ALL
         self.ledn = (

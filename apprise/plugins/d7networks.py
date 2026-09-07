@@ -39,6 +39,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -178,7 +179,7 @@ class NotifyD7Networks(NotifyBase):
         if not self.token:
             msg = f"The D7 Networks token specified ({token}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets
         self.targets = []

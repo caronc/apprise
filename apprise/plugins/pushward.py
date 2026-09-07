@@ -48,6 +48,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -211,7 +212,7 @@ class NotifyPushWard(NotifyBase):
                 f"({apikey}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # An explicit level forces every notification to that level
         self.level = None
@@ -220,7 +221,7 @@ class NotifyPushWard(NotifyBase):
             if self.level is None:
                 msg = f"An invalid PushWard level ({level}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Per-notification-type level mapping; each type may be overridden from
         # the URL, otherwise it falls back to the default
@@ -239,7 +240,7 @@ class NotifyPushWard(NotifyBase):
             if resolved is None:
                 msg = f"An invalid PushWard level ({value}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
             self.level_map[ntype] = resolved
 
         # Acquire our volume (only applied to critical notifications)
@@ -250,12 +251,12 @@ class NotifyPushWard(NotifyBase):
             except (ValueError, TypeError):
                 msg = f"An invalid PushWard volume ({volume}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
             if self.volume < 0.0 or self.volume > 1.0:
                 msg = f"An invalid PushWard volume ({volume}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.volume = None
 

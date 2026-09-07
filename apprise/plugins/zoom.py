@@ -62,6 +62,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -169,7 +170,7 @@ class NotifyZoom(NotifyBase):
         },
     )
 
-    def __init__(self, webhook_id, token, mode=None, **kwargs):
+    def __init__(self, webhook_id=None, token=None, mode=None, **kwargs):
         """Initialize Zoom Object."""
         super().__init__(**kwargs)
 
@@ -182,14 +183,14 @@ class NotifyZoom(NotifyBase):
                 " characters."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our verification token
         self.token = validate_regex(token)
         if not self.token:
             msg = "A Zoom verification token must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate notification mode
         if mode is None:
@@ -213,7 +214,7 @@ class NotifyZoom(NotifyBase):
             if not self.mode:
                 msg = "The Zoom mode ({}) is invalid.".format(mode)
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
     def send(
         self,

@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.octopush import NotifyOctopush
 
 logging.disable(logging.CRITICAL)
@@ -44,42 +45,42 @@ apprise_url_tests = (
         "octopush://",
         {
             # No API Login or API Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "octopush://:@/",
         {
             # Invalid API Login
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "octopush://user@myaccount.com",
         {
             # Valid API Login, but no API Key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "octopush://_/apikey?login=invalid",
         {
             # Invalid login
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "octopush://user@myaccount.com/%20",
         {
             # Valid API Login, but invalid API Key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "octopush://%20:user@myaccount.com/apikey",
         {
             # All valid entries, but invalid sender
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -124,7 +125,7 @@ apprise_url_tests = (
         "&purpose=invalid",
         {
             # Testing invalid purpose change
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -141,7 +142,7 @@ apprise_url_tests = (
         "&type=invalid",
         {
             # Testing invalid type change
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -210,7 +211,7 @@ def test_plugin_octopush_parse_url_and_validation():
 
     assert NotifyOctopush.parse_url(None) is None
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyOctopush(
             api_login="user@myaccount.com",
             api_key="apikey",

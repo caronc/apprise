@@ -36,6 +36,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.notifiarr import NotifyNotifiarr
 
 logging.disable(logging.CRITICAL)
@@ -45,13 +46,13 @@ apprise_url_tests = (
     (
         "notifiarr://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "notifiarr://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -67,7 +68,7 @@ apprise_url_tests = (
     (
         "notifiarr://apikey/1234/?event=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

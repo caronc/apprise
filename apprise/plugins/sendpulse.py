@@ -39,6 +39,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -249,7 +250,7 @@ class NotifySendPulse(NotifyBase):
                 else "{}".format(from_addr_[1])
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our lookup
         self.from_addr = from_addr_[1]
@@ -264,7 +265,7 @@ class NotifySendPulse(NotifyBase):
                 client_id
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Client Secret
         self.client_secret = validate_regex(
@@ -276,7 +277,7 @@ class NotifySendPulse(NotifyBase):
                 "({}) was specified.".format(client_secret)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Targets (To Emails)
         self.targets = []
@@ -301,7 +302,7 @@ class NotifySendPulse(NotifyBase):
                     f" ({template}) is invalid."
                 )
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         # Now our dynamic template data (if defined)
         self.template_data = (

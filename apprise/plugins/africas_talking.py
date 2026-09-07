@@ -33,6 +33,7 @@
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -207,7 +208,7 @@ class NotifyAfricasTalking(NotifyBase):
                 " invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.apikey = validate_regex(
             apikey, *self.template_tokens["apikey"]["regex"]
@@ -217,7 +218,7 @@ class NotifyAfricasTalking(NotifyBase):
                 f"The Africas Talking apikey specified ({apikey}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare Sender
         self.sender = (
@@ -250,7 +251,7 @@ class NotifyAfricasTalking(NotifyBase):
                     f"The Africas Talking mode specified ({mode}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.mode = self.template_args["mode"]["default"]
 

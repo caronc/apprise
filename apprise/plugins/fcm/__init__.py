@@ -53,6 +53,7 @@ import requests
 
 from ...apprise_attachment import AppriseAttachment
 from ...common import NotifyImageSize, NotifyType
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...utils.logic import dict_full_update
 from ...utils.parse import parse_bool, parse_list, validate_regex
@@ -248,7 +249,7 @@ class NotifyFCM(NotifyBase):
             if self.mode and self.mode not in FCM_MODES:
                 msg = f"The FCM mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Used for Legacy Mode; this is the Web API Key retrieved from the
         # User Panel
@@ -275,12 +276,12 @@ class NotifyFCM(NotifyBase):
             if not self.project:
                 msg = f"An invalid FCM Project ID ({project}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             if not keyfile:
                 msg = "No FCM JSON KeyFile was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Our keyfile object is just an AppriseAttachment object
             self.keyfile = AppriseAttachment(asset=self.asset)
@@ -295,7 +296,7 @@ class NotifyFCM(NotifyBase):
             if not self.apikey:
                 msg = f"An invalid FCM API key ({apikey}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Acquire Device IDs to notify
         self.targets = parse_list(targets)

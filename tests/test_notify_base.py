@@ -38,6 +38,7 @@ import pytest
 
 from apprise import AppriseAsset, NotifyFormat, NotifyImageSize, NotifyType
 from apprise.common import OverflowMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -50,11 +51,11 @@ def test_notify_base():
     """
 
     # invalid types throw exceptions
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBase(**{"format": "invalid"})
 
     # invalid types throw exceptions
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBase(**{"overflow": "invalid"})
 
     # Bad port information

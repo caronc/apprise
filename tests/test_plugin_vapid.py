@@ -39,6 +39,7 @@ import requests
 
 from apprise import asset, exception, url
 from apprise.common import PersistentStoreMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.vapid import NotifyVapid
 from apprise.plugins.vapid.subscription import (
     WebPushSubscription,
@@ -61,20 +62,20 @@ apprise_url_tests = (
     (
         "vapid://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vapid://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vapid://invalid-subscriber",
         {
             # An invalid Subscriber
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -289,7 +290,7 @@ def test_plugin_vapid_urls_with_required_assets(
             "vapid://user@example.com/user1?to=user2&ttl=-4000",
             {
                 # bad ttl
-                "instance": TypeError,
+                "instance": AppriseImproperlyConfigured,
             },
         ),
         (
@@ -303,14 +304,14 @@ def test_plugin_vapid_urls_with_required_assets(
             "vapid://user@example.com/user1?to=user2&mode=",
             {
                 # test mode
-                "instance": TypeError,
+                "instance": AppriseImproperlyConfigured,
             },
         ),
         (
             "vapid://user@example.com/user1?to=user2&mode=invalid",
             {
                 # test mode more
-                "instance": TypeError,
+                "instance": AppriseImproperlyConfigured,
             },
         ),
         (

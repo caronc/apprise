@@ -36,6 +36,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.smseagle import NotifySMSEagle
 
 logging.disable(logging.CRITICAL)
@@ -63,28 +64,28 @@ apprise_url_tests = (
         "smseagle://",
         {
             # No host specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smseagle://:@/",
         {
             # invalid host
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smseagle://localhost",
         {
             # Just a host provided (no access token)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smseagle://%20@localhost",
         {
             # invalid token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -154,7 +155,7 @@ apprise_url_tests = (
         "smseagle://token@localhost/@user/?priority=invalid",
         {
             # Invalid Priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid priority
@@ -162,7 +163,7 @@ apprise_url_tests = (
         "smseagle://token@localhost/@user/?priority=25",
         {
             # Invalid Priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

@@ -32,6 +32,7 @@ from unittest import mock
 import pytest
 
 from apprise.attachment.base import AttachBase
+from apprise.exception import AppriseImproperlyConfigured
 
 logging.disable(logging.CRITICAL)
 
@@ -62,7 +63,7 @@ def test_attach_base():
 
     """
     # an invalid mime-type
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AttachBase(**{"mimetype": "invalid"})
 
     # a valid mime-type does not cause an exception to throw

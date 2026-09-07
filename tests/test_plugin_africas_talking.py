@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.africas_talking import NotifyAfricasTalking
 
 logging.disable(logging.CRITICAL)
@@ -43,21 +44,21 @@ apprise_url_tests = (
         "atalk://",
         {
             # Instantiated but no auth, so no notification can happen
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "atalk://:@/",
         {
             # invalid auth
-            "instance": TypeError
+            "instance": AppriseImproperlyConfigured
         },
     ),
     (
         "atalk://user@^/",
         {
             # invalid apikey
-            "instance": TypeError
+            "instance": AppriseImproperlyConfigured
         },
     ),
     (
@@ -87,7 +88,7 @@ apprise_url_tests = (
     ),
     (
         "atalk://user@apikey/+{}?mode=invalid".format("4" * 11),
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     (
         "atalk://user@apikey/+{}?mode=s".format("4" * 11),

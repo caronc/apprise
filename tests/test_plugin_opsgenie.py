@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.opsgenie import (
     NotifyOpsgenie,
     NotifyType,
@@ -60,28 +61,28 @@ apprise_url_tests = (
         "opsgenie://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://%20%20/",
         {
             # invalid apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://apikey/user/?region=xx",
         {
             # invalid region id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -152,21 +153,21 @@ apprise_url_tests = (
         "opsgenie://apikey/@user?action=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://from@apikey/@user?:invalid=note",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://apikey/@user?:warning=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Creates an index entry

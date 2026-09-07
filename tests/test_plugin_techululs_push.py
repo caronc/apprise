@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.techuluspush import NotifyTechulusPush
 
 logging.disable(logging.CRITICAL)
@@ -44,14 +45,14 @@ apprise_url_tests = (
         "push://",
         {
             # Missing API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid API Key
     (
         "push://%s" % ("+" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey
@@ -67,7 +68,7 @@ apprise_url_tests = (
     (
         "push://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

@@ -40,6 +40,7 @@ from apprise.common import (
     MATCH_ALL_TAG,
 )
 from apprise.config.base import ConfigBase
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.manager_plugins import NotificationManager
 from apprise.plugins import NotifyBase
 from apprise.tag import AppriseTag
@@ -3040,25 +3041,25 @@ class TestServiceTimeout:
         with pytest.raises(ValueError):
             asyncio.run(a.async_notify(body="test", timeout=float("inf")))
 
-    def test_notify_non_numeric_timeout_raises_typeerror(self):
-        """notify(timeout="abc") raises TypeError."""
+    def test_notify_rejects_non_numeric_timeout(self):
+        """notify() rejects a non-numeric timeout."""
         a = Apprise()
         a.add("json://localhost")
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             a.notify(body="test", timeout="abc")
 
-    def test_notify_bool_timeout_raises_typeerror(self):
+    def test_notify_rejects_bool_timeout(self):
         """A bool timeout is rejected even though bool is an int subclass."""
         a = Apprise()
         a.add("json://localhost")
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             a.notify(body="test", timeout=True)
 
-    def test_async_notify_non_numeric_timeout_raises_typeerror(self):
-        """async_notify(timeout="abc") is a caller error (TypeError)."""
+    def test_async_notify_rejects_non_numeric_timeout(self):
+        """async_notify() rejects a non-numeric timeout."""
         a = Apprise()
         a.add("json://localhost")
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             asyncio.run(a.async_notify(body="test", timeout="abc"))
 
     def test_notify_timeout_defaults_to_zero(self):

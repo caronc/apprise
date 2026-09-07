@@ -95,6 +95,7 @@ from xml.etree import ElementTree
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_emails, validate_regex
@@ -264,7 +265,7 @@ class NotifySES(NotifyBase):
         if not self.aws_access_key_id:
             msg = "An invalid AWS Access Key ID was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our AWS API Secret Access key
         self.aws_secret_access_key = validate_regex(secret_access_key)
@@ -274,7 +275,7 @@ class NotifySES(NotifyBase):
                 f"({secret_access_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire our AWS Region Name:
         # eg. us-east-1, cn-north-1, us-west-2, ...
@@ -284,7 +285,7 @@ class NotifySES(NotifyBase):
         if not self.aws_region_name:
             msg = f"An invalid AWS Region ({region_name}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Email 'To'
         self.targets = []
@@ -325,7 +326,7 @@ class NotifySES(NotifyBase):
                 f"{self.user}@{self.host}"
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.reply_to = None
         if reply_to:
@@ -335,7 +336,7 @@ class NotifySES(NotifyBase):
                     f"{reply_to}"
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.reply_to = (
                 result["name"] if result["name"] else False,

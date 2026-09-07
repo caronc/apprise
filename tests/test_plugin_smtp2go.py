@@ -34,6 +34,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.smtp2go import NotifySMTP2Go
 
 logging.disable(logging.CRITICAL)
@@ -46,20 +47,20 @@ apprise_url_tests = (
     (
         "smtp2go://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smtp2go://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No Token specified
     (
         "smtp2go://user@localhost.localdomain",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Token is valid, but no user name specified
@@ -68,7 +69,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 8, "c" * 8
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid from email address
@@ -77,7 +78,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 8, "c" * 8
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No To email address, but everything else is valid

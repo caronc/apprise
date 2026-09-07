@@ -34,6 +34,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.guilded import NotifyGuilded
 
 logging.disable(logging.CRITICAL)
@@ -46,21 +47,21 @@ apprise_url_tests = (
     (
         "guilded://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "guilded://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No webhook_token specified
     (
         "guilded://%s" % ("i" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide both an webhook id and a webhook token
@@ -212,17 +213,17 @@ def test_plugin_guilded_general(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # Invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGuilded(webhook_id=None, webhook_token=webhook_token)
     # Invalid webhook id (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGuilded(webhook_id="  ", webhook_token=webhook_token)
 
     # Invalid webhook token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGuilded(webhook_id=webhook_id, webhook_token=None)
     # Invalid webhook token (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGuilded(webhook_id=webhook_id, webhook_token="   ")
 
     obj = NotifyGuilded(

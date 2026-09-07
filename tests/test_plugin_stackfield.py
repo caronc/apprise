@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.stackfield import NotifyStackfield
 
 logging.disable(logging.CRITICAL)
@@ -47,21 +48,21 @@ apprise_url_tests = (
     (
         "stackfield://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid token -- not a UUID
     (
         "stackfield://not-a-valid-uuid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid token -- wrong UUID length
     (
         "stackfield://11111111-2222-3333-4444-55555555555",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid token in URL path
@@ -155,19 +156,19 @@ def test_plugin_stackfield_init():
     assert obj2.url_identifier == obj.url_identifier
 
     # Missing token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyStackfield(token=None)
 
     # Empty token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyStackfield(token="")
 
     # Invalid token format (not a UUID)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyStackfield(token="not-a-valid-uuid-at-all")
 
     # Wrong UUID length (too short)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyStackfield(token="11111111-2222-3333-4444-55555555555")
 
 

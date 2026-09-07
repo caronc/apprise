@@ -42,6 +42,7 @@ import threading
 from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from .common import AWARE_DATE_ISO_FORMAT, JSON_COMPACT_SEPARATORS
+from .exception import AppriseDiskIOError
 
 if TYPE_CHECKING:
     # Import NotifyBase only for static analysis. Importing it at runtime
@@ -311,11 +312,11 @@ class _LogCaptureBudget:
 
                 # A short write means the record cannot be trusted later.
                 if self._disk.write(header) != len(header):
-                    raise OSError("short result log header write")
+                    raise AppriseDiskIOError("short result log header write")
 
                 # Write the complete log entry immediately after its header.
                 if self._disk.write(payload) != len(payload):
-                    raise OSError("short result log entry write")
+                    raise AppriseDiskIOError("short result log entry write")
 
                 if previous is not None:
                     # Link this capture's entries across the shared file.
@@ -325,7 +326,7 @@ class _LogCaptureBudget:
                     link = self._LINK.pack(offset)
 
                     if self._disk.write(link) != len(link):
-                        raise OSError("short result log link write")
+                        raise AppriseDiskIOError("short result log link write")
 
                 # Make completed writes available to result readers.
                 self._disk.flush()
@@ -355,7 +356,7 @@ class _LogCaptureBudget:
         with self._lock:
             # A closed result no longer has disk content to replay.
             if self._disk is None:
-                raise OSError("result log storage is closed")
+                raise AppriseDiskIOError("result log storage is closed")
 
             # Move directly to the record owned by this capture.
             self._disk.seek(offset)
@@ -365,21 +366,21 @@ class _LogCaptureBudget:
 
             # Reject partial records before decoding their content.
             if len(header) != self._HEADER.size:
-                raise OSError("truncated result log header")
+                raise AppriseDiskIOError("truncated result log header")
 
             # Recover the content length and the next record location.
             size, next_offset = self._HEADER.unpack(header)
 
             # A record cannot be larger than the complete disk allowance.
             if size > self.disk_size:
-                raise OSError("invalid result log entry size")
+                raise AppriseDiskIOError("invalid result log entry size")
 
             # Read only the number of bytes declared by this record.
             payload = self._disk.read(size)
 
             # Do not pass incomplete content to the JSON decoder.
             if len(payload) != size:
-                raise OSError("truncated result log entry")
+                raise AppriseDiskIOError("truncated result log entry")
 
             return payload, next_offset
 
@@ -552,7 +553,9 @@ class _NotifyLogStore:
                             and index + 1 < self._disk_count
                         ):
                             # The entry chain ended sooner than expected.
-                            raise OSError("truncated result log chain")
+                            raise AppriseDiskIOError(
+                                "truncated result log chain"
+                            )
 
                         # Continue from the location saved in this record.
                         offset = next_offset

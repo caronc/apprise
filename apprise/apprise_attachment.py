@@ -31,6 +31,7 @@ from typing import Any, Optional, Union
 from .asset import AppriseAsset
 from .attachment.base import AttachBase
 from .common import ContentLocation
+from .exception import AppriseImproperlyConfigured
 from .logger import logger
 from .manager_attachment import AttachmentManager
 from .url import URLBase
@@ -117,14 +118,16 @@ class AppriseAttachment:
                     "specified.",
                 )
                 logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
         else:
             # do not set location if no initialization was made for it
             self.location = None
 
         # Now parse any paths specified
         if paths is not None and not self.add(paths):
-            raise TypeError("One or more attachments could not be added.")
+            raise AppriseImproperlyConfigured(
+                "One or more attachments could not be added."
+            )
 
     def add(
         self,

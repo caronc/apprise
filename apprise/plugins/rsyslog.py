@@ -29,6 +29,7 @@ import os
 import socket
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool
 from .base import NotifyBase
@@ -219,7 +220,7 @@ class NotifyRSyslog(NotifyBase):
             except KeyError:
                 msg = f"An invalid syslog facility ({facility}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         else:
             self.facility = SYSLOG_FACILITY_MAP[

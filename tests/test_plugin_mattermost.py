@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mattermost import MattermostMode, NotifyMattermost
 
 # Attachment test fixtures
@@ -53,7 +54,7 @@ apprise_url_tests = (
         "mmosts://localhost",
         {
             # Thrown because there was no webhook id specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -210,7 +211,7 @@ apprise_url_tests = (
         "mmost://localhost/token?mode=invalid",
         {
             # invalid mode is detected in __init__
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -286,9 +287,9 @@ def test_plugin_mattermost_edge_cases():
     """NotifyMattermost() Edge Cases."""
 
     # Invalid Authorization Token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMattermost(None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMattermost("     ")
 
 

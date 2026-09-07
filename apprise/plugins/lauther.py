@@ -40,6 +40,7 @@
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -189,7 +190,7 @@ class NotifyLauther(NotifyBase):
         if not self.token:
             msg = f"The Lauther token specified ({token}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The priority of the message
         self.priority = int(
@@ -218,7 +219,7 @@ class NotifyLauther(NotifyBase):
         if self.priority not in LAUTHER_PRIORITIES:
             msg = f"The Lauther priority specified ({priority}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Optional appearance overrides and metadata
         self.sound = sound

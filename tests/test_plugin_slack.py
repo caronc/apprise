@@ -39,6 +39,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
@@ -51,34 +52,34 @@ apprise_url_tests = (
     (
         "slack://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://T1JJ3T3L2",
         {
             # Just Token 1 provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://T1JJ3T3L2/A1BRTD4JD/",
         {
             # Just 2 tokens provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/?mode=invalid",
         {
             # invalid Mode provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -290,7 +291,7 @@ apprise_url_tests = (
             "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
             "&to=#chan&mode=bot"
         ),
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     # Test blocks mode with timestamp variation
     (
@@ -427,21 +428,21 @@ apprise_url_tests = (
         "slack://username@-INVALID-/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool",
         {
             # invalid 1st Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://username@T1JJ3T3L2/-INVALID-/TIiajkdnlazkcOXrIdevi7FQ/#great",
         {
             # invalid 2rd Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://username@T1JJ3T3L2/A1BRTD4JD/-INVALID-/#channel",
         {
             # invalid 3rd Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -548,21 +549,21 @@ apprise_url_tests = (
     (
         "slack://T1JJ3T3L2/XXXXXXXX/?mode=workflow",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Workflow mode -- wrong count: trigger's 3 segments rejected
     (
         "slack://T1JJ3T3L2/XXXXXXXX/YYYYYYYY/?mode=workflow",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Trigger mode -- wrong count: workflow's 4 segments rejected
     (
         "slack://T1JJ3T3L2/Ft07XXXX/XXXXXXXX/YYYYYYYY/?mode=trigger",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )
@@ -593,7 +594,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     request.status_code = requests.codes.ok
 
     # We'll fail to validate the access_token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(access_token=token)
 
     # Generate a (valid) bot token
@@ -619,7 +620,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     assert obj.send(body="test") is True
 
     # A poorly formatted xoxe prefix should still be rejected
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(access_token="xoxe.xo-invalid", targets="#apprise")
 
     # Test Valid Attachment
@@ -830,7 +831,7 @@ def test_plugin_slack_webhook_mode(mock_request):
     )
 
     # Missing first Token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(
             token_a=None, token_b=token_b, token_c=token_c, targets=channels
         )
@@ -1843,8 +1844,8 @@ def test_plugin_slack_template_load_error(mock_request, tmpdir):
 
 
 def test_plugin_slack_template_bad_tokens():
-    """NotifySlack() - invalid tokens type raises TypeError."""
-    with pytest.raises(TypeError):
+    """NotifySlack() rejects an invalid template token type."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(
             token_a="T1JJ3T3L2",
             token_b="A1BRTD4JD",
@@ -1929,14 +1930,14 @@ def test_plugin_slack_template_inaccessible(mock_request, tmpdir):
 
 
 def test_plugin_slack_template_add_failure():
-    """NotifySlack() - TypeError when AppriseAttachment.add() drops entry."""
+    """NotifySlack() rejects a template attachment it cannot add."""
     # Simulate add() silently failing (returns 0 / len stays 0)
     with mock.patch("apprise.plugins.slack.AppriseAttachment") as mock_cls:
         inst = mock.MagicMock()
         inst.__len__ = mock.Mock(return_value=0)
         mock_cls.return_value = inst
 
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             NotifySlack(
                 token_a="T1JJ3T3L2",
                 token_b="A1BRTD4JD",
@@ -2175,33 +2176,33 @@ def test_plugin_slack_workflow_url_roundtrip(mock_request):
 
 
 def test_plugin_slack_workflow_invalid_path():
-    """NotifySlack() - invalid path segment counts raise TypeError."""
+    """NotifySlack() rejects workflow paths with the wrong segment count."""
     from apprise.plugins.slack import NotifySlack as _NS
 
     # Too few segments for explicit workflow mode (needs 4)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX"], mode="workflow")
 
     # Trigger's 3 segments rejected when mode=workflow is explicit
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(
             workflow_path=["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"],
             mode="workflow",
         )
 
     # Workflow's 4 segments rejected when mode=trigger is explicit
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(
             workflow_path=["T1JJ3T3L2", "Ft07XXXX", "XXXXXXXX", "YYYY"],
             mode="trigger",
         )
 
     # Empty path -- must raise (auto-detect path, 0 segments)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=[], mode="workflow")
 
     # Non-string / non-list type (else branch) -- 0 segments, must raise
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=42, mode="workflow")
 
     # Auto-detect: 4 segments -> WORKFLOW
@@ -2214,8 +2215,8 @@ def test_plugin_slack_workflow_invalid_path():
     assert obj.mode == "trigger"
     assert obj.workflow_path == ["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"]
 
-    # Auto-detect: 2 segments -> TypeError (neither 3 nor 4)
-    with pytest.raises(TypeError):
+    # Auto-detection requires either three or four segments.
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX"])
 
 

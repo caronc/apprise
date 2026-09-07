@@ -36,6 +36,7 @@ import apprise
 
 logging.disable(logging.CRITICAL)
 
+from apprise.exception import AppriseImproperlyConfigured  # noqa E402
 from apprise.plugins.rsyslog import NotifyRSyslog  # noqa E402
 
 
@@ -170,8 +171,8 @@ def test_plugin_rsyslog_edge_cases():
     assert r"logpid=yes" in obj.url()
 
     # Exception should be thrown about the fact no bot token was specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRSyslog(host="localhost", facility="invalid")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRSyslog(host="localhost", facility=object)

@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.google_chat import NotifyGoogleChat
 
 logging.disable(logging.CRITICAL)
@@ -45,27 +46,27 @@ apprise_url_tests = (
     (
         "gchat://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "gchat://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Workspace, but not Key or Token
     (
         "gchat://workspace",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Workspace and key, but no Token
     (
         "gchat://workspace/key/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Credentials are good
@@ -233,7 +234,7 @@ def test_plugin_google_chat_general(mock_post):
 
 def test_plugin_google_chat_edge_case():
     """NotifyGoogleChat() Edge Cases."""
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGoogleChat("workspace", "webhook", "token", thread_key=object())
 
 

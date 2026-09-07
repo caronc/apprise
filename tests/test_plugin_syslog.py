@@ -75,6 +75,7 @@ except ImportError:
 
 logging.disable(logging.CRITICAL)
 
+from apprise.exception import AppriseImproperlyConfigured  # noqa E402
 from apprise.plugins.syslog import NotifySyslog  # noqa E402
 
 
@@ -154,8 +155,8 @@ def test_plugin_syslog_edge_cases(openlog, syslog):
     assert r"logperror=no" in obj.url()
 
     # Exception should be thrown about the fact no bot token was specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySyslog(facility="invalid")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySyslog(facility=object)

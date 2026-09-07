@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.humhub import NotifyHumHub
 
 logging.disable(logging.CRITICAL)
@@ -51,35 +52,35 @@ apprise_url_tests = (
     (
         "humhub://hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Token present but no container ID
     (
         "humhub://token@hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid container ID (not numeric)
     (
         "humhubs://token@hostname/invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Negative container ID (not a positive integer)
     (
         "humhubs://token@hostname/-1",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Zero container ID (not a positive integer)
     (
         "humhubs://token@hostname/0",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid bearer token + container ID over HTTP (insecure)
@@ -197,23 +198,23 @@ def test_plugin_humhub_init():
     """NotifyHumHub() initialization edge cases."""
 
     # No user/token at all
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user=None, host="hostname", targets=["1"])
 
     # Empty string user
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="", host="hostname", targets=["1"])
 
     # No containers specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="token", host="hostname", targets=[])
 
     # None targets
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="token", host="hostname", targets=None)
 
     # Only invalid targets
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyHumHub(user="token", host="hostname", targets=["bad", "0", "-5"])
 
     # Mixed valid and invalid -- should succeed, dropping the bad ones
@@ -414,7 +415,7 @@ def test_plugin_humhub_url_parsing():
 
     # Empty / invalid URL returns None (no host)
     assert NotifyHumHub.parse_url("humhubs://") is None
-    # Only host, no user -- parse_url succeeds; TypeError raised at init
+    # Parsing accepts a host alone; initialization later requires a user.
     result = NotifyHumHub.parse_url("humhubs://hostname/1")
     assert result is not None
 

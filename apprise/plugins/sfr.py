@@ -45,6 +45,7 @@ import json
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no
@@ -180,13 +181,13 @@ class NotifySFR(NotifyBase):
                 "combination was not provided."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.space_id = space_id
         if not self.space_id:
             msg = "A SFR Space ID is required."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.voice = voice if voice else self.template_args["voice"]["default"]
         self.lang = lang if lang else self.template_args["lang"]["default"]
@@ -226,7 +227,7 @@ class NotifySFR(NotifyBase):
                 "provide as least one valid phone number."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

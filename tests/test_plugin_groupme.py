@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.groupme import NotifyGroupMe
 
 logging.disable(logging.CRITICAL)
@@ -60,21 +61,21 @@ apprise_url_tests = (
         # No bot_id
         "groupme://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Empty URL
         "groupme://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Invalid bot_id containing non-hex characters
         "groupme://not-a-valid-bot-id!",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -154,16 +155,16 @@ def test_plugin_groupme_init(mock_post):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.accepted
 
-    # Missing bot_id raises TypeError
-    with pytest.raises(TypeError):
+    # A bot ID is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGroupMe(bot_id=None)
 
-    # Blank bot_id raises TypeError
-    with pytest.raises(TypeError):
+    # A blank bot ID is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGroupMe(bot_id="")
 
-    # bot_id with invalid characters raises TypeError
-    with pytest.raises(TypeError):
+    # A bot ID cannot contain unsupported characters.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGroupMe(bot_id="not-valid!")
 
     # Valid bot_id instantiates without error

@@ -35,6 +35,7 @@ import contextlib
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
@@ -155,7 +156,7 @@ class NotifyVonage(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Vonage API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # API Secret (associated with project)
         self.secret = validate_regex(
@@ -164,7 +165,7 @@ class NotifyVonage(NotifyBase):
         if not self.secret:
             msg = f"An invalid Vonage API Secret ({secret}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Set our Time to Live Flag
         self.ttl = self.template_args["ttl"]["default"]
@@ -178,7 +179,7 @@ class NotifyVonage(NotifyBase):
         ):
             msg = f"The Vonage TTL specified ({self.ttl}) is out of range."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Source Phone #
         self.source = source
@@ -189,7 +190,7 @@ class NotifyVonage(NotifyBase):
                 f"The Account (From) Phone # specified ({source}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our parsed value
         self.source = result["full"]

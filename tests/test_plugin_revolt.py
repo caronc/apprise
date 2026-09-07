@@ -41,6 +41,7 @@ import requests
 
 from apprise import Apprise, NotifyFormat, NotifyType
 from apprise.common import OverflowMode
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.revolt import NotifyRevolt
 
 logging.disable(logging.CRITICAL)
@@ -64,14 +65,14 @@ apprise_url_tests = (
     (
         "revolt://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "revolt://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No channel_id specified
@@ -89,7 +90,7 @@ apprise_url_tests = (
     (
         "revolt://?channel=%s" % ("i" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # channel_id specified on url
@@ -365,10 +366,10 @@ def test_plugin_revolt_general(mock_sleep, mock_post):
     }
 
     # Invalid bot_token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRevolt(bot_token=None, targets=channel_id)
     # Invalid bot_token (whitespace)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRevolt(bot_token="  ", targets=channel_id)
 
     obj = NotifyRevolt(bot_token=bot_token, targets=channel_id)

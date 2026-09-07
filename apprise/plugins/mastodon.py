@@ -35,6 +35,7 @@ import requests
 
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -285,7 +286,7 @@ class NotifyMastodon(NotifyBase):
         if not self.token:
             msg = "An invalid Mastodon Access Token was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if visibility:
             # Input is a string; attempt to get the lookup from our
@@ -314,7 +315,7 @@ class NotifyMastodon(NotifyBase):
                     " invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             self.visibility = self.template_args["visibility"]["default"]
@@ -384,7 +385,7 @@ class NotifyMastodon(NotifyBase):
             # important we don't switch from the users original intentions
             msg = "No Mastodon targets to notify."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Ping targets (tokens from URL, already split by parse_list)
         self.ping = []

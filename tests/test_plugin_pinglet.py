@@ -36,6 +36,7 @@ import requests
 
 import apprise
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pinglet import NotifyPinglet, PingletPriority
 
 logging.disable(logging.CRITICAL)
@@ -59,20 +60,20 @@ apprise_url_tests = (
     (
         "pinglet://hostname/acme/deploys",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No namespace and/or topic specified
     (
         "pinglet://token@hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pinglet://token@hostname/deploys",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide an API Key, namespace, and topic
@@ -184,16 +185,16 @@ def test_plugin_pinglet_urls():
 def test_plugin_pinglet_edge_cases():
     """NotifyPinglet() Edge Cases."""
     # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token=None, namespace="acme", topic="deploys")
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token="   ", namespace="acme", topic="deploys")
 
     # Missing namespace and/or topic
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token="abc123", namespace=None, topic="deploys")
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token="abc123", namespace="acme", topic=None)
 
     # Direct instantiation without a fullpath defaults to "/"

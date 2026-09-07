@@ -51,7 +51,7 @@ from ...common import (
     PersistentStoreMode,
 )
 from ...conversion import html_to_text
-from ...exception import AppriseException
+from ...exception import AppriseImproperlyConfigured, ApprisePluginException
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import (
@@ -86,7 +86,7 @@ MATRIX_V3_MEDIA_PATH = "/_matrix/media/v3"
 MATRIX_V2_MEDIA_PATH = "/_matrix/media/r0"
 
 
-class MatrixDiscoveryException(AppriseException):
+class MatrixDiscoveryException(ApprisePluginException):
     """Apprise Matrix Exception Class."""
 
 
@@ -485,7 +485,7 @@ class NotifyMatrix(NotifyBase):
         if self.mode and self.mode not in MATRIX_WEBHOOK_MODES:
             msg = f"The mode specified ({mode}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Setup our version
         self.version = (
@@ -496,7 +496,7 @@ class NotifyMatrix(NotifyBase):
         if self.version not in MATRIX_VERSIONS:
             msg = f"The version specified ({version}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Setup our message type
         self.msgtype = (
@@ -507,7 +507,7 @@ class NotifyMatrix(NotifyBase):
         if self.msgtype and self.msgtype not in MATRIX_MESSAGE_TYPES:
             msg = f"The msgtype specified ({msgtype}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if self.mode == MatrixWebhookMode.T2BOT:
             # t2bot configuration requires that a webhook id is specified
@@ -520,12 +520,12 @@ class NotifyMatrix(NotifyBase):
                     f"({self.password}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         elif not is_hostname(self.host):
             msg = f"An invalid Matrix Hostname ({self.host}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         else:
             # Verify port if specified
@@ -536,7 +536,7 @@ class NotifyMatrix(NotifyBase):
             ):
                 msg = f"An invalid Matrix Port ({self.port}) was specified"
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         if self.mode != MatrixWebhookMode.DISABLED:
             # Discovery only works when we're not using webhooks

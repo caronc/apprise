@@ -38,6 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.serwersms import NotifySerwerSMS
 
 # Attachment test fixtures directory
@@ -57,35 +58,35 @@ apprise_url_tests = (
         "serwersms://",
         {
             # Missing credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://:@/",
         {
             # Empty credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://user@SenderA/+48123456789",
         {
             # Missing password
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://user:pass@/+48123456789",
         {
             # Missing sender (empty host)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "serwersms://user:pass@!!invalid!!",
         {
             # Invalid sender name (fails regex)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -189,11 +190,11 @@ def test_plugin_serwersms_init(mock_post):
     """NotifySerwerSMS() Initialisation tests."""
 
     # Missing username
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(sender="SenderA", targets=["+48123456789"])
 
     # Missing password
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             sender="SenderA",
@@ -201,7 +202,7 @@ def test_plugin_serwersms_init(mock_post):
         )
 
     # Missing sender
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             password="pass",
@@ -209,7 +210,7 @@ def test_plugin_serwersms_init(mock_post):
         )
 
     # Invalid sender (too long - >11 chars)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             password="pass",
@@ -218,7 +219,7 @@ def test_plugin_serwersms_init(mock_post):
         )
 
     # Invalid sender (starts with non-alphanumeric)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySerwerSMS(
             user="user",
             password="pass",

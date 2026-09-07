@@ -38,6 +38,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.base64 import decode_b64_dict, encode_b64_dict
 from ..utils.parse import is_email, parse_bool, parse_list, validate_regex
@@ -225,14 +226,14 @@ class NotifyOneSignal(NotifyBase):
         if not self.apikey:
             msg = f"An invalid OneSignal API key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The App ID associated with the account
         self.app = validate_regex(app)
         if not self.app:
             msg = f"An invalid OneSignal Application ID ({app}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare Batch Mode Flag
         self.batch_size = (
@@ -286,7 +287,7 @@ class NotifyOneSignal(NotifyBase):
         if not self.language or len(self.language) != 2:
             msg = f"An invalid OneSignal Language ({language}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Sort our targets
         for target_ in parse_list(targets):
@@ -347,7 +348,7 @@ class NotifyOneSignal(NotifyBase):
                 f"({custom}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Postback Data
         self.postback_data = {}
@@ -360,7 +361,7 @@ class NotifyOneSignal(NotifyBase):
                 f"({postback}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
         return
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):

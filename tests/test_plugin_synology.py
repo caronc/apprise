@@ -32,6 +32,7 @@ from unittest import mock
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.synology import NotifySynology
 
 logging.disable(logging.CRITICAL)
@@ -80,7 +81,7 @@ apprise_url_tests = (
     (
         "synology://user@localhost",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

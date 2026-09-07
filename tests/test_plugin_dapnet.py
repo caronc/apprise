@@ -34,6 +34,7 @@ import requests
 
 import apprise
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.dapnet import DapnetPriority, NotifyDapnet
 
 logging.disable(logging.CRITICAL)
@@ -44,28 +45,28 @@ apprise_url_tests = (
         "dapnet://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dapnet://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dapnet://user:pass",
         {
             # No call-sign specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dapnet://user@host",
         {
             # No password specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

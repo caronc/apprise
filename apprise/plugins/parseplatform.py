@@ -31,6 +31,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
 from .base import NotifyBase
@@ -147,7 +148,7 @@ class NotifyParsePlatform(NotifyBase):
                 f"({app_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Master Key
         self.master_key = validate_regex(master_key)
@@ -157,7 +158,7 @@ class NotifyParsePlatform(NotifyBase):
                 f"({master_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Initialize Devices Array
         self.devices = []
@@ -170,7 +171,7 @@ class NotifyParsePlatform(NotifyBase):
                     f"({device}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.device = self.template_args["device"]["default"]
 

@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushed import NotifyPushed
 
 logging.disable(logging.CRITICAL)
@@ -42,21 +43,21 @@ apprise_url_tests = (
     (
         "pushed://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Application Key Only
     (
         "pushed://%s" % ("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid URL
     (
         "pushed://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Application Key+Secret
@@ -87,7 +88,7 @@ apprise_url_tests = (
         "pushed://{}/{}/dropped_value/".format("a" * 32, "a" * 64),
         {
             # No entries validated is a fail
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Application Key+Secret + 2 channels
@@ -220,28 +221,28 @@ def test_plugin_pushed_edge_cases(mock_post, mock_get):
     mock_get.return_value.status_code = requests.codes.ok
 
     # No application Key specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushed(
             app_key=None,
             app_secret=app_secret,
             recipients=None,
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushed(
             app_key="  ",
             app_secret=app_secret,
             recipients=None,
         )
     # No application Secret specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushed(
             app_key=app_key,
             app_secret=None,
             recipients=None,
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushed(
             app_key=app_key,
             app_secret="   ",

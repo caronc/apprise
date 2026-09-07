@@ -66,6 +66,7 @@ from ..conversion import (
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
 )
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -170,7 +171,7 @@ class NotifyEvolution(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Evolution API key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Instance name
         self.instance = validate_regex(instance)
@@ -180,7 +181,7 @@ class NotifyEvolution(NotifyBase):
                 f"({instance}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse and validate recipient phone numbers
         self.phone = []
@@ -201,7 +202,7 @@ class NotifyEvolution(NotifyBase):
         if not self.phone:
             msg = "No valid Evolution API phone numbers were specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

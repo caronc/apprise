@@ -38,6 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseConfig, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.workflows import NotifyWorkflows
 
 logging.disable(logging.CRITICAL)
@@ -65,14 +66,14 @@ apprise_url_tests = (
         "workflow://host/workflow",
         {
             # workflow provided only, no signature
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "workflow://host:443/^(/signature",
         {
             # invalid workflow provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -693,14 +694,14 @@ def test_plugin_workflows_templating_invalid_contenttype(
     reason="Python <3.10: see test_plugin_workflows_template_add_failure_py39",
 )
 def test_plugin_workflows_template_add_failure():
-    """NotifyWorkflows() - TypeError when add() drops the entry."""
+    """NotifyWorkflows() rejects an attachment it cannot add."""
     # Simulate add() silently failing (len stays 0); no HTTP call needed
     with mock.patch("apprise.plugins.workflows.AppriseAttachment") as mock_cls:
         inst = mock.MagicMock()
         inst.__len__ = mock.Mock(return_value=0)
         mock_cls.return_value = inst
 
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             NotifyWorkflows(
                 workflow="T00000000001",
                 signature="AbCdEfGhIjKlMnOpQrStUvWx",
@@ -718,7 +719,7 @@ def test_plugin_workflows_template_add_failure():
     reason="Python 3.10+ mock.patch resolves via sys.modules directly",
 )
 def test_plugin_workflows_template_add_failure_py39_compat():
-    """NotifyWorkflows() - TypeError when add() drops the entry (Py 3.9)."""
+    """The attachment rejection remains compatible with Python 3.9."""
     import importlib
 
     # Resolve the live module so patch.object and the class share the same
@@ -732,7 +733,7 @@ def test_plugin_workflows_template_add_failure_py39_compat():
         inst.__len__ = mock.Mock(return_value=0)
         mock_cls.return_value = inst
 
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             _NotifyWorkflows(
                 workflow="T00000000001",
                 signature="AbCdEfGhIjKlMnOpQrStUvWx",
@@ -858,25 +859,25 @@ def test_workflows_yaml_config_missing_template_filename(
 def test_plugin_workflows_edge_cases():
     """NotifyWorkflows() Edge Cases."""
     # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(workflow="@", signature="@")
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(workflow="", signature="abcd")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(workflow=None, signature="abcd")
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(workflow="  ", signature="abcd")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(workflow="abcd", signature=None)
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(workflow="abcd", signature="  ")
 
     # test case where invalid tokens are specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(
             workflow="workflow", signature="signature", tokens="not-a-dict"
         )
@@ -956,7 +957,7 @@ def test_plugin_workflows_routing_id_parse_url(key):
 def test_plugin_workflows_routing_id_invalid():
     """NotifyWorkflows() rejects a non-numeric routing ID."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWorkflows(
             workflow="3XXX5", signature="iXXXU", routing_id="1/../evil"
         )

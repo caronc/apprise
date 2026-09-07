@@ -37,6 +37,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from .base import NotifyBase
 
@@ -97,7 +98,7 @@ class NotifyFreeMobile(NotifyBase):
                 "A FreeMobile user and password combination was not provided."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

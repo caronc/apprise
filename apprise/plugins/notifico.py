@@ -59,6 +59,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, validate_regex
@@ -249,7 +250,7 @@ class NotifyNotifico(NotifyBase):
                 f"An invalid Notifico Project ID ({project_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Assign our message hook
         self.msghook = validate_regex(
@@ -261,7 +262,7 @@ class NotifyNotifico(NotifyBase):
                 f"An invalid Notifico Message Token ({msghook}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Detect operating mode: self-hosted when a hostname is present
         self.mode = (

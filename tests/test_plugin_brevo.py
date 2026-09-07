@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.brevo import NotifyBrevo
 
 logging.disable(logging.CRITICAL)
@@ -77,14 +78,14 @@ apprise_url_tests = (
         "brevo://invalid-api-key+*-d:user@example.com",
         {
             # An invalid API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         ("brevo://abcd:user@example.com/newuser@example.com?reply=%20!"),
         {
             # An invalid Reply-To address
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -187,15 +188,15 @@ def test_plugin_brevo_edge_cases(mock_post, mock_get):
     """NotifyBrevo() Edge Cases."""
 
     # no apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBrevo(apikey=None, from_email="user@example.com")
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBrevo(apikey="abcd", from_email="!invalid")
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBrevo(apikey="abcd", from_email=None)
 
     # Invalid To email address

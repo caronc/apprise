@@ -36,6 +36,7 @@ import requests
 
 from apprise import Apprise
 from apprise.common import NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushplus import (
     PUSHPLUS_CHANNEL_DEFAULT,
     PUSHPLUS_CHANNELS,
@@ -65,21 +66,21 @@ apprise_url_tests = (
         "pushplus://",
         {
             # Empty token must raise
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushplus://short",
         {
             # Token too short (fewer than 32 characters)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushplus://invalid!chars00000000000000000000000000000",
         {
             # Token contains characters not allowed by the regex
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # ----------------------------------------------------------------
@@ -343,10 +344,10 @@ def test_plugin_pushplus_init():
     obj = NotifyPushplus(token=GOOD_TOKEN, channel="MAIL")
     assert obj.channel == PushPlusChannel.MAIL
 
-    # Invalid channel raises TypeError
+    # An invalid channel is rejected.
     import pytest
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushplus(token=GOOD_TOKEN, channel="invalid_channel")
 
     # Invalid target (bad characters) goes to invalid_targets
@@ -354,11 +355,11 @@ def test_plugin_pushplus_init():
     assert obj.topics == []
     assert obj.invalid_targets == ["bad!target"]
 
-    # Invalid token raises TypeError
-    with pytest.raises(TypeError):
+    # An invalid token is rejected.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushplus(token="short")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushplus(token="bad!token" + "0" * 30)
 
     # Webhook value stored as None when falsy

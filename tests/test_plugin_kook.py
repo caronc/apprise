@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.kook import (
     KookMode,
     NotifyKook,
@@ -67,14 +68,14 @@ TEST_URLS = (
     (
         "kook://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid mode
     (
         f"kook://{BOT_TOKEN}/?mode=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     ##
@@ -352,16 +353,16 @@ def test_plugin_kook_webhook_mode():
     assert obj2.mode == KookMode.WEBHOOK
 
     # Missing token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKook(token=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKook(token="")
 
 
 def test_plugin_kook_mode_invalid():
-    """Invalid mode raises TypeError."""
-    with pytest.raises(TypeError):
+    """An invalid mode is rejected."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKook(token=BOT_TOKEN, mode="invalid_mode")
 
 

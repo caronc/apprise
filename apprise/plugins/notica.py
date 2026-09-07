@@ -44,6 +44,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
@@ -167,7 +168,7 @@ class NotifyNotica(NotifyBase):
         if not self.token:
             msg = f"An invalid Notica Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Setup our mode
         self.mode = NoticaMode.SELFHOSTED if self.host else NoticaMode.OFFICIAL

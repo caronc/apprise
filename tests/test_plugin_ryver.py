@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ryver import NotifyRyver
 
 logging.disable(logging.CRITICAL)
@@ -41,34 +42,34 @@ apprise_url_tests = (
     (
         "ryver://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ryver://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ryver://apprise",
         {
             # Just org provided (no token)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ryver://apprise/ckhrjW8w672m6HG?mode=invalid",
         {
             # invalid mode provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ryver://x/ckhrjW8w672m6HG?mode=slack",
         {
             # Invalid org
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -173,15 +174,15 @@ def test_plugin_ryver_edge_cases():
     """NotifyRyver() Edge Cases."""
 
     # No token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRyver(organization="abc", token=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRyver(organization="abc", token="  ")
 
     # No organization
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRyver(organization=None, token="abc")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRyver(organization="  ", token="abc")

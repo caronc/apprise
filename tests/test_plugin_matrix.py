@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import errno
 import gc
 from json import dumps, loads
 
@@ -44,6 +45,11 @@ from apprise import (
     AppriseAttachment,
     NotifyType,
     PersistentStoreMode,
+)
+from apprise.exception import (
+    AppriseImproperlyConfigured,
+    AppriseInvalidData,
+    ApprisePluginException,
 )
 from apprise.plugins.matrix import MatrixDiscoveryException, NotifyMatrix
 
@@ -65,6 +71,14 @@ MATRIX_GOOD_RESPONSE = dumps(
         "m.identity_server": {"base_url": "https://vector.im"},
     }
 )
+
+
+def test_plugin_matrix_discovery_exception():
+    """Matrix discovery failures use the common plugin exception."""
+    exc = MatrixDiscoveryException("discovery failed")
+    assert isinstance(exc, ApprisePluginException)
+    assert exc.error_code == 600
+
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
@@ -108,9 +122,9 @@ apprise_url_tests = (
     (
         "matrix://localhost",
         {
-            # response is TypeError because we'll try to initialize as
-            # a t2bot and fail (localhost is too short of a api key)
-            "instance": TypeError
+            # Initialization as t2bot fails because localhost is too short
+            # to be an API key.
+            "instance": AppriseImproperlyConfigured
         },
     ),
     (
@@ -181,7 +195,7 @@ apprise_url_tests = (
         "matrix://user:token@localhost:123/#general/?v=invalid",
         {
             # Invalid version specified
-            "instance": TypeError
+            "instance": AppriseImproperlyConfigured
         },
     ),
     (
@@ -262,21 +276,21 @@ apprise_url_tests = (
         "matrixs://user:pass@hostname:port/#room_alias",
         {
             # Invalid Port specified (was a string)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "matrixs://user:pass@hostname:0/#room_alias",
         {
             # Invalid Port specified (was a string)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "matrixs://user:pass@hostname:65536/#room_alias",
         {
             # Invalid Port specified (was a string)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # More general testing...
@@ -319,7 +333,7 @@ apprise_url_tests = (
         "matrix://user:token@localhost?mode=On",
         {
             # invalid webhook specified (unexpected boolean)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -461,7 +475,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
     assert obj.send(body="test") is True
     assert obj.send(title="title", body="test") is True
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # invalid message type specified
         kwargs = NotifyMatrix.parse_url(
             "matrix://user:passwd@hostname/#abcd?msgtype=invalid"
@@ -2945,6 +2959,13 @@ def test_plugin_matrix_e2ee_megolm_session():
     s2 = MatrixMegOlmSession.from_dict(d)
     assert s2.session_id == s.session_id
     assert s2._counter == s._counter
+
+    # Cache data from an unsupported version is invalid, not a setting error.
+    with pytest.raises(
+        AppriseInvalidData, match="Incompatible MegOLM session cache format"
+    ) as exc_info:
+        MatrixMegOlmSession.from_dict({"version": -1})
+    assert exc_info.value.error_code == errno.EINVAL
 
     # should_rotate: explicit count threshold
     assert not s.should_rotate(msg_count=MEGOLM_ROTATION_MSGS - 1)

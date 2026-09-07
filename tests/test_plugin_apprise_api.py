@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.apprise_api import AppriseAPIVersion, NotifyAppriseAPI
 
 logging.disable(logging.CRITICAL)
@@ -62,21 +63,21 @@ apprise_url_tests = (
     (
         "apprise://localhost",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # invalid token
     (
         "apprise://localhost/!",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No token specified (whitespace is trimmed)
     (
         "apprise://localhost/%%20",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # A valid URL with Token
@@ -184,7 +185,7 @@ apprise_url_tests = (
     (
         "apprise://localhost/mytoken1/?version=3",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -242,7 +243,7 @@ apprise_url_tests = (
     (
         "apprises://localhost:8080/abc123/?method=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

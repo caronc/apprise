@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.flock import NotifyFlock
 
 logging.disable(logging.CRITICAL)
@@ -42,14 +43,14 @@ apprise_url_tests = (
     (
         "flock://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # An invalid url
     (
         "flock://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide a token
@@ -176,7 +177,7 @@ apprise_url_tests = (
     (
         "flock://%s/g:/u:?format=text" % ("i" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # we don't focus on the invalid length of the user/group fields.
@@ -245,8 +246,8 @@ def test_plugin_flock_edge_cases(mock_post, mock_get):
     """NotifyFlock() Edge Cases."""
 
     # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlock(token=None)
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlock(token="   ")
