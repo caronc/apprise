@@ -35,6 +35,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, validate_regex
@@ -227,7 +228,7 @@ class NotifyPagerDuty(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Pager Duty API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.integration_key = validate_regex(integrationkey)
         if not self.integration_key:
@@ -236,7 +237,7 @@ class NotifyPagerDuty(NotifyBase):
                 f"({integrationkey}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # An Optional Source
         self.source = self.template_tokens["source"]["default"]
@@ -248,7 +249,7 @@ class NotifyPagerDuty(NotifyBase):
                     f"({source}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.component = self.template_tokens["source"]["default"]
 
@@ -262,7 +263,7 @@ class NotifyPagerDuty(NotifyBase):
                     f"({component}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.component = self.template_tokens["component"]["default"]
 
@@ -282,7 +283,7 @@ class NotifyPagerDuty(NotifyBase):
             # Invalid region specified
             msg = f"The PagerDuty region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # The severity (if specified)
         self.severity = (
@@ -302,7 +303,7 @@ class NotifyPagerDuty(NotifyBase):
             # Invalid severity specified
             msg = f"The PagerDuty severity specified ({severity}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # A clickthrough option for notifications
         self.click = click

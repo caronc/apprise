@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.chime import NotifyChime
 
 logging.disable(logging.CRITICAL)
@@ -50,21 +51,21 @@ apprise_url_tests = (
         # No webhook_id or token
         "chime://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Empty URL
         "chime://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         # Webhook ID supplied but no token
         "chime://aabbccdd-1234-5678-abcd-ef1234567890",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -149,20 +150,20 @@ def test_plugin_chime_init(mock_post):
     mock_post.return_value = requests.Request()
     mock_post.return_value.status_code = requests.codes.ok
 
-    # Missing webhook_id raises TypeError
-    with pytest.raises(TypeError):
+    # A webhook ID is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyChime(webhook_id=None, token=TEST_TOKEN)
 
-    # Blank webhook_id raises TypeError
-    with pytest.raises(TypeError):
+    # A blank webhook ID is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyChime(webhook_id="  ", token=TEST_TOKEN)
 
-    # Missing token raises TypeError
-    with pytest.raises(TypeError):
+    # A token is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyChime(webhook_id=TEST_WEBHOOK_ID, token=None)
 
-    # Blank token raises TypeError
-    with pytest.raises(TypeError):
+    # A blank token is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyChime(webhook_id=TEST_WEBHOOK_ID, token="  ")
 
     # Valid object instantiates without error

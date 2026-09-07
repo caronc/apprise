@@ -95,6 +95,7 @@ except ImportError:
     NOTIFY_SESSIONOGS_ENABLED = False
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list
 from .base import NotifyBase
@@ -285,7 +286,7 @@ class NotifySessionOGS(NotifyBase):
                 f"characters ({_pk!r} is invalid)."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the validated public key.
         self.public_key = _pk
@@ -298,7 +299,7 @@ class NotifySessionOGS(NotifyBase):
                 f"characters ({_seed!r} is invalid)."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the validated seed hex string.
         self.seed = _seed
@@ -330,7 +331,7 @@ class NotifySessionOGS(NotifyBase):
         if not self.rooms:
             msg = "At least one valid SOGS room token must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def _sogs_auth_headers(self, method, path, body_bytes=None):
         """

@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.smsc import NotifySMSC
 
 logging.disable(logging.CRITICAL)
@@ -57,17 +58,17 @@ apprise_url_tests = (
     # Missing everything
     (
         "smsc://",
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     # Missing password
     (
         "smsc://login@+71234567890",
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     # Missing login
     (
         "smsc://:password@+71234567890",
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     # Valid single target
     (
@@ -154,16 +155,16 @@ def test_plugin_smsc_urls():
 def test_plugin_smsc_init(mock_post):
     """NotifySMSC() initialization and validation."""
 
-    # Missing login raises TypeError
-    with pytest.raises(TypeError):
+    # A login is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySMSC(targets=["+71234567890"])
 
-    # Missing password raises TypeError
-    with pytest.raises(TypeError):
+    # A password is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySMSC(user=LOGIN, targets=["+71234567890"])
 
     # Whitespace-only sender is invalid (validate_regex strips to empty)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySMSC(
             user=LOGIN,
             password=PASSWORD,

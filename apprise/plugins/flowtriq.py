@@ -61,6 +61,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import URL_PATH_SAFE_CHARS, validate_regex
 from .base import NotifyBase
@@ -145,25 +146,25 @@ class NotifyFlowtriq(NotifyBase):
                 apikey
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Webhook Path (the full path portion of the webhook URL provided
         # by the Flowtriq dashboard)
         if not webhook_path:
             msg = "A Flowtriq Webhook Path must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.webhook_path = webhook_path.strip("/")
         if not self.webhook_path:
             msg = "A Flowtriq Webhook Path must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if not self.host:
             msg = "A Flowtriq hostname must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Flowtriq Notification."""

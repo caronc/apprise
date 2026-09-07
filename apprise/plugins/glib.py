@@ -28,6 +28,7 @@
 import sys
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool
 from .base import NotifyBase
@@ -237,7 +238,7 @@ class NotifyGLib(NotifyBase):
                     f" ({x_axis},{y_axis}) are invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
         else:
             self.x_axis = None
             self.y_axis = None

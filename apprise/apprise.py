@@ -53,6 +53,7 @@ from .common import (
 from .config.base import ConfigBase
 from .conversion import convert_between
 from .emojis import apply_emojis
+from .exception import AppriseImproperlyConfigured
 from .locale import AppriseLocale
 from .logger import NotifyLogEntry, _ServiceLogCapture, logger
 from .manager_plugins import NotificationManager
@@ -290,11 +291,11 @@ def _timeout_log_entry(name: str, elapsed: float) -> NotifyLogEntry:
 def _validate_timeout(value: Union[int, float]) -> float:
     """Validate a timeout value shared by notify()/async_notify()."""
     if not isinstance(value, (int, float)) or isinstance(value, bool):
-        raise TypeError("timeout must be an int or float.")
+        raise AppriseImproperlyConfigured("timeout must be an int or float.")
 
     # inf/nan rejected: use 0 to mean "unbounded" instead.
     if not math.isfinite(value) or value < 0:
-        raise ValueError("timeout must be >= 0 and finite.")
+        raise AppriseImproperlyConfigured("timeout must be >= 0 and finite.")
 
     return float(value)
 
@@ -1254,7 +1255,8 @@ class Apprise:
         ``timeout`` limits the entire call in seconds; unfinished services
         report TIMEOUT. The earlier call or service limit applies. A value of
         0 leaves only the service limit active. Values must be finite,
-        non-negative numbers; invalid values raise TypeError or ValueError.
+        non-negative numbers; invalid values raise
+        ``AppriseImproperlyConfigured``.
 
         log_callback overrides the instance default for this call. It must be
         synchronous; schedule any async work from inside the callback.
@@ -1690,7 +1692,7 @@ class Apprise:
         if not (title or body or attach):
             msg = "No message content specified to deliver"
             logger.error(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         try:
             notify_type = (
@@ -1703,7 +1705,7 @@ class Apprise:
             err = (
                 f"An invalid notification type ({notify_type}) was specified."
             )
-            raise TypeError(err) from None
+            raise AppriseImproperlyConfigured(err) from None
 
         try:
             if title and isinstance(title, bytes):
@@ -1718,7 +1720,7 @@ class Apprise:
                 f"type: {self.asset.encoding}"
             )
             logger.error(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Normalize falsy values. Each service applies the cap from its own
         # asset below, which may differ from ``self.asset``.
@@ -1838,7 +1840,7 @@ class Apprise:
                         # Must be of string type
                         msg = "Failed to escape message body"
                         logger.error(msg)
-                        raise TypeError(msg) from None
+                        raise AppriseImproperlyConfigured(msg) from None
 
                 if server.interpret_emojis:
                     #

@@ -34,6 +34,7 @@ from helpers import reload_plugin
 import pytest
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.glib import GLibUrgency, NotifyGLib
 
 # Disable logging output during testing
@@ -248,10 +249,10 @@ def test_plugin_glib_disabled(mocker, enabled_glib_environment):
 
 
 def test_plugin_glib_invalid_coords():
-    """Invalid x/y coordinates cause TypeError"""
-    with pytest.raises(TypeError):
+    """Invalid x/y coordinates are rejected."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGLib(x_axis="bad", y_axis="1")
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGLib(x_axis="1", y_axis="bad")
 
 

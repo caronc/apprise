@@ -40,6 +40,7 @@ from apprise import Apprise, AppriseAsset, AttachmentManager
 from apprise.apprise_attachment import AppriseAttachment
 from apprise.attachment import AttachBase
 from apprise.common import ContentLocation
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.logger import LogCapture
 
 logging.disable(logging.CRITICAL)
@@ -231,9 +232,8 @@ def test_apprise_attachment():
     # length remains unchanged
     assert len(aa) == 0
 
-    # if instantiating attachments from the class, it will throw a TypeError
-    # if attachments couldn't be loaded
-    with pytest.raises(TypeError):
+    # Direct construction reports attachments that could not be loaded.
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAttachment("garbage://")
 
     # Load our other attachment types
@@ -260,7 +260,7 @@ def test_apprise_attachment():
     # Our length is still zero
     assert len(aa) == 0
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # Invalid location specified
         AppriseAttachment(location="invalid")
 

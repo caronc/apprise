@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushbullet import NotifyPushBullet
 
 logging.disable(logging.CRITICAL)
@@ -49,13 +50,13 @@ apprise_url_tests = (
     (
         "pbul://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pbul://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey
@@ -439,9 +440,9 @@ def test_plugin_pushbullet_edge_cases(mock_post, mock_get):
     mock_get.content = b""
 
     # Invalid Access Token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushBullet(accesstoken=None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushBullet(accesstoken="     ")
 
     obj = NotifyPushBullet(accesstoken=accesstoken, targets=recipients)

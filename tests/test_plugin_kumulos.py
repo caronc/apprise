@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.kumulos import NotifyKumulos
 
 logging.disable(logging.CRITICAL)
@@ -45,7 +46,7 @@ apprise_url_tests = (
         "kumulos://",
         {
             # No API or Server Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -55,14 +56,14 @@ apprise_url_tests = (
             # We don't have strict host checking on for kumulos, so this URL
             # actually becomes parseable and :@ becomes a hostname.
             # The below errors because a second token wasn't found
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         f"kumulos://{UUID4}/",
         {
             # No server key was specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -119,13 +120,13 @@ def test_plugin_kumulos_edge_cases():
     """NotifyKumulos() Edge Cases."""
 
     # Invalid API Key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKumulos(None, None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKumulos("     ", None)
 
     # Invalid Server Key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKumulos("abcd", None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyKumulos("abcd", "       ")

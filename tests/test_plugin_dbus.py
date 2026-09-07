@@ -34,6 +34,7 @@ from helpers import reload_plugin
 import pytest
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
@@ -309,7 +310,7 @@ def test_plugin_dbus_url_parsing(mock_dbus_module):
     assert "y=200" in obj.url()
 
     # Test Invalid X/Y
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDBus(x_axis="invalid")
 
 
@@ -359,11 +360,11 @@ def test_plugin_dbus_schema_not_supported(mock_dbus_module, mocker):
     reload_plugin("dbus")
     from apprise.plugins.dbus import NotifyDBus
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDBus(schema="not-a-real-schema")
 
     # Assert warning emitted (message content is stable)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyDBus(schema="still-not-real")
 
 

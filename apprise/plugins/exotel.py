@@ -31,6 +31,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -268,7 +269,7 @@ class NotifyExotel(NotifyBase):
         if not self.sid:
             msg = "An invalid Exotel SID ({}) was specified.".format(sid)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # API Token (associated with account)
         self.token = validate_regex(token)
@@ -277,7 +278,7 @@ class NotifyExotel(NotifyBase):
                 token
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # API Key used as the HTTP Basic Auth username. Older URLs did not
         # carry this separately, so default it to the account SID.
@@ -287,7 +288,7 @@ class NotifyExotel(NotifyBase):
                 apikey
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Used for URL generation afterwards only
         self.invalid_targets = []
@@ -309,7 +310,7 @@ class NotifyExotel(NotifyBase):
                 region_name
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Define whether or not we should set the unicode flag
         self.unicode = (
@@ -359,7 +360,7 @@ class NotifyExotel(NotifyBase):
                     priority
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # store our successfully looked up priority
             self.priority = EXOTEL_PRIORITY_MAP[result]
@@ -374,7 +375,7 @@ class NotifyExotel(NotifyBase):
                 "({}) is invalid.".format(source)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our parsed value
         self.source = result

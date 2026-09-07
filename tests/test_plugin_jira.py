@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.jira import JiraPriority, NotifyJira, NotifyType
 
 logging.disable(logging.CRITICAL)
@@ -56,28 +57,28 @@ apprise_url_tests = (
         "jira://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://%20%20/",
         {
             # invalid apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://apikey/user/?region=xx",
         {
             # invalid region id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -148,21 +149,21 @@ apprise_url_tests = (
         "jira://apikey/@user?action=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://from@apikey/@user?:invalid=note",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://apikey/@user?:warning=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Creates an index entry

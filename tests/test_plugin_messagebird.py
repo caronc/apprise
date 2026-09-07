@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.messagebird import NotifyMessageBird
 
 logging.disable(logging.CRITICAL)
@@ -43,21 +44,21 @@ apprise_url_tests = (
         "msgbird://",
         {
             # No hostname/apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "msgbird://{}/abcd".format("a" * 25),
         {
             # invalid characters in source phone number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "msgbird://{}/123".format("a" * 25),
         {
             # invalid source phone number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -149,7 +150,7 @@ def test_plugin_messagebird_edge_cases(mock_post):
     source = "+1 (555) 123-3456"
 
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMessageBird(apikey=None, source=source)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMessageBird(apikey="     ", source=source)

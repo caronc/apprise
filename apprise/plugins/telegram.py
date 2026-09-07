@@ -78,6 +78,7 @@ from ..conversion import (
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
 )
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -469,7 +470,7 @@ class NotifyTelegram(NotifyBase):
         if not self.bot_token:
             err = f"The Telegram Bot Token specified ({bot_token}) is invalid."
             self.logger.warning(err)
-            raise TypeError(err)
+            raise AppriseImproperlyConfigured(err)
 
         # Get our Markdown Version
         self.markdown_ver = (
@@ -512,7 +513,7 @@ class NotifyTelegram(NotifyBase):
         if self.content and self.content not in TELEGRAM_CONTENT_PLACEMENT:
             msg = f"The content placement specified ({content}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if topic:
             try:
@@ -522,7 +523,7 @@ class NotifyTelegram(NotifyBase):
                 # Not a valid integer; ignore entry
                 err = f"The Telegram Topic ID specified ({topic}) is invalid."
                 self.logger.warning(err)
-                raise TypeError(err) from exc
+                raise AppriseImproperlyConfigured(err) from exc
         else:
             # No Topic Thread
             self.topic = None
@@ -587,7 +588,7 @@ class NotifyTelegram(NotifyBase):
                     " could not be loaded."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Enforce a maximum file size on our template
             self.template[0].max_file_size = self.max_telegram_template_size
@@ -603,7 +604,7 @@ class NotifyTelegram(NotifyBase):
                 f" ({tokens}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def send_media(self, target, notify_type, payload=None, attach=None):
         """Sends a sticker based on the specified notify type."""

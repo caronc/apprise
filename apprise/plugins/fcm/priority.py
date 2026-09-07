@@ -31,6 +31,7 @@
 
 # Legacy priorities are defined here:
 # - https://firebase.google.com/docs/cloud-messaging/http-server-ref
+from ...exception import AppriseImproperlyConfigured
 from ...logger import logger
 from .common import FCM_MODES, FCMMode
 
@@ -171,7 +172,7 @@ class FCMPriorityManager:
         if self.mode not in FCM_MODES:
             msg = f"The FCM mode specified ({mode}) is invalid."
             logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.priority = None
         if priority:
@@ -186,7 +187,7 @@ class FCMPriorityManager:
             if not self.priority:
                 msg = f"An invalid FCM Priority ({priority}) was specified."
                 logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
     def payload(self):
         """Returns our payload depending on our mode."""

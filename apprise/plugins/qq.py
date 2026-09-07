@@ -33,6 +33,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import validate_regex
@@ -86,7 +87,7 @@ class NotifyQQ(NotifyBase):
         if not self.token:
             msg = f"The QQ Push token ({token}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.webhook_url = f"{self.notify_url}{self.token}"
 

@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.twitter import NotifyTwitter
 
 # Disable logging for a cleaner testing output
@@ -56,34 +57,34 @@ apprise_url_tests = (
         "twitter://",
         {
             # Missing Consumer API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://consumer_key",
         {
             # Missing Keys
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://consumer_key/consumer_secret/",
         {
             # Missing Keys
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twitter://consumer_key/consumer_secret/atoken1/",
         {
             # Missing Access Secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -208,7 +209,7 @@ apprise_url_tests = (
         "twitter://user@ckey/csecret/atoken13/access_secret?mode=invalid",
         {
             # An invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -618,16 +619,16 @@ def test_plugin_twitter_garbage_responses(mocker):
 def test_plugin_twitter_edge_cases():
     """NotifyTwitter() Edge Cases."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(ckey=None, csecret=None, akey=None, asecret=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(ckey="value", csecret=None, akey=None, asecret=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(ckey="value", csecret="value", akey=None, asecret=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwitter(
             ckey="value", csecret="value", akey="value", asecret=None
         )

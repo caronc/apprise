@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.zulip import NotifyZulip
 
 logging.disable(logging.CRITICAL)
@@ -41,41 +42,41 @@ apprise_url_tests = (
     (
         "zulip://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "zulip://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "zulip://apprise",
         {
             # Just org provided (no token or botname)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "zulip://botname@apprise",
         {
             # Just org and botname provided (no token)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # invalid token
     (
         "zulip://botname@apprise/{}".format("a" * 24),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # invalid botname
     (
         "zulip://....@apprise/{}".format("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid everything - botname with a dash
@@ -184,5 +185,5 @@ def test_plugin_zulip_edge_cases():
     token = "a" * 32
 
     # Invalid organization
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyZulip(botname="test", organization="#", token=token)

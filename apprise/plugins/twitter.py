@@ -58,6 +58,7 @@ from requests_oauthlib import OAuth1
 
 from ..attachment.base import AttachBase
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -241,25 +242,25 @@ class NotifyTwitter(NotifyBase):
         if not self.ckey:
             msg = "An invalid Twitter Consumer Key was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.csecret = validate_regex(csecret)
         if not self.csecret:
             msg = "An invalid Twitter Consumer Secret was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.akey = validate_regex(akey)
         if not self.akey:
             msg = "An invalid Twitter Access Key was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.asecret = validate_regex(asecret)
         if not self.asecret:
             msg = "An invalid Access Secret was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our webhook mode
         self.mode = (
@@ -277,7 +278,7 @@ class NotifyTwitter(NotifyBase):
                     f"The Twitter message mode specified ({mode}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.mode = self.template_args["mode"]["default"]
 

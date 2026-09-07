@@ -34,6 +34,7 @@ from unittest.mock import ANY, Mock, call
 import pytest
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mqtt import NotifyMQTT
 
 # Disable logging for a cleaner testing output
@@ -193,18 +194,18 @@ def test_plugin_mqtt_invalid_settings_failure(mqtt_client_mock):
     """Verify notifier instantiation croaks on invalid settings."""
 
     # Test case for invalid/unsupported MQTT version.
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         apprise.Apprise.instantiate(
             "mqtt://localhost?version=v1.0.0.0", suppress_exceptions=False
         )
 
     # Test case for invalid/unsupported `qos`.
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         apprise.Apprise.instantiate(
             "mqtt://localhost?qos=123", suppress_exceptions=False
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         apprise.Apprise.instantiate(
             "mqtt://localhost?qos=invalid", suppress_exceptions=False
         )

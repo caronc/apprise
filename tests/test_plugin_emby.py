@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.emby import NotifyEmby
 
 logging.disable(logging.CRITICAL)
@@ -60,7 +61,7 @@ apprise_url_tests = (
         "emby://localhost",
         {
             # Missing a username
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

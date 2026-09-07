@@ -48,6 +48,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -156,7 +157,7 @@ class NotifyMisskey(NotifyBase):
         if not self.token:
             msg = "An invalid Misskey Access Token was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if visibility:
             # Input is a string; attempt to get the lookup from our
@@ -179,7 +180,7 @@ class NotifyMisskey(NotifyBase):
                     " invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.visibility = self.template_args["visibility"]["default"]
 

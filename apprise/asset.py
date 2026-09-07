@@ -38,6 +38,7 @@ from .common import (
     NotifyType,
     PersistentStoreMode,
 )
+from .exception import AppriseImproperlyConfigured
 from .manager_plugins import NotificationManager
 from .utils.time import zoneinfo
 
@@ -293,14 +294,14 @@ class AppriseAsset:
         # Assign default arguments if specified
         for key, value in kwargs.items():
             if not hasattr(AppriseAsset, key):
-                raise AttributeError(
+                raise AppriseImproperlyConfigured(
                     f"AppriseAsset init(): An invalid key {key} was specified."
                 )
 
             if key.startswith("_") and (
                 key not in self._KWARGS_INTERNAL_ALLOWLIST
             ):
-                raise AttributeError(
+                raise AppriseImproperlyConfigured(
                     f"AppriseAsset init(): {key} can not be set directly; "
                     "use its dedicated keyword argument instead."
                 )
@@ -330,13 +331,13 @@ class AppriseAsset:
                     f"An invalid persistent store mode ({storage_mode}) was "
                     "specified."
                 )
-                raise AttributeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         if isinstance(storage_idlen, int):
             # Define the number of characters utilized from our namespace lengh
             if storage_idlen < 0:
                 # Unsupported type
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset storage_idlen(): Value must "
                     "be an integer and > 0"
                 )
@@ -350,7 +351,7 @@ class AppriseAsset:
         elif timezone is not None:
             self._tzinfo = zoneinfo(timezone)
             if not self._tzinfo:
-                raise AttributeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset timezone provided is invalid"
                 ) from None
         else:
@@ -362,13 +363,13 @@ class AppriseAsset:
             if not isinstance(service_timeout, (int, float)) or isinstance(
                 service_timeout, bool
             ):
-                raise TypeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset service_timeout must be an int or float."
                 )
 
             if not math.isfinite(service_timeout) or service_timeout < 0:
                 # Use 0 for no timeout; infinity is unsafe on some platforms.
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset service_timeout must be >= 0 and "
                     "finite (0 disables the timeout entirely)."
                 )
@@ -380,12 +381,12 @@ class AppriseAsset:
             if not isinstance(payload_max_size, int) or isinstance(
                 payload_max_size, bool
             ):
-                raise TypeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset payload_max_size must be an int."
                 )
 
             if payload_max_size < 0:
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset payload_max_size must be >= 0 "
                     "(0 disables the cap entirely)."
                 )
@@ -397,12 +398,12 @@ class AppriseAsset:
             if not isinstance(payload_buffer_threshold, int) or isinstance(
                 payload_buffer_threshold, bool
             ):
-                raise TypeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset payload_buffer_threshold must be an int."
                 )
 
             if payload_buffer_threshold < 0:
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset payload_buffer_threshold must be >= 0."
                 )
 
@@ -413,12 +414,12 @@ class AppriseAsset:
             if not isinstance(payload_min_buffer, int) or isinstance(
                 payload_min_buffer, bool
             ):
-                raise TypeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset payload_min_buffer must be an int."
                 )
 
             if payload_min_buffer < 0:
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset payload_min_buffer must be >= 0."
                 )
 
@@ -429,12 +430,12 @@ class AppriseAsset:
             if not isinstance(result_log_memory_size, int) or isinstance(
                 result_log_memory_size, bool
             ):
-                raise TypeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset result_log_memory_size must be an int."
                 )
 
             if result_log_memory_size < 0:
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset result_log_memory_size must be >= 0."
                 )
 
@@ -445,12 +446,12 @@ class AppriseAsset:
             if not isinstance(result_log_disk_size, int) or isinstance(
                 result_log_disk_size, bool
             ):
-                raise TypeError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset result_log_disk_size must be an int."
                 )
 
             if result_log_disk_size < 0:
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset result_log_disk_size must be >= 0."
                 )
 
@@ -468,13 +469,13 @@ class AppriseAsset:
 
                 except UnicodeEncodeError:
                     # Bad data; don't pass it along
-                    raise ValueError(
+                    raise AppriseImproperlyConfigured(
                         "AppriseAsset namespace_salt(): "
                         "Value provided could not be encoded"
                     ) from None
 
             else:  # Unsupported
-                raise ValueError(
+                raise AppriseImproperlyConfigured(
                     "AppriseAsset namespace_salt(): Value provided must be "
                     "string or bytes object"
                 )
@@ -573,7 +574,7 @@ class AppriseAsset:
             return AppriseAsset.hex_to_rgb(color)
 
         # Unsupported type
-        raise ValueError(
+        raise AppriseImproperlyConfigured(
             "AppriseAsset html_color(): An invalid color_type was specified."
         )
 

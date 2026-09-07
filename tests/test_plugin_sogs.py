@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sogs import (
     NotifySessionOGS,
     _build_session_message,
@@ -68,35 +69,35 @@ apprise_url_tests = (
     (
         f"sessions://host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing seed (user field present, no password)
     (
         f"sessions://{PUBLIC_KEY}@host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing public_key (bad key in user field, too short)
     (
         f"sessions://{BAD_KEY}:{SEED}@host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing room token (no path segments)
     (
         f"sessions://{PUBLIC_KEY}:{SEED}@host",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid seed (too short, in password field)
     (
         f"sessions://{PUBLIC_KEY}:{BAD_KEY}@host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid HTTPS URL - single room
@@ -272,15 +273,15 @@ def test_plugin_sogs_init(mock_post):
 )
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_public_key(mock_post):
-    """TypeError is raised when public_key is absent or invalid."""
-    with pytest.raises(TypeError):
+    """A missing or invalid public key is rejected."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=None,
             seed=SEED,
             targets=[ROOM],
             host="host",
         )
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=BAD_KEY,
             seed=SEED,
@@ -295,15 +296,15 @@ def test_plugin_sogs_missing_public_key(mock_post):
 )
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_seed(mock_post):
-    """TypeError is raised when seed is absent or invalid."""
-    with pytest.raises(TypeError):
+    """A missing or invalid seed is rejected."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=None,
             targets=[ROOM],
             host="host",
         )
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=BAD_KEY,
@@ -318,15 +319,15 @@ def test_plugin_sogs_missing_seed(mock_post):
 )
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_rooms(mock_post):
-    """TypeError is raised when no valid room token is provided."""
-    with pytest.raises(TypeError):
+    """At least one valid room token is required."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=SEED,
             targets=None,
             host="host",
         )
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=SEED,

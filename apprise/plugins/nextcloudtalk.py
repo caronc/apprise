@@ -30,6 +30,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
@@ -131,7 +132,7 @@ class NotifyNextcloudTalk(NotifyBase):
         if self.user is None or self.password is None:
             msg = "A NextCloudTalk User and Password must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our targets
         self.targets = parse_list(targets)

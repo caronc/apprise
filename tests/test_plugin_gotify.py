@@ -36,6 +36,7 @@ import requests
 
 import apprise
 from apprise import NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.gotify import GotifyPriority, NotifyGotify
 
 logging.disable(logging.CRITICAL)
@@ -52,7 +53,7 @@ apprise_url_tests = (
     (
         "gotify://hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide a hostname and token
@@ -152,10 +153,10 @@ def test_plugin_gotify_urls():
 def test_plugin_gotify_edge_cases():
     """NotifyGotify() Edge Cases."""
     # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGotify(token=None)
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGotify(token="   ")
 
 

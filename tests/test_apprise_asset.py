@@ -34,6 +34,7 @@ from zoneinfo import ZoneInfo
 import pytest
 
 from apprise.asset import AppriseAsset
+from apprise.exception import AppriseImproperlyConfigured
 
 logging.disable(logging.CRITICAL)
 
@@ -56,14 +57,14 @@ def test_timezone():
     asset = AppriseAsset(timezone=ZoneInfo("America/Toronto"))
     assert isinstance(asset.tzinfo, tzinfo)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(timezone=object)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(timezone="invalid")
 
     # The private field cannot bypass the validated timezone argument.
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(_tzinfo=timezone.utc)
 
 
@@ -88,15 +89,15 @@ def test_service_timeout():
     assert asset._service_timeout == 0.0
 
     # Negative values are rejected
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout=-1)
 
     # Non-numeric types are rejected
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout="invalid")
 
     # Booleans are rejected even though bool is technically an int subclass
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout=True)
 
     # inf might look like a second way to spell "unbounded" (0 is the
@@ -104,20 +105,20 @@ def test_service_timeout():
     # float("inf")) raises OverflowError on some platforms, silently
     # turning a successful notification into a reported FAILURE -- so
     # it's rejected outright, same as any other non-finite value.
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout=float("inf"))
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout=float("-inf"))
 
     # NaN fails every ordering comparison, so it would otherwise slip
     # past a plain "< 0" check and silently disable the timeout as an
     # accidental side effect of its comparison semantics.
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(service_timeout=float("nan"))
 
     # The private field cannot bypass the validated public argument.
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(_service_timeout=99.0)
 
 
@@ -137,22 +138,22 @@ def test_payload_max_size():
     assert asset._payload_max_size == 0
 
     # Negative values are rejected
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_max_size=-1)
 
     # Non-int types are rejected -- a float character count makes no sense
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_max_size=12.5)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_max_size="invalid")
 
     # Booleans are rejected even though bool is technically an int subclass
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_max_size=True)
 
     # The private field cannot bypass the validated public argument.
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(_payload_max_size=250)
 
 
@@ -175,31 +176,31 @@ def test_payload_buffer_threshold_and_min_buffer():
     assert asset._payload_min_buffer == 0
 
     # Negative values are rejected.
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_buffer_threshold=-1)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_min_buffer=-1)
 
     # Non-int types are rejected.
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_buffer_threshold=12.5)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_min_buffer="invalid")
 
     # Booleans are rejected even though bool is technically an int subclass.
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_buffer_threshold=True)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(payload_min_buffer=True)
 
     # Private fields cannot bypass the validated public arguments.
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(_payload_buffer_threshold=2)
 
-    with pytest.raises(AttributeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         AppriseAsset(_payload_min_buffer=7)
 
 
@@ -216,12 +217,12 @@ def test_result_log_storage_sizes():
     assert asset.result_log_disk_size == 4096
 
     for name in ("result_log_memory_size", "result_log_disk_size"):
-        with pytest.raises(ValueError):
+        with pytest.raises(AppriseImproperlyConfigured):
             AppriseAsset(**{name: -1})
         for value in (True, 1.5, "1024"):
-            with pytest.raises(TypeError):
+            with pytest.raises(AppriseImproperlyConfigured):
                 AppriseAsset(**{name: value})
-        with pytest.raises(AttributeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             AppriseAsset(**{"_{}".format(name): 1})
 
 

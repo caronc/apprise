@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.vonage import NotifyVonage
 
 logging.disable(logging.CRITICAL)
@@ -45,42 +46,42 @@ apprise_url_tests = (
         "vonage://",
         {
             # No API Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vonage://:@/",
         {
             # invalid Auth key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vonage://AC{}@12345678".format("a" * 8),
         {
             # Just a key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vonage://AC{}:{}@{}".format("a" * 8, "b" * 16, "3" * 9),
         {
             # key and secret provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vonage://AC{}:{}@{}/?ttl=0".format("b" * 8, "c" * 16, "3" * 11),
         {
             # Invalid ttl defined
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "vonage://AC{}:{}@{}".format("d" * 8, "e" * 16, "a" * 11),
         {
             # Invalid source number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -153,42 +154,42 @@ apprise_url_tests = (
         "nexmo://",
         {
             # No API Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nexmo://:@/",
         {
             # invalid Auth key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nexmo://AC{}@12345678".format("a" * 8),
         {
             # Just a key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nexmo://AC{}:{}@{}".format("a" * 8, "b" * 16, "3" * 9),
         {
             # key and secret provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nexmo://AC{}:{}@{}/?ttl=0".format("b" * 8, "c" * 16, "3" * 11),
         {
             # Invalid ttl defined
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "nexmo://AC{}:{}@{}".format("d" * 8, "e" * 16, "a" * 11),
         {
             # Invalid source number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -283,17 +284,17 @@ def test_plugin_vonage_edge_cases(mock_post):
     source = "+1 (555) 123-3456"
 
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyVonage(apikey=None, secret=secret, source=source)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyVonage(apikey="  ", secret=secret, source=source)
 
     # No secret specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyVonage(apikey=apikey, secret=None, source=source)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyVonage(apikey=apikey, secret="  ", source=source)
 
     # a error response

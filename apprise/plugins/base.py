@@ -54,6 +54,7 @@ from ..conversion import (
     split_dialect_chunk,
     truncate_dialect_chunk,
 )
+from ..exception import AppriseImproperlyConfigured
 from ..locale import Translatable, gettext_lazy as _
 from ..persistent_store import PersistentStore
 from ..url import URLBase
@@ -495,7 +496,7 @@ class NotifyBase(URLBase):
                 if _retry_val < 0:
                     msg = f"Service retry count must be >= 0; got {_retry_raw}"
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
                 self.retry = min(_retry_val, APPRISE_MAX_SERVICE_RETRY)
             except (TypeError, ValueError):
                 self.logger.warning(
@@ -517,7 +518,7 @@ class NotifyBase(URLBase):
         #   2. asset.default_service_wait
         # Only valid non-negative finite floats are accepted; integers are
         # promoted to float.  Invalid values fall back to the asset default.
-        # Negative values raise TypeError.
+        # Negative values are invalid and use the same fallback.
         _wait_raw = kwargs.get("wait")
         if _wait_raw is not None:
             try:
@@ -525,7 +526,7 @@ class NotifyBase(URLBase):
                 if not math.isfinite(_wait_val) or _wait_val < 0.0:
                     msg = f"Service retry wait must be >= 0; got {_wait_raw}"
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
                 self.wait = min(_wait_val, APPRISE_MAX_SERVICE_WAIT)
             except (TypeError, ValueError):
                 self.logger.warning(
@@ -620,7 +621,7 @@ class NotifyBase(URLBase):
                     f"An invalid notification format ({value}) was specified."
                 )
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
             if len(self._formats()) == 1:
                 # Single-format plugin: force the requested destination
@@ -641,7 +642,7 @@ class NotifyBase(URLBase):
                     f"({value}) was specified."
                 )
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         if "overflow" in kwargs:
             value = kwargs["overflow"]
@@ -655,7 +656,7 @@ class NotifyBase(URLBase):
             except (AttributeError, ValueError):
                 err = f"An invalid overflow method ({value}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         # Prepare our Persistent Storage switch
         self.persistent_storage = parse_bool(
@@ -930,7 +931,7 @@ class NotifyBase(URLBase):
             # Deny notifications issued to services that are disabled
             msg = f"{self.service_name} is currently disabled on this system."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare attachments if required
         if attach is not None and not isinstance(attach, AppriseAttachment):
@@ -949,7 +950,7 @@ class NotifyBase(URLBase):
             # present
             msg = "No message body or attachment was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if not body and not self.attachment_support:
             # If no body was specified, then we know that an attachment
@@ -963,7 +964,7 @@ class NotifyBase(URLBase):
                 "attachments; service skipped"
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Handle situations where the title is None
         title = title if title else ""

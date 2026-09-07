@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.one_signal import NotifyOneSignal
 
 logging.disable(logging.CRITICAL)
@@ -46,35 +47,35 @@ apprise_url_tests = (
         "onesignal://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "onesignal://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "onesignal://apikey/",
         {
             # no app id specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "onesignal://appid@%20%20/",
         {
             # invalid apikey
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "onesignal://appid@apikey/playerid/?lang=X",
         {
             # invalid language id (must be 2 characters)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -345,13 +346,13 @@ def test_plugin_onesignal_edge_cases():
     assert len(obj) == 16
 
     # custom must be a dictionary
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyOneSignal(
             app="appid", apikey="key", targets=["@user"], custom="not-a-dict"
         )
 
     # postback must be a dictionary
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyOneSignal(
             app="appid",
             apikey="key",

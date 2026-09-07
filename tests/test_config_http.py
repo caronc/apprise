@@ -37,6 +37,7 @@ import requests
 from apprise import NotificationManager
 from apprise.common import ConfigFormat
 from apprise.config.http import ConfigHTTP
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins import NotifyBase
 
 logging.disable(logging.CRITICAL)
@@ -215,7 +216,7 @@ def test_config_http(mock_post):
 
     results = ConfigHTTP.parse_url("http://localhost:8080/path/?cache=-10")
     assert isinstance(results, dict)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         ch = ConfigHTTP(**results)
 
     results = ConfigHTTP.parse_url("http://user@localhost?format=text")

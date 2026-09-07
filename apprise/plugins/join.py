@@ -40,6 +40,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -214,7 +215,7 @@ class NotifyJoin(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Join API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Priority of the message
         self.priority = int(

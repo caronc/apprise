@@ -35,6 +35,7 @@ import yaml
 
 from .. import common, plugins
 from ..asset import AppriseAsset
+from ..exception import AppriseImproperlyConfigured
 from ..logger import logging
 from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
@@ -177,7 +178,7 @@ class ConfigBase(URLBase):
             except (AttributeError, ValueError):
                 err = f"An invalid config format ({fmt}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         # Set our cache flag; it can be True or a (positive) integer
         try:
@@ -185,12 +186,12 @@ class ConfigBase(URLBase):
             if self.cache < 0:
                 err = f"A negative cache value ({cache}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err)
+                raise AppriseImproperlyConfigured(err)
 
         except (ValueError, TypeError):
             err = f"An invalid cache value ({cache}) was specified."
             self.logger.warning(err)
-            raise TypeError(err) from None
+            raise AppriseImproperlyConfigured(err) from None
 
         return
 

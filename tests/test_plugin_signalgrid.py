@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.signalgrid import NotifySignalgrid
 
 logging.disable(logging.CRITICAL)
@@ -45,7 +46,7 @@ apprise_url_tests = (
     (
         "signalgrid://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

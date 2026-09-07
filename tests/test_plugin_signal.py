@@ -39,6 +39,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.config import ConfigBase
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.base import NotifyFormat
 from apprise.plugins.signal_api import NotifySignalAPI
 
@@ -64,35 +65,35 @@ apprise_url_tests = (
         "signal://",
         {
             # No host specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://:@/",
         {
             # invalid host
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://localhost",
         {
             # Just a host provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://localhost",
         {
             # key and secret provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://localhost/123",
         {
             # invalid from phone
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -251,7 +252,7 @@ def test_plugin_signal_edge_cases(request_mock):
     title = "My Title"
 
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySignalAPI(source=None)
 
     aobj = Apprise()

@@ -28,6 +28,7 @@
 import sys
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool
 from .base import NotifyBase
@@ -254,7 +255,7 @@ class NotifyDBus(NotifyBase):
         if self.schema not in MAINLOOP_MAP:
             msg = f"The schema specified ({self.schema}) is not supported."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The urgency of the message
         self.urgency = int(
@@ -283,7 +284,7 @@ class NotifyDBus(NotifyBase):
                     " invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
         else:
             self.x_axis = None
             self.y_axis = None

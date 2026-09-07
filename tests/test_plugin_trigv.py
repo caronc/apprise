@@ -33,6 +33,7 @@ import pytest
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.trigv import NotifyTrigv
 
 logging.disable(logging.CRITICAL)
@@ -43,13 +44,13 @@ apprise_url_tests = (
     (
         "trigvs://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "trigv://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -109,13 +110,13 @@ apprise_url_tests = (
     (
         "trigvs://not-a-valid-key",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         f"trigvs://{VALID_API_KEY}/bad.channel/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -352,7 +353,7 @@ def test_plugin_trigv_empty_body_and_invalid_priority(mock_post):
 def test_plugin_trigv_invalid_urgency():
     """NotifyTrigv() rejects unknown urgency."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTrigv(api_key=VALID_API_KEY, urgency="critical")
 
 

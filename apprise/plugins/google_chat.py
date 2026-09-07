@@ -72,6 +72,7 @@ from ..conversion import (
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
 )
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -174,7 +175,7 @@ class NotifyGoogleChat(NotifyBase):
                 f"({workspace}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Webhook Key (associated with project)
         self.webhook_key = validate_regex(webhook_key)
@@ -184,7 +185,7 @@ class NotifyGoogleChat(NotifyBase):
                 f"({webhook_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Webhook Token (associated with project)
         self.webhook_token = validate_regex(webhook_token)
@@ -194,7 +195,7 @@ class NotifyGoogleChat(NotifyBase):
                 f"({webhook_token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if thread_key:
             self.thread_key = validate_regex(thread_key)
@@ -204,7 +205,7 @@ class NotifyGoogleChat(NotifyBase):
                     f"({thread_key}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.thread_key = None
 

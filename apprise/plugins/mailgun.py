@@ -58,6 +58,7 @@ from email.utils import formataddr
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..logger import logger
 from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
@@ -231,13 +232,13 @@ class NotifyMailgun(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Mailgun API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our username
         if not self.user:
             msg = "No Mailgun username was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Email 'To'
         self.targets = []
@@ -279,7 +280,7 @@ class NotifyMailgun(NotifyBase):
             # Invalid region specified
             msg = f"The Mailgun region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Get our From username (if specified)
         self.from_addr = [self.app_id, f"{self.user}@{self.host}"]
@@ -298,7 +299,7 @@ class NotifyMailgun(NotifyBase):
             # Parse Source domain based on from_addr
             msg = f"Invalid ~From~ email format: {self.from_addr}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if targets:
             # Validate recipients (to:) and drop bad ones:

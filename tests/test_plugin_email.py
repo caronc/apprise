@@ -52,7 +52,7 @@ from apprise import (
 )
 from apprise.attachment.memory import AttachMemory
 from apprise.config import ConfigBase
-from apprise.exception import AppriseException
+from apprise.exception import AppriseException, AppriseImproperlyConfigured
 from apprise.plugins import email
 
 try:
@@ -73,19 +73,19 @@ TEST_URLS = (
     (
         "mailto://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "mailtos://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "mailto://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No Username
@@ -93,7 +93,7 @@ TEST_URLS = (
         "mailtos://:pass@nuxref.com:567",
         {
             # Can't prepare a To address using this expression
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -101,7 +101,7 @@ TEST_URLS = (
         "mailto://user:pass@fastmail.com?tz=invalid",
         {
             # An error is thrown for this
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Pre-Configured Email Services
@@ -431,7 +431,7 @@ TEST_URLS = (
     (
         "mailtos://nuxref.com?user=&pass=.",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid To Address is accepted, but we won't be able to properly email
@@ -447,21 +447,21 @@ TEST_URLS = (
     (
         'mailtos://nuxref.com?user=%20"&pass=.',
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid From (and To) Address
     (
         "mailtos://nuxref.com?to=test",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid Secure Mode
     (
         "mailtos://user:pass@example.com?mode=notamode",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # STARTTLS flag checking
@@ -2577,7 +2577,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     assert results["smtp_host"] == "mobile.charter.net"
     assert results["password"] == "password"
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # We will fail
         Apprise.instantiate(results, suppress_exceptions=False)
 

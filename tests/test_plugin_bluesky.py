@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bluesky import NotifyBlueSky
 
 # Disable logging for a cleaner testing output
@@ -56,20 +57,20 @@ apprise_url_tests = (
         "bluesky://",
         {
             # Missing user and app_pass
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bluesky://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bluesky://app-pw",
         {
             # Missing User
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -473,7 +474,7 @@ def test_plugin_bluesky_general(mocker):
 def test_plugin_bluesky_edge_cases():
     """NotifyBlueSky() Edge Cases."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBlueSky()
 
 

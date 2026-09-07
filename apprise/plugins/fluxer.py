@@ -54,6 +54,7 @@ import requests
 
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_hostname,
@@ -292,7 +293,7 @@ class NotifyFluxer(NotifyBase):
         if not self.webhook_id:
             msg = f"An invalid Fluxer Webhook ID ({webhook_id}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Webhook Token (associated with project)
         self.webhook_token = validate_regex(
@@ -304,7 +305,7 @@ class NotifyFluxer(NotifyBase):
                 f"({webhook_token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare our mode
         self.mode = (
@@ -316,13 +317,13 @@ class NotifyFluxer(NotifyBase):
         if self.mode not in FLUXER_MODES:
             msg = f"An invalid Fluxer Mode ({mode}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if not self.host and self.mode == FluxerMode.PRIVATE:
             # No host provided
             msg = f"An invalid Fluxer Hostname ({self.host}) was provided."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if self.mode == FluxerMode.PRIVATE and self.__auto_cloud_host.search(
             self.host
@@ -399,7 +400,7 @@ class NotifyFluxer(NotifyBase):
                     f"An invalid Fluxer flags setting ({flags}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
         else:
             self.flags = None
 
