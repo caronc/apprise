@@ -51,6 +51,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyType, PersistentStoreMode
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -352,7 +353,7 @@ class NotifyOpsgenie(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Opsgenie API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Priority of the message
         self.priority = (
@@ -383,7 +384,7 @@ class NotifyOpsgenie(NotifyBase):
             # Invalid region specified
             msg = f"The Opsgenie region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         if action and isinstance(action, str):
             self.action = next(
@@ -392,7 +393,7 @@ class NotifyOpsgenie(NotifyBase):
             if self.action not in OPSGENIE_ACTIONS:
                 msg = f"The Opsgenie action specified ({action}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.action = self.template_args["action"]["default"]
 
@@ -408,7 +409,7 @@ class NotifyOpsgenie(NotifyBase):
                         "is invalid."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 v_lower = v_.lower()
                 v = next(
@@ -421,7 +422,7 @@ class NotifyOpsgenie(NotifyBase):
                         f"specified ({v_}) is invalid."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 # Update our mapping
                 self.mapping[k] = v

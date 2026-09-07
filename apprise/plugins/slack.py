@@ -94,6 +94,7 @@ from ..conversion import (
     commonmark_scan_autolink_dest,
     commonmark_scan_paren_dest,
 )
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_bool, parse_list, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -618,7 +619,7 @@ class NotifySlack(NotifyBase):
             if self.mode not in SLACK_MODES:
                 msg = f"The Slack mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         elif workflow_path:
             # Mode will be determined by segment count below;
@@ -658,7 +659,7 @@ class NotifySlack(NotifyBase):
                         f" ({workflow_path!r} has {seg_count})."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
             else:
                 # Auto-detect sub-mode from segment count
                 if seg_count == 4:
@@ -672,7 +673,7 @@ class NotifySlack(NotifyBase):
                         f" {seg_count})."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
         elif self.mode in (SlackMode.WEBHOOK, SlackMode.WEBHOOK_GOV):
             self.workflow_path = []
@@ -686,7 +687,7 @@ class NotifySlack(NotifyBase):
                     f"({token_a}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.token_b = validate_regex(
                 token_b, *self.template_tokens["token_b"]["regex"]
@@ -697,7 +698,7 @@ class NotifySlack(NotifyBase):
                     f"({token_b}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.token_c = validate_regex(
                 token_c, *self.template_tokens["token_c"]["regex"]
@@ -708,7 +709,7 @@ class NotifySlack(NotifyBase):
                     f"({token_c}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.workflow_path = []
             self.token_a = None
@@ -723,7 +724,7 @@ class NotifySlack(NotifyBase):
                     f"({access_token}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Look the users up by their email address and map them back to their
         # id here for future queries (if needed). This allows people to
@@ -790,7 +791,7 @@ class NotifySlack(NotifyBase):
                 # add() failed (unsupported schema, unparseable URL, etc.)
                 msg = f"The Slack template ({template!r}) could not be loaded."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
             # Enforce maximum file size
             self.template[0].max_file_size = self.max_slack_template_size
 
@@ -805,7 +806,7 @@ class NotifySlack(NotifyBase):
                 f"({tokens}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # A template always implies Block Kit mode; there is no meaningful
         # use for templates outside of blocks mode.

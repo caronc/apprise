@@ -33,6 +33,7 @@ from itertools import chain
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from .base import NotifyBase
@@ -116,7 +117,7 @@ class NotifyClickatell(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Clickatell API Token ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.source = None
         if source:
@@ -128,7 +129,7 @@ class NotifyClickatell(NotifyBase):
                 )
                 self.logger.warning(msg)
 
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Tidy source
             self.source = result["full"]

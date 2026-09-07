@@ -37,6 +37,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mastodon import NotifyMastodon
 
 logging.disable(logging.CRITICAL)
@@ -66,7 +67,7 @@ apprise_url_tests = (
         "mastodon://hostname",
         {
             # Missing Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -153,14 +154,14 @@ apprise_url_tests = (
         "mastodon://access_token@hostname/-/%/",
         {
             # Invalid users specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "mastodon://access_token@hostname?visibility=invalid",
         {
             # An invalid visibility
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

@@ -39,6 +39,7 @@ import re
 import requests
 
 from ..common import NOTIFY_TYPES, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -233,7 +234,7 @@ class NotifySplunk(NotifyBase):
         if not self.apikey:
             msg = f"The Splunk API Key specified ({apikey}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.routing_key = validate_regex(
             routing_key, *self.template_tokens["routing_key"]["regex"]
@@ -243,7 +244,7 @@ class NotifySplunk(NotifyBase):
                 f"The Splunk Routing Key specified ({routing_key}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if not (
             isinstance(entity_id, str) and len(entity_id.strip(" \r\n\t\v/"))
@@ -262,7 +263,7 @@ class NotifySplunk(NotifyBase):
             if self.action not in SPLUNK_ACTIONS:
                 msg = f"The Splunk action specified ({action}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.action = self.template_args["action"]["default"]
 
@@ -277,7 +278,7 @@ class NotifySplunk(NotifyBase):
                         f"The Splunk mapping key specified ({k_}) is invalid."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 v_upper = v_.upper()
                 v = next(
@@ -290,7 +291,7 @@ class NotifySplunk(NotifyBase):
                         f"specified ({v_}) is invalid."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 # Update our mapping
                 self.mapping[k] = v

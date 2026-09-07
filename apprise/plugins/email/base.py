@@ -40,6 +40,7 @@ from typing import Optional
 
 from ...common import NotifyFormat, NotifyType, PersistentStoreMode
 from ...conversion import convert_between
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...logger import logger
 from ...url import PrivacyMode
@@ -335,7 +336,7 @@ class NotifyEmail(NotifyBase):
                 secure_mode
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -431,7 +432,7 @@ class NotifyEmail(NotifyBase):
                 else "{}".format(self.from_addr[1])
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our lookup
         self.names[self.from_addr[1]] = self.from_addr[0]

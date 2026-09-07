@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sparkpost import NotifySparkPost
 
 logging.disable(logging.CRITICAL)
@@ -49,34 +50,34 @@ apprise_url_tests = (
     (
         "sparkpost://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sparkpost://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No Token specified
     (
         "sparkpost://user@localhost.localdomain",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Token is valid, but no user name specified
     (
         "sparkpost://localhost.localdomain/{}".format("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid from email address
     (
         'sparkpost://"@localhost.localdomain/{}'.format("b" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No To email address, but everything else is valid
@@ -218,7 +219,7 @@ apprise_url_tests = (
             "a" * 32
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # One 'To' Email address
@@ -356,11 +357,11 @@ def test_plugin_sparkpost_throttling(mock_post):
     targets = f"{user}@{host}"
 
     # Exception should be thrown about the fact no user was specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySparkPost(apikey=apikey, targets=targets, host=host)
 
     # Exception should be thrown about the fact no private key was specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySparkPost(apikey=None, targets=targets, user=user, host=host)
 
     okay_response = requests.Request()

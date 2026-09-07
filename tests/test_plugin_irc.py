@@ -36,6 +36,7 @@ from unittest import mock
 
 import pytest
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.irc import NotifyIRC
 from apprise.plugins.irc.client import IRCClient
 from apprise.plugins.irc.protocol import (
@@ -110,7 +111,7 @@ def test_plugin_irc_modes() -> None:
     """NotifyIRC auth mode tests."""
     with (
         mock.patch.object(NotifyIRC, "apply_irc_defaults"),
-        pytest.raises(TypeError),
+        pytest.raises(AppriseImproperlyConfigured),
     ):
         NotifyIRC(host="irc.example.com", targets=["#c"], mode="invalid")
 

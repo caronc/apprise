@@ -37,6 +37,7 @@ import pytest
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushover import NotifyPushover, PushoverPriority
 
 logging.disable(logging.CRITICAL)
@@ -49,21 +50,21 @@ apprise_url_tests = (
     (
         "pover://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # bad url
     (
         "pover://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no user
     (
         "pover://%s" % ("a" * 30),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + custom sound setting
@@ -277,7 +278,7 @@ apprise_url_tests = (
             "u" * 30, "a" * 30, "expire=100000"
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + emergency priority setting with invalid interval
@@ -286,7 +287,7 @@ apprise_url_tests = (
             "u" * 30, "a" * 30, "interval=15"
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + priority setting (empty)
@@ -349,7 +350,7 @@ apprise_url_tests = (
     (
         "pover://{}@{}?key=tooshort".format("u" * 30, "a" * 30),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # E2EE: invalid key (correct length but non-hex)
@@ -361,7 +362,7 @@ apprise_url_tests = (
             "z" * 64,
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )
@@ -503,7 +504,7 @@ def test_plugin_pushover_edge_cases(mock_post):
     """NotifyPushover() Edge Cases."""
 
     # No token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(token=None)
 
     # Initialize some generic (but valid) tokens
@@ -520,7 +521,7 @@ def test_plugin_pushover_edge_cases(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # No webhook id specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=user_key, webhook_id=None)
 
     obj = NotifyPushover(user_key=user_key, token=token, targets=devices)
@@ -606,14 +607,14 @@ def test_plugin_pushover_edge_cases(mock_post):
     assert len(obj) == 1
 
     # No User Key specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=None, token="abcd")
 
     # No Access Token specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key="abcd", token=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key="abcd", token="  ")
 
 
@@ -860,11 +861,11 @@ def test_plugin_pushover_e2ee(mock_post):
     mock_post.return_value = response
 
     # --- Invalid key: too short ---
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=user_key, token=token, encryption_key="abc")
 
     # --- Invalid key: 64 chars but non-hex ---
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=user_key, token=token, encryption_key="z" * 64)
 
     # --- Valid key: object instantiates correctly ---

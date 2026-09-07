@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.notifyre import NotifyNotifyre, NotifyreMode
 
 logging.disable(logging.CRITICAL)
@@ -71,14 +72,14 @@ apprise_url_tests = (
         "notifyre://",
         {
             # No API key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "notifyre://:@/",
         {
             # Empty credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -135,7 +136,7 @@ apprise_url_tests = (
         "notifyre://{}/+15551234567?mode=invalid".format(API_KEY),
         {
             # Invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -230,21 +231,21 @@ def test_plugin_notifyre_init():
     """Initialization and validation coverage."""
 
     # Missing API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifyre(apikey=None, targets=["+15551234567"])
 
     # Empty API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifyre(apikey="", targets=["+15551234567"])
 
     # Invalid mode
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifyre(
             apikey=API_KEY, targets=["+15551234567"], mode="invalid"
         )
 
     # Invalid source phone number
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyNotifyre(
             apikey=API_KEY, targets=["+15551234567"], source="not-a-phone"
         )

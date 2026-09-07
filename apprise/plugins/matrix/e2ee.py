@@ -84,6 +84,7 @@ except ImportError:
     MATRIX_E2EE_SUPPORT = False
 
 from ...common import JSON_COMPACT_SEPARATORS
+from ...exception import AppriseInvalidData
 
 # Rotate the MegOLM session after this many messages
 MEGOLM_ROTATION_MSGS = 100
@@ -1249,7 +1250,9 @@ class MatrixMegOlmSession:
     def from_dict(data):
         """Restore from a ``to_dict()`` snapshot."""
         if data.get("version") != MATRIX_MEGOLM_STORE_VERSION:
-            raise ValueError("Incompatible MegOLM session cache format")
+            raise AppriseInvalidData(
+                "Incompatible MegOLM session cache format"
+            )
         return MatrixMegOlmSession(
             ratchet=[_b64dec(r) for r in data["ratchet"]],
             counter=data["counter"],

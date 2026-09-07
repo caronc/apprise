@@ -45,6 +45,7 @@ from apprise import (
     NotifyFormat,
     NotifyType,
 )
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.telegram import NotifyTelegram
 
 logging.disable(logging.CRITICAL)
@@ -143,14 +144,14 @@ apprise_url_tests = (
     (
         "tgram://bottest@123456789:abcdefg_hijklmnop/id1/?topic=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # content must be 'before' or 'after'
     (
         "tgram://bottest@123456789:abcdefg_hijklmnop/id1/?content=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -385,7 +386,7 @@ def test_plugin_telegram_general(mock_post):
     mock_post.return_value.content = "{}"
 
     # Exception should be thrown about the fact no bot token was specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTelegram(bot_token=None, targets=chat_ids)
 
     # Invalid JSON while trying to detect bot owner
@@ -403,7 +404,7 @@ def test_plugin_telegram_general(mock_post):
 
     # Exception should be thrown about the fact an invalid bot token was
     # specifed
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTelegram(bot_token=invalid_bot_token, targets=chat_ids)
 
     obj = NotifyTelegram(
@@ -2771,8 +2772,8 @@ def test_plugin_telegram_template_load_error(mock_post, tmpdir):
 
 
 def test_plugin_telegram_template_bad_tokens():
-    """NotifyTelegram() - invalid tokens type raises TypeError."""
-    with pytest.raises(TypeError):
+    """NotifyTelegram() rejects an invalid template token type."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTelegram(
             bot_token="123456789:abcdefg_hijklmnop",
             targets="lead2gold",
@@ -2781,14 +2782,13 @@ def test_plugin_telegram_template_bad_tokens():
 
 
 def test_plugin_telegram_template_add_failure():
-    """NotifyTelegram() - TypeError when AppriseAttachment.add() drops
-    entry."""
+    """NotifyTelegram() rejects a template attachment it cannot add."""
     with mock.patch("apprise.plugins.telegram.AppriseAttachment") as mock_cls:
         inst = mock.MagicMock()
         inst.__len__ = mock.Mock(return_value=0)
         mock_cls.return_value = inst
 
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             NotifyTelegram(
                 bot_token="123456789:abcdefg_hijklmnop",
                 targets="lead2gold",

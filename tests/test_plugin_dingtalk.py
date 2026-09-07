@@ -34,6 +34,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.dingtalk import NotifyDingTalk
 
 logging.disable(logging.CRITICAL)
@@ -44,14 +45,14 @@ apprise_url_tests = (
         "dingtalk://",
         {
             # No Access Token specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dingtalk://a_bd_/",
         {
             # invalid Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -109,7 +110,7 @@ apprise_url_tests = (
     (
         "dingtalk://{}/?to={}&secret=_".format("a" * 8, "1" * 14),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

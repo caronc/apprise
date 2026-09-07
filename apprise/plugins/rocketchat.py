@@ -32,6 +32,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -230,7 +231,7 @@ class NotifyRocketChat(NotifyBase):
         if self.mode and self.mode not in ROCKETCHAT_AUTH_MODES:
             msg = f"The authentication mode specified ({mode}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Detect our mode if it wasn't specified
         if not self.mode:
@@ -257,12 +258,12 @@ class NotifyRocketChat(NotifyBase):
                 else "user/apikey"
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         elif self.mode == RocketChatAuthMode.WEBHOOK and not self.webhook:
             msg = "No Rocket.Chat Incoming Webhook was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if self.mode == RocketChatAuthMode.TOKEN:
             # Set our headers for further communication
@@ -304,7 +305,7 @@ class NotifyRocketChat(NotifyBase):
         ):
             msg = "No Rocket.Chat room and/or channels specified to notify."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare our avatar setting
         # - if specified; that trumps all

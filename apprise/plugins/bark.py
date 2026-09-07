@@ -43,6 +43,7 @@ except ImportError:
     BARK_AESGCM_SUPPORT = False
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured, ApprisePluginException
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -357,7 +358,7 @@ class NotifyBark(NotifyBase):
                     "characters."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
             # AES-GCM only accepts 128/192/256-bit (16/24/32 byte) keys
             if len(encryption_key_bytes) not in BARK_AES_KEY_LENGTHS:
@@ -366,7 +367,7 @@ class NotifyBark(NotifyBase):
                     "32 ASCII characters."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Fail closed; never fall back to sending plaintext when the
             # caller asked for encryption but the library isn't available
@@ -376,7 +377,7 @@ class NotifyBark(NotifyBase):
                     "Install Apprise with the 'all-plugins' extra."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # We're ready to encrypt every outbound payload with this key
             self.encryption_key = encryption_key
@@ -597,7 +598,9 @@ class NotifyBark(NotifyBase):
         # characters (a 96-bit GCM nonce)
         iv = secrets.token_urlsafe(BARK_GCM_IV_RANDOM_BYTES)
         if len(iv) != BARK_GCM_IV_LENGTH or not iv.isascii():
-            raise ValueError("Bark generated an incompatible AES-GCM IV")
+            raise ApprisePluginException(
+                "Bark generated an incompatible AES-GCM IV"
+            )
 
         # Bark decrypts a compact JSON object back into its parameters
         plaintext = json.dumps(

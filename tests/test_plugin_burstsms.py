@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.burstsms import NotifyBurstSMS
 
 logging.disable(logging.CRITICAL)
@@ -45,28 +46,28 @@ apprise_url_tests = (
         "burstsms://",
         {
             # No API Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "burstsms://:@/",
         {
             # invalid Auth key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "burstsms://{}@12345678".format("a" * 8),
         {
             # Just a key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "burstsms://{}:{}@%20".format("d" * 8, "e" * 16),
         {
             # Invalid source number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -123,7 +124,7 @@ apprise_url_tests = (
             "a" * 8, "b" * 16, "5" * 11, "6" * 11
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Test our validity
@@ -141,7 +142,7 @@ apprise_url_tests = (
             "a" * 8, "b" * 16, "5" * 11, "6" * 11
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -198,17 +199,17 @@ def test_plugin_burstsms_edge_cases(mock_post):
     source = "+1 (555) 123-3456"
 
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBurstSMS(apikey=None, secret=secret, source=source)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBurstSMS(apikey="  ", secret=secret, source=source)
 
     # No secret specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBurstSMS(apikey=apikey, secret=None, source=source)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBurstSMS(apikey=apikey, secret="  ", source=source)
 
     # a error response

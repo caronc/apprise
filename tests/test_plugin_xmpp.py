@@ -45,8 +45,16 @@ from typing import Any, Optional
 import pytest
 
 from apprise import LOGGER_NAME, Apprise, NotifyType
+from apprise.exception import AppriseException, AppriseImproperlyConfigured
 from apprise.plugins.xmpp import adapter as xmpp_adapter, base as xmpp_base
 from apprise.plugins.xmpp.base import NotifyXMPP
+
+
+def test_plugin_xmpp_channel_binding_exception() -> None:
+    """Channel-binding failures use the common Apprise exception."""
+    exc = xmpp_adapter.XMPPChannelBindingError()
+    assert isinstance(exc, AppriseException)
+    assert str(exc) == "SASL SCRAM-PLUS channel-binding authentication failed."
 
 
 def run_on_loop(loop: asyncio.AbstractEventLoop, coro: Any) -> Any:
@@ -267,7 +275,7 @@ def test_slixmpp_unavailable() -> None:
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
 def test_xmpp_invalid_jid() -> None:
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyXMPP(host="example.com", user="bad jid", password="x")
 
 
@@ -972,7 +980,7 @@ def test_xmpp_normalize_jid() -> None:
         "#room@conference.example.ca", "example.ca"
     ) == ("room@conference.example.ca", True)
 
-    with pytest.raises(ValueError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # Bad entry
         NotifyXMPP.normalize_jid("", "example.ca")
 
@@ -1406,7 +1414,7 @@ def test_xmpp_timeout_cleanup_loop_none_skips_disconnect_and_stop(
 def test_xmpp_process_unsupported_secure_mode(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Cover unsupported secure mode path (ValueError inside runner)."""
+    """The process runner handles an unsupported secure mode."""
     install_fake_slixmpp(monkeypatch)
     # See test_xmpp_invalid_targets_logged for why this is needed: older
     # pytest releases don't un-suppress a prior logging.disable(CRITICAL)
@@ -3203,13 +3211,10 @@ def test_adapter_keepalive_runner_failed_handlers(
 
 
 @pytest.mark.skipif(not SLIXMPP_AVAILABLE, reason="Requires slixmpp")
-def test_adapter_keepalive_runner_unsupported_secure_mode_hits_valueerror(
+def test_keepalive_runner_rejects_secure_mode(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """
-    Cover keepalive runner unsupported secure mode ValueError.
-    The exception is caught internally, but the raise line is executed.
-    """
+    """The keepalive runner handles an unsupported secure mode."""
     install_fake_slixmpp(monkeypatch)
 
     cfg = xmpp_adapter.XMPPConfig(

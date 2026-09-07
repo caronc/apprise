@@ -54,6 +54,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -114,7 +115,7 @@ class NotifyTechulusPush(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Techulus Push API key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Techulus Push Notification."""

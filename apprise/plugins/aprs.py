@@ -74,6 +74,7 @@ import sys
 
 from .. import __version__
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_call_sign, parse_call_sign
@@ -231,7 +232,7 @@ class NotifyAprs(NotifyBase):
         if not (self.user and self.password):
             msg = "An APRS user/pass was not provided."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         """
         Check if the user tries to use a read-only access
@@ -241,7 +242,7 @@ class NotifyAprs(NotifyBase):
         if self.password == "-1":
             msg = "APRS read-only passwords are not supported."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         """
         Check if the password is numeric
@@ -249,7 +250,7 @@ class NotifyAprs(NotifyBase):
         if not self.password.isnumeric():
             msg = "Invalid APRS-IS password"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         """
         Convert given user name (FROM callsign) and
@@ -269,7 +270,7 @@ class NotifyAprs(NotifyBase):
                 )
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Update our delay
         if delay is None:
@@ -287,7 +288,7 @@ class NotifyAprs(NotifyBase):
             except (TypeError, ValueError):
                 msg = f"Unsupported APRS-IS delay ({delay}) specified. "
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         # Bump up our request_rate
         self.request_rate_per_sec += self.delay

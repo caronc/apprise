@@ -41,6 +41,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
@@ -146,7 +147,7 @@ class NotifyRevolt(NotifyBase):
         if not self.bot_token:
             msg = f"An invalid Revolt Bot Token ({bot_token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our Channel IDs
         self.targets = []

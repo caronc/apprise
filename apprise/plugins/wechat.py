@@ -82,6 +82,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
@@ -241,14 +242,14 @@ class NotifyWeChat(NotifyBase):
         if not self.corpid:
             msg = "A WeChat (WeCom) Corp ID must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate the App Secret
         self.corpsecret = validate_regex(corpsecret)
         if not self.corpsecret:
             msg = "A WeChat (WeCom) App Secret must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate the Agent ID (must be a non-negative integer string)
         self.agentid = validate_regex(
@@ -261,7 +262,7 @@ class NotifyWeChat(NotifyBase):
                 " it must be a non-negative integer.".format(agentid)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parsed and validated recipient lists
         self.users = []

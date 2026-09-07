@@ -28,7 +28,7 @@ import errno
 
 
 class AppriseException(Exception):
-    """Base Apprise Exception Class."""
+    """Base class for exceptions raised by Apprise."""
 
     def __init__(self, message, error_code=0):
         super().__init__(message)
@@ -36,28 +36,50 @@ class AppriseException(Exception):
 
 
 class ApprisePluginException(AppriseException):
-    """Class object for handling exceptions raised from within a plugin."""
+    """Raised when a notification plugin cannot complete an operation."""
 
     def __init__(self, message, error_code=600):
         super().__init__(message, error_code=error_code)
 
 
-class AppriseDiskIOError(AppriseException):
-    """Thrown when an disk i/o error occurs."""
+class AppriseImproperlyConfigured(
+    AppriseException, TypeError, ValueError, AttributeError
+):
+    """Raised when Apprise receives missing, invalid, or conflicting settings.
 
-    def __init__(self, message, error_code=errno.EIO):
+    It remains compatible with code that catches the built-in exceptions
+    historically raised for these errors: ``TypeError``, ``ValueError``, and
+    ``AttributeError``.
+    """
+
+    def __init__(self, message, error_code=errno.EINVAL):
         super().__init__(message, error_code=error_code)
 
 
+class AppriseDiskIOError(AppriseException, OSError):
+    """Raised when a disk I/O operation fails."""
+
+    def __init__(self, message, error_code=errno.EIO):
+        super().__init__(message, error_code=error_code)
+        # Expose the standard I/O error code and message for compatibility
+        # with code that catches the built-in OSError.
+        self.errno = error_code
+        self.strerror = message
+
+    def __str__(self):
+        """Return the original message while exposing standard I/O details."""
+        return str(self.args[0])
+
+
 class AppriseInvalidData(AppriseException):
-    """Thrown when bad data was passed into an internal function."""
+    """Raised when Apprise cannot safely use supplied or stored data."""
 
     def __init__(self, message, error_code=errno.EINVAL):
         super().__init__(message, error_code=error_code)
 
 
 class AppriseFileNotFound(AppriseDiskIOError, FileNotFoundError):
-    """Thrown when a persistent write occured in MEMORY mode."""
+    """Raised when an attachment or stored file cannot be found."""
 
     def __init__(self, message):
         super().__init__(message, error_code=errno.ENOENT)

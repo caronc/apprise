@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.eight00com import NotifyEight00com
 
 logging.disable(logging.CRITICAL)
@@ -49,22 +50,22 @@ apprise_url_tests = (
     (
         "eight00com://",
         {
-            # No token -> TypeError
-            "instance": TypeError,
+            # Missing token
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "eight00com://:@/",
         {
-            # Empty token -> TypeError
-            "instance": TypeError,
+            # Empty token
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "eight00com://GOODTOKEN@badphone",
         {
-            # Non-numeric from-phone -> TypeError
-            "instance": TypeError,
+            # Non-numeric source phone number
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -161,16 +162,16 @@ def test_plugin_eight00com_init(mock_post):
     response.status_code = requests.codes.ok
     mock_post.return_value = response
 
-    # Missing token -> TypeError
-    with pytest.raises(TypeError):
+    # A token is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEight00com(token=None, source="8005551234")
 
-    # Empty token -> TypeError
-    with pytest.raises(TypeError):
+    # An empty token is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEight00com(token="", source="8005551234")
 
-    # Invalid source phone -> TypeError
-    with pytest.raises(TypeError):
+    # The source must be a valid phone number.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEight00com(token="mytoken", source="notaphone")
 
     # Valid with source only: defaults to texting ourselves

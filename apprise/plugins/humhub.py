@@ -70,6 +70,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
@@ -173,7 +174,7 @@ class NotifyHumHub(NotifyBase):
         if not self.user:
             msg = "A HumHub bearer token or username must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Accumulate invalid targets for lossless URL round-tripping
         self._invalid_targets = []
@@ -200,7 +201,7 @@ class NotifyHumHub(NotifyBase):
         if not self.targets:
             msg = "No valid HumHub container ID(s) were specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

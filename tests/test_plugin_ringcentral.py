@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ringcentral import (
     NotifyRingCentral,
     RingCentralAuthMode,
@@ -80,63 +81,63 @@ apprise_url_tests = (
         "ringc://",
         {
             # No credentials at all
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://:@/",
         {
             # No credentials at all
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://password@client_id/18005554321",
         {
             # No client secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://18005554321:jwt{}@client_id".format("a" * 60),
         {
             # JWT provided but no client secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://18005554321:jwt{}@%21%21%21/secret".format("b" * 60),
         {
             # Invalid client_id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://18005554321:jwt{}@client_id/%21%21%21/".format("c" * 60),
         {
             # Invalid client secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://18005554321:password@client_id/secret?mode=invalid",
         {
             # Invalid auth mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://18005554321:password@client_id/secret?env=invalid",
         {
             # Invalid environment
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ringc://18005554321:jwt=@client_id/secret?mode=jwt",
         {
             # Invalid JWT token (contains disallowed chars)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid JWT mode with explicit ?mode=jwt
@@ -249,7 +250,7 @@ def test_plugin_ringc_init(mock_post):
     mock_post.return_value = _mk_resp(b"{}")
 
     # No client_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=None,
             client_secret=CLIENT_SECRET,
@@ -257,7 +258,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # Blank client_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id="  ",
             client_secret=CLIENT_SECRET,
@@ -265,7 +266,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # No client_secret
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=CLIENT_ID,
             client_secret=None,
@@ -273,7 +274,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # Blank client_secret
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=CLIENT_ID,
             client_secret="  ",
@@ -281,7 +282,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # Invalid source phone
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
@@ -289,7 +290,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # Invalid auth mode
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
@@ -298,7 +299,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # Invalid environment
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,
@@ -307,7 +308,7 @@ def test_plugin_ringc_init(mock_post):
         )
 
     # Invalid JWT token in JWT mode
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyRingCentral(
             client_id=CLIENT_ID,
             client_secret=CLIENT_SECRET,

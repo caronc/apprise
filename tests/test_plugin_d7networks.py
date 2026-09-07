@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.d7networks import NotifyD7Networks
 
 logging.disable(logging.CRITICAL)
@@ -45,14 +46,14 @@ apprise_url_tests = (
         "d7sms://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "d7sms://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

@@ -47,6 +47,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -185,7 +186,7 @@ class NotifyResend(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Resend API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Targets (To Emails)
         self.targets = []
@@ -207,7 +208,7 @@ class NotifyResend(NotifyBase):
             # Invalid from
             msg = "Invalid ~From~ email specified: {}".format(from_addr)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # initialize our from address
         self.from_addr = (

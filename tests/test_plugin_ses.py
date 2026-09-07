@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ses import NotifySES
 
 logging.disable(logging.CRITICAL)
@@ -73,41 +74,41 @@ apprise_url_tests = (
     (
         "ses://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://user@example.com/T1JJ3T3L2",
         {
             # Just Token 1 provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://user@example.com/T1JJ3TD4JD/TIiajkdnlazk7FQ/",
         {
             # Missing a region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2",
         {
             # No email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://user@example.com/T1JJ3TD4JD/TIiajkdnlazk7FQ/user2@example.com",
         {
             # Missing a region (but has email)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -117,7 +118,7 @@ apprise_url_tests = (
         ),
         {
             # An invalid reply-to address
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
             # Our response expected server response
             "requests_response_text": AWS_SES_GOOD_RESPONSE,
         },
@@ -310,7 +311,7 @@ def test_plugin_ses_edge_cases(mock_post):
     """NotifySES() Edge Cases."""
 
     # Initializes the plugin with a valid access, but invalid access key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No access_key_id specified
         NotifySES(
             from_addr="user@example.eu",
@@ -320,7 +321,7 @@ def test_plugin_ses_edge_cases(mock_post):
             targets="user@example.ca",
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No secret_access_key specified
         NotifySES(
             from_addr="user@example.eu",
@@ -330,7 +331,7 @@ def test_plugin_ses_edge_cases(mock_post):
             targets="user@example.ca",
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No region_name specified
         NotifySES(
             from_addr="user@example.eu",

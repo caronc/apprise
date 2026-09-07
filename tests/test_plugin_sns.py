@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sns import NotifySNS, SNSMode
 
 logging.disable(logging.CRITICAL)
@@ -51,27 +52,27 @@ apprise_url_tests = (
     (
         "sns://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sns://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sns://T1JJ3T3L2",
         {
             # Just Token 1 provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/",
         {
             # Missing a region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -188,11 +189,11 @@ apprise_url_tests = (
         },
     ),
     (
-        # Invalid mode raises TypeError
+        # Invalid mode
         "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
         "/us-west-2/12223334444?mode=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )
@@ -212,7 +213,7 @@ def test_plugin_sns_edge_cases(mock_post):
     """NotifySNS() Edge Cases."""
     target = "+1800555999"
     # Initializes the plugin with a valid access, but invalid access key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No access_key_id specified
         NotifySNS(
             access_key_id=None,
@@ -221,7 +222,7 @@ def test_plugin_sns_edge_cases(mock_post):
             targets=target,
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No secret_access_key specified
         NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
@@ -230,7 +231,7 @@ def test_plugin_sns_edge_cases(mock_post):
             targets=target,
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No region_name specified
         NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
@@ -788,8 +789,8 @@ def test_plugin_sns_mode_detection():
     )
     assert obj.mode == SNSMode.TOPIC
 
-    # Invalid mode raises TypeError
-    with pytest.raises(TypeError):
+    # An invalid mode is rejected.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,

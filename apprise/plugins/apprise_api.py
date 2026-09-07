@@ -33,6 +33,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS, parse_list, validate_regex
@@ -207,7 +208,7 @@ class NotifyAppriseAPI(NotifyBase):
         if not self.token:
             msg = f"The Apprise API token specified ({token}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.method = (
             self.template_args["method"]["default"]
@@ -218,7 +219,7 @@ class NotifyAppriseAPI(NotifyBase):
         if self.method not in APPRISE_API_METHODS:
             msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Version 2 keeps the configuration ID out of the HTTP URL. Version 1
         # remains available for older Apprise API servers.
@@ -230,7 +231,7 @@ class NotifyAppriseAPI(NotifyBase):
         if self.version not in APPRISE_API_VERSIONS:
             msg = f"The Apprise API version specified ({version}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Build list of tags
         self.__tags = parse_list(tags)

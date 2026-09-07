@@ -38,6 +38,7 @@ import requests
 
 import apprise
 from apprise import NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ntfy import NotifyNtfy, NtfyPriority
 
 logging.disable(logging.CRITICAL)
@@ -373,14 +374,14 @@ apprise_url_tests = (
         "ntfys://user:web/token@localhost/topic/?mode=invalid",
         {
             # Invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ntfys://token@localhost/topic/?auth=invalid",
         {
             # Invalid Authentication type
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid hostname on localhost/private mode

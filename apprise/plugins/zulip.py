@@ -62,6 +62,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from .base import NotifyBase
@@ -203,7 +204,7 @@ class NotifyZulip(NotifyBase):
         except (TypeError, AttributeError) as err:
             msg = f"The Zulip botname specified ({botname}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from err
+            raise AppriseImproperlyConfigured(msg) from err
 
         try:
             match = VALIDATE_ORG.match(organization.strip())
@@ -222,7 +223,7 @@ class NotifyZulip(NotifyBase):
                 f"({organization}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from err
+            raise AppriseImproperlyConfigured(msg) from err
 
         self.token = validate_regex(
             token, *self.template_tokens["token"]["regex"]
@@ -230,7 +231,7 @@ class NotifyZulip(NotifyBase):
         if not self.token:
             msg = f"The Zulip token specified ({token}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:

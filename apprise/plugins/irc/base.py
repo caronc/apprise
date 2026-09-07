@@ -48,6 +48,7 @@ import re
 from typing import Any, Optional
 
 from ...common import NotifyType
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_bool, parse_list
@@ -209,7 +210,7 @@ class NotifyIRC(NotifyBase):
             if self.auth_mode not in IRC_AUTH_MODES:
                 msg = f"The IRC auth mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         self.fullname = (name or "").strip()
 

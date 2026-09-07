@@ -36,6 +36,7 @@ from apprise import AppriseAttachment, exception
 from apprise.attachment.base import AttachBase
 from apprise.attachment.memory import AttachMemory
 from apprise.common import ContentLocation
+from apprise.exception import AppriseImproperlyConfigured
 
 logging.disable(logging.CRITICAL)
 
@@ -74,7 +75,7 @@ def test_attach_memory_parse_url():
     # Stub function
     assert mem.download()
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # garbage in, garbage out
         AttachMemory(content=3)
 

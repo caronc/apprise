@@ -36,6 +36,7 @@ from uuid import uuid4
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -213,7 +214,7 @@ class NotifyHomeAssistant(NotifyBase):
                 f"({accesstoken}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # An Optional Notification Identifier
         self.nid = None
@@ -225,7 +226,7 @@ class NotifyHomeAssistant(NotifyBase):
                     f"({nid}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Prepare Batch Mode Flag
         self.batch = (

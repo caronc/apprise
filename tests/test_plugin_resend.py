@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.resend import NotifyResend
 
 logging.disable(logging.CRITICAL)
@@ -50,34 +51,34 @@ apprise_url_tests = (
     (
         "resend://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://abcd",
         {
             # Just an broken email (no api key or email)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://abcd@host",
         {
             # Just an Email specified, no API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "resend://invalid-api-key+*-d:user@example.com",
         {
             # An invalid API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -225,15 +226,15 @@ def test_plugin_resend_edge_cases(mock_post, mock_get):
     """NotifyResend() Edge Cases."""
 
     # no apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyResend(apikey=None, from_addr="user@example.com")
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyResend(apikey="abcd", from_addr="!invalid")
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyResend(apikey="abcd", from_addr=None)
 
     # Invalid To email address

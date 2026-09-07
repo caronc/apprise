@@ -39,6 +39,7 @@ import ssl
 from time import sleep
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list
@@ -269,12 +270,12 @@ class NotifyMQTT(NotifyBase):
                 or self.qos > self.template_args["qos"]["max"]
             ):
                 # Let error get handle on exceptio higher up
-                raise ValueError("")
+                raise AppriseImproperlyConfigured("")
 
         except (ValueError, TypeError):
             msg = f"An invalid MQTT QOS ({qos}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         if not self.port:
             # Assign port (if not otherwise set)
@@ -311,7 +312,7 @@ class NotifyMQTT(NotifyBase):
                 f"An invalid MQTT Protocol version ({version}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Our MQTT Client Object
         self.client = mqtt.Client(

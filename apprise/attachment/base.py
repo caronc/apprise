@@ -33,6 +33,7 @@ import time
 
 from .. import exception
 from ..common import ContentLocation
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import URLBase
 from ..utils.parse import parse_bool
@@ -160,13 +161,13 @@ class AttachBase(URLBase):
             except (TypeError, ValueError):
                 err = f"An invalid cache value ({cache}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
             # Some simple error checking
             if self.cache < 0:
                 err = f"A negative cache value ({cache}) was specified."
                 self.logger.warning(err)
-                raise TypeError(err)
+                raise AppriseImproperlyConfigured(err)
 
         else:
             self.cache = None
@@ -185,7 +186,7 @@ class AttachBase(URLBase):
         ):
             err = f"An invalid mime-type ({mimetype}) was specified."
             self.logger.warning(err)
-            raise TypeError(err)
+            raise AppriseImproperlyConfigured(err)
 
         return
 

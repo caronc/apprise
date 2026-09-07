@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mailersend import NotifyMailerSend
 
 logging.disable(logging.CRITICAL)
@@ -77,7 +78,7 @@ apprise_url_tests = (
         # invalid API key (contains disallowed characters)
         "mailersend://bad+key*!:user@example.com",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -146,7 +147,7 @@ apprise_url_tests = (
         # Invalid Reply-To address
         ("mailersend://abcd:user@example.com/newuser@example.com?reply=%20!"),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -226,23 +227,23 @@ def test_plugin_mailersend_edge_cases(mock_post, mock_get):
     """NotifyMailerSend() Edge Cases."""
 
     # No API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey=None, from_email="user@example.com")
 
     # Invalid API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey="bad+key*!", from_email="user@example.com")
 
     # Invalid From email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey="abcd", from_email="!invalid")
 
     # No From email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey="abcd", from_email=None)
 
-    # Invalid Reply-To email raises TypeError
-    with pytest.raises(TypeError):
+    # An invalid Reply-To address is rejected.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(
             apikey="abcd",
             from_email="user@example.com",

@@ -30,6 +30,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.serverchan import NotifyServerChan
 
 logging.disable(logging.CRITICAL)
@@ -40,14 +41,14 @@ apprise_url_tests = (
         "schan://",
         {
             # No Access Token specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "schan://a_bd_/",
         {
             # invalid Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
