@@ -495,7 +495,12 @@ def _call_with_retry(
 
 
 class Apprise:
-    """Our Notification Manager."""
+    """Manage and dispatch messages to Apprise services.
+
+    A service is any loaded notification plugin. It is not necessarily a push
+    notification server: email, IRC, XMPP, desktop integrations, webhooks, and
+    other custom protocols all use the same service interface.
+    """
 
     def __init__(
         self,
@@ -517,12 +522,26 @@ class Apprise:
         ] = None,
         log_level: Optional[int] = None,
     ) -> None:
-        """Load notification services with shared defaults.
+        """Initialize the manager and optionally load one or more services.
 
-        ``asset`` and ``location`` control service and attachment handling.
-        ``log_callback(entry, service)`` receives captured logs synchronously;
-        orchestration logs use ``None`` as the service. ``log_level`` defaults
-        to WARNING, or INFO when a callback is configured.
+        ``services`` may be a URL, a URL dictionary, an instantiated
+        notification or configuration plugin, an :class:`AppriseConfig`
+        object, or a list containing any mixture of these. URL-based services
+        are instantiated with ``asset``; when no asset is supplied, a default
+        :class:`AppriseAsset` is created and shared with them.
+
+        ``location`` applies an optional :class:`ContentLocation` restriction
+        when attachments are prepared. For example, callers can prevent a
+        remotely sourced request from attaching local content. A value of
+        ``None`` leaves attachment locations unrestricted.
+
+        ``log_callback`` receives captured entries synchronously as
+        ``callback(entry, service)``. ``service`` is the plugin associated with
+        the entry, or ``None`` for orchestration messages exposed through
+        :meth:`AppriseResult.call_logs`. ``log_level`` controls the minimum
+        captured level and defaults to ``WARNING``, or ``INFO`` when a callback
+        is configured. Both settings may be overridden by an individual call
+        to :meth:`notify` or :meth:`async_notify`.
         """
 
         # Store notification services and configuration sources.
@@ -567,10 +586,17 @@ class Apprise:
         tag: Optional[Union[str, list[str]]] = None,
         suppress_exceptions: bool = True,
     ) -> Optional[NotifyBase]:
-        """Create a notification service from a URL or dictionary.
+        """Create a notification service from a URL or URL dictionary.
 
-        Dictionaries must include at least a ``schema``. Invalid input returns
-        ``None``.
+        A string is parsed as an Apprise URL. A dictionary supplies the parsed
+        constructor components directly and must contain at least ``schema``
+        so the matching plugin can be selected. ``tag`` replaces the tags in
+        the parsed data, and ``asset`` is passed to the plugin instance.
+
+        Invalid, unsupported, or disabled services return ``None``. Plugin
+        constructor errors are also converted to ``None`` when
+        ``suppress_exceptions`` is true; setting it to false lets those errors
+        reach the caller.
 
         An example of a url dictionary object might look like:
           {
@@ -583,7 +609,9 @@ class Apprise:
         Alternatively the string is much easier to specify:
           mailto://user:mypassword@google.com
 
-        Dictionaries are useful with components returned by ``details()``.
+        The dictionary form is particularly useful to callers that use
+        :meth:`details` to discover the fields supported by a plugin and then
+        build those fields programmatically.
         """
 
         # Initialize our result set
@@ -722,10 +750,21 @@ class Apprise:
         asset: Optional[AppriseAsset] = None,
         tag: Optional[Union[str, list[str]]] = None,
     ) -> bool:
-        """Add one or more notification services.
+        """Add one or more notification services or configuration sources.
 
-        ``asset`` overrides the shared asset for these services. Use ``tag``
-        to group services and select them in ``notify()`` calls.
+        A string may contain one or more URLs and is split with
+        :func:`parse_urls`. Dictionaries are treated as parsed URL components.
+        Existing :class:`NotifyBase`, :class:`ConfigBase`, and
+        :class:`AppriseConfig` objects are stored directly.
+
+        ``asset`` overrides the manager's shared asset for services created
+        from URLs or dictionaries. ``tag`` associates one or more tags with
+        those newly created services so they can be selected by
+        :meth:`notify`, :meth:`async_notify`, or :meth:`find`.
+
+        The return value is true only when every supplied item was accepted.
+        Valid items are retained even if another item in the same collection
+        is invalid.
         """
 
         # Initialize our return status
@@ -787,7 +826,7 @@ class Apprise:
         return return_status
 
     def clear(self) -> None:
-        """Empties our service list."""
+        """Remove all directly loaded services and configuration sources."""
         self.services[:] = []
 
     def find(
@@ -795,7 +834,18 @@ class Apprise:
         tag: Any = common.MATCH_ALL_TAG,
         match_always: bool = True,
     ) -> Iterator[NotifyBase]:
-        """Yield services that match the requested tag filter."""
+        """Yield loaded services that match ``tag``.
+
+        Services inside configuration sources are resolved before matching,
+        so callers see the same flattened sequence used for delivery. At the
+        top level, tag entries are alternatives (OR); nested collections are
+        intersections (AND). For example, ``[('a', 'b'), 'c']`` means
+        ``(a AND b) OR c``.
+
+        When ``match_always`` is true, services carrying the reserved
+        ``always`` tag are yielded even when the requested filter would not
+        otherwise select them.
+        """
 
         # Build our tag setup
         #   - top level entries are treated as an 'or'
@@ -1735,8 +1785,11 @@ class Apprise:
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
 
-            # Resolve the output format for this call. Multi-format services
-            # may use the URL's format or the format passed to notify().
+            # Resolve this service's actual output format for this call.
+            # A single-format service always uses its declared format. A
+            # multi-format service may resolve differently for each call,
+            # based on its URL's ``format`` option or the ``body_format``
+            # supplied to notify().
             target_format = service.resolve_format(body_format)
 
             # Apply the service's own cap before conversion. Its asset may
@@ -2452,8 +2505,12 @@ class Apprise:
     def pop(self, index: int) -> NotifyBase:
         """Remove and return the notification service at ``index``.
 
-        Configuration containers remain loaded; only their services can be
-        removed.
+        Indexing uses the flattened service view: directly added plugins and
+        plugins discovered inside configuration sources share one continuous
+        sequence. Configuration containers are never popped by this method.
+        When ``index`` identifies one of their services, that service is
+        removed from the container while the configuration source remains
+        loaded. An out-of-range index raises :class:`IndexError`.
         """
 
         # Tracking variables
@@ -2493,7 +2550,12 @@ class Apprise:
         raise IndexError("list index out of range")
 
     def __getitem__(self, index: int) -> NotifyBase:
-        """Return the loaded notification service at ``index``."""
+        """Return a service by its index in the flattened service view.
+
+        Configuration sources themselves are not addressable here. Their
+        discovered services occupy positions in the same sequence as services
+        added directly. An out-of-range index raises :class:`IndexError`.
+        """
         # Tracking variables
         prev_offset = -1
         offset = prev_offset
@@ -2573,9 +2635,10 @@ class Apprise:
         return len(self) > 0
 
     def __iter__(self) -> Iterator[NotifyBase]:
-        """Returns an iterator to each of our services loaded.
+        """Iterate over the flattened collection of loaded services.
 
-        This includes those found inside configuration.
+        Configuration containers are not yielded. Instead, each service
+        discovered inside them is yielded alongside directly added services.
         """
         return chain(
             *[
@@ -2589,9 +2652,13 @@ class Apprise:
         )
 
     def __len__(self) -> int:
-        """Return the number of loaded notification services.
+        """Return the size of the flattened collection of loaded services.
 
-        Configuration containers are not counted, but their services are.
+        Directly added notification plugins each count as one. Configuration
+        containers do not count as entries themselves; every service currently
+        discovered inside them does. Calling ``len()`` may therefore cause a
+        configuration source to be read or refreshed according to its cache
+        policy.
         """
         return sum(
             (

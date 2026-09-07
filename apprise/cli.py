@@ -818,7 +818,8 @@ def main(
     debug,
     version,
 ):
-    """Send a notification to the services identified by the given URLs.
+    """Send the supplied title, body, and notification type to the services
+    identified by the given URLs or configuration sources.
 
     For a list of all of the supported services and information on how to use
     them, check out https://github.com/caronc/apprise

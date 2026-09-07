@@ -47,10 +47,14 @@ C_MGR = ConfigurationManager()
 
 
 class AppriseConfig:
-    """Our Apprise Configuration File Manager.
+    """Manage the configuration sources from which services are discovered.
 
-    - Supports a list of URLs defined one after another (text format)
-    - Supports a destinct YAML configuration format
+    Apprise supports a simple text format containing service URLs and a richer
+    YAML format. Sources may be local files, remote URLs, in-memory content, or
+    any other registered configuration plugin.
+
+    See https://appriseit.com/getting-started/configuration/ for the supported
+    file formats and examples.
     """
 
     def __init__(
@@ -62,12 +66,36 @@ class AppriseConfig:
         insecure_includes: bool = False,
         **kwargs: Any,
     ) -> None:
-        """Load one or more configuration sources.
+        """Initialize the manager and optionally add configuration sources.
 
-        ``cache`` may be a boolean or a lifetime in seconds. ``recursion``
-        limits nested ``include`` entries; zero disables them. Enabling
-        ``insecure_includes`` permits includes that normal source security
-        rules would reject.
+        ``paths`` may be one source string or a list of source strings. A
+        source can be an explicit configuration URL such as ``file://`` or
+        ``https://``; a path without a scheme is treated as a local file. If
+        ``paths`` is omitted, the manager starts empty. Default configuration
+        locations are selected by higher-level callers such as the CLI, not by
+        this class.
+
+        ``asset`` is shared with configuration plugins and with the services
+        they create. ``cache`` controls whether a source is read again: true
+        retains parsed results, false reloads on each request, and an integer
+        gives the cache lifetime in seconds. Caching matters most for remote
+        sources, where reloading requires another network request.
+
+        ``recursion`` is the number of nested ``include`` levels to follow.
+        Zero disables includes, one loads sources named by the top-level
+        configuration, and larger values allow the included sources to include
+        others. Keep this value low when loading content you do not control.
+
+        Configuration plugins declare whether they may be included from other
+        source types. In strict mode, a local ``file://`` source may include
+        another local file, but a remote ``http://`` or ``https://`` source may
+        not reach into the local filesystem. ``insecure_includes=True`` relaxes
+        this strict same-type boundary; it does not override sources that
+        prohibit inclusion entirely. This option is also required when trusted
+        in-memory configuration must include local files.
+
+        See https://appriseit.com/getting-started/configuration/ for the
+        configuration syntax and include examples.
         """
 
         # Store the configuration sources used to discover services.
@@ -102,11 +130,29 @@ class AppriseConfig:
         recursion: int | None = None,
         insecure_includes: bool | None = None,
     ) -> bool:
-        """Add one or more configuration URLs or sources.
+        """Add one or more configuration sources to the manager.
 
-        ``asset``, ``cache``, ``recursion``, and ``insecure_includes`` override
-        this object's defaults for newly created sources. Existing
-        ``ConfigBase`` objects keep their own settings.
+        ``configs`` accepts a source string, an instantiated
+        :class:`ConfigBase`, or a collection containing either. Strings without
+        a URL scheme are treated as local file paths. ``tag`` is attached to
+        newly created configuration sources and can later select which sources
+        :meth:`services` reads; it does not tag each service found inside.
+
+        ``asset``, ``cache``, ``recursion``, and ``insecure_includes`` are
+        passed to sources created from strings. ``asset``, ``recursion``, and
+        ``insecure_includes`` fall back to this manager's values when omitted.
+        An already instantiated :class:`ConfigBase` retains all of its own
+        settings because it is stored directly.
+
+        The cache setting may be true to retain parsed results, false to reload
+        whenever services are requested, or a non-negative integer cache
+        lifetime in seconds. ``recursion`` limits nested ``include`` entries.
+        ``insecure_includes`` relaxes strict cross-source inclusion rules; use
+        it only for trusted configuration.
+
+        The return value is true only when every supplied item was accepted.
+        Valid sources remain loaded when another item in the same collection
+        is invalid.
         """
 
         # Initialize our return status
@@ -191,11 +237,19 @@ class AppriseConfig:
         recursion: int | None = None,
         insecure_includes: bool | None = None,
     ) -> bool:
-        """Add raw configuration content as an in-memory source.
+        """Add raw configuration text as an in-memory source.
 
-        Set ``format`` to ``yaml`` or ``text`` to skip automatic detection.
-        ``recursion`` and ``insecure_includes`` override this object's defaults
-        for the new source.
+        The content exists only for the lifetime of the resulting in-memory
+        configuration object. Set ``format`` to ``yaml`` or ``text`` when it is
+        known; otherwise Apprise detects the format. The method returns false
+        when ``content`` is not a string or its format cannot be determined.
+
+        ``asset`` is passed to services created from the content, while ``tag``
+        labels the in-memory configuration source for filtering by
+        :meth:`services`. ``recursion`` and ``insecure_includes`` fall back to
+        this manager's defaults when omitted. Enable insecure includes only
+        when trusted in-memory content must include a source, such as a local
+        ``file://`` configuration, that the normal security boundary rejects.
         """
 
         # Initialize our default recursion value
@@ -253,11 +307,18 @@ class AppriseConfig:
         *args: Any,
         **kwargs: Any,
     ) -> list[NotifyBase]:
-        """Build services from matching configuration sources.
+        """Read matching configuration sources and return their services.
 
-        ``tag`` filters the configuration sources, not the services they
-        contain. Services tagged ``always`` are included when ``match_always``
-        is enabled.
+        ``tag`` is matched against tags on the configuration sources
+        themselves, not tags on the services defined inside those sources.
+        This lets a caller choose which files or remote locations to poll.
+        Top-level tag entries are alternatives (OR), while nested collections
+        are intersections (AND).
+
+        When ``match_always`` is true, configuration sources carrying the
+        reserved ``always`` tag are read even if the requested filter would not
+        otherwise select them. Each matching source applies its own cache,
+        recursion, and include-security policy as it builds the returned list.
         """
 
         # A match_always flag allows us to pick up on our 'any' keyword
@@ -383,7 +444,12 @@ class AppriseConfig:
         self.configs[:] = []
 
     def service_pop(self, index: int) -> NotifyBase:
-        """Remove and return the notification service at ``index``."""
+        """Remove and return a service from the flattened configuration view.
+
+        The configuration sources remain loaded. ``index`` addresses the
+        services discovered across them as one continuous sequence, and an
+        out-of-range index raises :class:`IndexError`.
+        """
 
         # Tracking variables
         prev_offset = -1
