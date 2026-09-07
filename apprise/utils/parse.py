@@ -88,8 +88,8 @@ URL_DETAILS_RE = re.compile(
 #   - user@example.com
 #   - label+user@example.com
 GET_EMAIL_RE = re.compile(
-    r'(([\s"\']+)?(?P<name>[^:<\'"]+)?[:<\s\'"]+)?'
-    r"(?P<full_email>((?P<label>[^+]+)\+)?"
+    r'(([\s"\']{0,32})?(?P<name>[^:<\'"]{0,128})?[:<\s\'"]{1,32})?'
+    r"(?P<full_email>((?P<label>[^+\s]{1,128})\+)?"
     r"(?P<email>(?P<userid>[a-z0-9_!#$%&*/=?%`{|}~^-]+"
     r"(?:\.[a-z0-9_!#$%&\'*/=?%`{|}~^-]+)"
     r"*)@(?P<domain>("
@@ -104,9 +104,11 @@ GET_EMAIL_RE = re.compile(
 # rougly conforms to a phone number before we parse it further
 IS_PHONE_NO = re.compile(r"^\+?(?P<phone>[0-9\s)(+-]+)\s*$")
 
-# Regular expression used to destinguish between multiple phone numbers
+# Regular expression used to destinguish between multiple phone numbers.
 PHONE_NO_DETECTION_RE = re.compile(
-    r"((?:[+(][+(\s]*)?[0-9][0-9()\s-]+[0-9])(?=$|[\s,+(]+[0-9])", re.I
+    r"((?:[+(][+(\s]{0,32})?[0-9][0-9()\s-]{1,32}[0-9])"
+    r"(?=$|[\s,+(]+[0-9])",
+    re.I,
 )
 
 IS_DOMAIN_SERVICE_TARGET = re.compile(
@@ -122,10 +124,10 @@ DOMAIN_SERVICE_TARGET_DETECTION_RE = re.compile(
     re.I,
 )
 
-# Support for prefix: (string followed by colon) infront of phone no
+# Support for prefix: (string followed by colon) infront of phone no.
 PHONE_NO_WPREFIX_DETECTION_RE = re.compile(
-    r"((?:[a-z]+:)?(?:[+(][+(\s]*)?[0-9][0-9()\s-]+[0-9])"
-    r"(?=$|(?:[a-z]+:)?[\s,+(]+[0-9])",
+    r"((?:[a-z]{1,32}:)?(?:[+(][+(\s]{0,32})?[0-9][0-9()\s-]{1,32}[0-9])"
+    r"(?=$|(?:[a-z]{1,32}:)?[\s,+(]+[0-9])",
     re.I,
 )
 
@@ -144,9 +146,9 @@ CALL_SIGN_DETECTION_RE = re.compile(
     re.I,
 )
 
-# Regular expression used to destinguish between multiple URLs
+# Regular expression used to destinguish between multiple URLs.
 URL_DETECTION_RE = re.compile(
-    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]+[a-z0-9]{1,32}?:\/\/)", re.I
+    r"([a-z0-9]+?:\/\/.*?)(?=$|[\s,]{1,32}[a-z0-9]{1,32}?:\/\/)", re.I
 )
 
 # No leading separator; first-char anchors make separator positions O(1)-fail
@@ -176,11 +178,6 @@ UUID4_RE = re.compile(
 VALID_PYTHON_FILE_RE = re.compile(r".+\.py(o|c)?$", re.IGNORECASE)
 
 # Keys created exclusively by full-mode (simple=False) parse_qsd() calls.
-# Simple-mode calls produce only 'qsd'; full-mode adds all three of these.
-# Used both internally by parse_qsd() and externally to detect whether a
-# result dict came from a full-mode parse without re-enumerating the names.
-# Stored as a tuple (not frozenset) so that dict construction order is
-# deterministic across Python runs regardless of PYTHONHASHSEED.
 QSD_FULL_MODE_KEYS = ("qsd+", "qsd-", "qsd:")
 
 # validate_regex() utilizes this mapping to track and re-use pre-complied
