@@ -486,8 +486,7 @@ def url_to_dict(url, secure_logging=True):
         )
 
     else:
-        # Parse our url details of the server object as dictionary
-        # containing all of the information parsed from our URL
+        # Parse the service URL into constructor arguments.
         results = N_MGR[schema].parse_url(url_)
         if not results:
             logger.error(

@@ -52,10 +52,10 @@ def test_apprise_interpret_escapes(mock_request):
     # Load our asset
     a = apprise.Apprise(asset=asset)
 
-    # add a test server
+    # add a test service
     assert a.add("json://localhost") is True
 
-    # Our servers should carry this flag
+    # Our services should carry this flag
     assert a[0].asset.interpret_escapes is False
 
     # Send notification
@@ -98,10 +98,10 @@ def test_apprise_interpret_escapes(mock_request):
     # Load our asset
     a = apprise.Apprise(asset=asset)
 
-    # add a test server
+    # add a test service
     assert a.add("json://localhost") is True
 
-    # Our servers should carry this flag
+    # Our services should carry this flag
     assert a[0].asset.interpret_escapes is True
 
     # Send notification

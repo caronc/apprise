@@ -107,43 +107,33 @@ class ConfigBase(URLBase):
         insecure_includes: bool = False,
         **kwargs: object,
     ) -> None:
-        """Initialize some general logging and common server arguments that
-        will keep things consistent when working with the configurations that
-        inherit this class.
+        """Initialize behavior shared by all configuration plugins.
 
-        By default we cache our responses so that subsiquent calls does not
-        cause the content to be retrieved again.  For local file references
-        this makes no difference at all.  But for remote content, this does
-        mean more then one call can be made to retrieve the (same) data.  This
-        method can be somewhat inefficient if disabled.  Only disable caching
-        if you understand the consequences.
+        ``cache=True`` retains parsed services after the first read.
+        ``cache=False`` reads and parses the source whenever :meth:`services`
+        is called, and a non-negative integer retains results for that many
+        seconds. Reloading is especially significant for an ``http://`` or
+        ``https://`` source because it performs another network request.
 
-        You can alternatively set the cache value to an int identifying the
-        number of seconds the previously retrieved can exist for before it
-        should be considered expired.
+        ``recursion`` controls how many levels of ``include`` entries are
+        followed. Zero ignores all includes; one reads sources included by this
+        source; two also follows includes found in those child sources, and so
+        on. A low limit protects against unexpectedly large or circular trees.
 
-        recursion defines how deep we recursively handle entries that use the
-        `include` keyword. This keyword requires us to fetch more configuration
-        from another source and add it to our existing compilation. If the
-        file we remotely retrieve also has an `include` reference, we will only
-        advance through it if recursion is set to 2 deep.  If set to zero
-        it is off.  There is no limit to how high you set this value. It would
-        be recommended to keep it low if you do intend to use it.
+        Each configuration plugin declares an
+        :class:`~apprise.common.ContentIncludeMode`. ``ALWAYS`` sources may be
+        included normally, ``NEVER`` sources cannot be included, and ``STRICT``
+        sources may only be included by a compatible source type. For example,
+        a local ``file://`` configuration can include another local file, but
+        an ``http://`` configuration cannot include a local file.
+        ``insecure_includes=True`` relaxes the ``STRICT`` compatibility check,
+        effectively treating strict sources as always includable; it never
+        overrides ``NEVER``. This is useful when trusted in-memory content must
+        include a local file, but it should not be enabled for untrusted input.
 
-        insecure_include by default are disabled. When set to True, all
-        Apprise Config files marked to be in STRICT mode are treated as being
-        in ALWAYS mode.
-
-        Take a file:// based configuration for example, only a file:// based
-        configuration can include another file:// based one. because it is set
-        to STRICT mode. If an http:// based configuration file attempted to
-        include a file:// one it woul fail. However this include would be
-        possible if insecure_includes is set to True.
-
-        There are cases where a self hosting apprise developer may wish to load
-        configuration from memory (in a string format) that contains 'include'
-        entries (even file:// based ones).  In these circumstances if you want
-        these 'include' entries to be honored, this value must be set to True.
+        Additional keyword arguments are handled by :class:`URLBase`. The
+        optional ``encoding`` and ``format`` values select the source encoding
+        and force ``text`` or ``yaml`` parsing respectively.
         """
 
         super().__init__(**kwargs)
@@ -154,7 +144,7 @@ class ConfigBase(URLBase):
         self._cached_time = None
 
         # Tracks previously loaded content for speed
-        self._cached_servers = None
+        self._cached_services = None
 
         # Initialize our recursion value
         self.recursion = recursion
@@ -195,20 +185,31 @@ class ConfigBase(URLBase):
 
         return
 
-    def servers(
+    def services(
         self,
         asset: AppriseAsset | None = None,
         **kwargs: object,
     ) -> list[plugins.NotifyBase]:
-        """Performs reads loaded configuration and returns all of the services
-        that could be parsed and loaded."""
+        """Read, parse, and return all services defined by this source.
+
+        A valid cache is returned immediately. Otherwise :meth:`read` obtains
+        the raw text, the selected text or YAML parser creates service plugins,
+        and any permitted ``include`` entries are loaded recursively. Included
+        services are appended to the direct services in the returned list.
+
+        ``asset`` overrides the source's asset for newly parsed services and is
+        propagated to included sources. A read failure or source with no
+        usable content returns an empty list. The result becomes this object's
+        mutable cache; methods such as ``len()``, iteration, indexing, and
+        :meth:`pop` all operate on that same list.
+        """
 
         if not self.expired():
             # We already have cached results to return; use them
-            return self._cached_servers
+            return self._cached_services
 
         # Our cached response object
-        self._cached_servers = []
+        self._cached_services = []
 
         # read() causes the child class to do whatever it takes for the
         # config plugin to load the data source and return unparsed content
@@ -219,7 +220,7 @@ class ConfigBase(URLBase):
             self._cached_time = time.time()
 
             # Nothing more to do; return our empty cache list
-            return self._cached_servers
+            return self._cached_services
 
         # Our Configuration format uses a default if one wasn't one detected
         # or enfored.
@@ -236,14 +237,14 @@ class ConfigBase(URLBase):
         asset = asset if isinstance(asset, AppriseAsset) else self.asset
 
         # Execute our config parse function which always returns a tuple
-        # of our servers and our configuration
-        servers, configs = fn(content=content, asset=asset)
+        # of our services and our configuration
+        services, configs = fn(content=content, asset=asset)
 
         # Free memory
         del content
 
-        # Add entry to our server list
-        self._cached_servers.extend(servers)
+        # Add entry to our service list
+        self._cached_services.extend(services)
 
         # Configuration files were detected; recursively populate them
         # If we have been configured to do so
@@ -278,11 +279,10 @@ class ConfigBase(URLBase):
                     url if not asset.secure_logging else cwe312_url(url)
                 )
 
-                # Parse our url details of the server object as dictionary
-                # containing all of the information parsed from our URL
+                # Parse the included configuration URL into constructor args.
                 results = C_MGR[schema].parse_url(url)
                 if not results:
-                    # Failed to parse the server URL
+                    # The included configuration URL could not be parsed.
                     self.logger.error(
                         f"Unparseable include URL {loggable_url}"
                     )
@@ -332,9 +332,8 @@ class ConfigBase(URLBase):
                     self.logger.debug(f"Loading Exception: {e!s}")
                     continue
 
-                # if we reach here, we can now add this servers found
-                # in this configuration file to our list
-                self._cached_servers.extend(cfg_plugin.servers(asset=asset))
+                # Add services found in the included configuration.
+                self._cached_services.extend(cfg_plugin.services(asset=asset))
 
             else:
                 # CWE-312 (Secure Logging) Handling
@@ -347,9 +346,9 @@ class ConfigBase(URLBase):
                     loggable_url,
                 )
 
-        if self._cached_servers:
+        if self._cached_services:
             self.logger.debug(
-                f"Loaded {len(self._cached_servers)} entries from"
+                f"Loaded {len(self._cached_services)} entries from"
                 f" {self.url(privacy=asset.secure_logging)}"
             )
         else:
@@ -361,7 +360,7 @@ class ConfigBase(URLBase):
         # Set the time our content was cached at
         self._cached_time = time.time()
 
-        return self._cached_servers
+        return self._cached_services
 
     def read(self) -> str | None:
         """This object should be implimented by the child classes."""
@@ -370,7 +369,7 @@ class ConfigBase(URLBase):
     def expired(self) -> bool:
         """Simply returns True if the configuration should be considered as
         expired or False if content should be retrieved."""
-        if isinstance(self._cached_servers, list) and self.cache:
+        if isinstance(self._cached_services, list) and self.cache:
             # We have enough reason to look further into our cached content
             # and verify it has not expired.
             if self.cache is True:
@@ -646,8 +645,8 @@ class ConfigBase(URLBase):
         """Parse the specified content as though it were a simple text file
         only containing a list of URLs.
 
-        Return a tuple that looks like (servers, configs) where:
-          - servers contains a list of loaded notification plugins
+        Return a tuple that looks like (services, configs) where:
+          - services contains a list of loaded notification plugins
           - configs contains a list of additional configuration files
             referenced.
 
@@ -674,7 +673,7 @@ class ConfigBase(URLBase):
             <Group(s)>=<Tag(s)>
         """
         # A list of loaded Notification Services
-        servers = []
+        services = []
 
         # A list of additional configuration files referenced using
         # the include keyword
@@ -866,10 +865,10 @@ class ConfigBase(URLBase):
                 continue
 
             # if we reach here, we successfully loaded our data
-            servers.append(plugin)
+            services.append(plugin)
 
         # Return what was loaded
-        return (servers, configs)
+        return (services, configs)
 
     @staticmethod
     def config_parse_yaml(
@@ -879,8 +878,8 @@ class ConfigBase(URLBase):
         """Parse the specified content as though it were a yaml file
         specifically formatted for Apprise.
 
-        Return a tuple that looks like (servers, configs) where:
-          - servers contains a list of loaded notification plugins
+        Return a tuple that looks like (services, configs) where:
+          - services contains a list of loaded notification plugins
           - configs contains a list of additional configuration files
             referenced.
 
@@ -888,7 +887,7 @@ class ConfigBase(URLBase):
         """
 
         # A list of loaded Notification Services
-        servers = []
+        services = []
 
         # A list of additional configuration files referenced using
         # the include keyword
@@ -1557,10 +1556,10 @@ class ConfigBase(URLBase):
                 continue
 
             # if we reach here, we successfully loaded our data
-            servers.append(plugin)
+            services.append(plugin)
 
         preloaded.clear()
-        return (servers, configs)
+        return (services, configs)
 
     def pop(self, index: int = -1) -> object:
         """Removes an indexed Notification Service from the stack and returns
@@ -1569,16 +1568,16 @@ class ConfigBase(URLBase):
         By default, the last element of the list is removed.
         """
 
-        if not isinstance(self._cached_servers, list):
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
         # Pop the element off of the stack
-        return self._cached_servers.pop(index)
+        return self._cached_services.pop(index)
 
     def clear_cache(self) -> None:
         """Cleans cache"""
-        self._cached_servers = None
+        self._cached_services = None
         self._cached_time = None
 
     @staticmethod
@@ -1727,37 +1726,40 @@ class ConfigBase(URLBase):
         return tokens
 
     def __getitem__(self, index: int) -> object:
-        """Returns the indexed server entry associated with the loaded
-        notification servers."""
-        if not isinstance(self._cached_servers, list):
+        """Return the cached service at ``index``, loading it if necessary."""
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
-        return self._cached_servers[index]
+        return self._cached_services[index]
 
     def __iter__(self) -> object:
-        """Returns an iterator to our server list."""
-        if not isinstance(self._cached_servers, list):
+        """Iterate over cached services, loading the source if necessary."""
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
-        return iter(self._cached_servers)
+        return iter(self._cached_services)
 
     def __len__(self) -> int:
-        """Returns the total number of servers loaded."""
-        if not isinstance(self._cached_servers, list):
-            # Generate ourselves a list of content we can pull from
-            self.servers()
+        """Return the number of parsed services, loading when necessary.
 
-        return len(self._cached_servers)
+        The configuration source itself is not counted. Services obtained from
+        permitted nested includes are included in the total.
+        """
+        if not isinstance(self._cached_services, list):
+            # Generate ourselves a list of content we can pull from
+            self.services()
+
+        return len(self._cached_services)
 
     def __bool__(self) -> bool:
         """Allows the Apprise object to be wrapped in an 'if statement'.
 
         True is returned if our content was downloaded correctly.
         """
-        if not isinstance(self._cached_servers, list):
+        if not isinstance(self._cached_services, list):
             # Generate ourselves a list of content we can pull from
-            self.servers()
+            self.services()
 
-        return bool(self._cached_servers)
+        return bool(self._cached_services)

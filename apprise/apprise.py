@@ -73,9 +73,9 @@ from .utils.parse import parse_list, parse_urls
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
-# One (server, notify()-kwargs) pair as produced by _create_notify_gen()
+# One (service, notify()-kwargs) pair as produced by _create_notify_gen()
 # and threaded through every dispatch primitive below.
-ServerCall = tuple[NotifyBase, dict[str, Any]]
+ServiceCall = tuple[NotifyBase, dict[str, Any]]
 
 # Extra seconds of patience for notify() calls.
 _ABANDON_GRACE_SECONDS = 0.1
@@ -155,29 +155,29 @@ def _abandoned_call_descriptions() -> list[str]:
 
 
 def _service_metadata(
-    server: NotifyBase,
+    service: NotifyBase,
 ) -> tuple[str, str, Optional[str], tuple[str, ...], int]:
     """Safely gather one service's identifying metadata.
 
     Plugin metadata helpers can raise. This helper keeps result-building
     defensive and returns (name, url, url_id, tag, weight).
     """
-    name = getattr(server, "service_name", "Unknown")
+    name = getattr(service, "service_name", "Unknown")
 
     try:
-        url = server.url(privacy=True)
+        url = service.url(privacy=True)
 
     except Exception:
         url = "unknown://"
 
     try:
-        url_id = server.url_id()
+        url_id = service.url_id()
 
     except Exception:
         url_id = None
 
     try:
-        weight = len(server)
+        weight = len(service)
 
     except Exception:
         weight = 1
@@ -185,7 +185,7 @@ def _service_metadata(
     try:
         # Sort tags for stable output. Custom tag objects may fail during
         # conversion, so use the same fallback as the metadata above.
-        tag = tuple(sorted(str(t) for t in getattr(server, "tags", ())))
+        tag = tuple(sorted(str(t) for t in getattr(service, "tags", ())))
 
     except Exception:
         tag = ()
@@ -193,16 +193,16 @@ def _service_metadata(
     return name, url, url_id, tag, weight
 
 
-def _safe_error_result(server: NotifyBase) -> NotifyResult:
+def _safe_error_result(service: NotifyBase) -> NotifyResult:
     """Build a best-effort result when a plugin fails outside dispatch."""
-    name, url, url_id, tag, weight = _service_metadata(server)
+    name, url, url_id, tag, weight = _service_metadata(service)
 
     return NotifyResult(
         name=name,
         url=url,
         url_id=url_id,
         tag=tag,
-        optional=getattr(server, "optional", False),
+        optional=getattr(service, "optional", False),
         weight=weight,
         max_attempts=1,
         # No real attempt data exists here, so keep one synthetic failure.
@@ -212,7 +212,7 @@ def _safe_error_result(server: NotifyBase) -> NotifyResult:
 
 
 def _compute_deadline(
-    server: NotifyBase, call_deadline: Optional[float]
+    service: NotifyBase, call_deadline: Optional[float]
 ) -> Optional[float]:
     """Return the monotonic deadline for one service dispatch.
 
@@ -225,7 +225,7 @@ def _compute_deadline(
     change the time limit. ``None`` means neither limit is enabled.
     """
     service_timeout = getattr(
-        server.asset,
+        service.asset,
         "_service_timeout",
         AppriseAsset._service_timeout,
     )
@@ -238,7 +238,7 @@ def _compute_deadline(
     # TRACE keeps large batches from spamming normal DEBUG output.
     logger.trace(
         "Deadline for '%s': %s",
-        getattr(server, "service_name", "Unknown"),
+        getattr(service, "service_name", "Unknown"),
         "none"
         if deadline is None
         else "{:.3f}s from now".format(deadline - time.monotonic()),
@@ -247,7 +247,7 @@ def _compute_deadline(
 
 
 def _timeout_result(
-    server: NotifyBase,
+    service: NotifyBase,
     elapsed: float,
     max_attempts: int,
 ) -> NotifyResult:
@@ -256,14 +256,14 @@ def _timeout_result(
     The worker may still be running. Record only what Apprise knows here:
     it stopped waiting, and optional handling still belongs to NotifyResult.
     """
-    name, url, url_id, tag, weight = _service_metadata(server)
+    name, url, url_id, tag, weight = _service_metadata(service)
 
     return NotifyResult(
         name=name,
         url=url,
         url_id=url_id,
         tag=tag,
-        optional=getattr(server, "optional", False),
+        optional=getattr(service, "optional", False),
         weight=weight,
         # Preserve the configured retry count even when the outer wait wins.
         max_attempts=max_attempts,
@@ -496,11 +496,16 @@ def _call_with_retry(
 
 
 class Apprise:
-    """Our Notification Manager."""
+    """Manage and dispatch messages to Apprise services.
+
+    A service is any loaded notification plugin. It is not necessarily a push
+    notification server: email, IRC, XMPP, desktop integrations, webhooks, and
+    other custom protocols all use the same service interface.
+    """
 
     def __init__(
         self,
-        servers: Optional[
+        services: Optional[
             Union[
                 str,
                 dict,
@@ -518,24 +523,30 @@ class Apprise:
         ] = None,
         log_level: Optional[int] = None,
     ) -> None:
-        """Loads a set of server urls while applying the Asset() module to each
-        if specified.
+        """Initialize the manager and optionally load one or more services.
 
-        If no asset is provided, then the default asset is used.
+        ``services`` may be a URL, a URL dictionary, an instantiated
+        notification or configuration plugin, an :class:`AppriseConfig`
+        object, or a list containing any mixture of these. URL-based services
+        are instantiated with ``asset``; when no asset is supplied, a default
+        :class:`AppriseAsset` is created and shared with them.
 
-        Optionally specify a global ContentLocation for a more strict means of
-        handling Attachments.
+        ``location`` applies an optional :class:`ContentLocation` restriction
+        when attachments are prepared. For example, callers can prevent a
+        remotely sourced request from attaching local content. A value of
+        ``None`` leaves attachment locations unrestricted.
 
-        log_callback receives captured entries as ``callback(entry, service)``.
-        ``service`` is ``None`` for orchestration entries returned by
-        ``AppriseResult.call_logs()``. The callback must be synchronous.
-
-        log_level controls captured service and call-level entries. It defaults
-        to WARNING, or INFO when a log_callback is configured.
+        ``log_callback`` receives captured entries synchronously as
+        ``callback(entry, service)``. ``service`` is the plugin associated with
+        the entry, or ``None`` for orchestration messages exposed through
+        :meth:`AppriseResult.call_logs`. ``log_level`` controls the minimum
+        captured level and defaults to ``WARNING``, or ``INFO`` when a callback
+        is configured. Both settings may be overridden by an individual call
+        to :meth:`notify` or :meth:`async_notify`.
         """
 
-        # Initialize a server list of URLs
-        self.servers = []
+        # Store notification services and configuration sources.
+        self.services = []
 
         # Assigns an central asset object that will be later passed into each
         # notification plugin.  Assets contain information such as the local
@@ -546,8 +557,8 @@ class Apprise:
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
         )
 
-        if servers:
-            self.add(servers)
+        if services:
+            self.add(services)
 
         # Initialize our locale object
         self.locale = AppriseLocale()
@@ -576,13 +587,17 @@ class Apprise:
         tag: Optional[Union[str, list[str]]] = None,
         suppress_exceptions: bool = True,
     ) -> Optional[NotifyBase]:
-        """Returns the instance of a instantiated plugin based on the provided
-        Server URL.  If the url fails to be parsed, then None is returned.
+        """Create a notification service from a URL or URL dictionary.
 
-        The specified url can be either a string (the URL itself) or a
-        dictionary containing all of the components needed to istantiate
-        the notification service.  If identifying a dictionary, at the bare
-        minimum, one must specify the schema.
+        A string is parsed as an Apprise URL. A dictionary supplies the parsed
+        constructor components directly and must contain at least ``schema``
+        so the matching plugin can be selected. ``tag`` replaces the tags in
+        the parsed data, and ``asset`` is passed to the plugin instance.
+
+        Invalid, unsupported, or disabled services return ``None``. Plugin
+        constructor errors are also converted to ``None`` when
+        ``suppress_exceptions`` is true; setting it to false lets those errors
+        reach the caller.
 
         An example of a url dictionary object might look like:
           {
@@ -595,8 +610,9 @@ class Apprise:
         Alternatively the string is much easier to specify:
           mailto://user:mypassword@google.com
 
-        The dictionary works well for people who are calling details() to
-        extract the components they need to build the URL manually.
+        The dictionary form is particularly useful to callers that use
+        :meth:`details` to discover the fields supported by a plugin and then
+        build those fields programmatically.
         """
 
         # Initialize our result set
@@ -612,7 +628,7 @@ class Apprise:
             )
 
             if results is None:
-                # Failed to parse the server URL; detailed logging handled
+                # Failed to parse the service URL; detailed logging handled
                 # inside url_to_dict - nothing to report here.
                 return None
 
@@ -724,7 +740,7 @@ class Apprise:
 
     def add(
         self,
-        servers: Union[
+        services: Union[
             str,
             dict,
             NotifyBase,
@@ -735,14 +751,21 @@ class Apprise:
         asset: Optional[AppriseAsset] = None,
         tag: Optional[Union[str, list[str]]] = None,
     ) -> bool:
-        """Adds one or more server URLs into our list.
+        """Add one or more notification services or configuration sources.
 
-        You can override the global asset if you wish by including it with the
-        server(s) that you add.
+        A string may contain one or more URLs and is split with
+        :func:`parse_urls`. Dictionaries are treated as parsed URL components.
+        Existing :class:`NotifyBase`, :class:`ConfigBase`, and
+        :class:`AppriseConfig` objects are stored directly.
 
-        The tag allows you to associate 1 or more tag values to the server(s)
-        being added. tagging a service allows you to exclusively access them
-        when calling the notify() function.
+        ``asset`` overrides the manager's shared asset for services created
+        from URLs or dictionaries. ``tag`` associates one or more tags with
+        those newly created services so they can be selected by
+        :meth:`notify`, :meth:`async_notify`, or :meth:`find`.
+
+        The return value is true only when every supplied item was accepted.
+        Valid items are retained even if another item in the same collection
+        is invalid.
         """
 
         # Initialize our return status
@@ -752,37 +775,37 @@ class Apprise:
             # prepare default asset
             asset = self.asset
 
-        if isinstance(servers, str):
-            # build our server list
-            servers = parse_urls(servers)
-            if len(servers) == 0:
+        if isinstance(services, str):
+            # build our service list
+            services = parse_urls(services)
+            if len(services) == 0:
                 return False
 
-        elif isinstance(servers, dict):
+        elif isinstance(services, dict):
             # no problem, we support kwargs, convert it to a list
-            servers = [servers]
+            services = [services]
 
-        elif isinstance(servers, (ConfigBase, NotifyBase, AppriseConfig)):
+        elif isinstance(services, (ConfigBase, NotifyBase, AppriseConfig)):
             # Go ahead and just add our plugin into our list
-            self.servers.append(servers)
+            self.services.append(services)
             return True
 
-        elif not isinstance(servers, (tuple, set, list)):
+        elif not isinstance(services, (tuple, set, list)):
             logger.error(
-                f"An invalid notification (type={type(servers)}) was"
+                f"An invalid notification (type={type(services)}) was"
                 " specified."
             )
             return False
 
-        for server in servers:
-            if isinstance(server, (ConfigBase, NotifyBase, AppriseConfig)):
+        for service in services:
+            if isinstance(service, (ConfigBase, NotifyBase, AppriseConfig)):
                 # Go ahead and just add our plugin into our list
-                self.servers.append(server)
+                self.services.append(service)
                 continue
 
-            elif not isinstance(server, (str, dict)):
+            elif not isinstance(service, (str, dict)):
                 logger.error(
-                    f"An invalid notification (type={type(server)}) was"
+                    f"An invalid notification (type={type(service)}) was"
                     " specified."
                 )
                 return_status = False
@@ -790,29 +813,40 @@ class Apprise:
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
-            instance = Apprise.instantiate(server, asset=asset, tag=tag)
+            instance = Apprise.instantiate(service, asset=asset, tag=tag)
             if not isinstance(instance, NotifyBase):
                 # No logging is required as instantiate() handles failure
                 # and/or success reasons for us
                 return_status = False
                 continue
 
-            # Add our initialized plugin to our server listings
-            self.servers.append(instance)
+            # Add our initialized plugin to our service listings
+            self.services.append(instance)
 
         # Return our status
         return return_status
 
     def clear(self) -> None:
-        """Empties our server list."""
-        self.servers[:] = []
+        """Remove all directly loaded services and configuration sources."""
+        self.services[:] = []
 
     def find(
         self,
         tag: Any = common.MATCH_ALL_TAG,
         match_always: bool = True,
     ) -> Iterator[NotifyBase]:
-        """Returns a list of all servers matching against the tag specified."""
+        """Yield loaded services that match ``tag``.
+
+        Services inside configuration sources are resolved before matching,
+        so callers see the same flattened sequence used for delivery. At the
+        top level, tag entries are alternatives (OR); nested collections are
+        intersections (AND). For example, ``[('a', 'b'), 'c']`` means
+        ``(a AND b) OR c``.
+
+        When ``match_always`` is true, services carrying the reserved
+        ``always`` tag are yielded even when the requested filter would not
+        otherwise select them.
+        """
 
         # Build our tag setup
         #   - top level entries are treated as an 'or'
@@ -829,25 +863,25 @@ class Apprise:
         match_always = common.MATCH_ALWAYS_TAG if match_always else None
 
         # Iterate over our loaded plugins
-        for entry in self.servers:
+        for entry in self.services:
             if isinstance(entry, (ConfigBase, AppriseConfig)):
-                # load our servers
-                servers = entry.servers()
+                # load our services
+                services = entry.services()
 
             else:
-                servers = [
+                services = [
                     entry,
                 ]
 
-            for server in servers:
+            for service in services:
                 # Apply our tag matching based on our defined logic
                 if is_exclusive_match(
                     logic=tag,
-                    data=server.tags,
+                    data=service.tags,
                     match_all=common.MATCH_ALL_TAG,
                     match_always=match_always,
                 ):
-                    yield server
+                    yield service
         return
 
     @staticmethod
@@ -856,7 +890,7 @@ class Apprise:
 
         A filter like "3:endpoint:2" or "endpoint:2" carries ":2" as the
         call-level retry count.  When present it overrides each matched
-        server's configured retry for this single notify() call.
+        service's configured retry for this single notify() call.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
             return None
@@ -898,12 +932,12 @@ class Apprise:
         return False
 
     @staticmethod
-    def _server_priority_for_tag_name(server, tag_name):
-        """Return the dispatch priority stored on *server* for *tag_name*.
+    def _service_priority_for_tag_name(service, tag_name):
+        """Return the dispatch priority stored on *service* for *tag_name*.
 
         Missing tags and plain strings use priority zero.
         """
-        for stag in server.tags:
+        for stag in service.tags:
             if str(stag) == tag_name:
                 return stag.priority if isinstance(stag, AppriseTag) else 0
         return 0
@@ -932,19 +966,19 @@ class Apprise:
         return retry_tokens
 
     @staticmethod
-    def _match_service_retry(server, retry_tokens):
-        """Return the first retry override matching ``server``.
+    def _match_service_retry(service, retry_tokens):
+        """Return the first retry override matching ``service``.
 
         Plain tokens match names; priority tokens also require that priority.
         """
         for ft in retry_tokens:
             tag_name = str(ft)
             if not ft.has_priority:
-                if tag_name in server.tags:
+                if tag_name in service.tags:
                     return ft.retry
 
             else:
-                for stag in server.tags:
+                for stag in service.tags:
                     if isinstance(stag, AppriseTag):
                         if (
                             str(stag) == tag_name
@@ -965,11 +999,11 @@ class Apprise:
             return all_calls
 
         result = []
-        for server, kwargs in all_calls:
-            retry = Apprise._match_service_retry(server, retry_tokens)
+        for service, kwargs in all_calls:
+            retry = Apprise._match_service_retry(service, retry_tokens)
             if retry is not None:
                 kwargs = dict(kwargs, _retry_override=retry)
-            result.append((server, kwargs))
+            result.append((service, kwargs))
         return result
 
     @staticmethod
@@ -1012,15 +1046,15 @@ class Apprise:
     def _build_tag_chains(all_calls, tag):
         """Group *all_calls* into per-OR-token escalation chains.
 
-        Returns {chain_key: {priority: [(server, kwargs)]}}.
+        Returns {chain_key: {priority: [(service, kwargs)]}}.
         Each service joins its first matching OR chain; unmatched services
         use ``""``. Match-all filters create one ``""`` chain.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
             chain: dict[int, list] = {}
-            for server, kwargs in all_calls:
-                p = Apprise._server_priority_for_filter(server, tag)
-                chain.setdefault(p, []).append((server, kwargs))
+            for service, kwargs in all_calls:
+                p = Apprise._service_priority_for_filter(service, tag)
+                chain.setdefault(p, []).append((service, kwargs))
             return {"": chain}
 
         # Flatten OR tokens while keeping true AND groups in the catch-all
@@ -1044,33 +1078,31 @@ class Apprise:
                     or_tag_names.append(str(AppriseTag.parse(tok)))
 
         chains: dict[str, dict[int, list]] = {}
-        for server, kwargs in all_calls:
+        for service, kwargs in all_calls:
             for chain_key in or_tag_names:
-                if chain_key and chain_key in server.tags:
-                    p = Apprise._server_priority_for_tag_name(
-                        server, chain_key
+                if chain_key and chain_key in service.tags:
+                    p = Apprise._service_priority_for_tag_name(
+                        service, chain_key
                     )
                     chains.setdefault(chain_key, {}).setdefault(p, []).append(
-                        (server, kwargs)
+                        (service, kwargs)
                     )
                     break
             else:
                 # fallback: use global priority
-                p = Apprise._server_priority_for_filter(server, tag)
+                p = Apprise._service_priority_for_filter(service, tag)
                 chains.setdefault("", {}).setdefault(p, []).append(
-                    (server, kwargs)
+                    (service, kwargs)
                 )
 
         return chains
 
     @staticmethod
-    def _server_priority_for_filter(server, tag):
-        """Return the effective dispatch priority for *server* given *tag*.
+    def _service_priority_for_filter(service, tag):
+        """Return the effective dispatch priority for *service* given *tag*.
 
-        The priority comes from the AppriseTag stored on the server whose
-        name matches one of the tag-filter names.  When multiple server tags
-        match, the minimum (highest-precedence) priority is returned.
-        Returns 0 when no matching priority tag is found.
+        Return the highest-precedence matching tag priority, or zero when no
+        priority tag matches.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
             return 0
@@ -1089,14 +1121,14 @@ class Apprise:
 
         priorities = [
             stag.priority if isinstance(stag, AppriseTag) else 0
-            for stag in server.tags
+            for stag in service.tags
             if str(stag) in filter_names
         ]
         return min(priorities) if priorities else 0
 
     @staticmethod
     def _split_and_dispatch(
-        batch: list[ServerCall], call_deadline: Optional[float] = None
+        batch: list[ServiceCall], call_deadline: Optional[float] = None
     ) -> tuple[bool, list[NotifyResult]]:
         """Dispatch sequential and parallel subsets of ``batch``.
 
@@ -1138,7 +1170,7 @@ class Apprise:
 
     @staticmethod
     async def _split_and_dispatch_async(
-        batch: list[ServerCall], call_deadline: Optional[float] = None
+        batch: list[ServiceCall], call_deadline: Optional[float] = None
     ) -> tuple[bool, list[NotifyResult]]:
         """Dispatch sequential and asynchronous subsets of ``batch``.
 
@@ -1320,7 +1352,7 @@ class Apprise:
                 )
 
             if not all_calls:
-                # Tag filter matched nothing, or no servers are loaded at all.
+                # Tag filter matched nothing, or no services are loaded at all.
                 return AppriseResult(
                     status=AppriseResultStatus.NOMATCH,
                     results=[],
@@ -1531,7 +1563,7 @@ class Apprise:
                 )
 
             if not all_calls:
-                # Tag filter matched nothing, or no servers are loaded at all.
+                # Tag filter matched nothing, or no services are loaded at all.
                 return AppriseResult(
                     status=AppriseResultStatus.NOMATCH,
                     results=[],
@@ -1653,7 +1685,7 @@ class Apprise:
     def _create_notify_calls(self, *args, **kwargs):
         """Creates notifications for all the plugins loaded.
 
-        Returns a list of (server, notify() kwargs) tuples for plugins with
+        Returns a list of (service, notify() kwargs) tuples for plugins with
         parallelism disabled and another list for plugins with parallelism
         enabled.
         """
@@ -1662,11 +1694,11 @@ class Apprise:
 
         # Split into sequential and parallel notify() calls.
         sequential, parallel = [], []
-        for server, notify_kwargs in all_calls:
-            if server.asset.async_mode:
-                parallel.append((server, notify_kwargs))
+        for service, notify_kwargs in all_calls:
+            if service.asset.async_mode:
+                parallel.append((service, notify_kwargs))
             else:
-                sequential.append((server, notify_kwargs))
+                sequential.append((service, notify_kwargs))
 
         return sequential, parallel
 
@@ -1750,48 +1782,48 @@ class Apprise:
         )
 
         # Iterate over our loaded plugins
-        for server in self.find(tag, match_always=match_always):
+        for service in self.find(tag, match_always=match_always):
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
 
-            # Resolve this server's actual per-call rendering target.
-            # Single-format servers always resolve to their one declared
-            # format. Multi-format servers may resolve differently per
-            # call depending on ?format= or this notify() call's
-            # body_format.
-            target_format = server.resolve_format(body_format)
+            # Resolve this service's actual output format for this call.
+            # A single-format service always uses its declared format. A
+            # multi-format service may resolve differently for each call,
+            # based on its URL's ``format`` option or the ``body_format``
+            # supplied to notify().
+            target_format = service.resolve_format(body_format)
 
             # Apply the service's own cap before conversion. Its asset may
             # differ from the top-level asset and have a smaller limit.
-            capped_title, capped_body = server.asset.enforce_payload_max_size(
+            capped_title, capped_body = service.asset.enforce_payload_max_size(
                 title, body
             )
             if len(capped_title) + len(capped_body) < len(title) + len(body):
                 logger.warning(
                     "%s payload trimmed to stay within the configured "
                     "payload_max_size of %d characters.",
-                    server.service_name,
-                    server.asset._payload_max_size,
+                    service.service_name,
+                    service.asset._payload_max_size,
                 )
 
             # Cache by the resolved format, title handling, and payload cap.
             # Services with the same output needs can share converted content.
             key = (
                 target_format
-                if server.title_maxlen > 0
+                if service.title_maxlen > 0
                 else f"_{target_format}"
             )
-            if server.asset._payload_max_size:
+            if service.asset._payload_max_size:
                 # Allocation settings can produce different capped content,
                 # so each combination needs its own conversion.
                 key += (
-                    f"-cap{server.asset._payload_max_size}"
-                    f"-buf{server.asset._payload_buffer_threshold}"
-                    f"-min{server.asset._payload_min_buffer}"
+                    f"-cap{service.asset._payload_max_size}"
+                    f"-buf{service.asset._payload_buffer_threshold}"
+                    f"-min{service.asset._payload_min_buffer}"
                 )
 
-            if server.interpret_emojis:
+            if service.interpret_emojis:
                 # alter our key slightly to handle emojis since their value is
                 # pulled out of the notification
                 key += "-emojis"
@@ -1804,7 +1836,7 @@ class Apprise:
 
                 # Conversion of title only occurs for services where the title
                 # is blended with the body (title_maxlen <= 0)
-                if conversion_title_map[key] and server.title_maxlen <= 0:
+                if conversion_title_map[key] and service.title_maxlen <= 0:
                     conversion_title_map[key] = convert_between(
                         body_format,
                         target_format,
@@ -1842,7 +1874,7 @@ class Apprise:
                         logger.error(msg)
                         raise AppriseImproperlyConfigured(msg) from None
 
-                if server.interpret_emojis:
+                if service.interpret_emojis:
                     #
                     # Convert our :emoji: definitions
                     #
@@ -1869,11 +1901,11 @@ class Apprise:
                 # token prevents direct callers from skipping their own cap.
                 "_payload_precapped": _PAYLOAD_PRECAPPED,
             }
-            yield (server, kwargs)
+            yield (service, kwargs)
 
     @staticmethod
     def _notify_sequential(
-        *services_kwargs: ServerCall, call_deadline: Optional[float] = None
+        *services_kwargs: ServiceCall, call_deadline: Optional[float] = None
     ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of notify() calls one at a time, in order.
 
@@ -1965,7 +1997,7 @@ class Apprise:
 
     @staticmethod
     def _notify_parallel_threadpool(
-        *services_kwargs: ServerCall, call_deadline: Optional[float] = None
+        *services_kwargs: ServiceCall, call_deadline: Optional[float] = None
     ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of notify() calls in parallel via a thread pool.
 
@@ -2095,7 +2127,7 @@ class Apprise:
 
     @staticmethod
     async def _notify_parallel_asyncio(
-        *services_kwargs: ServerCall, call_deadline: Optional[float] = None
+        *services_kwargs: ServiceCall, call_deadline: Optional[float] = None
     ) -> tuple[bool, list[NotifyResult]]:
         """Process a list of async_notify() calls concurrently via asyncio.
 
@@ -2464,40 +2496,42 @@ class Apprise:
     def urls(self, privacy: bool = False) -> list[str]:
         """Returns all of the loaded URLs defined in this apprise object."""
         urls = []
-        for s in self.servers:
+        for s in self.services:
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                for s_ in s.servers():
+                for s_ in s.services():
                     urls.append(s_.url(privacy=privacy))
             else:
                 urls.append(s.url(privacy=privacy))
         return urls
 
     def pop(self, index: int) -> NotifyBase:
-        """Removes an indexed Notification Service from the stack and returns
-        it.
+        """Remove and return the notification service at ``index``.
 
-        The thing is we can never pop AppriseConfig() entries, only what was
-        loaded within them. So pop needs to carefully iterate over our list and
-        only track actual entries.
+        Indexing uses the flattened service view: directly added plugins and
+        plugins discovered inside configuration sources share one continuous
+        sequence. Configuration containers are never popped by this method.
+        When ``index`` identifies one of their services, that service is
+        removed from the container while the configuration source remains
+        loaded. An out-of-range index raises :class:`IndexError`.
         """
 
         # Tracking variables
         prev_offset = -1
         offset = prev_offset
 
-        for idx, s in enumerate(self.servers):
+        for idx, s in enumerate(self.services):
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                servers = s.servers()
-                if len(servers) > 0:
+                services = s.services()
+                if len(services) > 0:
                     # Acquire a new maximum offset to work with
-                    offset = prev_offset + len(servers)
+                    offset = prev_offset + len(services)
 
                     if offset >= index:
                         # we can pop an element from our config stack
                         fn = (
                             s.pop
                             if isinstance(s, ConfigBase)
-                            else s.server_pop
+                            else s.service_pop
                         )
 
                         return fn(
@@ -2509,7 +2543,7 @@ class Apprise:
             else:
                 offset = prev_offset + 1
                 if offset == index:
-                    return self.servers.pop(idx)
+                    return self.services.pop(idx)
 
             # Update our old offset
             prev_offset = offset
@@ -2518,21 +2552,26 @@ class Apprise:
         raise IndexError("list index out of range")
 
     def __getitem__(self, index: int) -> NotifyBase:
-        """Returns the indexed server entry of a loaded notification server."""
+        """Return a service by its index in the flattened service view.
+
+        Configuration sources themselves are not addressable here. Their
+        discovered services occupy positions in the same sequence as services
+        added directly. An out-of-range index raises :class:`IndexError`.
+        """
         # Tracking variables
         prev_offset = -1
         offset = prev_offset
 
-        for idx, s in enumerate(self.servers):
+        for idx, s in enumerate(self.services):
             if isinstance(s, (ConfigBase, AppriseConfig)):
-                # Get our list of servers associate with our config object
-                servers = s.servers()
-                if len(servers) > 0:
+                # Get our list of services associate with our config object
+                services = s.services()
+                if len(services) > 0:
                     # Acquire a new maximum offset to work with
-                    offset = prev_offset + len(servers)
+                    offset = prev_offset + len(services)
 
                     if offset >= index:
-                        return servers[
+                        return services[
                             (
                                 index
                                 if prev_offset == -1
@@ -2543,7 +2582,7 @@ class Apprise:
             else:
                 offset = prev_offset + 1
                 if offset == index:
-                    return self.servers[idx]
+                    return self.services[idx]
 
             # Update our old offset
             prev_offset = offset
@@ -2559,11 +2598,11 @@ class Apprise:
             # and asset details associated with it
             "urls": [
                 {
-                    "url": server.url(privacy=False),
-                    "tag": server.tags if server.tags else None,
-                    "asset": server.asset,
+                    "url": service.url(privacy=False),
+                    "tag": service.tags if service.tags else None,
+                    "asset": service.asset,
                 }
-                for server in self.servers
+                for service in self.services
             ],
             "locale": self.locale,
             "debug": self.debug,
@@ -2574,7 +2613,7 @@ class Apprise:
 
     def __setstate__(self, state: dict[str, object]) -> None:
         """Pickle Support loads()"""
-        self.servers = []
+        self.services = []
         self.asset = state["asset"]
         self.locale = state["locale"]
 
@@ -2598,33 +2637,36 @@ class Apprise:
         return len(self) > 0
 
     def __iter__(self) -> Iterator[NotifyBase]:
-        """Returns an iterator to each of our servers loaded.
+        """Iterate over the flattened collection of loaded services.
 
-        This includes those found inside configuration.
+        Configuration containers are not yielded. Instead, each service
+        discovered inside them is yielded alongside directly added services.
         """
         return chain(
             *[
                 (
                     [s]
                     if not isinstance(s, (ConfigBase, AppriseConfig))
-                    else iter(s.servers())
+                    else iter(s.services())
                 )
-                for s in self.servers
+                for s in self.services
             ]
         )
 
     def __len__(self) -> int:
-        """Returns the number of servers loaded; this includes those found
-        within loaded configuration.
+        """Return the size of the flattened collection of loaded services.
 
-        This funtion nnever actually counts the Config entry themselves (if
-        they exist), only what they contain.
+        Directly added notification plugins each count as one. Configuration
+        containers do not count as entries themselves; every service currently
+        discovered inside them does. Calling ``len()`` may therefore cause a
+        configuration source to be read or refreshed according to its cache
+        policy.
         """
         return sum(
             (
                 1
                 if not isinstance(s, (ConfigBase, AppriseConfig))
-                else len(s.servers())
+                else len(s.services())
             )
-            for s in self.servers
+            for s in self.services
         )
