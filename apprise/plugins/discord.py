@@ -508,6 +508,11 @@ class NotifyDiscord(NotifyBase):
     ) -> bool:
         """Perform Discord Notification."""
 
+        if title and len(title) > 256:
+            title = title[:253] + "..."
+        if body and len(body) > 2000:
+            body = body[:1997] + "..."
+
         payload: dict[str, Any] = {
             "tts": self.tts,
             # If Text-To-Speech is set to True, then we do not want to wait

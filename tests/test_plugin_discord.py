@@ -1825,3 +1825,38 @@ def test_plugin_discord_attach_multi_batch(mock_post):
     assert mock_post.call_count == 3
     mock_post.side_effect = None
     obj.discord_max_attachments = 10
+
+
+@mock.patch("requests.post")
+def test_plugin_discord_truncation(mock_post):
+    """NotifyDiscord() defensive truncation."""
+
+    webhook_id = "A" * 24
+    webhook_token = "B" * 64
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    response.content = b""
+    response.headers = {}
+    mock_post.return_value = response
+
+    obj = NotifyDiscord(
+        webhook_id=webhook_id,
+        webhook_token=webhook_token,
+    )
+
+    long_title = "T" * 300
+    long_body = "B" * 2500
+
+    assert obj.send(body=long_body, title=long_title) is True
+
+    assert mock_post.call_count == 1
+    details = mock_post.call_args_list[0]
+    payload = loads(details[1]["data"])
+
+    # The content will be title\r\nbody
+    # Title truncated to 256 (T*253 + ...)
+    # Body truncated to 2000 (B*1997 + ...)
+    assert len(payload["content"]) <= 2260
+    assert "..." in payload["content"]
+
