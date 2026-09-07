@@ -66,7 +66,7 @@ def test_apprise_config(tmpdir):
     # Create ourselves a config object
     ac = AppriseConfig()
 
-    # There are no servers loaded
+    # There are no services loaded
     assert len(ac) == 0
 
     # Object can be directly checked as a boolean; response is False
@@ -74,7 +74,7 @@ def test_apprise_config(tmpdir):
     assert not ac
 
     # lets try anyway
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
     t = tmpdir.mkdir("simple-formatting").join("apprise")
     t.write("""
@@ -108,8 +108,8 @@ def test_apprise_config(tmpdir):
     # when there is at least one entry
     assert ac
 
-    # We should be able to read our 4 servers from that
-    assert len(ac.servers()) == 4
+    # We should be able to read our 4 services from that
+    assert len(ac.services()) == 4
 
     # Get our URL back
     assert isinstance(ac[0].url(), str)
@@ -128,7 +128,7 @@ def test_apprise_config(tmpdir):
     assert len(ac) == 1
 
     # No urls were set
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
     # Create a ConfigBase object
     cb = ConfigBase()
@@ -158,7 +158,7 @@ def test_apprise_config(tmpdir):
     assert len(ac) == 1
 
     # No urls were set
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
     #
     # Test Internatialization and the handling of unicode characters
@@ -180,7 +180,7 @@ def test_apprise_config(tmpdir):
 
     # This will fail because our default encoding is utf-8; however the file
     # we opened was not; it was latin-1 and could not be parsed.
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
     # Test iterator
     count = 0
@@ -195,7 +195,7 @@ def test_apprise_config(tmpdir):
     assert len(ac) == 1
 
     # Our URL should be found
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
     # Get our URL back
     assert isinstance(ac[0].url(), str)
@@ -224,14 +224,14 @@ def test_apprise_config(tmpdir):
     # One configuration file should have been found
     assert len(ac) == 1
 
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
     # update our buffer size to be slightly smaller then what we allow
     ac[0].max_buffer_size = len(buf) - 1
 
     # Content is automatically cached; so even though we adjusted the buffer
     # above, our results have been cached so we get a 1 response.
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
 
 def test_apprise_multi_config_entries(tmpdir):
@@ -269,7 +269,7 @@ def test_apprise_multi_config_entries(tmpdir):
     # Create ourselves a config object
     ac = AppriseConfig()
 
-    # There are no servers loaded
+    # There are no services loaded
     assert len(ac) == 0
 
     # Support adding of muilt strings and objects:
@@ -285,11 +285,11 @@ def test_apprise_multi_config_entries(tmpdir):
 
     # Try to pop an element out of range
     with pytest.raises(IndexError):
-        ac.server_pop(len(ac.servers()))
+        ac.service_pop(len(ac.services()))
 
     # Pop our elements
-    while len(ac.servers()) > 0:
-        assert isinstance(ac.server_pop(len(ac.servers()) - 1), NotifyBase)
+    while len(ac.services()) > 0:
+        assert isinstance(ac.service_pop(len(ac.services()) - 1), NotifyBase)
 
 
 def test_apprise_add_config():
@@ -323,8 +323,8 @@ def test_apprise_add_config():
     # when there is at least one entry
     assert ac
 
-    # We should be able to read our 3 servers from that
-    assert len(ac.servers()) == 3
+    # We should be able to read our 3 services from that
+    assert len(ac.services()) == 3
 
     # Get our URL back
     assert isinstance(ac[0].url(), str)
@@ -334,7 +334,7 @@ def test_apprise_add_config():
     assert ac.add_config(content=42) is False
     assert ac.add_config(content=None) is False
 
-    # Still only one server loaded
+    # Still only one service loaded
     assert len(ac) == 1
 
     # Test having a pre-defined asset object and tag created
@@ -342,11 +342,11 @@ def test_apprise_add_config():
         ac.add_config(content=content, asset=AppriseAsset(), tag="a") is True
     )
 
-    # Now there are 2 servers loaded
+    # Now there are 2 services loaded
     assert len(ac) == 2
 
     # and 6 urls.. (as we've doubled up)
-    assert len(ac.servers()) == 6
+    assert len(ac.services()) == 6
 
     content = """
     # A YAML File
@@ -378,8 +378,8 @@ def test_apprise_add_config():
     # when there is at least one entry
     assert ac
 
-    # We should be able to read our 4 servers from that
-    assert len(ac.servers()) == 4
+    # We should be able to read our 4 services from that
+    assert len(ac.services()) == 4
 
     # Now an invalid configuration file
     content = "invalid"
@@ -389,7 +389,7 @@ def test_apprise_add_config():
     assert ac.add_config(content=content) is False
 
     # Nothing is loaded
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
 
 def test_apprise_config_tagging(tmpdir):
@@ -414,13 +414,13 @@ def test_apprise_config_tagging(tmpdir):
     assert ac.add(configs=str(t), asset=AppriseAsset(), tag="a,b") is True
 
     # Now filter: a:
-    assert len(ac.servers(tag="a")) == 2
+    assert len(ac.services(tag="a")) == 2
     # Now filter: a or b:
-    assert len(ac.servers(tag="a,b")) == 3
+    assert len(ac.services(tag="a,b")) == 3
     # Now filter: a and b
-    assert len(ac.servers(tag=[("a", "b")])) == 1
+    assert len(ac.services(tag=[("a", "b")])) == 1
     # all matches everything
-    assert len(ac.servers(tag="all")) == 3
+    assert len(ac.services(tag="all")) == 3
 
     # Test cases using the `always` keyword
     # Create ourselves a config object
@@ -434,20 +434,20 @@ def test_apprise_config_tagging(tmpdir):
     assert ac.add(configs=str(t), asset=AppriseAsset(), tag="c,d") is True
 
     # Now filter: a:
-    assert len(ac.servers(tag="a")) == 1
+    assert len(ac.services(tag="a")) == 1
     # Now filter: a or b:
-    assert len(ac.servers(tag="a,b")) == 2
+    assert len(ac.services(tag="a,b")) == 2
     # Now filter: e
     # we'll match the `always'
-    assert len(ac.servers(tag="e")) == 1
-    assert len(ac.servers(tag="e", match_always=False)) == 0
+    assert len(ac.services(tag="e")) == 1
+    assert len(ac.services(tag="e", match_always=False)) == 0
     # all matches everything
-    assert len(ac.servers(tag="all")) == 3
+    assert len(ac.services(tag="all")) == 3
 
     # Now filter: d
     # we'll match the `always' tag
-    assert len(ac.servers(tag="d")) == 2
-    assert len(ac.servers(tag="d", match_always=False)) == 1
+    assert len(ac.services(tag="d")) == 2
+    assert len(ac.services(tag="d", match_always=False)) == 1
 
 
 def test_apprise_config_instantiate():
@@ -543,8 +543,8 @@ def test_invalid_apprise_config(tmpdir):
     # One configuration file
     assert len(ac) == 1
 
-    # All of the servers were invalid and would not load
-    assert len(ac.servers()) == 0
+    # All of the services were invalid and would not load
+    assert len(ac.services()) == 0
 
 
 def test_apprise_config_with_apprise_obj(tmpdir):
@@ -590,19 +590,19 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(ac) == 1
 
     # 2 services found in it
-    assert len(ac.servers()) == 2
+    assert len(ac.services()) == 2
 
     # Pop one of them (at index 0)
-    ac.server_pop(0)
+    ac.service_pop(0)
 
     # Verify that it no longer listed
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
     # Test our ability to add Config objects to our apprise object
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
 
     # Detect our 1 entry (originally there were 2 but we deleted one)
     assert len(a) == 1
@@ -612,7 +612,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
 
     # Add our configuration object
     assert (
-        a.add(servers=[AppriseConfig(str(t)), AppriseConfig(str(t))]) is True
+        a.add(services=[AppriseConfig(str(t)), AppriseConfig(str(t))]) is True
     )
 
     # Detect our 5 loaded entries now; 1 from first config, and another
@@ -620,8 +620,8 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     assert len(a) == 5
 
     # We can't add garbage
-    assert a.add(servers=object()) is False
-    assert a.add(servers=[object(), object()]) is False
+    assert a.add(services=object()) is False
+    assert a.add(services=[object(), object()]) is False
 
     # Our length is unchanged
     assert len(a) == 5
@@ -684,7 +684,7 @@ def test_apprise_config_with_apprise_obj(tmpdir):
     # Below we add 3 different types, a ConfigBase, NotifyBase, and URL
     assert (
         a.add(
-            servers=[
+            services=[
                 ConfigFile(path=(str(t))),
                 "good://another.host",
                 GoodNotification(**{"host": "nuxref.com"}),
@@ -817,7 +817,7 @@ include strict://{cfg04!s}""")
     # Create ourselves a config object
     ac = AppriseConfig()
 
-    # There are no servers loaded
+    # There are no services loaded
     assert len(ac) == 0
 
     # load our configuration
@@ -827,7 +827,7 @@ include strict://{cfg04!s}""")
     assert len(ac) == 1
 
     # 1 service will be loaded as there is no recursion at this point
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
     # Create ourselves a config object
     ac = AppriseConfig(recursion=1)
@@ -840,7 +840,7 @@ include strict://{cfg04!s}""")
     assert len(ac) == 1
 
     # 2 services loaded now that we loaded the same file twice
-    assert len(ac.servers()) == 2
+    assert len(ac.services()) == 2
 
     #
     # Now we test relative file inclusion
@@ -849,7 +849,7 @@ include strict://{cfg04!s}""")
     # Create ourselves a config object
     ac = AppriseConfig(recursion=10)
 
-    # There are no servers loaded
+    # There are no services loaded
     assert len(ac) == 0
 
     # load our configuration
@@ -860,14 +860,14 @@ include strict://{cfg04!s}""")
 
     # 11 services loaded because we reloaded ourselves 10 times
     # after loading the first entry
-    assert len(ac.servers()) == 11
+    assert len(ac.services()) == 11
 
     # Test our include modes (strict, always, and never)
 
     # Create ourselves a config object
     ac = AppriseConfig(recursion=1)
 
-    # There are no servers loaded
+    # There are no services loaded
     assert len(ac) == 0
 
     # load our configuration
@@ -876,7 +876,7 @@ include strict://{cfg04!s}""")
     # verify it loaded
     assert len(ac) == 1
 
-    # 2 servers loaded
+    # 2 services loaded
     # 1 - from the file read (which is set at mode STRICT
     # 1 - from the always://
     #
@@ -884,12 +884,12 @@ include strict://{cfg04!s}""")
     #  file:// (the one doing the include) so it is also ignored.
     #
     # By turning on the insecure_includes, we can include the strict files too
-    assert len(ac.servers()) == 2
+    assert len(ac.services()) == 2
 
     # Create ourselves a config object
     ac = AppriseConfig(recursion=1, insecure_includes=True)
 
-    # There are no servers loaded
+    # There are no services loaded
     assert len(ac) == 0
 
     # load our configuration
@@ -898,11 +898,11 @@ include strict://{cfg04!s}""")
     # verify it loaded
     assert len(ac) == 1
 
-    # 3 servers loaded
+    # 3 services loaded
     # 1 - from the file read (which is set at mode STRICT
     # 1 - from the always://
     # 1 - from the strict:// (due to insecure_includes set)
-    assert len(ac.servers()) == 3
+    assert len(ac.services()) == 3
 
 
 def test_apprise_config_file_loading(tmpdir):
@@ -1056,7 +1056,7 @@ class ConfigBugger(ConfigBase):
 
 
 @mock.patch("os.path.getsize")
-def test_config_base_parse_inaccessible_text_file(mock_getsize, tmpdir):
+def test_config_base_inaccessible_text_file(mock_getsize, tmpdir):
     """
     API: ConfigBase.parse_inaccessible_text_file
 
@@ -1079,7 +1079,7 @@ def test_config_base_parse_inaccessible_text_file(mock_getsize, tmpdir):
     assert len(ac) == 1
 
     # Thus no notifications are loaded
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
 
 def test_config_base_parse_yaml_file01(tmpdir):
@@ -1097,7 +1097,7 @@ def test_config_base_parse_yaml_file01(tmpdir):
     assert len(ac) == 1
 
     # no notifications are loaded
-    assert len(ac.servers()) == 0
+    assert len(ac.services()) == 0
 
 
 def test_config_base_parse_yaml_file02(tmpdir):
@@ -1121,13 +1121,13 @@ def test_config_base_parse_yaml_file02(tmpdir):
     assert len(ac) == 1
 
     # no notifications are loaded
-    assert len(ac.servers()) == 3
+    assert len(ac.services()) == 3
 
     # Test our ability to add Config objects to our apprise object
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1172,13 +1172,13 @@ def test_config_base_parse_yaml_file03(tmpdir):
     assert len(ac) == 1
 
     # no notifications lines processed is 3
-    assert len(ac.servers()) == 3
+    assert len(ac.services()) == 3
 
     # Test our ability to add Config objects to our apprise object
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1220,13 +1220,13 @@ def test_config_base_parse_yaml_file04(tmpdir):
     assert len(ac) == 1
 
     # no notifications are loaded
-    assert len(ac.servers()) == 3
+    assert len(ac.services()) == 3
 
     # Test our ability to add Config objects to our apprise object
     a = Apprise()
 
     # Add our configuration object
-    assert a.add(servers=ac) is True
+    assert a.add(services=ac) is True
 
     # Detect our 3 entry as they should have loaded successfully
     assert len(a) == 3
@@ -1279,7 +1279,7 @@ def test_apprise_config_template_parse(tmpdir):
     ac = AppriseConfig(paths=str(t))
 
     # 2 emails to be sent
-    assert len(ac.servers()) == 2
+    assert len(ac.services()) == 2
 
     # The below checks are very customized for NotifyMail but just
     # test that the content got passed correctly
@@ -1419,7 +1419,7 @@ def test_apprise_config_template_parse(tmpdir):
     ac = AppriseConfig(paths=str(t))
 
     # 2 emails to be sent and 1 Sinch service call
-    assert len(ac.servers()) == 4
+    assert len(ac.services()) == 4
 
     # Verify our users got placed into the to
     assert len(ac[0][0].targets) == 3
@@ -1472,7 +1472,7 @@ def test_config_base_yaml_trace_logging(tmpdir):
     ):
         ac = AppriseConfig(paths=str(t))
         assert len(ac) == 1
-        assert len(ac.servers()) == 1
+        assert len(ac.services()) == 1
 
         # We expect our TRACE log call to have happened at least once
         assert m_trace.called is True
@@ -1490,17 +1490,17 @@ def test_config_base_clear_cache(tmpdir):
     ac = AppriseConfig(paths=str(t))
 
     # Trigger a load to populate cache inside the config instance
-    assert len(ac.servers()) == 1
+    assert len(ac.services()) == 1
 
     # The underlying config object should have cached state
     cfg = ac[0]
     assert isinstance(cfg, ConfigBase)
-    assert isinstance(getattr(cfg, "_cached_servers", None), list)
+    assert isinstance(getattr(cfg, "_cached_services", None), list)
     assert getattr(cfg, "_cached_time", None) is not None
 
     # Now clear it and confirm it resets as expected
     cfg.clear_cache()
-    assert getattr(cfg, "_cached_servers", None) is None
+    assert getattr(cfg, "_cached_services", None) is None
     assert getattr(cfg, "_cached_time", None) is None
 
 
@@ -1545,7 +1545,7 @@ def test_config_base_expired_with_int_cache(monkeypatch):
     cb = ConfigBase(cache=30)
 
     # Seed cache
-    cb._cached_servers = []
+    cb._cached_services = []
     cb._cached_time = 1000.0
 
     # Within cache window
