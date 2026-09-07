@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.evolution import NotifyEvolution
 
 logging.disable(logging.CRITICAL)
@@ -61,28 +62,28 @@ apprise_url_tests = (
     (
         "evolution://hostname/myinstance/5511999999999",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing instance (single path entry treated as instance; no phone left)
     (
         "evolution://myapikey@hostname/5511999999999",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing phone number
     (
         "evolution://myapikey@hostname/myinstance",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid phone number
     (
         "evolution://myapikey@hostname/myinstance/notaphone",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid HTTP — minimal
@@ -180,27 +181,27 @@ def test_plugin_evolution_edge_cases():
     """NotifyEvolution() direct instantiation edge cases."""
 
     # No apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEvolution(
             apikey=None, instance="inst", targets=["5511999999999"]
         )
 
     # Blank apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEvolution(
             apikey="   ", instance="inst", targets=["5511999999999"]
         )
 
     # No instance
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEvolution(apikey="key", instance=None, targets=["5511999999999"])
 
     # No targets
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEvolution(apikey="key", instance="inst", targets=[])
 
     # All targets invalid
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyEvolution(
             apikey="key", instance="inst", targets=["notaphone", "xx"]
         )

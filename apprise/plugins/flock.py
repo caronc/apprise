@@ -45,6 +45,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -157,7 +158,7 @@ class NotifyFlock(NotifyBase):
         if not self.token:
             msg = f"An invalid Flock Access Key ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Track whether or not we want to send an image with our notification
         # or not.
@@ -189,7 +190,7 @@ class NotifyFlock(NotifyBase):
             # We have a bot token and no target(s) to message
             msg = "No Flock targets to notify."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

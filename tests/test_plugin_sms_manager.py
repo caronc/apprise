@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.smsmanager import NotifySMSManager
 
 logging.disable(logging.CRITICAL)
@@ -43,14 +44,14 @@ apprise_url_tests = (
         "smsmgr://",
         {
             # Instantiated but no auth, so no otification can happen
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smsmgr://:@/",
         {
             # invalid auth
-            "instance": TypeError
+            "instance": AppriseImproperlyConfigured
         },
     ),
     (
@@ -89,7 +90,7 @@ apprise_url_tests = (
         "smsmgr://{}@{}?gateway=invalid".format("a" * 10, "1" * 11),
         {
             # invalid gatewwway
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

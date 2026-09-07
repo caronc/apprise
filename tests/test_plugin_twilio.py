@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.twilio import NotifyTwilio, TwilioNotificationMethod
 
 logging.disable(logging.CRITICAL)
@@ -46,28 +47,28 @@ apprise_url_tests = (
         "twilio://",
         {
             # No Account SID specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twilio://:@/",
         {
             # invalid Auth token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twilio://AC{}@12345678".format("a" * 32),
         {
             # Just sid provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "twilio://AC{}:{}@_".format("a" * 32, "b" * 32),
         {
             # sid and token provided but invalid from
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -85,7 +86,7 @@ apprise_url_tests = (
         "twilio://AC{}:{}@{}".format("a" * 32, "b" * 32, "3" * 9),
         {
             # sid and token provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -124,7 +125,7 @@ apprise_url_tests = (
         ),
         {
             # Invalid short-code
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -153,7 +154,7 @@ apprise_url_tests = (
         "twilio://AC{}:{}@{}?method=mms".format("a" * 32, "b" * 32, "5" * 11),
         {
             # Invalid notification method
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -162,7 +163,7 @@ apprise_url_tests = (
         ),
         {
             # Incompatibility between Whatsapp mode and CALL method
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -353,19 +354,19 @@ def test_plugin_twilio_edge_cases(mock_post):
     whatsapp_source = "w:" + "+1 (555) 123-3456"
 
     # No account_sid specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwilio(account_sid=None, auth_token=auth_token, source=source)
 
     # No auth_token specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwilio(account_sid=account_sid, auth_token=None, source=source)
 
     # Source is bad
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwilio(account_sid=account_sid, auth_token=auth_token, source="")
 
     # Incompatibility between mode and method
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwilio(
             account_sid=account_sid,
             auth_token=auth_token,

@@ -34,6 +34,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -257,7 +258,7 @@ class NotifySMSEagle(NotifyBase):
                 f" ({token if token else self.user}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         #
         # Priority
@@ -300,7 +301,7 @@ class NotifySMSEagle(NotifyBase):
                     f"An invalid SMSEagle priority ({priority}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
             # store our successfully looked up priority
             self.priority = SMSEAGLE_PRIORITY_MAP[result]
@@ -311,7 +312,7 @@ class NotifySMSEagle(NotifyBase):
         ):
             msg = f"An invalid SMSEagle priority ({priority}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our targerts
         for target in parse_phone_no(targets):

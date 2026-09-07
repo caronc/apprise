@@ -39,6 +39,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from .base import NotifyBase
@@ -147,7 +148,7 @@ class NotifyRyver(NotifyBase):
         if not self.token:
             msg = f"An invalid Ryver API Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Organization (associated with project)
         self.organization = validate_regex(
@@ -159,7 +160,7 @@ class NotifyRyver(NotifyBase):
                 f"({organization}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our webhook mode
         self.mode = None if not isinstance(mode, str) else mode.lower()
@@ -167,7 +168,7 @@ class NotifyRyver(NotifyBase):
         if self.mode not in RYVER_WEBHOOK_MODES:
             msg = f"The Ryver webhook mode specified ({mode}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Place an image inline with the message body
         self.include_image = include_image

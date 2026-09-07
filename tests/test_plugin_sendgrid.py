@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sendgrid import NotifySendGrid
 
 logging.disable(logging.CRITICAL)
@@ -77,7 +78,7 @@ apprise_url_tests = (
         "sendgrid://invalid-api-key+*-d:user@example.com",
         {
             # An invalid API Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -199,15 +200,15 @@ def test_plugin_sendgrid_edge_cases(mock_post, mock_get):
     """NotifySendGrid() Edge Cases."""
 
     # no apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendGrid(apikey=None, from_email="user@example.com")
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendGrid(apikey="abcd", from_email="!invalid")
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendGrid(apikey="abcd", from_email=None)
 
     # Invalid To email address

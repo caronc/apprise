@@ -63,6 +63,7 @@ from typing import Any
 import requests
 
 from ..common import NotifyImageSize, NotifyType, PersistentStoreMode
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     URL_PATH_SAFE_CHARS,
@@ -264,7 +265,7 @@ class NotifyMattermost(NotifyBase):
             if self.mode not in MATTERMOST_MODES:
                 msg = f"The Mattermost mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.mode = self.template_args["mode"]["default"]
 
@@ -276,7 +277,7 @@ class NotifyMattermost(NotifyBase):
         if not self.token:
             msg = f"An invalid Mattermost Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Used for URL generation afterwards only
         self._invalid_targets = []

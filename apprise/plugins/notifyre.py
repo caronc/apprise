@@ -62,6 +62,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
 from .base import NotifyBase
@@ -213,7 +214,7 @@ class NotifyNotifyre(NotifyBase):
         if not apikey:
             msg = "A Notifyre API key must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our API key
         self.apikey = apikey
@@ -230,7 +231,7 @@ class NotifyNotifyre(NotifyBase):
                     mode
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Default to SMS
@@ -246,7 +247,7 @@ class NotifyNotifyre(NotifyBase):
                     "({}) is invalid.".format(source)
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Store normalised number with country code prefix
             self.source = "+{}".format(result["full"])

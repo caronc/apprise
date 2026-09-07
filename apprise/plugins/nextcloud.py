@@ -32,7 +32,7 @@ import re
 import requests
 
 from ..common import NotifyType, PersistentStoreMode
-from ..exception import AppriseException
+from ..exception import AppriseImproperlyConfigured, ApprisePluginException
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list
@@ -52,7 +52,7 @@ IS_USER = re.compile(
 )
 
 
-class NextcloudGroupDiscoveryException(AppriseException):
+class NextcloudGroupDiscoveryException(ApprisePluginException):
     """Apprise Nextcloud Group Discovery Exception Class."""
 
 
@@ -237,7 +237,7 @@ class NotifyNextcloud(NotifyBase):
                     f"At invalid Nextcloud version ({version}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         # Support URL Prefix
         self.url_prefix = (

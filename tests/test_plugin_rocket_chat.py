@@ -36,6 +36,7 @@ import requests
 
 import apprise
 from apprise import NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.rocketchat import NotifyRocketChat
 
 logging.disable(logging.CRITICAL)
@@ -64,35 +65,35 @@ apprise_url_tests = (
     (
         "rocket://localhost",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No room or channel
     (
         "rocket://user:pass@localhost",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No valid rooms or channels
     (
         "rocket://user:pass@localhost/#/!/@",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No user/pass combo
     (
         "rocket://user@localhost/room/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No user/pass combo
     (
         "rocket://localhost/room/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # A room and port identifier
@@ -283,7 +284,7 @@ apprise_url_tests = (
         "rockets://user:web/token@localhost/@user/?mode=invalid",
         {
             # invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -359,7 +360,7 @@ def test_plugin_rocket_chat_edge_cases(mock_post, mock_get):
     assert len(obj.rooms) == 1
 
     # No Webhook specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         obj = NotifyRocketChat(webhook=None, mode="webhook")
 
     #

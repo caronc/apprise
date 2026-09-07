@@ -67,6 +67,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list
 from .base import NotifyBase
@@ -216,7 +217,7 @@ class NotifyKook(NotifyBase):
         if not self.token:
             msg = "A Kook token must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Resolve operating mode
         if mode and isinstance(mode, str):
@@ -228,7 +229,7 @@ class NotifyKook(NotifyBase):
             if self.mode not in KOOK_MODES:
                 msg = f"The Kook mode specified ({mode}) is not valid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Default to bot mode

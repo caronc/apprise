@@ -38,6 +38,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.office365 import NotifyOffice365
 
 logging.disable(logging.CRITICAL)
@@ -54,14 +55,14 @@ apprise_url_tests = (
         "o365://",
         {
             # Missing tenant, client_id, secret, and targets!
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "o365://:@/",
         {
             # invalid url
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -75,7 +76,7 @@ apprise_url_tests = (
         ),
         {
             # Expected failure
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -89,7 +90,7 @@ apprise_url_tests = (
         ),
         {
             # Expected failure
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -437,7 +438,7 @@ def test_plugin_office365_general(mock_get, mock_post):
     # Test our notification
     assert bool(obj.notify(title="title", body="test")) is True
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No secret
         NotifyOffice365(
             email=email,
@@ -1295,7 +1296,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
     # Explicit mode=org on a personal domain — still requires valid email
     # source (no tenant needed for the personal flow, but org requires tenant)
     #
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # tenant is None but mode=org demands a valid tenant
         NotifyOffice365(
             source="user@live.com",
@@ -1307,7 +1308,7 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
     #
     # Personal mode requires source to be a valid email
     #
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyOffice365(
             source="not-an-email",
             client_id=client_id,
@@ -1316,9 +1317,9 @@ def test_plugin_office365_personal_mode(mock_post, mock_get):
         )
 
     #
-    # Invalid mode string raises TypeError
+    # An invalid mode is rejected.
     #
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyOffice365(
             source="user@live.com",
             client_id=client_id,

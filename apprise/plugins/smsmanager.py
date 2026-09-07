@@ -36,6 +36,7 @@
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -172,7 +173,7 @@ class NotifySMSManager(NotifyBase):
         if not self.apikey:
             msg = f"An invalid API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Setup our gateway
         self.gateway = (
@@ -183,7 +184,7 @@ class NotifySMSManager(NotifyBase):
         if self.gateway not in SMS_MANAGER_GATEWAYS:
             msg = f"The Gateway specified ({gateway}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Define whether or not we should operate in a batch mode
         self.batch = (

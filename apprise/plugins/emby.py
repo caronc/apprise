@@ -35,6 +35,7 @@ import requests
 
 from .. import __version__ as VERSION
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool
@@ -144,7 +145,7 @@ class NotifyEmby(NotifyBase):
             # User was not specified
             msg = "No Emby username was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

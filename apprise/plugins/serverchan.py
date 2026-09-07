@@ -30,6 +30,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -87,7 +88,7 @@ class NotifyServerChan(NotifyBase):
         if not self.token:
             msg = f"An invalid ServerChan API Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform ServerChan Notification."""

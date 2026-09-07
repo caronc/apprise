@@ -31,6 +31,7 @@ import requests
 
 from ..attachment.base import AttachBase
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from .base import NotifyBase
@@ -130,7 +131,7 @@ class NotifyPushBullet(NotifyBase):
                 f"({accesstoken}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.targets = parse_list(targets)
         if len(self.targets) == 0:

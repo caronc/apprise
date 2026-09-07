@@ -49,6 +49,7 @@ from .common import (
     NAIVE_DATE_ISO_FORMAT,
     PersistentStoreMode,
 )
+from .exception import AppriseImproperlyConfigured
 from .logger import logger
 from .utils.disk import path_decode
 
@@ -146,7 +147,7 @@ class CacheObject:
             )
 
         else:  # Unsupported
-            raise AttributeError(
+            raise AppriseImproperlyConfigured(
                 f"An invalid expiry time ({expires} was specified"
             )
 
@@ -199,11 +200,15 @@ class CacheObject:
             # Acquire some useful integrity objects
             class_name = content.get("c", "")
             if not isinstance(class_name, str):
-                raise TypeError("Class name not expected string")
+                raise AppriseImproperlyConfigured(
+                    "Class name not expected string"
+                )
 
             hashsum = content.get("!", "")
             if not isinstance(hashsum, str):
-                raise TypeError("SHA1SUM not expected string")
+                raise AppriseImproperlyConfigured(
+                    "SHA1SUM not expected string"
+                )
 
         except (TypeError, KeyError) as e:
             logger.trace(f"CacheObject could not be parsed from {content}")
@@ -396,7 +401,7 @@ class PersistentStore:
         if not isinstance(namespace, str) or not self.__valid_key.match(
             namespace
         ):
-            raise AttributeError(
+            raise AppriseImproperlyConfigured(
                 f"Persistent Storage namespace ({namespace}) provided is"
                 " invalid"
             )
@@ -437,11 +442,9 @@ class PersistentStore:
             )
 
         except (AttributeError, ValueError):
-            err = (
-                f"An invalid persistent storage mode ({mode}) was specified.",
-            )
+            err = f"An invalid persistent storage mode ({mode}) was specified."
             logger.warning(err)
-            raise AttributeError(err) from None
+            raise AppriseImproperlyConfigured(err) from None
 
         # Prepare our environment
         self.__prepare()
@@ -505,7 +508,7 @@ class PersistentStore:
             key = self.base_key
 
         elif not isinstance(key, str) or not self.__valid_key.match(key):
-            raise AttributeError(
+            raise AppriseImproperlyConfigured(
                 f"Persistent Storage key ({key} provided is invalid"
             )
 
@@ -513,7 +516,7 @@ class PersistentStore:
             # One last check, we will accept read() objets with the expectation
             # it will return a binary dataset
             if not (hasattr(data, "read") and callable(data.read)):
-                raise AttributeError(
+                raise AppriseImproperlyConfigured(
                     f"Invalid data type {type(data)} provided to Persistent"
                     " Storage"
                 )
@@ -522,7 +525,7 @@ class PersistentStore:
                 # Read in our data
                 data = data.read()
                 if not isinstance(data, (bytes, str)):
-                    raise AttributeError(
+                    raise AppriseImproperlyConfigured(
                         f"Invalid data type {type(data)} provided to"
                         " Persistent Storage"
                     )
@@ -769,7 +772,7 @@ class PersistentStore:
             key = self.base_key
 
         elif not isinstance(key, str) or not self.__valid_key.match(key):
-            raise AttributeError(
+            raise AppriseImproperlyConfigured(
                 f"Persistent Storage key ({key} provided is invalid"
             )
 
@@ -1368,7 +1371,7 @@ class PersistentStore:
                 namespace = [namespace]
 
             elif not isinstance(namespace, (tuple, set, list)):
-                raise AttributeError(
+                raise AppriseImproperlyConfigured(
                     "namespace must be None, a string, or a tuple/set/list "
                     "of strings"
                 )

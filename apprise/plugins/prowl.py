@@ -30,6 +30,7 @@ import contextlib
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -171,7 +172,7 @@ class NotifyProwl(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Prowl API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the provider key (if specified)
         if providerkey:
@@ -184,7 +185,7 @@ class NotifyProwl(NotifyBase):
                     f"({providerkey}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # No provider key was set

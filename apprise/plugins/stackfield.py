@@ -48,6 +48,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import validate_regex
@@ -128,7 +129,7 @@ class NotifyStackfield(NotifyBase):
                 f"An invalid Stackfield webhook token ({token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Stackfield Notification."""

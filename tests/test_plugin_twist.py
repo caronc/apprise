@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.twist import NotifyTwist
 
 logging.disable(logging.CRITICAL)
@@ -130,10 +131,10 @@ def test_plugin_twist_urls():
 
 def test_plugin_twist_init():
     """NotifyTwist() init()"""
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwist(email="invalid", targets=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyTwist(email="user@domain", targets=None)
 
     # Simple object initialization

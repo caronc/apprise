@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sendpulse import NotifySendPulse
 
 logging.disable(logging.CRITICAL)
@@ -58,34 +59,34 @@ apprise_url_tests = (
     (
         "sendpulse://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://abcd",
         {
             # invalid from email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://abcd@host.com",
         {
             # Just an Email specified, no client_id or client_secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://user@example.com/client_id/cs/?template=invalid",
         {
             # Invalid template
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -145,7 +146,7 @@ apprise_url_tests = (
         "sendpulse://?id=ci&secret=cs&user=chris",
         {
             # Set login through user= only - invaild email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -675,12 +676,12 @@ def test_plugin_sendpulse_fail_cases():
     """
 
     # no client_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id="abcd", client_secret=None, from_addr="user@example.com"
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id=None,
             client_secret="abcd123",
@@ -688,13 +689,13 @@ def test_plugin_sendpulse_fail_cases():
         )
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id="abcd", client_secret="abcd456", from_addr="!invalid"
         )
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id="abcd", client_secret="abcd789", from_addr=None
         )

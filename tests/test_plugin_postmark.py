@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.postmark import NotifyPostmark
 
 logging.disable(logging.CRITICAL)
@@ -48,28 +49,28 @@ apprise_url_tests = (
         "postmark://",
         {
             # No credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "postmark://:@/",
         {
             # Empty credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "postmark://abcd",
         {
             # API key only, no from email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "postmark://abcd@host",
         {
             # API key only, no from email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -206,15 +207,15 @@ def test_plugin_postmark_edge_cases(mock_post, mock_get):
     """NotifyPostmark() Edge Cases."""
 
     # No API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPostmark(apikey=None, from_email="user@example.com")
 
     # Invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPostmark(apikey="abcd", from_email="!invalid")
 
     # No from email (None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPostmark(apikey="abcd", from_email=None)
 
     # Invalid target email -- plugin loads but target is dropped

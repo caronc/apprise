@@ -35,6 +35,7 @@ import requests
 
 import apprise
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.join import JoinPriority, NotifyJoin
 
 logging.disable(logging.CRITICAL)
@@ -44,14 +45,14 @@ apprise_url_tests = (
     (
         "join://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + bad url
     (
         "join://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no device
@@ -191,11 +192,11 @@ def test_plugin_join_edge_cases(mock_post, mock_get):
     NotifyJoin(apikey=apikey, targets=None)
 
     # Initializes the plugin with an invalid apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyJoin(apikey=None)
 
     # Whitespace also acts as an invalid apikey
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyJoin(apikey="   ")
 
     # Initializes the plugin with devices set to a set

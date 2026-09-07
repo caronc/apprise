@@ -47,6 +47,7 @@ from json import dumps, loads
 import requests
 
 from ..common import NotifyType, PersistentStoreMode
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_uuid, parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -350,7 +351,7 @@ class NotifyJira(NotifyBase):
         if not self.apikey:
             msg = "An invalid Jira API Key ({}) was specified.".format(apikey)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Priority of the message
         self.priority = (
@@ -383,7 +384,7 @@ class NotifyJira(NotifyBase):
                 region_name
             )
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         if action and isinstance(action, str):
             self.action = next(
@@ -394,7 +395,7 @@ class NotifyJira(NotifyBase):
                     action
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
         else:
             self.action = self.template_args["action"]["default"]
 
@@ -410,7 +411,7 @@ class NotifyJira(NotifyBase):
                         "is invalid.".format(_k)
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 _v_lower = _v.lower()
                 v = next(
@@ -423,7 +424,7 @@ class NotifyJira(NotifyBase):
                         "specified ({}) is invalid.".format(k, _v)
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
                 # Update our mapping
                 self.mapping[k] = v

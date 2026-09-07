@@ -33,6 +33,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list, validate_regex
 from .base import NotifyBase
@@ -133,7 +134,7 @@ class NotifyPushy(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Pushy Secret API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Get our targets
         self.devices = []

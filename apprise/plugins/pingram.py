@@ -51,6 +51,7 @@ import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_email,
@@ -293,7 +294,7 @@ class NotifyPingram(NotifyBase):
                 apikey
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # For tracking our email -> name lookups
         self.names = {}
@@ -336,7 +337,7 @@ class NotifyPingram(NotifyBase):
             if self.mode not in PINGRAM_MODES:
                 msg = f"The Pingram mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Detect mode based on whether or not a message_type was
@@ -361,7 +362,7 @@ class NotifyPingram(NotifyBase):
                     "({}) was specified.".format(message_type)
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -385,7 +386,7 @@ class NotifyPingram(NotifyBase):
             # Invalid region specified
             msg = f"The Pingram region specified ({region}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Initialize an empty set of channels
         self.channels = set()
@@ -398,7 +399,7 @@ class NotifyPingram(NotifyBase):
                     f"({channel}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
             self.channels.add(channel)
 
         # Used for URL generation afterwards only

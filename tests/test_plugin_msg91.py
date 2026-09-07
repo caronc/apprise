@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.msg91 import NotifyMSG91
 
 logging.disable(logging.CRITICAL)
@@ -46,21 +47,21 @@ apprise_url_tests = (
         "msg91://",
         {
             # No hostname/authkey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "msg91://-",
         {
             # Invalid AuthKey
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "msg91://{}".format("a" * 23),
         {
             # valid AuthKey but no Template ID
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -158,13 +159,13 @@ def test_plugin_msg91_edge_cases(mock_post):
     target = "+1 (555) 123-3456"
 
     # No authkey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMSG91(template="1234", authkey=None, targets=target)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMSG91(template="1234", authkey="    ", targets=target)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMSG91(template="     ", authkey="a" * 23, targets=target)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMSG91(template=None, authkey="a" * 23, targets=target)
 
 

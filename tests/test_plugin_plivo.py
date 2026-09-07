@@ -30,6 +30,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.plivo import NotifyPlivo
 
 logging.disable(logging.CRITICAL)
@@ -40,35 +41,35 @@ apprise_url_tests = (
         "plivo://",
         {
             # No hostname/apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "plivo://{}@{}/15551232000".format("a" * 10, "a" * 25),
         {
             # invalid auth id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "plivo://{}@{}/15551232000".format("a" * 25, "a" * 10),
         {
             # invalid token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "plivo://{}@{}/123".format("a" * 25, "a" * 40),
         {
             # invalid phone number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "plivo://{}@{}/abc".format("a" * 25, "a" * 40),
         {
             # invalid phone number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

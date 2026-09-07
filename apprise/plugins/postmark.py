@@ -57,6 +57,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -183,7 +184,7 @@ class NotifyPostmark(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Postmark API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our from email address
         result = is_email(from_email)
@@ -192,7 +193,7 @@ class NotifyPostmark(NotifyBase):
                 f"An invalid Postmark From email ({from_email}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our from address as a (name, email) tuple
         self.from_addr = (

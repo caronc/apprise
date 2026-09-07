@@ -59,6 +59,8 @@ except ImportError:
 # Disable logging for a cleaner testing output
 import logging
 
+from apprise.exception import AppriseImproperlyConfigured
+
 logging.disable(logging.CRITICAL)
 
 # Test files for KeyFile Directory
@@ -72,21 +74,21 @@ apprise_url_tests = (
         "fcm://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "fcm://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "fcm://project@%20%20/",
         {
             # invalid apikey
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -118,7 +120,7 @@ apprise_url_tests = (
         "fcm://apikey/device?mode=invalid",
         {
             # Valid device, invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -194,7 +196,7 @@ apprise_url_tests = (
         "fcm://%20?to=device&keyfile=/invalid/path",
         {
             # invalid Project ID
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -219,7 +221,7 @@ apprise_url_tests = (
         "fcm://project_id?to=device&mode=oauth2",
         {
             # no keyfile was specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -960,10 +962,10 @@ def test_plugin_fcm_priority_manager():
     assert not instance.payload()
     assert str(instance) == ""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         instance = FCMPriorityManager(mode, "invalid")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         instance = FCMPriorityManager("invald", "high")
 
     # mode validation is done at the higher NotifyFCM() level so

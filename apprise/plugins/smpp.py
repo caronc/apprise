@@ -41,6 +41,7 @@ except ImportError:
 
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no
 from .base import NotifyBase
@@ -142,7 +143,7 @@ class NotifySMPP(NotifyBase):
         if not (self.user and self.password):
             msg = "No SMPP user/pass combination was provided"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_phone_no(source)
         if not result:
@@ -150,7 +151,7 @@ class NotifySMPP(NotifyBase):
                 f"The Account (From) Phone # specified ({source}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Tidy source
         self.source = result["full"]

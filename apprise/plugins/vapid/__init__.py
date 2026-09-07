@@ -39,6 +39,7 @@ from ...common import (
     NotifyType,
     PersistentStoreMode,
 )
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...utils import pem as _pem
 from ...utils.base64 import base64_urlencode
@@ -274,7 +275,7 @@ class NotifyVapid(NotifyBase):
             ):
                 msg = f"The Vapid TTL specified ({self.ttl}) is out of range."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Ignore newly reported expirations when another target succeeds.
         # Retrying may duplicate messages to healthy targets.
@@ -295,7 +296,7 @@ class NotifyVapid(NotifyBase):
         if not result:
             msg = f"An invalid Vapid Subscriber({subscriber}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
         self.subscriber = result["full_email"]
 
         # Store our Mode/service
@@ -314,7 +315,7 @@ class NotifyVapid(NotifyBase):
             # Invalid region specified
             msg = f"The Vapid mode specified ({mode}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Our Private keyfile
         self.keyfile = keyfile
