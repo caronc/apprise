@@ -78,8 +78,8 @@ def test_apprise_object():
 
     """
 
-    def do_notify(server, *args, **kwargs):
-        return server.notify(*args, **kwargs)
+    def do_notify(service, *args, **kwargs):
+        return service.notify(*args, **kwargs)
 
     apprise_test(do_notify)
 
@@ -91,9 +91,9 @@ def test_apprise_async():
     """
     with OuterEventLoop() as loop:
 
-        def do_notify(server, *args, **kwargs):
+        def do_notify(service, *args, **kwargs):
             return loop.run_until_complete(
-                server.async_notify(*args, **kwargs)
+                service.async_notify(*args, **kwargs)
             )
 
         apprise_test(do_notify)
@@ -116,15 +116,15 @@ def apprise_test(do_notify):
     # We can load the device using our asset
     a = Apprise(asset=asset)
 
-    # We can load our servers up front as well
-    servers = [
+    # We can load our services up front as well
+    services = [
         "json://myhost",
         "kodi://kodi.server.local",
     ]
 
-    a = Apprise(servers=servers)
+    a = Apprise(services=services)
 
-    # 2 servers loaded
+    # 2 services loaded
     assert len(a) == 2
 
     # Apprise object can also be directly tested with 'if' keyword
@@ -134,7 +134,7 @@ def apprise_test(do_notify):
     # We can retrieve our URLs this way:
     assert len(a.urls()) == 2
 
-    # We can add another server
+    # We can add another service
     assert (
         a.add(
             "mmosts://mattermost.server.local/3ccdd113474722377935511fc85d3dd4"
@@ -146,7 +146,7 @@ def apprise_test(do_notify):
     # Try adding nothing but delimiters
     assert a.add(",, ,, , , , ,") is False
 
-    # The number of servers added doesn't change
+    # The number of services added doesn't change
     assert len(a) == 3
 
     # We can pop an object off of our stack by it's indexed value:
@@ -181,7 +181,7 @@ def apprise_test(do_notify):
     assert a.add("json://user:@@@:bad?no.good") is False
     assert len(a) == 0
 
-    # Add a server with our asset we created earlier
+    # Add a service with our asset we created earlier
     assert (
         a.add(
             "mmosts://mattermost.server.local/"
@@ -191,16 +191,16 @@ def apprise_test(do_notify):
         is True
     )
 
-    # Clear our server listings again
+    # Clear our service listings again
     a.clear()
     assert len(a) == 0
 
-    # No servers to notify
+    # No services to notify
     assert bool(do_notify(a, title="my title", body="my body")) is False
 
     # More Variations of Multiple Adding of URLs
     a = Apprise()
-    assert a.add(servers)
+    assert a.add(services)
     assert len(a) == 2
     a.clear()
 
@@ -285,7 +285,7 @@ def apprise_test(do_notify):
     # We'll fail because we've got nothing to notify
     assert bool(do_notify(a, title="my title", body="my body")) is False
 
-    # Clear our server listings again
+    # Clear our service listings again
     a.clear()
 
     assert a.add("good://localhost") is True
@@ -703,8 +703,8 @@ def test_apprise_tagging(mock_request):
 
     """
 
-    def do_notify(server, *args, **kwargs):
-        return server.notify(*args, **kwargs)
+    def do_notify(service, *args, **kwargs):
+        return service.notify(*args, **kwargs)
 
     apprise_tagging_test(mock_request, do_notify)
 
@@ -717,9 +717,9 @@ def test_apprise_tagging_async(mock_request):
     """
     with OuterEventLoop() as loop:
 
-        def do_notify(server, *args, **kwargs):
+        def do_notify(service, *args, **kwargs):
             return loop.run_until_complete(
-                server.async_notify(*args, **kwargs)
+                service.async_notify(*args, **kwargs)
             )
 
         apprise_tagging_test(mock_request, do_notify)
@@ -1345,13 +1345,14 @@ def test_apprise_multi_format_resolution(caplog):
     API: multi-format notify_format resolution
 
     """
-    # Older pytest releases (e.g. the one shipped with EL9) do not
-    # un-disable logging on our behalf when caplog.set_level() is
-    # called, so a prior module-level logging.disable(logging.CRITICAL)
-    # call would otherwise silently swallow this debug message. Clear
-    # it explicitly and restore it once we're done.
-    logging.disable(logging.NOTSET)
+    # Older pytest versions may leave logging disabled after set_level().
+    # Override that state only when needed, then restore it below.
     caplog.set_level(logging.DEBUG, logger=LOGGER_NAME)
+    manual_override = not logging.getLogger(LOGGER_NAME).isEnabledFor(
+        logging.DEBUG
+    )
+    if manual_override:
+        logging.disable(logging.NOTSET)
 
     try:
 
@@ -1456,7 +1457,8 @@ def test_apprise_multi_format_resolution(caplog):
         assert multi.notify(body="hi", body_format=NotifyFormat.HTML) is True
         assert multi.received == [("send", "hi")]
     finally:
-        logging.disable(logging.CRITICAL)
+        if manual_override:
+            logging.disable(logging.CRITICAL)
 
 
 def test_apprise_multi_format_conversion_cache():
@@ -1501,7 +1503,7 @@ def test_apprise_multi_format_conversion_cache():
         assert (
             bool(a.notify(body="hello", body_format=NotifyFormat.TEXT)) is True
         )
-        # Both servers resolve to HTML; the body should only be converted
+        # Both services resolve to HTML; the body should only be converted
         # once and reused, exactly like the single-format cache today.
         assert mock_convert.call_count == 1
 
@@ -1701,15 +1703,16 @@ def test_apprise_payload_max_size_cache_key_includes_buffer_settings():
     assert delivered1 != delivered2
 
 
-def test_apprise_payload_max_size_warns_when_trimming(caplog):
+def test_apprise_payload_trim_warning(caplog):
     """API: Log a warning only when a service cap trims the input."""
-    # Older pytest releases (e.g. the one shipped with EL9) do not
-    # un-disable logging on our behalf when caplog.set_level() is
-    # called, so a prior module-level logging.disable(logging.CRITICAL)
-    # call would otherwise silently swallow this warning. Clear it
-    # explicitly and restore it once we're done.
-    logging.disable(logging.NOTSET)
+    # Older pytest versions may leave logging disabled after set_level().
+    # Override that state only when needed, then restore it below.
     caplog.set_level(logging.WARNING, logger=LOGGER_NAME)
+    manual_override = not logging.getLogger(LOGGER_NAME).isEnabledFor(
+        logging.WARNING
+    )
+    if manual_override:
+        logging.disable(logging.NOTSET)
 
     try:
 
@@ -1735,7 +1738,8 @@ def test_apprise_payload_max_size_warns_when_trimming(caplog):
         assert bool(a.notify(title="", body="x")) is True
         assert "payload_max_size" not in caplog.text
     finally:
-        logging.disable(logging.CRITICAL)
+        if manual_override:
+            logging.disable(logging.CRITICAL)
 
 
 def test_apprise_multi_format_details():
@@ -2956,7 +2960,7 @@ def test_apprise_async_mode(mock_threadpool, mock_gather, mock_request):
     a = Apprise(asset=asset)
 
     # add our services
-    a.add(servers=services)
+    a.add(services=services)
 
     # 2 services loaded
     assert len(a) == 2
@@ -2992,7 +2996,7 @@ def test_apprise_async_mode(mock_threadpool, mock_gather, mock_request):
         assert a.asset.async_mode is False
 
         # add our services
-        a.add(servers=services)
+        a.add(services=services)
 
         # 2 services loaded
         assert len(a) == 2

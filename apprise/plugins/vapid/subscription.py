@@ -385,7 +385,11 @@ class WebPushSubscriptionManager:
         return bool(self.__subscriptions)
 
     def __len__(self) -> int:
-        """Returns the number of loaded subscriptions."""
+        """Return the number of subscription records held by this manager.
+
+        Each record represents one endpoint and counts once, regardless of the
+        endpoint's host or push-service implementation.
+        """
         return len(self.__subscriptions)
 
     def __iadd__(
@@ -410,7 +414,7 @@ class WebPushSubscriptionManager:
         return False
 
     def clear(self) -> None:
-        """Empties our server list."""
+        """Remove every subscription record from this manager."""
         self.__subscriptions.clear()
 
     def loggable_path(self, path: Optional[str]) -> str:

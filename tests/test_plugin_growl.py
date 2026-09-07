@@ -303,8 +303,8 @@ def test_plugin_growl_general(mock_gntp):
         # Our expected Query response (True, False, or exception type)
         response = meta.get("response", True)
 
-        # Allow us to force the server response code to be something other then
-        # the defaults
+        # Allow us to force the server response code to be something other
+        # then the defaults
         growl_response = meta.get("growl_response", bool(response))
 
         mock_notifier = mock.Mock()
@@ -423,11 +423,11 @@ def test_plugin_growl_config_files(mock_gntp):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
+    # We should be able to read our 7 services from that
     # 3x low
     # 3x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 7
+    assert len(ac.services()) == 7
     assert len(aobj) == 7
     assert len(list(aobj.find(tag="low"))) == 3
     for s in aobj.find(tag="low"):
