@@ -199,7 +199,7 @@ def test_plugin_wpush_init():
     obj = NotifyWPush(apikey=GOOD_KEY, channel="mail")
     assert obj.channels == [WPushChannel.MAIL]
 
-    # parse_list() sorts and dedupes, so the stored order is alphabetical
+    # Channels are stored once in alphabetical order
     obj = NotifyWPush(apikey=GOOD_KEY, channel="feishu,dingtalk,qqbot")
     assert obj.channels == [
         WPushChannel.DINGTALK,
@@ -213,6 +213,10 @@ def test_plugin_wpush_init():
 
     obj = NotifyWPush(apikey=GOOD_KEY, channel="qqbot", group="123456")
     assert obj.group == "123456"
+
+    # Channel matching ignores case and duplicates
+    obj = NotifyWPush(apikey=GOOD_KEY, channel="Feishu,dingtalk,feishu")
+    assert obj.channels == [WPushChannel.DINGTALK, WPushChannel.FEISHU]
 
     obj = NotifyWPush(apikey=GOOD_KEY, click_url="https://example.com/")
     assert obj.click_url == "https://example.com/"
@@ -244,7 +248,7 @@ def test_plugin_wpush_url_round_trip():
 
     assert obj.url_identifier == obj2.url_identifier
     assert obj.topics == obj2.topics
-    # parse_list() sorts and dedupes, so the stored order is alphabetical
+    # Channels are stored once in alphabetical order
     assert obj2.channels == [WPushChannel.DINGTALK, WPushChannel.FEISHU]
     assert obj2.click_url == "https://example.com/"
 
@@ -293,7 +297,7 @@ def test_plugin_wpush_send_multi_channel(mock_post):
     response.content = GOOD_RESPONSE.encode("utf-8")
     mock_post.return_value = response
 
-    # parse_list() sorts and dedupes, so the joined string is alphabetical
+    # The payload keeps the stored alphabetical order
     obj = NotifyWPush(apikey=GOOD_KEY, channel="feishu,dingtalk,qqbot")
     assert obj.send(body="msg", title="t") is True
     assert mock_post.call_count == 1
@@ -324,14 +328,13 @@ def test_plugin_wpush_send_qqbot_group(mock_post):
     response.content = GOOD_RESPONSE.encode("utf-8")
     mock_post.return_value = response
 
-    # qqbot selected + group set -> option is sent
+    # Send the group code for QQ Robot
     obj = NotifyWPush(apikey=GOOD_KEY, channel="qqbot", group="123456")
     assert obj.send(body="msg") is True
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["option"] == "123456"
 
-    # group/option is channel-agnostic (feishu/dingtalk/webhook/wechat_work
-    # multi-instance codes, or qqbot group codes)
+    # Other supported channels use option to select a bound instance
     mock_post.reset_mock()
     obj = NotifyWPush(apikey=GOOD_KEY, channel="mail", group="123456")
     assert obj.send(body="msg") is True
@@ -419,8 +422,8 @@ def test_plugin_wpush_apprise_integration(mock_post):
     assert mock_post.call_count == 1
 
 
-def test_plugin_wpush_option_for_non_qqbot_channels():
-    """option/group must be sent for feishu/dingtalk/webhook instance codes."""
+def test_plugin_wpush_instance_options():
+    """Send instance codes through the option field."""
     from json import loads
 
     for channel in ("feishu", "dingtalk", "webhook", "wechat_work"):
@@ -442,8 +445,52 @@ def test_plugin_wpush_option_for_non_qqbot_channels():
             assert payload.get("channel") == channel
 
 
+def test_plugin_wpush_parse_native_url():
+    """Parse supported and invalid native URLs."""
+
+    # Parse the API Key
+    result = NotifyWPush.parse_native_url(
+        "https://api.wpush.cn/api/v1/send?apikey={}".format(GOOD_KEY)
+    )
+    assert result is not None
+    obj = NotifyWPush(**result)
+    assert obj.apikey == GOOD_KEY
+
+    # Preserve the channel parameter
+    result = NotifyWPush.parse_native_url(
+        "https://api.wpush.cn/api/v1/send?apikey={}&channel=mail".format(
+            GOOD_KEY
+        )
+    )
+    assert result is not None
+    obj = NotifyWPush(**result)
+    assert obj.channels == [WPushChannel.MAIL]
+
+    # Reject a URL without an API Key
+    assert (
+        NotifyWPush.parse_native_url(
+            "https://api.wpush.cn/api/v1/send?channel=mail"
+        )
+        is None
+    )
+
+    # Reject other domains
+    assert (
+        NotifyWPush.parse_native_url(
+            "https://other.example.com/api/v1/send?apikey={}".format(GOOD_KEY)
+        )
+        is None
+    )
+
+    # Reject a URL without query parameters
+    assert (
+        NotifyWPush.parse_native_url("https://api.wpush.cn/api/v1/send")
+        is None
+    )
+
+
 def test_plugin_wpush_rejects_boolean_code():
-    """JSON code:false must not be treated as success (False == 0 in Python)."""
+    """Reject Boolean codes even though False equals zero in Python."""
     obj = Apprise.instantiate("wpush://{}".format(GOOD_KEY))
     with mock.patch("requests.post") as mock_post:
         mock_post.return_value = mock.Mock(

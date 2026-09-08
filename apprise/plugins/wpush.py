@@ -181,6 +181,7 @@ class NotifyWPush(NotifyBase):
             "channel": {
                 "name": _("Channel"),
                 "type": "list:string",
+                "values": WPUSH_CHANNELS,
             },
             # ?to= is the standard Apprise alias for targets (topics)
             "to": {
@@ -246,7 +247,11 @@ class NotifyWPush(NotifyBase):
                     msg = "The WPUSH channel ({}) is not valid.".format(entry)
                     self.logger.warning(msg)
                     raise TypeError(msg)
-                self.channels.append(resolved)
+                # Remove duplicate channels before sorting them
+                if resolved not in self.channels:
+                    self.channels.append(resolved)
+
+            self.channels.sort()
 
         else:
             # Default to WeChat
@@ -299,6 +304,12 @@ class NotifyWPush(NotifyBase):
         # Track whether any individual send failed
         has_error = False
 
+        self.logger.debug(
+            "WPUSH POST URL: %s (cert_verify=%r)",
+            self.notify_url,
+            self.verify_certificate,
+        )
+
         for topic in topics_to_notify:
             # Build this topic's payload
             payload = {
@@ -318,15 +329,9 @@ class NotifyWPush(NotifyBase):
                 payload["topic_code"] = topic
 
             elif self.group:
-                # API `option`: qqbot group code, or multi-instance code for
-                # webhook / dingtalk / feishu / wechat_work
+                # The option selects a QQ group or a bound channel instance
                 payload["option"] = self.group
 
-            self.logger.debug(
-                "WPUSH POST URL: %s (cert_verify=%r)",
-                self.notify_url,
-                self.verify_certificate,
-            )
             self.logger.debug("WPUSH Payload: %r", payload)
 
             # Give each request a unique key to prevent duplicate delivery
@@ -380,7 +385,7 @@ class NotifyWPush(NotifyBase):
                         (r.content or b"")[:2000],
                     )
 
-                # Check WPUSH's result code (reject bool; False == 0 in Python)
+                # Accept only integer zero because Booleans compare as numbers
                 api_code = content.get("code") if content else None
                 if isinstance(api_code, bool) or api_code != 0:
                     # WPUSH rejected the request
