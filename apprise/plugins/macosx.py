@@ -128,10 +128,23 @@ class NotifyMacOSX(NotifyBase):
                 "name": _("Open/Click URL"),
                 "type": "string",
             },
+            # Some terminal-notifier builds require a sender; defaults
+            # to our app_id when not explicitly set
+            "sender": {
+                "name": _("Sender"),
+                "type": "string",
+            },
         },
     )
 
-    def __init__(self, sound=None, include_image=True, click=None, **kwargs):
+    def __init__(
+        self,
+        sound=None,
+        include_image=True,
+        click=None,
+        sender=None,
+        **kwargs,
+    ):
         """Initialize MacOSX Object."""
 
         super().__init__(**kwargs)
@@ -150,6 +163,10 @@ class NotifyMacOSX(NotifyBase):
 
         # Set sound object (no q/a for now)
         self.sound = sound
+
+        # Some builds require a sender to display notifications; if
+        # unset we fall back to our own app_id at send time
+        self.sender = sender
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform MacOSX Notification."""
@@ -178,6 +195,13 @@ class NotifyMacOSX(NotifyBase):
         # The sound to play
         if self.sound:
             cmd.extend(["-sound", self.sound])
+
+        # Identify ourselves to terminal-notifier. Some builds silently
+        # refuse to display anything without this set, so fall back to
+        # our own app_id when the caller hasn't overridden it.
+        sender = self.sender if self.sender else self.app_id
+        if sender:
+            cmd.extend(["-sender", sender])
 
         # Support any defined images if set
         image_path = (
@@ -217,6 +241,9 @@ class NotifyMacOSX(NotifyBase):
         if self.click:
             params["click"] = self.click
 
+        if self.sender:
+            params["sender"] = self.sender
+
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
@@ -248,5 +275,9 @@ class NotifyMacOSX(NotifyBase):
         # Support 'sound'
         if "sound" in results["qsd"] and len(results["qsd"]["sound"]):
             results["sound"] = NotifyMacOSX.unquote(results["qsd"]["sound"])
+
+        # Support 'sender'
+        if "sender" in results["qsd"] and len(results["qsd"]["sender"]):
+            results["sender"] = NotifyMacOSX.unquote(results["qsd"]["sender"])
 
         return results

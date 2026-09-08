@@ -251,3 +251,79 @@ def test_plugin_macosx_pretend_old_macos(mocker, macos_version):
 
     obj = apprise.Apprise.instantiate("macosx://", suppress_exceptions=False)
     assert obj is None
+
+
+def test_plugin_macosx_sender(mocker, macos_notify_environment):
+    """Pass `-sender` through and preserve it in generated URLs."""
+
+    mock_popen = mocker.patch(
+        "subprocess.Popen", return_value=Mock(returncode=0)
+    )
+
+    obj = apprise.Apprise.instantiate(
+        "macosx://_/?sender=me", suppress_exceptions=False
+    )
+    assert isinstance(obj, NotifyMacOSX) is True
+    assert obj.sender == "me"
+    assert "sender=me" in obj.url()
+
+    assert (
+        obj.notify(
+            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        )
+        is True
+    )
+
+    cmd = mock_popen.call_args[0][0]
+    assert "-sender" in cmd
+    assert cmd[cmd.index("-sender") + 1] == "me"
+
+
+def test_plugin_macosx_sender_default(mocker, macos_notify_environment):
+    """Without an explicit override, `-sender` falls back to our own
+    app_id so notifications work out of the box."""
+
+    mock_popen = mocker.patch(
+        "subprocess.Popen", return_value=Mock(returncode=0)
+    )
+
+    obj = apprise.Apprise.instantiate("macosx://", suppress_exceptions=False)
+    assert obj.sender is None
+
+    # The default isn't baked into the URL; it is resolved at send time
+    assert "sender=" not in obj.url()
+
+    assert (
+        obj.notify(
+            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        )
+        is True
+    )
+
+    cmd = mock_popen.call_args[0][0]
+    assert "-sender" in cmd
+    assert cmd[cmd.index("-sender") + 1] == obj.app_id
+
+
+def test_plugin_macosx_sender_empty_app_id(mocker, macos_notify_environment):
+    """When both `sender` and our own app_id are unset, `-sender` is
+    left off the command entirely rather than being sent empty."""
+
+    mock_popen = mocker.patch(
+        "subprocess.Popen", return_value=Mock(returncode=0)
+    )
+
+    asset = apprise.AppriseAsset(app_id="")
+    obj = apprise.Apprise.instantiate(
+        "macosx://", asset=asset, suppress_exceptions=False
+    )
+    assert obj.app_id == ""
+
+    assert (
+        obj.notify(
+            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        )
+        is True
+    )
+
+    assert "-sender" not in mock_popen.call_args[0][0]
