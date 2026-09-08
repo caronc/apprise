@@ -318,7 +318,7 @@ def test_plugin_wpush_send_topic_and_channel(mock_post):
 
 @mock.patch("requests.post")
 def test_plugin_wpush_send_qqbot_group(mock_post):
-    """NotifyWPush() includes "option" only for the qqbot channel."""
+    """NotifyWPush() includes API option whenever group/option is set."""
     response = mock.Mock()
     response.status_code = requests.codes.ok
     response.content = GOOD_RESPONSE.encode("utf-8")
@@ -330,12 +330,13 @@ def test_plugin_wpush_send_qqbot_group(mock_post):
     payload = loads(mock_post.call_args[1]["data"])
     assert payload["option"] == "123456"
 
-    # group set but qqbot not selected -> option is omitted entirely
+    # group/option is channel-agnostic (feishu/dingtalk/webhook/wechat_work
+    # multi-instance codes, or qqbot group codes)
     mock_post.reset_mock()
     obj = NotifyWPush(apikey=GOOD_KEY, channel="mail", group="123456")
     assert obj.send(body="msg") is True
     payload = loads(mock_post.call_args[1]["data"])
-    assert "option" not in payload
+    assert payload["option"] == "123456"
 
 
 @mock.patch("requests.post")
@@ -416,3 +417,37 @@ def test_plugin_wpush_apprise_integration(mock_post):
     assert aobj.add("wpush://{}".format(GOOD_KEY))
     assert aobj.notify(title="T", body="B") is True
     assert mock_post.call_count == 1
+
+
+def test_plugin_wpush_option_for_non_qqbot_channels():
+    """option/group must be sent for feishu/dingtalk/webhook instance codes."""
+    from json import loads
+
+    for channel in ("feishu", "dingtalk", "webhook", "wechat_work"):
+        obj = Apprise.instantiate(
+            "wpush://{}?channel={}&option=ops".format(GOOD_KEY, channel)
+        )
+        assert isinstance(obj, NotifyWPush)
+        assert obj.group == "ops"
+
+        with mock.patch("requests.post") as mock_post:
+            mock_post.return_value = mock.Mock(
+                status_code=200,
+                content=GOOD_RESPONSE.encode("utf-8"),
+            )
+            assert obj.notify(title="t", body="b") is True
+            assert mock_post.called
+            payload = loads(mock_post.call_args[1]["data"].decode("utf-8"))
+            assert payload.get("option") == "ops"
+            assert payload.get("channel") == channel
+
+
+def test_plugin_wpush_rejects_boolean_code():
+    """JSON code:false must not be treated as success (False == 0 in Python)."""
+    obj = Apprise.instantiate("wpush://{}".format(GOOD_KEY))
+    with mock.patch("requests.post") as mock_post:
+        mock_post.return_value = mock.Mock(
+            status_code=200,
+            content=dumps({"code": False, "message": "nope"}).encode("utf-8"),
+        )
+        assert obj.notify(title="t", body="b") is False

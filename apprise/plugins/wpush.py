@@ -45,6 +45,7 @@
 #     wpush://{apikey}/{topic}?channel=feishu,dingtalk
 #     wpush://{apikey}?url=https://example.com/
 #     wpush://{apikey}?channel=qqbot&group={qq_group_code}
+#     wpush://{apikey}?channel=feishu&option=ops
 #
 # Native API URL (also accepted):
 #     https://api.wpush.cn/api/v1/send?apikey={apikey}
@@ -193,9 +194,9 @@ class NotifyWPush(NotifyBase):
             "topic": {
                 "alias_of": "targets",
             },
-            # QQ group code used with channel=qqbot
+            # QQ group code or multi-instance option code (API `option`)
             "group": {
-                "name": _("QQ Group Code"),
+                "name": _("Group / Option Code"),
                 "type": "string",
                 "map_to": "group",
             },
@@ -254,15 +255,15 @@ class NotifyWPush(NotifyBase):
         # Send one request for each resolved topic code
         self.topics = parse_list(targets)
 
-        # QQ group code; ignored unless the qqbot channel is also selected
+        # Sub-target passed as API `option` (QQ group code or instance code)
         self.group = (
             group if isinstance(group, str) and group.strip() else None
         )
 
-        # WPUSH rejects requests that combine group and topic targets
+        # WPUSH rejects requests that combine option and topic targets
         if self.group and self.topics:
             msg = (
-                "The WPUSH group option cannot be combined with topic targets."
+                "The WPUSH option/group cannot be combined with topic targets."
             )
             self.logger.warning(msg)
             raise TypeError(msg)
@@ -316,8 +317,9 @@ class NotifyWPush(NotifyBase):
                 # Add the topic code when broadcasting to a specific topic
                 payload["topic_code"] = topic
 
-            elif self.group and WPushChannel.QQBOT in self.channels:
-                # Send the group code only when QQ Robot is selected
+            elif self.group:
+                # API `option`: qqbot group code, or multi-instance code for
+                # webhook / dingtalk / feishu / wechat_work
                 payload["option"] = self.group
 
             self.logger.debug(
@@ -378,9 +380,9 @@ class NotifyWPush(NotifyBase):
                         (r.content or b"")[:2000],
                     )
 
-                # Check WPUSH's result code
+                # Check WPUSH's result code (reject bool; False == 0 in Python)
                 api_code = content.get("code") if content else None
-                if api_code != 0:
+                if isinstance(api_code, bool) or api_code != 0:
                     # WPUSH rejected the request
                     error_str = (
                         content.get("message", "Unknown error")
