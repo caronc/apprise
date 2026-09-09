@@ -61,7 +61,7 @@ class AttachHTTP(AttachBase):
     # thread safe loading
     _lock = threading.Lock()
 
-    def __init__(self, headers=None, **kwargs):
+    def __init__(self, headers=None, http_session=None, **kwargs):
         """Initialize HTTP Object.
 
         headers can be a dictionary of key/value pairs that you want to
@@ -79,6 +79,9 @@ class AttachHTTP(AttachBase):
         if headers:
             # Store our extra headers
             self.headers.update(headers)
+
+        # Applications may provide a policy-aware Requests session.
+        self.http_session = http_session
 
         # Where our content is written to upon a call to download.
         self._temp_file = None
@@ -144,8 +147,13 @@ class AttachHTTP(AttachBase):
             )
 
             try:
-                # Make our request
-                with requests.get(
+                # Use the caller's transport when it needs destination policy.
+                http_get = (
+                    self.http_session.get
+                    if self.http_session is not None
+                    else requests.get
+                )
+                with http_get(
                     url,
                     headers=headers,
                     auth=auth,
