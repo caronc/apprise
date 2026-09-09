@@ -379,7 +379,7 @@ class NotifyOpsgenie(NotifyBase):
             if self.region_name not in OPSGENIE_REGIONS:
                 # allow the outer except to handle this common response
                 raise
-        except:
+        except Exception:
             # Invalid region specified
             msg = f"The Opsgenie region specified ({region_name}) is invalid."
             self.logger.warning(msg)
