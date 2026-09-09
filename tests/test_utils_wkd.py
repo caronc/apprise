@@ -31,6 +31,7 @@ import logging
 from unittest import mock
 from urllib.parse import urlparse
 
+import pytest
 import requests
 
 from apprise.utils.wkd import AppriseWKDController, AppriseWKDException
@@ -312,7 +313,7 @@ def _make_resp(status_code, chunks=None, url=None):
     return resp
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_fetch_subdomain_success(mock_get):
     """fetch() returns key bytes when the subdomain URL responds with 200."""
     # 0x99 is a valid old-format OpenPGP packet header byte (bit 7 set)
@@ -328,7 +329,7 @@ def test_fetch_subdomain_success(mock_get):
     assert mock_get.call_count == 1
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_fetch_direct_fallback(mock_get):
     """fetch() tries the direct URL when the subdomain URL fails."""
     key_bytes = b"\x99another-fake-key"
@@ -346,7 +347,7 @@ def test_fetch_direct_fallback(mock_get):
     assert mock_get.call_count == 2
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_fetch_both_fail(mock_get):
     """fetch() returns None when both WKD URLs fail."""
     mock_get.return_value = _make_resp(404)
@@ -363,7 +364,7 @@ def test_fetch_both_fail(mock_get):
 # ---------------------------------------------------------------------------
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_fetch_caches_result(mock_get):
     """A successful fetch is cached; subsequent calls skip the network."""
     key_bytes = b"\x99cached-key"
@@ -379,7 +380,7 @@ def test_fetch_caches_result(mock_get):
     assert mock_get.call_count == 1
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_fetch_cache_case_insensitive(mock_get):
     """Cache lookup normalises the email address."""
     key_bytes = b"\x99normalised-key"
@@ -393,7 +394,7 @@ def test_fetch_cache_case_insensitive(mock_get):
     assert mock_get.call_count == 1
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_fetch_expired_cache_refetches(mock_get):
     """An expired cache entry triggers a new network request."""
     key_bytes = b"\x99refreshed-key"
@@ -463,7 +464,7 @@ def test_fetch_at_only():
 # ---------------------------------------------------------------------------
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_non_200_returns_none(mock_get):
     """_get() returns None for any non-200 HTTP status."""
     for code in (301, 400, 403, 404, 500):
@@ -472,7 +473,7 @@ def test_get_non_200_returns_none(mock_get):
         assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_empty_body_returns_none(mock_get):
     """_get() returns None when the response body is empty."""
     mock_get.return_value = _make_resp(requests.codes.ok, chunks=[])
@@ -480,7 +481,7 @@ def test_get_empty_body_returns_none(mock_get):
     assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_empty_chunk_is_skipped(mock_get):
     """_get() skips empty bytestrings yielded by iter_content().
 
@@ -499,7 +500,7 @@ def test_get_empty_chunk_is_skipped(mock_get):
     assert result == key_bytes
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_oversized_via_content_length_returns_none(mock_get):
     """_get() rejects early when Content-Length already exceeds the limit.
 
@@ -514,7 +515,7 @@ def test_get_oversized_via_content_length_returns_none(mock_get):
     resp.iter_content.assert_not_called()
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_valid_content_length_within_limit_proceeds(mock_get):
     """_get() proceeds to read chunks when Content-Length is within the limit.
 
@@ -529,7 +530,7 @@ def test_get_valid_content_length_within_limit_proceeds(mock_get):
     assert ctrl._get("https://example.com/key") == key_bytes
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_malformed_content_length_proceeds(mock_get):
     """_get() ignores a malformed Content-Length and reads chunks normally."""
     key_bytes = b"\x99valid-key"
@@ -540,7 +541,7 @@ def test_get_malformed_content_length_proceeds(mock_get):
     assert ctrl._get("https://example.com/key") == key_bytes
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_oversized_body_returns_none(mock_get):
     """_get() returns None when accumulated chunks exceed max_response_size."""
     ctrl = AppriseWKDController()
@@ -550,7 +551,7 @@ def test_get_oversized_body_returns_none(mock_get):
     assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_non_pgp_body_returns_none(mock_get):
     """_get() returns None when the response body is not PGP data.
 
@@ -571,7 +572,7 @@ def test_get_non_pgp_body_returns_none(mock_get):
         )
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_binary_pgp_packet_accepted(mock_get):
     """_get() accepts a response whose first byte has bit 7 set (OpenPGP
     binary packet format)."""
@@ -582,7 +583,7 @@ def test_get_binary_pgp_packet_accepted(mock_get):
     assert ctrl._get("https://example.com/key") == pgp_binary
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_ascii_armoured_key_accepted(mock_get):
     """_get() accepts ASCII-armoured PGP key material (starts with '-----')."""
     armoured = b"-----BEGIN PGP PUBLIC KEY BLOCK-----\n..."
@@ -591,14 +592,17 @@ def test_get_ascii_armoured_key_accepted(mock_get):
     assert ctrl._get("https://example.com/key") == armoured
 
 
-@mock.patch("requests.get", side_effect=requests.RequestException("timeout"))
+@mock.patch(
+    "apprise.utils.http.HTTPPolicySession.get",
+    side_effect=requests.RequestException("timeout"),
+)
 def test_get_request_exception_returns_none(mock_get):
     """_get() returns None when requests raises any RequestException."""
     ctrl = AppriseWKDController()
     assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_stream_oserror_returns_none(mock_get):
     """_get() returns None when iter_content() raises OSError mid-stream.
 
@@ -612,7 +616,7 @@ def test_get_stream_oserror_returns_none(mock_get):
     assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_stream_generic_exception_returns_none(mock_get):
     """_get() returns None when iter_content() raises an unexpected exception.
 
@@ -626,7 +630,7 @@ def test_get_stream_generic_exception_returns_none(mock_get):
     assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_http_redirect_rejected(mock_get):
     """_get() returns None when a redirect lands on a non-HTTPS URL.
 
@@ -643,7 +647,7 @@ def test_get_http_redirect_rejected(mock_get):
     assert ctrl._get("https://example.com/key") is None
 
 
-@mock.patch("requests.get")
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_success_returns_bytes(mock_get):
     """_get() returns the response bytes on HTTP 200 with content."""
     payload = b"\x99\xaa\xbb\xcc"
@@ -713,7 +717,57 @@ def test_custom_allow_redirects():
     assert ctrl.allow_redirects is False
 
 
-@mock.patch("requests.get")
+def test_close_releases_session_once():
+    """Explicit cleanup closes and clears the owned HTTP session once."""
+    ctrl = AppriseWKDController()
+    session = mock.Mock()
+    ctrl.http_session = session
+
+    ctrl.close()
+    ctrl.close()
+
+    session.close.assert_called_once_with()
+    assert ctrl.http_session is None
+
+
+def test_close_clears_session_when_close_raises():
+    """A failed explicit close still leaves later cleanup harmless."""
+    ctrl = AppriseWKDController()
+    session = mock.Mock()
+    session.close.side_effect = RuntimeError("close failed")
+    ctrl.http_session = session
+
+    with pytest.raises(RuntimeError, match="close failed"):
+        ctrl.close()
+
+    assert ctrl.http_session is None
+
+
+def test_context_manager_closes_session():
+    """The context-manager lifecycle closes its session on exit."""
+    ctrl = AppriseWKDController()
+    session = mock.Mock()
+    ctrl.http_session = session
+
+    with ctrl as entered:
+        assert entered is ctrl
+
+    session.close.assert_called_once_with()
+    assert ctrl.http_session is None
+
+
+def test_destructor_suppresses_close_failure():
+    """Fallback cleanup cannot leak a session close exception."""
+    ctrl = object.__new__(AppriseWKDController)
+    ctrl.http_session = mock.Mock()
+    ctrl.http_session.close.side_effect = RuntimeError("close failed")
+
+    ctrl.__del__()
+
+    assert ctrl.http_session is None
+
+
+@mock.patch("apprise.utils.http.HTTPPolicySession.get")
 def test_get_passes_verify_and_timeout(mock_get):
     """_get() forwards verify_certificate, request_timeout, allow_redirects,
     and stream=True to requests."""
