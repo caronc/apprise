@@ -47,11 +47,11 @@ from urllib3.exceptions import (
     NewConnectionError,
 )
 from urllib3.poolmanager import PoolManager
-from urllib3.util.connection import (
-    _DEFAULT_TIMEOUT,
-    _set_socket_options,
-    allowed_gai_family,
-)
+from urllib3.util.connection import allowed_gai_family
+
+# Keep this sentinel local because urllib3's private equivalent varies by
+# version and is absent from the widely used 1.26.x series.
+_DEFAULT_TIMEOUT = object()
 
 # DNS work is shared so many policies cannot create unbounded thread pools.
 _DNS_POOL = ThreadPoolExecutor(
@@ -84,6 +84,11 @@ def is_public_ip_address(value):
                 embedded = ipaddress.IPv4Address(int(address) & 0xFFFFFFFF)
                 return is_public_ip_address(embedded)
 
+        # Judge IPv4-mapped addresses by their embedded IPv4 address because
+        # some Python releases misclassify the IPv6 wrapper as reserved.
+        if address.ipv4_mapped is not None:
+            return is_public_ip_address(address.ipv4_mapped)
+
     blocked = (
         address.is_private
         or address.is_loopback
@@ -104,9 +109,8 @@ def is_public_ip_address(value):
         return False
 
     if isinstance(address, ipaddress.IPv6Address):
-        # Validate common IPv4 transition formats by their embedded address.
-        embedded = address.ipv4_mapped or address.sixtofour
-        if embedded and not is_public_ip_address(embedded):
+        # IPv4-mapped addresses returned above; validate 6to4 addresses here.
+        if address.sixtofour and not is_public_ip_address(address.sixtofour):
             return False
 
         if address.teredo and not all(
@@ -134,6 +138,15 @@ def is_secure_http_url(url):
 def _release_dns_slot(_future):
     """Release a DNS slot only after its lookup has actually stopped."""
     _DNS_SLOTS.release()
+
+
+def _set_socket_options(sock, options):
+    """Apply the same socket options urllib3 would normally configure."""
+    if options is None:
+        return
+
+    for opt in options:
+        sock.setsockopt(*opt)
 
 
 class HTTPPolicy:
@@ -271,9 +284,7 @@ class HTTPPolicy:
                 # Confirm the socket reached the exact address DNS approved.
                 try:
                     expected_address = ipaddress.ip_address(sockaddr[0])
-                    peer_address = ipaddress.ip_address(
-                        sock.getpeername()[0]
-                    )
+                    peer_address = ipaddress.ip_address(sock.getpeername()[0])
                 except (IndexError, TypeError, ValueError) as exc:
                     raise OSError(
                         "Connected socket returned an invalid peer address"

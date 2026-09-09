@@ -165,7 +165,7 @@ apprise_url_tests = (
         "onesignal://appid@apikey/playerid/?language=X",
         {
             # invalid language id (must be 2 characters)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -408,7 +408,7 @@ def test_plugin_onesignal_language_and_subtitle(mock_post):
     assert obj.language == "fr"
 
     # An invalid language= is rejected the same way lang= is
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         Apprise.instantiate(
             "onesignal://appid@apikey/player/?language=X",
             suppress_exceptions=False,

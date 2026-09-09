@@ -78,6 +78,17 @@ def test_transition_address_categories():
     """IPv4 transition addresses inherit their embedded address safety."""
     assert is_public_ip_address("::ffff:8.8.8.8")
 
+    # Simulate Python releases that mark the IPv6 wrapper as reserved. The
+    # embedded IPv4 address must still decide whether the address is safe.
+    with mock.patch.object(
+        http.ipaddress.IPv6Address,
+        "is_reserved",
+        new_callable=mock.PropertyMock,
+        return_value=True,
+    ):
+        assert is_public_ip_address("::ffff:8.8.8.8")
+        assert not is_public_ip_address("::ffff:10.0.0.1")
+
     # Older Python releases do not classify these prefixes as private.
     with mock.patch.object(
         http.ipaddress.IPv6Address,
@@ -89,6 +100,10 @@ def test_transition_address_categories():
         assert not is_public_ip_address(
             "2001:0000:4136:e378:8000:63bf:f5ff:fffe"
         )
+
+        # A Teredo address whose server and client are both public must
+        # still be accepted once the embedded addresses are checked.
+        assert is_public_ip_address("2001:0:4136:e378::f7f7:f7f7")
 
 
 def test_secure_url_classification():
