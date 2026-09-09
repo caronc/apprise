@@ -34,6 +34,13 @@ from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool
 from .base import NotifyBase
 
+# The terminal-notifier major versions we know how to talk to
+NOTIFY_MACOSX_VERSIONS = ("2", "3")
+
+# Default version of terminal-notifier to use if not specified by the user.
+# This is detected at runtime based on the macOS version otherwise.
+NOTIFY_MACOSX_DEFAULT_VERSION = 2
+
 # Default our global support flag
 NOTIFY_MACOSX_SUPPORT_ENABLED = False
 
@@ -48,6 +55,11 @@ if platform.system() == "Darwin":
     NOTIFY_MACOSX_SUPPORT_ENABLED = int(major) > 10 or (
         int(major) == 10 and int(minor) >= 8
     )
+
+    # macOS 26 (Tahoe) is the first release contemporaneous with
+    # terminal-notifier 3.0
+    if int(major) >= 26:
+        NOTIFY_MACOSX_DEFAULT_VERSION = 3
 
 
 class NotifyMacOSX(NotifyBase):
@@ -128,8 +140,15 @@ class NotifyMacOSX(NotifyBase):
                 "name": _("Open/Click URL"),
                 "type": "string",
             },
-            # Some terminal-notifier builds require a sender; defaults
-            # to our app_id when not explicitly set
+            # terminal-notifier version
+            "version": {
+                "name": _("Terminal-Notifier Version"),
+                "type": "choice:string",
+                "values": NOTIFY_MACOSX_VERSIONS,
+                "default": str(NOTIFY_MACOSX_DEFAULT_VERSION),
+            },
+            # Only applies to terminal-notifier 2.x (see `version=`);
+            # defaults to our app_id when not explicitly set
             "sender": {
                 "name": _("Sender"),
                 "type": "string",
@@ -143,6 +162,7 @@ class NotifyMacOSX(NotifyBase):
         include_image=True,
         click=None,
         sender=None,
+        version=None,
         **kwargs,
     ):
         """Initialize MacOSX Object."""
@@ -167,6 +187,25 @@ class NotifyMacOSX(NotifyBase):
         # Some builds require a sender to display notifications; if
         # unset we fall back to our own app_id at send time
         self.sender = sender
+
+        # Set the terminal-notifier version to use.
+        if version is not None:
+            try:
+                self.version = int(version)
+
+            except (TypeError, ValueError):
+                self.version = None
+
+            if self.version not in (2, 3):
+                msg = (
+                    "The MacOSX terminal-notifier version specified "
+                    "({}) is invalid.".format(version)
+                )
+                self.logger.warning(msg)
+                raise TypeError(msg)
+
+        else:
+            self.version = NOTIFY_MACOSX_DEFAULT_VERSION
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform MacOSX Notification."""
@@ -196,18 +235,17 @@ class NotifyMacOSX(NotifyBase):
         if self.sound:
             cmd.extend(["-sound", self.sound])
 
-        # Identify ourselves to terminal-notifier. Some builds silently
-        # refuse to display anything without this set, so fall back to
-        # our own app_id when the caller hasn't overridden it.
-        sender = self.sender if self.sender else self.app_id
-        if sender:
-            cmd.extend(["-sender", sender])
+        if self.version == 2:
+            # Support sender.
+            sender = self.sender if self.sender else self.app_id
+            if sender:
+                cmd.extend(["-sender", sender])
 
         # Support any defined images if set
         image_path = (
             None if not self.include_image else self.image_url(notify_type)
         )
-        if image_path:
+        if image_path and self.version == 2:
             cmd.extend(["-appIcon", image_path])
 
         # Always call throttle before any remote server i/o is made
@@ -236,6 +274,7 @@ class NotifyMacOSX(NotifyBase):
         # Define any URL parametrs
         params = {
             "image": "yes" if self.include_image else "no",
+            "version": str(self.version),
         }
 
         if self.click:
@@ -279,5 +318,11 @@ class NotifyMacOSX(NotifyBase):
         # Support 'sender'
         if "sender" in results["qsd"] and len(results["qsd"]["sender"]):
             results["sender"] = NotifyMacOSX.unquote(results["qsd"]["sender"])
+
+        # Support 'version'
+        if "version" in results["qsd"] and len(results["qsd"]["version"]):
+            results["version"] = NotifyMacOSX.unquote(
+                results["qsd"]["version"]
+            )
 
         return results

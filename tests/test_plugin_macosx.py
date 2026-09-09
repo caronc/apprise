@@ -327,3 +327,89 @@ def test_plugin_macosx_sender_empty_app_id(mocker, macos_notify_environment):
     )
 
     assert "-sender" not in mock_popen.call_args[0][0]
+
+
+def test_plugin_macosx_version_explicit_modern(
+    mocker, macos_notify_environment
+):
+    """`?version=3` skips `-sender` and `-appIcon` outright, even
+    though the simulated macOS release defaults to the legacy (2.x)
+    behaviour."""
+
+    mock_popen = mocker.patch(
+        "subprocess.Popen", return_value=Mock(returncode=0)
+    )
+
+    obj = apprise.Apprise.instantiate(
+        "macosx://_/?version=3&sender=me&image=yes",
+        suppress_exceptions=False,
+    )
+    assert isinstance(obj, NotifyMacOSX) is True
+    assert obj.version == 3
+    assert "version=3" in obj.url()
+
+    assert (
+        obj.notify(
+            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        )
+        is True
+    )
+
+    cmd = mock_popen.call_args[0][0]
+    assert "-sender" not in cmd
+    assert "-appIcon" not in cmd
+
+
+def test_plugin_macosx_version_explicit_legacy(
+    mocker, macos_notify_environment
+):
+    """`?version=2` keeps sending `-sender`."""
+
+    mock_popen = mocker.patch(
+        "subprocess.Popen", return_value=Mock(returncode=0)
+    )
+
+    obj = apprise.Apprise.instantiate(
+        "macosx://_/?version=2", suppress_exceptions=False
+    )
+    assert isinstance(obj, NotifyMacOSX) is True
+    assert obj.version == 2
+
+    assert (
+        obj.notify(
+            title="title", body="body", notify_type=apprise.NotifyType.INFO
+        )
+        is True
+    )
+
+    cmd = mock_popen.call_args[0][0]
+    assert "-sender" in cmd
+
+
+@pytest.mark.parametrize("bad_version", ["99", "abc"])
+def test_plugin_macosx_version_invalid(macos_notify_environment, bad_version):
+    """An unsupported or non-numeric `version=` value is rejected
+    outright."""
+
+    with pytest.raises(TypeError):
+        apprise.Apprise.instantiate(
+            "macosx://_/?version={}".format(bad_version),
+            suppress_exceptions=False,
+        )
+
+
+def test_plugin_macosx_version_default_by_macos(mocker, pretend_macos):
+    """Without an explicit override, the default terminal-notifier
+    version tracks the running macOS release."""
+
+    # pretend_macos simulates macOS 10.8: defaults to the legacy
+    # (2.x) behaviour
+    obj = apprise.Apprise.instantiate("macosx://", suppress_exceptions=False)
+    assert obj.version == 2
+
+    # macOS 26 (Tahoe) and newer defaults to the modern (3.x) behaviour
+    mocker.patch("platform.mac_ver", return_value=("26.0", ("", "", ""), ""))
+    reload_plugin("macosx")
+
+    obj = apprise.Apprise.instantiate("macosx://", suppress_exceptions=False)
+    assert obj.version == 3
