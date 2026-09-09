@@ -34,6 +34,7 @@ from helpers import reload_plugin
 import pytest
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.macosx import NotifyMacOSX
 
 # Disable logging for a cleaner testing output.
@@ -411,7 +412,7 @@ def test_plugin_macosx_version_invalid(macos_notify_environment, bad_version):
     """An unsupported or non-numeric `version=` value is rejected
     outright."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         apprise.Apprise.instantiate(
             "macosx://_/?version={}".format(bad_version),
             suppress_exceptions=False,

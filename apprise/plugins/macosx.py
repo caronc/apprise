@@ -30,6 +30,7 @@ import platform
 import subprocess
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool
 from .base import NotifyBase
@@ -202,7 +203,7 @@ class NotifyMacOSX(NotifyBase):
                     "({}) is invalid.".format(version)
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             self.version = NOTIFY_MACOSX_DEFAULT_VERSION
