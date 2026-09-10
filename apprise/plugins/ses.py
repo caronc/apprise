@@ -90,7 +90,6 @@ from hashlib import sha256
 import hmac
 import re
 from urllib.parse import quote
-from xml.etree import ElementTree
 
 import requests
 
@@ -99,6 +98,7 @@ from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_emails, validate_regex
+from ..utils.xml import flatten_xml_response
 from .base import NotifyBase
 
 # Our Regin Identifier
@@ -809,44 +809,11 @@ class NotifySES(NotifyBase):
             "Message": "error_message",
         }
 
-        # A default response object that we'll manipulate as we pull more data
-        # from our AWS Response object
-        response = {
-            "type": None,
-            "request_id": None,
-            "message_id": None,
-        }
-
-        try:
-            # we build our tree, but not before first eliminating any
-            # reference to namespacing (if present) as it makes parsing
-            # the tree so much easier.
-            root = ElementTree.fromstring(
-                re.sub(r' xmlns="[^"]+"', "", aws_response, count=1)
-            )
-
-            # Store our response tag object name
-            response["type"] = str(root.tag)
-
-            def _xml_iter(root, response):
-                if len(root) > 0:
-                    for child in root:
-                        # use recursion to parse everything
-                        _xml_iter(child, response)
-
-                elif root.tag in aws_keep_map:
-                    response[aws_keep_map[root.tag]] = (root.text).strip()
-
-            # Recursivly iterate over our AWS Response to extract the
-            # fields we're interested in in efforts to populate our response
-            # object.
-            _xml_iter(root, response)
-
-        except (ElementTree.ParseError, TypeError):
-            # bad data just causes us to generate a bad response
-            pass
-
-        return response
+        return flatten_xml_response(
+            aws_response,
+            aws_keep_map,
+            defaults={"request_id": None, "message_id": None},
+        )
 
     @property
     def url_identifier(self):
