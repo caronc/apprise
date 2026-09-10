@@ -51,10 +51,12 @@
 #
 # Development API Reference::
 #  - https://core.telegram.org/bots/api
+from contextlib import ExitStack
 from json import dumps, loads
 from json.decoder import JSONDecodeError
 import os
 import re
+import struct
 
 import requests
 
@@ -78,6 +80,14 @@ from ..utils.templates import TemplateType, apply_template
 from .base import NotifyBase
 
 TELEGRAM_IMAGE_XY = NotifyImageSize.XY_256
+
+TELEGRAM_PHOTO_MAX_BYTES = 10_000_000
+TELEGRAM_FILE_MAX_BYTES = 50_000_000
+TELEGRAM_PHOTO_DIMENSION_SUM_MAX = 10_000
+TELEGRAM_PHOTO_ASPECT_RATIO_MAX = 20
+TELEGRAM_MEDIA_GROUP_MIN = 2
+TELEGRAM_MEDIA_GROUP_MAX = 10
+TELEGRAM_HEADER_SCAN_MAX = 1_048_576
 
 # Chat ID is required
 # If the Chat ID is positive, then it's addressed to a single person
@@ -131,6 +141,191 @@ TELEGRAM_CONTENT_PLACEMENT = (
     TelegramContentPlacement.BEFORE,
     TelegramContentPlacement.AFTER,
 )
+
+
+class TelegramMediaKind:
+    """Attachment delivery modes used by the media-group planner."""
+
+    PHOTO = "photo"
+    VIDEO = "video"
+    DOCUMENT = "document"
+    NATIVE = "native"
+
+
+def _jpeg_dimensions(file_obj):
+    """Return JPEG dimensions without decoding image pixels."""
+    if file_obj.read(2) != b"\xff\xd8":
+        return None
+
+    sof_markers = {
+        0xC0,
+        0xC1,
+        0xC2,
+        0xC3,
+        0xC5,
+        0xC6,
+        0xC7,
+        0xC9,
+        0xCA,
+        0xCB,
+        0xCD,
+        0xCE,
+        0xCF,
+    }
+
+    while file_obj.tell() < TELEGRAM_HEADER_SCAN_MAX:
+        marker_start = file_obj.read(1)
+        if not marker_start:
+            return None
+        if marker_start != b"\xff":
+            continue
+
+        marker = file_obj.read(1)
+        while marker == b"\xff":
+            marker = file_obj.read(1)
+        if not marker:
+            return None
+
+        marker_no = marker[0]
+        if marker_no in (0xD8, 0xD9) or 0xD0 <= marker_no <= 0xD7:
+            continue
+        if marker_no == 0xDA:
+            return None
+
+        raw_length = file_obj.read(2)
+        if len(raw_length) != 2:
+            return None
+        segment_length = struct.unpack(">H", raw_length)[0]
+        if segment_length < 2:
+            return None
+
+        if marker_no in sof_markers:
+            data = file_obj.read(5)
+            if len(data) != 5:
+                return None
+            height, width = struct.unpack(">HH", data[1:5])
+            return (width, height) if width and height else None
+
+        file_obj.seek(segment_length - 2, os.SEEK_CUR)
+
+    return None
+
+
+def _png_dimensions(file_obj):
+    """Return PNG dimensions and reject animated PNG files."""
+    header = file_obj.read(24)
+    if (
+        len(header) != 24
+        or header[:8] != b"\x89PNG\r\n\x1a\n"
+        or header[12:16] != b"IHDR"
+    ):
+        return None
+
+    width, height = struct.unpack(">II", header[16:24])
+    if not width or not height:
+        return None
+
+    file_obj.seek(8)
+    while file_obj.tell() < TELEGRAM_HEADER_SCAN_MAX:
+        raw_length = file_obj.read(4)
+        chunk_type = file_obj.read(4)
+        if len(raw_length) != 4 or len(chunk_type) != 4:
+            break
+        chunk_length = struct.unpack(">I", raw_length)[0]
+        if chunk_type == b"acTL":
+            return None
+        if chunk_type in (b"IDAT", b"IEND"):
+            break
+        if chunk_length > TELEGRAM_HEADER_SCAN_MAX:
+            break
+        file_obj.seek(chunk_length + 4, os.SEEK_CUR)
+
+    return width, height
+
+
+def _webp_dimensions(file_obj):
+    """Return static WebP dimensions without decoding image pixels."""
+    header = file_obj.read(12)
+    if len(header) != 12 or header[:4] != b"RIFF" or header[8:] != b"WEBP":
+        return None
+
+    dimensions = None
+    animated = False
+    while file_obj.tell() < TELEGRAM_HEADER_SCAN_MAX:
+        chunk_header = file_obj.read(8)
+        if len(chunk_header) != 8:
+            break
+        chunk_type = chunk_header[:4]
+        chunk_length = struct.unpack("<I", chunk_header[4:])[0]
+        if chunk_length > TELEGRAM_HEADER_SCAN_MAX:
+            break
+        data = file_obj.read(min(chunk_length, 16))
+
+        if chunk_type == b"VP8X" and len(data) >= 10:
+            animated = bool(data[0] & 0x02)
+            width = 1 + int.from_bytes(data[4:7], "little")
+            height = 1 + int.from_bytes(data[7:10], "little")
+            dimensions = (width, height)
+
+        elif (
+            chunk_type == b"VP8 "
+            and len(data) >= 10
+            and data[3:6] == b"\x9d\x01\x2a"
+        ):
+            width = struct.unpack("<H", data[6:8])[0] & 0x3FFF
+            height = struct.unpack("<H", data[8:10])[0] & 0x3FFF
+            dimensions = (width, height)
+
+        elif chunk_type == b"VP8L" and len(data) >= 5 and data[0] == 0x2F:
+            width = 1 + data[1] + ((data[2] & 0x3F) << 8)
+            height = 1 + (
+                (data[2] >> 6) | (data[3] << 2) | ((data[4] & 0x0F) << 10)
+            )
+            dimensions = (width, height)
+
+        elif chunk_type in (b"ANIM", b"ANMF"):
+            animated = True
+
+        remaining = chunk_length - len(data)
+        if remaining:
+            file_obj.seek(remaining, os.SEEK_CUR)
+        if chunk_length % 2:
+            file_obj.seek(1, os.SEEK_CUR)
+
+    if animated or not dimensions or not all(dimensions):
+        return None
+    return dimensions
+
+
+def telegram_image_dimensions(path):
+    """Return supported static image dimensions from a bounded scan."""
+    try:
+        with open(path, "rb") as file_obj:
+            signature = file_obj.read(12)
+            file_obj.seek(0)
+            if signature.startswith(b"\xff\xd8"):
+                return _jpeg_dimensions(file_obj)
+            if signature.startswith(b"\x89PNG\r\n\x1a\n"):
+                return _png_dimensions(file_obj)
+            if signature[:4] == b"RIFF" and signature[8:] == b"WEBP":
+                return _webp_dimensions(file_obj)
+    except OSError:
+        return None
+    return None
+
+
+def telegram_is_mp4(path):
+    """Perform a bounded ISO-BMFF ftyp check."""
+    try:
+        with open(path, "rb") as file_obj:
+            header = file_obj.read(64)
+    except OSError:
+        return False
+
+    if len(header) < 12:
+        return False
+    box_size = struct.unpack(">I", header[:4])[0]
+    return header[4:8] == b"ftyp" and 8 <= box_size <= TELEGRAM_HEADER_SCAN_MAX
 
 
 class NotifyTelegram(NotifyBase):
@@ -401,6 +596,11 @@ class NotifyTelegram(NotifyBase):
                 "type": "bool",
                 "default": False,
             },
+            "album": {
+                "name": _("Group Photo/Video Attachments"),
+                "type": "bool",
+                "default": False,
+            },
             "topic": {
                 "name": _("Topic Thread ID"),
                 "type": "int",
@@ -447,6 +647,7 @@ class NotifyTelegram(NotifyBase):
         include_image=False,
         silent=None,
         preview=None,
+        album=False,
         topic=None,
         content=None,
         mdv=None,
@@ -496,6 +697,9 @@ class NotifyTelegram(NotifyBase):
             if preview is None
             else bool(preview)
         )
+
+        # Define whether eligible photo/video attachments should be grouped
+        self.album = bool(album)
 
         # Setup our content placement
         self.content = (
@@ -1582,8 +1786,317 @@ class NotifyTelegram(NotifyBase):
 
         return not has_error
 
+    def _inspect_album_attachment(self, attachment):
+        """Classify an attachment while preserving its original bytes."""
+        if not isinstance(attachment, AttachBase) or not attachment:
+            return TelegramMediaKind.NATIVE, "attachment is unavailable"
+
+        try:
+            size = os.path.getsize(attachment.path)
+        except OSError:
+            return TelegramMediaKind.NATIVE, "attachment size is unavailable"
+
+        mimetype = (attachment.mimetype or "").lower()
+        if mimetype == "image/gif":
+            return (
+                TelegramMediaKind.NATIVE,
+                "GIF animations are sent individually",
+            )
+
+        if mimetype.startswith("image/"):
+            dimensions = telegram_image_dimensions(attachment.path)
+            if size > TELEGRAM_PHOTO_MAX_BYTES:
+                return TelegramMediaKind.DOCUMENT, "photo exceeds 10 MB"
+            if not dimensions:
+                return (
+                    TelegramMediaKind.DOCUMENT,
+                    "photo dimensions are unsupported",
+                )
+
+            width, height = dimensions
+            if width + height > TELEGRAM_PHOTO_DIMENSION_SUM_MAX:
+                return (
+                    TelegramMediaKind.DOCUMENT,
+                    "photo width and height exceed 10000",
+                )
+            if (
+                max(width, height) / min(width, height)
+                > TELEGRAM_PHOTO_ASPECT_RATIO_MAX
+            ):
+                return (
+                    TelegramMediaKind.DOCUMENT,
+                    "photo aspect ratio exceeds 20:1",
+                )
+            return TelegramMediaKind.PHOTO, None
+
+        if mimetype.startswith("video/"):
+            if size > TELEGRAM_FILE_MAX_BYTES:
+                return TelegramMediaKind.DOCUMENT, "video exceeds 50 MB"
+            if mimetype == "video/mp4" and telegram_is_mp4(attachment.path):
+                return TelegramMediaKind.VIDEO, None
+            return (
+                TelegramMediaKind.DOCUMENT,
+                "video is not a valid MP4 upload",
+            )
+
+        return TelegramMediaKind.NATIVE, None
+
+    @staticmethod
+    def _telegram_response_error(response):
+        """Return Telegram's error description when available."""
+        try:
+            return loads(response.content).get("description", "unknown")
+        except (AttributeError, TypeError, ValueError):
+            return "unknown"
+
+    def _send_document(self, target, attachment, payload=None):
+        """Send an attachment as a document regardless of its MIME type."""
+        payload = dict(payload or {})
+        if not isinstance(attachment, AttachBase) or not attachment:
+            self.logger.error("Could not access Telegram document attachment.")
+            return False
+
+        try:
+            size = os.path.getsize(attachment.path)
+        except OSError:
+            self.logger.error("Could not determine Telegram document size.")
+            return False
+        if size > TELEGRAM_FILE_MAX_BYTES:
+            self.logger.warning(
+                "Telegram document %s exceeds the 50 MB Bot API limit.",
+                attachment.name,
+            )
+            return False
+
+        chat_id, topic = target
+        payload.update(
+            {
+                "chat_id": chat_id,
+                "disable_notification": self.silent,
+            }
+        )
+        if topic:
+            payload["message_thread_id"] = topic
+        payload.pop("show_caption_above_media", None)
+        payload.pop("title", None)
+
+        self.throttle()
+        try:
+            with attachment.open() as file_obj:
+                response = requests.post(
+                    f"{self.notify_url}{self.bot_token}/sendDocument",
+                    headers={"User-Agent": self.app_id},
+                    files={
+                        "document": (
+                            attachment.name or "attachment.dat",
+                            file_obj,
+                            attachment.mimetype,
+                        )
+                    },
+                    data=payload,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
+                )
+        except (OSError, requests.RequestException) as error:
+            self.logger.warning(
+                "Failed to upload Telegram document: %s", error
+            )
+            return False
+
+        if response.status_code != requests.codes.ok:
+            self.logger.warning(
+                "Failed to send Telegram document: %s (HTTP %s).",
+                self._telegram_response_error(response),
+                response.status_code,
+            )
+            return False
+        return True
+
+    def _send_album_item(
+        self, target, notify_type, attachment, kind, payload=None
+    ):
+        """Send one planned album item through the appropriate endpoint."""
+        if kind == TelegramMediaKind.DOCUMENT:
+            return self._send_document(target, attachment, payload=payload)
+        return self.send_media(
+            target,
+            notify_type,
+            payload=dict(payload or {}),
+            attach=attachment,
+        )
+
+    def _send_media_group(self, target, attachments, kinds, payload=None):
+        """Return success, fallback, or failure for one media group."""
+        chat_id, topic = target
+        request_data = {
+            "chat_id": chat_id,
+            "disable_notification": self.silent,
+        }
+        if topic:
+            request_data["message_thread_id"] = topic
+
+        caption = dict(payload or {})
+        show_caption_above_media = caption.pop(
+            "show_caption_above_media", None
+        )
+        media = []
+        try:
+            with ExitStack() as stack:
+                files = {}
+                for index, (attachment, kind) in enumerate(
+                    zip(attachments, kinds)
+                ):
+                    if not attachment:
+                        return "failure"
+                    field_name = f"file{index}"
+                    file_obj = stack.enter_context(attachment.open())
+                    files[field_name] = (
+                        attachment.name or f"media{index}",
+                        file_obj,
+                        attachment.mimetype,
+                    )
+                    item = {
+                        "type": kind,
+                        "media": f"attach://{field_name}",
+                    }
+                    if show_caption_above_media is not None:
+                        item["show_caption_above_media"] = (
+                            show_caption_above_media
+                        )
+                    if index == 0 and caption:
+                        item.update(caption)
+                        item.pop("title", None)
+                    media.append(item)
+
+                request_data["media"] = dumps(media)
+                self.throttle()
+                response = requests.post(
+                    f"{self.notify_url}{self.bot_token}/sendMediaGroup",
+                    headers={"User-Agent": self.app_id},
+                    files=files,
+                    data=request_data,
+                    verify=self.verify_certificate,
+                    timeout=self.request_timeout,
+                    allow_redirects=self.redirects,
+                )
+        except (OSError, requests.RequestException) as error:
+            self.logger.warning(
+                "Failed to upload Telegram media group: %s", error
+            )
+            return "failure"
+
+        if response.status_code == requests.codes.ok:
+            return "success"
+        self.logger.warning(
+            "Failed to send Telegram media group: %s (HTTP %s).",
+            self._telegram_response_error(response),
+            response.status_code,
+        )
+        return (
+            "fallback"
+            if response.status_code in (requests.codes.bad_request, 422)
+            else "failure"
+        )
+
+    def _send_album_attachments(
+        self, target, notify_type, attach, payload=None
+    ):
+        """Send attachments in eligible, ordered photo/video groups."""
+        attachments = list(attach)
+        inspected = [
+            self._inspect_album_attachment(item) for item in attachments
+        ]
+        caption = dict(payload or {})
+        index = 0
+        while index < len(attachments):
+            kind, reason = inspected[index]
+            if kind not in (
+                TelegramMediaKind.PHOTO,
+                TelegramMediaKind.VIDEO,
+            ):
+                if reason:
+                    self.logger.info(
+                        "Telegram attachment %s is not album eligible: %s.",
+                        attachments[index].name,
+                        reason,
+                    )
+                if not self._send_album_item(
+                    target,
+                    notify_type,
+                    attachments[index],
+                    kind,
+                    payload=caption,
+                ):
+                    return False
+                caption = {}
+                index += 1
+                continue
+
+            run_end = index
+            while run_end < len(attachments) and inspected[run_end][0] in (
+                TelegramMediaKind.PHOTO,
+                TelegramMediaKind.VIDEO,
+            ):
+                run_end += 1
+
+            run_index = index
+            while run_index < run_end:
+                batch_end = min(run_index + TELEGRAM_MEDIA_GROUP_MAX, run_end)
+                batch = attachments[run_index:batch_end]
+                batch_kinds = [
+                    item[0] for item in inspected[run_index:batch_end]
+                ]
+
+                if len(batch) < TELEGRAM_MEDIA_GROUP_MIN:
+                    if not self._send_album_item(
+                        target,
+                        notify_type,
+                        batch[0],
+                        batch_kinds[0],
+                        payload=caption,
+                    ):
+                        return False
+                else:
+                    outcome = self._send_media_group(
+                        target, batch, batch_kinds, payload=caption
+                    )
+                    if outcome == "failure":
+                        return False
+                    if outcome == "fallback":
+                        for fallback_index, (
+                            attachment,
+                            fallback_kind,
+                        ) in enumerate(zip(batch, batch_kinds)):
+                            fallback_payload = (
+                                caption if fallback_index == 0 else {}
+                            )
+                            if not self._send_album_item(
+                                target,
+                                notify_type,
+                                attachment,
+                                fallback_kind,
+                                payload=fallback_payload,
+                            ):
+                                return False
+
+                caption = {}
+                run_index = batch_end
+
+            index = run_end
+
+        return True
+
     def _send_attachments(self, target, notify_type, attach, payload=None):
         """Sends our attachments."""
+        if self.album:
+            return self._send_album_attachments(
+                target=target,
+                notify_type=notify_type,
+                attach=attach,
+                payload=payload,
+            )
+
         if payload is None:
             payload = {}
         has_error = False
@@ -1837,6 +2350,7 @@ class NotifyTelegram(NotifyBase):
             "detect": "yes" if self.detect_owner else "no",
             "silent": "yes" if self.silent else "no",
             "preview": "yes" if self.preview else "no",
+            "album": "yes" if self.album else "no",
             "content": self.content,
             "mdv": TELEGRAM_MARKDOWN_VERSIONS[self.markdown_ver],
         }
@@ -1984,6 +2498,9 @@ class NotifyTelegram(NotifyBase):
 
         # Show Web Page Preview
         results["preview"] = parse_bool(results["qsd"].get("preview", False))
+
+        # Group eligible photo/video attachments into Telegram media groups
+        results["album"] = parse_bool(results["qsd"].get("album", False))
 
         # Include images with our message
         results["include_image"] = parse_bool(
