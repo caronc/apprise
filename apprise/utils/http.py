@@ -89,6 +89,7 @@ def is_public_ip_address(value):
         if address.ipv4_mapped is not None:
             return is_public_ip_address(address.ipv4_mapped)
 
+    # Reject any address that is not a public unicast address.
     blocked = (
         address.is_private
         or address.is_loopback
@@ -113,6 +114,7 @@ def is_public_ip_address(value):
         if address.sixtofour and not is_public_ip_address(address.sixtofour):
             return False
 
+        # Teredo addresses embed an IPv4 address in their last 32 bits.
         if address.teredo and not all(
             is_public_ip_address(item) for item in address.teredo
         ):
@@ -180,6 +182,7 @@ class HTTPPolicy:
             ) from exc
 
         if not allowed:
+            # A policy that returns false must fail closed as a request error.
             raise requests.exceptions.InvalidURL(
                 "URL denied by outbound HTTP policy"
             )
@@ -194,6 +197,8 @@ class HTTPPolicy:
             )
 
         try:
+            # Submit a DNS lookup to the shared thread pool so it cannot block
+            # the caller.
             future = _DNS_POOL.submit(
                 socket.getaddrinfo,
                 host,
@@ -360,9 +365,13 @@ def _policy_pool_classes(policy):
     PolicyHTTPSConnection.policy = policy
 
     class PolicyHTTPConnectionPool(HTTPConnectionPool):
+        """Use a policy-aware connection class for HTTP."""
+
         ConnectionCls = PolicyHTTPConnection
 
     class PolicyHTTPSConnectionPool(HTTPSConnectionPool):
+        """Use a policy-aware connection class for HTTPS."""
+
         ConnectionCls = PolicyHTTPSConnection
 
     return {
@@ -410,12 +419,14 @@ class HTTPPolicySession(requests.Session):
     """A Requests session that validates every hop and pins its DNS result."""
 
     def __init__(self, policy):
+        """Create a session that enforces the given HTTPPolicy."""
         super().__init__()
         self.policy = policy
 
         # Environment proxies must not reroute a checked destination.
         self.trust_env = False
 
+        # Install a policy-aware adapter for all HTTP and HTTPS requests.
         adapter = _PolicyHTTPAdapter(policy)
         self.mount("http://", adapter)
         self.mount("https://", adapter)

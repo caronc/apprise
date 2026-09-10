@@ -475,6 +475,32 @@ def test_plugin_ses_aws_response_handling():
     assert response["error_code"] == "InvalidParameter"
     assert response["error_message"] == "Invalid parameter"
 
+    # An empty known element (no text at all) doesn't blow up; it's
+    # just treated as blank
+    response = NotifySES.aws_response_to_dict("""
+        <ErrorResponse xmlns="http://ses.amazonaws.com/doc/2010-03-31/">
+            <Error>
+                <Type>Sender</Type>
+                <Code>InvalidParameter</Code>
+                <Message/>
+            </Error>
+            <RequestId>b5614883-babe-56ca-93b2-1c592ba6191e</RequestId>
+        </ErrorResponse>
+        """)
+    assert response["type"] == "ErrorResponse"
+    assert response["error_message"] == ""
+
+    # A response nested far deeper than Python's recursion limit still
+    # parses instead of raising a RecursionError
+    depth = sys.getrecursionlimit() + 1000
+    response = NotifySES.aws_response_to_dict(
+        ("<RequestId>" * depth)
+        + "b5614883-babe-56ca-93b2-1c592ba6191e"
+        + ("</RequestId>" * depth)
+    )
+    assert response["type"] == "RequestId"
+    assert response["request_id"] == "b5614883-babe-56ca-93b2-1c592ba6191e"
+
 
 @mock.patch("requests.post")
 def test_plugin_ses_attachments(mock_post):
