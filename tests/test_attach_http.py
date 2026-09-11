@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 # Disable logging for a cleaner testing output
+import errno
 import logging
 import mimetypes
 from os.path import dirname, getsize, join
@@ -234,7 +235,7 @@ def test_attach_http(mock_get, mock_request):
     # Now a call would yield a detected result that we'd agree with:
     assert attachment.mimetype == "image/gif"
 
-    # had it not been there and it was forced to detect it on it's own
+    # Detect the MIME type again without a Content-Type header.
     # we would have had a different result; the below forces it to detect it
     # again:
     attachment.detected_mimetype = None
@@ -260,11 +261,7 @@ def test_attach_http(mock_get, mock_request):
     assert attachment
     assert len(attachment) == getsize(path)
 
-    # Test case where location is simply set to INACCESSIBLE
-    # Below is a bad example, but it proves the section of code properly works.
-    # Ideally a server admin may wish to just disable all HTTP based
-    # attachments entirely. In this case, they simply just need to change the
-    # global singleton at the start of their program like:
+    # Administrators can disable all HTTP attachments globally:
     #
     # import apprise
     # apprise.attachment.AttachHTTP.location = \
@@ -272,7 +269,7 @@ def test_attach_http(mock_get, mock_request):
     attachment = AttachHTTP(**results)
     attachment.location = ContentLocation.INACCESSIBLE
     assert attachment.path is None
-    # Downloads just don't work period
+    # Downloads are blocked when HTTP attachments are inaccessible.
     assert attachment.download() is False
 
     # No path specified
@@ -561,7 +558,7 @@ def test_attach_http(mock_get, mock_request):
     assert isinstance(results, dict)
     obj_no_redir = AttachHTTP(**results)
     assert obj_no_redir.redirects is False
-    # Download must fail -- streaming a redirect stub would be wrong
+    # Do not stream a redirect response when redirects are disabled.
     assert obj_no_redir.download() is False
     # Restore for downstream tests
     mock_get.return_value = dummy_response
@@ -579,3 +576,110 @@ def test_attach_http(mock_get, mock_request):
         mock_file.side_effect = OSError
         with pytest.raises(exception.AppriseDiskIOError):
             obj.base64()
+
+
+class SizedResponse:
+    """A dummy response that streams a fixed payload in small chunks."""
+
+    status_code = requests.codes.ok
+    headers: ClassVar[dict[str, str]] = {"Content-Type": "text/plain"}
+
+    # The payload streamed back to the caller
+    payload = b"abcdefghij"
+
+    def close(self):
+        return
+
+    def iter_content(self, chunk_size=1024):
+        """Stream our payload back 2 bytes at a time."""
+        for index in range(0, len(self.payload), 2):
+            yield self.payload[index : index + 2]
+
+    def raise_for_status(self):
+        return
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *args, **kwargs):
+        return
+
+
+@mock.patch("requests.get")
+def test_attach_http_download_dir(mock_get, tmpdir):
+    """AttachHTTP writes downloads into the requested directory."""
+
+    mock_get.return_value = SizedResponse()
+
+    # Point our download at a directory of our own choosing
+    download_dir = str(tmpdir.mkdir("attachments"))
+    results = AttachHTTP.parse_url("http://localhost/file.txt")
+    assert isinstance(results, dict)
+    attachment = AttachHTTP(download_dir=download_dir, **results)
+    assert attachment
+
+    # Our content lives in the directory we asked for
+    assert dirname(attachment.path) == download_dir
+    assert len(attachment) == len(SizedResponse.payload)
+
+    # Without a download_dir we fall back to the system temporary directory
+    attachment = AttachHTTP(**results)
+    assert attachment
+    assert dirname(attachment.path) != download_dir
+
+
+@mock.patch("requests.get")
+def test_attach_http_size_limit(mock_get):
+    """AttachHTTP never writes more than max_file_size bytes."""
+
+    mock_get.return_value = SizedResponse()
+
+    # Track how large the file grew before it was thrown away
+    written = []
+    invalidate = AttachHTTP.invalidate
+
+    def record(self):
+        if self._temp_file:
+            # tell() covers buffered writes that have not reached disk yet
+            written.append(self._temp_file.tell())
+
+        invalidate(self)
+
+    results = AttachHTTP.parse_url("http://localhost/file.txt")
+    assert isinstance(results, dict)
+
+    with mock.patch.object(AttachHTTP, "invalidate", record):
+        attachment = AttachHTTP(**results)
+
+        # Allow 5 of the 10 bytes on offer
+        attachment.max_file_size = 5
+
+        # Our download fails because the payload is over our limit
+        assert attachment.download() is False
+
+    # Stop before the chunk that would cross the limit.
+    assert written
+    assert all(size <= 5 for size in written)
+    assert written[0] == 4
+
+    # A payload landing exactly on our limit is still accepted
+    attachment = AttachHTTP(**results)
+    attachment.max_file_size = len(SizedResponse.payload)
+    assert attachment.download() is True
+    assert len(attachment) == len(SizedResponse.payload)
+
+
+@mock.patch("apprise.attachment.http.NamedTemporaryFile")
+@mock.patch("requests.get")
+def test_attach_http_preserves_storage_error(mock_get, mock_temp_file):
+    """Callers can inspect a download failure caused by local storage."""
+
+    mock_get.return_value = SizedResponse()
+    storage_error = OSError(errno.ENOSPC, "disk full")
+    mock_temp_file.side_effect = storage_error
+
+    results = AttachHTTP.parse_url("http://localhost/file.txt")
+    attachment = AttachHTTP(**results)
+
+    assert attachment.download() is False
+    assert attachment.download_error is storage_error

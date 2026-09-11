@@ -36,6 +36,7 @@ import requests
 
 from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins import sogs
 from apprise.plugins.sogs import (
     NotifySessionOGS,
     _build_session_message,
@@ -226,10 +227,34 @@ def test_plugin_sogs_no_cryptography():
     obj = Apprise.instantiate(BASE_URL)
     assert obj is None
 
-    # Direct instantiation must raise ImportError with a helpful message,
-    # not the confusing AttributeError from None.from_private_bytes().
-    with pytest.raises(ImportError, match="cryptography"):
-        NotifySessionOGS(public_key=PUBLIC_KEY, seed=SEED, targets=[ROOM])
+    # Direct construction remains safe, but sending is unavailable.
+    direct = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+    )
+    assert direct.enabled is False
+    assert direct.send("test") is False
+
+
+def test_plugin_sogs_disabled_dependency(monkeypatch):
+    """Direct use fails safely when cryptography is unavailable."""
+    monkeypatch.setattr(sogs, "NOTIFY_SESSIONOGS_ENABLED", False)
+    monkeypatch.setattr(NotifySessionOGS, "enabled", False)
+
+    assert Apprise.instantiate(BASE_URL) is None
+
+    direct = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+    )
+    assert direct._signing_key is None
+    assert direct._bot_pubkey_bytes is None
+
+    with mock.patch("requests.post") as mock_post:
+        assert direct.send("test") is False
+        mock_post.assert_not_called()
 
 
 @pytest.mark.skipif(
@@ -244,6 +269,7 @@ def test_plugin_sogs_init(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -348,6 +374,7 @@ def test_plugin_sogs_send_success(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -378,6 +405,7 @@ def test_plugin_sogs_send_multi_room(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -404,6 +432,7 @@ def test_plugin_sogs_send_partial_failure(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b""
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.side_effect = [
@@ -433,6 +462,7 @@ def test_plugin_sogs_http_error(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b""
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     obj = NotifySessionOGS(
@@ -485,6 +515,7 @@ def test_plugin_sogs_http_insecure(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -511,6 +542,7 @@ def test_plugin_sogs_url_and_privacy(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -548,6 +580,7 @@ def test_plugin_sogs_custom_port(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -636,6 +669,7 @@ def test_plugin_sogs_invalid_room_token(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -700,6 +734,7 @@ def test_plugin_sogs_auth_headers(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -754,6 +789,7 @@ def test_plugin_sogs_response_unparseable_json(mock_post):
     r = mock.Mock()
     r.status_code = requests.codes.created
     r.content = b"not-json"
+    r.iter_content = lambda chunk_size=None: iter([r.content])
     mock_post.return_value = r
 
     obj = NotifySessionOGS(
@@ -763,6 +799,56 @@ def test_plugin_sogs_response_unparseable_json(mock_post):
         host="open.getsession.org",
     )
     assert bool(obj.notify(body="Hello")) is True
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
+@mock.patch("requests.post")
+def test_plugin_sogs_oversized_response_rejected(mock_post):
+    """Reject a response whose body grows past the acknowledgement limit.
+
+    The empty chunk confirms that keep-alive chunks are ignored.
+    """
+    over_limit = b"x" * (NotifySessionOGS.max_response_size + 1)
+    r = mock.Mock()
+    r.status_code = requests.codes.created
+    r.headers = {}
+    r.iter_content = lambda chunk_size=None: iter([b"", over_limit])
+    mock_post.return_value = r
+
+    obj = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+        host="open.getsession.org",
+    )
+    assert bool(obj.notify(body="Hello")) is False
+    r.close.assert_called_once()
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
+@mock.patch("requests.post")
+def test_plugin_sogs_closes_connection_after_read(mock_post):
+    """The streamed connection is closed once the body is read."""
+    r = mock.Mock()
+    r.status_code = requests.codes.created
+    r.content = b'{"id": 1}'
+    r.iter_content = lambda chunk_size=None: iter([r.content])
+    mock_post.return_value = r
+
+    obj = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+        host="open.getsession.org",
+    )
+    assert bool(obj.notify(body="Hello")) is True
+    r.close.assert_called_once()
 
 
 def test_plugin_sogs_build_session_message():
@@ -813,6 +899,7 @@ def test_plugin_sogs_apprise_integration(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()

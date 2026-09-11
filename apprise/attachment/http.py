@@ -25,11 +25,14 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from __future__ import annotations
+
 import contextlib
 import os
 import re
 from tempfile import NamedTemporaryFile
 import threading
+from typing import Any, Optional
 
 import requests
 
@@ -61,11 +64,17 @@ class AttachHTTP(AttachBase):
     # thread safe loading
     _lock = threading.Lock()
 
-    def __init__(self, headers=None, http_session=None, **kwargs):
-        """Initialize HTTP Object.
+    def __init__(
+        self,
+        headers: Optional[dict[str, str]] = None,
+        http_session: Optional[requests.Session] = None,
+        download_dir: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
+        """Initialize an HTTP attachment.
 
-        headers can be a dictionary of key/value pairs that you want to
-        additionally include as part of the server headers to post with
+        ``headers`` adds request headers. ``download_dir`` selects the
+        temporary-file directory and defaults to the system location.
         """
         super().__init__(**kwargs)
 
@@ -83,8 +92,14 @@ class AttachHTTP(AttachBase):
         # Applications may provide a policy-aware Requests session.
         self.http_session = http_session
 
+        # Applications may store downloads outside the system temp directory.
+        self.download_dir = download_dir
+
         # Where our content is written to upon a call to download.
         self._temp_file = None
+
+        # Preserve storage failures for callers that need a detailed error.
+        self.download_error = None
 
         # Our Query String Dictionary; we use this to track arguments
         # specified that aren't otherwise part of this class
@@ -96,9 +111,11 @@ class AttachHTTP(AttachBase):
 
         return
 
-    def download(self, **kwargs):
+    def download(self, **kwargs: Any) -> bool:
         """Perform retrieval of the configuration based on the specified
         request."""
+
+        self.download_error = None
 
         if self.location == ContentLocation.INACCESSIBLE:
             # our content is inaccessible
@@ -166,11 +183,8 @@ class AttachHTTP(AttachBase):
                     # Handle Errors
                     r.raise_for_status()
 
-                    # raise_for_status() only covers 4xx/5xx; when redirect
-                    # following is disabled any 3xx must be treated as a
-                    # failure so we do not silently stream a redirect stub.
-                    # Using a status-code range rather than r.is_redirect
-                    # catches 3xx responses that lack a Location header.
+                    # Reject every 3xx response when redirects are disabled,
+                    # including responses without a Location header.
                     if not self.redirects and 300 <= r.status_code < 400:
                         self.logger.error(
                             "HTTP redirect encountered but redirect "
@@ -191,7 +205,7 @@ class AttachHTTP(AttachBase):
                         self.max_file_size > 0
                         and file_size > self.max_file_size
                     ):
-                        # The content retrieved is to large
+                        # The content is too large.
                         self.logger.error(
                             "HTTP response exceeds allowable maximum file"
                             f" length ({int(self.max_file_size / 1024)}KB):"
@@ -212,11 +226,11 @@ class AttachHTTP(AttachBase):
                     if result:
                         self.detected_name = result.group("name").strip()
 
-                    # Create a temporary file to work with; delete must be set
-                    # to False or it isn't compatible with Microsoft Windows
-                    # instances. In lieu of this, __del__ will clean up the
-                    # file for us.
-                    self._temp_file = NamedTemporaryFile(delete=False)  # noqa: SIM115
+                    # Keep the file on Windows; __del__ cleans it up.
+                    self._temp_file = NamedTemporaryFile(  # noqa: SIM115
+                        delete=False,
+                        dir=self.download_dir,
+                    )
 
                     # Get our chunk size
                     chunk_size = self.chunk_size
@@ -229,36 +243,29 @@ class AttachHTTP(AttachBase):
                     for chunk in r.iter_content(chunk_size=chunk_size):
                         # filter out keep-alive chunks
                         if chunk:
+                            # Enforce the limit while streaming because the
+                            # server may omit or misreport Content-Length.
+                            if (
+                                self.max_file_size > 0
+                                and bytes_written + len(chunk)
+                                > self.max_file_size
+                            ):
+                                # The downloaded content is too large.
+                                self.logger.error(
+                                    "HTTP response exceeds allowable"
+                                    " maximum file length"
+                                    f" ({int(self.max_file_size / 1024)}"
+                                    f"KB): {self.url(privacy=True)}"
+                                )
+
+                                # Invalidate any variables previously set
+                                self.invalidate()
+
+                                # Return False (signifying a failure)
+                                return False
+
                             self._temp_file.write(chunk)
                             bytes_written = self._temp_file.tell()
-
-                            # Prevent a case where Content-Length isn't
-                            # provided. In this case we don't want to fetch
-                            # beyond our limits
-                            if self.max_file_size > 0:
-                                if bytes_written > self.max_file_size:
-                                    # The content retrieved is to large
-                                    self.logger.error(
-                                        "HTTP response exceeds allowable"
-                                        " maximum file length"
-                                        f" ({int(self.max_file_size / 1024)}"
-                                        f"KB): {self.url(privacy=True)}"
-                                    )
-
-                                    # Invalidate any variables previously set
-                                    self.invalidate()
-
-                                    # Return False (signifying a failure)
-                                    return False
-
-                                elif (
-                                    bytes_written + chunk_size
-                                    > self.max_file_size
-                                ):
-                                    # Adjust out next read to accommodate up to
-                                    # our limit +1. This will prevent us from
-                                    # reading to much into our memory buffer
-                                    self.max_file_size - bytes_written + 1
 
                     # Ensure our content is flushed to disk for post-processing
                     self._temp_file.flush()
@@ -282,9 +289,11 @@ class AttachHTTP(AttachBase):
                 # Return False (signifying a failure)
                 return False
 
-            except OSError:
-                # IOError is present for backwards compatibility with Python
-                # versions older then 3.3.  >= 3.3 throw OSError now.
+            except OSError as e:
+                # IOError remains for compatibility; modern Python raises
+                # OSError here.
+
+                self.download_error = e
 
                 # Could not open and/or write the temporary file
                 self.logger.error(
