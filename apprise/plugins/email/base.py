@@ -217,11 +217,6 @@ class NotifyEmail(NotifyBase):
                 "default": "",
                 "map_to": "pgp_key",
             },
-            # Backward-compat alias; deprecated in favour of pgppub=
-            # Handled in parse_url() with a deprecation warning.
-            "pgpkey": {
-                "alias_of": "pgppub",
-            },
             "pgpprv": {
                 "name": _("PGP Private Key Path"),
                 "type": "string",
@@ -477,20 +472,6 @@ class NotifyEmail(NotifyBase):
         # does not override a deliberate pgp=none choice
         pgp_mode_explicit = pgp_mode is not None
 
-        # Handle deprecated use_pgp boolean for backward compatibility;
-        # kept in **kwargs rather than as a named parameter so the template
-        # verification test does not flag it as an unmapped __init__ argument
-        use_pgp = kwargs.pop("use_pgp", None)
-        if use_pgp is not None:
-            self.logger.warning(
-                "Email use_pgp= is deprecated; use pgp_mode='encrypt' instead"
-            )
-            # Only override pgp_mode when the caller did not also pass it
-            if pgp_mode is None:
-                pgp_mode = PGPMode.ENCRYPT if use_pgp else PGPMode.NONE
-                # use_pgp counts as an explicit setting
-                pgp_mode_explicit = True
-
         # Resolve PGP mode via prefix match (allows 'e', 'en', 'encrypt')
         if not pgp_mode:
             self.pgp_mode = PGP_MODE_DEFAULT
@@ -500,8 +481,7 @@ class NotifyEmail(NotifyBase):
                 PGP_MODE_DEFAULT,
             )
 
-        # WKD flag -- use parse_bool() so string values like 'no'/'false'
-        # are treated as disabled (bool('no') would incorrectly return True)
+        # Parse string values such as "no" correctly.
         self.use_wkd = parse_bool(use_wkd)
 
         # wkd=yes implies pgp=encrypt when pgp= was not explicitly set
@@ -551,16 +531,10 @@ class NotifyEmail(NotifyBase):
         return
 
     def apply_email_defaults(self, secure_mode=None, port=None, **kwargs):
-        """
-        A function that prefills defaults based on the email
-        it was provided.
-        """
+        """Apply provider defaults inferred from the sender address."""
 
         if self.smtp_host:
-            # SMTP Server was explicitly specified, therefore it is assumed
-            # the caller knows what he's doing and is intentionally
-            # over-riding any smarts to be applied. We also can not apply
-            # any default if there was no user specified.
+            # Preserve an explicitly selected SMTP server.
             return
 
         # detect our email address using our user/host combo
@@ -586,7 +560,7 @@ class NotifyEmail(NotifyBase):
                     f"Applying {templates.EMAIL_TEMPLATES[i][0]} Defaults"
                 )
 
-                # the secure flag can not be altered if defined in the template
+                # A template may require a specific security mode.
                 self.secure = templates.EMAIL_TEMPLATES[i][2].get(
                     "secure", self.secure
                 )
@@ -1009,31 +983,16 @@ class NotifyEmail(NotifyBase):
                 # Don't lose defined email addresses
                 results["targets"].append(NotifyEmail.unquote(results["host"]))
 
-            # Detect if we have a valid hostname or not; be sure to reset it's
-            # value if invalid; we'll attempt to figure this out later on
+            # Clear invalid hosts so a later step can infer one.
             results["host"] = ""
 
-        # Get PGP mode -- accept the new choice strings (none, encrypt)
-        # with prefix matching, and fall back to legacy boolean parsing
-        # for backward compatibility with existing ?pgp=yes/no URLs.
+        # Unknown PGP modes fall back to the default.
         pgp_raw = results["qsd"].get("pgp", "")
         if pgp_raw:
-            pgp_mode = next(
+            results["pgp_mode"] = next(
                 (m for m in PGP_MODES if m.startswith(str(pgp_raw).lower())),
-                None,
+                PGP_MODE_DEFAULT,
             )
-            if pgp_mode is None:
-                # Not a recognised mode string; try legacy boolean
-                if parse_bool(pgp_raw):
-                    logger.warning(
-                        "Email ?pgp=%s is deprecated;"
-                        " use ?pgp=encrypt instead",
-                        pgp_raw,
-                    )
-                    pgp_mode = PGPMode.ENCRYPT
-                else:
-                    pgp_mode = PGP_MODE_DEFAULT
-            results["pgp_mode"] = pgp_mode
 
         # Get Web Key Directory flag
         if "wkd" in results["qsd"] and results["qsd"]["wkd"]:
@@ -1046,19 +1005,6 @@ class NotifyEmail(NotifyBase):
         # Get PGP Public Key Override (canonical name: pgppub=)
         if "pgppub" in results["qsd"] and results["qsd"]["pgppub"]:
             results["pgp_key"] = NotifyEmail.unquote(results["qsd"]["pgppub"])
-
-        # Backward-compat: pgpkey= is the old name for pgppub=; emit a
-        # deprecation warning and map it through so existing URLs still work.
-        if "pgpkey" in results["qsd"] and results["qsd"]["pgpkey"]:
-            logger.warning(
-                "Email ?pgpkey= is deprecated; use ?pgppub= instead."
-                " Support for pgpkey= will be removed in a future release."
-            )
-            # Only override pgp_key when pgppub= was not also present
-            if "pgp_key" not in results:
-                results["pgp_key"] = NotifyEmail.unquote(
-                    results["qsd"]["pgpkey"]
-                )
 
         # Get PGP Private Key Override (canonical name: pgpprv=)
         if "pgpprv" in results["qsd"] and results["qsd"]["pgpprv"]:
@@ -1109,7 +1055,7 @@ class NotifyEmail(NotifyBase):
             smtp_host = NotifyEmail.unquote(results["qsd"]["smtp"])
 
         if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
-            # Extract the secure mode to over-ride the default
+            # Extract the security mode override.
             results["secure_mode"] = results["qsd"]["mode"].lower()
 
         # Handle Carbon Copy Addresses
@@ -1138,12 +1084,10 @@ class NotifyEmail(NotifyBase):
 
     @staticmethod
     def _get_charset(input_string):
-        """
-        Get utf-8 charset if non ascii string only
+        """Use UTF-8 only when text contains non-ASCII characters.
 
-        Encode an ascii string to utf-8 is bad for email deliverability
-        because some anti-spam gives a bad score for that
-        like SUBJ_EXCESS_QP flag on Rspamd
+        Encoding ASCII unnecessarily can trigger spam filters such as
+        Rspamd's ``SUBJ_EXCESS_QP`` rule.
         """
         if not input_string:
             return None
@@ -1175,8 +1119,7 @@ class NotifyEmail(NotifyBase):
         # When True, image attachments are embedded inline (RFC 2387)
         # so HTML bodies can reference them via <img src="cid:filename">
         inline=False,
-        # Define our timezone; if one isn't provided, then we use
-        # the system time instead
+        # Use the system timezone when none is provided.
         tzinfo=None,
     ):
         """
@@ -1287,22 +1230,10 @@ class NotifyEmail(NotifyBase):
             if reply_to_:
                 logger.debug("Email Reply-To: {}".format(", ".join(reply_to_)))
 
-            # When inline mode is active, pre-scan image attachments
-            # before the MIME body is built so the modified body is
-            # picked up by all parts (text/plain alternative included).
-            #
-            # HTML emails: collect any existing cid:filename refs from
-            # the body, then append <br/><img src="cid:name"> for each
-            # image attachment that is not yet referenced.  This ensures
-            # all images are embedded inline -- even when the caller did
-            # not write the cid: anchors manually.
-            #
-            # Plain-text emails: images cannot be embedded; append a
-            # short [Image: name] marker so the recipient knows the
-            # attachment is there.
-            #
-            # Non-image attachments are never modified here; they always
-            # fall back to standard Content-Disposition: attachment.
+            # Prepare inline attachments before building the MIME body:
+            # - HTML appends missing image references.
+            # - Plain text adds an [Image: name] marker.
+            # Non-images remain regular attachments unless explicitly linked.
             cid_refs = set()
             if inline and attach:
                 if notify_format == NotifyFormat.HTML:
@@ -1322,9 +1253,7 @@ class NotifyEmail(NotifyBase):
                         for _no, _a in enumerate(attach, start=1)
                     }
 
-                    # Warn for every cid: ref in the body that has no
-                    # corresponding attachment -- the user likely made a
-                    # typo or forgot to include the file
+                    # Warn when a cid: reference has no matching attachment.
                     for _ref in sorted(cid_refs - _attach_names):
                         logger.warning(
                             "Email inline: no attachment matches "
@@ -1332,14 +1261,8 @@ class NotifyEmail(NotifyBase):
                             _ref,
                         )
 
-                    # Drop refs that have no matching attachment so they
-                    # do not influence the multipart/related decision.
-                    # Note: only IMAGE attachments are ever auto-appended
-                    # (see img_appends loop below), but explicit cid: refs
-                    # in the caller-supplied body are honored for any
-                    # attachment type -- a cid: URI can only resolve
-                    # within the same MIME package, so if the caller wrote
-                    # it they clearly attached the file on purpose.
+                    # Ignore missing files when selecting the MIME wrapper.
+                    # Explicit matching references may use any file type.
                     cid_refs &= _attach_names
 
                     # Append inline anchors for any image not yet listed
@@ -1509,13 +1432,8 @@ class NotifyEmail(NotifyBase):
                 # the function continues to work unchanged
                 base = signed
 
-                # Opportunistic encryption: try to find the recipient's
-                # public key and encrypt the signed payload if found.
-                # autogen=False prevents a fake key from being auto-created
-                # for the recipient -- only pre-existing keys (WKD lookups
-                # or explicit pgppub= files) qualify for encryption.
-                # A missing key is NOT an error in sign mode -- we simply
-                # send the signed (unencrypted) email instead.
+                # Encrypt when the recipient already has a public key.
+                # Sign mode remains usable when no recipient key exists.
                 enc_content = pgp.encrypt(
                     base.as_string(), to_addr, autogen=False
                 )
