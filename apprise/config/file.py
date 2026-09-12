@@ -46,6 +46,9 @@ class ConfigFile(ConfigBase):
     # Configuration file inclusion can only be of the same type
     allow_cross_includes = ContentIncludeMode.STRICT
 
+    # Files explicitly loaded by the application are trusted local configs.
+    _allow_environment = True
+
     def __init__(self, path, **kwargs):
         """Initialize File Object.
 

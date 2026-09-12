@@ -444,6 +444,60 @@ apprise -vv --title 'custom override' \
 
 You can read more about creating your own custom notifications and/or hooks [here](https://appriseit.com/library/extending/decorator/).
 
+### Environment variables in configuration
+
+Notification URLs in local TEXT and YAML configuration files can reference
+environment variables using `${NAME}`. YAML URL option values support the same
+syntax:
+
+```text
+notifications = tgram://123456789:${TELEGRAM_BOT_TOKEN}/-1001234567890
+```
+
+```yaml
+urls:
+  - tgram://123456789:${TELEGRAM_BOT_TOKEN}/-1001234567890:
+      tag: notifications
+```
+
+Supply the variables in the environment of the process running Apprise. No
+allowlist or additional setting is needed:
+
+```sh
+# Supply TELEGRAM_BOT_TOKEN through your secret manager or container environment.
+apprise --config=apprise.conf --tag=notifications --body='Test notification'
+```
+
+Substitution applies to files loaded through `--config`, the default local
+configuration paths, or `AppriseConfig.add(path)`. It does not apply to HTTP
+configuration, in-memory content passed to `add_config()`, or notification URLs
+passed directly to `Apprise.add()` or the CLI. These sources preserve placeholders
+literally and cannot enable substitution through a URL parameter or YAML setting.
+Local includes inherit substitution only when every source in the include chain
+is local; a remote source cannot regain access by including a file, even with
+`insecure_includes=True`.
+
+Only load trusted, administrator-managed files through the local file loader.
+Applications that accept uploaded configuration should continue to use
+`add_config()` for that content, even if it is stored on disk. Apprise API
+currently uses this in-memory path for saved configurations, so those
+configurations do not receive environment substitution with this library change.
+
+An unset or empty variable rejects the local configuration source rather than
+sending with a partially substituted URL. Values containing
+newlines or NUL characters are also rejected. Errors identify the variable name,
+not its value. Existing logging and configuration export policies still apply
+to the resolved notification services.
+
+Substitution is literal and occurs once; default value syntax and recursive
+expansion are not supported. `$${NAME}` produces literal `${NAME}` in local
+files. URL substitutions must already be appropriately
+percent-encoded; YAML option values are substituted after YAML parsing and
+remain strings. Includes, tag-group definitions, and global assets are not
+expanded. Configuration files are never rewritten. Resolved services follow
+the normal configuration cache lifetime; reload the configuration after changing
+environment values.
+
 ## CLI Environment Variables
 
 Those using the Command Line Interface (CLI) can also leverage environment variables to pre-set the default settings:
