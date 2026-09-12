@@ -39,6 +39,9 @@ class ConfigMemory(ConfigBase):
     # The default protocol
     protocol = "memory"
 
+    # Configuration supplied explicitly by the embedding application.
+    _allow_environment = True
+
     def __init__(self, content, **kwargs):
         """Initialize Memory Object.
 

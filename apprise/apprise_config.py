@@ -252,6 +252,10 @@ class AppriseConfig:
         as a memory based object and only exists for the life of this
         AppriseConfig object it was loaded into.
 
+        Notification URLs and YAML URL option values can reference environment
+        variables using ${NAME}. Content supplied here is treated as
+        application-managed configuration, like an explicitly loaded file.
+
         If you know the format ('yaml' or 'text') you can specify it for
         slightly less overhead during this call.  Otherwise the configuration
         is auto-detected.

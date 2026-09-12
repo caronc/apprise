@@ -67,13 +67,19 @@ def local_config(tmp_path):
         "      tag: notifications",
     ],
 )
-def test_config_environment_telegram(environment, local_config, content):
+@pytest.mark.parametrize("memory", [False, True])
+def test_config_environment_telegram(
+    environment, local_config, content, memory
+):
     """TEXT and YAML URL/token forms resolve through the public loader."""
     config = AppriseConfig()
     source = local_config(
         content, fmt="yaml" if content.startswith("urls:") else "text"
     )
-    assert config.add(source)
+    if memory:
+        assert config.add_config(content)
+    else:
+        assert config.add(source)
     services = config.servers()
     assert len(services) == 1
     assert services[0].bot_token == "123456789:test_token"
@@ -95,8 +101,9 @@ def test_config_environment_file(environment, tmp_path):
 
 @pytest.mark.parametrize("value", ["", "one\ntwo", "one\rtwo", None])
 @pytest.mark.parametrize("fmt", ["text", "yaml"])
+@pytest.mark.parametrize("memory", [False, True])
 def test_config_environment_invalid(
-    environment, local_config, monkeypatch, value, fmt, mocker
+    environment, local_config, monkeypatch, value, fmt, mocker, memory
 ):
     """A bad secret rejects the whole source, including preceding URLs."""
     if value is None:
@@ -110,7 +117,12 @@ def test_config_environment_invalid(
             "  - json://user:${PASSWORD}@localhost"
         )
     error = mocker.patch.object(ConfigBase.logger, "error")
-    assert local_config(source, fmt=fmt).servers() == []
+    config = (
+        ConfigMemory(source, format=fmt)
+        if memory
+        else local_config(source, fmt=fmt)
+    )
+    assert config.servers() == []
     assert "PASSWORD" in str(error.call_args)
     if value:
         assert value not in str(error.call_args)
@@ -118,13 +130,14 @@ def test_config_environment_invalid(
 
 @pytest.mark.parametrize("fmt", ["text", "yaml"])
 def test_config_environment_memory(environment, fmt):
-    """Raw or API-supplied content must keep placeholders literal."""
+    """Application-managed content expands without rewriting the input."""
     source = "json://user:${PASSWORD}@localhost"
     if fmt == "yaml":
         source = "urls:\n  - " + source
     config = AppriseConfig()
     assert config.add_config(source, format=fmt)
-    assert config.servers()[0].password == "${PASSWORD}"
+    assert config.servers()[0].password == "test_password"
+    assert config[0].content == source
     services, _ = ConfigBase.config_parse(source, config_format=fmt)
     assert services[0].password == "${PASSWORD}"
 
@@ -255,7 +268,7 @@ def test_config_environment_local_include(environment, tmp_path):
 
 
 def test_config_environment_memory_include(environment, tmp_path):
-    """Allowing file includes does not grant environment access to memory."""
+    """Explicitly allowed local includes retain environment expansion."""
     child = tmp_path / "child.conf"
     child.write_text("json://user:${PASSWORD}@localhost")
     config = ConfigMemory(
@@ -264,7 +277,7 @@ def test_config_environment_memory_include(environment, tmp_path):
         recursion=1,
         insecure_includes=True,
     )
-    assert config.servers()[0].password == "${PASSWORD}"
+    assert config.servers()[0].password == "test_password"
 
 
 def test_config_environment_remote_include(environment, tmp_path, mocker):

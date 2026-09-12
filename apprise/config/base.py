@@ -74,7 +74,7 @@ C_MGR = ConfigurationManager()
 
 
 class _ConfigEnvironment:
-    """Substitute environment variables in parsed local configuration."""
+    """Substitute variables in parsed application-managed configuration."""
 
     pattern = re.compile(
         r"\$\$\{([A-Za-z_][A-Za-z0-9_]*)\}|"
@@ -156,8 +156,8 @@ class ConfigBase(URLBase):
     # line found in configuration files.
     allow_cross_includes = common.ContentIncludeMode.NEVER
 
-    # Only local files may expand environment variables. This is not a URL
-    # option and is disabled for descendants of remote/in-memory sources.
+    # Local files and application-managed content may expand variables.
+    # This is not a URL option; remote descendants keep it disabled.
     _allow_environment = False
 
     # the config path manages the handling of relative include

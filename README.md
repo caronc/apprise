@@ -446,9 +446,9 @@ You can read more about creating your own custom notifications and/or hooks [her
 
 ### Environment variables in configuration
 
-Notification URLs in local TEXT and YAML configuration files can reference
-environment variables using `${NAME}`. YAML URL option values support the same
-syntax:
+Notification URLs in local TEXT and YAML configuration files and content supplied
+through `AppriseConfig.add_config()` can reference environment variables using
+`${NAME}`. YAML URL option values support the same syntax:
 
 ```text
 notifications = tgram://123456789:${TELEGRAM_BOT_TOKEN}/-1001234567890
@@ -469,21 +469,29 @@ apprise --config=apprise.conf --tag=notifications --body='Test notification'
 ```
 
 Substitution applies to files loaded through `--config`, the default local
-configuration paths, or `AppriseConfig.add(path)`. It does not apply to HTTP
-configuration, in-memory content passed to `add_config()`, or notification URLs
+configuration paths, `AppriseConfig.add(path)`, or `AppriseConfig.add_config(content)`.
+It does not apply to HTTP-fetched configuration or notification URLs
 passed directly to `Apprise.add()` or the CLI. These sources preserve placeholders
 literally and cannot enable substitution through a URL parameter or YAML setting.
-Local includes inherit substitution only when every source in the include chain
-is local; a remote source cannot regain access by including a file, even with
+Local includes inherit substitution from files and application-managed content;
+a remote source cannot regain access by including a file, even with
 `insecure_includes=True`.
 
-Only load trusted, administrator-managed files through the local file loader.
-Applications that accept uploaded configuration should continue to use
-`add_config()` for that content, even if it is stored on disk. Apprise API
-currently uses this in-memory path for saved configurations, so those
-configurations do not receive environment substitution with this library change.
+Both local files and content passed to `add_config()` are treated as
+application-managed configuration with access to the process environment.
 
-An unset or empty variable rejects the local configuration source rather than
+Apprise API uses `add_config()` for saved configurations, so both mounted files
+and configurations saved through its admin UI support substitution. For a mounted
+`/config/apprise.cfg`, use the TEXT example above with
+`APPRISE_STATEFUL_MODE=simple`, supply `TELEGRAM_BOT_TOKEN` in the container
+environment, and send notifications to `/notify/apprise` with `tag=notifications`.
+No configuration lock is required. With Compose, an `env_file` can supply the
+token from a separate, untracked file; Compose's `.env` file alone does not pass
+variables into the container. Recreate the container after changing its environment.
+The stored configuration retains its placeholders, so protocols, tags, and chat
+IDs can be backed up separately from credentials.
+
+An unset or empty variable rejects the configuration source rather than
 sending with a partially substituted URL. Values containing
 newlines or NUL characters are also rejected. Errors identify the variable name,
 not its value. Existing logging and configuration export policies still apply
