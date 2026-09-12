@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins import jellyfin
 
 logging.disable(logging.CRITICAL)
@@ -58,7 +59,7 @@ apprise_url_tests = (
         "jellyfin://localhost",
         {
             # Missing a username
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

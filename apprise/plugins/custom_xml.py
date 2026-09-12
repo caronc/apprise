@@ -31,7 +31,8 @@ import re
 import requests
 
 from .. import exception
-from ..common import NotifyImageSize, NotifyType
+from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS
@@ -78,6 +79,14 @@ class NotifyXML(NotifyBase):
 
     # Support attachments
     attachment_support = True
+
+    # Pass-through Notify Formats. The endpoint receives whichever body
+    # representation Apprise resolved for this send.
+    notify_format = (
+        NotifyFormat.TEXT,
+        NotifyFormat.HTML,
+        NotifyFormat.MARKDOWN,
+    )
 
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_128
@@ -197,7 +206,7 @@ class NotifyXML(NotifyBase):
         if self.method not in METHODS:
             msg = f"The method specified ({method}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # A payload map allows users to over-ride the default mapping if
         # they're detected with the :overide=value.  Normally this would

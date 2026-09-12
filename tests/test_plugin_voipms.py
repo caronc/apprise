@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.voipms import NotifyVoipms
 
 logging.disable(logging.CRITICAL)
@@ -46,35 +47,35 @@ apprise_url_tests = (
         "voipms://",
         {
             # No email/password specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "voipms://@:",
         {
             # Invalid url
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "voipms://{}/{}".format("user@example.com", "1" * 11),
         {
             # No password specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "voipms://:{}".format("password"),
         {
             # No email specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "voipms://{}:{}/{}".format("user@", "pass", "1" * 11),
         {
             # Check valid email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -83,7 +84,7 @@ apprise_url_tests = (
         ),
         {
             # No from_phone specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid phone number test
@@ -93,7 +94,7 @@ apprise_url_tests = (
         ),
         {
             # Invalid phone number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid country code phone number test
@@ -103,7 +104,7 @@ apprise_url_tests = (
         ),
         {
             # Non North American phone number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -227,7 +228,7 @@ def test_plugin_voipms_edge_cases(mock_get):
     targets = "+1 (555) 123-9876"
 
     # No email specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyVoipms(email=None, source=source)
 
     # a error response is returned
@@ -248,7 +249,7 @@ def test_plugin_voipms_edge_cases(mock_get):
     assert isinstance(obj, NotifyVoipms)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
 
 @mock.patch("requests.get")
@@ -283,7 +284,7 @@ def test_plugin_voipms_non_success_status(mock_get):
     assert isinstance(obj, NotifyVoipms)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
     response.content = "{"
     assert obj.send("title", "body") is False

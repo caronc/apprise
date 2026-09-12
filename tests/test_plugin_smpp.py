@@ -34,6 +34,7 @@ from helpers import AppriseURLTester
 import pytest
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.smpp import NotifySMPP
 
 with suppress(ImportError):
@@ -46,55 +47,55 @@ apprise_url_tests = (
     (
         "smpp://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp:///",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://user@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://user:pass/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://user:pass@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://user@hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://user:pass@host:/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smpp://user:pass@host:2775/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -190,7 +191,11 @@ def test_plugin_smpp_edge_case():
 
         # Well fail to establish a connection
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )
 
@@ -203,6 +208,10 @@ def test_plugin_smpp_edge_case():
 
         # Well fail to deliver our message
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is False
         )

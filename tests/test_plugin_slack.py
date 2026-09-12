@@ -31,6 +31,7 @@ from json import dumps, loads
 # Disable logging for a cleaner testing output
 import logging
 import os
+from timeit import default_timer
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -38,6 +39,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
@@ -50,34 +52,34 @@ apprise_url_tests = (
     (
         "slack://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://T1JJ3T3L2",
         {
             # Just Token 1 provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://T1JJ3T3L2/A1BRTD4JD/",
         {
             # Just 2 tokens provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/?mode=invalid",
         {
             # invalid Mode provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -289,7 +291,7 @@ apprise_url_tests = (
             "slack://?token=T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/"
             "&to=#chan&mode=bot"
         ),
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     # Test blocks mode with timestamp variation
     (
@@ -426,21 +428,21 @@ apprise_url_tests = (
         "slack://username@-INVALID-/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#cool",
         {
             # invalid 1st Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://username@T1JJ3T3L2/-INVALID-/TIiajkdnlazkcOXrIdevi7FQ/#great",
         {
             # invalid 2rd Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "slack://username@T1JJ3T3L2/A1BRTD4JD/-INVALID-/#channel",
         {
             # invalid 3rd Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -547,21 +549,21 @@ apprise_url_tests = (
     (
         "slack://T1JJ3T3L2/XXXXXXXX/?mode=workflow",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Workflow mode -- wrong count: trigger's 3 segments rejected
     (
         "slack://T1JJ3T3L2/XXXXXXXX/YYYYYYYY/?mode=workflow",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Trigger mode -- wrong count: workflow's 4 segments rejected
     (
         "slack://T1JJ3T3L2/Ft07XXXX/XXXXXXXX/YYYYYYYY/?mode=trigger",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )
@@ -592,7 +594,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     request.status_code = requests.codes.ok
 
     # We'll fail to validate the access_token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(access_token=token)
 
     # Generate a (valid) bot token
@@ -618,7 +620,7 @@ def test_plugin_slack_oauth_access_token(mock_request):
     assert obj.send(body="test") is True
 
     # A poorly formatted xoxe prefix should still be rejected
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(access_token="xoxe.xo-invalid", targets="#apprise")
 
     # Test Valid Attachment
@@ -656,11 +658,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -694,11 +698,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
         requests.ConnectionError(0, "requests.ConnectionError() not handled"),
     )
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -707,11 +713,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
     mock_request.return_value = None
     mock_request.side_effect = (request, OSError(0, "OSError"))
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -723,11 +731,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -751,11 +761,13 @@ def test_plugin_slack_oauth_access_token(mock_request):
     attach = AppriseAttachment(path)
     # We'll fail because of the bad 'file' response
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -812,12 +824,14 @@ def test_plugin_slack_webhook_mode(mock_request):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
     # Missing first Token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(
             token_a=None, token_b=token_b, token_c=token_c, targets=channels
         )
@@ -833,7 +847,9 @@ def test_plugin_slack_webhook_mode(mock_request):
 
     # This call includes an image with it's payload:
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -856,7 +872,7 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
     # Webhook mode without botname should not force username,
     # allowing Slack's configured webhook identity to be used.
     obj = NotifySlack(token_a=token_a, token_b=token_b, token_c=token_c)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     payload = loads(mock_request.call_args.kwargs["data"])
     assert "username" not in payload
 
@@ -868,7 +884,7 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
         token_c=token_c,
         user="CustomWebhookName",
     )
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     payload = loads(mock_request.call_args.kwargs["data"])
     assert payload.get("username") == "CustomWebhookName"
 
@@ -877,7 +893,7 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
     mock_request.reset_mock()
     response.content = dumps({"ok": True, "channel": "C123456"})
     obj = NotifySlack(access_token="xoxb-1234-1234-abc124", targets="#test")
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     payload = loads(mock_request.call_args.kwargs["data"])
     assert "username" not in payload
 
@@ -891,7 +907,7 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
         token_c=token_c,
         mode=SlackMode.WEBHOOK_GOV,
     )
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     payload = loads(mock_request.call_args.kwargs["data"])
     assert "username" not in payload
 
@@ -905,7 +921,7 @@ def test_plugin_slack_username_payload_by_mode(mock_request):
         token_c=token_c,
         use_blocks=True,
     )
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     payload = loads(mock_request.call_args.kwargs["data"])
     assert "username" not in payload
 
@@ -939,7 +955,9 @@ def test_plugin_slack_send_by_email(mock_get, mock_request):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -967,7 +985,9 @@ def test_plugin_slack_send_by_email(mock_get, mock_request):
     # Send our notification again (cached copy of user id associated with
     # email is used)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -1008,7 +1028,9 @@ def test_plugin_slack_send_by_email(mock_get, mock_request):
     # Send our notification; it will fail because we failed to look up
     # the user id
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -1046,7 +1068,9 @@ def test_plugin_slack_send_by_email(mock_get, mock_request):
     # Send our notification; it will fail because we failed to look up
     # the user id
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -1084,7 +1108,9 @@ def test_plugin_slack_send_by_email(mock_get, mock_request):
     # Send our notification; it will fail because we failed to look up
     # the user id
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -1129,7 +1155,9 @@ def test_plugin_slack_send_by_email(mock_get, mock_request):
     # Send our notification; it will fail because we failed to look up
     # the user id
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -1233,7 +1261,9 @@ def test_plugin_slack_single_thread_reply(mock_request):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -1277,7 +1307,9 @@ def test_plugin_slack_multiple_thread_reply(mock_request):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -1351,11 +1383,13 @@ def test_plugin_slack_file_upload_success(mock_request):
 
     obj = NotifySlack(access_token=token, targets=["#general"])
     assert (
-        obj.notify(
-            body="Success path test",
-            title="Slack Upload OK",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="Success path test",
+                title="Slack Upload OK",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -1483,7 +1517,7 @@ def test_plugin_slack_attach_memory(mock_request):
         mimetype="text/html",
     )
 
-    assert obj.notify(body="Test", attach=mem) is True
+    assert bool(obj.notify(body="Test", attach=mem)) is True
     assert mock_request.call_count >= 1
 
 
@@ -1538,7 +1572,11 @@ def test_plugin_slack_template_blocks(mock_request, tmpdir):
 
     # Notification should succeed
     assert (
-        obj.notify(body="hello", title="world", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(
+                body="hello", title="world", notify_type=NotifyType.INFO
+            )
+        )
         is True
     )
     assert mock_request.called is True
@@ -1592,7 +1630,9 @@ def test_plugin_slack_template_blocks_implied(mock_request, tmpdir):
     # use_blocks must have been forced on by the template
     assert obj.use_blocks is True
     assert (
-        obj.notify(body="implied", title="t", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="implied", title="t", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_request.called is True
@@ -1711,7 +1751,8 @@ def test_plugin_slack_template_invalid_json(mock_request, tmpdir):
 
     # Notification must fail due to bad JSON
     assert (
-        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     # No HTTP call should have been made
     assert mock_request.called is False
@@ -1734,7 +1775,8 @@ def test_plugin_slack_template_blocks_not_list(mock_request, tmpdir):
     )
     assert isinstance(obj, NotifySlack)
     assert (
-        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.called is False
 
@@ -1746,7 +1788,8 @@ def test_plugin_slack_template_blocks_not_list(mock_request, tmpdir):
     )
     assert isinstance(obj2, NotifySlack)
     assert (
-        obj2.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj2.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.called is False
 
@@ -1768,7 +1811,8 @@ def test_plugin_slack_template_block_missing_type(mock_request, tmpdir):
     )
     assert isinstance(obj, NotifySlack)
     assert (
-        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.called is False
 
@@ -1793,15 +1837,15 @@ def test_plugin_slack_template_load_error(mock_request, tmpdir):
     with mock.patch("builtins.open", side_effect=OSError):
         # Notification must fail because the file cannot be read
         assert (
-            obj.notify(body="x", title="y", notify_type=NotifyType.INFO)
+            bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
             is False
         )
     assert mock_request.called is False
 
 
 def test_plugin_slack_template_bad_tokens():
-    """NotifySlack() - invalid tokens type raises TypeError."""
-    with pytest.raises(TypeError):
+    """NotifySlack() rejects an invalid template token type."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySlack(
             token_a="T1JJ3T3L2",
             token_b="A1BRTD4JD",
@@ -1879,20 +1923,21 @@ def test_plugin_slack_template_inaccessible(mock_request, tmpdir):
 
     # Template attachment resolves to falsy because the file is missing
     assert (
-        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.called is False
 
 
 def test_plugin_slack_template_add_failure():
-    """NotifySlack() - TypeError when AppriseAttachment.add() drops entry."""
+    """NotifySlack() rejects a template attachment it cannot add."""
     # Simulate add() silently failing (returns 0 / len stays 0)
     with mock.patch("apprise.plugins.slack.AppriseAttachment") as mock_cls:
         inst = mock.MagicMock()
         inst.__len__ = mock.Mock(return_value=0)
         mock_cls.return_value = inst
 
-        with pytest.raises(TypeError):
+        with pytest.raises(AppriseImproperlyConfigured):
             NotifySlack(
                 token_a="T1JJ3T3L2",
                 token_b="A1BRTD4JD",
@@ -1918,7 +1963,8 @@ def test_plugin_slack_template_content_not_dict(mock_request, tmpdir):
     )
     assert isinstance(obj, NotifySlack)
     assert (
-        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.called is False
 
@@ -1940,7 +1986,8 @@ def test_plugin_slack_template_block_not_dict(mock_request, tmpdir):
     )
     assert isinstance(obj, NotifySlack)
     assert (
-        obj.notify(body="x", title="y", notify_type=NotifyType.INFO) is False
+        bool(obj.notify(body="x", title="y", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.called is False
 
@@ -1969,7 +2016,7 @@ def test_plugin_slack_template_none_token_value(mock_request, tmpdir):
     assert isinstance(obj, NotifySlack)
     # Must succeed -- None coerced to "" keeps the JSON valid
     assert (
-        obj.notify(body="hello", title="t", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="hello", title="t", notify_type=NotifyType.INFO))
         is True
     )
     assert mock_request.called is True
@@ -2002,7 +2049,11 @@ def test_plugin_slack_workflow_default_payload(mock_request):
 
     # Notification with title
     assert (
-        obj.notify(body="hello", title="Alert", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(
+                body="hello", title="Alert", notify_type=NotifyType.INFO
+            )
+        )
         is True
     )
     assert mock_request.called is True
@@ -2018,7 +2069,9 @@ def test_plugin_slack_workflow_default_payload(mock_request):
 
     # Notification without title -- body only
     assert (
-        obj.notify(body="body only", title="", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body only", title="", notify_type=NotifyType.INFO)
+        )
         is True
     )
     posted = loads(mock_request.call_args_list[0][1]["data"])
@@ -2040,7 +2093,10 @@ def test_plugin_slack_workflow_trigger_mode(mock_request):
     assert obj.mode == "trigger"
     assert obj.workflow_path == ["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"]
 
-    assert obj.notify(body="hi", title="", notify_type=NotifyType.INFO) is True
+    assert (
+        bool(obj.notify(body="hi", title="", notify_type=NotifyType.INFO))
+        is True
+    )
     call_url = mock_request.call_args_list[0][0][1]
     assert "hooks.slack.com/triggers/" in call_url
     assert "T1JJ3T3L2/XXXXXXXX/YYYYYYYY" in call_url
@@ -2067,7 +2123,7 @@ def test_plugin_slack_workflow_native_url(mock_request):
         "YYYYYYYY",
     ]
     assert (
-        obj.notify(body="native", title="", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="native", title="", notify_type=NotifyType.INFO))
         is True
     )
     call_url = mock_request.call_args_list[0][0][1]
@@ -2082,7 +2138,9 @@ def test_plugin_slack_workflow_native_url(mock_request):
     assert isinstance(obj2, NotifySlack)
     assert obj2.mode == "trigger"
     assert (
-        obj2.notify(body="trigger", title="", notify_type=NotifyType.INFO)
+        bool(
+            obj2.notify(body="trigger", title="", notify_type=NotifyType.INFO)
+        )
         is True
     )
     call_url2 = mock_request.call_args_list[0][0][1]
@@ -2118,33 +2176,33 @@ def test_plugin_slack_workflow_url_roundtrip(mock_request):
 
 
 def test_plugin_slack_workflow_invalid_path():
-    """NotifySlack() - invalid path segment counts raise TypeError."""
+    """NotifySlack() rejects workflow paths with the wrong segment count."""
     from apprise.plugins.slack import NotifySlack as _NS
 
     # Too few segments for explicit workflow mode (needs 4)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX"], mode="workflow")
 
     # Trigger's 3 segments rejected when mode=workflow is explicit
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(
             workflow_path=["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"],
             mode="workflow",
         )
 
     # Workflow's 4 segments rejected when mode=trigger is explicit
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(
             workflow_path=["T1JJ3T3L2", "Ft07XXXX", "XXXXXXXX", "YYYY"],
             mode="trigger",
         )
 
     # Empty path -- must raise (auto-detect path, 0 segments)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=[], mode="workflow")
 
     # Non-string / non-list type (else branch) -- 0 segments, must raise
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=42, mode="workflow")
 
     # Auto-detect: 4 segments -> WORKFLOW
@@ -2157,8 +2215,8 @@ def test_plugin_slack_workflow_invalid_path():
     assert obj.mode == "trigger"
     assert obj.workflow_path == ["T1JJ3T3L2", "XXXXXXXX", "YYYYYYYY"]
 
-    # Auto-detect: 2 segments -> TypeError (neither 3 nor 4)
-    with pytest.raises(TypeError):
+    # Auto-detection requires either three or four segments.
+    with pytest.raises(AppriseImproperlyConfigured):
         _NS(workflow_path=["T1JJ3T3L2", "XXXXXXXX"])
 
 
@@ -2190,7 +2248,7 @@ def test_plugin_slack_workflow_template(mock_request, tmpdir):
     assert isinstance(obj, NotifySlack)
     assert obj.mode == "workflow"
     assert (
-        obj.notify(body="wf-tmpl", title="", notify_type=NotifyType.INFO)
+        bool(obj.notify(body="wf-tmpl", title="", notify_type=NotifyType.INFO))
         is True
     )
     assert mock_request.called is True
@@ -2210,7 +2268,8 @@ def test_plugin_slack_workflow_template(mock_request, tmpdir):
     )
     assert isinstance(obj2, NotifySlack)
     assert (
-        obj2.notify(body="x", title="", notify_type=NotifyType.INFO) is False
+        bool(obj2.notify(body="x", title="", notify_type=NotifyType.INFO))
+        is False
     )
     assert mock_request.call_count == 1  # no new request made
 
@@ -2236,9 +2295,11 @@ def test_plugin_slack_html_to_markdown_format(mock_request):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Slack
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -2253,9 +2314,11 @@ def test_plugin_slack_html_to_markdown_format(mock_request):
 
     # Convert CommonMark links to Slack's ``<url|text>`` syntax.
     assert (
-        aobj.notify(
-            body='<a href="https://example.com/x">click here</a>',
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body='<a href="https://example.com/x">click here</a>',
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -2270,9 +2333,11 @@ def test_plugin_slack_html_to_markdown_format(mock_request):
     # '&'/'<'/'>' need Slack's HTML-entity escaping, not CommonMark's backslash
     # escaping (which Slack doesn't support for these and would otherwise.
     assert (
-        aobj.notify(
-            body="<p>2 &lt; 3 &amp; 4</p>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<p>2 &lt; 3 &amp; 4</p>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -2282,12 +2347,187 @@ def test_plugin_slack_html_to_markdown_format(mock_request):
     mock_request.reset_mock()
 
     # Direct Slack mrkdwn input remains unchanged.
-    assert aobj.notify(body="**already** slack-bound markdown #tag") is True
+    assert (
+        bool(aobj.notify(body="**already** slack-bound markdown #tag")) is True
+    )
     payload = loads(mock_request.call_args_list[0][1]["data"])
     assert (
         payload["attachments"][0]["text"]
         == "**already** slack-bound markdown #tag"
     )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_markdown_dialect_requires_declared_source(
+    mock_request,
+):
+    """Slack dialect conversion requires a declared source format."""
+
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    aobj = Apprise()
+    assert aobj.add("slack://{}/#general?blocks=yes".format(slack_token))
+
+    body = "**hello** &amp; <world>"
+
+    def block_text(payload):
+        return payload["attachments"][0]["blocks"][0]["text"]["text"]
+
+    # Declared Markdown is translated to Slack mrkdwn.
+    assert bool(aobj.notify(body=body, body_format=NotifyFormat.MARKDOWN))
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert block_text(payload) == "*hello* &amp;amp; <world>"
+    mock_request.reset_mock()
+
+    # This undeclared body reaches Slack without dialect conversion.
+    assert bool(aobj.notify(body=body))
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert block_text(payload) == body
+    mock_request.reset_mock()
+
+    # Slack's declared plain-text format needs no dialect conversion.
+    assert bool(aobj.notify(body=body, body_format=NotifyFormat.TEXT))
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert block_text(payload) == body
+
+
+def test_plugin_slack_bare_link_and_autolink_dialect():
+    """Bare-paren links and standalone autolinks convert safely."""
+
+    # Bare destinations convert without treating URL punctuation as emphasis.
+    assert (
+        NotifySlack._commonmark_to_slack("[click here](https://a*b)")
+        == "<https://a*b|click here>"
+    )
+
+    # Complete autolinks become Slack's unlabeled anchors.
+    assert (
+        NotifySlack._commonmark_to_slack("see <https://a*b> now")
+        == "see <https://a*b> now"
+    )
+
+    # A "<" that never forms a valid scheme is passed through literally.
+    assert NotifySlack._commonmark_to_slack("a < b") == "a < b"
+
+
+def test_plugin_slack_nested_angle_link():
+    """Keep the outer link when a nested angle link is invalid."""
+
+    # Retire only the invalid inner label so the outer link still converts.
+    body = "[OUTER [INNER](<badstuff)](https://example.com)"
+    assert NotifySlack._commonmark_to_slack(body) == (
+        "<https://example.com|OUTER [INNER](<badstuff)>"
+    )
+
+
+def test_plugin_slack_stray_bracket_retires_opener():
+    """A "]" with no "(" must retire its "[" instead of leaving it
+    pending for a later, unrelated link to reuse."""
+
+    # No "(" ever follows the first "]", so "[label]" is not a link and
+    # must not be spliced into the later, unrelated "](https://...)".
+    body = "[label] and ](https://example.com) end"
+    assert (
+        NotifySlack._commonmark_to_slack(body)
+        == "[label] and ](https://example.com) end"
+    )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_html_blockquote_heading(mock_request):
+    """Render an HTML blockquote heading as quoted, bold Slack text.
+
+    Use ``Apprise`` to exercise the complete HTML-to-Slack conversion path.
+    """
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    token_a = "A" * 9
+    token_b = "B" * 9
+    token_c = "c" * 24
+
+    obj = NotifySlack(token_a=token_a, token_b=token_b, token_c=token_c)
+    aobj = Apprise()
+    assert aobj.add(obj) is True
+    assert bool(
+        aobj.notify(
+            body="<blockquote><h2>Alert</h2><p>body</p></blockquote>",
+            body_format=NotifyFormat.HTML,
+        )
+    )
+
+    payload = loads(mock_request.call_args_list[0][1]["data"])
+    assert payload["attachments"][0]["text"] == "> *Alert*\n> body"
+
+
+def test_plugin_slack_dialect_long_link_destination():
+    """Convert long links while bounding aggregate destination scanning."""
+    for size in (4092, 4096, 4100, 50000):
+        url = "a" * size
+        body = f"[label](<{url}>)"
+        result = NotifySlack._commonmark_to_slack(body)
+        assert result == f"<{url}|label>", f"failed at size={size}"
+
+
+def test_plugin_slack_scan_budget_preserves_later_links():
+    """Preserve nearby links after malformed scans exhaust the shared
+    budget."""
+    # A handful of malformed prefixes must not prevent a later link from
+    # converting.
+    body = (
+        "".join(f"[bad{i}](" + ("x" * 1000) for i in range(8)) + "[good](ok)"
+    )
+    assert NotifySlack._commonmark_to_slack(body).endswith("<ok|good>")
+
+    # Scale beyond the shared budget while preserving the trailing link.
+    times = []
+    for count in (500, 2000, 8000):
+        body = (
+            "".join(f"[bad{i}](" + ("x" * 100) for i in range(count))
+            + "[good](ok)"
+        )
+        start = default_timer()
+        result = NotifySlack._commonmark_to_slack(body)
+        times.append(default_timer() - start)
+        assert result.endswith("<ok|good>")
+
+    # A fourfold input increase should remain well below quadratic growth.
+    assert times[1] < times[0] * 4 * 3
+    assert times[2] < times[1] * 4 * 3
+
+
+def test_plugin_slack_dialect_scan_allowance_boundary():
+    """The fallback scan must leave room for a URL's closing characters.
+
+    Malformed prefixes spend the shared budget, forcing the final URL to use
+    only the fixed fallback allowance.
+    """
+    prefix = "".join(f"[bad{i}](" + ("x" * 1000) for i in range(8))
+
+    # Angle URLs need enough fallback space for both the content and ``>)``.
+    for size, should_convert in ((255, True), (256, True), (257, False)):
+        url = "a" * size
+        body = prefix + f"[label](<{url}>)"
+        result = NotifySlack._commonmark_to_slack(body)
+        assert result.endswith(f"<{url}|label>") == should_convert, (
+            f"angle destination size={size}"
+        )
+
+    # Bare destinations: the ")" terminator must fit the same way.
+    for size, should_convert in ((255, True), (256, True), (257, False)):
+        url = "a" * size
+        body = prefix + f"[label]({url})"
+        result = NotifySlack._commonmark_to_slack(body)
+        assert result.endswith(f"<{url}|label>") == should_convert, (
+            f"bare destination size={size}"
+        )
 
 
 @mock.patch("requests.request")
@@ -2302,9 +2542,12 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
     mock_request.return_value.text = "ok"
 
     def notify(body):
+        """Send one HTML body through the configured Slack plugin."""
         aobj = Apprise()
         assert aobj.add("slack://{}/#general".format(slack_token))
-        assert aobj.notify(body=body, body_format=NotifyFormat.HTML) is True
+        assert (
+            bool(aobj.notify(body=body, body_format=NotifyFormat.HTML)) is True
+        )
         payload = loads(mock_request.call_args_list[-1][1]["data"])
         mock_request.reset_mock()
         return payload["attachments"][0]["text"]
@@ -2312,9 +2555,8 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
     # <code>/<pre> content is buffered raw by html_to_markdown.
     assert notify("<code>a &lt; b &amp; c</code>") == "`a &lt; b &amp; c`"
 
-    # Immediately-adjacent nested emphasis (no text between the outer and inner
-    # tag's open) must stay correctly nested ("*_x_*"), not cross ("*_x*_").
-    assert notify("<b><i>x</i></b>") == "*_x_*"
+    # CommonMark reads the combined "***...***" runs as italic around bold.
+    assert notify("<b><i>x</i></b>") == "_*x*_"
 
     # Bold/italic text nested inside a link is preserved in Slack's own
     # "<url|text>" form.
@@ -2323,8 +2565,8 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         == "<https://example.com/x|*click*>"
     )
 
-    # Sibling (non-nested) bold spans stay separate, not merged.
-    assert notify("<b>A</b><b>B</b>") == "*A**B*"
+    # CommonMark keeps the ambiguous middle run literal inside one bold span.
+    assert notify("<b>A</b><b>B</b>") == "*A****B*"
 
     # Entity-escape Slack control characters in link destinations.
     assert (
@@ -2354,18 +2596,27 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         "text ``unterminated"
     )
 
-    # An empty entity collapse mid-string (not just a final one at the end of
-    # the scan).
-    assert NotifySlack._commonmark_to_slack("****x") == "x"
+    # Preserve an opener with no closer.
+    assert NotifySlack._commonmark_to_slack("****x") == "****x"
+
+    # User-supplied Private Use characters must not collide with internal
+    # emphasis placeholders. ``chr()`` keeps the invisible value explicit.
+    f = NotifySlack._commonmark_to_slack
+    marker = chr(0xE000)
+    attack = f"before {marker}0{marker} after"
+    assert f(attack) == attack
+    assert f(f"*bold* {attack}") == f"_bold_ {attack}"
 
     # overflow=split can hand this method just one chunk of a longer body, with
     # a span that doesn't open or close until a different chunk entirely.
     aobj = Apprise()
     assert aobj.add("slack://{}/#general?overflow=split".format(slack_token))
     assert (
-        aobj.notify(
-            body="<b>" + ("x" * 39990) + "</b>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>" + ("x" * 39990) + "</b>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -2393,6 +2644,53 @@ def test_plugin_slack_html_to_markdown_hardening(mock_request):
         NotifySlack._commonmark_to_slack("[text](<https://incomplete")
         == "[text](<https://incomplete"
     )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_dialect_overflow(mock_request):
+    """Reapply Slack overflow limits after ``mrkdwn`` expansion.
+
+    The framework resizes converted output before calling ``send()``.
+    """
+
+    slack_token = "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"
+
+    mock_request.return_value = requests.Request()
+    mock_request.return_value.status_code = requests.codes.ok
+    mock_request.return_value.content = b"ok"
+    mock_request.return_value.text = "ok"
+
+    def notify(overflow):
+        aobj = Apprise()
+        assert aobj.add(f"slack://{slack_token}/#general?overflow={overflow}")
+        # Each "&" expands to "&amp;" once entity-escaped, so this body
+        # fits comfortably before dialect conversion but not after it.
+        assert aobj.notify(
+            body="& " * 10000, body_format=NotifyFormat.MARKDOWN
+        )
+        texts = [
+            loads(c[1]["data"])["attachments"][0]["text"]
+            for c in mock_request.call_args_list
+        ]
+        mock_request.reset_mock()
+        return texts
+
+    # UPSTREAM: sent oversized rather than adjusted.
+    texts = notify("upstream")
+    assert len(texts) == 1
+    assert len(texts[0]) > NotifySlack.body_maxlen
+
+    # TRUNCATE: clipped to fit in one message.
+    texts = notify("truncate")
+    assert len(texts) == 1
+    assert len(texts[0]) <= NotifySlack.body_maxlen
+
+    # SPLIT preserves every escaped entity; framework chunking may trim
+    # whitespace exactly at a boundary.
+    texts = notify("split")
+    assert len(texts) > 1
+    assert all(len(text) <= NotifySlack.body_maxlen for text in texts)
+    assert "".join(texts).count("&amp;") == 10000
 
 
 def test_plugin_slack_parse_native_url_fallthrough():

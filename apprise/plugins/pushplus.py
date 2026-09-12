@@ -80,6 +80,7 @@ import re
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -275,7 +276,7 @@ class NotifyPushplus(NotifyBase):
         if not self.token:
             msg = "The Pushplus token ({}) is invalid.".format(token)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Resolve the delivery channel from the schema alias when the URL
         # was entered as wechat:// or wecom:// instead of pushplus://.
@@ -298,7 +299,7 @@ class NotifyPushplus(NotifyBase):
             if not self.channel:
                 msg = "The Pushplus channel ({}) is not valid.".format(channel)
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         elif schema_channel:
             # Schema-implied channel (wechat:// or wecom://)

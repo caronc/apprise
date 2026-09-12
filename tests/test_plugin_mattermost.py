@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mattermost import MattermostMode, NotifyMattermost
 
 # Attachment test fixtures
@@ -53,7 +54,7 @@ apprise_url_tests = (
         "mmosts://localhost",
         {
             # Thrown because there was no webhook id specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -210,7 +211,7 @@ apprise_url_tests = (
         "mmost://localhost/token?mode=invalid",
         {
             # invalid mode is detected in __init__
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -286,9 +287,9 @@ def test_plugin_mattermost_edge_cases():
     """NotifyMattermost() Edge Cases."""
 
     # Invalid Authorization Token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMattermost(None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMattermost("     ")
 
 
@@ -313,7 +314,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
     assert len(obj) == 2
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert "mode=bot" in obj.url()
 
     # bot: channels are channel_id values -> count
@@ -322,7 +323,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.mode == MattermostMode.BOT
     # our #chan isn't added to the list because no team was provided
     assert len(obj) == 1
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert "mode=bot" in obj.url()
 
     obj = Apprise.instantiate("mmost://localhost/token?mode=bot&to=#chan")
@@ -330,7 +331,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.mode == MattermostMode.BOT
     # No one to notify (but we always return a minimum of 1)
     assert len(obj) == 1
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
     assert "mode=bot" in obj.url()
 
     obj = Apprise.instantiate(
@@ -340,10 +341,10 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.mode == MattermostMode.BOT
     assert len(obj) == 2
     # We can look up the team now
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert "mode=bot" in obj.url()
     # Second call to notify() pulls from cache
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     obj = Apprise.instantiate(
         "mmost://team@localhost/token?mode=bot&to=#chan,id1"
@@ -352,7 +353,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.mode == MattermostMode.BOT
     # Invalid response
     request_get_mock.return_value.content = b"}"
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
     obj = Apprise.instantiate(
         "mmost://team@localhost/token?mode=bot&to=#chan,id1"
@@ -361,7 +362,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.mode == MattermostMode.BOT
     # empty response
     request_get_mock.return_value.content = b"{}"
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
     obj = Apprise.instantiate(
         "mmost://team@localhost/token?mode=bot&to=#chan,id1"
@@ -370,7 +371,7 @@ def test_plugin_mattermost_len_webhook_and_bot(
     assert obj.mode == MattermostMode.BOT
     # upstream inquiry failure
     request_get_mock.side_effect = requests.RequestException
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
 
 def test_plugin_mattermost_channels(request_post_mock):
@@ -389,7 +390,7 @@ def test_plugin_mattermost_channels(request_post_mock):
     )
 
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert request_post_mock.called is True
     assert request_post_mock.call_count == 2
@@ -414,6 +415,7 @@ def test_plugin_mattermost_channels(request_post_mock):
 
 
 def test_mattermost_post_default_port(request_post_mock):
+    """Verify webhook delivery uses the default Mattermost port."""
     # Test token
     token = "token"
 
@@ -421,7 +423,7 @@ def test_mattermost_post_default_port(request_post_mock):
     obj = Apprise.instantiate(f"mmosts://mattermost.example.com/{token}")
 
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     # Make sure we don't use port if not provided
     assert request_post_mock.called is True
@@ -437,6 +439,7 @@ def test_mattermost_post_default_port(request_post_mock):
 
 
 def test_mattermost_icon_override(request_post_mock):
+    """Verify a configured icon URL is included in the webhook payload."""
     # Test token
     token = "token"
     icon_url = "http://localhost/test.png"
@@ -450,7 +453,7 @@ def test_mattermost_icon_override(request_post_mock):
     )
 
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert request_post_mock.called is True
     assert request_post_mock.call_count == 1
@@ -472,7 +475,7 @@ def test_plugin_mattermost_webhook_payload_variants(request_post_mock, mocker):
     obj = Apprise.instantiate("mmost://user@localhost/token?to=test")
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.WEBHOOK
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     posted_json = json.loads(request_post_mock.call_args_list[-1][1]["data"])
     assert posted_json["username"] == "user"
@@ -486,7 +489,7 @@ def test_plugin_mattermost_webhook_payload_variants(request_post_mock, mocker):
         "mmost://user@localhost/token?to=test&icon_url=http://x/icon.png"
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     posted_json = json.loads(request_post_mock.call_args_list[0][1]["data"])
     assert posted_json["icon_url"] == "http://x/icon.png"
@@ -495,7 +498,7 @@ def test_plugin_mattermost_webhook_payload_variants(request_post_mock, mocker):
     request_post_mock.reset_mock()
     obj = Apprise.instantiate("mmost://user@localhost/token")
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     posted_json = json.loads(request_post_mock.call_args_list[0][1]["data"])
     assert "channel" not in posted_json
@@ -511,12 +514,12 @@ def test_plugin_mattermost_webhook_http_error_and_exception(
 
     # HTTP error
     request_post_mock.return_value.status_code = requests.codes.bad_request
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
 
     # Request exception
     request_post_mock.reset_mock()
     request_post_mock.side_effect = requests.RequestException("boom")
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
 
 
 def test_plugin_mattermost_bot_mode_success_and_payload(request_post_mock):
@@ -533,7 +536,7 @@ def test_plugin_mattermost_bot_mode_success_and_payload(request_post_mock):
     # Mattermost returns 201 Created for /api/v4/posts
     request_post_mock.return_value.status_code = requests.codes.created
 
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     assert request_post_mock.called is True
     assert request_post_mock.call_count == 1
 
@@ -557,7 +560,7 @@ def test_plugin_mattermost_bot_mode_requires_channel_id(request_post_mock):
     assert obj.mode == MattermostMode.BOT
 
     request_post_mock.return_value.status_code = requests.codes.created
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     assert request_post_mock.called is False
 
 
@@ -572,12 +575,12 @@ def test_plugin_mattermost_bot_mode_http_error_and_exception(
 
     # HTTP error (not 201)
     request_post_mock.return_value.status_code = requests.codes.unauthorized
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
 
     # Request exception
     request_post_mock.reset_mock()
     request_post_mock.side_effect = requests.RequestException("boom")
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
 
 
 def test_plugin_mattermost_bot_channel_lookup_success(
@@ -603,7 +606,7 @@ def test_plugin_mattermost_bot_channel_lookup_success(
     assert obj.mode == MattermostMode.BOT
 
     request_post_mock.return_value.status_code = requests.codes.created
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert request_get_mock.called is True
     get_url = request_get_mock.call_args_list[0][0][0]
@@ -643,7 +646,7 @@ def test_plugin_mattermost_bot_channel_lookup_partial_success(
     assert isinstance(obj, NotifyMattermost)
     request_post_mock.return_value.status_code = requests.codes.created
 
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     assert request_post_mock.call_count == 1
     posted_json = json.loads(request_post_mock.call_args_list[0][1]["data"])
     assert posted_json["channel_id"] == "cid-good"
@@ -659,7 +662,7 @@ def test_plugin_mattermost_webhook_attachment_warning(request_post_mock):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Pipeline silently drops the attachment; text message still succeeds
-    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is True
     assert request_post_mock.call_count == 1
 
     # No file upload should have been attempted
@@ -692,7 +695,7 @@ def test_plugin_mattermost_webhook_botname_in_url(request_post_mock):
 
     # Webhook payload carries username = botname
     request_post_mock.return_value.status_code = requests.codes.ok
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     posted = json.loads(request_post_mock.call_args_list[0][1]["data"])
     assert posted["username"] == "mybot"
 
@@ -737,7 +740,7 @@ def test_plugin_mattermost_bot_attachments(request_post_mock):
     assert isinstance(obj, NotifyMattermost)
     assert obj.mode == MattermostMode.BOT
 
-    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is True
     assert request_post_mock.call_count == 2
 
     # First call is the file upload
@@ -795,7 +798,7 @@ def test_plugin_mattermost_bot_multi_attach_multi_target(request_post_mock):
         )
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is True
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is True
     assert request_post_mock.call_count == 6
 
     # Verify file_ids for each post
@@ -826,7 +829,7 @@ def test_plugin_mattermost_bot_attachment_upload_http_error(
         f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
     # Only the upload was attempted; no post was made
     assert request_post_mock.call_count == 1
     assert "/api/v4/files" in request_post_mock.call_args_list[0][0][0]
@@ -847,7 +850,7 @@ def test_plugin_mattermost_bot_attachment_request_exception(
         f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
     assert request_post_mock.call_count == 1
 
 
@@ -866,7 +869,10 @@ def test_plugin_mattermost_bot_attachment_ioerror(request_post_mock):
             f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
         )
         assert isinstance(obj, NotifyMattermost)
-        assert obj.notify(body="body", title="title", attach=attach) is False
+        assert (
+            bool(obj.notify(body="body", title="title", attach=attach))
+            is False
+        )
 
     # No HTTP request should have been made
     assert request_post_mock.call_count == 0
@@ -887,7 +893,10 @@ def test_plugin_mattermost_bot_attachment_valueerror(request_post_mock):
             f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
         )
         assert isinstance(obj, NotifyMattermost)
-        assert obj.notify(body="body", title="title", attach=attach) is False
+        assert (
+            bool(obj.notify(body="body", title="title", attach=attach))
+            is False
+        )
 
     assert request_post_mock.call_count == 0
 
@@ -908,7 +917,7 @@ def test_plugin_mattermost_bot_attachment_bad_response(request_post_mock):
         f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
     assert request_post_mock.call_count == 1
 
 
@@ -929,7 +938,7 @@ def test_plugin_mattermost_bot_attachment_no_file_id(request_post_mock):
         f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
 
 
 def test_plugin_mattermost_bot_attachment_invalid(request_post_mock):
@@ -943,7 +952,7 @@ def test_plugin_mattermost_bot_attachment_invalid(request_post_mock):
         f"mmost://localhost/{bearer}?mode=bot&to={channel_id}"
     )
     assert isinstance(obj, NotifyMattermost)
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
     # No upload request should be made for an invalid attachment
     assert request_post_mock.call_count == 0
 
@@ -991,7 +1000,7 @@ def test_plugin_mattermost_bot_attachment_partial_target_failure(
     )
     assert isinstance(obj, NotifyMattermost)
     # One target succeeded, one failed -> overall False
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
     # 1 upload + 1 post (ch1) + 1 upload-fail (ch2) = 3 calls
     assert request_post_mock.call_count == 3
 
@@ -1053,7 +1062,9 @@ def test_plugin_mattermost_bot_attachment_memory_multi_target(
     assert isinstance(obj, NotifyMattermost)
 
     with mock.patch.object(attach.attachments[0], "open", _open_once):
-        assert obj.notify(body="body", title="title", attach=attach) is True
+        assert (
+            bool(obj.notify(body="body", title="title", attach=attach)) is True
+        )
 
     # open() was called exactly once (pre-read), not once per target
     assert open_calls[0] == 1

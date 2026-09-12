@@ -51,6 +51,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_call_sign, parse_bool, parse_call_sign, parse_list
@@ -197,7 +198,7 @@ class NotifyDapnet(NotifyBase):
         if not (self.user and self.password):
             msg = "A Dapnet user/pass was not provided."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Get the transmitter group
         self.txgroups = parse_list(

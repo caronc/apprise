@@ -59,6 +59,8 @@ except ImportError:
 # Disable logging for a cleaner testing output
 import logging
 
+from apprise.exception import AppriseImproperlyConfigured
+
 logging.disable(logging.CRITICAL)
 
 # Test files for KeyFile Directory
@@ -72,21 +74,21 @@ apprise_url_tests = (
         "fcm://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "fcm://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "fcm://project@%20%20/",
         {
             # invalid apikey
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -118,7 +120,7 @@ apprise_url_tests = (
         "fcm://apikey/device?mode=invalid",
         {
             # Valid device, invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -194,7 +196,7 @@ apprise_url_tests = (
         "fcm://%20?to=device&keyfile=/invalid/path",
         {
             # invalid Project ID
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -219,7 +221,7 @@ apprise_url_tests = (
         "fcm://project_id?to=device&mode=oauth2",
         {
             # no keyfile was specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -337,7 +339,7 @@ def test_plugin_fcm_legacy_default(mock_post_legacy):
     )
 
     # Send our notification
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -376,7 +378,7 @@ def test_plugin_fcm_legacy_priorities(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -409,7 +411,7 @@ def test_plugin_fcm_legacy_no_colors(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -439,7 +441,7 @@ def test_plugin_fcm_legacy_colors(mock_post_legacy):
     assert mock_post_legacy.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post_legacy.call_count == 1
@@ -474,7 +476,7 @@ def test_plugin_fcm_oauth_default(mock_post):
     )
 
     # send our notification
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # Test our call count
     assert mock_post.call_count == 3
@@ -504,7 +506,7 @@ def test_plugin_fcm_oauth_invalid_project_id(mock_post):
     )
 
     # we'll fail as a result
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -523,7 +525,7 @@ def test_plugin_fcm_oauth_keyfile_error(mock_post):
 
     with mock.patch("builtins.open", side_effect=OSError):
         # we'll fail as a result
-        assert obj.notify("test") is False
+        assert bool(obj.notify("test")) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -546,7 +548,7 @@ def test_plugin_fcm_oauth_data_parameters(mock_post):
     assert mock_post.call_count == 0
 
     # send our notification
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # Test our call count
     assert mock_post.call_count == 3
@@ -615,7 +617,7 @@ def test_plugin_fcm_oauth_priorities(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -653,7 +655,7 @@ def test_plugin_fcm_oauth_no_colors(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -688,7 +690,7 @@ def test_plugin_fcm_oauth_colors(mock_post):
     assert mock_post.call_count == 0
 
     # Send our notification
-    assert obj.notify(title="title", body="body") is True
+    assert bool(obj.notify(title="title", body="body")) is True
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -960,10 +962,10 @@ def test_plugin_fcm_priority_manager():
     assert not instance.payload()
     assert str(instance) == ""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         instance = FCMPriorityManager(mode, "invalid")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         instance = FCMPriorityManager("invald", "high")
 
     # mode validation is done at the higher NotifyFCM() level so

@@ -31,14 +31,15 @@ from hashlib import sha256
 import hmac
 from itertools import chain
 import re
-from xml.etree import ElementTree
 
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_list, validate_regex
+from ..utils.xml import flatten_xml_response
 from .base import NotifyBase
 
 # Topic Detection
@@ -228,7 +229,7 @@ class NotifySNS(NotifyBase):
         if not self.aws_access_key_id:
             msg = "An invalid AWS Access Key ID was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our AWS API Secret Access key
         self.aws_secret_access_key = validate_regex(secret_access_key)
@@ -238,7 +239,7 @@ class NotifySNS(NotifyBase):
                 f"({secret_access_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire our AWS Region Name:
         # eg. us-east-1, cn-north-1, us-west-2, ...
@@ -248,7 +249,7 @@ class NotifySNS(NotifyBase):
         if not self.aws_region_name:
             msg = f"An invalid AWS Region ({region_name}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Initialize topic list
         self.topics = []
@@ -297,7 +298,7 @@ class NotifySNS(NotifyBase):
             if self.mode not in SNS_MODES:
                 msg = f"The AWS SNS mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Auto-detect: topic mode when all targets are SNS topics
@@ -631,43 +632,9 @@ class NotifySNS(NotifyBase):
             "Message": "error_message",
         }
 
-        # A default response object that we'll manipulate as we pull more data
-        # from our AWS Response object
-        response = {
-            "type": None,
-            "request_id": None,
-        }
-
-        try:
-            # we build our tree, but not before first eliminating any
-            # reference to namespacing (if present) as it makes parsing
-            # the tree so much easier.
-            root = ElementTree.fromstring(
-                re.sub(r' xmlns="[^"]+"', "", aws_response, count=1)
-            )
-
-            # Store our response tag object name
-            response["type"] = str(root.tag)
-
-            def _xml_iter(root, response):
-                if len(root) > 0:
-                    for child in root:
-                        # use recursion to parse everything
-                        _xml_iter(child, response)
-
-                elif root.tag in aws_keep_map:
-                    response[aws_keep_map[root.tag]] = (root.text).strip()
-
-            # Recursivly iterate over our AWS Response to extract the
-            # fields we're interested in in efforts to populate our response
-            # object.
-            _xml_iter(root, response)
-
-        except (ElementTree.ParseError, TypeError):
-            # bad data just causes us to generate a bad response
-            pass
-
-        return response
+        return flatten_xml_response(
+            aws_response, aws_keep_map, defaults={"request_id": None}
+        )
 
     @property
     def url_identifier(self):

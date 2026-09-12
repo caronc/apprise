@@ -30,6 +30,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.kavenegar import NotifyKavenegar
 
 logging.disable(logging.CRITICAL)
@@ -40,14 +41,14 @@ apprise_url_tests = (
         "kavenegar://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "kavenegar://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -91,14 +92,14 @@ apprise_url_tests = (
         "kavenegar://{}@{}/{}".format("a" * 14, "b" * 24, "3" * 14),
         {
             # invalid from number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "kavenegar://{}@{}/{}".format("3" * 4, "b" * 24, "3" * 14),
         {
             # invalid from number
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

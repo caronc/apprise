@@ -56,6 +56,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -188,13 +189,13 @@ class NotifySerwerSMS(NotifyBase):
         if not self.user:
             msg = "A SerwerSMS username must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate password
         if not self.password:
             msg = "A SerwerSMS password must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate sender name
         self.sender = validate_regex(
@@ -204,7 +205,7 @@ class NotifySerwerSMS(NotifyBase):
         if not self.sender:
             msg = "A SerwerSMS sender name ({}) is invalid.".format(sender)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets into phones and groups
         self.target_phones = []

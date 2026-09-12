@@ -37,6 +37,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -106,7 +107,7 @@ class NotifyFeishu(NotifyBase):
         if not self.token:
             msg = f"The Feishu token specified ({token}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         return
 

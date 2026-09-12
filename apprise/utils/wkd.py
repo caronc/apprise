@@ -50,6 +50,7 @@
 #   https://wiki.gnupg.org/WKD
 #   https://datatracker.ietf.org/doc/html/rfc9080
 
+from contextlib import suppress
 from datetime import datetime, timedelta, timezone
 import hashlib
 from urllib.parse import quote
@@ -59,6 +60,12 @@ import requests
 from ..asset import AppriseAsset
 from ..exception import ApprisePluginException
 from ..logger import logger
+from .http import (
+    HTTPPolicy,
+    HTTPPolicySession,
+    is_public_ip_address,
+    is_secure_http_url,
+)
 from .parse import is_hostname
 
 
@@ -112,6 +119,9 @@ class AppriseWKDController:
                 response from the WKD host.
         """
 
+        # Establish cleanup state before any later initialization can fail.
+        self.http_session = None
+
         # Prepare our Asset Object
         self.asset = (
             asset if isinstance(asset, AppriseAsset) else AppriseAsset()
@@ -128,6 +138,35 @@ class AppriseWKDController:
 
         # In-memory cache: lower-cased email -> {data, expires}
         self._cache = {}
+
+        # WKD redirects must remain on public HTTPS destinations.
+        self.http_session = HTTPPolicySession(
+            HTTPPolicy(
+                url_filter=is_secure_http_url,
+                address_filter=is_public_ip_address,
+            )
+        )
+
+    def close(self):
+        """Close this controller's pooled HTTP connections."""
+        # Clear first so cleanup stays safe when called more than once.
+        http_session = self.http_session
+        self.http_session = None
+        if http_session is not None:
+            http_session.close()
+
+    def __enter__(self):
+        """Return this controller for use as a context manager."""
+        return self
+
+    def __exit__(self, *_args):
+        """Close pooled connections when leaving a context."""
+        self.close()
+
+    def __del__(self):
+        """Release pooled connections if explicit cleanup was missed."""
+        with suppress(Exception):
+            self.close()
 
     @classmethod
     def zb32_encode(cls, data):
@@ -275,7 +314,7 @@ class AppriseWKDController:
         logger.debug("WKD GET %s", url)
 
         try:
-            with requests.get(
+            with self.http_session.get(
                 url,
                 headers={"User-Agent": self.asset.app_id},
                 verify=self.verify_certificate,

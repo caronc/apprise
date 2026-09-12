@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushdeer import NotifyPushDeer
 
 logging.disable(logging.CRITICAL)
@@ -42,13 +43,13 @@ apprise_url_tests = (
     (
         "pushdeer://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushdeers://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ifttt import NotifyIFTTT
 
 logging.disable(logging.CRITICAL)
@@ -43,20 +44,20 @@ apprise_url_tests = (
     (
         "ifttt://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ifttt://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No User
     (
         "ifttt://EventID/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # A nicely formed ifttt url with 1 event and a new key/value store
@@ -94,7 +95,7 @@ apprise_url_tests = (
         "https://maker.ifttt.com/use/WebHookID/",
         {
             # No EventID specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -166,26 +167,28 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     mock_post.return_value.content = "{}"
 
     # No webhook_id specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyIFTTT(webhook_id=None, events=None)
 
     # Initializes the plugin with an invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyIFTTT(webhook_id=None, events=events)
 
     # Whitespace also acts as an invalid webhook id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyIFTTT(webhook_id="   ", events=events)
 
     # No events specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyIFTTT(webhook_id=webhook_id, events=None)
 
     obj = NotifyIFTTT(webhook_id=webhook_id, events=events)
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -210,12 +213,14 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
     # Invalid del_tokens entry
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyIFTTT(
             webhook_id=webhook_id,
             events=events,
@@ -225,7 +230,9 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -244,7 +251,9 @@ def test_plugin_ifttt_edge_cases(mock_post, mock_get):
     assert isinstance(obj, NotifyIFTTT)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

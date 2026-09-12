@@ -32,6 +32,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from .base import NotifyBase
@@ -158,7 +159,7 @@ class NotifyNotifiarr(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Notifiarr APIKey ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Place a thumbnail image inline with the message body
         self.include_image = (
@@ -181,7 +182,7 @@ class NotifyNotifiarr(NotifyBase):
                     f"({event}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
         # Prepare our targets
         self.targets = {

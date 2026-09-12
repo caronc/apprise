@@ -39,6 +39,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -62,8 +63,9 @@ class NotifySendPulse(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/sendpulse/"
 
-    # Default to markdown
-    notify_format = NotifyFormat.HTML
+    # SendPulse can send either HTML or plain text. HTML remains the
+    # default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # The default Email API URL to use
     notify_email_url = "https://api.sendpulse.com/smtp/emails"
@@ -132,7 +134,7 @@ class NotifySendPulse(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -248,7 +250,7 @@ class NotifySendPulse(NotifyBase):
                 else "{}".format(from_addr_[1])
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our lookup
         self.from_addr = from_addr_[1]
@@ -263,7 +265,7 @@ class NotifySendPulse(NotifyBase):
                 client_id
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Client Secret
         self.client_secret = validate_regex(
@@ -275,7 +277,7 @@ class NotifySendPulse(NotifyBase):
                 "({}) was specified.".format(client_secret)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Targets (To Emails)
         self.targets = []
@@ -300,7 +302,7 @@ class NotifySendPulse(NotifyBase):
                     f" ({template}) is invalid."
                 )
                 self.logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
 
         # Now our dynamic template data (if defined)
         self.template_data = (
@@ -498,6 +500,7 @@ class NotifySendPulse(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """
@@ -527,9 +530,12 @@ class NotifySendPulse(NotifyBase):
             }
         }
 
-        # Prepare Email Message
-        if self.notify_format == NotifyFormat.HTML:
-            # HTML
+        # Resolve the requested delivery representation for this send.
+        # HTML mode includes a derived plain-text alternative; TEXT mode
+        # sends the plain body only.
+        if self.resolve_format(body_format) == NotifyFormat.HTML:
+            # HTML is the caller-selected representation; derive the
+            # plain-text companion field for mail clients that need it.
             payload_["email"].update(
                 {
                     "text": convert_between(

@@ -31,6 +31,7 @@ import os
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.misskey import NotifyMisskey
 
 logging.disable(logging.CRITICAL)
@@ -60,7 +61,7 @@ apprise_url_tests = (
         "misskey://hostname",
         {
             # Missing Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -99,7 +100,7 @@ apprise_url_tests = (
         "misskey://access_token@hostname?visibility=invalid",
         {
             # An invalid visibility
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

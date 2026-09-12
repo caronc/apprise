@@ -38,6 +38,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
@@ -195,7 +196,7 @@ class NotifyBulkSMS(NotifyBase):
                     f"({source}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Tidy source
             self.source = "+{}".format(result["full"])
@@ -209,7 +210,7 @@ class NotifyBulkSMS(NotifyBase):
         if self.route not in BULKSMS_ROUTING_GROUPS:
             msg = f"The route specified ({route}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Define whether or not we should set the unicode flag
         self.unicode = (

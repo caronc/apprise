@@ -34,6 +34,7 @@ import requests
 
 import apprise
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.dapnet import DapnetPriority, NotifyDapnet
 
 logging.disable(logging.CRITICAL)
@@ -44,28 +45,28 @@ apprise_url_tests = (
         "dapnet://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dapnet://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dapnet://user:pass",
         {
             # No call-sign specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "dapnet://user@host",
         {
             # No password specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -209,7 +210,9 @@ def test_plugin_dapnet_edge_cases(mock_post):
     assert len(obj) == 2
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 2
@@ -254,10 +257,10 @@ def test_plugin_dapnet_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
+    # We should be able to read our 7 services from that
     # 4x normal (invalid + 3 exclusivly specified to be so)
     # 3x emerg
-    assert len(ac.servers()) == 7
+    assert len(ac.services()) == 7
     assert len(aobj) == 7
     assert len(list(aobj.find(tag="normal"))) == 3
     for s in aobj.find(tag="normal"):
@@ -277,4 +280,4 @@ def test_plugin_dapnet_config_files(mock_post):
     )
 
     # Notifications work
-    assert aobj.notify(title="title", body="body") is True
+    assert bool(aobj.notify(title="title", body="body")) is True

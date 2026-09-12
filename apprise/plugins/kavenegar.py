@@ -39,6 +39,7 @@ from json import loads
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
 from .base import NotifyBase
@@ -163,7 +164,7 @@ class NotifyKavenegar(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Kavenegar API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.source = None
         if source is not None:
@@ -171,7 +172,7 @@ class NotifyKavenegar(NotifyBase):
             if not result:
                 msg = f"The Kavenegar source specified ({source}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Store our source
             self.source = result["full"]

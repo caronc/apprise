@@ -31,6 +31,9 @@ from enum import Enum
 AWARE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f%z"
 NAIVE_DATE_ISO_FORMAT = "%Y-%m-%dT%H:%M:%S.%f"
 
+# Compact separators (no space after "," or ":").
+JSON_COMPACT_SEPARATORS = (",", ":")
+
 
 class NotifyType(str, Enum):
     """A simple mapping of notification types most commonly used with all types

@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pagerduty import NotifyPagerDuty
 
 logging.disable(logging.CRITICAL)
@@ -43,56 +44,56 @@ apprise_url_tests = (
         "pagerduty://",
         {
             # No Access Token or Integration/Routing Key specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://%20@%20/",
         {
             # invalid Access Token and Integration/Routing Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://%20/",
         {
             # invalid Access Token; no Integration/Routing Key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://%20@abcd/",
         {
             # Invalid Integration/Routing Key (but valid Access Token)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://myroutekey@myapikey/%20",
         {
             # bad source
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://myroutekey@myapikey/mysource/%20",
         {
             # bad component
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://myroutekey@myapikey?region=invalid",
         {
             # invalid region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pagerduty://myroutekey@myapikey?severity=invalid",
         {
             # invalid severity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -196,6 +197,7 @@ def test_plugin_pagerduty_urls():
 
 @mock.patch("requests.post")
 def test_plugin_pagerduty_notify_type_is_string(mock_post):
+    """Verify string notification types are accepted and delivered."""
     response = mock.Mock()
     response.status_code = requests.codes.ok
     response.content = ""
@@ -205,7 +207,9 @@ def test_plugin_pagerduty_notify_type_is_string(mock_post):
     assert isinstance(obj, NotifyPagerDuty)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 1

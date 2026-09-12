@@ -62,6 +62,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -246,13 +247,13 @@ class NotifySparkPost(NotifyBase):
         if not self.apikey:
             msg = f"An invalid SparkPost API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our username
         if not self.user:
             msg = "No SparkPost username was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Email 'To'
         self.targets = []
@@ -282,7 +283,7 @@ class NotifySparkPost(NotifyBase):
             # Invalid region specified
             msg = f"The SparkPost region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Get our From username (if specified)
         self.from_name = from_name
@@ -294,7 +295,7 @@ class NotifySparkPost(NotifyBase):
             # Parse Source domain based on from_addr
             msg = f"Invalid ~From~ email format: {self.from_addr}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.headers = {}
         if headers:

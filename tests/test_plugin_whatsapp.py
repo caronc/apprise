@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.whatsapp import IS_GROUP_ID, NotifyWhatsApp
 
 logging.disable(logging.CRITICAL)
@@ -46,28 +47,28 @@ apprise_url_tests = (
         "whatsapp://",
         {
             # Not enough details
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "whatsapp://:@/",
         {
             # invalid Access Token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "whatsapp://{}@_".format("a" * 32),
         {
             # token provided but invalid from
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "whatsapp://%20:{}@12345/{}".format("e" * 32, "4" * 11),
         {
             # Invalid template
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -134,7 +135,7 @@ apprise_url_tests = (
         "whatsapp://template:{}@12345/{}?lang=1234".format("e" * 32, "4" * 11),
         {
             # template with invalid language over-ride
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -159,7 +160,7 @@ apprise_url_tests = (
             # template with kwarg assignments
             # Invalid keyword specified; cna only be a digit OR `body'
             # or 'type'
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -167,7 +168,7 @@ apprise_url_tests = (
         {
             # template with kwarg assignments
             # No Body Assigment
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -177,7 +178,7 @@ apprise_url_tests = (
         {
             # template with kwarg assignments
             # Ambiguious assignment {{1}} assigned twice
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -330,13 +331,13 @@ def test_plugin_whatsapp_edge_cases(mock_post):
     targets = ("+1 (555) 123-3456",)
 
     # No token specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWhatsApp(
             token=None, from_phone_id=from_phone_id, targets=targets
         )
 
     # No from_phone_id specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWhatsApp(token=token, from_phone_id=None, targets=targets)
 
     # a error response
@@ -359,7 +360,7 @@ def test_plugin_whatsapp_edge_cases(mock_post):
     )
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False
 
 
 @mock.patch("requests.post")

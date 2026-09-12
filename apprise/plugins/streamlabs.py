@@ -38,6 +38,7 @@
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -202,7 +203,7 @@ class NotifyStreamlabs(NotifyBase):
         if not self.access_token:
             msg = "An invalid Streamslabs access token was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the call
         try:
@@ -216,7 +217,7 @@ class NotifyStreamlabs(NotifyBase):
             msg = f"The streamlabs call specified ({call}) is invalid."
             self.logger.warning(msg)
             self.logger.debug(f"Socket Exception: {e!s}")
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Store the alert_type
         # only applicable when calling /alerts
@@ -231,7 +232,7 @@ class NotifyStreamlabs(NotifyBase):
             msg = f"The streamlabs alert type specified ({call}) is invalid."
             self.logger.warning(msg)
             self.logger.debug(f"Socket Exception: {e!s}")
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # params only applicable when calling /alerts
         self.image_href = image_href
@@ -254,7 +255,7 @@ class NotifyStreamlabs(NotifyBase):
         if not self.currency:
             msg = "An invalid Streamslabs currency was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # only applicable when calling /donations
         # The name of the donor
@@ -262,7 +263,7 @@ class NotifyStreamlabs(NotifyBase):
         if not self.name:
             msg = "An invalid Streamslabs donor was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # An identifier for this donor,
         # which is used to group donations with the same donor.

@@ -27,39 +27,33 @@
 
 # Signup @ https://www.mailgun.com/
 #
-# Each domain will have an API key associated with it. If you sign up you'll
-# get a sandbox domain to use.  Or if you set up your own, they'll have
-# api keys associated with them too.  Find your API key out by visiting
+# Each domain has an API key. New accounts also receive a sandbox domain.
+# Find the key by visiting:
 #    https://app.mailgun.com/app/domains
 #
 # From here you can click on the domain you're interested in. You can acquire
 # the API Key from here which will look something like:
 #    4b4f2918c6c21ba0a26ad2af73c07f4d-dk5f51da-8f91a0df
 #
-# You'll also need to know the domain that is associated with your API key.
-# This will be obvious with a paid account because it will be the domain name
-# you've registered with them.   But if you're using a test account, it will
-# be name of the sandbox you've set up such as:
+# You also need the registered or sandbox domain associated with the key:
 #    sandbox74bda3414c06kb5acb946.mailgun.org
 #
-# Knowing this, you can buid your mailgun url as follows:
+# Build the Mailgun URL as follows:
 #  mailgun://{user}@{domain}/{apikey}
 #  mailgun://{user}@{domain}/{apikey}/{email}
 #
 # You can email as many addresses as you want as:
 #  mailgun://{user}@{domain}/{apikey}/{email1}/{email2}/{emailN}
 #
-#  The {user}@{domain} effectively assembles the 'from' email address
-#  the email will be transmitted from.  If no email address is specified
-#  then it will also become the 'to' address as well.
+# {user}@{domain} forms the sender. Without a target, it is also the recipient.
 #
 from email.utils import formataddr
 
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
-from ..logger import logger
 from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
 from .base import NotifyBase
 
@@ -150,7 +144,7 @@ class NotifyMailgun(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -231,13 +225,13 @@ class NotifyMailgun(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Mailgun API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate our username
         if not self.user:
             msg = "No Mailgun username was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Acquire Email 'To'
         self.targets = []
@@ -279,7 +273,7 @@ class NotifyMailgun(NotifyBase):
             # Invalid region specified
             msg = f"The Mailgun region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Get our From username (if specified)
         self.from_addr = [self.app_id, f"{self.user}@{self.host}"]
@@ -298,7 +292,7 @@ class NotifyMailgun(NotifyBase):
             # Parse Source domain based on from_addr
             msg = f"Invalid ~From~ email format: {self.from_addr}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if targets:
             # Validate recipients (to:) and drop bad ones:
@@ -739,18 +733,13 @@ class NotifyMailgun(NotifyBase):
             )
 
             if "name" in results["qsd"] and len(results["qsd"]["name"]):
-                # Depricate use of both `from=` and `name=` in the same url as
-                # they will be synomomus of one another in the future.
+                # Use name= as the display name for the from= address.
                 results["from_addr"] = formataddr(
                     (
                         NotifyMailgun.unquote(results["qsd"]["name"]),
                         results["from_addr"],
                     ),
                     charset="utf-8",
-                )
-                logger.warning(
-                    "Mailgun name= and from= are synonymous; "
-                    "use one or the other."
                 )
 
         elif "name" in results["qsd"] and len(results["qsd"]["name"]):

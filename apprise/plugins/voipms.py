@@ -39,6 +39,7 @@ from json import loads
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, is_phone_no, parse_phone_no
 from .base import NotifyBase
@@ -81,7 +82,7 @@ class NotifyVoipms(NotifyBase):
         **{
             "email": {
                 "name": _("User Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "password": {
@@ -133,14 +134,14 @@ class NotifyVoipms(NotifyBase):
         if self.password is None:
             msg = "Password has to be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # User is the email associated with the account
         result = is_email(email)
         if not result:
             msg = f"An invalid VoIPms user email: ({email}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
         self.email = result["full_email"]
 
         # Validate our source Phone #
@@ -148,7 +149,7 @@ class NotifyVoipms(NotifyBase):
         if not result:
             msg = f"An invalid VoIPms source phone # ({source}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Source Phone # only supports +1 country code
         # Allow 7 digit phones (presume they're local with +1 country code)
@@ -161,7 +162,7 @@ class NotifyVoipms(NotifyBase):
                 f"({source}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our source phone number (without country code)
         self.source = result["area"] + result["line"]

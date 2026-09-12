@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.seven import NotifySeven
 
 logging.disable(logging.CRITICAL)
@@ -41,7 +42,7 @@ apprise_url_tests = (
         "seven://",
         {
             # No hostname/apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -157,5 +158,5 @@ def test_plugin_seven_edge_cases(mock_post):
     mock_post.return_value = response
     source = "+1 (555) 123-3456"
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySeven(apikey=None, source=source)

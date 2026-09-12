@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.lauther import LautherPriority, NotifyLauther
 
 logging.disable(logging.CRITICAL)
@@ -43,27 +44,27 @@ apprise_url_tests = (
         "lauther://",
         {
             # No token specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "lauther://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "lauther://%badtoken%",
         {
             # Not a valid token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "lauther://abc123",
         {
             # Tokens must carry the lpt_ prefix
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -107,7 +108,7 @@ apprise_url_tests = (
         "lauther://lpt_abc123?priority=99",
         {
             # An out-of-range priority is not acceptable
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

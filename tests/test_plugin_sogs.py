@@ -35,6 +35,8 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins import sogs
 from apprise.plugins.sogs import (
     NotifySessionOGS,
     _build_session_message,
@@ -68,35 +70,35 @@ apprise_url_tests = (
     (
         f"sessions://host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing seed (user field present, no password)
     (
         f"sessions://{PUBLIC_KEY}@host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing public_key (bad key in user field, too short)
     (
         f"sessions://{BAD_KEY}:{SEED}@host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Missing room token (no path segments)
     (
         f"sessions://{PUBLIC_KEY}:{SEED}@host",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid seed (too short, in password field)
     (
         f"sessions://{PUBLIC_KEY}:{BAD_KEY}@host/{ROOM}",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Valid HTTPS URL - single room
@@ -225,10 +227,34 @@ def test_plugin_sogs_no_cryptography():
     obj = Apprise.instantiate(BASE_URL)
     assert obj is None
 
-    # Direct instantiation must raise ImportError with a helpful message,
-    # not the confusing AttributeError from None.from_private_bytes().
-    with pytest.raises(ImportError, match="cryptography"):
-        NotifySessionOGS(public_key=PUBLIC_KEY, seed=SEED, targets=[ROOM])
+    # Direct construction remains safe, but sending is unavailable.
+    direct = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+    )
+    assert direct.enabled is False
+    assert direct.send("test") is False
+
+
+def test_plugin_sogs_disabled_dependency(monkeypatch):
+    """Direct use fails safely when cryptography is unavailable."""
+    monkeypatch.setattr(sogs, "NOTIFY_SESSIONOGS_ENABLED", False)
+    monkeypatch.setattr(NotifySessionOGS, "enabled", False)
+
+    assert Apprise.instantiate(BASE_URL) is None
+
+    direct = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+    )
+    assert direct._signing_key is None
+    assert direct._bot_pubkey_bytes is None
+
+    with mock.patch("requests.post") as mock_post:
+        assert direct.send("test") is False
+        mock_post.assert_not_called()
 
 
 @pytest.mark.skipif(
@@ -243,6 +269,7 @@ def test_plugin_sogs_init(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -272,15 +299,15 @@ def test_plugin_sogs_init(mock_post):
 )
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_public_key(mock_post):
-    """TypeError is raised when public_key is absent or invalid."""
-    with pytest.raises(TypeError):
+    """A missing or invalid public key is rejected."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=None,
             seed=SEED,
             targets=[ROOM],
             host="host",
         )
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=BAD_KEY,
             seed=SEED,
@@ -295,15 +322,15 @@ def test_plugin_sogs_missing_public_key(mock_post):
 )
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_seed(mock_post):
-    """TypeError is raised when seed is absent or invalid."""
-    with pytest.raises(TypeError):
+    """A missing or invalid seed is rejected."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=None,
             targets=[ROOM],
             host="host",
         )
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=BAD_KEY,
@@ -318,15 +345,15 @@ def test_plugin_sogs_missing_seed(mock_post):
 )
 @mock.patch("requests.post")
 def test_plugin_sogs_missing_rooms(mock_post):
-    """TypeError is raised when no valid room token is provided."""
-    with pytest.raises(TypeError):
+    """At least one valid room token is required."""
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=SEED,
             targets=None,
             host="host",
         )
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySessionOGS(
             public_key=PUBLIC_KEY,
             seed=SEED,
@@ -347,6 +374,7 @@ def test_plugin_sogs_send_success(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -357,12 +385,12 @@ def test_plugin_sogs_send_success(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Hello SOGS") is True
+    assert bool(obj.notify(body="Hello SOGS")) is True
     assert mock_post.call_count == 1
 
     # HTTP 200 (OK) is also treated as success.
     mock_post.return_value = _mk_resp(requests.codes.ok)
-    assert obj.notify(body="Hello SOGS") is True
+    assert bool(obj.notify(body="Hello SOGS")) is True
 
 
 @pytest.mark.skipif(
@@ -377,6 +405,7 @@ def test_plugin_sogs_send_multi_room(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -387,7 +416,7 @@ def test_plugin_sogs_send_multi_room(mock_post):
         targets=[ROOM, ROOM2],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Multi") is True
+    assert bool(obj.notify(body="Multi")) is True
     assert mock_post.call_count == 2
 
 
@@ -403,6 +432,7 @@ def test_plugin_sogs_send_partial_failure(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b""
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.side_effect = [
@@ -416,7 +446,7 @@ def test_plugin_sogs_send_partial_failure(mock_post):
         targets=[ROOM, ROOM2],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Partial") is False
+    assert bool(obj.notify(body="Partial")) is False
     assert mock_post.call_count == 2
 
 
@@ -432,6 +462,7 @@ def test_plugin_sogs_http_error(mock_post):
         r = mock.Mock()
         r.status_code = code
         r.content = b""
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     obj = NotifySessionOGS(
@@ -451,7 +482,7 @@ def test_plugin_sogs_http_error(mock_post):
     ):
         mock_post.reset_mock()
         mock_post.return_value = _mk_resp(code)
-        assert obj.notify(body="Error") is False
+        assert bool(obj.notify(body="Error")) is False
 
 
 @pytest.mark.skipif(
@@ -469,7 +500,7 @@ def test_plugin_sogs_request_exception(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Error") is False
+    assert bool(obj.notify(body="Error")) is False
 
 
 @pytest.mark.skipif(
@@ -484,13 +515,14 @@ def test_plugin_sogs_http_insecure(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
 
     obj = Apprise()
     assert obj.add(f"session://{PUBLIC_KEY}:{SEED}@open.getsession.org/{ROOM}")
-    assert obj.notify(body="Plain HTTP") is True
+    assert bool(obj.notify(body="Plain HTTP")) is True
 
     # Confirm the request was sent to http:// not https://.
     url_called = mock_post.call_args[0][0]
@@ -510,6 +542,7 @@ def test_plugin_sogs_url_and_privacy(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -547,6 +580,7 @@ def test_plugin_sogs_custom_port(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -559,7 +593,7 @@ def test_plugin_sogs_custom_port(mock_post):
         port=8443,
     )
     assert ":8443" in obj.url()
-    assert obj.notify(body="custom port") is True
+    assert bool(obj.notify(body="custom port")) is True
 
     url_called = mock_post.call_args[0][0]
     assert ":8443" in url_called
@@ -635,6 +669,7 @@ def test_plugin_sogs_invalid_room_token(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -699,6 +734,7 @@ def test_plugin_sogs_auth_headers(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
@@ -709,7 +745,7 @@ def test_plugin_sogs_auth_headers(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Auth test") is True
+    assert bool(obj.notify(body="Auth test")) is True
 
     call_kwargs = mock_post.call_args[1]
     headers = call_kwargs.get("headers", {})
@@ -753,6 +789,7 @@ def test_plugin_sogs_response_unparseable_json(mock_post):
     r = mock.Mock()
     r.status_code = requests.codes.created
     r.content = b"not-json"
+    r.iter_content = lambda chunk_size=None: iter([r.content])
     mock_post.return_value = r
 
     obj = NotifySessionOGS(
@@ -761,7 +798,57 @@ def test_plugin_sogs_response_unparseable_json(mock_post):
         targets=[ROOM],
         host="open.getsession.org",
     )
-    assert obj.notify(body="Hello") is True
+    assert bool(obj.notify(body="Hello")) is True
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
+@mock.patch("requests.post")
+def test_plugin_sogs_oversized_response_rejected(mock_post):
+    """Reject a response whose body grows past the acknowledgement limit.
+
+    The empty chunk confirms that keep-alive chunks are ignored.
+    """
+    over_limit = b"x" * (NotifySessionOGS.max_response_size + 1)
+    r = mock.Mock()
+    r.status_code = requests.codes.created
+    r.headers = {}
+    r.iter_content = lambda chunk_size=None: iter([b"", over_limit])
+    mock_post.return_value = r
+
+    obj = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+        host="open.getsession.org",
+    )
+    assert bool(obj.notify(body="Hello")) is False
+    r.close.assert_called_once()
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
+@mock.patch("requests.post")
+def test_plugin_sogs_closes_connection_after_read(mock_post):
+    """The streamed connection is closed once the body is read."""
+    r = mock.Mock()
+    r.status_code = requests.codes.created
+    r.content = b'{"id": 1}'
+    r.iter_content = lambda chunk_size=None: iter([r.content])
+    mock_post.return_value = r
+
+    obj = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+        host="open.getsession.org",
+    )
+    assert bool(obj.notify(body="Hello")) is True
+    r.close.assert_called_once()
 
 
 def test_plugin_sogs_build_session_message():
@@ -812,11 +899,12 @@ def test_plugin_sogs_apprise_integration(mock_post):
         r = mock.Mock()
         r.status_code = requests.codes.created
         r.content = b'{"id": 1}'
+        r.iter_content = lambda chunk_size=None: iter([r.content])
         return r
 
     mock_post.return_value = _mk_resp()
 
     app = Apprise()
     assert app.add(BASE_URL)
-    assert app.notify(title="Title", body="Body") is True
+    assert bool(app.notify(title="Title", body="Body")) is True
     assert mock_post.call_count == 1

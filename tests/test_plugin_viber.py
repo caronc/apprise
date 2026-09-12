@@ -189,9 +189,9 @@ def test_plugin_viber_http_error_and_exception(mocker):
     post.return_value.status_code = 400
     a = Apprise()
     assert a.add("viber://token/target2") is True
-    assert a.notify("test") is False
+    assert bool(a.notify("test")) is False
 
     post.side_effect = requests.RequestException("boom")
     a = Apprise()
     assert a.add("viber://token/target2") is True
-    assert a.notify("test") is False
+    assert bool(a.notify("test")) is False

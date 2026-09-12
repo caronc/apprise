@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bluesky import NotifyBlueSky
 
 # Disable logging for a cleaner testing output
@@ -56,20 +57,20 @@ apprise_url_tests = (
         "bluesky://",
         {
             # Missing user and app_pass
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bluesky://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bluesky://app-pw",
         {
             # Missing User
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -473,7 +474,7 @@ def test_plugin_bluesky_general(mocker):
 def test_plugin_bluesky_edge_cases():
     """NotifyBlueSky() Edge Cases."""
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyBlueSky()
 
 
@@ -503,11 +504,13 @@ def test_plugin_bluesky_attachments_basic(
 
     # Send our notification
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -548,6 +551,7 @@ def test_plugin_bluesky_attachments_bad_message_response(
     good_message_response,
     bad_message_response,
 ):
+    """Verify a failed message response fails attachment delivery."""
 
     mock_get.return_value = good_message_response
     mock_post.side_effect = [
@@ -562,11 +566,13 @@ def test_plugin_bluesky_attachments_bad_message_response(
 
     # Our notification will fail now since our message will error out.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -602,6 +608,7 @@ def test_plugin_bluesky_attachments_upload_fails(
     good_media_response,
     good_message_response,
 ):
+    """Verify a failed media upload fails attachment delivery."""
 
     # Test case where upload fails.
     mock_get.return_value = good_message_response
@@ -613,11 +620,13 @@ def test_plugin_bluesky_attachments_upload_fails(
 
     # Send our notification; it will fail because of the message response.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -653,6 +662,7 @@ def test_plugin_bluesky_attachments_invalid_attachment(
     good_message_response,
     good_media_response,
 ):
+    """Verify an invalid attachment is rejected cleanly."""
 
     mock_get.return_value = good_message_response
     mock_post.side_effect = [good_message_response, good_media_response]
@@ -665,11 +675,13 @@ def test_plugin_bluesky_attachments_invalid_attachment(
 
     # An invalid attachment will cause a failure.
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -702,6 +714,7 @@ def test_plugin_bluesky_attachments_multiple_batch(
     good_message_response,
     good_media_response,
 ):
+    """Verify multiple attachments are uploaded and sent as one batch."""
 
     mock_get.return_value = good_message_response
     mock_post.side_effect = [
@@ -730,11 +743,13 @@ def test_plugin_bluesky_attachments_multiple_batch(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -806,11 +821,13 @@ def test_plugin_bluesky_attachments_multiple_batch(
     ]
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -861,6 +878,7 @@ def test_plugin_bluesky_auth_failure(
     good_message_response,
     bad_message_response,
 ):
+    """Verify authentication failures prevent message delivery."""
 
     mock_get.return_value = good_message_response
     mock_post.return_value = bad_message_response
@@ -869,7 +887,9 @@ def test_plugin_bluesky_auth_failure(
     obj = Apprise.instantiate(bluesky_url)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -924,7 +944,7 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
     mock_post.side_effect = [session_response, post_response]
 
     obj = Apprise.instantiate(bluesky_url)
-    assert obj.notify(body="Resolved PLC Flow") is True
+    assert bool(obj.notify(body="Resolved PLC Flow")) is True
 
     # Reset for did:web test
     identity_response = good_response({"did": "did:web:example.com"})
@@ -944,14 +964,14 @@ def test_plugin_bluesky_did_web_and_plc_resolution(
     mock_post.side_effect = [session_response, post_response]
 
     obj = Apprise.instantiate(bluesky_url)
-    assert obj.notify(body="Resolved WEB Flow") is True
+    assert bool(obj.notify(body="Resolved WEB Flow")) is True
 
     # Invalid DID scheme
     bad_did_response = good_response({"did": "did:unsupported:scheme"})
 
     mock_get.side_effect = [bad_did_response]
     obj = Apprise.instantiate(bluesky_url)
-    assert obj.notify(body="fail due to bad scheme") is False
+    assert bool(obj.notify(body="fail due to bad scheme")) is False
 
 
 @patch("requests.get")

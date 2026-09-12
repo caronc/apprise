@@ -36,6 +36,7 @@ import requests
 
 import apprise
 from apprise import NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pinglet import NotifyPinglet, PingletPriority
 
 logging.disable(logging.CRITICAL)
@@ -59,20 +60,20 @@ apprise_url_tests = (
     (
         "pinglet://hostname/acme/deploys",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No namespace and/or topic specified
     (
         "pinglet://token@hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pinglet://token@hostname/deploys",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide an API Key, namespace, and topic
@@ -184,16 +185,16 @@ def test_plugin_pinglet_urls():
 def test_plugin_pinglet_edge_cases():
     """NotifyPinglet() Edge Cases."""
     # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token=None, namespace="acme", topic="deploys")
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token="   ", namespace="acme", topic="deploys")
 
     # Missing namespace and/or topic
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token="abc123", namespace=None, topic="deploys")
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPinglet(token="abc123", namespace="acme", topic=None)
 
     # Direct instantiation without a fullpath defaults to "/"
@@ -215,13 +216,12 @@ def test_plugin_pinglet_payload(mock_post):
         "?priority=urgent&:CPU=95%25&:Host=web-1&+region=eu-west"
     )
 
-    assert (
+    assert bool(
         aobj.notify(
             title="Hello",
             body="It works",
             notify_type=NotifyType.FAILURE,
         )
-        is True
     )
 
     assert mock_post.call_count == 1
@@ -254,7 +254,7 @@ def test_plugin_pinglet_payload_defaults(mock_post):
     aobj = apprise.Apprise()
     assert aobj.add("pinglet://mykey@hostname/acme/deploys")
 
-    assert aobj.notify(body="It works") is True
+    assert bool(aobj.notify(body="It works"))
 
     assert mock_post.call_count == 1
     assert mock_post.call_args_list[0][0][0] == "http://hostname/acme/deploys"

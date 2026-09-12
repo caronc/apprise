@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ses import NotifySES
 
 logging.disable(logging.CRITICAL)
@@ -73,41 +74,41 @@ apprise_url_tests = (
     (
         "ses://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://user@example.com/T1JJ3T3L2",
         {
             # Just Token 1 provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://user@example.com/T1JJ3TD4JD/TIiajkdnlazk7FQ/",
         {
             # Missing a region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ/us-west-2",
         {
             # No email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ses://user@example.com/T1JJ3TD4JD/TIiajkdnlazk7FQ/user2@example.com",
         {
             # Missing a region (but has email)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -117,7 +118,7 @@ apprise_url_tests = (
         ),
         {
             # An invalid reply-to address
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
             # Our response expected server response
             "requests_response_text": AWS_SES_GOOD_RESPONSE,
         },
@@ -310,7 +311,7 @@ def test_plugin_ses_edge_cases(mock_post):
     """NotifySES() Edge Cases."""
 
     # Initializes the plugin with a valid access, but invalid access key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No access_key_id specified
         NotifySES(
             from_addr="user@example.eu",
@@ -320,7 +321,7 @@ def test_plugin_ses_edge_cases(mock_post):
             targets="user@example.ca",
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No secret_access_key specified
         NotifySES(
             from_addr="user@example.eu",
@@ -330,7 +331,7 @@ def test_plugin_ses_edge_cases(mock_post):
             targets="user@example.ca",
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No region_name specified
         NotifySES(
             from_addr="user@example.eu",
@@ -350,7 +351,7 @@ def test_plugin_ses_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
     # The phone number is invalid, and without it, there is nothing
     # to notify; we
@@ -363,7 +364,7 @@ def test_plugin_ses_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
 
 def test_plugin_ses_url_parsing():
@@ -474,6 +475,32 @@ def test_plugin_ses_aws_response_handling():
     assert response["error_code"] == "InvalidParameter"
     assert response["error_message"] == "Invalid parameter"
 
+    # An empty known element (no text at all) doesn't blow up; it's
+    # just treated as blank
+    response = NotifySES.aws_response_to_dict("""
+        <ErrorResponse xmlns="http://ses.amazonaws.com/doc/2010-03-31/">
+            <Error>
+                <Type>Sender</Type>
+                <Code>InvalidParameter</Code>
+                <Message/>
+            </Error>
+            <RequestId>b5614883-babe-56ca-93b2-1c592ba6191e</RequestId>
+        </ErrorResponse>
+        """)
+    assert response["type"] == "ErrorResponse"
+    assert response["error_message"] == ""
+
+    # A response nested far deeper than Python's recursion limit still
+    # parses instead of raising a RecursionError
+    depth = sys.getrecursionlimit() + 1000
+    response = NotifySES.aws_response_to_dict(
+        ("<RequestId>" * depth)
+        + "b5614883-babe-56ca-93b2-1c592ba6191e"
+        + ("</RequestId>" * depth)
+    )
+    assert response["type"] == "RequestId"
+    assert response["request_id"] == "b5614883-babe-56ca-93b2-1c592ba6191e"
+
 
 @mock.patch("requests.post")
 def test_plugin_ses_attachments(mock_post):
@@ -499,7 +526,7 @@ def test_plugin_ses_attachments(mock_post):
     )
 
     # Send a good attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Reset our mock object
     mock_post.reset_mock()
@@ -509,7 +536,7 @@ def test_plugin_ses_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Send our attachments
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -520,7 +547,7 @@ def test_plugin_ses_attachments(mock_post):
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = AppriseAttachment(path)
-    assert obj.notify(body="test", attach=attach) is False
+    assert bool(obj.notify(body="test", attach=attach)) is False
 
 
 @mock.patch("requests.post")
@@ -544,7 +571,7 @@ def test_plugin_ses_session_token(mock_post):
     assert obj.aws_session_token == TEST_SESSION_TOKEN
 
     # send() must include X-Amz-Security-Token in request headers
-    assert obj.notify(body="test") is True
+    assert bool(obj.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" in call_kwargs["headers"]
     assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
@@ -581,7 +608,7 @@ def test_plugin_ses_session_token(mock_post):
         targets=["recipient@example.com"],
     )
     assert obj_plain.aws_session_token is None
-    assert obj_plain.notify(body="test") is True
+    assert bool(obj_plain.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" not in call_kwargs["headers"]
 

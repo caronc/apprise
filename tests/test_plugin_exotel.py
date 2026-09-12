@@ -34,6 +34,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.exotel import NotifyExotel
 
 logging.disable(logging.CRITICAL)
@@ -44,42 +45,42 @@ apprise_url_tests = (
         "exotel://",
         {
             # No Account SID specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "exotel://:@/",
         {
             # invalid Auth token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "exotel://{}@12345678".format("a" * 32),
         {
             # Just sid provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "exotel://{}:{}@_".format("a" * 32, "b" * 32),
         {
             # sid and token provided but invalid from
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "exotel://{}:{}@/%20".format("a" * 32, "b" * 32),
         {
             # sid and token provided but no from
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "exotel://{}:{}@{}".format("a" * 32, "b" * 32, "3" * 8),
         {
             # sid and token provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -118,7 +119,7 @@ apprise_url_tests = (
         "exotel://{}:{}@12345/{}".format("a" * 32, "b" * 32, "4" * 11),
         {
             # using short-code (5 characters) is not supported
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -196,7 +197,7 @@ apprise_url_tests = (
         ),
         {
             # Test region flag Invalid
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -223,7 +224,7 @@ apprise_url_tests = (
         ),
         {
             # Test region flag Invalid
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -290,16 +291,16 @@ def test_plugin_exotel_edge_cases(mock_post):
 
     mock_post.return_value = response
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyExotel(sid=sid, token=token, source=" ")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyExotel(sid=sid, token=token, source=source, apikey=" ")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyExotel(sid=sid, token=token, source=source, region_name=" ")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyExotel(sid=sid, token=token, source=source, priority=" ")
 
     # Programmatic priority shorthand is supported as an Apprise convenience.

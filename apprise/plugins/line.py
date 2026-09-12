@@ -34,6 +34,7 @@ import re
 import requests
 
 from ..common import NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -122,7 +123,7 @@ class NotifyLine(NotifyBase):
         if not self.token:
             msg = f"An invalid Access Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Display our Apprise Image
         self.include_image = include_image

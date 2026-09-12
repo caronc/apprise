@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.feishu import NotifyFeishu
 
 logging.disable(logging.CRITICAL)
@@ -40,19 +41,19 @@ apprise_url_tests = (
     (
         "feishu://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "feishu://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "feishu://%badtoken%",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

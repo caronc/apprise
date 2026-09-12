@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.flowtriq import NotifyFlowtriq
 
 logging.disable(logging.CRITICAL)
@@ -52,14 +53,14 @@ apprise_url_tests = (
     (
         "flowtriq://apikey@hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No API key specified
     (
         "flowtriq://hostname/hooks/abc123",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide a hostname, apikey, and webhook path (insecure)
@@ -150,24 +151,24 @@ def test_plugin_flowtriq_urls():
 def test_plugin_flowtriq_edge_cases():
     """NotifyFlowtriq() Edge Cases."""
     # Initializes the plugin with an invalid API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlowtriq(apikey=None, webhook_path="hooks/abc123")
     # Whitespace also acts as an invalid API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlowtriq(apikey="   ", webhook_path="hooks/abc123")
 
     # Missing webhook path
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlowtriq(apikey="validkey", webhook_path=None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlowtriq(apikey="validkey", webhook_path="   ")
 
     # A webhook path consisting only of slashes strips to empty
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlowtriq(apikey="validkey", webhook_path="///")
 
     # Missing host is caught after super().__init__()
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyFlowtriq(
             apikey="validkey", webhook_path="hooks/abc123", host=None
         )
@@ -362,5 +363,5 @@ def test_plugin_flowtriq_apprise_integration(mock_post):
 
     app = Apprise()
     assert app.add("flowtriq://mykey@flowtriq.com/hooks/abc123") is True
-    assert app.notify(title="Title", body="Body") is True
+    assert bool(app.notify(title="Title", body="Body")) is True
     assert mock_post.call_count == 1

@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.simplepush import NotifySimplePush
 
 logging.disable(logging.CRITICAL)
@@ -47,7 +48,7 @@ apprise_url_tests = (
         "spush://",
         {
             # No api key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -161,17 +162,17 @@ def test_plugin_simplepush_edge_cases():
     """
 
     # No token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySimplePush(apikey=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySimplePush(apikey="  ")
 
     # Bad event
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySimplePush(apikey="abc", event=object)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySimplePush(apikey="abc", event="  ")
 
 
@@ -195,4 +196,4 @@ def test_plugin_simplepush_general(mock_post):
     obj = Apprise.instantiate("spush://{}".format("Y" * 14))
 
     # Verify our content works as expected
-    assert obj.notify(title="test", body="test") is True
+    assert bool(obj.notify(title="test", body="test")) is True

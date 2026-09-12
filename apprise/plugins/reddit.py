@@ -53,6 +53,7 @@ import requests
 
 from .. import __title__, __version__
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, parse_list, validate_regex
@@ -284,19 +285,19 @@ class NotifyReddit(NotifyBase):
         if self.kind not in REDDIT_MESSAGE_KINDS:
             msg = f"An invalid Reddit message kind ({kind}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.user = validate_regex(self.user)
         if not self.user:
             msg = f"An invalid Reddit User ID ({self.user}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.password = validate_regex(self.password)
         if not self.password:
             msg = f"An invalid Reddit Password ({self.password}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.client_id = validate_regex(
             app_id, *self.template_tokens["app_id"]["regex"]
@@ -304,7 +305,7 @@ class NotifyReddit(NotifyBase):
         if not self.client_id:
             msg = f"An invalid Reddit App ID ({app_id}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.client_secret = validate_regex(
             app_secret, *self.template_tokens["app_secret"]["regex"]
@@ -312,7 +313,7 @@ class NotifyReddit(NotifyBase):
         if not self.client_secret:
             msg = f"An invalid Reddit App Secret ({app_secret}) was specified"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Build list of subreddits
         self.subreddits = [

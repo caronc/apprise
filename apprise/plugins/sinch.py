@@ -40,6 +40,7 @@ import json
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_phone_no, validate_regex
@@ -190,7 +191,7 @@ class NotifySinch(NotifyBase):
                 f"({service_plan_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Authentication Token associated with the account
         self.api_token = validate_regex(
@@ -202,7 +203,7 @@ class NotifySinch(NotifyBase):
                 f"({api_token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Setup our region
         self.region = (
@@ -213,7 +214,7 @@ class NotifySinch(NotifyBase):
         if self.region and self.region not in SINCH_REGIONS:
             msg = f"The region specified ({region}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # The Source Phone # and/or short-code
         result = is_phone_no(source, min_len=5)
@@ -223,7 +224,7 @@ class NotifySinch(NotifyBase):
                 f"({source}) is invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Tidy source
         self.source = result["full"]
@@ -237,7 +238,7 @@ class NotifySinch(NotifyBase):
                     f"({source}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # else... it as a short code so we're okay
 

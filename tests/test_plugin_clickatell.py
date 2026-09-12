@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.clickatell import NotifyClickatell
 
 logging.disable(logging.CRITICAL)
@@ -43,35 +44,35 @@ apprise_url_tests = (
         "clickatell://",
         {
             # only schema provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "clickatell:///",
         {
             # invalid apikey
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "clickatell://@/",
         {
             # invalid apikey
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "clickatell://{}@/".format("1" * 10),
         {
             # no api key provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "clickatell://{}@{}/".format("1" * 3, "a" * 32),
         {
             # invalid From/Source
-            "instance": TypeError
+            "instance": AppriseImproperlyConfigured
         },
     ),
     (
@@ -193,7 +194,7 @@ def test_plugin_clickatell_edge_cases(mock_post):
     from_phone = "+1 (555) 123-3456"
 
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyClickatell(apikey=None, from_phone=from_phone)
 
     # a error response
@@ -210,4 +211,4 @@ def test_plugin_clickatell_edge_cases(mock_post):
     obj = NotifyClickatell(apikey=apikey, from_phone=from_phone)
 
     # We will fail with the above error code
-    assert obj.notify("title", "body", "info") is False
+    assert bool(obj.notify("title", "body", "info")) is False

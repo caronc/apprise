@@ -64,6 +64,7 @@ import requests
 
 from ..apprise_attachment import AppriseAttachment
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -245,7 +246,7 @@ class NotifyWorkflows(NotifyBase):
         if not self.workflow:
             msg = f"An invalid Workflows ID ({workflow}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.signature = validate_regex(
             signature, *self.template_tokens["signature"]["regex"]
@@ -253,7 +254,7 @@ class NotifyWorkflows(NotifyBase):
         if not self.signature:
             msg = f"An invalid Signature ({signature}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Place a thumbnail image inline with the message body
         self.include_image = bool(
@@ -281,7 +282,7 @@ class NotifyWorkflows(NotifyBase):
                     f" ({routing_id}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Wrap Text
         self.wrap = bool(
@@ -297,7 +298,7 @@ class NotifyWorkflows(NotifyBase):
                 # add() failed (unsupported schema, unparseable URL, etc.)
                 msg = "The Workflows template specified could not be loaded."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
             # Enforce maximum file size
             self.template[0].max_file_size = self.max_workflows_template_size
 
@@ -325,7 +326,7 @@ class NotifyWorkflows(NotifyBase):
                 f"({tokens}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # else:  NoneType - this is okay
         return

@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mailersend import NotifyMailerSend
 
 logging.disable(logging.CRITICAL)
@@ -77,7 +78,7 @@ apprise_url_tests = (
         # invalid API key (contains disallowed characters)
         "mailersend://bad+key*!:user@example.com",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -146,7 +147,7 @@ apprise_url_tests = (
         # Invalid Reply-To address
         ("mailersend://abcd:user@example.com/newuser@example.com?reply=%20!"),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -226,23 +227,23 @@ def test_plugin_mailersend_edge_cases(mock_post, mock_get):
     """NotifyMailerSend() Edge Cases."""
 
     # No API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey=None, from_email="user@example.com")
 
     # Invalid API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey="bad+key*!", from_email="user@example.com")
 
     # Invalid From email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey="abcd", from_email="!invalid")
 
     # No From email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(apikey="abcd", from_email=None)
 
-    # Invalid Reply-To email raises TypeError
-    with pytest.raises(TypeError):
+    # An invalid Reply-To address is rejected.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyMailerSend(
             apikey="abcd",
             from_email="user@example.com",
@@ -288,7 +289,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
         "mailersend://abcd:user@example.com/to@example.com"
     )
     assert isinstance(obj, NotifyMailerSend)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     assert mock_post.call_count == 1
 
     mock_post.reset_mock()
@@ -299,7 +300,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
         from_email="user@example.com",
         targets=["t1@example.com", "t2@example.com"],
     )
-    assert obj.notify(body="body") is True
+    assert bool(obj.notify(body="body")) is True
     assert mock_post.call_count == 2
 
     mock_post.reset_mock()
@@ -310,7 +311,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
         from_email="user@example.com",
         targets=["!invalid"],
     )
-    assert obj.notify(body="body") is False
+    assert bool(obj.notify(body="body")) is False
     assert mock_post.call_count == 0
 
     mock_post.reset_mock()
@@ -325,7 +326,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
         from_email="user@example.com",
         targets=["t1@example.com", "t2@example.com"],
     )
-    assert obj.notify(body="body") is False
+    assert bool(obj.notify(body="body")) is False
 
     mock_post.reset_mock()
     mock_post.side_effect = None
@@ -335,7 +336,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
     obj = Apprise.instantiate(
         "mailersend://abcd:user@example.com/to@example.com"
     )
-    assert obj.notify(body="body") is False
+    assert bool(obj.notify(body="body")) is False
 
     mock_post.side_effect = None
 
@@ -349,7 +350,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
         bcc=["bcc@example.com", "to@example.com"],
         reply_to="reply@example.com",
     )
-    assert obj.notify(body="body") is True
+    assert bool(obj.notify(body="body")) is True
     call_payload = mock_post.call_args
     assert call_payload is not None
 
@@ -359,7 +360,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
     obj = Apprise.instantiate(
         "mailersend://abcd:user@example.com/to@example.com?format=text"
     )
-    assert obj.notify(body="<p>body</p>") is True
+    assert bool(obj.notify(body="<p>body</p>")) is True
 
     # unknown response code (not 202) is treated as failure
     mock_post.reset_mock()
@@ -367,7 +368,7 @@ def test_plugin_mailersend_send(mock_post, mock_get):
     obj = Apprise.instantiate(
         "mailersend://abcd:user@example.com/to@example.com"
     )
-    assert obj.notify(body="body") is False
+    assert bool(obj.notify(body="body")) is False
 
 
 @mock.patch("requests.post")
@@ -390,11 +391,13 @@ def test_plugin_mailersend_attachments(mock_post):
     )
     assert isinstance(obj, NotifyMailerSend)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -404,11 +407,13 @@ def test_plugin_mailersend_attachments(mock_post):
     # Inaccessible file -- os.path.isfile returns False
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -418,11 +423,13 @@ def test_plugin_mailersend_attachments(mock_post):
     # OSError on open
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -432,11 +439,13 @@ def test_plugin_mailersend_attachments(mock_post):
     # HTTP error after successful open
     mock_post.return_value = _mk_resp(requests.codes.internal_server_error)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -446,11 +455,13 @@ def test_plugin_mailersend_attachments(mock_post):
     # RequestException after successful open
     mock_post.side_effect = requests.RequestException("boom")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -465,11 +476,13 @@ def test_plugin_mailersend_attachments(mock_post):
     ]
     multi_attach = AppriseAttachment(paths)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=multi_attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=multi_attach,
+            )
         )
         is True
     )
@@ -545,4 +558,4 @@ def test_plugin_mailersend_apprise_integration(mock_post, mock_get):
 
     a = Apprise()
     assert a.add("mailersend://abcd:user@example.com/to@example.com")
-    assert a.notify(body="body", title="title") is True
+    assert bool(a.notify(body="body", title="title")) is True

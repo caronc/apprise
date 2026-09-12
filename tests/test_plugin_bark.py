@@ -37,6 +37,10 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyFormat
+from apprise.exception import (
+    AppriseImproperlyConfigured,
+    ApprisePluginException,
+)
 import apprise.plugins.bark as bark_module
 from apprise.plugins.bark import NotifyBark
 
@@ -315,9 +319,11 @@ def test_plugin_bark_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework converts it to Markdown
     # before dispatching to the Bark plugin
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )
@@ -383,7 +389,9 @@ def test_plugin_bark_aesgcm_wire_format(
 )
 def test_plugin_bark_rejects_invalid_encryption_keys(key):
     """NotifyBark() rejects keys Bark cannot use as raw AES keys."""
-    with pytest.raises(TypeError, match="Bark encryption key"):
+    with pytest.raises(
+        AppriseImproperlyConfigured, match="Bark encryption key"
+    ):
         NotifyBark(
             host="localhost",
             targets=("device-key",),
@@ -396,7 +404,10 @@ def test_plugin_bark_encryption_fails_closed_without_cryptography(monkeypatch):
     """NotifyBark() never downgrades requested encryption to plaintext."""
     monkeypatch.setattr(bark_module, "BARK_AESGCM_SUPPORT", False)
 
-    with pytest.raises(TypeError, match="requires the 'cryptography' package"):
+    with pytest.raises(
+        AppriseImproperlyConfigured,
+        match="requires the 'cryptography' package",
+    ):
         NotifyBark(
             host="localhost",
             targets=("device-key",),
@@ -640,8 +651,11 @@ def test_plugin_bark_rejects_incompatible_generated_iv(monkeypatch):
         encryption_key="k" * 32,
     )
 
-    with pytest.raises(ValueError, match="incompatible AES-GCM IV"):
+    with pytest.raises(
+        ApprisePluginException, match="incompatible AES-GCM IV"
+    ) as exc_info:
         instance._encrypt_payload({"body": "private body"})
+    assert exc_info.value.error_code == 600
 
 
 @mock.patch("requests.post")

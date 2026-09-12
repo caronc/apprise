@@ -35,6 +35,7 @@ import time
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -141,7 +142,7 @@ class NotifyDingTalk(NotifyBase):
         if not self.token:
             msg = f"An invalid DingTalk API Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.secret = None
         if secret:
@@ -151,7 +152,7 @@ class NotifyDingTalk(NotifyBase):
             if not self.secret:
                 msg = f"An invalid DingTalk Secret ({token}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Parse our targets
         self.targets = []

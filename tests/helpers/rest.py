@@ -100,6 +100,21 @@ class AppriseURLTester:
         if tests:
             self.__tests = tests
 
+    @staticmethod
+    def __iter_content(robj):
+        """Build ``iter_content()`` for a mocked response.
+
+        The configured body is returned as one chunk for streaming plugins.
+        """
+
+        def _iter_content(chunk_size=None, *args, **kwargs):
+            content = robj.content or b""
+            if isinstance(content, str):
+                content = content.encode("utf-8")
+            return iter([content]) if content else iter([])
+
+        return _iter_content
+
     def add(self, url, meta):
         """Adds a test suite to our object."""
         self.__tests.append(
@@ -184,6 +199,7 @@ class AppriseURLTester:
         # Mock our request object
         robj = mock.Mock()
         robj.content = ""
+        robj.iter_content = self.__iter_content(robj)
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_request.return_value = robj
@@ -408,6 +424,7 @@ class AppriseURLTester:
         robj = mock.Mock()
         robj.content = ""
         robj.text = ""
+        robj.iter_content = self.__iter_content(robj)
         mock_get.return_value = robj
         mock_post.return_value = robj
         mock_head.return_value = robj

@@ -33,6 +33,7 @@ from os import urandom
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import validate_regex
@@ -138,7 +139,7 @@ class NotifySimplePush(NotifyBase):
         if not self.apikey:
             msg = f"An invalid SimplePush API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if event:
             # Event Name (associated with project)
@@ -149,7 +150,7 @@ class NotifySimplePush(NotifyBase):
                     f"({event}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Default Event Name

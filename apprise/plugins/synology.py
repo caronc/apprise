@@ -30,6 +30,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import URL_PATH_SAFE_CHARS
@@ -143,7 +144,7 @@ class NotifySynology(NotifyBase):
         if not self.token:
             msg = f"An invalid Synology Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.fullpath = kwargs.get("fullpath")
 

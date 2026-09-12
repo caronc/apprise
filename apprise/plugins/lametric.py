@@ -93,6 +93,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_hostname, is_ipaddr, validate_regex
 from .base import NotifyBase
@@ -560,7 +561,7 @@ class NotifyLametric(NotifyBase):
         if self.mode not in LAMETRIC_MODES:
             msg = f"An invalid LaMetric Mode ({mode}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if self.mode == LametricMode.CLOUD:
             try:
@@ -571,7 +572,7 @@ class NotifyLametric(NotifyBase):
                     f"({app_id}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
             # Detect our Access Token
             self.lametric_app_access_token = validate_regex(
@@ -583,7 +584,7 @@ class NotifyLametric(NotifyBase):
                     f"({app_token}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # If app_ver is specified, it over-rides all
             if app_ver:
@@ -596,7 +597,7 @@ class NotifyLametric(NotifyBase):
                         f"({app_ver}) was specified."
                     )
                     self.logger.warning(msg)
-                    raise TypeError(msg)
+                    raise AppriseImproperlyConfigured(msg)
 
             else:
                 # If app_ver wasn't specified, we parse it from the
@@ -618,7 +619,7 @@ class NotifyLametric(NotifyBase):
                     f"({apikey}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         if priority not in LAMETRIC_PRIORITIES:
             self.priority = self.template_args["priority"]["default"]

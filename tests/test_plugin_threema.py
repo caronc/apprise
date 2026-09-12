@@ -33,6 +33,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.threema import NotifyThreema
 
 logging.disable(logging.CRITICAL)
@@ -43,21 +44,21 @@ apprise_url_tests = (
         "threema://",
         {
             # No user/secret specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "threema://@:",
         {
             # Invalid url
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "threema://user@secret",
         {
             # gateway id must be 8 characters in len
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -161,7 +162,7 @@ def test_plugin_threema_edge_cases(mock_post):
     targets = "+1 (555) 123-9876"
 
     # No email specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyThreema(user=gwid, secret=None, targets=targets)
 
     results = NotifyThreema.parse_url(

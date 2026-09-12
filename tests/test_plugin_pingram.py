@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pingram import NotifyPingram
 
 logging.disable(logging.CRITICAL)
@@ -50,48 +51,48 @@ apprise_url_tests = (
         "pingram://",
         {
             # No API Key at all
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pingram://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pingram://abcd",
         {
             # Doesn't match the pingram_(sk|pk)_ prefix
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pingram://pingram_sk_key/+15551235553/?mode=invalid",
         {
             # Invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pingram://pingram_sk_key/+15551235553/?region=invalid",
         {
             # Invalid region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pingram://pingram_sk_key/+15551235553/?type=*(",
         {
             # Invalid type
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pingram://pingram_sk_key/+15551235553/?channels=bad",
         {
             # Invalid channel
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -412,7 +413,9 @@ def test_plugin_pingram_template_sms_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -481,7 +484,9 @@ def test_plugin_pingram_template_email_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -556,7 +561,9 @@ def test_plugin_pingram_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -609,7 +616,9 @@ def test_plugin_pingram_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -656,7 +665,9 @@ def test_plugin_pingram_message_payloads(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -711,7 +722,9 @@ def test_plugin_pingram_targets(mock_post):
     assert isinstance(obj.url(), str)
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -743,7 +756,9 @@ def test_plugin_pingram_targets(mock_post):
     assert len(obj.targets) == 2
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 2
@@ -754,7 +769,9 @@ def test_plugin_pingram_targets(mock_post):
     obj = Apprise.instantiate(f"pingram://{apikey}/+15551234567?region=eu")
     assert isinstance(obj, NotifyPingram)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     assert mock_post.call_count == 1
@@ -768,7 +785,9 @@ def test_plugin_pingram_targets(mock_post):
     obj = Apprise.instantiate(f"pingram://{apikey}/myid/+15551234567")
     assert isinstance(obj, NotifyPingram)
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
     payload = loads(mock_post.call_args_list[0][1]["data"])
@@ -778,12 +797,12 @@ def test_plugin_pingram_targets(mock_post):
 def test_plugin_pingram_edge_cases():
     """NotifyPingram() Edge Cases."""
 
-    # No API Key raises TypeError
-    with pytest.raises(TypeError):
+    # An API key is required.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPingram(apikey=None, targets=["+15551239876"])
 
-    # An invalid API Key (wrong prefix) raises TypeError
-    with pytest.raises(TypeError):
+    # An API key with the wrong prefix is invalid.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPingram(apikey="not-a-pingram-key", targets=["+15551239876"])
 
     # Tests case where tokens is == None
