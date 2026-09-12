@@ -243,11 +243,11 @@ TEST_URLS = (
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=encrypt",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=yes",
         {
-            # Encryption fails without a public key.
-            "instance": email.NotifyEmail,
-            "response": False,
+            # The legacy yes/no boolean spelling of pgp= is no longer
+            # supported because it is now an unrecognized mode string.
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -555,6 +555,8 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
         mock_socket = mock.Mock()
         mock_socket.starttls.return_value = True
         mock_socket.login.return_value = True
+        # An empty refusal map means SMTP accepted every recipient.
+        mock_socket.sendmail.return_value = {}
 
         # Create a mock SMTP Object
         mock_smtp.return_value = mock_socket
@@ -570,7 +572,6 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 smtplib.SMTPException(
                     0, "smtplib.SMTPException() not handled"
                 ),
-                RuntimeError(0, "smtplib.HTTPError() not handled"),
                 smtplib.SMTPRecipientsRefused(
                     "smtplib.SMTPRecipientsRefused() not handled"
                 ),
@@ -774,7 +775,7 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     # Support Exception handling of smtplib.SMTP
-    mock_smtplib.side_effect = RuntimeError("Test")
+    mock_smtplib.side_effect = OSError("Test")
 
     assert (
         bool(
@@ -785,6 +786,17 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib):
 
     # A handled and expected exception
     mock_smtplib.side_effect = smtplib.SMTPException("Test")
+    assert (
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
+        is False
+    )
+
+    # AppriseSMTPController re-raises RuntimeError (part of its own
+    # SMTP_EXCEPTIONS catch-all in __enter__) after cleanup, so send()
+    # must still catch it here rather than let it escape
+    mock_smtplib.side_effect = RuntimeError("Test")
     assert (
         bool(
             obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
@@ -804,10 +816,10 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     # Support an email simulation where we can correctly quit
-    mock_smtplib.starttls.return_value = True
-    mock_smtplib.login.return_value = True
-    mock_smtplib.sendmail.return_value = True
-    mock_smtplib.quit.return_value = True
+    mock_smtplib.return_value.starttls.return_value = True
+    mock_smtplib.return_value.login.return_value = True
+    mock_smtplib.return_value.sendmail.return_value = {}
+    mock_smtplib.return_value.quit.return_value = True
 
     assert (
         bool(
@@ -934,6 +946,7 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
         suppress_exceptions=False,
     )
     assert isinstance(obj, email.NotifyEmail)
+    mock_smtplib.return_value.sendmail.return_value = {}
 
     assert (
         bool(
@@ -983,6 +996,8 @@ def test_plugin_email_timezone(mock_smtp):
     """NotifyEmail() Timezone Handling"""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp.return_value = response
 
     # Loads America/Toronto
@@ -1351,6 +1366,8 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     """NotifyEmail() Test email url parsing."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2040,6 +2057,8 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     """NotifyEmail() support + in To Email address."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2187,6 +2206,8 @@ def test_plugin_email_formatting_990(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2285,6 +2306,8 @@ def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2347,6 +2370,8 @@ def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2433,6 +2458,8 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2497,7 +2524,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert isinstance(results, dict)
     assert results["user"] == "name@spectrum.net"
-    assert results["host"] == ""  # No hostname defined; it's detected later
+    assert results["host"] == ""  # No hostname; it is detected later.
     assert results["smtp_host"] == "mobile.charter.net"
     assert results["password"] == "password"
 
@@ -2574,7 +2601,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert isinstance(results, dict)
     assert results["user"] == "name@spectrum.net"
-    assert results["host"] == ""  # No hostname defined; it's detected later
+    assert results["host"] == ""  # No hostname; it is detected later.
     assert results["smtp_host"] == "mobile.charter.net"
     assert results["password"] == "password"
 
@@ -2625,6 +2652,8 @@ def test_plugin_email_by_ipaddr_1113(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2665,6 +2694,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
 
     # Create a mock SMTP Object
     mock_smtp.return_value = mock_socket
@@ -2802,9 +2833,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # We will find our key
     assert obj.pgp.public_key() is not None
 
-    # We do this again but even when we do a requisition for a public key
-    # it will generate a new pair or keys for us once it detects we don't
-    # have any
+    # Direct lookups without an address still use the sender's own key.
     tmpdir3 = tmpdir.mkdir("tmp03")
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
@@ -2830,7 +2859,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     assert obj.pgp.public_keyfile().endswith("chris-pub.asc")
 
-    assert bool(obj.notify("test body")) is True
+    # A real send fails rather than generating an unknown recipient's key.
+    assert bool(obj.notify("test body")) is False
 
     # The private key is not needed for sending the encrypted messages
     os.unlink(os.path.join(obj.store.path, "chris-prv.asc"))
@@ -2880,19 +2910,16 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     )
     # user-pub still trumps
     assert obj.pgp.public_keyfile("user@example.com").endswith("user-pub.asc")
-    assert obj.pgp.public_keyfile("invalid@example.com").endswith(
-        "chris@nuxref.com-pub.asc"
-    )
+    # Never substitute the sender's key for a missing recipient key.
+    assert obj.pgp.public_keyfile("invalid@example.com") is None
 
     # remove this file
     os.unlink(os.path.join(obj.store.path, "user-pub.asc"))
 
-    # now we fall back to basic/default configuration
-    assert obj.pgp.public_keyfile("user@example.com").endswith(
-        "chris@nuxref.com-pub.asc"
-    )
+    # Removing the recipient key must not expose sender keys as fallbacks.
+    assert obj.pgp.public_keyfile("user@example.com") is None
     os.unlink(os.path.join(obj.store.path, "chris@nuxref.com-pub.asc"))
-    assert obj.pgp.public_keyfile("user@example.com").endswith("chris-pub.asc")
+    assert obj.pgp.public_keyfile("user@example.com") is None
 
     # Testing again
     tmpdir4 = tmpdir.mkdir("tmp04")
@@ -3000,9 +3027,10 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         asset=asset,
     )
 
+    # Use the recipient's filename to exercise the corrupt-key path.
     shutil.copyfile(
         os.path.join(TEST_VAR_DIR, "pgp", "corrupt-pub.asc"),
-        os.path.join(obj.store.path, "chris-pub.asc"),
+        os.path.join(obj.store.path, "user@example.com-pub.asc"),
     )
 
     # Key is corrupted
@@ -3010,7 +3038,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     shutil.copyfile(
         os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
-        os.path.join(obj.store.path, "chris-pub.asc"),
+        os.path.join(obj.store.path, "user@example.com-pub.asc"),
     )
 
     # Key is a binary image; definitely not a valid key
@@ -3025,6 +3053,8 @@ def test_plugin_email_pgp_modes(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3042,7 +3072,7 @@ def test_plugin_email_pgp_modes(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=e")
     assert obj.pgp_mode == "encrypt"
 
-    # pgp=none -> no mode match; falls to default 'no' (backward compat)
+    # "none" is an explicit synonym for "no".
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=none")
     assert obj.pgp_mode == "no"
 
@@ -3054,9 +3084,13 @@ def test_plugin_email_pgp_modes(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no")
     assert obj.pgp_mode == "no"
 
-    # Unknown values fall back to the default "no" mode.
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=invalid")
-    assert obj.pgp_mode == "no"
+    # Removed boolean spellings are rejected; canonical "no" remains valid.
+    for legacy in ("yes", "true", "false"):
+        with pytest.raises(AppriseImproperlyConfigured):
+            Apprise.instantiate(
+                f"mailto://user:pass@nuxref.com?pgp={legacy}",
+                suppress_exceptions=False,
+            )
 
     # url() emits 'pgp=encrypt' when mode is encrypt, and nothing when no
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
@@ -3087,6 +3121,38 @@ def test_plugin_email_pgp_modes(mock_smtp, mock_smtpssl):
     assert "pgppub=****" in obj.url(privacy=True)
     assert "my-pub.asc" not in obj.url(privacy=True)
 
+    # The removed pgpkey alias is ignored and is no longer advertised.
+    assert "pgpkey" not in email.NotifyEmail.template_args
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgpkey=/old/public-key.asc"
+    )
+    assert obj is not None
+    assert obj.pgp_key is None
+
+    # An unknown old alias cannot replace the supported parameter.
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com"
+        "?pgppub=/current/public-key.asc&pgpkey=/old/public-key.asc"
+    )
+    assert obj is not None
+    assert obj.pgp_key == "/current/public-key.asc"
+
+    # Reject typos instead of silently disabling encryption.
+    with pytest.raises(AppriseImproperlyConfigured):
+        email.NotifyEmail(
+            user="user",
+            password="pass",
+            host="nuxref.com",
+            pgp_mode="encrpyt",
+        )
+
+    # Same applies when the value arrives via the URL
+    with pytest.raises(AppriseImproperlyConfigured):
+        Apprise.instantiate(
+            "mailto://user:pass@nuxref.com?pgp=encrpyt",
+            suppress_exceptions=False,
+        )
+
 
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
@@ -3096,6 +3162,8 @@ def test_plugin_email_wkd_param(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3162,6 +3230,8 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3182,9 +3252,11 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     )
     pub_bytes = str(key.pubkey).encode()
 
+    # Keep WKD as the only key source in this test.
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir),
+        pgp_autogen=False,
     )
 
     obj = Apprise.instantiate(
@@ -3201,7 +3273,6 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     obj.pgp._ApprisePGPController__key_lookup.clear()
 
     # WKD returning None with autogen disabled falls through gracefully
-    asset.pgp_autogen = False
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
         assert bool(obj.notify("test body")) is False
 
@@ -3214,6 +3285,8 @@ def test_plugin_email_pgp_sign_mode_param(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3250,6 +3323,8 @@ def test_plugin_email_pgp_privkey_param(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3287,6 +3362,8 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3311,6 +3388,237 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
     raw = mock_socket.sendmail.call_args[0][2]
     assert "multipart/signed" in raw
     assert "application/pgp-signature" in raw
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_encrypt_send_with_autocrypt(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Encrypt with a recipient key and advertise the sender key."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    pub_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-pub.asc"
+    )
+
+    # Generate a sender key that includes an encryption subkey.
+    keygen_ctrl = utils.pgp.ApprisePGPController(
+        path=str(tmpdir.mkdir("keygen")), email="user@nuxref.com"
+    )
+    assert keygen_ctrl.keygen() is True
+    own_prv_path = keygen_ctrl.private_keyfile()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir.mkdir("send")),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com/recipient@example.com"
+        f"?pgp=encrypt&pgppub={pub_path}&pgpprv={own_prv_path}",
+        asset=asset,
+    )
+    assert obj is not None
+    assert bool(obj.notify("test body")) is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert "multipart/encrypted" in raw
+    assert raw.count("Autocrypt:") == 1
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_encrypt_self_send_autogens_key(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Encrypted self-sends may generate the sender's key."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgp=encrypt", asset=asset
+    )
+    assert obj is not None
+    assert obj.pgp.private_key() is None
+
+    assert bool(obj.notify("test body")) is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert "multipart/encrypted" in raw
+    assert obj.pgp.private_key() is not None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_encrypt_external_recipient_no_autogen(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Encrypted external sends never generate the recipient's key."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com/other@example.org?pgp=encrypt",
+        asset=asset,
+    )
+    assert obj is not None
+
+    assert bool(obj.notify("test body")) is False
+    assert obj.pgp.public_keyfile("other@example.org") is None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_send_without_autocrypt(mock_smtp, mock_smtpssl, tmpdir):
+    """Protected sends omit Autocrypt when no sender key is available."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+    pub_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-pub.asc"
+    )
+
+    with mock.patch.object(
+        utils.pgp.ApprisePGPController,
+        "autocrypt_header",
+        return_value=None,
+    ):
+        # Sign mode
+        asset = AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir.mkdir("sign")),
+        )
+        obj = Apprise.instantiate(
+            f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}",
+            asset=asset,
+        )
+        assert bool(obj.notify("test body")) is True
+        raw = mock_socket.sendmail.call_args[0][2]
+        assert "Autocrypt:" not in raw
+
+        mock_socket.reset_mock()
+
+        # Encrypt mode
+        asset = AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir.mkdir("encrypt")),
+        )
+        obj = Apprise.instantiate(
+            f"mailto://user:pass@nuxref.com?pgp=encrypt&pgppub={pub_path}",
+            asset=asset,
+        )
+        assert bool(obj.notify("test body")) is True
+        raw = mock_socket.sendmail.call_args[0][2]
+        assert "Autocrypt:" not in raw
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_autocrypt_deduplication(mock_smtp, mock_smtpssl, tmpdir):
+    """Generated Autocrypt headers replace custom case variants."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # Generate a sender key that Autocrypt can advertise.
+    keygen_ctrl = utils.pgp.ApprisePGPController(
+        path=str(tmpdir.mkdir("keygen")), email="user@nuxref.com"
+    )
+    assert keygen_ctrl.keygen() is True
+    prv_path = keygen_ctrl.private_keyfile()
+
+    # Keep iterations isolated, even on case-insensitive filesystems.
+    for index, custom_key in enumerate(
+        ("Autocrypt", "autocrypt", "AUTOCRYPT")
+    ):
+        mock_socket.reset_mock()
+        asset = AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir.mkdir(f"sign-{index}")),
+        )
+        spoofed_value = "addr%3Dattacker%40example.com%3B%20keydata%3Dbogus"
+        obj = Apprise.instantiate(
+            f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}"
+            f"&+{custom_key}={spoofed_value}",
+            asset=asset,
+        )
+        assert bool(obj.notify("test body")) is True
+        raw = mock_socket.sendmail.call_args[0][2]
+
+        # Keep only the controller-generated Autocrypt value.
+        assert raw.lower().count("autocrypt:") == 1
+        assert "attacker@example.com" not in raw
+        assert "keydata=bogus" not in raw
+
+
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_autocrypt_custom_only_deduplication(
+    mock_smtp, mock_smtpssl
+):
+    """Custom Autocrypt header names are deduplicated case-insensitively."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # pgp=no prevents a controller-generated Autocrypt header.
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com/friend@example.org"
+        "?+Autocrypt=first&+autocrypt=second"
+    )
+    assert bool(obj.notify("test body")) is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert raw.lower().count("autocrypt:") == 1
+    assert "Autocrypt: first" in raw
+    assert "second" not in raw
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
@@ -3360,8 +3668,7 @@ def test_plugin_email_pgp_sign_crlf_roundtrip(tmpdir):
         "the signed body must use CRLF line endings (RFC 3156)"
     )
 
-    # The bare-LF form must NOT verify (regression guard: CRLF
-    # normalisation before pgp.sign() must not be removed).
+    # The bare-LF form must not verify after CRLF normalization.
     lf_ok = bool(pub_key.verify(lf_body, sig))
     assert not lf_ok, (
         "Signature verified against bare-LF content -- CRLF normalisation "
@@ -3382,6 +3689,8 @@ def test_plugin_email_pgp_sign_wire_content_crlf(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3438,6 +3747,8 @@ def test_plugin_email_pgp_sign_no_privkey_fails(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3465,6 +3776,8 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3530,6 +3843,8 @@ def test_plugin_email_pgp_sign_no_pgp_support(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3563,6 +3878,8 @@ def test_plugin_email_pgp_sign_encrypt_none_mode(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3597,6 +3914,8 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3627,6 +3946,7 @@ def test_plugin_email_multi_format(mock_smtp):
     )
 
     instance = mock_smtp.return_value
+    instance.sendmail.return_value = {}
 
     aobj = Apprise()
     assert aobj.add("mailto://user:pass@example.com") is True
@@ -3750,6 +4070,8 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
     """NotifyEmail() GMX template lookup tests."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp.return_value = response
 
     for domain in (
@@ -3795,9 +4117,11 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
     passing a validating SSL context to smtplib."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     response.starttls.return_value = True
     response.login.return_value = True
-    response.sendmail.return_value = True
+    response.sendmail.return_value = {}
     response.quit.return_value = True
     mock_smtp.return_value = response
     mock_smtpssl.return_value = response
@@ -3875,6 +4199,8 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
 def test_plugin_email_starttls_certificate_failure_handling(mock_smtp):
     """A rejected STARTTLS certificate must be a normal send failure."""
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     response.starttls.side_effect = ssl.SSLCertVerificationError(
         "certificate verify failed"
     )

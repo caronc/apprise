@@ -314,7 +314,7 @@ def test_persistent_storage_flush_mode(tmpdir):
     # Setting the same value and explictly marking the field as not being
     # perisistent
     pc.set("key-xx", "abc123", persistent=False)
-    # Changing it's value doesn't alter the persistent flag
+    # Changing its value does not alter the persistent flag.
     pc["key-xx"] = "def678"
     # Setting it twice
     pc["key-xx"] = "def678"
@@ -548,7 +548,7 @@ def test_persistent_storage_flush_mode(tmpdir):
         expires=datetime.now() - timedelta(days=1),
     )
 
-    # It's actually there... but it's expired so our persistent
+    # The expired persistent entry still exists on disk.
     # storage is behaving as it should
     assert "expired" not in pc
     assert pc.get("expired") is None
@@ -1180,6 +1180,19 @@ def test_persistent_custom_io(tmpdir):
         mock.patch("os.unlink", side_effect=FileNotFoundError()),
     ):
         assert pc.write(b"test") is False
+
+
+def test_persistent_memory_open_uses_apprise_exception(tmpdir):
+    """Opening memory-only storage raises the compatible Apprise error."""
+    store = PersistentStore(
+        path=str(tmpdir),
+        mode=PersistentStoreMode.MEMORY,
+    )
+
+    with pytest.raises(exception.AppriseFileNotFound) as error:
+        store.open("key")
+
+    assert isinstance(error.value, FileNotFoundError)
 
 
 def test_persistent_storage_cache_object(tmpdir):

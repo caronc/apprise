@@ -29,56 +29,38 @@
 import dataclasses
 
 from ...exception import ApprisePluginException
+from .smtp import SMTP_DEFAULT_PORTS, SMTPSecureMode
 
 
 class AppriseEmailException(ApprisePluginException):
-    """
-    Thrown when there is an error with the Email Attachment
-    """
+    """Raised when an email cannot be prepared."""
 
     def __init__(self, message, error_code=601):
         super().__init__(message, error_code=error_code)
 
 
 class WebBaseLogin:
-    """
-    This class is just used in conjunction of the default emailers
-    to best formulate a login to it using the data detected
-    """
+    """Identify the login format expected by an email provider."""
 
     # User Login must be Email Based
     EMAIL = "Email"
 
-    # User Login must UserID Based
+    # Login must use a user ID
     USERID = "UserID"
 
 
-# Secure Email Modes
-class SecureMailMode:
-    INSECURE = "insecure"
-    SSL = "ssl"
-    STARTTLS = "starttls"
+# Keep the established email name as an alias for the shared SMTP modes.
+SecureMailMode = SMTPSecureMode
 
-
-# Define all of the secure modes (used during validation)
+# Preserve the existing mode-to-default-port format for email callers.
 SECURE_MODES = {
-    SecureMailMode.STARTTLS: {
-        "default_port": 587,
-    },
-    SecureMailMode.SSL: {
-        "default_port": 465,
-    },
-    SecureMailMode.INSECURE: {
-        "default_port": 25,
-    },
+    mode: {"default_port": port} for mode, port in SMTP_DEFAULT_PORTS.items()
 }
 
 
 @dataclasses.dataclass
 class EmailMessage:
-    """
-    Our message structure
-    """
+    """Prepared email payload and recipients."""
 
     recipient: str
     to_addrs: list[str]

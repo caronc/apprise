@@ -3111,12 +3111,7 @@ def test_apprise_cli_limit_hard_exit(mock_request, mock_force_exit):
 
 
 def test_wait_for_abandoned_calls_polls_full_grace_period():
-    """_wait_for_abandoned_calls() polls in
-    CLI_TIMEOUT_EXIT_POLL_INTERVAL increments (never a single lump
-    sleep) and returns False once the full timeout elapses with
-    _any_abandoned_calls_still_running() still reporting True
-    throughout.
-    """
+    """Poll in short intervals until the full grace period expires."""
     with (
         mock.patch("apprise.cli.time.sleep") as mock_sleep,
         mock.patch(
