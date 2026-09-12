@@ -30,7 +30,10 @@
 
 import logging
 import os
+import sys
 from unittest import mock
+
+import pytest
 
 from apprise import Apprise, AppriseAsset, NotifyBase, PersistentStoreMode
 from apprise.exception import AppriseImproperlyConfigured
@@ -333,6 +336,7 @@ def test_plugin_deltachat_send_forces_text_format(mock_smtp, mock_smtpssl):
     assert "text/html" not in raw
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP")
 @mock.patch("smtplib.SMTP_SSL")
 def test_plugin_deltachat_autocrypt_and_pgp_inherited(
@@ -374,6 +378,7 @@ def test_plugin_deltachat_autocrypt_and_pgp_inherited(
     assert "Subject: Chat: T secret chat message" not in raw
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP")
 @mock.patch("smtplib.SMTP_SSL")
 def test_plugin_deltachat_encrypt_subject_privacy(

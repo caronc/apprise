@@ -679,6 +679,7 @@ def test_has_encryption_subkey_skips_subkey_without_selfsig():
     assert ApprisePGPController._has_encryption_subkey(key) is False
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
 def test_has_encryption_subkey_skips_subkey_with_wrong_flags():
     """A signed subkey without encryption usage is not usable."""
 
@@ -697,6 +698,7 @@ def test_has_encryption_subkey_skips_subkey_with_wrong_flags():
     assert ApprisePGPController._has_encryption_subkey(key) is False
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
 def test_has_encryption_subkey_rejects_multiple_userids():
     """Autocrypt rejects keys with multiple identities."""
 
@@ -720,6 +722,7 @@ def test_has_encryption_subkey_rejects_multiple_userids():
     assert ApprisePGPController._has_encryption_subkey(key) is False
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
 def test_has_encryption_subkey_rejects_multiple_subkeys():
     """Autocrypt Level 1 requires exactly one subkey."""
 
@@ -745,6 +748,7 @@ def test_has_encryption_subkey_rejects_multiple_subkeys():
     assert ApprisePGPController._has_encryption_subkey(key) is False
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
 def test_has_encryption_subkey_rejects_extra_uid_selfsig():
     """Autocrypt rejects a UID with an extra self-signature."""
 
@@ -771,6 +775,7 @@ def test_has_encryption_subkey_rejects_extra_uid_selfsig():
     assert ApprisePGPController._has_encryption_subkey(key) is False
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
 def test_has_encryption_subkey_rejects_extra_subkey_binding_sig():
     """Autocrypt rejects a subkey with an extra binding signature."""
 
@@ -803,6 +808,7 @@ def test_has_encryption_subkey_rejects_extra_subkey_binding_sig():
     assert ApprisePGPController._has_encryption_subkey(key) is False
 
 
+@pytest.mark.skipif(not pgp_module.PGP_SUPPORT, reason="Requires PGPy")
 def test_has_encryption_subkey_rejects_uid_without_selfsig():
     """Reject a UID whose only signature is from a third party."""
 

@@ -3390,6 +3390,7 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
     assert "application/pgp-signature" in raw
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_pgp_encrypt_send_with_autocrypt(
@@ -3432,6 +3433,7 @@ def test_plugin_email_pgp_encrypt_send_with_autocrypt(
     assert raw.count("Autocrypt:") == 1
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_pgp_encrypt_self_send_autogens_key(
@@ -3463,6 +3465,7 @@ def test_plugin_email_pgp_encrypt_self_send_autogens_key(
     assert obj.pgp.private_key() is not None
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_pgp_encrypt_external_recipient_no_autogen(
@@ -3491,6 +3494,7 @@ def test_plugin_email_pgp_encrypt_external_recipient_no_autogen(
     assert obj.pgp.public_keyfile("other@example.org") is None
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_send_without_autocrypt(mock_smtp, mock_smtpssl, tmpdir):
@@ -3545,6 +3549,7 @@ def test_plugin_email_send_without_autocrypt(mock_smtp, mock_smtpssl, tmpdir):
         assert "Autocrypt:" not in raw
 
 
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
 def test_plugin_email_autocrypt_deduplication(mock_smtp, mock_smtpssl, tmpdir):
@@ -3565,11 +3570,14 @@ def test_plugin_email_autocrypt_deduplication(mock_smtp, mock_smtpssl, tmpdir):
     assert keygen_ctrl.keygen() is True
     prv_path = keygen_ctrl.private_keyfile()
 
-    for custom_key in ("Autocrypt", "autocrypt", "AUTOCRYPT"):
+    # Keep iterations isolated, even on case-insensitive filesystems.
+    for index, custom_key in enumerate(
+        ("Autocrypt", "autocrypt", "AUTOCRYPT")
+    ):
         mock_socket.reset_mock()
         asset = AppriseAsset(
             storage_mode=PersistentStoreMode.FLUSH,
-            storage_path=str(tmpdir.mkdir(f"sign-{custom_key}")),
+            storage_path=str(tmpdir.mkdir(f"sign-{index}")),
         )
         spoofed_value = "addr%3Dattacker%40example.com%3B%20keydata%3Dbogus"
         obj = Apprise.instantiate(
