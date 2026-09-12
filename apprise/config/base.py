@@ -73,6 +73,66 @@ N_MGR = NotificationManager()
 C_MGR = ConfigurationManager()
 
 
+class _ConfigEnvironment:
+    """Substitute variables in parsed application-managed configuration."""
+
+    pattern = re.compile(
+        r"\$\$\{([A-Za-z_][A-Za-z0-9_]*)\}|"
+        r"\$\{([A-Za-z_][A-Za-z0-9_]*)\}"
+    )
+
+    def expand(self, value, depth=0, memo=None):
+        """Substitute once, preserving parsed YAML structure and types."""
+        if depth > 64:
+            raise ValueError("Environment template nesting limit exceeded.")
+        if isinstance(value, str):
+            return self.pattern.sub(self._replace, value)
+        if not isinstance(value, (list, dict)):
+            return value
+        if memo is None:
+            memo = {}
+        identity = id(value)
+        if identity in memo:
+            if memo[identity] is None:
+                raise ValueError("Recursive environment template structure.")
+            return memo[identity]
+        # Cache expanded aliases and reject cycles without expanding a YAML
+        # alias graph into an exponentially larger tree.
+        memo[identity] = None
+        if isinstance(value, list):
+            result = [self.expand(item, depth + 1, memo) for item in value]
+        else:
+            result = {}
+            for key, item in value.items():
+                # YAML supports URLs as keys; option names remain literal.
+                expanded_key = (
+                    self.expand(key, depth + 1, memo)
+                    if isinstance(key, str) and "://" in key
+                    else key
+                )
+                if expanded_key in result:
+                    raise ValueError("Duplicate environment template URL.")
+                result[expanded_key] = self.expand(item, depth + 1, memo)
+        memo[identity] = result
+        return result
+
+    def _replace(self, match):
+        """Resolve a placeholder from the process environment."""
+        if match.group(1):
+            return "${" + match.group(1) + "}"
+        name = match.group(2)
+        value = os.environ.get(name)
+        if not value:
+            raise ValueError(
+                f"Environment variable {name} is missing or empty."
+            )
+        if any(char in value for char in ("\r", "\n", "\0")):
+            raise ValueError(
+                f"Environment variable {name} contains a control character."
+            )
+        return value
+
+
 class ConfigBase(URLBase):
     """This is the base class for all supported configuration sources."""
 
@@ -95,6 +155,10 @@ class ConfigBase(URLBase):
     # By default all configuration is not includable using the 'include'
     # line found in configuration files.
     allow_cross_includes = common.ContentIncludeMode.NEVER
+
+    # Local files and application-managed content may expand variables.
+    # This is not a URL option; remote descendants keep it disabled.
+    _allow_environment = False
 
     # the config path manages the handling of relative include
     config_path = os.getcwd()
@@ -236,7 +300,9 @@ class ConfigBase(URLBase):
 
         # Execute our config parse function which always returns a tuple
         # of our servers and our configuration
-        servers, configs = fn(content=content, asset=asset)
+        servers, configs = fn(
+            content=content, asset=asset, _environment=self._allow_environment
+        )
 
         # Free memory
         del content
@@ -330,6 +396,12 @@ class ConfigBase(URLBase):
                     )
                     self.logger.debug(f"Loading Exception: {e!s}")
                     continue
+
+                # A remote source cannot gain environment access by including
+                # a local file, even when insecure_includes is enabled.
+                cfg_plugin._allow_environment = (
+                    self._allow_environment and cfg_plugin._allow_environment
+                )
 
                 # if we reach here, we can now add this servers found
                 # in this configuration file to our list
@@ -641,6 +713,8 @@ class ConfigBase(URLBase):
     def config_parse_text(
         content: str,
         asset: AppriseAsset | None = None,
+        *,
+        _environment: bool = False,
     ) -> tuple[list[object], list[str]]:
         """Parse the specified content as though it were a simple text file
         only containing a list of URLs.
@@ -710,6 +784,8 @@ class ConfigBase(URLBase):
             )
             return ([], [])
 
+        environment = _ConfigEnvironment()
+
         for line, entry in enumerate(content, start=1):
             result = valid_line_re.match(entry)
             if not result:
@@ -746,6 +822,15 @@ class ConfigBase(URLBase):
                 # Store our include line
                 configs.append(config.strip())
                 continue
+
+            try:
+                if _environment:
+                    url = environment.expand(url)
+            except ValueError as error:
+                ConfigBase.logger.error(
+                    "Invalid configuration template: %s", error
+                )
+                return ([], [])
 
             # CWE-312 (Secure Logging) Handling
             loggable_url = url if not asset.secure_logging else cwe312_url(url)
@@ -874,6 +959,8 @@ class ConfigBase(URLBase):
     def config_parse_yaml(
         content: str,
         asset: AppriseAsset | None = None,
+        *,
+        _environment: bool = False,
     ) -> tuple[list[object], list[str]]:
         """Parse the specified content as though it were a yaml file
         specifically formatted for Apprise.
@@ -1097,6 +1184,15 @@ class ConfigBase(URLBase):
         if not isinstance(urls, (list, tuple)):
             # Not a problem; we simply have no urls
             urls = []
+
+        try:
+            if _environment:
+                urls = _ConfigEnvironment().expand(urls)
+        except ValueError as error:
+            ConfigBase.logger.error(
+                "Invalid configuration template: %s", error
+            )
+            return ([], [])
 
         # Iterate over each URL
         for no, url in enumerate(urls):

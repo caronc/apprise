@@ -444,6 +444,68 @@ apprise -vv --title 'custom override' \
 
 You can read more about creating your own custom notifications and/or hooks [here](https://appriseit.com/library/extending/decorator/).
 
+### Environment variables in configuration
+
+Notification URLs in local TEXT and YAML configuration files and content supplied
+through `AppriseConfig.add_config()` can reference environment variables using
+`${NAME}`. YAML URL option values support the same syntax:
+
+```text
+notifications = tgram://123456789:${TELEGRAM_BOT_TOKEN}/-1001234567890
+```
+
+```yaml
+urls:
+  - tgram://123456789:${TELEGRAM_BOT_TOKEN}/-1001234567890:
+      tag: notifications
+```
+
+Supply the variables in the environment of the process running Apprise. No
+allowlist or additional setting is needed:
+
+```sh
+# Supply TELEGRAM_BOT_TOKEN through your secret manager or container environment.
+apprise --config=apprise.conf --tag=notifications --body='Test notification'
+```
+
+Substitution applies to files loaded through `--config`, the default local
+configuration paths, `AppriseConfig.add(path)`, or `AppriseConfig.add_config(content)`.
+It does not apply to HTTP-fetched configuration or notification URLs
+passed directly to `Apprise.add()` or the CLI. These sources preserve placeholders
+literally and cannot enable substitution through a URL parameter or YAML setting.
+Local includes inherit substitution from files and application-managed content;
+a remote source cannot regain access by including a file, even with
+`insecure_includes=True`.
+
+Both local files and content passed to `add_config()` are treated as
+application-managed configuration with access to the process environment.
+
+Apprise API uses `add_config()` for saved configurations, so both mounted files
+and configurations saved through its admin UI support substitution. For a mounted
+`/config/apprise.cfg`, use the TEXT example above with
+`APPRISE_STATEFUL_MODE=simple`, supply `TELEGRAM_BOT_TOKEN` in the container
+environment, and send notifications to `/notify/apprise` with `tag=notifications`.
+No configuration lock is required. With Compose, an `env_file` can supply the
+token from a separate, untracked file; Compose's `.env` file alone does not pass
+variables into the container. Recreate the container after changing its environment.
+The stored configuration retains its placeholders, so protocols, tags, and chat
+IDs can be backed up separately from credentials.
+
+An unset or empty variable rejects the configuration source rather than
+sending with a partially substituted URL. Values containing
+newlines or NUL characters are also rejected. Errors identify the variable name,
+not its value. Existing logging and configuration export policies still apply
+to the resolved notification services.
+
+Substitution is literal and occurs once; default value syntax and recursive
+expansion are not supported. `$${NAME}` produces literal `${NAME}` in local
+files. URL substitutions must already be appropriately
+percent-encoded; YAML option values are substituted after YAML parsing and
+remain strings. Includes, tag-group definitions, and global assets are not
+expanded. Configuration files are never rewritten. Resolved services follow
+the normal configuration cache lifetime; reload the configuration after changing
+environment values.
+
 ## CLI Environment Variables
 
 Those using the Command Line Interface (CLI) can also leverage environment variables to pre-set the default settings:
