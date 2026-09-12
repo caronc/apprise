@@ -62,7 +62,8 @@ notification services. It supports sending alerts to platforms such as: \
 `APRS`, \
 `AWS SES`, `AWS SNS`, `Bark`, `Blink(1)`, `BlueSky`, `Brevo`, \
 `Burst SMS`, `BulkSMS`, `BulkVS`, \
-`Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `DingTalk`, `Discord`, \
+`Chanify`, `Clickatell`, `ClickSend`, `DAPNET`, `Delta Chat`, \
+`DingTalk`, `Discord`, \
 `Dot. (Quote/0)`, `E-Mail`, `Emby`, `Evolution API`, `Exotel`, \
 `FCM`, `Feishu`, `Flock`, `Flowtriq`, `Fluxer`, `Free Mobile`, `Google Chat`, \
 `Gotify`, `GroupMe`, `Growl`, `Guilded`, `Home Assistant`, `httpSMS`, \

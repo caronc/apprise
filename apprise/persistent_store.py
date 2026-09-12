@@ -108,13 +108,10 @@ class CacheObject:
         expires: Union[bool, float, int, datetime, None] = None,
         persistent: Optional[bool] = None,
     ) -> None:
-        """Sets fields on demand, if set to none, then they are left as is.
+        """Replace the value and optionally update its metadata.
 
-        The intent of set is that it allows you to set a new a value and
-        optionally alter meta information against it.
-
-        If expires or persistent isn't specified then their previous values are
-        used.
+        Existing expiry and persistence settings remain when their arguments
+        are ``None``.
         """
 
         self.__value = value
@@ -455,13 +452,10 @@ class PersistentStore:
         compress: bool = True,
         expires: Union[bool, float, int] = False,
     ) -> Optional[bytes]:
-        """Returns the content of the persistent store object.
+        """Read stored content as bytes.
 
-        if refresh is set to True, then the file's modify time is updated
-        preventing it from getting caught in prune calls.  It's a means of
-        allowing it to persist and not get cleaned up in later prune calls.
-
-        Content is always returned as a byte object
+        With ``expires=False``, the entry is marked for renewal so pruning
+        does not remove it.
         """
         try:
             with self.open(key, mode="rb", compress=compress) as fd:
@@ -496,12 +490,9 @@ class PersistentStore:
         compress: bool = True,
         _recovery: bool = False,
     ) -> bool:
-        """Writes the content to the persistent store if it doesn't exceed our
-        filesize limit.
+        """Write content when it fits within the file-size limit.
 
-        Content is always written as a byte object
-
-        _recovery is reserved for internal usage and should not be changed
+        Content is stored as bytes. ``_recovery`` is for internal use.
         """
 
         if key is None:
@@ -513,8 +504,7 @@ class PersistentStore:
             )
 
         if not isinstance(data, (bytes, str)):
-            # One last check, we will accept read() objets with the expectation
-            # it will return a binary dataset
+            # Accept readable objects when they return bytes or text.
             if not (hasattr(data, "read") and callable(data.read)):
                 raise AppriseImproperlyConfigured(
                     f"Invalid data type {type(data)} provided to Persistent"
@@ -631,7 +621,7 @@ class PersistentStore:
             self.max_file_size > 0
             and (new_file_size + self.size() - prev_size) > self.max_file_size
         ):
-            # The content to store is to large
+            # The content to store is too large.
             logger.warning(
                 "Persistent content exceeds allowable maximum file length"
                 f" ({int(self.max_file_size / 1024)}KB); provide"
@@ -762,11 +752,7 @@ class PersistentStore:
         compress: bool = False,
         compresslevel: int = 9,
     ) -> Any:
-        """Returns an iterator to our our file within our namespace identified
-        by the key provided.
-
-        If no key is provided, then the default is used
-        """
+        """Open a stored file by key, using the default when omitted."""
 
         if key is None:
             key = self.base_key
@@ -777,8 +763,10 @@ class PersistentStore:
             )
 
         if self.__mode == PersistentStoreMode.MEMORY:
-            # Nothing further can be done
-            raise FileNotFoundError()
+            # Memory-only storage has no file that can be opened.
+            raise exception.AppriseFileNotFound(
+                "Persistent storage has no disk-backed file"
+            )
 
         io_file = os.path.join(self.__data_path, f"{key}{self.__extension}")
         try:
@@ -872,13 +860,10 @@ class PersistentStore:
         return True
 
     def clear(self, *args: str) -> Optional[bool]:
-        """Remove one or more cache entry by it's key.
+        """Remove selected cache keys, or all keys when none are given.
 
-            e.g: clear('key')
-                 clear('key1', 'key2', key-12')
-
-        Or clear everything:
-                 clear()
+        Examples: ``clear("key")``, ``clear("key1", "key2")``, or
+        ``clear()``.
         """
         if self._cache is None and not self.__load_cache():
             return False
@@ -1086,7 +1071,7 @@ class PersistentStore:
         force: bool = False,
         _recovery: bool = False,
     ) -> bool:
-        """Save's our cache to disk."""
+        """Save the cache to disk."""
 
         if self._cache is None or self.__mode == PersistentStoreMode.MEMORY:
             # nothing to do
@@ -1355,7 +1340,7 @@ class PersistentStore:
         namespace: Optional[Union[str, list[str]]] = None,
         closest: bool = True,
     ) -> list[str]:
-        """Scansk a path provided and returns namespaces detected."""
+        """Scan a path and return the detected namespaces."""
 
         logger.trace("Persistent path can of: %s", path)
 
@@ -1416,16 +1401,10 @@ class PersistentStore:
         expires: Optional[Union[int, float]] = None,
         action: bool = False,
     ) -> dict[str, list[dict[str, Union[str, bool]]]]:
-        """Prune persistent disk storage entries that are old and/or
-        unreferenced.
+        """Find expired persistent files below ``path``.
 
-        you must specify a path to perform the prune within
-
-        if one or more namespaces are provided, then pruning focuses ONLY on
-        those entries (if matched).
-
-        if action is not set to False, directories to be removed are returned
-        only
+        ``namespace`` limits the scan. ``action=False`` previews matches;
+        ``action=True`` removes them and records the result.
         """
 
         # Prepare our File Expiry
@@ -1639,7 +1618,7 @@ class PersistentStore:
             self.flush()
 
     def __delitem__(self, key: str) -> None:
-        """Remove a cache entry by it's key."""
+        """Remove a cache entry by its key."""
         if self._cache is None and not self.__load_cache():
             raise KeyError("Could not initialize cache")
 
@@ -1662,11 +1641,7 @@ class PersistentStore:
         return
 
     def __contains__(self, key: str) -> bool:
-        """Verify if our storage contains the key specified or not.
-
-        In additiont to this, if the content is expired, it is considered to be
-        not contained in the storage.
-        """
+        """Return whether storage contains a non-expired key."""
         if self._cache is None and not self.__load_cache():
             return False
 
@@ -1723,9 +1698,9 @@ class PersistentStore:
         cache: Optional[bool] = None,
         validate: bool = True,
     ) -> bool:
-        """Manages our file space and tidys it up.
+        """Delete selected files, cached data, or all stored content.
 
-        delete('key', 'key2') delete(all=True) delete(temp=True, cache=True)
+        Examples: ``delete("key", "key2")`` or ``delete(all=True)``.
         """
 
         # Our failure flag
