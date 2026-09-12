@@ -243,10 +243,9 @@ TEST_URLS = (
         },
     ),
     (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=yes",
+        "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=encrypt",
         {
-            # Test deprecated pgp=yes flag (backward compat); notify() fails
-            # because no key is provided and PGP requires one to be useful.
+            # Encryption fails without a public key.
             "instance": email.NotifyEmail,
             "response": False,
         },
@@ -298,22 +297,9 @@ TEST_URLS = (
     ),
     (
         "mailtos://%20@domain.com?user=admin@mail-domain.com"
-        "&pgp=encrypt&pgpkey=%2Fpath%2Fto%2Fpub.asc",
+        "&pgp=encrypt&pgppub=%2Fpath%2Fto%2Fpub.asc",
         {
-            # Test deprecated pgpkey= alias; exercises the deprecation
-            # warning branch in parse_url() and maps to pgp_key.
-            # notify() returns False because the key path does not exist.
-            "instance": email.NotifyEmail,
-            "response": False,
-        },
-    ),
-    (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com"
-        "&pgp=encrypt&pgppub=%2Fpath%2Fto%2Fpub.asc"
-        "&pgpkey=%2Fold%2Fpath.asc",
-        {
-            # Test pgppub= wins over deprecated pgpkey= when both present.
-            # notify() returns False because the key path does not exist.
+            # Encryption fails when pgppub= cannot be found.
             "instance": email.NotifyEmail,
             "response": False,
         },
@@ -560,7 +546,7 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
         response = meta.get("response", True)
 
         # Our expected privacy url
-        # Don't set this if don't need to check it's value
+        # Leave this unset when its value is not needed.
         privacy_url = meta.get("privacy_url")
 
         test_smtplib_exceptions = meta.get("test_smtplib_exceptions", False)
@@ -1043,7 +1029,7 @@ def test_plugin_email_timezone(mock_smtp):
     assert "tz=" not in obj.url()
 
     # Having ourselves a default variable also does not prevent
-    # anyone from defining their own over-ride is still supported:
+    # A caller may still provide its own override:
 
     # Loads America/Montreal
     results = email.NotifyEmail.parse_url(
@@ -1083,8 +1069,7 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
 
     class SMTPMock:
         def sendmail(self, *args, **kwargs):
-            """Over-ride sendmail calls so we can check our our
-            internationalization formatting went."""
+            """Capture sendmail calls to check international formatting."""
 
             match_subject = re.search(
                 r"\n?(?P<line>Subject: (?P<subject>(.+?)))\n(?:[a-z0-9-]+:)",
@@ -1369,9 +1354,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
-    # Test variations of username required to be an email address
-    # user@example.com; we also test an over-ride port on a template driven
-    # mailto:// entry
+    # Accept a full email username and a custom template port.
     results = email.NotifyEmail.parse_url(
         "mailtos://user:pass123@hotmail.com:444"
         "?to=user2@yahoo.com&name=test%20name"
@@ -1466,7 +1449,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.url().startswith(
         "mailtos://user:pass123@hotmail.com/user2%40yahoo.com"
     )
-    # Test that our template over-ride worked
+    # Confirm the template override.
     assert "mode=ssl" in obj.url()
     assert "smtp=override.com" in obj.url()
     # No reply address specified
@@ -1785,7 +1768,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.from_addr[1] == "user@example.com"
     assert obj.secure_mode == "starttls"
     assert obj.url().startswith("mailtos://user:pass@example.com")
-    # Test that our template over-ride worked
+    # Confirm the template override.
     assert "reply=noreply%40example.com" in obj.url()
 
     assert mock_smtp.call_count == 0
@@ -1820,7 +1803,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.from_addr[1] == "user@example.com"
     assert obj.secure_mode == "starttls"
     assert obj.url().startswith("mailtos://user:pass@example.com")
-    # Test that our template over-ride worked
+    # Confirm the template override.
     assert "reply=Chris%20%3Cnoreply%40example.ca%3E" in obj.url()
 
     assert mock_smtp.call_count == 0
@@ -1843,9 +1826,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     # Fast Mail Handling
 
-    # Test variations of username required to be an email address
-    # user@example.com; we also test an over-ride port on a template driven
-    # mailto:// entry
+    # Accept a full email username and a custom template port.
     results = email.NotifyEmail.parse_url(
         "mailto://fastmail.com/?to=hello@concordium-explorer.nl"
         "&user=joe@mydomain.nl&pass=abc123"
@@ -1894,13 +1875,11 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     mock_smtp_ssl.reset_mock()
     response.reset_mock()
 
-    # Issue github.com/caronc/apprise/issue/1040
+    # Omitting to= sends to the authenticated account itself:
     #  mailto://fastmail.com?user=username@customdomain.com \
     #          &to=username@customdomain.com&pass=password123
-    #
-    # should just have to be written like (to= omitted)
     #  mailto://fastmail.com?user=username@customdomain.com&pass=password123
-    #
+    # See https://github.com/caronc/apprise/issues/1040
     results = email.NotifyEmail.parse_url(
         "mailto://fastmail.com?user=username@customdomain.com&pass=password123"
     )
@@ -1950,7 +1929,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     mock_smtp_ssl.reset_mock()
     response.reset_mock()
 
-    # Similar test as above, just showing that we can over-ride the From=
+    # Confirm that From= can be overridden.
     # with these custom URLs as well and not require a full email
     results = email.NotifyEmail.parse_url(
         "mailto://fastmail.com?user=username@customdomain.com"
@@ -2271,7 +2250,7 @@ def test_plugin_email_variables_1087():
     result, _ = ConfigBase.config_parse(
         cleandoc("""
     #
-    # Test Email Parsing where YAML tokens over-ride qsd
+    # YAML tokens override query-string values.
     #
     urls:
       - mailtos://alt.lan/?pass=abcd&user=joe@alt.lan:
@@ -2286,8 +2265,7 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
-    # YAML child tokens are higher priority than URL query-string
-    # parameters -- testuser and xxxxXXXxxx win over joe and abcd.
+    # YAML child values override URL query values.
     email_ = result[0]
     assert email_.from_addr == ["Apprise", "testuser@alt.lan"]
     assert email_.user == "testuser@alt.lan"
@@ -2710,7 +2688,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.pgp.public_keyfile() is None
     assert obj.pgp.public_key() is None
     assert obj.pgp.encrypt("message") is False
-    # Keys can not be generated in memory mode
+    # Keys cannot be generated in memory mode.
     assert obj.pgp.keygen() is False
 
     # The reason... no location to store data
@@ -2724,7 +2702,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare PGP
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt", asset=asset
     )
     assert obj.store.mode == PersistentStoreMode.FLUSH
 
@@ -2741,14 +2719,14 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     os.unlink(os.path.join(obj.store.path, "pgp-pub.asc"))
     os.unlink(os.path.join(obj.store.path, "pgp-prv.asc"))
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt", asset=asset
     )
     assert obj.store.mode == PersistentStoreMode.FLUSH
     assert obj.pgp.keygen() is True
 
     # Prepare PGP while providing it a key
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes&"
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt&"
         f"pgppub={obj.pgp.public_keyfile()}",
         asset=asset,
     )
@@ -2759,7 +2737,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # Get our key
     key = obj.pgp.public_key()
 
-    # In this circumstance we can not generate a new key as the one provided
+    # A replacement key cannot be generated in this case.
     # is immutable
     assert obj.pgp.keygen() is False
 
@@ -2774,7 +2752,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare Invalid PGP Key
     obj = Apprise.instantiate(
-        "mailto://pgpX:pass@nuxref.com?pgp=yes", asset=asset0
+        "mailto://pgpX:pass@nuxref.com?pgp=encrypt", asset=asset0
     )
 
     # No keyfiles
@@ -2799,7 +2777,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare Invalid PGP Key
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes&pgppub=invalid", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt&pgppub=invalid", asset=asset
     )
 
     # Returns false
@@ -2812,7 +2790,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir2),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com?pgp=encrypt", asset=asset
     )
 
     assert obj.store.mode == PersistentStoreMode.FLUSH
@@ -2833,7 +2811,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir3),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     assert obj.store.mode == PersistentStoreMode.FLUSH
@@ -2922,7 +2901,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir4),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     with mock.patch("builtins.open", side_effect=FileNotFoundError):
@@ -2978,7 +2958,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir5),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     # Catch edge case where we just can't generate the the key
@@ -3015,7 +2996,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir6),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     shutil.copyfile(
@@ -3037,8 +3019,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
-def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
-    """NotifyEmail() pgp_mode parameter and backward-compat use_pgp."""
+def test_plugin_email_pgp_modes(mock_smtp, mock_smtpssl):
+    """NotifyEmail() handles supported and unknown PGP modes."""
 
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
@@ -3072,17 +3054,9 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no")
     assert obj.pgp_mode == "no"
 
-    # pgp=false -> legacy bool path; no deprecation warning -> default 'no'
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=false")
+    # Unknown values fall back to the default "no" mode.
+    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=invalid")
     assert obj.pgp_mode == "no"
-
-    # pgp=yes -> parse_bool -> True -> 'encrypt' (deprecated path)
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=yes")
-    assert obj.pgp_mode == "encrypt"
-
-    # pgp=true -> same deprecated path
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=true")
-    assert obj.pgp_mode == "encrypt"
 
     # url() emits 'pgp=encrypt' when mode is encrypt, and nothing when no
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
@@ -3092,31 +3066,12 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
     assert "pgp=" not in obj.url()
 
-    # use_pgp=True deprecated kwarg maps to pgp_mode='encrypt'
-    obj = email.NotifyEmail(
-        user="user",
-        password="pass",
-        host="nuxref.com",
-        use_pgp=True,
-    )
-    assert obj.pgp_mode == "encrypt"
-
-    # use_pgp=False deprecated kwarg maps to pgp_mode='no'
-    obj = email.NotifyEmail(
-        user="user",
-        password="pass",
-        host="nuxref.com",
-        use_pgp=False,
-    )
-    assert obj.pgp_mode == "no"
-
-    # pgp_mode wins over use_pgp when both are supplied
+    # The constructor also accepts pgp_mode directly.
     obj = email.NotifyEmail(
         user="user",
         password="pass",
         host="nuxref.com",
         pgp_mode="encrypt",
-        use_pgp=False,
     )
     assert obj.pgp_mode == "encrypt"
 
@@ -3242,8 +3197,7 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
         assert bool(obj.notify("test body")) is True
 
-    # Clear the parsed-key cache so the second block cannot reuse the
-    # key loaded above -- we need the fetch mock to be the sole source
+    # Clear the cache so the next fetch uses only its mock result.
     obj.pgp._ApprisePGPController__key_lookup.clear()
 
     # WKD returning None with autogen disabled falls through gracefully
@@ -3398,10 +3352,8 @@ def test_plugin_email_pgp_sign_crlf_roundtrip(tmpdir):
     # Parse the returned armored signature back to a PGPSignature object
     sig = _pgpy.PGPSignature.from_blob(sig_str)
 
-    # The CRLF body must verify -- this is what the recipient receives.
-    # pgpy.verify() returns a SignatureVerification object (truthy on
-    # success, falsy on failure) rather than raising PGPError for a bad
-    # signature; check the return value directly.
+    # Verify the CRLF form received by the recipient.
+    # PGPy reports verification through the result's truth value.
     crlf_ok = bool(pub_key.verify(crlf_body, sig))
     assert crlf_ok, (
         "Signature did not verify against CRLF content -- "
@@ -3661,9 +3613,7 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     # Generate the key pair into the storage directory
     assert obj.pgp.keygen() is True
 
-    # Now send -- the auto-generated private key must be discovered.
-    # With both keys present the message is sign+encrypted; the signing
-    # step is the behavior under test, so we only assert success here.
+    # Sending must discover the generated private key.
     assert bool(obj.notify("test body")) is True
 
 
@@ -4026,7 +3976,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert len(sent_messages) == 1
     msg = sent_messages[0]
 
-    # Image inlined regardless -- anchor appended automatically
+    # Unreferenced images receive an automatic inline anchor.
     assert "multipart/related" in msg
     assert "Content-Disposition: inline" in msg
     assert "Content-ID:" in msg
@@ -4152,7 +4102,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
                 body="plain text body",
                 title="test",
                 notify_type=NotifyType.INFO,
-                attach=aa,  # application/pdf override -- not an image
+                attach=aa,  # application/pdf is not an image
             )
         )
         is True
@@ -4228,9 +4178,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
         )
         assert "missing-file.jpg" in warning_texts
 
-    # inline=True, HTML, only unmatched cid: ref with a non-image attachment:
-    # the unmatched ref is dropped after the warning so cid_refs is empty
-    # when the wrapper type is chosen -- wrapper must be multipart/mixed
+    # An unmatched cid: with only a PDF keeps the mixed wrapper.
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger"):
         assert (
@@ -4239,7 +4187,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
                     body='<p>body <img src="cid:ghost.jpg"></p>',
                     title="test",
                     notify_type=NotifyType.INFO,
-                    # application/pdf -- not an image, not named ghost.jpg
+                    # application/pdf is not an image or ghost.jpg
                     attach=aa,
                 )
             )
@@ -4253,11 +4201,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert "multipart/related" not in msg
     assert "Content-ID" not in msg
 
-    # inline=True, HTML, explicit cid: ref whose filename MATCHES a
-    # non-image attachment (PDF): a cid: URI can only resolve within
-    # the same MIME package, so if the caller wrote it they attached
-    # the file deliberately.  The ref is honored regardless of type --
-    # wrapper becomes multipart/related and the PDF is inlined.
+    # A matching explicit cid: reference also inlines a PDF.
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
@@ -4304,7 +4248,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
             is True
         )
 
-    # No warning about an unmatched ref -- %20 decoded to space matched it
+    # Percent-decoding lets the cid: reference match the spaced filename.
     for call in mock_logger.warning.call_args_list:
         assert "my" not in str(call), (
             "Spurious warning fired for a cid: ref that should have "
@@ -4335,7 +4279,7 @@ def test_plugin_email_inline_attachments(mock_smtplib):
         )
         is False  # bad attachment detected by the main loop
     )
-    # No sendmail call -- the bad attachment caused an early failure
+    # An inaccessible attachment fails before SMTP delivery.
     assert len(sent_messages) == 0
 
     # inline=True, TEXT format, inaccessible attachment
