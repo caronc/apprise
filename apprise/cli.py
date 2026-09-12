@@ -72,16 +72,6 @@ from .utils.parse import GET_SCHEMA_RE, parse_list
 # files.
 DEFAULT_RECURSION_DEPTH = 1
 
-# Default number of days to prune persistent storage
-DEFAULT_STORAGE_PRUNE_DAYS = int(
-    os.environ.get("APPRISE_STORAGE_PRUNE_DAYS", 30)
-)
-
-# The default URL ID Length
-DEFAULT_STORAGE_UID_LENGTH = int(
-    os.environ.get("APPRISE_STORAGE_UID_LENGTH", 8)
-)
-
 # Defines the environment variable to parse if defined. This is ONLY
 # Referenced if:
 # - No Configuration Files were found/loaded/specified
@@ -96,6 +86,22 @@ DEFAULT_ENV_APPRISE_PLUGIN_PATH = "APPRISE_PLUGIN_PATH"
 
 # Defines the override path for the persistent storage
 DEFAULT_ENV_APPRISE_STORAGE_PATH = "APPRISE_STORAGE_PATH"
+
+# Environment variable controlling the storage retention period
+DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS = "APPRISE_STORAGE_PRUNE_DAYS"
+
+# Environment variable controlling generated storage URL ID length
+DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH = "APPRISE_STORAGE_UID_LENGTH"
+
+# Default number of days to prune persistent storage
+DEFAULT_STORAGE_PRUNE_DAYS = int(
+    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PRUNE_DAYS, 30)
+)
+
+# The default URL ID Length
+DEFAULT_STORAGE_UID_LENGTH = int(
+    os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_UID_LENGTH, 8)
+)
 
 # Grace period for abandoned service calls to finish before forced exit.
 # Normal interpreter shutdown would otherwise wait on those threads.
@@ -255,9 +261,9 @@ PERSISTENT_STORAGE_MODES = (
     PersistentStorageMode.CLEAR,
 )
 
-if os.environ.get("APPRISE_STORAGE_PATH", "").strip():
+if os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PATH, "").strip():
     # Override Default Storage Path
-    DEFAULT_STORAGE_PATH = os.environ.get("APPRISE_STORAGE_PATH")
+    DEFAULT_STORAGE_PATH = os.environ.get(DEFAULT_ENV_APPRISE_STORAGE_PATH)
 
 
 def _log_runtime_env():
@@ -912,18 +918,7 @@ def main(
     # Apply Environment Overrides if defined
     #
     config_paths = DEFAULT_CONFIG_PATHS
-    if "APPRISE_CONFIG" in os.environ:
-        # Deprecate (this was from previous versions of Apprise <= 1.9.1)
-        logger.deprecate(
-            "APPRISE_CONFIG environment variable has been changed to "
-            f"{DEFAULT_ENV_APPRISE_CONFIG_PATH}"
-        )
-        logger.debug(
-            "Loading provided APPRISE_CONFIG (deprecated) environment variable"
-        )
-        config_paths = (os.environ.get("APPRISE_CONFIG", "").strip(),)
-
-    elif DEFAULT_ENV_APPRISE_CONFIG_PATH in os.environ:
+    if DEFAULT_ENV_APPRISE_CONFIG_PATH in os.environ:
         logger.debug(
             f"Loading provided {DEFAULT_ENV_APPRISE_CONFIG_PATH} "
             "environment variable"
@@ -931,6 +926,16 @@ def main(
         config_paths = re.split(
             r"[\r\n;]+",
             os.environ.get(DEFAULT_ENV_APPRISE_CONFIG_PATH).strip(),
+        )
+
+    elif "APPRISE_CONFIG" in os.environ:
+        logger.deprecate(
+            "The APPRISE_CONFIG environment variable has been renamed to "
+            f"{DEFAULT_ENV_APPRISE_CONFIG_PATH}"
+        )
+        config_paths = re.split(
+            r"[\r\n;]+",
+            os.environ.get("APPRISE_CONFIG").strip(),
         )
 
     plugin_paths_ = DEFAULT_PLUGIN_PATHS
@@ -1193,8 +1198,7 @@ def main(
         click.echo("Try 'apprise --help' for more information.")
         ctx.exit(1)
 
-    # each --tag entry comprises of a comma separated 'and' list
-    # we or each of of the --tag and sets specified.
+    # Each --tag value is a comma-separated AND group; values are ORed.
     tags = None if not tag else [parse_list(t) for t in tag]
 
     # Determine if we're dealing with URLs or url_ids based on the first
@@ -1373,18 +1377,12 @@ def main(
             if action == PersistentStorageMode.CLEAR:
                 storage_prune_days = 0
 
-            # Derive the namespace for disk_prune.  The scoping rules
-            # mirror those for disk_scan:
-            #   - URL filters: resolved plugin uids + any uid-prefix
-            #     strings; empty means no-op (nothing to prune).
-            #   - Tag filters: same scoping — resolved plugin uids + any
-            #     uid-prefix strings; empty means no-op.
-            #   - Plain uid-prefix or no filter: pass through directly.
+            # Match disk-scan filtering when choosing prune namespaces:
+            # - URL and tag filters use resolved UIDs plus explicit prefixes.
+            # - An empty filtered result prunes nothing.
+            # - Otherwise, pass explicit prefixes or no filter through.
             if _had_url_filters or tags:
-                # Scope to the uids that the filtered plugins resolved
-                # to.  If none resolved (e.g. unknown tag), exit early
-                # -- disk_prune() with namespace=None targets ALL
-                # namespaces, so passing None here is not a no-op.
+                # Exit when filters resolve nothing because None prunes all.
                 _prune_ns = list(uids.keys()) + uid_filter_list
                 if not _prune_ns:
                     ctx.exit(0)
