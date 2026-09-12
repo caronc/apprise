@@ -719,7 +719,7 @@ def test_apprise_cli_nux_env(tmpdir):
         )
         assert result.exit_code == 1
 
-        # If we specify an inline URL, it will over-ride the environment
+        # An inline URL overrides the environment.
         # variable
         result = runner.invoke(
             cli.main,
@@ -748,8 +748,8 @@ def test_apprise_cli_nux_env(tmpdir):
         )
         assert result.exit_code == 0
 
-    with environ(APPRISE_CONFIG=str(t2)):
-        # Deprecated test case
+    with environ(APPRISE_CONFIG_PATH=str(t2)):
+        # Load the configuration from the current environment variable.
         result = runner.invoke(
             cli.main,
             [
@@ -761,8 +761,24 @@ def test_apprise_cli_nux_env(tmpdir):
         )
         assert result.exit_code == 0
 
-    with environ(APPRISE_CONFIG_PATH=str(t2)):
-        # Our configuration file will load from our environmment variable
+    with environ(APPRISE_CONFIG=str(t2)):
+        # The deprecated name still works and emits a notice.
+        result = runner.invoke(
+            cli.main,
+            [
+                "-b",
+                "has myTag",
+                "--tag",
+                "myTag",
+            ],
+        )
+        assert result.exit_code == 0
+
+    with environ(
+        APPRISE_CONFIG_PATH=str(t2),
+        APPRISE_CONFIG="garbage/file/path.yaml",
+    ):
+        # Prefer APPRISE_CONFIG_PATH when both names are defined.
         result = runner.invoke(
             cli.main,
             [
@@ -775,7 +791,7 @@ def test_apprise_cli_nux_env(tmpdir):
         assert result.exit_code == 0
 
     with environ(APPRISE_CONFIG_PATH=str(t2) + ";/another/path"):
-        # Our configuration file will load from our environmment variable
+        # The current variable accepts multiple configuration paths.
         result = runner.invoke(
             cli.main,
             [
@@ -789,7 +805,7 @@ def test_apprise_cli_nux_env(tmpdir):
 
     with (
         mock.patch("apprise.cli.DEFAULT_CONFIG_PATHS", []),
-        environ(APPRISE_CONFIG="      "),
+        environ(APPRISE_CONFIG_PATH="      "),
     ):
         # We will fail to send the notification as no path was specified.
         # We override the DEFAULT_CONFIG_PATHS because we don't want to detect
@@ -803,7 +819,7 @@ def test_apprise_cli_nux_env(tmpdir):
         )
         assert result.exit_code == 1
 
-    with environ(APPRISE_CONFIG="garbage/file/path.yaml"):
+    with environ(APPRISE_CONFIG_PATH="garbage/file/path.yaml"):
         # We will fail to send the notification as the path
         # specified is not loadable
         result = runner.invoke(
@@ -815,8 +831,7 @@ def test_apprise_cli_nux_env(tmpdir):
         )
         assert result.exit_code == 1
 
-        # We can force an over-ride by specifying a config file on the
-        # command line options:
+        # A command-line configuration overrides the invalid environment path.
         result = runner.invoke(
             cli.main,
             [
@@ -830,8 +845,7 @@ def test_apprise_cli_nux_env(tmpdir):
         )
         assert result.exit_code == 0
 
-    # Just a general test; if both the --config and urls are specified
-    # then the the urls trumps all
+    # Explicit URLs take priority over --config.
     result = runner.invoke(
         cli.main,
         [
@@ -1576,7 +1590,7 @@ def test_apprise_cli_persistent_storage(tmpdir):
         ],
     )
     assert result.exit_code == 0
-    # ea482db7 must be intact -- the no-match prune must not wipe storage
+    # A prune with no matches must leave existing storage intact.
     assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
 
     # Tag-scoped CLEAR with the same unmatchable tag: same guard must fire.
@@ -1594,7 +1608,7 @@ def test_apprise_cli_persistent_storage(tmpdir):
         ],
     )
     assert result.exit_code == 0
-    # ea482db7 must survive -- a no-match clear must not erase everything
+    # A clear with no matches must leave existing storage intact.
     assert os.path.isdir(os.path.join(str(tmpdir), "ea482db7"))
 
     # URL filter that fails to load (unknown schema): _had_url_filters is
@@ -2027,10 +2041,9 @@ def test_apprise_cli_details(tmpdir):
     class TestReq03Notification(NotifyBase):
         """This class is used to test various requirement configurations."""
 
-        # Set some requirements (but additionally include a details over-ride)
+        # Set requirements with a custom details value.
         requirements: ClassVar[RequirementsSpec] = {
-            # We can over-ride the default details assigned to our plugin if
-            # specified
+            # Allow callers to override the plugin's default details.
             "details": _("some specified requirement details"),
             # We can set a string value as well (it does not have to be a list)
             "packages_recommended": "cryptography <= 3.4",
@@ -2217,8 +2230,7 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
             "json://localhost",
         ],
     )
-    # The path is silently loaded but fails... it's okay because the
-    # notification we're choosing to notify does exist
+    # The valid notification still loads despite the invalid path.
     assert result.exit_code == 0
 
     # Directories that don't exist passed in by the CLI aren't even scanned
@@ -2236,8 +2248,7 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
             "json://localhost",
         ],
     )
-    # The path is silently loaded but fails... it's okay because the
-    # notification we're choosing to notify does exist
+    # The valid notification still loads despite the invalid path.
     assert result.exit_code == 0
     assert len(N_MGR._paths_previously_scanned) == 1
     assert join(str(tmpdir), "empty") in N_MGR._paths_previously_scanned
@@ -2276,8 +2287,7 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
     # meanwhile we would have failed to load the myhook path
     assert result.exit_code == 1
 
-    # The path is silently loaded but fails... it's okay because the
-    # notification we're choosing to notify does exist
+    # The valid notification still loads despite the invalid path.
     assert len(N_MGR._paths_previously_scanned) == 1
     assert str(notify_hook_a) in N_MGR._paths_previously_scanned
     # However there was nothing to load
@@ -2494,7 +2504,7 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
         cleandoc("""
     from apprise.decorators import notify
 
-    # We can't over-ride an element that already exists
+    # Existing elements cannot be overridden.
     # in this case json://
     @notify(on="json")
     def mywrapper_01(body, title, notify_type, *args, **kwargs):
@@ -2511,18 +2521,13 @@ def test_apprise_cli_plugin_loading(mock_request, tmpdir):
         # Return True
         return True
 
-    # This is a duplicate o the entry above, so it can not be
-    # loaded...
+    # A duplicate schema cannot be loaded.
     @notify(on="clihook1", name="a duplicate of the clihook entry")
     def mywrapper_04(body, title, notify_type, *args, **kwargs):
         # Return True
         return True
 
-    # This is where things get realy cool... we can not only
-    # define the schema we want to over-ride, but we can define
-    # some default values to pass into our wrapper function to
-    # act as a base before whatever was actually passed in is
-    # applied ontop.... think of it like templating information
+    # A schema URL may also provide defaults for the wrapper.
     @notify(on="clihook2://localhost")
     def mywrapper_05(body, title, notify_type, *args, **kwargs):
         # Return True
@@ -2724,7 +2729,7 @@ def test_apprise_cli_runtime_env_logging(
         def runtime_deps():
             return ("testpkg",)
 
-    # Disabled plugin -- its dep must NOT appear in output
+    # Dependencies from disabled plugins must not appear.
     class DisabledPlugin:
         enabled = False
 
@@ -2732,7 +2737,7 @@ def test_apprise_cli_runtime_env_logging(
         def runtime_deps():
             return ("disabled-dep",)
 
-    # Plugin with no runtime_deps attribute -- silently skipped
+    # Plugins without runtime_deps are skipped.
     class NoRuntimeDepsPlugin:
         enabled = True
 
@@ -2936,7 +2941,7 @@ def test_apprise_cli_runtime_env_no_packages_distributions(
     calls = [a for a, _ in mock_logger.debug.call_args_list]
     assert any(a[0] == "Apprise: %s" for a in calls)
 
-    # No dep listing -- packages_distributions was unavailable
+    # No dependency list is logged without packages_distributions.
     assert not any(a[0] == "Runtime deps: %s" for a in calls)
 
 
@@ -2965,14 +2970,14 @@ def test_apprise_cli_runtime_env_py39_no_packages_distributions(
 
     mock_mgr.return_value = [{"plugin": {DepPlugin}}]
 
-    # packages_distributions() absent natively -- no manipulation needed
+    # This Python version lacks packages_distributions natively.
     cli._log_runtime_env()
 
     # Env summary was still logged despite the missing function
     calls = [a for a, _ in mock_logger.debug.call_args_list]
     assert any(a[0] == "Apprise: %s" for a in calls)
 
-    # No dep listing -- packages_distributions unavailable on Python < 3.11
+    # No dependency list is logged without packages_distributions.
     assert not any(a[0] == "Runtime deps: %s" for a in calls)
 
 
@@ -3013,8 +3018,7 @@ def test_apprise_cli_notify_runtime_stat_log(mock_request):
             "Finished in %.2fs. %d service(s) tried (%s): %d sent / "
             "%d failed / %d timed out."
         )
-        # a[1] is the elapsed seconds float -- not asserted here, just
-        # that it's present as the first substitution.
+        # The elapsed-seconds value is the first substitution.
         and a[2:] == (1, "SUCCESS", 1, 0, 0)
         for a in calls
     )
@@ -3067,15 +3071,11 @@ def test_apprise_cli_limit_option_times_out_service(
 
 @mock.patch("apprise.cli._force_exit")
 @mock.patch("requests.request")
-def test_apprise_cli_limit_option_hard_exit_when_call_still_running(
-    mock_request, mock_force_exit
-):
-    """
-    CLI: force exit when a timed-out call outlives the grace period.
+def test_apprise_cli_limit_hard_exit(mock_request, mock_force_exit):
+    """Force exit when a call outlives the timeout grace period.
 
-    This complements the normal timeout test. The 2-second service delay
-    safely exceeds the shortened grace periods, preventing false positives on
-    slower hosts. _force_exit() is mocked so the test process stays alive.
+    A two-second delay avoids timing races. ``_force_exit()`` is mocked so the
+    test process stays alive.
     """
     import time
 
@@ -3136,11 +3136,8 @@ def test_wait_for_abandoned_calls_polls_full_grace_period():
         assert call.args[0] <= cli.CLI_TIMEOUT_EXIT_POLL_INTERVAL
 
 
-def test_wait_for_abandoned_calls_logs_service_descriptions_at_debug():
-    """_wait_for_abandoned_calls() logs which specific still-running
-    service(s) it's waiting on, once, at DEBUG level only -- so this
-    stays out of default-verbosity output even though the url() is
-    already privacy-masked by _abandoned_call_descriptions()."""
+def test_wait_for_abandoned_calls_logs_masked_services():
+    """Log masked descriptions for unfinished calls at DEBUG once."""
     with (
         mock.patch("apprise.cli.time.sleep"),
         mock.patch(
@@ -3165,8 +3162,7 @@ def test_wait_for_abandoned_calls_exits_early_when_calls_finish():
     always waiting out the full grace period -- the whole point of
     polling instead of a single fixed sleep.
     """
-    # "Still running" for the first two checks, then finished -- so
-    # only 2 short sleeps happen instead of the full grace period.
+    # Two busy checks produce two short sleeps before completion.
     with (
         mock.patch("apprise.cli.time.sleep") as mock_sleep,
         mock.patch(
