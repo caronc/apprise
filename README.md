@@ -336,6 +336,76 @@ apprise -vv -t 'my title' -b 'my notification body' \
    --config=https://localhost/my/apprise/config
 ```
 
+## CLI Template Variables
+
+A YAML configuration can leave a value out of a URL and have it filled in
+later, which lets you keep the configuration in version control without the
+secrets in it.
+
+Write `${NAME}` where the value belongs and declare every name you use in a
+`template:` section:
+
+```yaml
+template:
+  # A value written here is used when nothing else supplies one
+  smtp_host: smtp.example.com
+  # No value, so this one must always be supplied
+  api_key:
+
+urls:
+  - sendgrid://${API_KEY}:noreply@example.com/you@example.com:
+      - tag: alerts
+```
+
+Apprise looks for each value in this order and stops at the first answer:
+
+1. a value passed with `--template-var` (`-tv`)
+2. the environment variable `APPRISE_TEMPLATE_<NAME>`
+3. the default written in the `template:` section
+
+```bash
+# Supply it directly
+apprise --config=apprise.yml --tag=alerts \
+   --template-var api_key=your-secret-key \
+   --body="Hello"
+
+# Or leave it in the environment
+export APPRISE_TEMPLATE_API_KEY=your-secret-key
+apprise --config=apprise.yml --tag=alerts --body="Hello"
+```
+
+A URL still missing a value is not loaded; the others are still notified and
+Apprise exits with a status of `4`. Add `--dry-run` to see what a
+configuration is still waiting for without sending anything.
+
+`${NAME}` only means something when `NAME` is declared in the `template:`
+section. Anywhere else it is ordinary text, so a password containing `${...}`
+is never touched. Names ignore case, a name may be used as often as you like,
+and this applies to YAML configuration only; TEXT configuration is passed
+through unchanged. Extra supplied names are accepted and ignored; the local
+debug log identifies their names without recording their values.
+
+The configuration author may place a variable directly in a URL or in a named
+YAML setting below it. URL placement is intentionally unrestricted, supporting
+email addresses, `user:pass`, comma-separated targets, and other forms a
+service understands. Because punctuation may affect that field, use a named
+setting when an untrusted caller should control only one specific option.
+
+A variable may not appear before `://`, may not be used for `tag:`/`tags:`, and
+may not be used as a setting's name. Which service is used, and who is
+notified, are settled before values are filled in. Tags select the entries to
+resolve, so allowing a value to change a tag would create a circular lookup.
+
+Templates can be switched off for a whole installation through the asset:
+
+```python
+asset = apprise.AppriseAsset(allow_templates=False)
+```
+
+Configurations are then read exactly as they were before templates existed: a
+`template:` section is ignored, `${NAME}` is ordinary text, and nothing is read
+from the environment. Template-specific comparisons and warnings are skipped.
+
 ## CLI Tagging Support
 
 Apprise allows you to tag your services in your configuration to organize them (e.g., `family`, `devops`, `critical`). You can then filter which services to notify using the `--tag` (`-g`) switch.
@@ -454,6 +524,7 @@ Those using the Command Line Interface (CLI) can also leverage environment varia
 |  `APPRISE_CONFIG_PATH`  | Explicitly specify the config search path to use (overriding the default). The path(s) defined here must point to the absolute filename to open/reference. Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 |  `APPRISE_PLUGIN_PATH`  | Explicitly specify the custom plugin search path to use (overriding the default). Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 |  `APPRISE_STORAGE_PATH` | Explicitly specify the persistent storage path to use (overriding the default).
+|  `APPRISE_TEMPLATE_<NAME>` | Supply a value for a `${NAME}` used by a YAML configuration. For example `APPRISE_TEMPLATE_API_KEY` fills in `${API_KEY}`. A value passed with `--template-var` (`-tv`) takes priority over this.
 
 # Developer API Usage
 

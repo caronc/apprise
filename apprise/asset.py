@@ -266,6 +266,11 @@ class AppriseAsset:
     # When enabled, both limits cover the complete notification call.
     _result_log_disk_size = 0
 
+    # Whether YAML may declare and fill ${NAME} values. This internal setting
+    # belongs to the host, not the configuration. When disabled, template
+    # sections are ignored and markers remain ordinary text.
+    _allow_templates = True
+
     def __init__(
         self,
         plugin_paths: Optional[list[str]] = None,
@@ -276,6 +281,7 @@ class AppriseAsset:
         timezone: Optional[Union[str, tzinfo]] = None,
         service_timeout: Optional[Union[int, float]] = None,
         payload_max_size: Optional[int] = None,
+        allow_templates: Optional[bool] = None,
         payload_buffer_threshold: Optional[int] = None,
         payload_min_buffer: Optional[int] = None,
         result_log_memory_size: Optional[int] = None,
@@ -357,6 +363,14 @@ class AppriseAsset:
         else:
             # Default our timezone to what is detected on the system
             self._tzinfo = datetime.now().astimezone().tzinfo
+
+        if allow_templates is not None:
+            if not isinstance(allow_templates, bool):
+                raise AppriseImproperlyConfigured(
+                    "AppriseAsset allow_templates must be a bool."
+                )
+
+            self._allow_templates = allow_templates
 
         if service_timeout is not None:
             # Store all durations as floats and reject bool values.
@@ -743,6 +757,11 @@ class AppriseAsset:
         """Return the persistent storage id length."""
 
         return self.__storage_idlen
+
+    @property
+    def allow_templates(self) -> bool:
+        """Return whether a YAML configuration may use template variables."""
+        return self._allow_templates
 
     @property
     def result_log_memory_size(self) -> int:

@@ -53,7 +53,7 @@ from .common import (
 from .config.base import ConfigBase
 from .conversion import convert_between
 from .emojis import apply_emojis
-from .exception import AppriseImproperlyConfigured
+from .exception import AppriseImproperlyConfigured, AppriseTemplateError
 from .locale import AppriseLocale
 from .logger import NotifyLogEntry, _ServiceLogCapture, logger
 from .manager_plugins import NotificationManager
@@ -65,10 +65,12 @@ from .result import (
     NotifyResult,
 )
 from .tag import AppriseTag
+from .template import NotifyTemplate
 from .utils.cwe312 import cwe312_url
 from .utils.json import AppriseJSONEncoder
 from .utils.logic import is_exclusive_match
 from .utils.parse import parse_list, parse_urls
+from .utils.template import normalize_name, resolve_values
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -326,6 +328,29 @@ def _aggregate_status(
         return AppriseResultStatus.TIMEOUT
 
     return AppriseResultStatus.FAILURE
+
+
+def _template_status(
+    status: AppriseResultStatus,
+    skipped: list,
+) -> AppriseResultStatus:
+    """Account for entries that never loaded for want of a value.
+
+    An entry written with ``${NAME}`` is left out when no value could
+    be found for it.  The caller is told something was left out rather
+    than being handed a clean success.
+    """
+    if not skipped:
+        return status
+
+    if status == AppriseResultStatus.SUCCESS:
+        return AppriseResultStatus.PARTIAL
+
+    if status == AppriseResultStatus.NOMATCH:
+        # Everything that matched was waiting on a value we never got
+        return AppriseResultStatus.FAILURE
+
+    return status
 
 
 def _resolve_retry_count(service: NotifyBase, kwargs: dict[str, Any]) -> int:
@@ -834,6 +859,9 @@ class Apprise:
         self,
         tag: Any = common.MATCH_ALL_TAG,
         match_always: bool = True,
+        template: Optional[dict] = None,
+        resolve: bool = True,
+        report: Optional[list] = None,
     ) -> Iterator[NotifyBase]:
         """Yield loaded services that match ``tag``.
 
@@ -846,6 +874,12 @@ class Apprise:
         When ``match_always`` is true, services carrying the reserved
         ``always`` tag are yielded even when the requested filter would not
         otherwise select them.
+
+        ``template`` supplies values for pending ``${NAME}`` entries. Missing
+        values fall back to ``APPRISE_TEMPLATE_<NAME>`` and then to the
+        configuration's own defaults. Names are case-insensitive, and unused
+        names are ignored. Unresolved entries are skipped and optionally added
+        to ``report``. Set ``resolve=False`` to return them unchanged.
         """
 
         # Build our tag setup
@@ -862,6 +896,11 @@ class Apprise:
         # and notify these services under all circumstances
         match_always = common.MATCH_ALWAYS_TAG if match_always else None
 
+        # One value table can cover several configurations. Extra names are
+        # harmless, but acknowledge them in the local debug log.
+        if resolve and template:
+            self._log_unused_template_names(template)
+
         # Iterate over our loaded plugins
         for entry in self.services:
             if isinstance(entry, (ConfigBase, AppriseConfig)):
@@ -875,14 +914,110 @@ class Apprise:
 
             for service in services:
                 # Apply our tag matching based on our defined logic
-                if is_exclusive_match(
+                if not is_exclusive_match(
                     logic=tag,
                     data=service.tags,
                     match_all=common.MATCH_ALL_TAG,
                     match_always=match_always,
                 ):
-                    yield service
+                    continue
+
+                if resolve and isinstance(service, NotifyTemplate):
+                    built = self._resolve_template(service, template)
+                    if built is None:
+                        if report is not None:
+                            # Track the entry itself, never the value
+                            # it was waiting on
+                            report.append(service)
+                        continue
+
+                    service = built
+
+                yield service
         return
+
+    def _log_unused_template_names(self, template: dict) -> None:
+        """Acknowledge supplied names that no loaded template uses."""
+
+        known: set[str] = set()
+        for entry in self.services:
+            services = (
+                entry.services()
+                if isinstance(entry, (ConfigBase, AppriseConfig))
+                else [entry]
+            )
+            known.update(
+                name
+                for service in services
+                if isinstance(service, NotifyTemplate)
+                for name in service.template_names
+            )
+
+        unused = []
+        seen = set()
+        unused_count = 0
+        for key in template:
+            if not isinstance(key, str):
+                continue
+
+            name = normalize_name(key)
+            if name in known or name in seen:
+                continue
+
+            seen.add(name)
+            unused_count += 1
+            if len(unused) < 20:
+                # Keep debug output bounded for large caller mappings.
+                unused.append(name)
+
+        if not unused_count:
+            return
+
+        # Names may help the operator find a typo, but values may be secrets.
+        # Keep this out of result logs that an API can stream to its caller.
+        logger.debug(
+            "Template variable(s) %s%s were supplied but not used",
+            ", ".join(unused),
+            (
+                " (+{} more)".format(unused_count - len(unused))
+                if unused_count > len(unused)
+                else ""
+            ),
+            extra={"apprise_capture": False},
+        )
+
+    @staticmethod
+    def _resolve_template(
+        service: NotifyTemplate,
+        template: Optional[dict],
+    ) -> Optional[NotifyBase]:
+        """Build a pending service, or return ``None`` when values are missing.
+
+        Missing variable names are written only to the local log.
+        """
+
+        try:
+            values = resolve_values(
+                service.template_schema,
+                template,
+                names=service.names,
+            )
+
+        except AppriseTemplateError as e:
+            logger.error(
+                "Template variable '%s' is not available; %s:// was skipped",
+                e.variable,
+                service.schema,
+                extra={"apprise_capture": False},
+            )
+            logger.warning(
+                "A %s:// entry was skipped; it is waiting on a"
+                " configuration value",
+                service.schema,
+            )
+            return None
+
+        return service.resolve(values)
 
     @staticmethod
     def _extract_filter_retry(tag):
@@ -1232,6 +1367,7 @@ class Apprise:
         match_always: bool = True,
         attach: Any = None,
         interpret_escapes: Optional[bool] = None,
+        template: Optional[dict] = None,
         timeout: Union[int, float] = 0,
         log_callback: Optional[
             Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
@@ -1284,6 +1420,12 @@ class Apprise:
         Set interpret_escapes to True if you want to pre-escape a string such
         as turning a \n into an actual new line, etc.
 
+        ``template`` supplies values for any YAML configuration entry
+        written with ``${NAME}``.  A value not given here is looked for
+        in ``APPRISE_TEMPLATE_<NAME>`` and then in the configuration's
+        own defaults.  An entry still missing a value is skipped, and
+        the overall status reports PARTIAL rather than SUCCESS.
+
         ``timeout`` limits the entire call in seconds; unfinished services
         report TIMEOUT. The earlier call or service limit applies. A value of
         0 leaves only the service limit active. Values must be finite,
@@ -1309,6 +1451,9 @@ class Apprise:
         call_level = Apprise._resolve_call_level(
             effective_log_level, effective_log_callback
         )
+
+        # Entries held back because a template value was never supplied
+        skipped = []
 
         # Wall-clock start for AppriseResult.elapsed -- covers the entire
         # call, including argument validation, not just service dispatch.
@@ -1339,6 +1484,8 @@ class Apprise:
                         match_always=match_always,
                         attach=attach,
                         interpret_escapes=interpret_escapes,
+                        template=template,
+                        report=skipped,
                     )
                 )
 
@@ -1354,7 +1501,9 @@ class Apprise:
             if not all_calls:
                 # Tag filter matched nothing, or no services are loaded at all.
                 return AppriseResult(
-                    status=AppriseResultStatus.NOMATCH,
+                    status=_template_status(
+                        AppriseResultStatus.NOMATCH, skipped
+                    ),
                     results=[],
                     elapsed=time.monotonic() - start,
                     call_logs=call_capture.entries,
@@ -1373,7 +1522,9 @@ class Apprise:
                     all_calls, call_deadline=call_deadline
                 )
                 return AppriseResult(
-                    status=_aggregate_status(ok, results),
+                    status=_template_status(
+                        _aggregate_status(ok, results), skipped
+                    ),
                     results=results,
                     elapsed=time.monotonic() - start,
                     call_logs=call_capture.entries,
@@ -1414,7 +1565,10 @@ class Apprise:
                     for st in chain_states.values()
                 ):
                     return AppriseResult(
-                        status=_aggregate_status(False, all_results),
+                        status=_template_status(
+                            _aggregate_status(False, all_results),
+                            skipped,
+                        ),
                         results=all_results,
                         elapsed=time.monotonic() - start,
                         call_logs=call_capture.entries,
@@ -1501,7 +1655,9 @@ class Apprise:
 
             success = all(st["succeeded"] for st in chain_states.values())
             return AppriseResult(
-                status=_aggregate_status(success, all_results),
+                status=_template_status(
+                    _aggregate_status(success, all_results), skipped
+                ),
                 results=all_results,
                 elapsed=time.monotonic() - start,
                 call_logs=call_capture.entries,
@@ -1532,6 +1688,10 @@ class Apprise:
         call_level = Apprise._resolve_call_level(
             effective_log_level, effective_log_callback
         )
+
+        # Entries held back because a template value was never supplied
+        skipped = []
+        kwargs["report"] = skipped
 
         # Wall-clock start for AppriseResult.elapsed -- see notify().
         start = time.monotonic()
@@ -1565,7 +1725,9 @@ class Apprise:
             if not all_calls:
                 # Tag filter matched nothing, or no services are loaded at all.
                 return AppriseResult(
-                    status=AppriseResultStatus.NOMATCH,
+                    status=_template_status(
+                        AppriseResultStatus.NOMATCH, skipped
+                    ),
                     results=[],
                     elapsed=time.monotonic() - start,
                     call_logs=call_capture.entries,
@@ -1585,7 +1747,9 @@ class Apprise:
                     all_calls, call_deadline=call_deadline
                 )
                 return AppriseResult(
-                    status=_aggregate_status(ok, results),
+                    status=_template_status(
+                        _aggregate_status(ok, results), skipped
+                    ),
                     results=results,
                     elapsed=time.monotonic() - start,
                     call_logs=call_capture.entries,
@@ -1616,7 +1780,10 @@ class Apprise:
                     for st in chain_states.values()
                 ):
                     return AppriseResult(
-                        status=_aggregate_status(False, all_results),
+                        status=_template_status(
+                            _aggregate_status(False, all_results),
+                            skipped,
+                        ),
                         results=all_results,
                         elapsed=time.monotonic() - start,
                         call_logs=call_capture.entries,
@@ -1676,7 +1843,9 @@ class Apprise:
 
             success = all(st["succeeded"] for st in chain_states.values())
             return AppriseResult(
-                status=_aggregate_status(success, all_results),
+                status=_template_status(
+                    _aggregate_status(success, all_results), skipped
+                ),
                 results=all_results,
                 elapsed=time.monotonic() - start,
                 call_logs=call_capture.entries,
@@ -1712,6 +1881,8 @@ class Apprise:
         match_always=True,
         attach=None,
         interpret_escapes=None,
+        template=None,
+        report=None,
     ):
         """Internal generator function for _create_notify_calls()."""
 
@@ -1782,7 +1953,12 @@ class Apprise:
         )
 
         # Iterate over our loaded plugins
-        for service in self.find(tag, match_always=match_always):
+        for service in self.find(
+            tag,
+            match_always=match_always,
+            template=template,
+            report=report,
+        ):
             # If our code reaches here, we either did not define a tag (it
             # was set to None), or we did define a tag and the logic above
             # determined we need to notify the service it's associated with
@@ -2490,6 +2666,52 @@ class Apprise:
 
             # Build our response object
             response["schemas"].append(content)
+
+        return response
+
+    def template_vars(
+        self,
+        tag: Any = common.MATCH_ALL_TAG,
+        match_always: bool = True,
+    ) -> dict[str, dict]:
+        """Summarize the template variables used by loaded entries.
+
+        Returns a mapping of variable name to a small summary::
+
+            {"api_key":   {"default": None, "services": 2},
+             "smtp_host": {"default": "smtp.example.com", "services": 1}}
+
+        ``default`` is ``None`` when callers must supply a value. Defaults are
+        configuration content and should only be shared with authorized users.
+        """
+
+        response: dict[str, dict] = {}
+        for service in self.find(
+            tag, match_always=match_always, resolve=False
+        ):
+            if not isinstance(service, NotifyTemplate):
+                continue
+
+            for name in service.template_names:
+                variable = service.template_schema.variables[name]
+                if name not in response:
+                    response[name] = {
+                        "default": variable.default,
+                        "services": 0,
+                    }
+
+                elif response[name]["default"] != variable.default:
+                    # Two configurations disagree on the default.  Keep
+                    # the stricter reading so nothing is quietly sent
+                    # with a value its author did not choose.
+                    logger.warning(
+                        "Template variable '%s' is declared differently"
+                        " in more than one configuration",
+                        name,
+                    )
+                    response[name]["default"] = None
+
+                response[name]["services"] += 1
 
         return response
 
