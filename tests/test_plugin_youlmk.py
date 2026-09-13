@@ -128,6 +128,28 @@ apprise_url_tests = (
         },
     ),
     (
+        f"youlmk://{TOKEN}?url=https://example.com&url_label=View%20run",
+        {
+            # A link with its own wording
+            "instance": NotifyYouLMK,
+        },
+    ),
+    (
+        f"youlmk://{TOKEN}?image=yes",
+        {
+            # The notification-type image rides along
+            "instance": NotifyYouLMK,
+        },
+    ),
+    (
+        f"https://youlmk.com/k/{KEY}",
+        {
+            # The key door pasted in as-is
+            "instance": NotifyYouLMK,
+            "privacy_url": "youlmk://k...4/",
+        },
+    ),
+    (
         f"youlmk://{TOKEN}",
         {
             "instance": NotifyYouLMK,
@@ -379,7 +401,7 @@ def test_plugin_youlmk_empty_title(mock_post):
 def test_plugin_youlmk_failures(mock_post):
     """NotifyYouLMK() The door's own codes read as failures."""
 
-    for code in (401, 402, 410, 413, 422, 429, 503):
+    for code in (400, 401, 402, 410, 413, 422, 429, 503):
         response = mock.Mock()
         response.status_code = code
         response.content = b'{"error":"code"}'
@@ -443,6 +465,92 @@ def test_plugin_youlmk_parse_url():
     assert results["info"] == "high"
     assert results["link"] == "https://example.com"
     assert results["group"] == "g"
+
+
+@mock.patch("requests.post")
+def test_plugin_youlmk_url_label(mock_post):
+    """NotifyYouLMK() The primary button carries its own wording."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        f"youlmk://{TOKEN}?url=https://example.com&url_label=View%20run"
+    )
+    assert obj.url_label == "View run"
+
+    assert obj.notify(title="t", body="b") is True
+    payload = loads(mock_post.call_args[1]["data"])
+    assert payload["url_label"] == "View run"
+
+    # And it comes back out of the URL
+    assert "url_label=View%20run" in obj.url()
+
+    # Anything over the payload's limit is trimmed
+    obj = NotifyYouLMK(
+        token=TOKEN, link="https://example.com", url_label="x" * 40
+    )
+    assert obj.url_label == "x" * 24
+
+    # A label with no address to sit on is left out of the payload
+    mock_post.reset_mock()
+    obj = NotifyYouLMK(token=TOKEN, url_label="View run")
+    assert obj.notify(title="t", body="b") is True
+    payload = loads(mock_post.call_args[1]["data"])
+    assert "url" not in payload
+    assert "url_label" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_youlmk_image(mock_post):
+    """NotifyYouLMK() The notification-type image is opt-in."""
+
+    response = mock.Mock()
+    response.status_code = requests.codes.ok
+    mock_post.return_value = response
+
+    # Off by default
+    obj = Apprise.instantiate(f"youlmk://{TOKEN}")
+    assert obj.include_image is False
+    assert obj.notify(title="t", body="b") is True
+    assert "image" not in loads(mock_post.call_args[1]["data"])
+    assert "image=no" in obj.url()
+
+    # On when asked for
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(f"youlmk://{TOKEN}?image=yes")
+    assert obj.include_image is True
+    assert obj.notify(title="t", body="b") is True
+    assert loads(mock_post.call_args[1]["data"])["image"].startswith("http")
+    assert "image=yes" in obj.url()
+
+    # An asset with no imagery leaves the field out
+    mock_post.reset_mock()
+    asset = AppriseAsset(image_url_mask=None, image_path_mask=None)
+    obj = Apprise.instantiate(f"youlmk://{TOKEN}?image=yes", asset=asset)
+    assert obj.notify(title="t", body="b") is True
+    assert "image" not in loads(mock_post.call_args[1]["data"])
+
+
+def test_plugin_youlmk_parse_native_url():
+    """NotifyYouLMK() parse_native_url()."""
+
+    # The key door pasted straight from the source's Key screen
+    results = NotifyYouLMK.parse_native_url(f"https://youlmk.com/k/{KEY}")
+    assert results["token"] == KEY
+
+    # A www. prefix, a trailing slash and query arguments all travel
+    results = NotifyYouLMK.parse_native_url(
+        f"https://www.youlmk.com/k/{KEY}/?priority=low"
+    )
+    assert results["token"] == KEY
+    assert results["priority"] == "low"
+
+    # The bearer door is not a key door
+    assert (
+        NotifyYouLMK.parse_native_url("https://youlmk.com/v1/notify") is None
+    )
 
 
 def test_plugin_youlmk_priority_resolution():

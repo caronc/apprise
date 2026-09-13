@@ -38,26 +38,33 @@
 #   - the URL key, "k_" followed by 14 characters:
 #       youlmk://k_xxxxxxxxxxxxxx
 #
+# The key door can also be pasted in as-is; it is recognised on its own:
+#   https://youlmk.com/k/k_xxxxxxxxxxxxxx
+#
 # The priority (low, normal, high, critical) is derived from the Apprise
 # notification type unless forced with ?priority=, and each type's mapping
-# can be changed (e.g. ?failure=critical). A primary button and a grouping
-# key can be set with ?url= and ?group=.
+# can be changed (e.g. ?failure=critical). A primary button, its wording and
+# a grouping key can be set with ?url=, ?url_label= and ?group=. Apprise's
+# own notification-type image can be placed on the card with ?image=yes.
 #
 # References:
 # - https://youlmk.com/docs/http
 # - https://youlmk.com/docs/payload
 
 from json import dumps
+import re
+from typing import Any, Optional
 
 import requests
 
-from ..common import NotifyType
+from ..common import NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
-from ..utils.parse import validate_regex
+from ..utils.parse import parse_bool, validate_regex
 from .base import NotifyBase
 
 # Extend HTTP Error Messages with YouLMK's own codes
 YOULMK_HTTP_ERROR_MAP = {
+    400: "Bad Request - The payload could not be read as JSON.",
     401: "Unauthorized - Unknown key or token.",
     402: "Payment Required - The trial's 10 notifications are used.",
     410: "Gone - The key was rotated or the source deleted.",
@@ -88,7 +95,7 @@ YOULMK_DEFAULT_PRIORITIES = {
 }
 
 
-def youlmk_priority(value):
+def youlmk_priority(value: Any) -> Optional[str]:
     """Resolve a full or short-form priority (e.g. 'crit', 'c') to one of
     YouLMK's four, or None when it matches none."""
     value = str(value).strip().lower()
@@ -127,11 +134,17 @@ class NotifyYouLMK(NotifyBase):
     title_maxlen = 120
     body_maxlen = 2000
 
+    # The label on the primary button is capped by the payload
+    url_label_maxlen = 24
+
     # 60 a minute per key, in bursts of up to 10 a second
     request_rate_per_sec = 1.0
 
-    # An attachment has no place in the payload; an image is a URL the
-    # sender already hosts, so file attachments are not wired in
+    # The notification image replaces the source's own icon on the card
+    image_size = NotifyImageSize.XY_256
+
+    # The payload takes an image as a URL it fetches itself; there is no
+    # endpoint to upload a file to, so attachments are not wired in
     attachment_support = False
 
     # Define object URL templates
@@ -197,27 +210,43 @@ class NotifyYouLMK(NotifyBase):
                 "type": "string",
                 "map_to": "link",
             },
+            # The wording on that button; YouLMK writes "Open" otherwise
+            "url_label": {
+                "name": _("Link Label"),
+                "type": "string",
+            },
             # Notifications with the same group within ten minutes become
             # one card with a count; the default is the title
             "group": {
                 "name": _("Group"),
                 "type": "string",
             },
+            # Put Apprise's notification-type image on the card in place of
+            # the source's own icon. Off by default so the source keeps the
+            # icon its owner chose
+            "image": {
+                "name": _("Include Image"),
+                "type": "bool",
+                "default": False,
+                "map_to": "include_image",
+            },
         },
     )
 
     def __init__(
         self,
-        token,
-        priority=None,
-        info=None,
-        success=None,
-        warning=None,
-        failure=None,
-        link=None,
-        group=None,
-        **kwargs,
-    ):
+        token: str,
+        priority: Optional[str] = None,
+        info: Optional[str] = None,
+        success: Optional[str] = None,
+        warning: Optional[str] = None,
+        failure: Optional[str] = None,
+        link: Optional[str] = None,
+        url_label: Optional[str] = None,
+        group: Optional[str] = None,
+        include_image: bool = False,
+        **kwargs: Any,
+    ) -> None:
         """Initialize YouLMK Object."""
         super().__init__(**kwargs)
 
@@ -257,23 +286,42 @@ class NotifyYouLMK(NotifyBase):
                 msg = f"An invalid YouLMK priority ({value}) was specified."
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
             self.priority_map[ntype] = resolved
 
         # The primary button's address, if any
         self.link = link if link else None
 
+        # The wording on that button. The payload rejects anything longer,
+        # so trim it rather than lose the notification
+        self.url_label = None
+        if url_label:
+            if len(url_label) > self.url_label_maxlen:
+                self.logger.warning("The YouLMK link label was truncated.")
+
+            self.url_label = url_label[: self.url_label_maxlen]
+
         # The grouping key, if any
         self.group = group if group else None
+
+        # Whether the notification-type image rides along
+        self.include_image = include_image
 
         return
 
     @property
-    def is_token(self):
+    def is_token(self) -> bool:
         """True when the credential is the bearer token, False for the URL
         key."""
         return self.token.lower().startswith("ylk_")
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform YouLMK Notification."""
 
         # Prepare our headers
@@ -313,8 +361,17 @@ class NotifyYouLMK(NotifyBase):
         if self.link:
             payload["url"] = self.link
 
+            # The label only means something alongside an address
+            if self.url_label:
+                payload["url_label"] = self.url_label
+
         if self.group:
             payload["group"] = self.group
+
+        # Acquire our image url if configured to do so
+        image_url = self.image_url(notify_type) if self.include_image else None
+        if image_url:
+            payload["image"] = image_url
 
         self.logger.debug(
             "YouLMK POST URL: %s (cert_verify=%s)",
@@ -350,9 +407,7 @@ class NotifyYouLMK(NotifyBase):
                     )
                 )
 
-                self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000]
-                )
+                self.logger.debug("Response Details:\r\n%s", r.content)
 
                 # Return; we're done
                 return False
@@ -370,7 +425,7 @@ class NotifyYouLMK(NotifyBase):
         return True
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
         another simliar one.
 
@@ -381,11 +436,13 @@ class NotifyYouLMK(NotifyBase):
             self.token,
         )
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Define any URL parameters
-        params = {}
+        params: dict[str, Any] = {
+            "image": "yes" if self.include_image else "no",
+        }
         if self.priority:
             params["priority"] = self.priority
 
@@ -402,6 +459,9 @@ class NotifyYouLMK(NotifyBase):
         if self.link:
             params["url"] = self.link
 
+        if self.url_label:
+            params["url_label"] = self.url_label
+
         if self.group:
             params["group"] = self.group
 
@@ -415,7 +475,7 @@ class NotifyYouLMK(NotifyBase):
         )
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
         results = NotifyBase.parse_url(url, verify_host=False)
@@ -447,8 +507,46 @@ class NotifyYouLMK(NotifyBase):
         if "url" in results["qsd"] and results["qsd"]["url"]:
             results["link"] = NotifyYouLMK.unquote(results["qsd"]["url"])
 
+        # The wording on that button
+        if "url_label" in results["qsd"] and results["qsd"]["url_label"]:
+            results["url_label"] = NotifyYouLMK.unquote(
+                results["qsd"]["url_label"]
+            )
+
         # The grouping key
         if "group" in results["qsd"] and results["qsd"]["group"]:
             results["group"] = NotifyYouLMK.unquote(results["qsd"]["group"])
 
+        # Whether the notification-type image is included
+        results["include_image"] = parse_bool(
+            results["qsd"].get(
+                "image", NotifyYouLMK.template_args["image"]["default"]
+            )
+        )
+
         return results
+
+    @staticmethod
+    def parse_native_url(url: str) -> Optional[dict[str, Any]]:
+        """Support the key door pasted straight from the source's Key screen:
+
+        https://youlmk.com/k/{key}
+        """
+        result = re.match(
+            r"^https?://(www\.)?youlmk\.com/k/"
+            r"(?P<key>k_[a-z0-9]+)/?"
+            r"(?P<params>\?.+)?$",
+            url,
+            re.I,
+        )
+
+        if result:
+            return NotifyYouLMK.parse_url(
+                "{schema}://{key}/{params}".format(
+                    schema=NotifyYouLMK.secure_protocol,
+                    key=result.group("key"),
+                    params=result.group("params") or "",
+                )
+            )
+
+        return None
