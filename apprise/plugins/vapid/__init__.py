@@ -30,6 +30,7 @@ from itertools import chain
 from json import dumps
 import os
 import time
+from urllib.parse import urlparse
 
 import requests
 
@@ -229,6 +230,10 @@ class NotifyVapid(NotifyBase):
         # Path to our subscription.json file
         self.subfile = None
 
+        # The JWT audience in use; set per subscription at notification time
+        # from that subscription's own endpoint
+        self.audience = None
+
         #
         # Our Targets
         #
@@ -372,14 +377,11 @@ class NotifyVapid(NotifyBase):
             )
             return False
 
-        # Prepare our notify URL (based on our mode)
-        notify_url = VAPID_API_LOOKUP[self.mode]
         headers = {
             "User-Agent": self.app_id,
             "TTL": str(self.ttl),
             "Content-Encoding": "aes128gcm",
             "Content-Type": "application/octet-stream",
-            "Authorization": f"vapid t={self.jwt_token}, k={self.public_key}",
         }
 
         has_error = False
@@ -398,6 +400,23 @@ class NotifyVapid(NotifyBase):
                 self.targets.remove(target)
                 has_error = True
                 continue
+
+            # A Web Push message must be delivered to the endpoint the
+            # browser issued for this subscription, and the JWT must be
+            # audienced to that endpoint's origin (RFC 8030 / RFC 8292). The
+            # per-mode entry in VAPID_API_LOOKUP is only a fallback audience.
+            notify_url = self.subscriptions[target].endpoint
+            results = urlparse(notify_url)
+            self.audience = f"{results.scheme}://{results.netloc}"
+
+            # The token is signed for this endpoint alone, so it is carried in
+            # a copy of the headers rather than shared between subscriptions
+            target_headers = {
+                **headers,
+                "Authorization": (
+                    f"vapid t={self.jwt_token}, k={self.public_key}"
+                ),
+            }
 
             # Encrypt our payload
             encrypted_payload = self.pem.encrypt_webpush(
@@ -422,7 +441,7 @@ class NotifyVapid(NotifyBase):
                 r = requests.post(
                     notify_url,
                     data=encrypted_payload,
-                    headers=headers,
+                    headers=target_headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                     allow_redirects=self.redirects,
@@ -430,6 +449,9 @@ class NotifyVapid(NotifyBase):
                 if r.status_code not in (
                     requests.codes.ok,
                     requests.codes.no_content,
+                    # Push services acknowledge a queued message with a 201
+                    requests.codes.created,
+                    requests.codes.accepted,
                 ):
                     # We had a problem
                     status_str = NotifyBase.http_response_code_lookup(
@@ -593,7 +615,7 @@ class NotifyVapid(NotifyBase):
 
         # JWT payload
         payload = {
-            "aud": VAPID_API_LOOKUP[self.mode],
+            "aud": self.audience or VAPID_API_LOOKUP[self.mode],
             "exp": int(time.time()) + self.vapid_jwt_expiration_sec,
             "sub": f"mailto:{self.subscriber}",
         }

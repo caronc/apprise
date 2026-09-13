@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+import base64
 import json
 
 # Disable logging for a cleaner testing output
@@ -39,7 +40,7 @@ import requests
 
 from apprise import asset, exception, url
 from apprise.common import PersistentStoreMode
-from apprise.plugins.vapid import NotifyVapid
+from apprise.plugins.vapid import VAPID_API_LOOKUP, NotifyVapid
 from apprise.plugins.vapid.subscription import (
     WebPushSubscription,
     WebPushSubscriptionManager,
@@ -840,3 +841,161 @@ def test_plugin_vapid_initializations_without_c(tmpdir):
         asset=asset_,
     )
     assert isinstance(obj, NotifyVapid)
+
+
+def _jwt_audience(authorization):
+    """Returns the aud claim of the VAPID JWT held in an Authorization
+    header."""
+
+    token = authorization.split("t=", 1)[1].split(",", 1)[0]
+    payload = token.split(".")[1]
+    # JWT segments are base64url encoded without padding
+    payload += "=" * (-len(payload) % 4)
+    return json.loads(base64.urlsafe_b64decode(payload))["aud"]
+
+
+def _write_subscriptions(path, endpoints):
+    """Builds a subscriptions.json containing the endpoints provided."""
+
+    smgr = WebPushSubscriptionManager()
+    for endpoint in endpoints:
+        assert (
+            smgr.add(
+                {
+                    "endpoint": endpoint,
+                    "keys": {
+                        "p256dh": (
+                            "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
+                            "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
+                        ),
+                        "auth": "k9Xzm43nBGo=",
+                    },
+                }
+            )
+            is True
+        )
+
+    assert smgr.write(path) is True
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+@mock.patch("requests.post")
+def test_plugin_vapid_posts_to_subscription_endpoint(mock_post, tmpdir):
+    """NotifyVapid() delivers to the endpoint of the subscription itself."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    tmpdir0 = tmpdir.mkdir("tmp10")
+    subfile = os.path.join(str(tmpdir0), "subscriptions.json")
+    endpoint = "https://fcm.googleapis.com/fcm/send/abc123"
+    _write_subscriptions(subfile, [endpoint])
+
+    obj = NotifyVapid(
+        "user@example.ca",
+        targets=["abc123"],
+        subfile=subfile,
+        asset=asset.AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir0),
+            pem_autogen=True,
+        ),
+    )
+    assert obj.send("test") is True
+
+    # The message goes to the endpoint the browser issued, not to the
+    # per-mode base url
+    assert mock_post.call_args[0][0] == endpoint
+    assert mock_post.call_args[0][0] != VAPID_API_LOOKUP[obj.mode]
+
+    # ...and the JWT is audienced to that endpoint's origin
+    headers = mock_post.call_args[1]["headers"]
+    assert _jwt_audience(headers["Authorization"]) == (
+        "https://fcm.googleapis.com"
+    )
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+@mock.patch("requests.post")
+def test_plugin_vapid_endpoints_are_addressed_individually(mock_post, tmpdir):
+    """NotifyVapid() handles subscriptions hosted by different services."""
+
+    okay_response = requests.Request()
+    okay_response.status_code = requests.codes.ok
+    okay_response.content = ""
+    mock_post.return_value = okay_response
+
+    tmpdir0 = tmpdir.mkdir("tmp11")
+    subfile = os.path.join(str(tmpdir0), "subscriptions.json")
+    endpoints = {
+        "abc123": "https://fcm.googleapis.com/fcm/send/abc123",
+        "xyz789": "https://web.push.apple.com/xyz789",
+    }
+    _write_subscriptions(subfile, list(endpoints.values()))
+
+    obj = NotifyVapid(
+        "user@example.ca",
+        targets=list(endpoints.keys()),
+        subfile=subfile,
+        asset=asset.AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir0),
+            pem_autogen=True,
+        ),
+    )
+    assert obj.send("test") is True
+    assert mock_post.call_count == len(endpoints)
+
+    # Each subscription is delivered to its own service, with a JWT
+    # audienced accordingly; a shared audience would be rejected
+    delivered = {}
+    for call in mock_post.call_args_list:
+        url = call[0][0]
+        delivered[url] = _jwt_audience(call[1]["headers"]["Authorization"])
+
+    assert set(delivered) == set(endpoints.values())
+    assert delivered["https://fcm.googleapis.com/fcm/send/abc123"] == (
+        "https://fcm.googleapis.com"
+    )
+    assert delivered["https://web.push.apple.com/xyz789"] == (
+        "https://web.push.apple.com"
+    )
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules, reason="Requires cryptography"
+)
+@mock.patch("requests.post")
+def test_plugin_vapid_accepts_created_response(mock_post, tmpdir):
+    """NotifyVapid() treats a 201 Created as a successful delivery."""
+
+    created_response = requests.Request()
+    created_response.status_code = requests.codes.created
+    created_response.content = ""
+    mock_post.return_value = created_response
+
+    tmpdir0 = tmpdir.mkdir("tmp12")
+    subfile = os.path.join(str(tmpdir0), "subscriptions.json")
+    _write_subscriptions(
+        subfile, ["https://fcm.googleapis.com/fcm/send/abc123"]
+    )
+
+    obj = NotifyVapid(
+        "user@example.ca",
+        targets=["abc123"],
+        subfile=subfile,
+        asset=asset.AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir0),
+            pem_autogen=True,
+        ),
+    )
+
+    # RFC 8030 push services acknowledge a queued message with a 201
+    assert obj.send("test") is True
