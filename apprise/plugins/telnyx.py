@@ -35,7 +35,10 @@
 # API Reference:
 #     https://developers.telnyx.com/api-reference/messages/send-a-message
 #
+from __future__ import annotations
+
 import json
+from typing import Any, Optional
 
 import requests
 
@@ -132,8 +135,13 @@ class NotifyTelnyx(NotifyBase):
     )
 
     def __init__(
-        self, apikey=None, source=None, targets=None, profile=None, **kwargs
-    ):
+        self,
+        apikey: Optional[str] = None,
+        source: Optional[str] = None,
+        targets: Optional[Any] = None,
+        profile: Optional[str] = None,
+        **kwargs: Any,
+    ) -> None:
         """Initialize Telnyx Object."""
         super().__init__(**kwargs)
 
@@ -179,7 +187,13 @@ class NotifyTelnyx(NotifyBase):
 
         return
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body: str,
+        title: str = "",
+        notify_type: NotifyType = NotifyType.INFO,
+        **kwargs: Any,
+    ) -> bool:
         """Perform Telnyx Notification."""
 
         if not self.targets:
@@ -281,7 +295,7 @@ class NotifyTelnyx(NotifyBase):
         return not has_error
 
     @property
-    def url_identifier(self):
+    def url_identifier(self) -> tuple[Any, ...]:
         """Returns all of the identifiers that make this URL unique from
         another simliar one.
 
@@ -289,11 +303,11 @@ class NotifyTelnyx(NotifyBase):
         """
         return (self.secure_protocol, self.source, self.apikey, self.profile)
 
-    def url(self, privacy=False, *args, **kwargs):
+    def url(self, privacy: bool = False, *args: Any, **kwargs: Any) -> str:
         """Returns the URL built dynamically based on specified arguments."""
 
         # Prepare our parameters
-        params = {}
+        params: dict[str, Any] = {}
         if self.profile:
             params["profile"] = self.profile
 
@@ -317,13 +331,13 @@ class NotifyTelnyx(NotifyBase):
             params=NotifyTelnyx.urlencode(params),
         )
 
-    def __len__(self):
+    def __len__(self) -> int:
         """Returns the number of targets associated with this notification."""
 
         return len(self.targets) if self.targets else 1
 
     @staticmethod
-    def parse_url(url):
+    def parse_url(url: str) -> Optional[dict[str, Any]]:
         """Parses the URL and returns enough arguments that can allow us to re-
         instantiate this object."""
 

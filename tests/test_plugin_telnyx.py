@@ -128,6 +128,15 @@ apprise_url_tests = (
         "telnyx://{}@{}".format("b" * 10, "5" * 11),
         {
             "instance": NotifyTelnyx,
+            # A failure from the upstream server
+            "response": False,
+            "requests_response_code": requests.codes.internal_server_error,
+        },
+    ),
+    (
+        "telnyx://{}@{}".format("b" * 10, "5" * 11),
+        {
+            "instance": NotifyTelnyx,
             # throw a bizarre code forcing us to fail to look it up
             "response": False,
             "requests_response_code": 999,
