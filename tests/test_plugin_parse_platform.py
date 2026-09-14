@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.parseplatform import NotifyParsePlatform
 
 logging.disable(logging.CRITICAL)
@@ -54,21 +55,21 @@ apprise_url_tests = (
     (
         "parsep://%s" % ("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no master_key
     (
         "parsep://app_id@%s" % ("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no app_id
     (
         "parseps://:master_key@%s" % ("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # app_id + master_key (using arguments=)
@@ -93,7 +94,7 @@ apprise_url_tests = (
     (
         "parsep://app_id:master_key@localhost?device=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Normal Query

@@ -4,10 +4,13 @@
 name: RPM Packaging
 
 on:
+  # master             - v1.x branch
+  # apprise-v2-release - v2.x branch
   push:
-    branches: [main, master, 'release/**']
+    # Always test on pull requests targeting main/master
+    branches: [main, master, 'release/**', apprise-v2-release]
   pull_request:
-    branches: [main, master]
+    branches: [main, master, apprise-v2-release]
   workflow_dispatch:
 
 jobs:

@@ -30,6 +30,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushy import NotifyPushy
 
 logging.disable(logging.CRITICAL)
@@ -46,14 +47,14 @@ apprise_url_tests = (
         "pushy://",
         {
             # No no secret api key
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "pushy://:@/",
         {
             # just invalid all around
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

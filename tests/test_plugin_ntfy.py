@@ -38,6 +38,7 @@ import requests
 
 import apprise
 from apprise import NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.ntfy import NotifyNtfy, NtfyPriority
 
 logging.disable(logging.CRITICAL)
@@ -373,14 +374,14 @@ apprise_url_tests = (
         "ntfys://user:web/token@localhost/topic/?mode=invalid",
         {
             # Invalid mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "ntfys://token@localhost/topic/?auth=invalid",
         {
             # Invalid Authentication type
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid hostname on localhost/private mode
@@ -472,7 +473,7 @@ def test_plugin_ntfy_attachments(mock_post):
     obj = apprise.Apprise.instantiate("ntfy://user:pass@localhost:8084/topic")
 
     # Send a good attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count; includes both image and message
     assert mock_post.call_count == 1
@@ -494,7 +495,9 @@ def test_plugin_ntfy_attachments(mock_post):
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
 
     # Send our attachments
-    assert obj.notify(body="test", title="wonderful", attach=attach) is True
+    assert (
+        bool(obj.notify(body="test", title="wonderful", attach=attach)) is True
+    )
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -522,7 +525,7 @@ def test_plugin_ntfy_attachments(mock_post):
     # An invalid attachment will cause a failure
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     attach = apprise.AppriseAttachment(path)
-    assert obj.notify(body="test", attach=attach) is False
+    assert bool(obj.notify(body="test", attach=attach)) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -608,8 +611,10 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert "topic1" in instance.topics
 
     assert (
-        instance.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            instance.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -634,8 +639,10 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     instance = NotifyNtfy(**results)
 
     assert (
-        instance.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            instance.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -689,11 +696,11 @@ def test_plugin_ntfy_config_files(mock_post, mock_get):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 8 servers from that
+    # We should be able to read our 8 services from that
     # 3x min
     # 4x max
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 8
+    assert len(ac.services()) == 8
     assert len(aobj) == 8
     assert len(list(aobj.find(tag="min"))) == 3
     for s in aobj.find(tag="min"):
@@ -844,9 +851,9 @@ def test_plugin_ntfy_xtags_no_apprise_tag_collision():
     )
     a = apprise.Apprise()
     a.add(cfg)
-    servers = list(cfg.servers())
-    assert len(servers) == 1
-    s = servers[0]
+    services = list(cfg.services())
+    assert len(services) == 1
+    s = services[0]
     # X-Tags must be preserved
     assert s._NotifyNtfy__tags == ["warning"]
     # No Apprise routing tag should have been created
@@ -871,9 +878,11 @@ def test_plugin_ntfy_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to ntfy
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

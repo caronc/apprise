@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.lametric import NotifyLametric
 
 logging.disable(logging.CRITICAL)
@@ -45,14 +46,14 @@ apprise_url_tests = (
         "lametric://",
         {
             # No APIKey or App ID specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "lametric://:@/",
         {
             # No APIKey or App ID specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -61,7 +62,7 @@ apprise_url_tests = (
         ),
         {
             # No APIKey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -139,7 +140,7 @@ apprise_url_tests = (
         "?app_ver=invalid".format("A" * 88),
         {
             # We set invalid app version
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # our lametric object initialized via argument
@@ -168,7 +169,7 @@ apprise_url_tests = (
         f"lametrics://{UUID4}@192.168.0.7/?mode=invalid",
         {
             # Invalid Mode
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -324,9 +325,9 @@ def test_plugin_lametric_urls():
 def test_plugin_lametric_edge_cases():
     """NotifyLametric() Edge Cases."""
     # Initializes the plugin with an invalid API Key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyLametric(apikey=None, mode="device")
 
     # Initializes the plugin with an invalid Client Secret
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyLametric(client_id="valid", secret=None, mode="cloud")

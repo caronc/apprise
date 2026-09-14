@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.bulkvs import NotifyBulkVS
 
 logging.disable(logging.CRITICAL)
@@ -45,28 +46,28 @@ apprise_url_tests = (
         "bulkvs://",
         {
             # Instantiated but no auth, so no otification can happen
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bulkvs://:@/",
         {
             # invalid auth
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bulkvs://{}@9876543210/".format("a" * 10),
         {
             # Just user provided (no password)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "bulkvs://{}:{}@{}".format("u" * 10, "p" * 10, "3" * 5),
         {
             # invalid source number provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -190,7 +191,9 @@ def test_plugin_bulkvs_edge_cases(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

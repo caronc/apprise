@@ -36,6 +36,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.smseagle import NotifySMSEagle
 
 logging.disable(logging.CRITICAL)
@@ -63,28 +64,28 @@ apprise_url_tests = (
         "smseagle://",
         {
             # No host specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smseagle://:@/",
         {
             # invalid host
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smseagle://localhost",
         {
             # Just a host provided (no access token)
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "smseagle://%20@localhost",
         {
             # invalid token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -154,7 +155,7 @@ apprise_url_tests = (
         "smseagle://token@localhost/@user/?priority=invalid",
         {
             # Invalid Priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid priority
@@ -162,7 +163,7 @@ apprise_url_tests = (
         "smseagle://token@localhost/@user/?priority=25",
         {
             # Invalid Priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -640,7 +641,7 @@ def test_notify_smseagle_plugin_result_list(mock_post):
     assert isinstance(obj, NotifySMSEagle)
 
     # We should successfully handle the list
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
 
     # However if one of the elements in the list is bad
     okay_response.content = dumps(
@@ -656,7 +657,7 @@ def test_notify_smseagle_plugin_result_list(mock_post):
     mock_post.return_value = okay_response
 
     # We should now fail
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
 
 @mock.patch("requests.post")
@@ -680,11 +681,13 @@ def test_notify_smseagle_plugin_attachments(mock_post):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -692,11 +695,13 @@ def test_notify_smseagle_plugin_attachments(mock_post):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -714,11 +719,13 @@ def test_notify_smseagle_plugin_attachments(mock_post):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -733,11 +740,13 @@ def test_notify_smseagle_plugin_attachments(mock_post):
     # Now send an attachment normally without issues
     mock_post.reset_mock()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -787,11 +796,13 @@ def test_notify_smseagle_plugin_attachments(mock_post):
     # Unsupported (non image types are not sent)
     attach = os.path.join(TEST_VAR_DIR, "apprise-test.mp4")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )

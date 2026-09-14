@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushsafer import NotifyPushSafer
 
 logging.disable(logging.CRITICAL)
@@ -49,19 +50,19 @@ apprise_url_tests = (
     (
         "psafer://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "psafer://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "psafers://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -163,7 +164,7 @@ apprise_url_tests = (
         "psafer://{}?priority=invalid".format("f" * 20),
         {
             # Invalid Priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid priority
@@ -171,7 +172,7 @@ apprise_url_tests = (
         "psafer://{}?priority=25".format("f" * 20),
         {
             # Invalid Priority
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Set sound
@@ -200,14 +201,14 @@ apprise_url_tests = (
         "psafer://{}?sound=invalid".format("h" * 20),
         {
             # Invalid Sound
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "psafer://{}?sound=94000".format("h" * 20),
         {
             # Invalid Sound
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Set vibration (integer only)
@@ -226,7 +227,7 @@ apprise_url_tests = (
         "psafer://{}?vibration=invalid".format("h" * 20),
         {
             # Invalid Vibration
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid vibration
@@ -234,7 +235,7 @@ apprise_url_tests = (
         "psafer://{}?vibration=25000".format("h" * 20),
         {
             # Invalid Vibration
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -307,7 +308,7 @@ def test_plugin_pushsafer_general(mock_post):
     )
 
     # Exception should be thrown about the fact no private key was specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushSafer(privatekey=None)
 
     # Multiple Attachment Support
@@ -318,11 +319,13 @@ def test_plugin_pushsafer_general(mock_post):
 
     obj = NotifyPushSafer(privatekey=privatekey)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -345,11 +348,13 @@ def test_plugin_pushsafer_general(mock_post):
     # The notify itself will still be successful
     mock_post.reset_mock()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -364,11 +369,13 @@ def test_plugin_pushsafer_general(mock_post):
     # Invalid file path
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )

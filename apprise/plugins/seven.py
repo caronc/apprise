@@ -34,6 +34,7 @@ import json
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
 from .base import NotifyBase
@@ -137,7 +138,7 @@ class NotifySeven(NotifyBase):
         if not self.apikey:
             msg = f"An invalid seven API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.source = None if not isinstance(source, str) else source.strip()
         self.flash = (

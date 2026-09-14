@@ -36,6 +36,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -128,7 +129,7 @@ class NotifyOctopush(NotifyBase):
         **{
             "api_login": {
                 "name": _("API Login"),
-                "type": "string",
+                "type": "email",
                 "private": True,
                 "required": True,
             },
@@ -197,8 +198,8 @@ class NotifyOctopush(NotifyBase):
 
     def __init__(
         self,
-        api_login,
-        api_key,
+        api_login=None,
+        api_key=None,
         targets=None,
         batch=False,
         sender=None,
@@ -217,7 +218,7 @@ class NotifyOctopush(NotifyBase):
                 api_login
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our API Key
         self.api_key = validate_regex(api_key)
@@ -226,7 +227,7 @@ class NotifyOctopush(NotifyBase):
                 api_key
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Prepare Batch Mode Flag
         self.batch = batch
@@ -255,7 +256,7 @@ class NotifyOctopush(NotifyBase):
         if self.mtype is None:
             msg = "The Octopush type specified ({}) is invalid.".format(mtype)
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.purpose = (
             self.template_args["purpose"]["default"]
@@ -267,7 +268,7 @@ class NotifyOctopush(NotifyBase):
                 purpose
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.purpose = self.purpose.lower()
         if self.purpose not in OCTOPUSH_PURPOSES:
@@ -275,7 +276,7 @@ class NotifyOctopush(NotifyBase):
                 purpose
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.sender = None
         if sender:
@@ -285,7 +286,7 @@ class NotifyOctopush(NotifyBase):
                     sender
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Initialize numbers list
         self.targets = []

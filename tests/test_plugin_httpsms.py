@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.httpsms import NotifyHttpSMS
 
 logging.disable(logging.CRITICAL)
@@ -45,21 +46,21 @@ apprise_url_tests = (
         "httpsms://",
         {
             # Instantiated but no auth, so no notification can happen
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "httpsms://:@/",
         {
             # invalid token
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "httpsms://{}:{}@{}".format("u" * 10, "p" * 10, "3" * 5),
         {
             # invalid source number provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -173,7 +174,9 @@ def test_plugin_httpsms_edge_cases(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 

@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.jira import JiraPriority, NotifyJira, NotifyType
 
 logging.disable(logging.CRITICAL)
@@ -56,28 +57,28 @@ apprise_url_tests = (
         "jira://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://%20%20/",
         {
             # invalid apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://apikey/user/?region=xx",
         {
             # invalid region id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -148,21 +149,21 @@ apprise_url_tests = (
         "jira://apikey/@user?action=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://from@apikey/@user?:invalid=note",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "jira://apikey/@user?:warning=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Creates an index entry
@@ -427,11 +428,11 @@ def test_plugin_jira_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 9 servers from that
+    # We should be able to read our 9 services from that
     # 4x low
     # 4x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 9
+    assert len(ac.services()) == 9
     assert len(aobj) == 9
     assert len(list(aobj.find(tag="low"))) == 4
     for s in aobj.find(tag="low"):
@@ -464,11 +465,11 @@ def test_plugin_jira_edge_case(mock_post):
     assert isinstance(instance, NotifyJira)
 
     assert len(instance.store.keys()) == 0
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
 
     # Again just causes same index to get over-written
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
     assert "a62f2225bf" in instance.store
 
@@ -477,11 +478,11 @@ def test_plugin_jira_edge_case(mock_post):
     # This causes an internal check to fail where the keys are expected to be
     # as a list (this one is now a string)
     # content self corrects and things are fine
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
 
     # new key is new index
-    assert instance.notify("test", "key2", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key2", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 2
 
 
@@ -508,18 +509,18 @@ def test_plugin_jira_mapping(mock_post):
     instance = apprise.Apprise.instantiate("jira://apikey/@user")
     assert isinstance(instance, NotifyJira)
 
-    assert instance.notify("body", "title", NotifyType.INFO) is True
+    assert bool(instance.notify("body", "title", NotifyType.INFO)) is True
     assert mock_post.call_count == 0
 
     # --- Default mapping: WARNING/FAILURE → NEW ---
     # These should POST to the base alerts URL immediately.
     mock_post.reset_mock()
-    assert instance.notify("body", "title", NotifyType.WARNING) is True
+    assert bool(instance.notify("body", "title", NotifyType.WARNING)) is True
     assert mock_post.call_count == 1
     assert mock_post.call_args[0][0] == base_url
 
     mock_post.reset_mock()
-    assert instance.notify("body", "title", NotifyType.FAILURE) is True
+    assert bool(instance.notify("body", "title", NotifyType.FAILURE)) is True
     assert mock_post.call_count == 1
     assert mock_post.call_args[0][0] == base_url
 
@@ -527,14 +528,14 @@ def test_plugin_jira_mapping(mock_post):
     # instance already has stored request IDs from the WARNING/FAILURE calls
     # above, so SUCCESS should POST to the /close endpoint.
     mock_post.reset_mock()
-    assert instance.notify("body", "title", NotifyType.SUCCESS) is True
+    assert bool(instance.notify("body", "title", NotifyType.SUCCESS)) is True
     assert mock_post.call_count >= 1
     assert mock_post.call_args[0][0].endswith("/close")
 
     # Fresh instance: SUCCESS with no stored IDs → nothing to close, no call.
     fresh = apprise.Apprise.instantiate("jira://apikey/@user")
     mock_post.reset_mock()
-    assert fresh.notify("body", "title", NotifyType.SUCCESS) is True
+    assert bool(fresh.notify("body", "title", NotifyType.SUCCESS)) is True
     assert mock_post.call_count == 0
 
     # --- Custom mapping: :info=new overrides INFO → NOTE with INFO → NEW ---
@@ -542,7 +543,7 @@ def test_plugin_jira_mapping(mock_post):
     assert isinstance(instance2, NotifyJira)
 
     mock_post.reset_mock()
-    assert instance2.notify("body", "title", NotifyType.INFO) is True
+    assert bool(instance2.notify("body", "title", NotifyType.INFO)) is True
     # A POST to the base alerts URL must have been made
     assert mock_post.call_count == 1
     assert mock_post.call_args[0][0] == base_url
@@ -558,6 +559,6 @@ def test_plugin_jira_mapping(mock_post):
     assert instance3.mapping[NotifyType.INFO] == "new"
 
     mock_post.reset_mock()
-    assert instance3.notify("body", "title", NotifyType.INFO) is True
+    assert bool(instance3.notify("body", "title", NotifyType.INFO)) is True
     assert mock_post.call_count == 1
     assert mock_post.call_args[0][0] == base_url

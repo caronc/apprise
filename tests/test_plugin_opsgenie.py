@@ -35,6 +35,7 @@ from helpers import AppriseURLTester
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.opsgenie import (
     NotifyOpsgenie,
     NotifyType,
@@ -60,28 +61,28 @@ apprise_url_tests = (
         "opsgenie://",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://:@/",
         {
             # We failed to identify any valid authentication
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://%20%20/",
         {
             # invalid apikey specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://apikey/user/?region=xx",
         {
             # invalid region id
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -152,21 +153,21 @@ apprise_url_tests = (
         "opsgenie://apikey/@user?action=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://from@apikey/@user?:invalid=note",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "opsgenie://apikey/@user?:warning=invalid",
         {
             # Assign an entity
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Creates an index entry
@@ -426,11 +427,11 @@ def test_plugin_opsgenie_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 9 servers from that
+    # We should be able to read our 9 services from that
     # 4x low
     # 4x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 9
+    assert len(ac.services()) == 9
     assert len(aobj) == 9
     assert len(list(aobj.find(tag="low"))) == 4
     for s in aobj.find(tag="low"):
@@ -464,11 +465,11 @@ def test_plugin_opsgenie_edge_case(mock_post):
     assert isinstance(instance, NotifyOpsgenie)
 
     assert len(instance.store.keys()) == 0
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
 
     # Again just causes same index to get over-written
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
     assert "a62f2225bf" in instance.store
 
@@ -477,9 +478,9 @@ def test_plugin_opsgenie_edge_case(mock_post):
     # This causes an internal check to fail where the keys are expected to be
     # as a list (this one is now a string)
     # content self corrects and things are fine
-    assert instance.notify("test", "key", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 1
 
     # new key is new index
-    assert instance.notify("test", "key2", NotifyType.FAILURE) is True
+    assert bool(instance.notify("test", "key2", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 2

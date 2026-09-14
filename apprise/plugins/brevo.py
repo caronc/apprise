@@ -36,6 +36,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -127,8 +128,9 @@ class NotifyBrevo(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/brevo/"
 
-    # Default to markdown
-    notify_format = NotifyFormat.HTML
+    # Brevo can accept either HTML or plain text as the main message
+    # body. HTML remains the default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # The default Email API URL to use
     notify_url = "https://api.brevo.com/v3/smtp/email"
@@ -162,12 +164,12 @@ class NotifyBrevo(NotifyBase):
             },
             "from_email": {
                 "name": _("Source Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -220,13 +222,13 @@ class NotifyBrevo(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Brevo API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_email(from_email)
         if not result:
             msg = f"Invalid ~From~ email specified: {from_email}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store email address
         self.from_email = result["full_email"]
@@ -240,7 +242,7 @@ class NotifyBrevo(NotifyBase):
                     f"{reply_to}"
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.reply_to = (
                 result["name"] if result["name"] else False,
@@ -358,6 +360,7 @@ class NotifyBrevo(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """Perform Brevo Notification."""
@@ -388,17 +391,22 @@ class NotifyBrevo(NotifyBase):
             "to": [{"email": None}],
             "subject": title if title else self.default_empty_subject,
         }
-        # Body selection
-        use_html = self.notify_format == NotifyFormat.HTML
+        # Resolve the requested delivery representation for this send.
+        # Brevo still wants both htmlContent and textContent, so the
+        # resolved format decides which one is the original body and
+        # which one is derived from it.
+        use_html = self.resolve_format(body_format) == NotifyFormat.HTML
 
         if use_html:
-            # body already normalised; keep your existing logic
+            # HTML is the caller-selected representation; derive the
+            # plain-text alternative for Brevo's companion field.
             payload_["htmlContent"] = body
             payload_["textContent"] = convert_between(
                 NotifyFormat.HTML, NotifyFormat.TEXT, body
             )
         else:
-            # Plain text requested, but Brevo still wants HTML
+            # Plain text is the caller-selected representation; derive
+            # the HTML alternative so the payload remains complete.
             payload_["textContent"] = body
             payload_["htmlContent"] = convert_between(
                 NotifyFormat.TEXT, NotifyFormat.HTML, body

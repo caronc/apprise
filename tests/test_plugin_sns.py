@@ -27,6 +27,7 @@
 
 # Disable logging for a cleaner testing output
 import logging
+import sys
 from unittest import mock
 
 from helpers import AppriseURLTester
@@ -34,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sns import NotifySNS, SNSMode
 
 logging.disable(logging.CRITICAL)
@@ -51,27 +53,27 @@ apprise_url_tests = (
     (
         "sns://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sns://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sns://T1JJ3T3L2",
         {
             # Just Token 1 provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sns://T1JJ3TD4JD/TIiajkdnlazk7FQ/",
         {
             # Missing a region
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -188,11 +190,11 @@ apprise_url_tests = (
         },
     ),
     (
-        # Invalid mode raises TypeError
+        # Invalid mode
         "sns://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcevi7FQ"
         "/us-west-2/12223334444?mode=invalid",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )
@@ -212,7 +214,7 @@ def test_plugin_sns_edge_cases(mock_post):
     """NotifySNS() Edge Cases."""
     target = "+1800555999"
     # Initializes the plugin with a valid access, but invalid access key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No access_key_id specified
         NotifySNS(
             access_key_id=None,
@@ -221,7 +223,7 @@ def test_plugin_sns_edge_cases(mock_post):
             targets=target,
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No secret_access_key specified
         NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
@@ -230,7 +232,7 @@ def test_plugin_sns_edge_cases(mock_post):
             targets=target,
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # No region_name specified
         NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
@@ -248,7 +250,7 @@ def test_plugin_sns_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
     # The phone number is invalid, and without it, there is nothing
     # to notify
@@ -260,7 +262,7 @@ def test_plugin_sns_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
     # The phone number is invalid, and without it, there is nothing
     # to notify; we
@@ -272,7 +274,7 @@ def test_plugin_sns_edge_cases(mock_post):
     )
 
     # The object initializes properly but would not be able to send anything
-    assert obj.notify(body="test", title="test") is False
+    assert bool(obj.notify(body="test", title="test")) is False
 
 
 def test_plugin_sns_url_parsing():
@@ -412,6 +414,32 @@ def test_plugin_sns_aws_response_handling():
     assert response["error_message"].startswith("Invalid parameter:")
     assert response["error_message"].endswith("required parameter")
 
+    # An empty known element (no text at all) doesn't blow up; it's
+    # just treated as blank
+    response = NotifySNS.aws_response_to_dict("""
+        <ErrorResponse xmlns="http://sns.amazonaws.com/doc/2010-03-31/">
+            <Error>
+                <Type>Sender</Type>
+                <Code>InvalidParameter</Code>
+                <Message/>
+            </Error>
+            <RequestId>b5614883-babe-56ca-93b2-1c592ba6191e</RequestId>
+        </ErrorResponse>
+        """)
+    assert response["type"] == "ErrorResponse"
+    assert response["error_message"] == ""
+
+    # A response nested far deeper than Python's recursion limit still
+    # parses instead of raising a RecursionError
+    depth = sys.getrecursionlimit() + 1000
+    response = NotifySNS.aws_response_to_dict(
+        ("<RequestId>" * depth)
+        + "b5614883-babe-56ca-93b2-1c592ba6191e"
+        + ("</RequestId>" * depth)
+    )
+    assert response["type"] == "RequestId"
+    assert response["request_id"] == "b5614883-babe-56ca-93b2-1c592ba6191e"
+
 
 @mock.patch("requests.post")
 def test_plugin_sns_aws_topic_handling(mock_post):
@@ -462,7 +490,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     )
 
     # CreateTopic fails
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     def post(url, data, **kwargs):
         """Since Publishing a token requires 2 posts, we need to return our
@@ -487,7 +515,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     mock_post.side_effect = post
 
     # Publish fails
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     # Disable our side effect
     mock_post.side_effect = None
@@ -499,14 +527,14 @@ def test_plugin_sns_aws_topic_handling(mock_post):
 
     # Assign ourselves a new function
     mock_post.return_value = robj
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     # Handle case where we fails get a bad response
     robj = mock.Mock()
     robj.text = ""
     robj.status_code = requests.codes.bad_request
     mock_post.return_value = robj
-    assert a.notify(title="", body="test") is False
+    assert bool(a.notify(title="", body="test")) is False
 
     # Handle case where we get a valid response and TopicARN
     robj = mock.Mock()
@@ -514,7 +542,7 @@ def test_plugin_sns_aws_topic_handling(mock_post):
     robj.status_code = requests.codes.ok
     mock_post.return_value = robj
     # We would have failed to make Post
-    assert a.notify(title="", body="test") is True
+    assert bool(a.notify(title="", body="test")) is True
 
 
 @mock.patch("requests.post")
@@ -537,7 +565,7 @@ def test_plugin_sns_session_token(mock_post):
     assert obj.aws_session_token == TEST_SESSION_TOKEN
 
     # send() must include X-Amz-Security-Token in request headers
-    assert obj.notify(body="test") is True
+    assert bool(obj.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" in call_kwargs["headers"]
     assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
@@ -575,7 +603,7 @@ def test_plugin_sns_session_token(mock_post):
         targets="+18001234567",
     )
     assert obj_plain.aws_session_token is None
-    assert obj_plain.notify(body="test") is True
+    assert bool(obj_plain.notify(body="test")) is True
     call_kwargs = mock_post.call_args[1]
     assert "X-Amz-Security-Token" not in call_kwargs["headers"]
 
@@ -602,7 +630,7 @@ def test_plugin_sns_session_token_via_kwarg(mock_post):
 
     obj = NotifySNS(**results)
     assert obj.aws_session_token == TEST_SESSION_TOKEN
-    assert obj.notify(body="test") is True
+    assert bool(obj.notify(body="test")) is True
 
     call_kwargs = mock_post.call_args[1]
     assert call_kwargs["headers"]["X-Amz-Security-Token"] == TEST_SESSION_TOKEN
@@ -670,7 +698,7 @@ def test_plugin_sns_detailed_failures(mocker):
     mock_post.return_value = mock_response_bad
 
     # Should return False because the SMS failed
-    assert obj_sms.notify(body="test") is False
+    assert bool(obj_sms.notify(body="test")) is False
 
     # --- Scenario 2: Topic Creation Failure ---
     obj_topic = NotifySNS(
@@ -684,7 +712,7 @@ def test_plugin_sns_detailed_failures(mocker):
     mock_post.return_value = mock_response_bad
 
     # Should return False because CreateTopic failed
-    assert obj_topic.notify(body="test") is False
+    assert bool(obj_topic.notify(body="test")) is False
 
     # --- Scenario 3: CreateTopic Success, but Publish Failure ---
     # We need a side_effect to return 200 for the first call (CreateTopic)
@@ -712,7 +740,7 @@ def test_plugin_sns_detailed_failures(mocker):
     mock_post.side_effect = side_effect
 
     # Should return False because Publish failed
-    assert obj_topic.notify(body="test") is False
+    assert bool(obj_topic.notify(body="test")) is False
 
 
 def test_plugin_sns_mode_detection():
@@ -788,8 +816,8 @@ def test_plugin_sns_mode_detection():
     )
     assert obj.mode == SNSMode.TOPIC
 
-    # Invalid mode raises TypeError
-    with pytest.raises(TypeError):
+    # An invalid mode is rejected.
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySNS(
             access_key_id=TEST_ACCESS_KEY_ID,
             secret_access_key=TEST_ACCESS_KEY_SECRET,
@@ -841,14 +869,14 @@ def test_plugin_sns_topic_mode_send(mock_post):
     assert obj.mode == SNSMode.TOPIC
 
     # With title: Subject must appear in the Publish payload
-    assert obj.notify(title="My Title", body="My Body") is True
+    assert bool(obj.notify(title="My Title", body="My Body")) is True
     # urlencode() uses %20 for spaces
     assert "Subject=My%20Title" in publish_data["data"]
     assert "Message=My%20Body" in publish_data["data"]
 
     # With no title: Subject must not appear in the Publish payload
     publish_data.clear()
-    assert obj.notify(title="", body="My Body") is True
+    assert bool(obj.notify(title="", body="My Body")) is True
     assert "Subject=" not in publish_data.get("data", "")
 
 
@@ -872,7 +900,7 @@ def test_plugin_sns_topic_mode_phone_forced(mock_post):
     assert obj.mode == SNSMode.TOPIC
 
     # With a title: it must be prepended to the body in the SMS payload
-    assert obj.notify(title="My Title", body="My Body") is True
+    assert bool(obj.notify(title="My Title", body="My Body")) is True
     data = mock_post.call_args[1]["data"]
     # urlencode() uses %20 for spaces; \r\n becomes %0D%0A
     assert "My%20Title" in data
@@ -880,7 +908,7 @@ def test_plugin_sns_topic_mode_phone_forced(mock_post):
 
     # With no title: body is sent as-is without modification
     mock_post.reset_mock()
-    assert obj.notify(title="", body="My Body") is True
+    assert bool(obj.notify(title="", body="My Body")) is True
     data = mock_post.call_args[1]["data"]
     assert "My%20Body" in data
 

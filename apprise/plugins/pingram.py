@@ -51,6 +51,7 @@ import requests
 
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_email,
@@ -147,6 +148,10 @@ class NotifyPingram(NotifyBase):
     # A URL that takes you to the setup/help of the specific protocol
     setup_url = "https://appriseit.com/services/pingram/"
 
+    # Pingram can send plain text or HTML depending on the selected
+    # channel. Plain text remains the default.
+    notify_format = (NotifyFormat.TEXT, NotifyFormat.HTML)
+
     # If no Pingram Message Type is specified, then the following is used
     default_message_type = "apprise"
 
@@ -182,7 +187,7 @@ class NotifyPingram(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "target_id": {
@@ -289,7 +294,7 @@ class NotifyPingram(NotifyBase):
                 apikey
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # For tracking our email -> name lookups
         self.names = {}
@@ -332,7 +337,7 @@ class NotifyPingram(NotifyBase):
             if self.mode not in PINGRAM_MODES:
                 msg = f"The Pingram mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Detect mode based on whether or not a message_type was
@@ -357,7 +362,7 @@ class NotifyPingram(NotifyBase):
                     "({}) was specified.".format(message_type)
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Acquire Carbon Copies
         self.cc = set()
@@ -381,7 +386,7 @@ class NotifyPingram(NotifyBase):
             # Invalid region specified
             msg = f"The Pingram region specified ({region}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         # Initialize an empty set of channels
         self.channels = set()
@@ -394,7 +399,7 @@ class NotifyPingram(NotifyBase):
                     f"({channel}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
             self.channels.add(channel)
 
         # Used for URL generation afterwards only
@@ -608,9 +613,19 @@ class NotifyPingram(NotifyBase):
         return max(1, len(self.targets))
 
     def gen_payload(
-        self, body, title="", notify_type=NotifyType.INFO, **kwargs
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
     ):
-        """Generates our Pingram payload."""
+        """Generate one or more Pingram payloads.
+
+        ``body_format`` carries the caller's original source format so
+        this helper can resolve whether the already-prepared body should
+        be treated as the HTML original or the text original.
+        """
 
         payload_ = {
             "type": self.message_type,
@@ -637,10 +652,16 @@ class NotifyPingram(NotifyBase):
             )
 
         else:
-            # Acquire text version of body if provided
+            # Resolve once for both SMS and Email channel branches.
+            # Direct gen_payload()/send() calls may arrive unresolved.
+            body_format = self.resolve_format(body_format)
+
+            # SMS always needs text. If the resolved body is HTML, derive
+            # a text companion from it; otherwise the body already is the
+            # text representation.
             text_body = (
                 convert_between(NotifyFormat.HTML, NotifyFormat.TEXT, body)
-                if self.notify_format == NotifyFormat.HTML
+                if body_format == NotifyFormat.HTML
                 else body
             )
 
@@ -671,11 +692,14 @@ class NotifyPingram(NotifyBase):
                     )
 
                 elif channel == PingramChannel.EMAIL:
+                    # Email always needs HTML. If the resolved body is
+                    # text, derive the HTML companion from it; otherwise
+                    # the body already is the HTML representation.
                     html_body = (
                         convert_between(
                             NotifyFormat.TEXT, NotifyFormat.HTML, body
                         )
-                        if self.notify_format != NotifyFormat.HTML
+                        if body_format != NotifyFormat.HTML
                         else body
                     )
 
@@ -788,7 +812,14 @@ class NotifyPingram(NotifyBase):
 
             yield payload
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform Pingram Notification."""
 
         # error tracking (used for function return)
@@ -810,7 +841,11 @@ class NotifyPingram(NotifyBase):
         }
 
         for payload in self.gen_payload(
-            body, title=title, notify_type=notify_type, **kwargs
+            body,
+            title=title,
+            notify_type=notify_type,
+            body_format=body_format,
+            **kwargs,
         ):
             # A target may have no "id" (it's always optional), so fall
             # back to number/email for log messages.

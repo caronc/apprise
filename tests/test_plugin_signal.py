@@ -39,6 +39,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.config import ConfigBase
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.base import NotifyFormat
 from apprise.plugins.signal_api import NotifySignalAPI
 
@@ -64,35 +65,35 @@ apprise_url_tests = (
         "signal://",
         {
             # No host specified
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://:@/",
         {
             # invalid host
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://localhost",
         {
             # Just a host provided
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://localhost",
         {
             # key and secret provided and from but invalid from no
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "signal://localhost/123",
         {
             # invalid from phone
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -251,7 +252,7 @@ def test_plugin_signal_edge_cases(request_mock):
     title = "My Title"
 
     # No apikey specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySignalAPI(source=None)
 
     aobj = Apprise()
@@ -436,11 +437,13 @@ def test_notify_signal_plugin_attachments(request_mock):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -448,11 +451,13 @@ def test_notify_signal_plugin_attachments(request_mock):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -469,11 +474,13 @@ def test_notify_signal_plugin_attachments(request_mock):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -488,11 +495,13 @@ def test_notify_signal_plugin_attachments(request_mock):
     # Now send an attachment normally without issues
     request_mock.reset_mock()
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -535,7 +544,9 @@ def test_plugin_signal_text_mode_markdown_from_library(request_mock):
         format=NotifyFormat.MARKDOWN,
     )
 
-    assert obj.notify(title="Title", body="Body **bold** _italic_") is True
+    assert (
+        bool(obj.notify(title="Title", body="Body **bold** _italic_")) is True
+    )
 
     assert request_mock.call_count == 1
     details = request_mock.call_args_list[0]

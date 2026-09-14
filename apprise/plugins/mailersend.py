@@ -67,6 +67,7 @@ import requests
 from .. import exception
 from ..common import NotifyFormat, NotifyType
 from ..conversion import convert_between
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import is_email, parse_list, validate_regex
 from ..utils.sanitize import sanitize_payload
@@ -99,8 +100,9 @@ class NotifyMailerSend(NotifyBase):
     # The MailerSend Email API endpoint
     notify_url = "https://api.mailersend.com/v1/email"
 
-    # Default to HTML notifications
-    notify_format = NotifyFormat.HTML
+    # MailerSend can accept either HTML or plain text as the main
+    # message body. HTML remains the default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # Support attachments
     attachment_support = True
@@ -131,12 +133,12 @@ class NotifyMailerSend(NotifyBase):
             },
             "from_email": {
                 "name": _("Source Email"),
-                "type": "string",
+                "type": "email",
                 "required": True,
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -189,14 +191,14 @@ class NotifyMailerSend(NotifyBase):
         if not self.apikey:
             msg = f"An invalid MailerSend API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate and store the From Email
         result = is_email(from_email)
         if not result:
             msg = f"Invalid MailerSend From email specified: {from_email}"
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the verified from address
         self.from_email = result["full_email"]
@@ -211,7 +213,7 @@ class NotifyMailerSend(NotifyBase):
                     f" ({reply_to}) was specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.reply_to = result["full_email"]
 
@@ -329,6 +331,7 @@ class NotifyMailerSend(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
         """Perform MailerSend Notification."""
@@ -348,8 +351,10 @@ class NotifyMailerSend(NotifyBase):
             "Authorization": "Bearer {}".format(self.apikey),
         }
 
-        # Determine whether the body is HTML or plain text
-        use_html = self.notify_format == NotifyFormat.HTML
+        # Resolve the requested delivery representation for this send.
+        # MailerSend accepts both html and text fields, so the resolved
+        # format decides which field receives the original body.
+        use_html = self.resolve_format(body_format) == NotifyFormat.HTML
 
         # Build a base payload template reused per recipient
         payload_ = {
@@ -361,7 +366,8 @@ class NotifyMailerSend(NotifyBase):
             "subject": title if title else self.default_empty_subject,
         }
 
-        # Assign body fields; provide both html and text
+        # Assign both body fields so MailerSend has an HTML part and a
+        # plain-text alternative regardless of the selected source.
         if use_html:
             payload_["html"] = body
             payload_["text"] = convert_between(

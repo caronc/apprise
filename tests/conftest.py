@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import gc
+import logging
 import mimetypes
 import os
 import sys
@@ -37,6 +38,7 @@ from apprise import (
     ConfigurationManager,
     NotificationManager,
 )
+from apprise.logger import logger as apprise_logger
 
 sys.path.append(os.path.join(os.path.dirname(__file__), "helpers"))
 
@@ -50,22 +52,17 @@ A_MGR = AttachmentManager()
 
 @pytest.fixture(scope="function", autouse=True)
 def mimetypes_always_available():
-    """A pytest session fixture which ensures mimetypes is set correctly
-    pointing to our temporary mime.types file."""
+    """Use the test MIME database for every test."""
     files = (os.path.join(os.path.dirname(__file__), "var", "mime.types"),)
     mimetypes.init(files=files)
 
 
 @pytest.fixture(scope="function", autouse=True)
 def no_throttling_everywhere(mocker):
-    """A pytest session fixture which disables throttling on all notifiers.
+    """Disable plugin throttling for every test.
 
-    It is automatically enabled.
-
-    Uses the function-scoped mocker (not session_mocker) so each test's
-    patches are torn down at the end of that same test instead of
-    accumulating across the whole suite, which otherwise makes final
-    teardown effectively O(n^2).
+    Function-scoped cleanup prevents patches from accumulating across the
+    suite and slowing final teardown.
     """
     # Ensure we're working with a clean slate for each test
     N_MGR.unload_modules()
@@ -77,11 +74,31 @@ def no_throttling_everywhere(mocker):
 
 
 @pytest.fixture(scope="function", autouse=True)
-def collect_all_garbage():
-    """A pytest session fixture to ensure no __del__ cleanup call from one
-    plugin will cause testing issues with another.
+def _reset_apprise_logger_state():
+    """Reset shared logger state around every test.
 
-    Run garbage collection after every test
+    CLI tests change the Apprise and asyncio loggers. Restoring their levels
+    and handlers prevents those changes from affecting later log assertions.
     """
+    asyncio_logger = logging.getLogger("asyncio")
+
+    original_level = apprise_logger.level
+    original_handlers = list(apprise_logger.handlers)
+    original_asyncio_level = asyncio_logger.level
+    original_asyncio_handlers = list(asyncio_logger.handlers)
+
+    apprise_logger.setLevel(logging.NOTSET)
+    asyncio_logger.setLevel(logging.NOTSET)
+    asyncio_logger.handlers[:] = []
+    yield
+    apprise_logger.setLevel(original_level)
+    apprise_logger.handlers[:] = original_handlers
+    asyncio_logger.setLevel(original_asyncio_level)
+    asyncio_logger.handlers[:] = original_asyncio_handlers
+
+
+@pytest.fixture(scope="function", autouse=True)
+def collect_all_garbage():
+    """Collect garbage after each test to isolate plugin finalizers."""
     # Force garbage collection
     gc.collect()

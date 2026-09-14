@@ -278,11 +278,10 @@ class WebPushSubscriptionManager:
         return bool(self.__subscriptions)
 
     def __len__(self) -> int:
-        """Returns the number of servers loaded; this includes those found
-        within loaded configuration.
+        """Return the number of subscription records held by this manager.
 
-        This funtion nnever actually counts the Config entry themselves (if
-        they exist), only what they contain.
+        Each record represents one endpoint and counts once, regardless of the
+        endpoint's host or push-service implementation.
         """
         return len(self.__subscriptions)
 
@@ -300,7 +299,7 @@ class WebPushSubscriptionManager:
         return key.lower() in self.__subscriptions
 
     def clear(self) -> None:
-        """Empties our server list."""
+        """Remove every subscription record from this manager."""
         self.__subscriptions.clear()
 
     @property

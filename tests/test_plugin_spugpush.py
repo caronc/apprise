@@ -31,6 +31,7 @@ import logging
 from helpers import AppriseURLTester
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.spugpush import NotifySpugpush
 
 logging.disable(logging.CRITICAL)
@@ -39,13 +40,13 @@ apprise_url_tests = (
     (
         "spugpush://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "spugpush://invalid!",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (

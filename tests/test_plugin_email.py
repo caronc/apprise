@@ -45,13 +45,14 @@ from apprise import (
     AppriseAttachment,
     AttachBase,
     NotifyBase,
+    NotifyFormat,
     NotifyType,
     PersistentStoreMode,
     utils,
 )
 from apprise.attachment.memory import AttachMemory
 from apprise.config import ConfigBase
-from apprise.exception import AppriseException
+from apprise.exception import AppriseException, AppriseImproperlyConfigured
 from apprise.plugins import email
 
 try:
@@ -72,19 +73,19 @@ TEST_URLS = (
     (
         "mailto://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "mailtos://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "mailto://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No Username
@@ -92,7 +93,7 @@ TEST_URLS = (
         "mailtos://:pass@nuxref.com:567",
         {
             # Can't prepare a To address using this expression
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -100,7 +101,7 @@ TEST_URLS = (
         "mailto://user:pass@fastmail.com?tz=invalid",
         {
             # An error is thrown for this
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Pre-Configured Email Services
@@ -244,10 +245,9 @@ TEST_URLS = (
     (
         "mailtos://%20@domain.com?user=admin@mail-domain.com&pgp=yes",
         {
-            # Test deprecated pgp=yes flag (backward compat); notify() fails
-            # because no key is provided and PGP requires one to be useful.
-            "instance": email.NotifyEmail,
-            "response": False,
+            # The legacy yes/no boolean spelling of pgp= is no longer
+            # supported because it is now an unrecognized mode string.
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -297,22 +297,9 @@ TEST_URLS = (
     ),
     (
         "mailtos://%20@domain.com?user=admin@mail-domain.com"
-        "&pgp=encrypt&pgpkey=%2Fpath%2Fto%2Fpub.asc",
+        "&pgp=encrypt&pgppub=%2Fpath%2Fto%2Fpub.asc",
         {
-            # Test deprecated pgpkey= alias; exercises the deprecation
-            # warning branch in parse_url() and maps to pgp_key.
-            # notify() returns False because the key path does not exist.
-            "instance": email.NotifyEmail,
-            "response": False,
-        },
-    ),
-    (
-        "mailtos://%20@domain.com?user=admin@mail-domain.com"
-        "&pgp=encrypt&pgppub=%2Fpath%2Fto%2Fpub.asc"
-        "&pgpkey=%2Fold%2Fpath.asc",
-        {
-            # Test pgppub= wins over deprecated pgpkey= when both present.
-            # notify() returns False because the key path does not exist.
+            # Encryption fails when pgppub= cannot be found.
             "instance": email.NotifyEmail,
             "response": False,
         },
@@ -430,7 +417,7 @@ TEST_URLS = (
     (
         "mailtos://nuxref.com?user=&pass=.",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid To Address is accepted, but we won't be able to properly email
@@ -446,21 +433,21 @@ TEST_URLS = (
     (
         'mailtos://nuxref.com?user=%20"&pass=.',
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid From (and To) Address
     (
         "mailtos://nuxref.com?to=test",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid Secure Mode
     (
         "mailtos://user:pass@example.com?mode=notamode",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # STARTTLS flag checking
@@ -559,7 +546,7 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
         response = meta.get("response", True)
 
         # Our expected privacy url
-        # Don't set this if don't need to check it's value
+        # Leave this unset when its value is not needed.
         privacy_url = meta.get("privacy_url")
 
         test_smtplib_exceptions = meta.get("test_smtplib_exceptions", False)
@@ -568,6 +555,8 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
         mock_socket = mock.Mock()
         mock_socket.starttls.return_value = True
         mock_socket.login.return_value = True
+        # An empty refusal map means SMTP accepted every recipient.
+        mock_socket.sendmail.return_value = {}
 
         # Create a mock SMTP Object
         mock_smtp.return_value = mock_socket
@@ -583,7 +572,6 @@ def test_plugin_email(mock_smtp, mock_smtpssl):
                 smtplib.SMTPException(
                     0, "smtplib.SMTPException() not handled"
                 ),
-                RuntimeError(0, "smtplib.HTTPError() not handled"),
                 smtplib.SMTPRecipientsRefused(
                     "smtplib.SMTPRecipientsRefused() not handled"
                 ),
@@ -787,17 +775,32 @@ def test_plugin_email_smtplib_init_fail(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     # Support Exception handling of smtplib.SMTP
-    mock_smtplib.side_effect = RuntimeError("Test")
+    mock_smtplib.side_effect = OSError("Test")
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
     # A handled and expected exception
     mock_smtplib.side_effect = smtplib.SMTPException("Test")
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
+        is False
+    )
+
+    # AppriseSMTPController re-raises RuntimeError (part of its own
+    # SMTP_EXCEPTIONS catch-all in __enter__) after cleanup, so send()
+    # must still catch it here rather than let it escape
+    mock_smtplib.side_effect = RuntimeError("Test")
+    assert (
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -813,13 +816,15 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     # Support an email simulation where we can correctly quit
-    mock_smtplib.starttls.return_value = True
-    mock_smtplib.login.return_value = True
-    mock_smtplib.sendmail.return_value = True
-    mock_smtplib.quit.return_value = True
+    mock_smtplib.return_value.starttls.return_value = True
+    mock_smtplib.return_value.login.return_value = True
+    mock_smtplib.return_value.sendmail.return_value = {}
+    mock_smtplib.return_value.quit.return_value = True
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -830,43 +835,54 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     assert isinstance(obj, email.NotifyEmail)
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
     # Create an apprise object to work with as well
     a = Apprise()
     assert a.add("mailto://user:pass@gmail.com?format=text")
+    assert a.add("mailto://other:pass@gmail.com?format=text")
 
     # Send Attachment with success
     attach = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     assert (
-        obj.notify(
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attach) is True
+    assert bool(a.notify(body="body", title="test", attach=attach)) is True
 
     # test using an Apprise Attachment object
     assert (
-        obj.notify(
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=AppriseAttachment(attach),
+        bool(
+            obj.notify(
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=AppriseAttachment(attach),
+            )
         )
         is True
     )
 
     # same results happen from our Apprise object
     assert (
-        a.notify(body="body", title="test", attach=AppriseAttachment(attach))
+        bool(
+            a.notify(
+                body="body", title="test", attach=AppriseAttachment(attach)
+            )
+        )
         is True
     )
 
@@ -890,24 +906,28 @@ def test_plugin_email_smtplib_send_okay(mock_smtplib):
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attachment) is True
+    result = a.notify(body="body", title="test", attach=attachment)
+    assert bool(result) is True
+    assert len(result) == 2
 
     max_file_size = AttachBase.max_file_size
     # Now do a case where the file can't be sent
 
     AttachBase.max_file_size = 1
     assert (
-        obj.notify(
-            body="body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
 
     # same results happen from our Apprise object
-    assert a.notify(body="body", title="test", attach=attach) is False
+    assert bool(a.notify(body="body", title="test", attach=attach)) is False
 
     # Restore value
     AttachBase.max_file_size = max_file_size
@@ -926,9 +946,12 @@ def test_plugin_email_smtplib_send_multiple_recipients(mock_smtplib):
         suppress_exceptions=False,
     )
     assert isinstance(obj, email.NotifyEmail)
+    mock_smtplib.return_value.sendmail.return_value = {}
 
     assert (
-        obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="test", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -973,6 +996,8 @@ def test_plugin_email_timezone(mock_smtp):
     """NotifyEmail() Timezone Handling"""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp.return_value = response
 
     # Loads America/Toronto
@@ -1019,7 +1044,7 @@ def test_plugin_email_timezone(mock_smtp):
     assert "tz=" not in obj.url()
 
     # Having ourselves a default variable also does not prevent
-    # anyone from defining their own over-ride is still supported:
+    # A caller may still provide its own override:
 
     # Loads America/Montreal
     results = email.NotifyEmail.parse_url(
@@ -1059,8 +1084,7 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
 
     class SMTPMock:
         def sendmail(self, *args, **kwargs):
-            """Over-ride sendmail calls so we can check our our
-            internationalization formatting went."""
+            """Capture sendmail calls to check international formatting."""
 
             match_subject = re.search(
                 r"\n?(?P<line>Subject: (?P<subject>(.+?)))\n(?:[a-z0-9-]+:)",
@@ -1108,13 +1132,15 @@ def test_plugin_email_smtplib_internationalization(mock_smtp):
 
     # Further test encoding through the message content as well
     assert (
-        obj.notify(
-            # Google Translated to Arabic:
-            #  "Let's make the world a better place."
-            title="دعونا نجعل العالم مكانا أفضل.",
-            # Google Translated to Hungarian: "One line of code at a time.'
-            body="Egy sor kódot egyszerre.",
-            notify_type=NotifyType.INFO,
+        bool(
+            obj.notify(
+                # Google Translated to Arabic:
+                #  "Let's make the world a better place."
+                title="دعونا نجعل العالم مكانا أفضل.",
+                # Google Translated to Hungarian: "One line of code at a time.'
+                body="Egy sor kódot egyszerre.",
+                notify_type=NotifyType.INFO,
+            )
         )
         is True
     )
@@ -1340,12 +1366,12 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     """NotifyEmail() Test email url parsing."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
-    # Test variations of username required to be an email address
-    # user@example.com; we also test an over-ride port on a template driven
-    # mailto:// entry
+    # Accept a full email username and a custom template port.
     results = email.NotifyEmail.parse_url(
         "mailtos://user:pass123@hotmail.com:444"
         "?to=user2@yahoo.com&name=test%20name"
@@ -1363,7 +1389,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1413,7 +1439,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1440,7 +1466,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.url().startswith(
         "mailtos://user:pass123@hotmail.com/user2%40yahoo.com"
     )
-    # Test that our template over-ride worked
+    # Confirm the template override.
     assert "mode=ssl" in obj.url()
     assert "smtp=override.com" in obj.url()
     # No reply address specified
@@ -1463,7 +1489,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1488,7 +1514,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1515,7 +1541,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1546,7 +1572,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj1.notify("test") is True
+    assert bool(obj1.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1573,7 +1599,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj2.notify("test") is True
+    assert bool(obj2.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1600,7 +1626,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1624,7 +1650,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1648,7 +1674,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1696,7 +1722,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1730,7 +1756,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1759,13 +1785,13 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.from_addr[1] == "user@example.com"
     assert obj.secure_mode == "starttls"
     assert obj.url().startswith("mailtos://user:pass@example.com")
-    # Test that our template over-ride worked
+    # Confirm the template override.
     assert "reply=noreply%40example.com" in obj.url()
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1794,13 +1820,13 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert obj.from_addr[1] == "user@example.com"
     assert obj.secure_mode == "starttls"
     assert obj.url().startswith("mailtos://user:pass@example.com")
-    # Test that our template over-ride worked
+    # Confirm the template override.
     assert "reply=Chris%20%3Cnoreply%40example.ca%3E" in obj.url()
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -1817,9 +1843,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     # Fast Mail Handling
 
-    # Test variations of username required to be an email address
-    # user@example.com; we also test an over-ride port on a template driven
-    # mailto:// entry
+    # Accept a full email username and a custom template port.
     results = email.NotifyEmail.parse_url(
         "mailto://fastmail.com/?to=hello@concordium-explorer.nl"
         "&user=joe@mydomain.nl&pass=abc123"
@@ -1841,7 +1865,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1868,13 +1892,11 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     mock_smtp_ssl.reset_mock()
     response.reset_mock()
 
-    # Issue github.com/caronc/apprise/issue/1040
+    # Omitting to= sends to the authenticated account itself:
     #  mailto://fastmail.com?user=username@customdomain.com \
     #          &to=username@customdomain.com&pass=password123
-    #
-    # should just have to be written like (to= omitted)
     #  mailto://fastmail.com?user=username@customdomain.com&pass=password123
-    #
+    # See https://github.com/caronc/apprise/issues/1040
     results = email.NotifyEmail.parse_url(
         "mailto://fastmail.com?user=username@customdomain.com&pass=password123"
     )
@@ -1897,7 +1919,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -1924,7 +1946,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     mock_smtp_ssl.reset_mock()
     response.reset_mock()
 
-    # Similar test as above, just showing that we can over-ride the From=
+    # Confirm that From= can be overridden.
     # with these custom URLs as well and not require a full email
     results = email.NotifyEmail.parse_url(
         "mailto://fastmail.com?user=username@customdomain.com"
@@ -1949,7 +1971,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 1
     assert response.starttls.call_count == 0
@@ -2005,7 +2027,7 @@ def test_plugin_email_url_parsing(mock_smtp, mock_smtp_ssl):
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert response.starttls.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2035,6 +2057,8 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
     """NotifyEmail() support + in To Email address."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2062,7 +2086,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -2107,7 +2131,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -2151,7 +2175,7 @@ def test_plugin_email_plus_in_toemail(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("test") is True
+    assert bool(obj.notify("test")) is True
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
     assert response.starttls.call_count == 1
@@ -2182,6 +2206,8 @@ def test_plugin_email_formatting_990(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2245,7 +2271,7 @@ def test_plugin_email_variables_1087():
     result, _ = ConfigBase.config_parse(
         cleandoc("""
     #
-    # Test Email Parsing where YAML tokens over-ride qsd
+    # YAML tokens override query-string values.
     #
     urls:
       - mailtos://alt.lan/?pass=abcd&user=joe@alt.lan:
@@ -2260,8 +2286,7 @@ def test_plugin_email_variables_1087():
     assert isinstance(result, list)
     assert len(result) == 1
 
-    # YAML child tokens are higher priority than URL query-string
-    # parameters -- testuser and xxxxXXXxxx win over joe and abcd.
+    # YAML child values override URL query values.
     email_ = result[0]
     assert email_.from_addr == ["Apprise", "testuser@alt.lan"]
     assert email_.user == "testuser@alt.lan"
@@ -2281,6 +2306,8 @@ def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2309,7 +2336,7 @@ def test_plugin_email_to_handling_1356(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2343,6 +2370,8 @@ def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2369,7 +2398,7 @@ def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2410,7 +2439,7 @@ def test_plugin_email_variables_1334(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2429,6 +2458,8 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2458,7 +2489,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2493,7 +2524,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert isinstance(results, dict)
     assert results["user"] == "name@spectrum.net"
-    assert results["host"] == ""  # No hostname defined; it's detected later
+    assert results["host"] == ""  # No hostname; it is detected later.
     assert results["smtp_host"] == "mobile.charter.net"
     assert results["password"] == "password"
 
@@ -2512,7 +2543,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2551,7 +2582,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
     assert results["smtp_host"] == "mobile.charter.net"
     assert results["password"] == "password"
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # We will fail
         Apprise.instantiate(results, suppress_exceptions=False)
 
@@ -2570,7 +2601,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert isinstance(results, dict)
     assert results["user"] == "name@spectrum.net"
-    assert results["host"] == ""  # No hostname defined; it's detected later
+    assert results["host"] == ""  # No hostname; it is detected later.
     assert results["smtp_host"] == "mobile.charter.net"
     assert results["password"] == "password"
 
@@ -2589,7 +2620,7 @@ def test_plugin_host_detection_from_source_email(mock_smtp, mock_smtp_ssl):
 
     assert mock_smtp.call_count == 0
     assert mock_smtp_ssl.call_count == 0
-    assert obj.notify("body", "title") is True
+    assert bool(obj.notify("body", "title")) is True
 
     assert mock_smtp.call_count == 1
     assert mock_smtp_ssl.call_count == 0
@@ -2621,6 +2652,8 @@ def test_plugin_email_by_ipaddr_1113(mock_smtp, mock_smtp_ssl):
     """
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp_ssl.return_value = response
     mock_smtp.return_value = response
 
@@ -2661,6 +2694,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
 
     # Create a mock SMTP Object
     mock_smtp.return_value = mock_socket
@@ -2672,7 +2707,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # no PGP
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
     # No PGP Support and set enabled
-    assert obj.notify("test body") is False
+    assert bool(obj.notify("test body")) is False
 
     # Return the PGP status for remaining checks
     utils.pgp.PGP_SUPPORT = True
@@ -2684,7 +2719,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     assert obj.pgp.public_keyfile() is None
     assert obj.pgp.public_key() is None
     assert obj.pgp.encrypt("message") is False
-    # Keys can not be generated in memory mode
+    # Keys cannot be generated in memory mode.
     assert obj.pgp.keygen() is False
 
     # The reason... no location to store data
@@ -2698,7 +2733,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare PGP
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt", asset=asset
     )
     assert obj.store.mode == PersistentStoreMode.FLUSH
 
@@ -2715,14 +2750,14 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     os.unlink(os.path.join(obj.store.path, "pgp-pub.asc"))
     os.unlink(os.path.join(obj.store.path, "pgp-prv.asc"))
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt", asset=asset
     )
     assert obj.store.mode == PersistentStoreMode.FLUSH
     assert obj.pgp.keygen() is True
 
     # Prepare PGP while providing it a key
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes&"
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt&"
         f"pgppub={obj.pgp.public_keyfile()}",
         asset=asset,
     )
@@ -2733,7 +2768,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # Get our key
     key = obj.pgp.public_key()
 
-    # In this circumstance we can not generate a new key as the one provided
+    # A replacement key cannot be generated in this case.
     # is immutable
     assert obj.pgp.keygen() is False
 
@@ -2748,7 +2783,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare Invalid PGP Key
     obj = Apprise.instantiate(
-        "mailto://pgpX:pass@nuxref.com?pgp=yes", asset=asset0
+        "mailto://pgpX:pass@nuxref.com?pgp=encrypt", asset=asset0
     )
 
     # No keyfiles
@@ -2773,7 +2808,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     # Prepare Invalid PGP Key
     obj = Apprise.instantiate(
-        "mailto://pgp:pass@nuxref.com?pgp=yes&pgppub=invalid", asset=asset
+        "mailto://pgp:pass@nuxref.com?pgp=encrypt&pgppub=invalid", asset=asset
     )
 
     # Returns false
@@ -2786,7 +2821,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir2),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com?pgp=encrypt", asset=asset
     )
 
     assert obj.store.mode == PersistentStoreMode.FLUSH
@@ -2798,16 +2833,15 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     # We will find our key
     assert obj.pgp.public_key() is not None
 
-    # We do this again but even when we do a requisition for a public key
-    # it will generate a new pair or keys for us once it detects we don't
-    # have any
+    # Direct lookups without an address still use the sender's own key.
     tmpdir3 = tmpdir.mkdir("tmp03")
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir3),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     assert obj.store.mode == PersistentStoreMode.FLUSH
@@ -2825,7 +2859,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
 
     assert obj.pgp.public_keyfile().endswith("chris-pub.asc")
 
-    assert obj.notify("test body") is True
+    # A real send fails rather than generating an unknown recipient's key.
+    assert bool(obj.notify("test body")) is False
 
     # The private key is not needed for sending the encrypted messages
     os.unlink(os.path.join(obj.store.path, "chris-prv.asc"))
@@ -2875,19 +2910,16 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     )
     # user-pub still trumps
     assert obj.pgp.public_keyfile("user@example.com").endswith("user-pub.asc")
-    assert obj.pgp.public_keyfile("invalid@example.com").endswith(
-        "chris@nuxref.com-pub.asc"
-    )
+    # Never substitute the sender's key for a missing recipient key.
+    assert obj.pgp.public_keyfile("invalid@example.com") is None
 
     # remove this file
     os.unlink(os.path.join(obj.store.path, "user-pub.asc"))
 
-    # now we fall back to basic/default configuration
-    assert obj.pgp.public_keyfile("user@example.com").endswith(
-        "chris@nuxref.com-pub.asc"
-    )
+    # Removing the recipient key must not expose sender keys as fallbacks.
+    assert obj.pgp.public_keyfile("user@example.com") is None
     os.unlink(os.path.join(obj.store.path, "chris@nuxref.com-pub.asc"))
-    assert obj.pgp.public_keyfile("user@example.com").endswith("chris-pub.asc")
+    assert obj.pgp.public_keyfile("user@example.com") is None
 
     # Testing again
     tmpdir4 = tmpdir.mkdir("tmp04")
@@ -2896,7 +2928,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir4),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     with mock.patch("builtins.open", side_effect=FileNotFoundError):
@@ -2934,7 +2967,7 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
     with mock.patch("pgpy.PGPMessage.new", side_effect=NameError):
         assert obj.pgp.encrypt("message") is None
         # Attempts to encrypt a message
-        assert obj.notify("test-encrypt") is False
+        assert bool(obj.notify("test-encrypt")) is False
 
     # Create new keys
     assert obj.pgp.keygen() is True
@@ -2952,7 +2985,8 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir5),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
     # Catch edge case where we just can't generate the the key
@@ -2989,34 +3023,38 @@ def test_plugin_email_pgp(mock_smtp, mock_smtpssl, tmpdir):
         storage_path=str(tmpdir6),
     )
     obj = Apprise.instantiate(
-        "mailto://chris:pass@nuxref.com/user@example.com?pgp=yes", asset=asset
+        "mailto://chris:pass@nuxref.com/user@example.com?pgp=encrypt",
+        asset=asset,
     )
 
+    # Use the recipient's filename to exercise the corrupt-key path.
     shutil.copyfile(
         os.path.join(TEST_VAR_DIR, "pgp", "corrupt-pub.asc"),
-        os.path.join(obj.store.path, "chris-pub.asc"),
+        os.path.join(obj.store.path, "user@example.com-pub.asc"),
     )
 
     # Key is corrupted
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
     shutil.copyfile(
         os.path.join(TEST_VAR_DIR, "apprise-test.jpeg"),
-        os.path.join(obj.store.path, "chris-pub.asc"),
+        os.path.join(obj.store.path, "user@example.com-pub.asc"),
     )
 
     # Key is a binary image; definitely not a valid key
-    assert obj.notify("test") is False
+    assert bool(obj.notify("test")) is False
 
 
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
-def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
-    """NotifyEmail() pgp_mode parameter and backward-compat use_pgp."""
+def test_plugin_email_pgp_modes(mock_smtp, mock_smtpssl):
+    """NotifyEmail() handles supported and unknown PGP modes."""
 
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3034,7 +3072,7 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=e")
     assert obj.pgp_mode == "encrypt"
 
-    # pgp=none -> no mode match; falls to default 'no' (backward compat)
+    # "none" is an explicit synonym for "no".
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=none")
     assert obj.pgp_mode == "no"
 
@@ -3046,17 +3084,13 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=no")
     assert obj.pgp_mode == "no"
 
-    # pgp=false -> legacy bool path; no deprecation warning -> default 'no'
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=false")
-    assert obj.pgp_mode == "no"
-
-    # pgp=yes -> parse_bool -> True -> 'encrypt' (deprecated path)
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=yes")
-    assert obj.pgp_mode == "encrypt"
-
-    # pgp=true -> same deprecated path
-    obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=true")
-    assert obj.pgp_mode == "encrypt"
+    # Removed boolean spellings are rejected; canonical "no" remains valid.
+    for legacy in ("yes", "true", "false"):
+        with pytest.raises(AppriseImproperlyConfigured):
+            Apprise.instantiate(
+                f"mailto://user:pass@nuxref.com?pgp={legacy}",
+                suppress_exceptions=False,
+            )
 
     # url() emits 'pgp=encrypt' when mode is encrypt, and nothing when no
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com?pgp=encrypt")
@@ -3066,31 +3100,12 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     obj = Apprise.instantiate("mailto://user:pass@nuxref.com")
     assert "pgp=" not in obj.url()
 
-    # use_pgp=True deprecated kwarg maps to pgp_mode='encrypt'
-    obj = email.NotifyEmail(
-        user="user",
-        password="pass",
-        host="nuxref.com",
-        use_pgp=True,
-    )
-    assert obj.pgp_mode == "encrypt"
-
-    # use_pgp=False deprecated kwarg maps to pgp_mode='no'
-    obj = email.NotifyEmail(
-        user="user",
-        password="pass",
-        host="nuxref.com",
-        use_pgp=False,
-    )
-    assert obj.pgp_mode == "no"
-
-    # pgp_mode wins over use_pgp when both are supplied
+    # The constructor also accepts pgp_mode directly.
     obj = email.NotifyEmail(
         user="user",
         password="pass",
         host="nuxref.com",
         pgp_mode="encrypt",
-        use_pgp=False,
     )
     assert obj.pgp_mode == "encrypt"
 
@@ -3106,6 +3121,38 @@ def test_plugin_email_pgp_mode_param(mock_smtp, mock_smtpssl):
     assert "pgppub=****" in obj.url(privacy=True)
     assert "my-pub.asc" not in obj.url(privacy=True)
 
+    # The removed pgpkey alias is ignored and is no longer advertised.
+    assert "pgpkey" not in email.NotifyEmail.template_args
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgpkey=/old/public-key.asc"
+    )
+    assert obj is not None
+    assert obj.pgp_key is None
+
+    # An unknown old alias cannot replace the supported parameter.
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com"
+        "?pgppub=/current/public-key.asc&pgpkey=/old/public-key.asc"
+    )
+    assert obj is not None
+    assert obj.pgp_key == "/current/public-key.asc"
+
+    # Reject typos instead of silently disabling encryption.
+    with pytest.raises(AppriseImproperlyConfigured):
+        email.NotifyEmail(
+            user="user",
+            password="pass",
+            host="nuxref.com",
+            pgp_mode="encrpyt",
+        )
+
+    # Same applies when the value arrives via the URL
+    with pytest.raises(AppriseImproperlyConfigured):
+        Apprise.instantiate(
+            "mailto://user:pass@nuxref.com?pgp=encrpyt",
+            suppress_exceptions=False,
+        )
+
 
 @mock.patch("smtplib.SMTP_SSL")
 @mock.patch("smtplib.SMTP")
@@ -3115,6 +3162,8 @@ def test_plugin_email_wkd_param(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3181,6 +3230,8 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3201,9 +3252,11 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
     )
     pub_bytes = str(key.pubkey).encode()
 
+    # Keep WKD as the only key source in this test.
     asset = AppriseAsset(
         storage_mode=PersistentStoreMode.FLUSH,
         storage_path=str(tmpdir),
+        pgp_autogen=False,
     )
 
     obj = Apprise.instantiate(
@@ -3214,16 +3267,14 @@ def test_plugin_email_wkd_key_discovery(mock_smtp, mock_smtpssl, tmpdir):
 
     # Patch WKD fetch to return our generated public key
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
-    # Clear the parsed-key cache so the second block cannot reuse the
-    # key loaded above -- we need the fetch mock to be the sole source
+    # Clear the cache so the next fetch uses only its mock result.
     obj.pgp._ApprisePGPController__key_lookup.clear()
 
     # WKD returning None with autogen disabled falls through gracefully
-    asset.pgp_autogen = False
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
-        assert obj.notify("test body") is False
+        assert bool(obj.notify("test body")) is False
 
 
 @mock.patch("smtplib.SMTP_SSL")
@@ -3234,6 +3285,8 @@ def test_plugin_email_pgp_sign_mode_param(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3270,6 +3323,8 @@ def test_plugin_email_pgp_privkey_param(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3307,6 +3362,8 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3324,13 +3381,244 @@ def test_plugin_email_pgp_sign_send(mock_smtp, mock_smtpssl, tmpdir):
     assert obj is not None
 
     # Notification should succeed and sendmail should be called once
-    assert obj.notify("test body") is True
+    assert bool(obj.notify("test body")) is True
     assert mock_socket.sendmail.call_count == 1
 
     # The emitted email must contain the multipart/signed structure
     raw = mock_socket.sendmail.call_args[0][2]
     assert "multipart/signed" in raw
     assert "application/pgp-signature" in raw
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_encrypt_send_with_autocrypt(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Encrypt with a recipient key and advertise the sender key."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    pub_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-pub.asc"
+    )
+
+    # Generate a sender key that includes an encryption subkey.
+    keygen_ctrl = utils.pgp.ApprisePGPController(
+        path=str(tmpdir.mkdir("keygen")), email="user@nuxref.com"
+    )
+    assert keygen_ctrl.keygen() is True
+    own_prv_path = keygen_ctrl.private_keyfile()
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir.mkdir("send")),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com/recipient@example.com"
+        f"?pgp=encrypt&pgppub={pub_path}&pgpprv={own_prv_path}",
+        asset=asset,
+    )
+    assert obj is not None
+    assert bool(obj.notify("test body")) is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert "multipart/encrypted" in raw
+    assert raw.count("Autocrypt:") == 1
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_encrypt_self_send_autogens_key(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Encrypted self-sends may generate the sender's key."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com?pgp=encrypt", asset=asset
+    )
+    assert obj is not None
+    assert obj.pgp.private_key() is None
+
+    assert bool(obj.notify("test body")) is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert "multipart/encrypted" in raw
+    assert obj.pgp.private_key() is not None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_pgp_encrypt_external_recipient_no_autogen(
+    mock_smtp, mock_smtpssl, tmpdir
+):
+    """Encrypted external sends never generate the recipient's key."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    asset = AppriseAsset(
+        storage_mode=PersistentStoreMode.FLUSH,
+        storage_path=str(tmpdir),
+    )
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com/other@example.org?pgp=encrypt",
+        asset=asset,
+    )
+    assert obj is not None
+
+    assert bool(obj.notify("test body")) is False
+    assert obj.pgp.public_keyfile("other@example.org") is None
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_send_without_autocrypt(mock_smtp, mock_smtpssl, tmpdir):
+    """Protected sends omit Autocrypt when no sender key is available."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    prv_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-prv.asc"
+    )
+    pub_path = os.path.join(
+        os.path.dirname(__file__), "var", "pgp", "valid-pub.asc"
+    )
+
+    with mock.patch.object(
+        utils.pgp.ApprisePGPController,
+        "autocrypt_header",
+        return_value=None,
+    ):
+        # Sign mode
+        asset = AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir.mkdir("sign")),
+        )
+        obj = Apprise.instantiate(
+            f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}",
+            asset=asset,
+        )
+        assert bool(obj.notify("test body")) is True
+        raw = mock_socket.sendmail.call_args[0][2]
+        assert "Autocrypt:" not in raw
+
+        mock_socket.reset_mock()
+
+        # Encrypt mode
+        asset = AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir.mkdir("encrypt")),
+        )
+        obj = Apprise.instantiate(
+            f"mailto://user:pass@nuxref.com?pgp=encrypt&pgppub={pub_path}",
+            asset=asset,
+        )
+        assert bool(obj.notify("test body")) is True
+        raw = mock_socket.sendmail.call_args[0][2]
+        assert "Autocrypt:" not in raw
+
+
+@pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_autocrypt_deduplication(mock_smtp, mock_smtpssl, tmpdir):
+    """Generated Autocrypt headers replace custom case variants."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # Generate a sender key that Autocrypt can advertise.
+    keygen_ctrl = utils.pgp.ApprisePGPController(
+        path=str(tmpdir.mkdir("keygen")), email="user@nuxref.com"
+    )
+    assert keygen_ctrl.keygen() is True
+    prv_path = keygen_ctrl.private_keyfile()
+
+    # Keep iterations isolated, even on case-insensitive filesystems.
+    for index, custom_key in enumerate(
+        ("Autocrypt", "autocrypt", "AUTOCRYPT")
+    ):
+        mock_socket.reset_mock()
+        asset = AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir.mkdir(f"sign-{index}")),
+        )
+        spoofed_value = "addr%3Dattacker%40example.com%3B%20keydata%3Dbogus"
+        obj = Apprise.instantiate(
+            f"mailto://user:pass@nuxref.com?pgp=sign&pgpprv={prv_path}"
+            f"&+{custom_key}={spoofed_value}",
+            asset=asset,
+        )
+        assert bool(obj.notify("test body")) is True
+        raw = mock_socket.sendmail.call_args[0][2]
+
+        # Keep only the controller-generated Autocrypt value.
+        assert raw.lower().count("autocrypt:") == 1
+        assert "attacker@example.com" not in raw
+        assert "keydata=bogus" not in raw
+
+
+@mock.patch("smtplib.SMTP_SSL")
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_autocrypt_custom_only_deduplication(
+    mock_smtp, mock_smtpssl
+):
+    """Custom Autocrypt header names are deduplicated case-insensitively."""
+
+    mock_socket = mock.Mock()
+    mock_socket.starttls.return_value = True
+    mock_socket.login.return_value = True
+    mock_socket.sendmail.return_value = {}
+    mock_smtp.return_value = mock_socket
+    mock_smtpssl.return_value = mock_socket
+
+    # pgp=no prevents a controller-generated Autocrypt header.
+    obj = Apprise.instantiate(
+        "mailto://user:pass@nuxref.com/friend@example.org"
+        "?+Autocrypt=first&+autocrypt=second"
+    )
+    assert bool(obj.notify("test body")) is True
+
+    raw = mock_socket.sendmail.call_args[0][2]
+    assert raw.lower().count("autocrypt:") == 1
+    assert "Autocrypt: first" in raw
+    assert "second" not in raw
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
@@ -3372,18 +3660,15 @@ def test_plugin_email_pgp_sign_crlf_roundtrip(tmpdir):
     # Parse the returned armored signature back to a PGPSignature object
     sig = _pgpy.PGPSignature.from_blob(sig_str)
 
-    # The CRLF body must verify -- this is what the recipient receives.
-    # pgpy.verify() returns a SignatureVerification object (truthy on
-    # success, falsy on failure) rather than raising PGPError for a bad
-    # signature; check the return value directly.
+    # Verify the CRLF form received by the recipient.
+    # PGPy reports verification through the result's truth value.
     crlf_ok = bool(pub_key.verify(crlf_body, sig))
     assert crlf_ok, (
         "Signature did not verify against CRLF content -- "
         "the signed body must use CRLF line endings (RFC 3156)"
     )
 
-    # The bare-LF form must NOT verify (regression guard: CRLF
-    # normalisation before pgp.sign() must not be removed).
+    # The bare-LF form must not verify after CRLF normalization.
     lf_ok = bool(pub_key.verify(lf_body, sig))
     assert not lf_ok, (
         "Signature verified against bare-LF content -- CRLF normalisation "
@@ -3404,6 +3689,8 @@ def test_plugin_email_pgp_sign_wire_content_crlf(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3432,7 +3719,7 @@ def test_plugin_email_pgp_sign_wire_content_crlf(
     with mock.patch.object(
         utils.pgp.ApprisePGPController, "sign", capturing_sign
     ):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     # Confirm send actually happened and our interceptor was triggered
     assert mock_socket.sendmail.call_count == 1
@@ -3460,6 +3747,8 @@ def test_plugin_email_pgp_sign_no_privkey_fails(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3473,7 +3762,7 @@ def test_plugin_email_pgp_sign_no_privkey_fails(
         asset=asset,
     )
     assert obj is not None
-    assert obj.notify("test body") is False
+    assert bool(obj.notify("test body")) is False
 
 
 @pytest.mark.skipif("pgpy" not in sys.modules, reason="Requires PGPy")
@@ -3487,6 +3776,8 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3524,7 +3815,7 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
 
     # With WKD returning a public key: sign + encrypt
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=pub_bytes):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     raw = mock_socket.sendmail.call_args[0][2]
     # The outer structure is multipart/encrypted (the signed body is inside)
@@ -3536,7 +3827,7 @@ def test_plugin_email_pgp_sign_opportunistic_encrypt(
 
     # With WKD returning nothing: sign only, no failure
     with mock.patch.object(obj.pgp.wkd, "fetch", return_value=None):
-        assert obj.notify("test body") is True
+        assert bool(obj.notify("test body")) is True
 
     raw = mock_socket.sendmail.call_args[0][2]
     # No encryption this time; just a signed message
@@ -3552,6 +3843,8 @@ def test_plugin_email_pgp_sign_no_pgp_support(mock_smtp, mock_smtpssl):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3569,7 +3862,7 @@ def test_plugin_email_pgp_sign_no_pgp_support(mock_smtp, mock_smtpssl):
     real_support = pgp_utils.PGP_SUPPORT
     pgp_utils.PGP_SUPPORT = False
     try:
-        assert obj.notify("test body") is False
+        assert bool(obj.notify("test body")) is False
     finally:
         pgp_utils.PGP_SUPPORT = real_support
 
@@ -3585,6 +3878,8 @@ def test_plugin_email_pgp_sign_encrypt_none_mode(
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3602,7 +3897,7 @@ def test_plugin_email_pgp_sign_encrypt_none_mode(
         asset=asset,
     )
     assert obj is not None
-    assert obj.notify("test body") is True
+    assert bool(obj.notify("test body")) is True
 
     # The email must not contain any PGP markers
     raw = mock_socket.sendmail.call_args[0][2]
@@ -3619,6 +3914,8 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     mock_socket = mock.Mock()
     mock_socket.starttls.return_value = True
     mock_socket.login.return_value = True
+    # An empty refusal map means SMTP accepted every recipient.
+    mock_socket.sendmail.return_value = {}
     mock_smtp.return_value = mock_socket
     mock_smtpssl.return_value = mock_socket
 
@@ -3635,10 +3932,49 @@ def test_plugin_email_pgp_sign_keygen_auto(mock_smtp, mock_smtpssl, tmpdir):
     # Generate the key pair into the storage directory
     assert obj.pgp.keygen() is True
 
-    # Now send -- the auto-generated private key must be discovered.
-    # With both keys present the message is sign+encrypted; the signing
-    # step is the behavior under test, so we only assert success here.
-    assert obj.notify("test body") is True
+    # Sending must discover the generated private key.
+    assert bool(obj.notify("test body")) is True
+
+
+@mock.patch("smtplib.SMTP")
+def test_plugin_email_multi_format(mock_smtp):
+    """NotifyEmail() declares HTML+TEXT and resolves per-call."""
+
+    assert email.NotifyEmail.notify_format == (
+        NotifyFormat.HTML,
+        NotifyFormat.TEXT,
+    )
+
+    instance = mock_smtp.return_value
+    instance.sendmail.return_value = {}
+
+    aobj = Apprise()
+    assert aobj.add("mailto://user:pass@example.com") is True
+
+    # Default (no body_format): still builds a multipart/alternative
+    # message with both an HTML and a derived plain-text part.
+    assert bool(aobj.notify(body="<b>Bold HTML</b> body")) is True
+    msg = instance.sendmail.call_args_list[-1][0][2]
+    assert "multipart" in msg
+    assert "text/plain" in msg
+    assert "text/html" in msg
+
+    # body_format=TEXT aligns directly to TEXT mode (no HTML round
+    # trip); the exact original text is sent, unescaped and unchanged.
+    assert (
+        bool(
+            aobj.notify(
+                body="Plain text with <literal> angle brackets.",
+                body_format=NotifyFormat.TEXT,
+            )
+        )
+        is True
+    )
+    msg = instance.sendmail.call_args_list[-1][0][2]
+    assert "multipart" not in msg
+    assert "text/plain" in msg
+    assert "text/html" not in msg
+    assert "Plain text with <literal> angle brackets." in msg
 
 
 def test_plugin_email_prepare():
@@ -3734,6 +4070,8 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
     """NotifyEmail() GMX template lookup tests."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     mock_smtp.return_value = response
 
     for domain in (
@@ -3757,7 +4095,7 @@ def test_plugin_email_gmx_template_lookup(mock_smtp):
         assert obj.secure is True
 
         # Send once to trigger SMTP/login behaviour
-        assert obj.notify("body", "title") is True
+        assert bool(obj.notify("body", "title")) is True
 
         # STARTTLS used
         assert response.starttls.call_count == 1
@@ -3779,9 +4117,11 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
     passing a validating SSL context to smtplib."""
 
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     response.starttls.return_value = True
     response.login.return_value = True
-    response.sendmail.return_value = True
+    response.sendmail.return_value = {}
     response.quit.return_value = True
     mock_smtp.return_value = response
     mock_smtpssl.return_value = response
@@ -3794,7 +4134,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
     )
     assert isinstance(obj, email.NotifyEmail)
     assert obj.verify_certificate is True
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert mock_smtpssl.call_count == 1
     context = mock_smtpssl.call_args.kwargs.get("context")
@@ -3812,7 +4152,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
         suppress_exceptions=False,
     )
     assert obj.verify_certificate is False
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert mock_smtpssl.call_count == 1
     context = mock_smtpssl.call_args.kwargs.get("context")
@@ -3830,7 +4170,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
         suppress_exceptions=False,
     )
     assert obj.verify_certificate is True
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert response.starttls.call_count == 1
     context = response.starttls.call_args.kwargs.get("context")
@@ -3846,7 +4186,7 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
         suppress_exceptions=False,
     )
     assert obj.verify_certificate is False
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     assert response.starttls.call_count == 1
     context = response.starttls.call_args.kwargs.get("context")
@@ -3859,6 +4199,8 @@ def test_plugin_email_tls_certificate_verification(mock_smtpssl, mock_smtp):
 def test_plugin_email_starttls_certificate_failure_handling(mock_smtp):
     """A rejected STARTTLS certificate must be a normal send failure."""
     response = mock.Mock()
+    # An empty refusal map means SMTP accepted every recipient.
+    response.sendmail.return_value = {}
     response.starttls.side_effect = ssl.SSLCertVerificationError(
         "certificate verify failed"
     )
@@ -3874,7 +4216,7 @@ def test_plugin_email_starttls_certificate_failure_handling(mock_smtp):
     )
     assert isinstance(obj, email.NotifyEmail)
 
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     response.login.assert_not_called()
     response.sendmail.assert_not_called()
 
@@ -3918,11 +4260,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>hello</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj.notify(
+                body="<p>hello</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -3945,18 +4289,20 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # the attachment is embedded inline
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>no cid ref here</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj.notify(
+                body="<p>no cid ref here</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
     assert len(sent_messages) == 1
     msg = sent_messages[0]
 
-    # Image inlined regardless -- anchor appended automatically
+    # Unreferenced images receive an automatic inline anchor.
     assert "multipart/related" in msg
     assert "Content-Disposition: inline" in msg
     assert "Content-ID:" in msg
@@ -3968,11 +4314,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body=html_with_ref,
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj.notify(
+                body=html_with_ref,
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -3992,11 +4340,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body=html_one_ref,
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=AppriseAttachment([img, img2]),
+        bool(
+            obj.notify(
+                body=html_one_ref,
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=AppriseAttachment([img, img2]),
+            )
         )
         is True
     )
@@ -4022,11 +4372,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>body</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa,
+        bool(
+            obj.notify(
+                body="<p>body</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa,
+            )
         )
         is True
     )
@@ -4049,11 +4401,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain text body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=img,
+        bool(
+            obj_txt.notify(
+                body="plain text body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=img,
+            )
         )
         is True
     )
@@ -4069,11 +4423,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # inline=True, TEXT format, non-image attachment
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain text body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa,  # application/pdf override -- not an image
+        bool(
+            obj_txt.notify(
+                body="plain text body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa,  # application/pdf is not an image
+            )
         )
         is True
     )
@@ -4092,11 +4448,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>no cid</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_upper,
+        bool(
+            obj.notify(
+                body="<p>no cid</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_upper,
+            )
         )
         is True
     )
@@ -4111,11 +4469,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # also appear, proving the case-insensitive check works in the text path
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_upper,
+        bool(
+            obj_txt.notify(
+                body="plain body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_upper,
+            )
         )
         is True
     )
@@ -4127,11 +4487,13 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     # warning is logged so the user can debug the mismatch
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
-            obj.notify(
-                body='<img src="cid:missing-file.jpg">',
-                title="test",
-                notify_type=NotifyType.INFO,
-                attach=img,
+            bool(
+                obj.notify(
+                    body='<img src="cid:missing-file.jpg">',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    attach=img,
+                )
             )
             is True
         )
@@ -4142,18 +4504,18 @@ def test_plugin_email_inline_attachments(mock_smtplib):
         )
         assert "missing-file.jpg" in warning_texts
 
-    # inline=True, HTML, only unmatched cid: ref with a non-image attachment:
-    # the unmatched ref is dropped after the warning so cid_refs is empty
-    # when the wrapper type is chosen -- wrapper must be multipart/mixed
+    # An unmatched cid: with only a PDF keeps the mixed wrapper.
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger"):
         assert (
-            obj.notify(
-                body='<p>body <img src="cid:ghost.jpg"></p>',
-                title="test",
-                notify_type=NotifyType.INFO,
-                # application/pdf -- not an image, not named ghost.jpg
-                attach=aa,
+            bool(
+                obj.notify(
+                    body='<p>body <img src="cid:ghost.jpg"></p>',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    # application/pdf is not an image or ghost.jpg
+                    attach=aa,
+                )
             )
             is True
         )
@@ -4165,20 +4527,18 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     assert "multipart/related" not in msg
     assert "Content-ID" not in msg
 
-    # inline=True, HTML, explicit cid: ref whose filename MATCHES a
-    # non-image attachment (PDF): a cid: URI can only resolve within
-    # the same MIME package, so if the caller wrote it they attached
-    # the file deliberately.  The ref is honored regardless of type --
-    # wrapper becomes multipart/related and the PDF is inlined.
+    # A matching explicit cid: reference also inlines a PDF.
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
-            obj.notify(
-                body=f'<p>body <embed src="cid:{pdf_attach.name}"></p>',
-                title="test",
-                notify_type=NotifyType.INFO,
-                # same PDF attachment as earlier tests
-                attach=aa,
+            bool(
+                obj.notify(
+                    body=f'<p>body <embed src="cid:{pdf_attach.name}"></p>',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    # same PDF attachment as earlier tests
+                    attach=aa,
+                )
             )
             is True
         )
@@ -4203,16 +4563,18 @@ def test_plugin_email_inline_attachments(mock_smtplib):
     sent_messages.clear()
     with mock.patch("apprise.plugins.email.base.logger") as mock_logger:
         assert (
-            obj.notify(
-                body='<img src="cid:my%20photo.gif">',
-                title="test",
-                notify_type=NotifyType.INFO,
-                attach=aa_spaced,
+            bool(
+                obj.notify(
+                    body='<img src="cid:my%20photo.gif">',
+                    title="test",
+                    notify_type=NotifyType.INFO,
+                    attach=aa_spaced,
+                )
             )
             is True
         )
 
-    # No warning about an unmatched ref -- %20 decoded to space matched it
+    # Percent-decoding lets the cid: reference match the spaced filename.
     for call in mock_logger.warning.call_args_list:
         assert "my" not in str(call), (
             "Spurious warning fired for a cid: ref that should have "
@@ -4233,25 +4595,29 @@ def test_plugin_email_inline_attachments(mock_smtplib):
 
     sent_messages.clear()
     assert (
-        obj.notify(
-            body="<p>body</p>",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_bad,
+        bool(
+            obj.notify(
+                body="<p>body</p>",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_bad,
+            )
         )
         is False  # bad attachment detected by the main loop
     )
-    # No sendmail call -- the bad attachment caused an early failure
+    # An inaccessible attachment fails before SMTP delivery.
     assert len(sent_messages) == 0
 
     # inline=True, TEXT format, inaccessible attachment
     sent_messages.clear()
     assert (
-        obj_txt.notify(
-            body="plain body",
-            title="test",
-            notify_type=NotifyType.INFO,
-            attach=aa_bad,
+        bool(
+            obj_txt.notify(
+                body="plain body",
+                title="test",
+                notify_type=NotifyType.INFO,
+                attach=aa_bad,
+            )
         )
         is False
     )

@@ -35,6 +35,7 @@ from typing import Any, Optional
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_bool, validate_regex
@@ -137,7 +138,7 @@ class NotifySIGNL4(NotifyBase):
                 "({}) was specified.".format(secret)
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # A service option for notifications
         self.service = service

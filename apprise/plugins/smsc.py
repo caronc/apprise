@@ -54,6 +54,7 @@ from json import loads
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -193,13 +194,13 @@ class NotifySMSC(NotifyBase):
         if not self.user:
             msg = "An SMSC login must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate password
         if not self.password:
             msg = "An SMSC password must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Optional sender ID
         self.sender = None
@@ -208,7 +209,7 @@ class NotifySMSC(NotifyBase):
             if not self.sender:
                 msg = f"The SMSC sender ID specified ({sender}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Transliteration flag
         self.translit = (

@@ -28,6 +28,7 @@
 import requests
 
 from ..common import NotifyFormat, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, validate_regex
 from .base import NotifyBase
@@ -94,7 +95,7 @@ class NotifyPushMe(NotifyBase):
         if not self.token:
             msg = f"An invalid PushMe Token ({token}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Set Status type
         self.status = status

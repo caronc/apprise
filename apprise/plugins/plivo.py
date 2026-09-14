@@ -36,6 +36,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
     is_phone_no,
@@ -156,7 +157,7 @@ class NotifyPlivo(NotifyBase):
                 "invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.token = validate_regex(
             token, *self.template_tokens["token"]["regex"]
@@ -167,13 +168,13 @@ class NotifyPlivo(NotifyBase):
                 "invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         result = is_phone_no(source)
         if not result:
             msg = f"The Plivo source specified ({source}) is invalid."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our source; enforce E.164 format
         self.source = f"+{result['full']}"

@@ -53,6 +53,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyFormat, NotifyType, PersistentStoreMode
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_email, parse_bool, parse_emails, validate_regex
@@ -280,7 +281,7 @@ class NotifyOffice365(NotifyBase):
             },
             "target_email": {
                 "name": _("Target Email"),
-                "type": "string",
+                "type": "email",
                 "map_to": "targets",
             },
             "targets": {
@@ -352,7 +353,7 @@ class NotifyOffice365(NotifyBase):
             if _mode not in OFFICE365_MODES:
                 msg = f"The Office 365 mode specified ({mode}) is invalid."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
             self.mode = _mode
         else:
             _src = is_email(source) if source else None
@@ -376,7 +377,7 @@ class NotifyOffice365(NotifyBase):
                 f"({client_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Client Secret (org) or seed Refresh Token (personal)
         self.secret = validate_regex(secret)
@@ -386,7 +387,7 @@ class NotifyOffice365(NotifyBase):
                 f"({secret}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if self.mode == Office365Mode.ORG:
             # Tenant identifier — required for org mode
@@ -396,7 +397,7 @@ class NotifyOffice365(NotifyBase):
             if not self.tenant:
                 msg = f"An invalid Office 365 Tenant ({tenant}) was specified."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             # Personal mode requires no tenant
@@ -518,7 +519,7 @@ class NotifyOffice365(NotifyBase):
                     f"mode; got ({self.source})."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             self.from_email = result["full_email"]
             self.from_name = result["name"] or None

@@ -31,6 +31,7 @@ from typing import Any, Optional, Union
 from .asset import AppriseAsset
 from .attachment.base import AttachBase
 from .common import ContentLocation
+from .exception import AppriseImproperlyConfigured
 from .logger import logger
 from .manager_attachment import AttachmentManager
 from .url import URLBase
@@ -117,14 +118,16 @@ class AppriseAttachment:
                     "specified.",
                 )
                 logger.warning(err)
-                raise TypeError(err) from None
+                raise AppriseImproperlyConfigured(err) from None
         else:
             # do not set location if no initialization was made for it
             self.location = None
 
         # Now parse any paths specified
         if paths is not None and not self.add(paths):
-            raise TypeError("One or more attachments could not be added.")
+            raise AppriseImproperlyConfigured(
+                "One or more attachments could not be added."
+            )
 
     def add(
         self,
@@ -228,7 +231,7 @@ class AppriseAttachment:
                 return_status = False
                 continue
 
-            # Add our initialized plugin to our server listings
+            # Add the initialized plugin to our attachment list.
             if isinstance(instance, list):
                 self.attachments.extend(instance)
 
@@ -268,12 +271,11 @@ class AppriseAttachment:
                 logger.warning(f"Unsupported schema {schema}.")
                 return None
 
-        # Parse our url details of the server object as dictionary containing
-        # all of the information parsed from our URL
+        # Parse the attachment URL into constructor arguments.
         results = A_MGR[schema].parse_url(url)
 
         if not results:
-            # Failed to parse the server URL
+            # The attachment URL could not be parsed.
             logger.warning(f"Unparseable URL {url}.")
             return None
 

@@ -32,6 +32,7 @@ import re
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import parse_list, validate_regex
@@ -131,7 +132,7 @@ class NotifyPushed(NotifyBase):
                 f"An invalid Pushed Application Key ({app_key}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Access Secret (associated with project)
         self.app_secret = validate_regex(app_secret)
@@ -141,7 +142,7 @@ class NotifyPushed(NotifyBase):
                 f"({app_secret}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Initialize channel list
         self.channels = []
@@ -175,7 +176,7 @@ class NotifyPushed(NotifyBase):
                 # explicitly identifying at least one.
                 msg = "No Pushed targets to notify."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         return
 

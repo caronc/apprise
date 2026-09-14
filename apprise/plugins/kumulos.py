@@ -40,6 +40,7 @@ from json import dumps
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import validate_regex
 from .base import NotifyBase
@@ -116,7 +117,7 @@ class NotifyKumulos(NotifyBase):
         if not self.apikey:
             msg = f"An invalid Kumulos API Key ({apikey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Server Key (associated with project)
         self.serverkey = validate_regex(
@@ -125,7 +126,7 @@ class NotifyKumulos(NotifyBase):
         if not self.serverkey:
             msg = f"An invalid Kumulos Server Key ({serverkey}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Kumulos Notification."""

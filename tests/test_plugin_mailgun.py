@@ -34,6 +34,7 @@ from helpers import AppriseURLTester
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.mailgun import NotifyMailgun
 
 logging.disable(logging.CRITICAL)
@@ -46,20 +47,20 @@ apprise_url_tests = (
     (
         "mailgun://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "mailgun://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No Token specified
     (
         "mailgun://user@localhost.localdomain",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Token is valid, but no user name specified
@@ -68,7 +69,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 8, "c" * 8
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Invalid from email address
@@ -77,7 +78,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 8, "c" * 8
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # No To email address, but everything else is valid
@@ -137,7 +138,7 @@ apprise_url_tests = (
             "a" * 32, "b" * 8, "c" * 8
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Use of both 'name' and 'from' together; these are synonymous
@@ -293,11 +294,13 @@ def test_plugin_mailgun_attachments(mock_post):
     path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
     attach = AppriseAttachment(path)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -305,11 +308,13 @@ def test_plugin_mailgun_attachments(mock_post):
     # Test invalid attachment
     path = os.path.join(TEST_VAR_DIR, "/invalid/path/to/an/invalid/file.jpg")
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=path,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=path,
+            )
         )
         is False
     )
@@ -318,11 +323,13 @@ def test_plugin_mailgun_attachments(mock_post):
     mock_post.side_effect = OSError()
     # We can't send the message if we can't read the attachment
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is False
     )
@@ -341,11 +348,13 @@ def test_plugin_mailgun_attachments(mock_post):
     with mock.patch("builtins.open", side_effect=OSError()):
         # We can't send the message we can't open the attachment for reading
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -355,11 +364,13 @@ def test_plugin_mailgun_attachments(mock_post):
         "builtins.open", side_effect=(mock.Mock(), mock.Mock(), OSError())
     ):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -371,11 +382,13 @@ def test_plugin_mailgun_attachments(mock_post):
 
         # We can't send the message we can't seek through it
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -387,11 +400,13 @@ def test_plugin_mailgun_attachments(mock_post):
         mock_open.return_value = mock_fp
         # We can't send the message we can't seek through it
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -415,11 +430,13 @@ def test_plugin_mailgun_attachments(mock_post):
     mock_post.reset_mock()
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -431,11 +448,13 @@ def test_plugin_mailgun_attachments(mock_post):
     obj.default_batch_size = 2
 
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -465,7 +484,9 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -496,7 +517,9 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -522,7 +545,9 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -547,7 +572,9 @@ def test_plugin_mailgun_header_check(mock_post):
 
     # Send our notification
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -567,10 +594,10 @@ def test_plugin_mailgun_cc_bcc_invalid_branch():
 
     # Build a NotifyMailgun with:
     #   cc  = one valid address + one that parse_emails passes but is_email
-    #         rejects (hits the FALSE branch at line 327).
+    #         rejects, exercising the invalid-address branch.
     #         A list must be used -- parse_emails filters invalid tokens out
     #         of comma-separated strings before is_email is ever called.
-    #   bcc = same, for the FALSE branch at line 343
+    #   bcc = the same arrangement for the BCC validation branch
     obj = NotifyMailgun(
         apikey=apikey,
         targets=["user@example.com"],

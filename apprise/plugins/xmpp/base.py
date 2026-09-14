@@ -33,6 +33,7 @@ import re
 from typing import Any, Optional
 
 from ...common import NotifyType
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
 from ...utils.parse import parse_bool, parse_list, validate_regex
@@ -208,7 +209,7 @@ class NotifyXMPP(NotifyBase):
         except ValueError:
             msg = f"An invalid XMPP JID ({self.user}) was specified."
             self.logger.warning(msg)
-            raise TypeError(msg) from None
+            raise AppriseImproperlyConfigured(msg) from None
 
         self.targets: list[(str, str)] = []
         # Flag for tracking if we want Multi-User Chat function enabled
@@ -240,7 +241,7 @@ class NotifyXMPP(NotifyBase):
                     f"({secure_mode}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         else:
             self.secure_mode = (
@@ -497,7 +498,7 @@ class NotifyXMPP(NotifyBase):
         raw = (value or "").strip()
         results = IS_JID.match(raw)
         if not results:
-            raise ValueError("Invalid JID")
+            raise AppriseImproperlyConfigured("Invalid JID")
 
         is_muc = bool(results.group("is_room"))
         host = results.group("domain") or default_host

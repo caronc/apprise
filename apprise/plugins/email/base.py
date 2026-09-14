@@ -25,7 +25,6 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-import contextlib
 from datetime import datetime
 from email.header import Header
 from email.mime.application import MIMEApplication
@@ -35,11 +34,11 @@ from email.mime.text import MIMEText
 from email.utils import format_datetime, formataddr, make_msgid
 import re
 import smtplib
-import ssl
 from typing import Optional
 
 from ...common import NotifyFormat, NotifyType, PersistentStoreMode
 from ...conversion import convert_between
+from ...exception import AppriseImproperlyConfigured
 from ...locale import gettext_lazy as _
 from ...logger import logger
 from ...url import PrivacyMode
@@ -60,6 +59,7 @@ from .common import (
     SecureMailMode,
     WebBaseLogin,
 )
+from .smtp import AppriseSMTPController
 
 
 class PGPMode:
@@ -112,8 +112,8 @@ class NotifyEmail(NotifyBase):
     # reference; this allows us to auto-generate our config if needed
     storage_mode = PersistentStoreMode.AUTO
 
-    # Default Notify Format
-    notify_format = NotifyFormat.HTML
+    # Email can send either HTML or plain text. HTML remains the default.
+    notify_format = (NotifyFormat.HTML, NotifyFormat.TEXT)
 
     # Default SMTP Timeout (in seconds)
     socket_connect_timeout = 15
@@ -215,11 +215,6 @@ class NotifyEmail(NotifyBase):
                 # By default persistent storage is referenced
                 "default": "",
                 "map_to": "pgp_key",
-            },
-            # Backward-compat alias; deprecated in favour of pgppub=
-            # Handled in parse_url() with a deprecation warning.
-            "pgpkey": {
-                "alias_of": "pgppub",
             },
             "pgpprv": {
                 "name": _("PGP Private Key Path"),
@@ -335,7 +330,7 @@ class NotifyEmail(NotifyBase):
                 secure_mode
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate recipients (cc:) and drop bad ones:
         for recipient in parse_emails(cc):
@@ -431,7 +426,7 @@ class NotifyEmail(NotifyBase):
                 else "{}".format(self.from_addr[1])
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store our lookup
         self.names[self.from_addr[1]] = self.from_addr[0]
@@ -476,31 +471,25 @@ class NotifyEmail(NotifyBase):
         # does not override a deliberate pgp=none choice
         pgp_mode_explicit = pgp_mode is not None
 
-        # Handle deprecated use_pgp boolean for backward compatibility;
-        # kept in **kwargs rather than as a named parameter so the template
-        # verification test does not flag it as an unmapped __init__ argument
-        use_pgp = kwargs.pop("use_pgp", None)
-        if use_pgp is not None:
-            self.logger.warning(
-                "Email use_pgp= is deprecated; use pgp_mode='encrypt' instead"
-            )
-            # Only override pgp_mode when the caller did not also pass it
-            if pgp_mode is None:
-                pgp_mode = PGPMode.ENCRYPT if use_pgp else PGPMode.NONE
-                # use_pgp counts as an explicit setting
-                pgp_mode_explicit = True
-
-        # Resolve PGP mode via prefix match (allows 'e', 'en', 'encrypt')
+        # Accept unambiguous prefixes such as "e" and "en". Treat "none"
+        # as "no", and reject unknown values instead of disabling PGP.
         if not pgp_mode:
             self.pgp_mode = PGP_MODE_DEFAULT
+
+        elif str(pgp_mode).lower() == "none":
+            self.pgp_mode = PGPMode.NONE
+
         else:
             self.pgp_mode = next(
                 (m for m in PGP_MODES if m.startswith(str(pgp_mode).lower())),
-                PGP_MODE_DEFAULT,
+                None,
             )
+            if self.pgp_mode is None:
+                msg = f"The Email PGP mode specified ({pgp_mode}) is invalid."
+                self.logger.warning(msg)
+                raise AppriseImproperlyConfigured(msg)
 
-        # WKD flag -- use parse_bool() so string values like 'no'/'false'
-        # are treated as disabled (bool('no') would incorrectly return True)
+        # Parse string values such as "no" correctly.
         self.use_wkd = parse_bool(use_wkd)
 
         # wkd=yes implies pgp=encrypt when pgp= was not explicitly set
@@ -549,17 +538,15 @@ class NotifyEmail(NotifyBase):
 
         return
 
+    def _protocol_headers(self, body):
+        """Return protocol headers supplied by an Email subclass."""
+        return {}
+
     def apply_email_defaults(self, secure_mode=None, port=None, **kwargs):
-        """
-        A function that prefills defaults based on the email
-        it was provided.
-        """
+        """Apply provider defaults inferred from the sender address."""
 
         if self.smtp_host:
-            # SMTP Server was explicitly specified, therefore it is assumed
-            # the caller knows what he's doing and is intentionally
-            # over-riding any smarts to be applied. We also can not apply
-            # any default if there was no user specified.
+            # Preserve an explicitly selected SMTP server.
             return
 
         # detect our email address using our user/host combo
@@ -585,7 +572,7 @@ class NotifyEmail(NotifyBase):
                     f"Applying {templates.EMAIL_TEMPLATES[i][0]} Defaults"
                 )
 
-                # the secure flag can not be altered if defined in the template
+                # A template may require a specific security mode.
                 self.secure = templates.EMAIL_TEMPLATES[i][2].get(
                     "secure", self.secure
                 )
@@ -649,8 +636,10 @@ class NotifyEmail(NotifyBase):
         title="",
         notify_type=NotifyType.INFO,
         attach=None,
+        body_format=None,
         **kwargs,
     ):
+        """Perform Email Notification."""
 
         if not self.targets:
             # There is no one to email; we're done
@@ -660,92 +649,67 @@ class NotifyEmail(NotifyBase):
         # error tracking (used for function return)
         has_error = False
 
-        # bind the socket variable to the current namespace
-        socket = None
-
         # Always call throttle before any remote server i/o is made
         self.throttle()
 
-        # Build an SSL context that honours our verify_certificate setting so
-        # that SMTPS/STARTTLS connections actually validate the remote server's
-        # certificate (and hostname) instead of silently accepting any
-        # certificate presented to us.
-        context = ssl.create_default_context()
-        if not self.verify_certificate:
-            context.check_hostname = False
-            context.verify_mode = ssl.CERT_NONE
-
         try:
-            self.logger.debug("Connecting to remote SMTP server...")
-            socket_func = smtplib.SMTP
-            socket_args = {}
-            if self.secure_mode == SecureMailMode.SSL:
-                self.logger.debug("Securing connection with SSL...")
-                socket_func = smtplib.SMTP_SSL
-                socket_args["context"] = context
+            with AppriseSMTPController(
+                host=self.smtp_host,
+                port=self.port,
+                secure_mode=self.secure_mode,
+                user=self.user,
+                password=self.password,
+                verify_certificate=self.verify_certificate,
+                socket_connect_timeout=self.socket_connect_timeout,
+            ) as smtp:
+                # Prepare our headers
+                headers = {
+                    "X-Application": self.app_id,
+                }
+                headers.update(self.headers)
 
-            socket = socket_func(
-                self.smtp_host,
-                self.port,
-                None,
-                timeout=self.socket_connect_timeout,
-                **socket_args,
-            )
+                # Add any protocol headers supplied by a subclass.
+                headers.update(self._protocol_headers(body))
 
-            if self.secure_mode == SecureMailMode.STARTTLS:
-                # Handle Secure Connections
-                self.logger.debug("Securing connection with STARTTLS...")
-                socket.starttls(context=context)
-
-            self.logger.trace("Login ID: {}".format(self.user))
-            if self.user and self.password:
-                # Apply Login credentials
-                self.logger.debug("Applying user credentials...")
-                socket.login(self.user, self.password)
-
-            # Prepare our headers
-            headers = {
-                "X-Application": self.app_id,
-            }
-            headers.update(self.headers)
-
-            # Iterate over our email messages we can generate and then
-            # send them off.
-            for message in NotifyEmail.prepare_emails(
-                subject=title,
-                body=body,
-                notify_format=self.notify_format,
-                from_addr=self.from_addr,
-                to=self.targets,
-                cc=self.cc,
-                bcc=self.bcc,
-                reply_to=self.reply_to,
-                smtp_host=self.smtp_host,
-                attach=attach,
-                headers=headers,
-                names=self.names,
-                pgp=self.pgp,
-                pgp_mode=self.pgp_mode,
-                inline=self.inline,
-                tzinfo=self.tzinfo,
-            ):
-                try:
-                    socket.sendmail(
+                # Build each message in its resolved text or HTML format.
+                for message in NotifyEmail.prepare_emails(
+                    subject=title,
+                    body=body,
+                    notify_format=self.resolve_format(body_format),
+                    from_addr=self.from_addr,
+                    to=self.targets,
+                    cc=self.cc,
+                    bcc=self.bcc,
+                    reply_to=self.reply_to,
+                    smtp_host=self.smtp_host,
+                    attach=attach,
+                    headers=headers,
+                    names=self.names,
+                    pgp=self.pgp,
+                    pgp_mode=self.pgp_mode,
+                    inline=self.inline,
+                    tzinfo=self.tzinfo,
+                ):
+                    if smtp.sendmail(
                         self.from_addr[1], message.to_addrs, message.body
-                    )
+                    ):
+                        self.logger.info("Sent Email to %s", message.recipient)
 
-                    self.logger.info("Sent Email to %s", message.recipient)
+                    else:
+                        self.logger.warning(
+                            'Sending email to "%s" failed.',
+                            message.recipient,
+                        )
 
-                except (OSError, smtplib.SMTPException, RuntimeError) as e:
-                    self.logger.warning(
-                        'Sending email to "%s" failed.', message.recipient
-                    )
-                    self.logger.debug(f"Socket Exception: {e}")
+                        # Mark as failure
+                        has_error = True
 
-                    # Mark as failure
-                    has_error = True
-
-        except (OSError, smtplib.SMTPException, RuntimeError) as e:
+        except (
+            OSError,
+            smtplib.SMTPException,
+            RuntimeError,
+            AppriseImproperlyConfigured,
+        ) as e:
             self.logger.warning(
                 'Connection error while submitting email to "%s"',
                 self.smtp_host,
@@ -760,17 +724,6 @@ class NotifyEmail(NotifyBase):
 
             # Mark as failure
             has_error = True
-
-        finally:
-            # Gracefully terminate the connection with the server
-            if socket is not None:
-                with contextlib.suppress(
-                    OSError, smtplib.SMTPException, RuntimeError
-                ):
-                    # Handles a failed TLS handshake that may have already
-                    # invalidated the socket.
-                    socket.quit()
-                    pass
 
         # Reduce our dictionary (eliminate expired keys if any)
         self.pgp.prune()
@@ -1005,13 +958,10 @@ class NotifyEmail(NotifyBase):
                 # Don't lose defined email addresses
                 results["targets"].append(NotifyEmail.unquote(results["host"]))
 
-            # Detect if we have a valid hostname or not; be sure to reset it's
-            # value if invalid; we'll attempt to figure this out later on
+            # Clear invalid hosts so a later step can infer one.
             results["host"] = ""
 
-        # Get PGP mode -- accept the new choice strings (none, encrypt)
-        # with prefix matching, and fall back to legacy boolean parsing
-        # for backward compatibility with existing ?pgp=yes/no URLs.
+        # Accept PGP mode prefixes and treat "none" as "no".
         pgp_raw = results["qsd"].get("pgp", "")
         if pgp_raw:
             pgp_mode = next(
@@ -1019,16 +969,8 @@ class NotifyEmail(NotifyBase):
                 None,
             )
             if pgp_mode is None:
-                # Not a recognised mode string; try legacy boolean
-                if parse_bool(pgp_raw):
-                    logger.warning(
-                        "Email ?pgp=%s is deprecated;"
-                        " use ?pgp=encrypt instead",
-                        pgp_raw,
-                    )
-                    pgp_mode = PGPMode.ENCRYPT
-                else:
-                    pgp_mode = PGP_MODE_DEFAULT
+                # Let __init__ report invalid and removed boolean values.
+                pgp_mode = pgp_raw
             results["pgp_mode"] = pgp_mode
 
         # Get Web Key Directory flag
@@ -1042,19 +984,6 @@ class NotifyEmail(NotifyBase):
         # Get PGP Public Key Override (canonical name: pgppub=)
         if "pgppub" in results["qsd"] and results["qsd"]["pgppub"]:
             results["pgp_key"] = NotifyEmail.unquote(results["qsd"]["pgppub"])
-
-        # Backward-compat: pgpkey= is the old name for pgppub=; emit a
-        # deprecation warning and map it through so existing URLs still work.
-        if "pgpkey" in results["qsd"] and results["qsd"]["pgpkey"]:
-            logger.warning(
-                "Email ?pgpkey= is deprecated; use ?pgppub= instead."
-                " Support for pgpkey= will be removed in a future release."
-            )
-            # Only override pgp_key when pgppub= was not also present
-            if "pgp_key" not in results:
-                results["pgp_key"] = NotifyEmail.unquote(
-                    results["qsd"]["pgpkey"]
-                )
 
         # Get PGP Private Key Override (canonical name: pgpprv=)
         if "pgpprv" in results["qsd"] and results["qsd"]["pgpprv"]:
@@ -1105,7 +1034,7 @@ class NotifyEmail(NotifyBase):
             smtp_host = NotifyEmail.unquote(results["qsd"]["smtp"])
 
         if "mode" in results["qsd"] and len(results["qsd"]["mode"]):
-            # Extract the secure mode to over-ride the default
+            # Extract the security mode override.
             results["secure_mode"] = results["qsd"]["mode"].lower()
 
         # Handle Carbon Copy Addresses
@@ -1134,12 +1063,10 @@ class NotifyEmail(NotifyBase):
 
     @staticmethod
     def _get_charset(input_string):
-        """
-        Get utf-8 charset if non ascii string only
+        """Use UTF-8 only when text contains non-ASCII characters.
 
-        Encode an ascii string to utf-8 is bad for email deliverability
-        because some anti-spam gives a bad score for that
-        like SUBJ_EXCESS_QP flag on Rspamd
+        Encoding ASCII unnecessarily can trigger spam filters such as
+        Rspamd's ``SUBJ_EXCESS_QP`` rule.
         """
         if not input_string:
             return None
@@ -1154,51 +1081,34 @@ class NotifyEmail(NotifyBase):
         cc: Optional[set] = None,
         bcc: Optional[set] = None,
         reply_to: Optional[set] = None,
-        # Providing an SMTP Host helps improve Email Message-ID
-        # and avoids getting flagged as spam
+        # SMTP host used in the Message-ID
         smtp_host=None,
-        # Can be either 'html' or 'text'
+        # Either HTML or plain text
         notify_format=NotifyFormat.HTML,
         attach=None,
         headers: Optional[dict] = None,
-        # Names can be a dictionary
+        # Display names keyed by address
         names=None,
-        # Pretty Good Privacy Support; Pass in an
-        # ApprisePGPController if you wish to use it
+        # Optional PGP controller
         pgp=None,
         # PGP mode string (PGPMode.NONE / PGPMode.SIGN / PGPMode.ENCRYPT)
         pgp_mode=PGP_MODE_DEFAULT,
         # When True, image attachments are embedded inline (RFC 2387)
         # so HTML bodies can reference them via <img src="cid:filename">
         inline=False,
-        # Define our timezone; if one isn't provided, then we use
-        # the system time instead
+        # Use the system timezone when none is provided.
         tzinfo=None,
     ):
-        """
-        Generator for emails
-            from_addr: must be in format: (from_name, from_addr)
-            to: must be in the format:
-                 [(to_name, to_addr), (to_name, to_addr)), ...]
-            cc: must be a set of email addresses
-            bcc: must be a set of email addresses
-            reply_to: must be either None, or an email address
-            smtp_host: This is used to generate the email's Message-ID. Set
-                       this correctly to avoid getting flagged as Spam
-            notify_format: can be either 'text' or 'html'
-            attach: must be of class AppriseAttachment
-            headers: Optionally provide a dictionary of additional headers you
-                     would like to include in the email payload
-            names: This is a dictionary of email addresses as keys and the
-                   Names to associate with them when sending the email.
-                   This is cross referenced for the cc and bcc lists
-            pgp:      ApprisePGPController for signing and/or encrypting
-                      email via Pretty Good Privacy.  Pass None to skip.
-            pgp_mode: PGPMode string controlling what PGP operation to
-                      perform.  PGPMode.ENCRYPT encrypts (existing
-                      behaviour).  PGPMode.SIGN signs with the sender's
-                      private key and opportunistically encrypts when a
-                      recipient public key is available.
+        """Yield prepared email messages.
+
+        - ``from_addr`` is ``(name, address)``; ``to`` contains those pairs.
+        - ``cc`` and ``bcc`` are address sets; ``reply_to`` is one address.
+        - ``smtp_host`` forms the Message-ID, and ``notify_format`` selects
+          plain text or HTML.
+        - ``attach`` contains Apprise attachments; ``headers`` adds headers.
+        - ``names`` maps addresses to display names for CC and BCC entries.
+        - ``pgp`` supplies signing or encryption. ``PGPMode.SIGN`` may also
+          encrypt when a recipient key is available.
         """
         if not to:
             # There is no one to email; we're done
@@ -1283,22 +1193,10 @@ class NotifyEmail(NotifyBase):
             if reply_to_:
                 logger.debug("Email Reply-To: {}".format(", ".join(reply_to_)))
 
-            # When inline mode is active, pre-scan image attachments
-            # before the MIME body is built so the modified body is
-            # picked up by all parts (text/plain alternative included).
-            #
-            # HTML emails: collect any existing cid:filename refs from
-            # the body, then append <br/><img src="cid:name"> for each
-            # image attachment that is not yet referenced.  This ensures
-            # all images are embedded inline -- even when the caller did
-            # not write the cid: anchors manually.
-            #
-            # Plain-text emails: images cannot be embedded; append a
-            # short [Image: name] marker so the recipient knows the
-            # attachment is there.
-            #
-            # Non-image attachments are never modified here; they always
-            # fall back to standard Content-Disposition: attachment.
+            # Prepare inline attachments before building the MIME body:
+            # - HTML appends missing image references.
+            # - Plain text adds an [Image: name] marker.
+            # Non-images remain regular attachments unless explicitly linked.
             cid_refs = set()
             if inline and attach:
                 if notify_format == NotifyFormat.HTML:
@@ -1318,9 +1216,7 @@ class NotifyEmail(NotifyBase):
                         for _no, _a in enumerate(attach, start=1)
                     }
 
-                    # Warn for every cid: ref in the body that has no
-                    # corresponding attachment -- the user likely made a
-                    # typo or forgot to include the file
+                    # Warn when a cid: reference has no matching attachment.
                     for _ref in sorted(cid_refs - _attach_names):
                         logger.warning(
                             "Email inline: no attachment matches "
@@ -1328,14 +1224,8 @@ class NotifyEmail(NotifyBase):
                             _ref,
                         )
 
-                    # Drop refs that have no matching attachment so they
-                    # do not influence the multipart/related decision.
-                    # Note: only IMAGE attachments are ever auto-appended
-                    # (see img_appends loop below), but explicit cid: refs
-                    # in the caller-supplied body are honored for any
-                    # attachment type -- a cid: URI can only resolve
-                    # within the same MIME package, so if the caller wrote
-                    # it they clearly attached the file on purpose.
+                    # Ignore missing files when selecting the MIME wrapper.
+                    # Explicit matching references may use any file type.
                     cid_refs &= _attach_names
 
                     # Append inline anchors for any image not yet listed
@@ -1457,6 +1347,10 @@ class NotifyEmail(NotifyBase):
 
                 base = mixed
 
+            # Suppress a custom Autocrypt value only when the controller
+            # supplies one of its own.
+            autocrypt_added = False
+
             if pgp and pgp_mode == PGPMode.SIGN:
                 logger.debug("Securing Email with PGP Signature")
                 # RFC 3156 requires the signature to be computed over the CRLF
@@ -1505,13 +1399,8 @@ class NotifyEmail(NotifyBase):
                 # the function continues to work unchanged
                 base = signed
 
-                # Opportunistic encryption: try to find the recipient's
-                # public key and encrypt the signed payload if found.
-                # autogen=False prevents a fake key from being auto-created
-                # for the recipient -- only pre-existing keys (WKD lookups
-                # or explicit pgppub= files) qualify for encryption.
-                # A missing key is NOT an error in sign mode -- we simply
-                # send the signed (unencrypted) email instead.
+                # Encrypt when the recipient already has a public key.
+                # Sign mode remains usable when no recipient key exists.
                 enc_content = pgp.encrypt(
                     base.as_string(), to_addr, autogen=False
                 )
@@ -1523,14 +1412,6 @@ class NotifyEmail(NotifyBase):
                     enc = MIMEMultipart(
                         "encrypted",
                         protocol="application/pgp-encrypted",
-                    )
-
-                    # Autocrypt header for DeltaChat / compatible clients
-                    enc.add_header(
-                        "Autocrypt",
-                        "addr={}; prefer-encrypt=mutual".format(
-                            formataddr((False, to_addr), charset="utf-8")
-                        ),
                     )
 
                     # Version identifier part (required by RFC 3156)
@@ -1546,6 +1427,13 @@ class NotifyEmail(NotifyBase):
                     # Replace base with the fully encrypted container
                     base = enc
 
+                # Advertise our key on the outer message so an Autocrypt-aware
+                # recipient can encrypt future replies.
+                autocrypt = pgp.autocrypt_header()
+                if autocrypt:
+                    base.add_header("Autocrypt", autocrypt)
+                    autocrypt_added = True
+
             elif pgp and pgp_mode == PGPMode.ENCRYPT:
                 logger.debug("Securing Email with PGP Encryption")
                 # Set our header information to include in the encryption
@@ -1557,13 +1445,17 @@ class NotifyEmail(NotifyBase):
                     subject, NotifyEmail._get_charset(subject)
                 )
 
-                # Apply our encryption
-                encrypted_content = pgp.encrypt(base.as_string(), to_addr)
+                # External recipients need an existing key. Self-sends may
+                # generate the sender's key when pgp_autogen permits it.
+                autogen = (
+                    None if to_addr.lower() == from_addr[1].lower() else False
+                )
+                encrypted_content = pgp.encrypt(
+                    base.as_string(), to_addr, autogen=autogen
+                )
 
                 if not encrypted_content:
-                    # Unable to send notification.  Include the plugin-specific
-                    # hint here (pgp.py logs only generic debug detail so it
-                    # stays reusable across plugins).
+                    # Give Email users a plugin-specific recovery hint.
                     msg = (
                         "Unable to encrypt email via PGP; supply a public key"
                         " via pgppub= or place one in the cache directory"
@@ -1576,24 +1468,30 @@ class NotifyEmail(NotifyBase):
                     "encrypted", protocol="application/pgp-encrypted"
                 )
 
-                # Store Autocrypt header (DeltaChat Support)
-                base.add_header(
-                    "Autocrypt",
-                    f"addr={formataddr((False, to_addr), charset='utf-8')}; "
-                    "prefer-encrypt=mutual",
-                )
+                # Advertise our key for encrypted replies.
+                autocrypt = pgp.autocrypt_header()
+                if autocrypt:
+                    base.add_header("Autocrypt", autocrypt)
+                    autocrypt_added = True
 
                 # Set Encryption Info Part
                 enc_payload = MIMEText("Version: 1", "plain")
                 enc_payload.set_type("application/pgp-encrypted")
                 base.attach(enc_payload)
 
+                # Set Encrypted Data Part
                 enc_payload = MIMEBase("application", "octet-stream")
                 enc_payload.set_payload(encrypted_content)
                 base.attach(enc_payload)
 
-            # Apply any provided custom headers
+            # Header names are case-insensitive; keep only the first
+            # Autocrypt value unless the controller supplied its own.
+            autocrypt_seen = autocrypt_added
             for k, v in headers.items():
+                if k.strip().lower() == "autocrypt":
+                    if autocrypt_seen:
+                        continue
+                    autocrypt_seen = True
                 base[k] = Header(v, NotifyEmail._get_charset(v))
 
             base["Subject"] = Header(
@@ -1618,7 +1516,5 @@ class NotifyEmail(NotifyBase):
 
     @staticmethod
     def runtime_deps():
-        """Return a tuple of top-level Python package names that this plugin
-        imported as optional runtime dependencies.
-        """
+        """Return this plugin's optional package names."""
         return ("pgpy",)

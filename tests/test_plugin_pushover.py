@@ -37,6 +37,7 @@ import pytest
 import requests
 
 import apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushover import NotifyPushover, PushoverPriority
 
 logging.disable(logging.CRITICAL)
@@ -49,21 +50,21 @@ apprise_url_tests = (
     (
         "pover://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # bad url
     (
         "pover://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # APIkey; no user
     (
         "pover://%s" % ("a" * 30),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + custom sound setting
@@ -277,7 +278,7 @@ apprise_url_tests = (
             "u" * 30, "a" * 30, "expire=100000"
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + emergency priority setting with invalid interval
@@ -286,7 +287,7 @@ apprise_url_tests = (
             "u" * 30, "a" * 30, "interval=15"
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # API Key + priority setting (empty)
@@ -349,7 +350,7 @@ apprise_url_tests = (
     (
         "pover://{}@{}?key=tooshort".format("u" * 30, "a" * 30),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # E2EE: invalid key (correct length but non-hex)
@@ -361,7 +362,7 @@ apprise_url_tests = (
             "z" * 64,
         ),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
 )
@@ -409,7 +410,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     assert isinstance(obj, NotifyPushover)
 
     # Test our attachment
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -423,7 +424,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
 
     # Test multiple attachments
     assert attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 2
@@ -443,7 +444,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     image.write("a" * NotifyPushover.attach_max_size_bytes)
 
     attach = apprise.AppriseAttachment.instantiate(str(image))
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # Test our call count
     assert mock_post.call_count == 1
@@ -459,7 +460,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     image.write("a" * (NotifyPushover.attach_max_size_bytes + 1))
 
     attach = apprise.AppriseAttachment.instantiate(str(image))
-    assert obj.notify(body="test", attach=attach) is False
+    assert bool(obj.notify(body="test", attach=attach)) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -469,7 +470,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
         f"file://{image!s}?cache=False"
     )
     os.unlink(str(image))
-    assert obj.notify(body="body", title="title", attach=attach) is False
+    assert bool(obj.notify(body="body", title="title", attach=attach)) is False
 
     # Test our call count
     assert mock_post.call_count == 0
@@ -480,7 +481,7 @@ def test_plugin_pushover_attachments(mock_post, tmpdir):
     attach = apprise.AppriseAttachment.instantiate(str(image))
 
     # Content is silently ignored
-    assert obj.notify(body="test", attach=attach) is True
+    assert bool(obj.notify(body="test", attach=attach)) is True
 
     # prepare our attachment
     attach = apprise.AppriseAttachment(
@@ -503,7 +504,7 @@ def test_plugin_pushover_edge_cases(mock_post):
     """NotifyPushover() Edge Cases."""
 
     # No token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(token=None)
 
     # Initialize some generic (but valid) tokens
@@ -520,7 +521,7 @@ def test_plugin_pushover_edge_cases(mock_post):
     mock_post.return_value.status_code = requests.codes.ok
 
     # No webhook id specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=user_key, webhook_id=None)
 
     obj = NotifyPushover(user_key=user_key, token=token, targets=devices)
@@ -531,8 +532,10 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     # We notify the 2 devices loaded
     assert (
-        obj.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -546,8 +549,10 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     # This call succeeds because all of the devices are valid
     assert (
-        obj.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -572,8 +577,10 @@ def test_plugin_pushover_edge_cases(mock_post):
 
     # Verify notification to a group succeeds (separate API call per group)
     assert (
-        obj.notify(
-            body="body", title="title", notify_type=apprise.NotifyType.INFO
+        bool(
+            obj.notify(
+                body="body", title="title", notify_type=apprise.NotifyType.INFO
+            )
         )
         is True
     )
@@ -600,15 +607,52 @@ def test_plugin_pushover_edge_cases(mock_post):
     assert len(obj) == 1
 
     # No User Key specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=None, token="abcd")
 
     # No Access Token specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key="abcd", token=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key="abcd", token="  ")
+
+
+@mock.patch("requests.post")
+def test_plugin_pushover_multi_format(mock_post):
+    """NotifyPushover() multi-format resolution."""
+
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    token = "a" * 30
+    user_key = "u" * 30
+
+    obj = NotifyPushover(user_key=user_key, token=token)
+
+    # HTML: declared source aligns directly, html flag set, body as-is.
+    mock_post.reset_mock()
+    assert obj.notify(body="<b>hi</b>", body_format=apprise.NotifyFormat.HTML)
+    sent = mock_post.call_args[1]["data"]
+    assert sent["html"] == 1
+    assert sent["message"] == "<b>hi</b>"
+
+    # Markdown is converted to HTML because Pushover has no Markdown mode.
+    mock_post.reset_mock()
+    assert obj.notify(body="*hi*", body_format=apprise.NotifyFormat.MARKDOWN)
+    sent = mock_post.call_args[1]["data"]
+    assert sent["html"] == 1
+    assert sent["message"] != "*hi*"
+
+    # Undeclared input stays unconverted, even with a Markdown override.
+    mock_post.reset_mock()
+    obj_override = NotifyPushover(
+        user_key=user_key, token=token, format="markdown"
+    )
+    assert obj_override.notify(body="*hi*")
+    sent = mock_post.call_args[1]["data"]
+    assert "html" not in sent
+    assert sent["message"] == "*hi*"
 
 
 @mock.patch("requests.post")
@@ -650,11 +694,11 @@ def test_plugin_pushover_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 7 servers from that
+    # We should be able to read our 7 services from that
     # 3x low
     # 3x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 7
+    assert len(ac.services()) == 7
     assert len(aobj) == 7
     assert len(list(aobj.find(tag="low"))) == 3
     for s in aobj.find(tag="low"):
@@ -677,14 +721,16 @@ def test_plugin_pushover_config_files(mock_post):
     # Notifications work
     # We test 'pushover_str_int' and 'low' which only matches 1 end point
     assert (
-        aobj.notify(
-            title="title", body="body", tag=[("pushover_str_int", "low")]
+        bool(
+            aobj.notify(
+                title="title", body="body", tag=[("pushover_str_int", "low")]
+            )
         )
         is True
     )
 
     # Notify everything loaded
-    assert aobj.notify(title="title", body="body") is True
+    assert bool(aobj.notify(title="title", body="body")) is True
 
 
 @mock.patch("requests.post")
@@ -793,7 +839,7 @@ def test_plugin_pushover_attach_memory(mock_post):
         mimetype="text/html",
     )
 
-    assert obj.notify(body="Test", attach=mem) is True
+    assert bool(obj.notify(body="Test", attach=mem)) is True
     assert mock_post.call_count == 1
 
 
@@ -815,11 +861,11 @@ def test_plugin_pushover_e2ee(mock_post):
     mock_post.return_value = response
 
     # --- Invalid key: too short ---
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=user_key, token=token, encryption_key="abc")
 
     # --- Invalid key: 64 chars but non-hex ---
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushover(user_key=user_key, token=token, encryption_key="z" * 64)
 
     # --- Valid key: object instantiates correctly ---

@@ -32,6 +32,7 @@ from helpers import AppriseURLTester
 import pytest
 import requests
 
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.pushjet import NotifyPushjet
 
 logging.disable(logging.CRITICAL)
@@ -60,7 +61,7 @@ apprise_url_tests = (
     (
         "pjet://%s" % ("a" * 32),
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # The proper way to log in
@@ -134,8 +135,8 @@ def test_plugin_pushjet_edge_cases():
     """NotifyPushjet() Edge Cases."""
 
     # No application Key specified
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushjet(secret_key=None)
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPushjet(secret_key="  ")

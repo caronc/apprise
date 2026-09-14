@@ -35,6 +35,7 @@ import requests
 
 from .. import exception
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import is_phone_no, parse_bool, parse_phone_no
@@ -190,7 +191,7 @@ class NotifySignalAPI(NotifyBase):
                 f"({source}) was provided."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         self.source = "+{}".format(result["full"])
 

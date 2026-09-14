@@ -35,6 +35,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.postmark import NotifyPostmark
 
 logging.disable(logging.CRITICAL)
@@ -48,28 +49,28 @@ apprise_url_tests = (
         "postmark://",
         {
             # No credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "postmark://:@/",
         {
             # Empty credentials
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "postmark://abcd",
         {
             # API key only, no from email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "postmark://abcd@host",
         {
             # API key only, no from email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -206,15 +207,15 @@ def test_plugin_postmark_edge_cases(mock_post, mock_get):
     """NotifyPostmark() Edge Cases."""
 
     # No API key
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPostmark(apikey=None, from_email="user@example.com")
 
     # Invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPostmark(apikey="abcd", from_email="!invalid")
 
     # No from email (None)
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyPostmark(apikey="abcd", from_email=None)
 
     # Invalid target email -- plugin loads but target is dropped
@@ -265,7 +266,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
     # Basic send to self (no explicit target)
     obj = Apprise.instantiate("postmark://abcd:user@example.com")
     assert isinstance(obj, NotifyPostmark)
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
 
     # Verify the X-Postmark-Server-Token header was set
     assert mock_post.call_count == 1
@@ -282,7 +283,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
     obj = Apprise.instantiate(
         "postmark://abcd:user@example.com/target@example.com"
     )
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert posted["To"] == "target@example.com"
     mock_post.reset_mock()
@@ -295,7 +296,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
         cc=["cc@example.com"],
         bcc=["bcc@example.com"],
     )
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert "Cc" in posted
     assert "Bcc" in posted
@@ -307,7 +308,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
         from_email="user@example.com",
         reply_to=["reply@example.com"],
     )
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert "ReplyTo" in posted
     mock_post.reset_mock()
@@ -317,7 +318,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
         apikey="abcd",
         from_email="user@example.com",
     )
-    assert obj.notify(body="body", title="") is True
+    assert bool(obj.notify(body="body", title="")) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert posted["Subject"] == NotifyPostmark.default_empty_subject
     mock_post.reset_mock()
@@ -330,7 +331,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
     from apprise.common import NotifyFormat
 
     obj.notify_format = NotifyFormat.TEXT
-    assert obj.notify(body="body", title="title") is True
+    assert bool(obj.notify(body="body", title="title")) is True
     posted = json.loads(mock_post.call_args[1]["data"])
     assert "TextBody" in posted
     assert "HtmlBody" not in posted
@@ -341,17 +342,17 @@ def test_plugin_postmark_send(mock_post, mock_get):
     obj = Apprise.instantiate(
         "postmark://abcd:user@example.com/target@example.com"
     )
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     mock_post.reset_mock()
 
     # Unknown HTTP code
     mock_post.return_value = _mk_resp(999)
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     mock_post.reset_mock()
 
     # RequestException
     mock_post.side_effect = requests.RequestException("Connection failed")
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     mock_post.side_effect = None
     mock_post.reset_mock()
 
@@ -362,7 +363,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
         targets=["!invalid"],
     )
     mock_post.return_value = _mk_resp()
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     assert mock_post.call_count == 0
 
     # Multiple targets -- partial failure
@@ -374,7 +375,7 @@ def test_plugin_postmark_send(mock_post, mock_get):
         from_email="user@example.com",
         targets=["t1@example.com", "t2@example.com"],
     )
-    assert obj.notify(body="body", title="title") is False
+    assert bool(obj.notify(body="body", title="title")) is False
     assert mock_post.call_count == 2
     mock_post.side_effect = None
 
@@ -397,11 +398,13 @@ def test_plugin_postmark_attachments(mock_post):
     obj = Apprise.instantiate("postmark://abcd:user@example.com")
     assert isinstance(obj, NotifyPostmark)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -418,11 +421,13 @@ def test_plugin_postmark_attachments(mock_post):
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
     attach.add(os.path.join(TEST_VAR_DIR, "apprise-test.png"))
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -433,13 +438,15 @@ def test_plugin_postmark_attachments(mock_post):
     # Attachment inaccessible (file not found)
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=AppriseAttachment(
-                    os.path.join(TEST_VAR_DIR, "apprise-test.gif")
-                ),
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=AppriseAttachment(
+                        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+                    ),
+                )
             )
             is False
         )
@@ -447,13 +454,15 @@ def test_plugin_postmark_attachments(mock_post):
     # Attachment read error (OSError)
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=AppriseAttachment(
-                    os.path.join(TEST_VAR_DIR, "apprise-test.gif")
-                ),
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=AppriseAttachment(
+                        os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+                    ),
+                )
             )
             is False
         )

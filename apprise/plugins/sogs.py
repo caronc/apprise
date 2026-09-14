@@ -34,22 +34,19 @@
 #  - https://github.com/session-foundation/session-pysogs
 #
 # Setting up a bot account
-# -------------------------
 # 1. Generate a 32-byte Ed25519 seed and note its 64-character hex encoding.
 #    In Python:
 #        import os; print(os.urandom(32).hex())
-#    Keep this value secret -- it is your bot's seed.
+#    Keep this value secret because it controls your bot.
 #
 # 2. Find the SOGS public_key from any Session group join link.
 #    The link looks like:
 #        https://open.getsession.org/discussion?public_key=a03c383c...
 #    The value after "public_key=" is the 64-hex-char public_key.
 #
-# 3. Find the room token -- the path segment of the join link above
-#    ("discussion" in the example).
+# 3. Find the room token in the join-link path ("discussion" above).
 #
 # Apprise URL format
-# -------------------
 # Secure (HTTPS):
 #    sessions://{public_key}:{seed}@{host}/{room}
 #    sessions://{public_key}:{seed}@{host}/{room1}/{room2}
@@ -95,6 +92,7 @@ except ImportError:
     NOTIFY_SESSIONOGS_ENABLED = False
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_list
 from .base import NotifyBase
@@ -185,6 +183,10 @@ class NotifySessionOGS(NotifyBase):
     # 2000-character soft limit (Session app displays long messages fine).
     body_maxlen = 2000
 
+    # Stop reading a response once it grows beyond a normal
+    # acknowledgement; protects against a hostile or compromised server.
+    max_response_size = 32768
+
     # Set our global enabled flag.
     enabled = NOTIFY_SESSIONOGS_ENABLED
 
@@ -266,17 +268,6 @@ class NotifySessionOGS(NotifyBase):
         """Initialize Session Open Group Server Object."""
         super().__init__(**kwargs)
 
-        # Raise a clear error when the cryptography library is absent so
-        # callers get an explicit message rather than a confusing
-        # AttributeError from None.from_private_bytes().
-        if not NOTIFY_SESSIONOGS_ENABLED:
-            msg = (
-                "The cryptography library is required for SOGS "
-                "notifications.  Install it with: pip install cryptography"
-            )
-            self.logger.warning(msg)
-            raise ImportError(msg)
-
         # Validate the public key (64-char hex Curve25519 public key).
         _pk = (public_key or "").strip().lower()
         if not IS_PUBLIC_KEY.match(_pk):
@@ -285,7 +276,7 @@ class NotifySessionOGS(NotifyBase):
                 f"characters ({_pk!r} is invalid)."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the validated public key.
         self.public_key = _pk
@@ -298,20 +289,23 @@ class NotifySessionOGS(NotifyBase):
                 f"characters ({_seed!r} is invalid)."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Store the validated seed hex string.
         self.seed = _seed
 
-        # Derive the Ed25519 signing key from the seed.
-        self._signing_key = Ed25519PrivateKey.from_private_bytes(
-            bytes.fromhex(self.seed)
-        )
-
-        # Derive the 32-byte Ed25519 public key for auth headers.
-        self._bot_pubkey_bytes = self._signing_key.public_key().public_bytes(
-            Encoding.Raw, PublicFormat.Raw
-        )
+        self._signing_key = None
+        self._bot_pubkey_bytes = None
+        if NOTIFY_SESSIONOGS_ENABLED:
+            # Prepare the signing identity used by every request.
+            self._signing_key = Ed25519PrivateKey.from_private_bytes(
+                bytes.fromhex(self.seed)
+            )
+            public_key = self._signing_key.public_key()
+            self._bot_pubkey_bytes = public_key.public_bytes(
+                Encoding.Raw,
+                PublicFormat.Raw,
+            )
 
         # Parse and validate the room token list.
         self.rooms = []
@@ -330,16 +324,13 @@ class NotifySessionOGS(NotifyBase):
         if not self.rooms:
             msg = "At least one valid SOGS room token must be specified."
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
     def _sogs_auth_headers(self, method, path, body_bytes=None):
-        """
-        Build the four X-SOGS-* authentication headers for a request.
+        """Build the four ``X-SOGS-*`` authentication headers.
 
-        The signature covers:
-            SERVER_KEY || NONCE || TIMESTAMP || METHOD || PATH [|| HBODY]
-        where HBODY is the 64-byte blake2b hash of the request body when
-        the body is non-empty.  The signing key is the bot's Ed25519 key.
+        The Ed25519 signature covers the server key, nonce, timestamp, method,
+        path, and the body hash when content is present.
         """
         # Generate a fresh 16-byte random nonce for each request.
         nonce = os.urandom(16)
@@ -375,6 +366,12 @@ class NotifySessionOGS(NotifyBase):
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Session Open Group Server Notification."""
 
+        if not NOTIFY_SESSIONOGS_ENABLED:
+            self.logger.warning(
+                "SOGS notifications require the cryptography library."
+            )
+            return False
+
         # Encode as a Session protocol protobuf message with padding.
         # title_maxlen=0 ensures the framework already prepended any title.
         msg_data = _build_session_message(body)
@@ -398,6 +395,28 @@ class NotifySessionOGS(NotifyBase):
                 has_error = True
 
         return not has_error
+
+    @staticmethod
+    def _read_bounded(r, max_bytes):
+        """Read a response body, stopping once it exceeds max_bytes.
+
+        Returns None (and closes the connection early) if the body grows
+        past the limit, instead of buffering the whole thing first.
+        """
+        chunks = []
+        total = 0
+        try:
+            for chunk in r.iter_content(chunk_size=8192):
+                if not chunk:
+                    continue
+                total += len(chunk)
+                if total > max_bytes:
+                    return None
+                chunks.append(chunk)
+            return b"".join(chunks)
+
+        finally:
+            r.close()
 
     def _post(self, room, body_bytes):
         """POST a notification to a single SOGS room."""
@@ -442,16 +461,29 @@ class NotifySessionOGS(NotifyBase):
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
                 allow_redirects=self.redirects,
+                stream=True,
             )
+
+            # Read the body incrementally and stop early if it grows too
+            # large, instead of letting Requests buffer it all up front.
+            body = self._read_bounded(r, self.max_response_size)
+            if body is None:
+                self.logger.warning(
+                    "SOGS response from room %r exceeds %d bytes; "
+                    "not parsing it.",
+                    room,
+                    self.max_response_size,
+                )
+                return False
 
             # Parse response body defensively.
             try:
-                content = loads(r.content)
+                content = loads(body)
             except (AttributeError, TypeError, ValueError):
                 content = {}
                 self.logger.debug(
                     "Failed to parse SOGS JSON response; body: %r",
-                    (r.content or b"")[:2000],
+                    body[:2000],
                 )
 
             if r.status_code not in (
@@ -469,7 +501,7 @@ class NotifySessionOGS(NotifyBase):
                     ", " if status_str else "",
                     r.status_code,
                 )
-                self.logger.debug("Response Details:\r\n%s", r.content)
+                self.logger.debug("Response Details:\r\n%s", body)
                 return False
 
             self.logger.info("Sent SOGS notification to room %r.", room)
@@ -586,8 +618,5 @@ class NotifySessionOGS(NotifyBase):
 
     @staticmethod
     def runtime_deps():
-        """
-        Return a tuple of top-level Python package names that this
-        plugin imported as optional runtime dependencies.
-        """
+        """Return this plugin's optional package names."""
         return ("cryptography",)

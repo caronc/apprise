@@ -25,6 +25,7 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
+from base64 import b64encode
 from datetime import datetime, timedelta, timezone
 import hashlib
 import os
@@ -38,14 +39,13 @@ from ..logger import logger
 def _ensure_imghdr_shim():
     """Install a minimal imghdr shim when the module is absent.
 
-    pgpy 0.6.0 imports imghdr, which was removed from the standard
-    library in Python 3.13 (PEP 594). pgpy's only use of imghdr is
-    ImageEncoding.encodingof(), which Apprise never calls. Returning
-    None from what() is the same safe fallback the library uses
-    internally for non-JPEG data.
+    PGPy 0.6.0 still imports this module after Python 3.13 removed it.
+    Apprise does not use PGPy's image detection, so a minimal fallback is
+    sufficient.
     """
     try:
         import imghdr  # noqa: F401
+
     except ImportError:
         import sys
         import types
@@ -71,24 +71,19 @@ except ImportError:
 
 
 class ApprisePGPException(ApprisePluginException):
-    """Thrown when there is an error with the Pretty Good Privacy
-    Controller."""
+    """Raised when PGP processing fails."""
 
     def __init__(self, message, error_code=602):
         super().__init__(message, error_code=error_code)
 
 
 class ApprisePGPController:
-    """Pretty Good Privacy Controller Tool for the Apprise Library."""
+    """Manage PGP keys, signing, encryption, and discovery."""
 
-    # There is no reason a PGP Public Key should exceed 8K in size
-    # If it is more than this, then it is not accepted
+    # Keep public-key attachment reads bounded.
     max_pgp_public_key_size = 8000
 
-    # Private keys can be materially larger than public keys, especially for
-    # 4096-bit RSA or keys carrying multiple subkeys and UIDs; 32K is
-    # generous enough to accommodate all realistic cases without being
-    # unbounded.
+    # Allow larger private keys while keeping attachment reads bounded.
     max_pgp_private_key_size = 32000
 
     def __init__(
@@ -101,12 +96,10 @@ class ApprisePGPController:
         wkd=None,
         **kwargs,
     ):
-        """Path should be the directory keys can be written and read from such
-        as <notifyobject>.store.path.
+        """Configure PGP key storage and discovery.
 
-        Optionally additionally specify a pub_keyfile and/or prv_keyfile to
-        use explicit key files, and/or an AppriseWKDController to enable Web
-        Key Directory key discovery when no local key is found.
+        ``path`` stores generated keys. Explicit key files and a WKD
+        controller may provide keys from other sources.
         """
 
         # PGP hash
@@ -149,8 +142,7 @@ class ApprisePGPController:
             # Add our definition to our pgp_key reference
             self._prv_keyfile.add(prv_keyfile)
 
-            # Enforce a private-key-specific size limit; private keys can be
-            # larger than public keys (4096-bit RSA, multiple subkeys/UIDs)
+            # Private keys may contain extra identities and subkeys.
             self._prv_keyfile[0].max_file_size = self.max_pgp_private_key_size
 
         else:
@@ -158,17 +150,6 @@ class ApprisePGPController:
 
     def keygen(self, email=None, name=None, force=False):
         """Generates a set of keys based on email configured."""
-
-        try:
-            # Create a new RSA key pair with 2048-bit strength
-            key = pgpy.PGPKey.new(
-                pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
-            )
-
-        except NameError:
-            # PGPy not installed
-            logger.debug("PGPy not installed; keygen disabled")
-            return False
 
         if self._pub_keyfile is not None or not self.path:
             logger.trace(
@@ -179,6 +160,21 @@ class ApprisePGPController:
                     else "no-write-path"
                 ),
             )
+            return False
+
+        try:
+            # Autocrypt uses a signing primary key and a separate encryption
+            # subkey, which is attached below.
+            key = pgpy.PGPKey.new(
+                pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+            )
+            subkey = pgpy.PGPKey.new(
+                pgpy.constants.PubKeyAlgorithm.RSAEncryptOrSign, 2048
+            )
+
+        except NameError:
+            # PGPy not installed
+            logger.debug("PGPy not installed; keygen disabled")
             return False
 
         if not name:
@@ -211,16 +207,25 @@ class ApprisePGPController:
             # Ensure our key no longer exists
             del self.__key_lookup[lookup_key]
 
-        # Add the user ID to the key
+        # Add a signing and certification identity to the primary key.
         key.add_uid(
             uid,
             usage={
                 pgpy.constants.KeyFlags.Sign,
-                pgpy.constants.KeyFlags.EncryptCommunications,
+                pgpy.constants.KeyFlags.Certify,
             },
             hashes=[pgpy.constants.HashAlgorithm.SHA256],
             ciphers=[pgpy.constants.SymmetricKeyAlgorithm.AES256],
             compression=[pgpy.constants.CompressionAlgorithm.ZLIB],
+        )
+
+        # Bind the encryption-capable subkey to the primary key
+        key.add_subkey(
+            subkey,
+            usage={
+                pgpy.constants.KeyFlags.EncryptCommunications,
+                pgpy.constants.KeyFlags.EncryptStorage,
+            },
         )
 
         try:
@@ -272,12 +277,7 @@ class ApprisePGPController:
         return True
 
     def _pub_key_candidates(self, *emails):
-        """Returns the ordered list of candidate public-key filenames to
-        search, highest priority first.
-
-        Shared by public_keyfile() and the diagnostic warning in public_key()
-        so both always reflect exactly the same search order.
-        """
+        """Return public-key filenames in search order."""
 
         # Base candidates, lowest priority first
         fnames = [
@@ -287,16 +287,13 @@ class ApprisePGPController:
             "pub.asc",
         ]
 
-        # Merge the controller's own email with any caller-supplied addresses.
-        # Two filenames are prepended per address: localpart shorthand is
-        # inserted at index 0 first, then the full address is also inserted
-        # at index 0 -- so the full address lands ahead of the localpart in
-        # the list (full address has higher priority as it is more specific).
-        all_emails = [self.email, *emails] if self.email else list(emails)
+        # Use the sender only when no recipient address was supplied.
+        all_emails = (
+            list(emails) if emails else ([self.email] if self.email else [])
+        )
         for em in all_emails:
-            # Localpart shorthand (e.g. "chris-pub.asc")
+            # Prefer the full address over its local-part shorthand.
             fnames.insert(0, f"{em.split('@')[0].lower()}-pub.asc")
-            # Full lowercase email (e.g. "chris@nuxref.com-pub.asc")
             fnames.insert(0, f"{em.lower()}-pub.asc")
 
         return fnames
@@ -327,8 +324,7 @@ class ApprisePGPController:
         return fnames
 
     def public_keyfile(self, *emails):
-        """Returns the first match of a useable public key based emails
-        provided."""
+        """Return the first usable public-key path for these addresses."""
 
         if not PGP_SUPPORT:
             msg = "PGP Support unavailable; install PGPy library"
@@ -366,12 +362,10 @@ class ApprisePGPController:
         )
 
     def private_keyfile(self):
-        """Returns the path to the private key file if one can be found.
+        """Return the selected private-key path.
 
-        Returns the explicit path when prv_keyfile was provided, looks for a
-        matching auto-generated key in self.path otherwise.  Returns False
-        when an explicit keyfile was given but could not be accessed, and
-        None when no key file could be located at all.
+        An inaccessible explicit key returns ``False``. A missing discovered
+        key returns ``None``.
         """
 
         if self._prv_keyfile is not None:
@@ -405,12 +399,9 @@ class ApprisePGPController:
         )
 
     def private_key(self):
-        """Loads and returns the PGP private key object.
+        """Load an explicit or stored PGP private key.
 
-        Reads from the explicit prv_keyfile if one was provided, otherwise
-        scans the persistent storage path for an auto-generated private key.
-        Returns None when no usable private key could be found or loaded.
-        Passphrase-protected keys are not supported and will be rejected.
+        Returns ``None`` for missing, unusable, or passphrase-protected keys.
         """
 
         # Locate the private key file
@@ -419,12 +410,12 @@ class ApprisePGPController:
             if path is False:
                 # An explicit pgpprv= file was given but could not be accessed;
                 # keep as WARNING because the user made an explicit choice that
-                # failed -- this is always actionable regardless of plugin
+                # failed. This is actionable regardless of the plugin.
                 logger.warning("PGP Private Key could not be accessed")
 
             elif self.path:
                 # path is None: storage was searched but nothing matched.
-                # Only hash + filename is shown -- never an absolute path.
+                # Show only the namespace hash and filename.
                 ns = os.path.basename(self.path)
                 candidates = self._prv_key_candidates()
                 shown = ", ".join(f"'{ns}/{fn}'" for fn in candidates[:4])
@@ -436,7 +427,7 @@ class ApprisePGPController:
                 )
 
             else:
-                # No storage path at all -- nothing was searched
+                # No storage path was available to search.
                 logger.debug("No PGP private key found")
 
             return None
@@ -452,7 +443,7 @@ class ApprisePGPController:
             if entry["expires"] > datetime.now(timezone.utc):
                 return entry["private_key"]
 
-            # Expired -- remove and re-load below
+            # Remove expired entries before reloading.
             del self.__key_lookup[cache_key]
 
         try:
@@ -490,6 +481,15 @@ class ApprisePGPController:
             )
             return None
 
+        if private_key.is_public:
+            # Reject a public-only file supplied through pgpprv=.
+            logger.warning(
+                "PGP Private Key file does not contain secret key "
+                "material: %s",
+                path,
+            )
+            return None
+
         # Cache the successfully loaded key
         self.__key_lookup[cache_key] = {
             "private_key": private_key,
@@ -499,13 +499,10 @@ class ApprisePGPController:
         return private_key
 
     def sign(self, message):
-        """Creates a detached PGP signature for the given message string.
+        """Create a detached PGP signature.
 
-        Returns a (signature_str, micalg) tuple on success where
-        signature_str is the armored PGP signature block and micalg is the
-        MIME hash algorithm label (e.g. 'pgp-sha256') for the
-        Content-Type header of the multipart/signed container.
-        Returns None when signing is not possible.
+        Returns the armored signature and MIME hash label, or ``None`` when
+        signing is unavailable.
         """
 
         # Load our private key
@@ -606,8 +603,7 @@ class ApprisePGPController:
         return None
 
     def public_key(self, *emails, autogen=None):
-        """Opens a spcified pgp public file and returns the key from it which
-        is used to encrypt the message."""
+        """Load the public key used to encrypt a message."""
         path = self.public_keyfile(*emails)
         if not path:
             # Try Web Key Directory before falling back to autogen
@@ -623,11 +619,7 @@ class ApprisePGPController:
                     # We should get a hit now
                     return self.public_key(*emails)
 
-            # All discovery methods exhausted (local file, WKD, autogen).
-            # Log at DEBUG so the caller's warning (with plugin-specific hints)
-            # is the only user-visible message.  Only the namespace hash +
-            # filename is shown -- never an absolute path -- so no sensitive
-            # filesystem layout is revealed.
+            # Keep discovery details at DEBUG and avoid exposing full paths.
             if self.path:
                 ns = os.path.basename(self.path)
                 candidates = self._pub_key_candidates(*emails)
@@ -679,13 +671,130 @@ class ApprisePGPController:
         }
         return public_key
 
+    # Autocrypt Level 1 specification:
+    # https://docs.autocrypt.org/level1.html
+    # Autocrypt limits the complete encoded header to 10 KiB.
+    max_autocrypt_header_size = 10 * 1024
+
+    # Add whitespace every 76 characters so long keydata can be folded safely.
+    autocrypt_fold_width = 76
+
+    @staticmethod
+    def _has_encryption_subkey(key):
+        """Check the exported key's UID and encryption-subkey shape.
+
+        It requires one self-signed UID, no user attributes, and one usable
+        encryption subkey. Pass a key parsed from the bytes being advertised.
+        """
+        if key.userattributes:
+            return False
+
+        # Revocations are separate from the signatures checked below.
+        if list(key.revocation_signatures):
+            return False
+
+        if len(key.userids) != 1 or len(key.subkeys) != 1:
+            return False
+
+        uid = key.userids[0]
+
+        # PGPy selects signatures that identify the primary key as issuer.
+        if uid.selfsig is None:
+            return False
+
+        # PGPy has no public signature-count accessor. Fail safely if its
+        # private collection changes in a future release.
+        try:
+            uid_signature_count = len(uid._signatures)
+        except AttributeError:
+            logger.debug(
+                "PGPy internals changed; cannot verify UID signature "
+                "count for Autocrypt compliance"
+            )
+            return False
+
+        if uid_signature_count != 1:
+            return False
+
+        subkey = next(iter(key.subkeys.values()))
+        if list(subkey.revocation_signatures):
+            return False
+
+        # PGPy filters non-expired bindings by their identified issuer.
+        subkey_sigs = list(subkey.self_signatures)
+        if len(subkey_sigs) != 1:
+            return False
+
+        encrypt_flags = {
+            pgpy.constants.KeyFlags.EncryptCommunications,
+            pgpy.constants.KeyFlags.EncryptStorage,
+        }
+        return bool(subkey_sigs[0].key_flags & encrypt_flags)
+
+    def autocrypt_header(self):
+        """Build an Autocrypt header advertising our public key.
+
+        Returns ``None`` when the sender address or a usable sender private
+        key is missing, or when the result exceeds Autocrypt's size limit.
+        """
+        if not self.email:
+            return None
+
+        # Advertise only a key we can decrypt with. Generate a sender pair
+        # when allowed; public-only files and WKD results are not eligible.
+        private_key = self.private_key()
+        if not private_key and self.asset.pgp_autogen and self.keygen():
+            private_key = self.private_key()
+
+        if not private_key:
+            return None
+
+        # Re-parse the exported bytes so validation matches the advertised key.
+        exported = bytes(private_key.pubkey)
+        try:
+            exported_key, _ = pgpy.PGPKey.from_blob(exported)
+        except Exception:
+            logger.debug("Unable to re-parse our own exported PGP key")
+            return None
+
+        if not self._has_encryption_subkey(exported_key):
+            logger.debug(
+                "PGP private key lacks an Autocrypt-compatible encryption "
+                "subkey; omitting Autocrypt header"
+            )
+            return None
+
+        # Autocrypt uses the base64-encoded raw public key, without armor.
+        keydata = b64encode(exported).decode("ascii")
+
+        # Fold only keydata; Base64 decoders ignore the added whitespace.
+        folded_keydata = "\r\n ".join(
+            keydata[i : i + self.autocrypt_fold_width]
+            for i in range(0, len(keydata), self.autocrypt_fold_width)
+        )
+        header = (
+            f"addr={self.email}; prefer-encrypt=mutual; "
+            f"keydata={folded_keydata}"
+        )
+
+        # Count folding whitespace when enforcing the complete header limit.
+        rendered_size = len(f"Autocrypt: {header}".encode())
+        if rendered_size > self.max_autocrypt_header_size:
+            logger.debug(
+                "Autocrypt header (%d bytes) exceeds the %d byte spec "
+                "limit; omitting",
+                rendered_size,
+                self.max_autocrypt_header_size,
+            )
+            return None
+
+        return header
+
     # Encrypt message using the recipient's public key
     def encrypt(self, message, *emails, autogen=None):
-        """If provided a path to a pgp-key, content is encrypted.
+        """Encrypt with the selected public key.
 
-        Pass autogen=False to suppress key auto-generation during the
-        public-key lookup.  This is used in sign mode for opportunistic
-        encryption: only encrypt when a pre-existing key is found.
+        ``autogen=False`` limits lookup to existing keys.
         """
 
         # Acquire our key; autogen controls whether a missing key is created

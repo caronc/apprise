@@ -37,6 +37,7 @@ import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.sendpulse import NotifySendPulse
 
 logging.disable(logging.CRITICAL)
@@ -58,34 +59,34 @@ apprise_url_tests = (
     (
         "sendpulse://",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://:@/",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://abcd",
         {
             # invalid from email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://abcd@host.com",
         {
             # Just an Email specified, no client_id or client_secret
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
         "sendpulse://user@example.com/client_id/cs/?template=invalid",
         {
             # Invalid template
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -145,7 +146,7 @@ apprise_url_tests = (
         "sendpulse://?id=ci&secret=cs&user=chris",
         {
             # Set login through user= only - invaild email
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     (
@@ -385,7 +386,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
     )
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -426,7 +429,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
     obj = Apprise.instantiate("sendpulse://user@example.com/ci/cs/?from=John")
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -466,7 +471,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
 
     # Second call no longer needs to authenticate
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -480,7 +487,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
     # force an exception
     mock_post.side_effect = requests.RequestException
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -488,7 +497,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
     mock_post.side_effect = None
     request.status_code = 403
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -523,7 +534,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
     mock_post.return_value = sendpulse()
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is True
     )
 
@@ -590,7 +603,9 @@ def test_plugin_sendpulse_edge_cases(mock_post):
     mock_post.return_value = sendpulse()
 
     assert (
-        obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        bool(
+            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+        )
         is False
     )
 
@@ -645,7 +660,11 @@ def test_plugin_sendpulse_edge_cases(mock_post):
         # Instantiate our object
         obj = Apprise.instantiate("sendpulse://user@example.com/ci/cs/")
         assert (
-            obj.notify(body="body", title="title", notify_type=NotifyType.INFO)
+            bool(
+                obj.notify(
+                    body="body", title="title", notify_type=NotifyType.INFO
+                )
+            )
             is True
         )
 
@@ -657,12 +676,12 @@ def test_plugin_sendpulse_fail_cases():
     """
 
     # no client_id
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id="abcd", client_secret=None, from_addr="user@example.com"
         )
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id=None,
             client_secret="abcd123",
@@ -670,13 +689,13 @@ def test_plugin_sendpulse_fail_cases():
         )
 
     # invalid from email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id="abcd", client_secret="abcd456", from_addr="!invalid"
         )
 
     # no email
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifySendPulse(
             client_id="abcd", client_secret="abcd789", from_addr=None
         )
@@ -721,11 +740,13 @@ def test_plugin_sendpulse_attachments(mock_post):
     obj = Apprise.instantiate("sendpulse://user@example.com/aaaa/bbbb")
     assert isinstance(obj, NotifySendPulse)
     assert (
-        obj.notify(
-            body="body",
-            title="title",
-            notify_type=NotifyType.INFO,
-            attach=attach,
+        bool(
+            obj.notify(
+                body="body",
+                title="title",
+                notify_type=NotifyType.INFO,
+                attach=attach,
+            )
         )
         is True
     )
@@ -735,11 +756,13 @@ def test_plugin_sendpulse_attachments(mock_post):
     # Try again in a use case where we can't access the file
     with mock.patch("os.path.isfile", return_value=False):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )
@@ -747,11 +770,13 @@ def test_plugin_sendpulse_attachments(mock_post):
     # Try again in a use case where we can't access the file
     with mock.patch("builtins.open", side_effect=OSError):
         assert (
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
             is False
         )

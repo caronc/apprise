@@ -56,6 +56,7 @@ import requests
 from ..apprise_attachment import AppriseAttachment
 from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..utils.parse import parse_bool, parse_list, validate_regex
 from ..utils.templates import TemplateType, apply_template
@@ -84,6 +85,10 @@ class NotifyDiscord(NotifyBase):
 
     # Discord Webhook
     notify_url = "https://discord.com/api/webhooks"
+
+    # Discord supports plain text and Markdown-style embeds. Plain text
+    # remains the default.
+    notify_format = (NotifyFormat.TEXT, NotifyFormat.MARKDOWN)
 
     # Support attachments
     attachment_support = True
@@ -273,7 +278,7 @@ class NotifyDiscord(NotifyBase):
                 f"An invalid Discord Webhook ID ({webhook_id}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Webhook Token (associated with project)
         self.webhook_token = validate_regex(webhook_token)
@@ -283,7 +288,7 @@ class NotifyDiscord(NotifyBase):
                 f"({webhook_token}) was specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Text To Speech
         self.tts = tts
@@ -327,7 +332,7 @@ class NotifyDiscord(NotifyBase):
                     "specified."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
         else:
             self.flags = None
 
@@ -360,7 +365,7 @@ class NotifyDiscord(NotifyBase):
                 # add() failed (unsupported schema, unparseable URL, etc.)
                 msg = "The Discord template specified could not be loaded."
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
             # Enforce maximum file size
             self.template[0].max_file_size = self.max_discord_template_size
@@ -376,7 +381,7 @@ class NotifyDiscord(NotifyBase):
                 f"({tokens}) are not identified as a dictionary."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # else: NoneType - this is okay
 
@@ -504,9 +509,12 @@ class NotifyDiscord(NotifyBase):
         title: str = "",
         notify_type: NotifyType = NotifyType.INFO,
         attach: list[AttachBase] | None = None,
+        body_format: NotifyFormat | None = None,
         **kwargs: Any,
     ) -> bool:
         """Perform Discord Notification."""
+
+        # body_format arrives as the resolved render target.
 
         payload: dict[str, Any] = {
             "tts": self.tts,
@@ -537,11 +545,9 @@ class NotifyDiscord(NotifyBase):
         # Template mode bypasses ping detection and embed construction;
         # the template defines the complete payload content.
         if not self.template:
-            # Ping handling rules:
-            # - If ping= is set, it is an additive if in MARKDOWN mode
-            #   otherwise it is explicit for TEXT/HTML formats.
-            # - Otherwise, ping detection only happens in MARKDOWN mode
-            if self.notify_format == NotifyFormat.MARKDOWN:
+            # Markdown can detect pings; ping= is additive there and
+            # explicit for text/HTML.
+            if body_format == NotifyFormat.MARKDOWN:
                 if self.ping:
                     payload.update(
                         self.ping_payload(body, " ".join(self.ping))
@@ -549,7 +555,7 @@ class NotifyDiscord(NotifyBase):
                 else:
                     payload.update(self.ping_payload(body))
 
-            # TEXT/HTML: no body parsing, ping= is exclusive
+            # TEXT destination: no body parsing, ping= is exclusive.
             elif self.ping:
                 payload.update(self.ping_payload(" ".join(self.ping)))
 
@@ -576,7 +582,7 @@ class NotifyDiscord(NotifyBase):
             # Track extra embed fields (if used)
             fields: list[dict[str, str]] = []
 
-            if self.notify_format == NotifyFormat.MARKDOWN:
+            if body_format == NotifyFormat.MARKDOWN:
                 # Use embeds for payload
                 payload["embeds"] = [
                     {

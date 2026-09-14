@@ -36,6 +36,7 @@ import requests
 
 import apprise
 from apprise import NotifyFormat
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.gotify import GotifyPriority, NotifyGotify
 
 logging.disable(logging.CRITICAL)
@@ -52,7 +53,7 @@ apprise_url_tests = (
     (
         "gotify://hostname",
         {
-            "instance": TypeError,
+            "instance": AppriseImproperlyConfigured,
         },
     ),
     # Provide a hostname and token
@@ -152,10 +153,10 @@ def test_plugin_gotify_urls():
 def test_plugin_gotify_edge_cases():
     """NotifyGotify() Edge Cases."""
     # Initializes the plugin with an invalid token
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGotify(token=None)
     # Whitespace also acts as an invalid token value
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyGotify(token="   ")
 
 
@@ -201,11 +202,11 @@ def test_plugin_gotify_config_files(mock_post):
     # Add our configuration
     aobj.add(ac)
 
-    # We should be able to read our 8 servers from that
+    # We should be able to read our 8 services from that
     # 4x low
     # 3x emerg
     # 1x invalid (so takes on normal priority)
-    assert len(ac.servers()) == 8
+    assert len(ac.services()) == 8
     assert len(aobj) == 8
     assert len(list(aobj.find(tag="low"))) == 4
     for s in aobj.find(tag="low"):
@@ -240,9 +241,11 @@ def test_plugin_gotify_html_to_markdown_format(mock_post):
     # Notify with an HTML body; the framework should convert it
     # to Markdown before dispatching to Gotify
     assert (
-        aobj.notify(
-            body="<b>hello</b> <i>world</i>",
-            body_format=NotifyFormat.HTML,
+        bool(
+            aobj.notify(
+                body="<b>hello</b> <i>world</i>",
+                body_format=NotifyFormat.HTML,
+            )
         )
         is True
     )

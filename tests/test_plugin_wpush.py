@@ -36,6 +36,7 @@ import pytest
 import requests
 
 from apprise import Apprise
+from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins.wpush import (
     WPUSH_CHANNEL_DEFAULT,
     NotifyWPush,
@@ -55,11 +56,11 @@ BAD_RESPONSE = dumps({"code": 401, "message": "API Key error"})
 apprise_url_tests = (
     (
         "wpush://",
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     (
         "wpush://short",
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     (
         "wpush://{}".format(GOOD_KEY),
@@ -142,11 +143,11 @@ apprise_url_tests = (
     ),
     (
         "wpush://{}?channel=nope".format(GOOD_KEY),
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     (
         "wpush://{}?group=123456&topic_code=mytopic".format(GOOD_KEY),
-        {"instance": TypeError},
+        {"instance": AppriseImproperlyConfigured},
     ),
     (
         "https://api.wpush.cn/api/v1/send?apikey={}".format(GOOD_KEY),
@@ -221,16 +222,16 @@ def test_plugin_wpush_init():
     obj = NotifyWPush(apikey=GOOD_KEY, click_url="https://example.com/")
     assert obj.click_url == "https://example.com/"
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWPush(apikey=GOOD_KEY, channel="nope")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWPush(apikey=GOOD_KEY, channel="feishu,nope")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         NotifyWPush(apikey="bad")
 
-    with pytest.raises(TypeError):
+    with pytest.raises(AppriseImproperlyConfigured):
         # Group and topic targets cannot be combined
         NotifyWPush(apikey=GOOD_KEY, group="123456", targets=["topic1"])
 
@@ -418,7 +419,7 @@ def test_plugin_wpush_apprise_integration(mock_post):
 
     aobj = Apprise()
     assert aobj.add("wpush://{}".format(GOOD_KEY))
-    assert aobj.notify(title="T", body="B") is True
+    assert bool(aobj.notify(title="T", body="B")) is True
     assert mock_post.call_count == 1
 
 
