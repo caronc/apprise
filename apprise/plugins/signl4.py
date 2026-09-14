@@ -301,7 +301,7 @@ class NotifySIGNL4(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        url = "{schema}://{secret}"
+        url = "{schema}://{secret}/?{params}"
 
         return url.format(
             schema=self.secure_protocol,

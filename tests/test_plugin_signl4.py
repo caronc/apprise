@@ -32,6 +32,7 @@ import logging
 
 from helpers import AppriseURLTester
 
+from apprise import Apprise
 from apprise.plugins.signl4 import (
     NotifySIGNL4,
     NotifyType,
@@ -149,6 +150,22 @@ apprise_url_tests = (
         },
     ),
     (
+        (
+            "signl4://secret/?service=IoT&location=40.6413111,-73.7781391"
+            "&alerting_scenario=multi_ack&filtering=yes&external_id=ar1234"
+            "&status=new"
+        ),
+        {
+            # All of our supported parameters at once
+            "instance": NotifySIGNL4,
+            "notify_type": NotifyType.FAILURE,
+            # Our response expected server response
+            "requests_response_text": SIGNL4_GOOD_RESPONSE,
+            # Our parameters are all present in the generated URL
+            "privacy_url": "signl4://****/?service=IoT",
+        },
+    ),
+    (
         "signl4://secret/",
         {
             "instance": NotifySIGNL4,
@@ -174,3 +191,36 @@ def test_plugin_signl4_urls():
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+def test_plugin_signl4_url_round_trip():
+    """NotifySIGNL4() URL Round Trip."""
+
+    url = (
+        "signl4://secret/?service=IoT&location=40.6413111,-73.7781391"
+        "&alerting_scenario=multi_ack&filtering=yes&external_id=ar1234"
+        "&status=new&format=markdown&verify=no"
+    )
+
+    obj = Apprise.instantiate(url)
+    assert isinstance(obj, NotifySIGNL4)
+
+    # Our URL is re-loadable and nothing is lost along the way
+    new_obj = Apprise.instantiate(obj.url())
+    assert isinstance(new_obj, NotifySIGNL4)
+
+    # Our SIGNL4 specific settings survive
+    assert new_obj.secret == obj.secret == "secret"
+    assert new_obj.service == obj.service == "IoT"
+    assert new_obj.location == obj.location == "40.6413111,-73.7781391"
+    assert new_obj.alerting_scenario == obj.alerting_scenario == "multi_ack"
+    assert new_obj.filtering is obj.filtering is True
+    assert new_obj.external_id == obj.external_id == "ar1234"
+    assert new_obj.status == obj.status == "new"
+
+    # Our base settings survive too
+    assert new_obj.notify_format == obj.notify_format
+    assert new_obj.verify_certificate is obj.verify_certificate is False
+
+    # A second pass produces the exact same URL
+    assert new_obj.url() == obj.url()
