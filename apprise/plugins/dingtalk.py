@@ -206,7 +206,7 @@ class NotifyDingTalk(NotifyBase):
                 "title": title,
                 "text": body,
             }
-
+            payload["msgtype"] = "markdown"
         else:
             payload["text"] = {
                 "content": body,
