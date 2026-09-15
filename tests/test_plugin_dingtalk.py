@@ -173,3 +173,55 @@ def test_plugin_dingtalk_html_to_markdown_format(mock_post):
     # The body must arrive as Markdown, not stripped plain text
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["markdown"]["text"] == "**hello** *world*"
+
+
+@mock.patch("requests.post")
+def test_plugin_dingtalk_msgtype(mock_post):
+    """NotifyDingTalk(): msgtype tracks the notification format."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # Text is our default format
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}".format("a" * 8))
+    assert aobj.notify(title="title", body="body") is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["msgtype"] == "text"
+    assert payload["text"]["content"] == "title\r\nbody"
+    assert "markdown" not in payload
+
+    mock_post.reset_mock()
+
+    # Markdown must flip the msgtype over as well
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}?format=markdown".format("a" * 8))
+    assert aobj.notify(title="title", body="body") is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["msgtype"] == "markdown"
+    assert payload["markdown"]["title"] == "title"
+    assert payload["markdown"]["text"] == "body"
+    assert "text" not in payload
+
+
+@mock.patch("requests.post")
+def test_plugin_dingtalk_markdown_no_title(mock_post):
+    """NotifyDingTalk(): a markdown message always carries a title."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # DingTalk rejects a markdown message with an empty title, so we
+    # substitute our application description when none was provided
+    obj = Apprise.instantiate("dingtalk://{}?format=markdown".format("a" * 8))
+    assert obj.notify(body="body") is True
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["markdown"]["title"] == obj.app_desc
