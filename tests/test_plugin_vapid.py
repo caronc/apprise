@@ -999,3 +999,66 @@ def test_plugin_vapid_accepts_created_response(mock_post, tmpdir):
 
     # RFC 8030 push services acknowledge a queued message with a 201
     assert obj.send("test") is True
+
+
+@mock.patch("requests.post")
+def test_plugin_vapid_prunes_expired_subscriptions(mock_post, tmpdir):
+    """A 410/404 from the push service removes that subscription from disk."""
+
+    def respond(url, *args, **kwargs):
+        response = requests.Request()
+        response.content = ""
+        # the dead endpoint answers 410 Gone, the live one 201 Created
+        response.status_code = (
+            requests.codes.gone
+            if url.endswith("DEAD")
+            else requests.codes.created
+        )
+        return response
+
+    mock_post.side_effect = respond
+
+    tmpdir0 = tmpdir.mkdir("prune")
+    subfile = os.path.join(str(tmpdir0), "subscriptions.json")
+    keys = {
+        "p256dh": (
+            "BI2RNIK2PkeCVoEfgVQNjievBi4gWvZxMiuCpOx6K6qCO"
+            "5caru5QCPuc-nEaLplbbFkHxTrR9YzE8ZkTjie5Fq0"
+        ),
+        "auth": "k9Xzm43nBGo=",
+    }
+    with open(subfile, "w") as f:
+        json.dump(
+            {
+                "live": {
+                    "endpoint": "https://web.push.apple.com/LIVE",
+                    "keys": keys,
+                },
+                "dead": {
+                    "endpoint": "https://web.push.apple.com/DEAD",
+                    "keys": keys,
+                },
+            },
+            f,
+        )
+
+    obj = NotifyVapid(
+        "user@example.ca",
+        targets=["live", "dead"],
+        subfile=subfile,
+        asset=asset.AppriseAsset(
+            storage_mode=PersistentStoreMode.FLUSH,
+            storage_path=str(tmpdir0),
+            pem_autogen=True,
+        ),
+    )
+
+    # one target 410'd, so the overall send reports failure
+    assert obj.send("test") is False
+
+    # ...but the dead subscription must be gone from disk, the live one kept
+    with open(subfile) as f:
+        remaining = json.load(f)
+
+    assert "live" in remaining
+    assert "dead" not in remaining
