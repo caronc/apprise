@@ -89,8 +89,9 @@ notification services. It supports sending alerts to platforms such as: \
 `Sinch`, `Slack`, `SMPP`, `SMSC`, `SMSEagle`, `SMS Manager`, `SMTP2Go`, \
 `SparkPost`, `Splunk`, `Spike`, `Spug Push`, `Stackfield`, `Super Toasty`, \
 `Streamlabs`, `Stride`, \
-`Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Threema Gateway`, \
-`Trigv`, `Twilio`, `Twitter`, `Twist`, `Vapid`, `Viber`, `VictorOps`, \
+`Synology Chat`, `Syslog`, `Techulus Push`, `Telegram`, `Telnyx`, \
+`Threema Gateway`, `Trigv`, `Twilio`, `Twitter`, `Twist`, `Vapid`, \
+`Viber`, `VictorOps`, \
 `Voipms`, `Vonage`, `WebPush`, `WeChat (WeCom)`, `WeCom Bot`, `WhatsApp`, \
 `Webex Teams`, `Workflows`, `WPUSH`, `WxPusher`, `XBMC`, `XMPP`, `YouLMK`, \
 `Zoom`, and `Zulip`.}
