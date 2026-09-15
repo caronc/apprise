@@ -299,6 +299,17 @@ class WebPushSubscriptionManager:
         """Checks if the key exists."""
         return key.lower() in self.__subscriptions
 
+    def __delitem__(self, key: str) -> None:
+        """Removes a subscription by name."""
+        del self.__subscriptions[key.lower()]
+
+    def remove(self, key: str) -> bool:
+        """Removes a subscription; returns True if one was removed."""
+        if key.lower() in self.__subscriptions:
+            del self.__subscriptions[key.lower()]
+            return True
+        return False
+
     def clear(self) -> None:
         """Empties our server list."""
         self.__subscriptions.clear()

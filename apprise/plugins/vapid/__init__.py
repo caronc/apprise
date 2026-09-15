@@ -386,6 +386,10 @@ class NotifyVapid(NotifyBase):
 
         has_error = False
 
+        # Subscriptions the push service reported as permanently gone; removed
+        # from the store after the loop so we stop retrying dead endpoints.
+        expired = []
+
         # Create a copy of the targets list
         targets = list(self.targets)
         while len(targets):
@@ -446,7 +450,21 @@ class NotifyVapid(NotifyBase):
                     timeout=self.request_timeout,
                     allow_redirects=self.redirects,
                 )
-                if r.status_code not in (
+                if r.status_code in (
+                    requests.codes.not_found,
+                    requests.codes.gone,
+                ):
+                    # 404/410 mean the subscription is permanently gone
+                    # (RFC 8030 s6). Drop it so we never target it again
+                    # -- this keeps subscriptions.json self-cleaning as
+                    # devices are uninstalled.
+                    self.logger.info(
+                        "Removing expired Vapid subscription: %s", target
+                    )
+                    expired.append(target)
+                    has_error = True
+
+                elif r.status_code not in (
                     requests.codes.ok,
                     requests.codes.no_content,
                     # Push services acknowledge a queued message with a 201
@@ -484,6 +502,14 @@ class NotifyVapid(NotifyBase):
                 self.logger.debug("Socket Exception: %s", e)
 
                 has_error = True
+
+        # Persist the store if any dead subscriptions were dropped, so the
+        # cleanup survives to the next notification.
+        if expired:
+            for name in expired:
+                self.subscriptions.remove(name)
+            if self.subfile:
+                self.subscriptions.write(self.subfile)
 
         return not has_error
 
