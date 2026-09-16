@@ -195,7 +195,7 @@ def test_template_rejects_loop():
 
 
 def test_template_avoids_placeholder_collision():
-    """A placeholder can not collide with the configuration."""
+    """A placeholder cannot collide with the configuration."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     assert f"a{placeholders.nonce}" not in "some configuration body"
 
@@ -208,11 +208,46 @@ def test_template_call_value_precedence():
     assert values == {"target": "from-call"}
 
 
-def test_template_environment_precedence():
-    """A deployment may override what the config file ships."""
+def test_template_config_default_beats_the_environment():
+    """A default in the configuration wins over the server's own value.
+
+    The author picked that default for this configuration in particular,
+    so it is used ahead of anything the deployment set.
+    """
     schema = schema_of({"target": "from-config"})
     env = {"APPRISE_TEMPLATE_TARGET": "from-env"}
+    assert resolve_values(schema, None, env) == {"target": "from-config"}
+
+
+def test_template_environment_fills_a_name_with_no_default():
+    """The environment is what a required name falls back to."""
+    schema = schema_of("target")
+    env = {"APPRISE_TEMPLATE_TARGET": "from-env"}
     assert resolve_values(schema, None, env) == {"target": "from-env"}
+
+
+def test_template_blank_value_reads_as_nothing_supplied():
+    """Whitespace is not a value, so the next source is used."""
+    schema = schema_of({"target": "from-config"})
+    for blank in ("", "   ", "\t"):
+        assert resolve_values(schema, {"target": blank}) == {
+            "target": "from-config"
+        }
+
+
+def test_template_value_is_trimmed():
+    """Surrounding whitespace never reaches the URL."""
+    schema = schema_of("target")
+    assert resolve_values(schema, {"target": "  spaced  "}) == {
+        "target": "spaced"
+    }
+
+
+def test_template_blank_environment_value_is_ignored():
+    """A blank environment value leaves the name unresolved."""
+    schema = schema_of("target")
+    with pytest.raises(AppriseTemplateError):
+        resolve_values(schema, None, {"APPRISE_TEMPLATE_TARGET": "   "})
 
 
 def test_template_default_fallback():
@@ -235,7 +270,7 @@ def test_template_supplied_name_case_insensitive():
     assert resolve_values(schema, {"TaRgEt": "x"}, {}) == {"target": "x"}
 
 
-def test_template_ignores_another_configurations_name():
+def test_template_ignores_unrelated_name():
     """Each configuration ignores names that it does not use."""
     schema = schema_of({"target": "a-default"})
     values = resolve_values(schema, {"target": "x", "elsewhere": "y"}, {})
@@ -266,7 +301,7 @@ def test_template_rejects_control_character(value):
 
 
 def test_template_value_length_limit():
-    """Values are capped so a caller can not flood the parser."""
+    """Cap values so a caller cannot flood the parser."""
     with pytest.raises(AppriseTemplateError):
         validate_value("target", "x" * (MAX_TEMPLATE_VALUE_LEN + 1))
 
@@ -292,7 +327,7 @@ def test_template_converts_scalar_value(value, expected):
     ["${" * 50000, "$" * 200000, "${A" * 20000, "${" * 10000 + "}" * 10000],
 )
 def test_template_regex_performance(payload):
-    """The pattern is bounded, so it can not be made to hang."""
+    """Bound the pattern so input cannot make it hang."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     start = time.monotonic()
     placeholders.encode(payload)
@@ -455,7 +490,7 @@ def test_template_allows_a_complete_email_host():
     assert result["host"] == "example.com"
 
 
-def test_template_allows_credentials_in_a_complete_authority():
+def test_template_allows_full_authority_credentials():
     """A whole authority may carry user:pass@host."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     parsed = {
@@ -504,7 +539,7 @@ def test_template_leaves_a_setting_value_alone():
     assert result["bcc"] == "b64/secret@host&x"
 
 
-def test_template_setting_name_check_skips_non_text_keys():
+def test_template_ignores_non_text_setting_keys():
     """YAML allows a number as a key; there is nothing to look at."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     assert placeholders.keys_contain_placeholder({1: "x", 2.5: "y"}) is None

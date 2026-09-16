@@ -32,6 +32,7 @@ parsed. Their values are then applied to the parsed fields.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import os
 import re
 import secrets
@@ -128,6 +129,46 @@ def validate_value(name: str, value: Any) -> str:
     return value
 
 
+def validate_overrides(overrides: Any) -> dict:
+    """Check the values handed in for one call and return them.
+
+    A mapping of name/value pairs is the only accepted form.  Anything
+    else, along with a name that does not look like a variable name, is
+    turned down here so it can never reach a log entry or a URL.
+    """
+
+    if overrides is None:
+        # Nothing was supplied, which is perfectly normal.
+        return {}
+
+    if not isinstance(overrides, Mapping):
+        raise AppriseTemplateError(
+            "Template values must be supplied as a mapping of names to values."
+        )
+
+    seen = set()
+    for key in overrides:
+        if not isinstance(key, str) or not TEMPLATE_NAME_RE.match(key):
+            raise AppriseTemplateError(
+                "Invalid template variable name {!r}.".format(key)
+            )
+
+        name = normalize_name(key)
+        if name in seen:
+            # Two spellings of one name leave no way to tell which value
+            # was meant, so neither is used.
+            raise AppriseTemplateError(
+                "Template variable '{}' was supplied more than once.".format(
+                    name
+                ),
+                variable=name,
+            )
+
+        seen.add(name)
+
+    return overrides
+
+
 class TemplateVariable:
     """One variable declared in a ``template:`` section."""
 
@@ -143,7 +184,7 @@ class TemplateVariable:
 
     @property
     def required(self) -> bool:
-        """A variable with no default must always be supplied."""
+        """Report whether the configuration gave this name no default."""
         return self.default is None
 
     def __repr__(self) -> str:
@@ -172,8 +213,8 @@ class TemplateSchema:
         - a list of ``- name`` or ``- name: default`` entries
         - a mapping of ``name: default`` entries
 
-        In both cases a variable written without a value is mandatory
-        and must be supplied before the URL using it can load.
+        In both cases a name without a default needs a value from the call
+        or the environment before its URL can load.
         """
 
         variables = {}
@@ -186,7 +227,7 @@ class TemplateSchema:
             items = []
             for entry in entries:
                 if isinstance(entry, str):
-                    # A bare "- name"; mandatory
+                    # A bare "- name" has no configuration default.
                     items.append((entry, None))
 
                 elif isinstance(entry, dict):
@@ -245,9 +286,9 @@ class TemplateSchema:
 class TemplatePlaceholderMap:
     """Swap declared variables for parse-safe placeholders and back.
 
-    A placeholder is a short run of letters and digits, which is legal
-    anywhere in a URL.  Swapping it in lets the URL parse normally
-    even though the real value is not known yet.
+    Each placeholder uses characters accepted throughout a URL. This lets the
+    URL parse normally before the real value is known, then restores or fills
+    the variable afterward.
     """
 
     def __init__(self, schema: TemplateSchema, content: str = ""):
@@ -303,7 +344,7 @@ class TemplatePlaceholderMap:
             return self._placeholder(name)
 
         # One pass only.  re.sub never looks at what it just wrote, so
-        # a value can not be expanded a second time.
+        # a value cannot be expanded a second time.
         return TEMPLATE_VAR_RE.sub(replace, text)
 
     def encode_obj(self, obj: Any, memo: Optional[dict] = None) -> Any:
@@ -489,30 +530,38 @@ def resolve_values(
     Each variable is looked for in this order:
 
     - a value handed in directly for this call
-    - the ``APPRISE_TEMPLATE_<NAME>`` environment variable
     - the default written in the configuration
+    - the ``APPRISE_TEMPLATE_<NAME>`` environment variable
 
-    Use ``names`` to resolve only one entry's variables, or ``environ={}`` to
-    disable environment lookups. Missing required values raise an error.
+    Call and environment values are trimmed. Blank ones read as unsupplied,
+    so the next source is used. Configuration defaults stay as written.
+
+    Use ``names`` to resolve only one entry's variables. ``environ`` replaces
+    the process environment and should contain text values; ``{}`` disables
+    those lookups. Missing required values raise an error.
     """
 
     if environ is None:
         # Read the process environment unless the caller supplied an override.
         environ = os.environ
 
+    # Turn down anything that is not a usable mapping of name/value pairs.
+    overrides = validate_overrides(overrides)
+
     # Names handed in are matched without regard to case
     supplied = {}
-    for key, value in (overrides or {}).items():
-        if not isinstance(key, str) or not TEMPLATE_NAME_RE.match(key):
-            raise AppriseTemplateError(
-                "Invalid template variable name {!r}.".format(key)
-            )
-
+    for key, value in overrides.items():
         name = normalize_name(key)
         if name not in schema.variables:
             # One mapping can serve several configurations. This entry simply
             # ignores names it does not use.
             continue
+
+        if isinstance(value, str):
+            # Trim call values first; blanks let the next source apply.
+            value = value.strip()
+            if not value:
+                continue
 
         supplied[name] = validate_value(name, value)
 
@@ -527,15 +576,17 @@ def resolve_values(
             results[name] = supplied[name]
             continue
 
-        value = environ.get(TEMPLATE_ENV_PREFIX + name.upper())
-        if value:
-            # Environment values provide deployment-wide defaults.
-            results[name] = validate_value(name, value)
+        if variable.default is not None:
+            # The configuration default beats the environment.
+            results[name] = variable.default
             continue
 
-        if variable.default is not None:
-            # The declaration default is the final available source.
-            results[name] = variable.default
+        value = environ.get(TEMPLATE_ENV_PREFIX + name.upper())
+        # Process environment values are text; injected mappings should be too.
+        value = value.strip() if value else ""
+        if value:
+            # Use environment only without a default; never expose its value.
+            results[name] = validate_value(name, value)
             continue
 
         raise AppriseTemplateError(

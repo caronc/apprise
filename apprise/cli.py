@@ -68,6 +68,7 @@ from .common import (
 from .logger import logger
 from .utils.disk import bytes_to_str, dir_size, path_decode
 from .utils.parse import GET_SCHEMA_RE, parse_list
+from .utils.template import TEMPLATE_NAME_RE, normalize_name
 
 # By default we allow looking 1 level down recursively in Apprise configuration
 # files.
@@ -701,7 +702,8 @@ def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
     help=(
         "Supply a value used by a YAML configuration written with "
         "${NAME}. Use multiple --template-var (-tv) entries for more "
-        "than one. A value not given here is looked for in "
+        "than one. A value not given here is looked for in the "
+        "configuration's own default and then in "
         "APPRISE_TEMPLATE_<NAME>."
     ),
 )
@@ -1220,19 +1222,36 @@ def main(
 
     # Split once so equals signs remain valid inside the value.
     template_vars = {}
+
+    # Names are matched without regard to case, so track what we have seen.
+    template_seen = set()
     for entry in template_var:
         name, sep, value = entry.partition("=")
-        if not sep or not name.strip():
+        name = name.strip()
+        if not sep or not TEMPLATE_NAME_RE.match(name):
+            # Only the name is echoed; the rest of the entry may be a
+            # secret and must not reach the screen or a captured log.
             click.echo(
-                "The --template-var (-tv) entry '{}' is not in the"
-                " expected NAME=VALUE format.".format(entry)
+                "The --template-var (-tv) name '{}' is not in the"
+                " expected NAME=VALUE format.".format(name)
             )
             click.echo("Try 'apprise --help' for more information.")
 
             # Match Click's exit code for invalid parameters.
             ctx.exit(2)
 
-        template_vars[name.strip()] = value
+        if normalize_name(name) in template_seen:
+            click.echo(
+                "The --template-var (-tv) name '{}' was provided more than"
+                " once.".format(name)
+            )
+            click.echo("Try 'apprise --help' for more information.")
+
+            # Match Click's exit code for invalid parameters.
+            ctx.exit(2)
+
+        template_seen.add(normalize_name(name))
+        template_vars[name] = value
 
     # Determine if we're dealing with URLs or url_ids based on the first
     # entry provided.
@@ -1513,7 +1532,7 @@ def main(
 
             elif isinstance(service, NotifyTemplate):
                 # Explain why this pending entry has no identifier.
-                uid = "- template; missing value(s), would not send -"
+                uid = "- template; unresolved, would not send -"
                 unresolved += 1
 
             else:
@@ -1550,8 +1569,10 @@ def main(
         if unresolved:
             click.echo()
             click.echo(
-                "{} of {} matched entries are missing template values and"
-                " would not be sent.".format(unresolved, idx + 1)
+                "{} of {} matched entries could not be resolved and would"
+                " not be sent. Check the log for the reason.".format(
+                    unresolved, idx + 1
+                )
             )
 
         # Dry-run has no AppriseResult, so map its outcome to the same enum.

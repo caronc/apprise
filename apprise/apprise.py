@@ -28,7 +28,7 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import Iterator
+from collections.abc import Iterator, Mapping
 import concurrent.futures as cf
 import contextvars
 from functools import partial
@@ -70,7 +70,11 @@ from .utils.cwe312 import cwe312_url
 from .utils.json import AppriseJSONEncoder
 from .utils.logic import is_exclusive_match
 from .utils.parse import parse_list, parse_urls
-from .utils.template import normalize_name, resolve_values
+from .utils.template import (
+    normalize_name,
+    resolve_values,
+    validate_overrides,
+)
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
@@ -334,11 +338,10 @@ def _template_status(
     status: AppriseResultStatus,
     skipped: list,
 ) -> AppriseResultStatus:
-    """Account for entries that never loaded for want of a value.
+    """Account for template entries that could not be built.
 
-    An entry written with ``${NAME}`` is left out when no value could
-    be found for it.  The caller is told something was left out rather
-    than being handed a clean success.
+    The caller is told something was skipped rather than receiving a clean
+    success for an incomplete delivery.
     """
     if not skipped:
         return status
@@ -347,7 +350,7 @@ def _template_status(
         return AppriseResultStatus.PARTIAL
 
     if status == AppriseResultStatus.NOMATCH:
-        # Everything that matched was waiting on a value we never got
+        # Every matching template entry was skipped before dispatch.
         return AppriseResultStatus.FAILURE
 
     return status
@@ -865,21 +868,20 @@ class Apprise:
     ) -> Iterator[NotifyBase]:
         """Yield loaded services that match ``tag``.
 
-        Services inside configuration sources are resolved before matching,
-        so callers see the same flattened sequence used for delivery. At the
-        top level, tag entries are alternatives (OR); nested collections are
-        intersections (AND). For example, ``[('a', 'b'), 'c']`` means
-        ``(a AND b) OR c``.
+        Services from configuration sources are flattened into the same
+        sequence used for delivery. Top-level tags are alternatives (OR),
+        while nested collections are intersections (AND). For example,
+        ``[('a', 'b'), 'c']`` means ``(a AND b) OR c``.
 
-        When ``match_always`` is true, services carrying the reserved
-        ``always`` tag are yielded even when the requested filter would not
-        otherwise select them.
+        When ``match_always`` is true, services tagged ``always`` are yielded
+        even when the requested filter would not otherwise select them.
 
-        ``template`` supplies values for pending ``${NAME}`` entries. Missing
-        values fall back to ``APPRISE_TEMPLATE_<NAME>`` and then to the
-        configuration's own defaults. Names are case-insensitive, and unused
-        names are ignored. Unresolved entries are skipped and optionally added
-        to ``report``. Set ``resolve=False`` to return them unchanged.
+        ``template`` supplies values for pending ``${NAME}`` entries. A
+        value not given here falls back to the configuration's own default
+        and then to ``APPRISE_TEMPLATE_<NAME>``. Names are case-insensitive,
+        unused names are ignored, and a blank value reads as no value.
+        Unresolved entries are skipped and may be added to ``report``. Set
+        ``resolve=False`` to return pending entries unchanged.
         """
 
         # Build our tag setup
@@ -896,21 +898,28 @@ class Apprise:
         # and notify these services under all circumstances
         match_always = common.MATCH_ALWAYS_TAG if match_always else None
 
+        # Turn down unusable input before anything is logged or built.
+        template = validate_overrides(template)
+
         # One value table can cover several configurations. Extra names are
         # harmless, but acknowledge them in the local debug log.
+        loaded = None
         if resolve and template:
-            self._log_unused_template_names(template)
+            # Reading a configuration can mean a network request, so keep
+            # what each source returns and use it for both the check below
+            # and the matching further down.
+            loaded = [self._entry_services(entry) for entry in self.services]
+            self._log_unused_template_names(template, loaded)
 
         # Iterate over our loaded plugins
-        for entry in self.services:
-            if isinstance(entry, (ConfigBase, AppriseConfig)):
-                # load our services
-                services = entry.services()
-
-            else:
-                services = [
-                    entry,
-                ]
+        for index, entry in enumerate(self.services):
+            # Without a value table nothing was read ahead of time, so each
+            # source is still visited only as it is needed.
+            services = (
+                loaded[index]
+                if loaded is not None
+                else self._entry_services(entry)
+            )
 
             for service in services:
                 # Apply our tag matching based on our defined logic
@@ -936,16 +945,30 @@ class Apprise:
                 yield service
         return
 
-    def _log_unused_template_names(self, template: dict) -> None:
-        """Acknowledge supplied names that no loaded template uses."""
+    @staticmethod
+    def _entry_services(entry: Any) -> list:
+        """Return the services one loaded entry stands for."""
+        if isinstance(entry, (ConfigBase, AppriseConfig)):
+            # A configuration source may hold any number of services.
+            return entry.services()
+
+        return [
+            entry,
+        ]
+
+    def _log_unused_template_names(
+        self,
+        template: Mapping,
+        loaded: list,
+    ) -> None:
+        """Acknowledge supplied names that no loaded template uses.
+
+        ``loaded`` holds the services each entry already returned, so no
+        configuration source is read a second time here.
+        """
 
         known: set[str] = set()
-        for entry in self.services:
-            services = (
-                entry.services()
-                if isinstance(entry, (ConfigBase, AppriseConfig))
-                else [entry]
-            )
+        for services in loaded:
             known.update(
                 name
                 for service in services
@@ -957,9 +980,8 @@ class Apprise:
         seen = set()
         unused_count = 0
         for key in template:
-            if not isinstance(key, str):
-                continue
-
+            # Names arriving here already passed validate_overrides(), so
+            # nothing unprintable can reach the log line below.
             name = normalize_name(key)
             if name in known or name in seen:
                 continue
@@ -1422,9 +1444,11 @@ class Apprise:
 
         ``template`` supplies values for any YAML configuration entry
         written with ``${NAME}``.  A value not given here is looked for
-        in ``APPRISE_TEMPLATE_<NAME>`` and then in the configuration's
-        own defaults.  An entry still missing a value is skipped, and
-        the overall status reports PARTIAL rather than SUCCESS.
+        in the configuration's own defaults and then in
+        ``APPRISE_TEMPLATE_<NAME>``. Blank call values are ignored, while
+        an empty configuration default remains valid. An entry still missing
+        a value is skipped, and the overall status reports PARTIAL rather
+        than SUCCESS.
 
         ``timeout`` limits the entire call in seconds; unfinished services
         report TIMEOUT. The earlier call or service limit applies. A value of
@@ -2681,8 +2705,12 @@ class Apprise:
             {"api_key":   {"default": None, "services": 2},
              "smtp_host": {"default": "smtp.example.com", "services": 1}}
 
-        ``default`` is ``None`` when callers must supply a value. Defaults are
-        configuration content and should only be shared with authorized users.
+        ``default`` is ``None`` when no configuration default applies, either
+        because none was written or because two configurations disagreed on
+        one. A value may still arrive from ``APPRISE_TEMPLATE_<NAME>``, so
+        ``None`` does not always mean the caller has to supply it. Defaults
+        are configuration content and should only be shared with authorized
+        users.
         """
 
         response: dict[str, dict] = {}

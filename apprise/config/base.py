@@ -261,11 +261,10 @@ def _yaml_key_label(key) -> str:
 def _templated_key(
     obj: object, schema: TemplateSchema, memo=None
 ) -> str | None:
-    """Return a declared variable used as a setting name, if there is one.
+    """Return a declared variable used as a setting name, if any.
 
-    A variable fills in a value; it never decides what a setting is
-    called.  Setting names are read before anything is swapped out, so
-    this looks for the ``${NAME}`` markers as the author wrote them.
+    Variables may fill setting values, but may not choose setting names.
+    This scans the original ``${NAME}`` markers before substitution.
     """
 
     if not schema:
@@ -321,6 +320,31 @@ def _templated_schema(url: str, schema: TemplateSchema) -> str | None:
             return name
 
     return None
+
+
+def _dropped_variable(
+    url: str, results: dict, placeholders: TemplatePlaceholderMap | None
+) -> str | None:
+    """Find a declared marker the URL parser did not retain.
+
+    A marker in a field such as the port can disappear during parsing and
+    damage nearby fields. Return one missing name so the caller can reject
+    that entry; return ``None`` when all markers survived.
+    """
+
+    if not placeholders:
+        # Ordinary URLs have no template markers to compare.
+        return None
+
+    # Ignore the saved URL text; it still contains every original marker.
+    parsed = placeholders.used(
+        {key: value for key, value in results.items() if key != "url"}
+    )
+
+    # Compare the markers originally written with those in parsed fields.
+    missing = placeholders.used(url) - parsed
+    # Pick a stable name when more than one marker was lost.
+    return sorted(missing)[0] if missing else None
 
 
 def _templated_query_tag(
@@ -1168,11 +1192,16 @@ class ConfigBase(URLBase):
         # Track our entries to preload
         preloaded = []
 
-        loader = None
         try:
             # Keep the parsed YAML nodes long enough to report useful lines.
             loader = _AppriseYamlLoader(content)
-            result = loader.get_single_data()
+            try:
+                result = loader.get_single_data()
+
+            finally:
+                # Only reached once the loader exists, so there is always
+                # something to tidy up here.
+                loader.dispose()
 
         except (
             AttributeError,
@@ -1183,10 +1212,6 @@ class ConfigBase(URLBase):
             ConfigBase.logger.error("Invalid Apprise YAML data specified.")
             ConfigBase.logger.debug(f"YAML Exception:{os.linesep}{e}")
             return ([], [])
-
-        finally:
-            if loader is not None:
-                loader.dispose()
 
         # The host decides whether this configuration may use templates.
         asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
@@ -1558,8 +1583,20 @@ class ConfigBase(URLBase):
                     )
                     continue
 
-                # add our results to our global set
-                results.append((results_, {}))
+                # Parsing can succeed while silently dropping a marker.
+                offender = _dropped_variable(url, results_, placeholders)
+                if offender:
+                    # Do not keep a partially parsed template entry.
+                    ConfigBase.logger.error(
+                        "Template variable '{}' can not be used at this"
+                        " position for {}://, entry #{}".format(
+                            offender, schema.group("schema").lower(), no + 1
+                        )
+                    )
+                    continue
+
+                # A plain URL string has no settings written under it.
+                results.append((results_, {}, {}))
 
             elif isinstance(url, dict):
                 # We are a url string with additional unescaped options. In
@@ -1689,7 +1726,25 @@ class ConfigBase(URLBase):
                         "schema": schema,
                     }
 
+                else:
+                    # Check the parsed URL before applying YAML settings.
+                    offender = _dropped_variable(url_, results_, placeholders)
+                    if offender:
+                        # Settings underneath cannot repair a lost URL marker.
+                        ConfigBase.logger.error(
+                            "Template variable '{}' can not be used at this"
+                            " position for {}://, entry #{}".format(
+                                offender, schema, no + 1
+                            )
+                        )
+                        continue
+
                 if isinstance(tokens, (list, tuple, set)):
+                    # Keep YAML names before aliases are mapped (smtp to
+                    # smtp_host). Name and from can both feed from_addr,
+                    # so a listing must show which name was written.
+                    written_ = dict(sibling_tokens) if sibling_tokens else {}
+
                     # Pre-process sibling tokens once before the loop
                     # so each per-entry copy already has template
                     # mappings resolved (smtp -> smtp_host, etc.)
@@ -1716,6 +1771,10 @@ class ConfigBase(URLBase):
                             if "schema" in entries:
                                 del entries["schema"]
 
+                            # Add this entry's written names over shared ones.
+                            written_entry = dict(written_)
+                            written_entry.update(entries)
+
                             # support our special tokens
                             if schema in N_MGR:
                                 entries = ConfigBase._special_token_handler(
@@ -1734,7 +1793,7 @@ class ConfigBase(URLBase):
                             yaml_.update(entries)
 
                             # add our results to our global set
-                            results.append((r, yaml_))
+                            results.append((r, yaml_, written_entry))
 
                 elif isinstance(tokens, dict):
                     # Strip 'schema' from child tokens -- it is determined
@@ -1742,6 +1801,10 @@ class ConfigBase(URLBase):
                     # by a child dict value (matching the list-expansion
                     # branch that does the same via del entries["schema"]).
                     tokens.pop("schema", None)
+
+                    # Record the names as written before any mapping.
+                    written_ = dict(sibling_tokens) if sibling_tokens else {}
+                    written_.update(tokens)
 
                     # Normalize sibling and child token dicts
                     # independently before merging, so that an alias key
@@ -1774,12 +1837,15 @@ class ConfigBase(URLBase):
                     r.update(tokens)
 
                     # add our results to our global set
-                    results.append((r, dict(tokens)))
+                    results.append((r, dict(tokens), written_))
 
                 elif sibling_tokens:
                     # The URL key had a null child value, but sibling
                     # keys supply token overrides. Process them the
                     # same way as a child token dict.
+                    #
+                    # Record the names as written before any mapping.
+                    written_ = dict(sibling_tokens)
                     if schema in N_MGR:
                         sibling_tokens = ConfigBase._special_token_handler(
                             schema, sibling_tokens
@@ -1793,11 +1859,11 @@ class ConfigBase(URLBase):
                     r.update(sibling_tokens)
 
                     # add our results to our global set
-                    results.append((r, dict(sibling_tokens)))
+                    results.append((r, dict(sibling_tokens), written_))
 
                 else:
                     # add our results to our global set
-                    results.append((results_, {}))
+                    results.append((results_, {}, {}))
 
             else:
                 # Unsupported
@@ -1817,7 +1883,7 @@ class ConfigBase(URLBase):
                 entry += 1
 
                 # Grab our first item
-                results_, yaml_tokens_ = results.popleft()
+                results_, yaml_tokens_, written_tokens_ = results.popleft()
 
                 if results_["schema"] not in N_MGR:
                     # the arguments are invalid or can not be used.
@@ -1958,6 +2024,7 @@ class ConfigBase(URLBase):
                 preloaded.append(
                     {
                         "results": results_,
+                        "settings": written_tokens_,
                         "entry": no + 1,
                         "item": entry,
                     }
@@ -2001,6 +2068,7 @@ class ConfigBase(URLBase):
                             placeholders=placeholders,
                             schema=template_schema,
                             names=needed,
+                            settings=entry["settings"],
                             asset=results.get("asset"),
                             entry=entry["entry"],
                             item=entry["item"],

@@ -41,7 +41,7 @@ import zlib
 
 import pytest
 
-from apprise import exception
+from apprise import Apprise, exception
 from apprise.asset import AppriseAsset
 from apprise.persistent_store import (
     CacheJSONEncoder,
@@ -49,6 +49,7 @@ from apprise.persistent_store import (
     PersistentStore,
     PersistentStoreMode,
 )
+from apprise.plugins.base import NotifyBase
 
 logging.disable(logging.CRITICAL)
 
@@ -1710,3 +1711,52 @@ def test_persistent_storage_disk_changes(tmpdir):
     shutil.rmtree(pc.path)
     assert not os.path.isdir(pc.path)
     assert pc.set("key-t01", "value")
+
+
+@pytest.mark.parametrize(
+    "url",
+    [
+        "json://localhost/",
+        "xml://localhost/",
+        "form://localhost/",
+        "mailtos://user:pass@example.com/a@b.com",
+    ],
+)
+def test_persistent_storage_disabled_per_url(url, tmpdir):
+    """``store=no`` keeps the identifier but writes nothing to disk.
+
+    Services with read-only identifiers must switch storage mode without
+    trying to replace that identifier.
+    """
+    asset = AppriseAsset(
+        storage_path=str(tmpdir), storage_mode=PersistentStoreMode.FLUSH
+    )
+
+    service = Apprise.instantiate(f"{url}?store=no", asset=asset)
+    assert isinstance(service, NotifyBase)
+
+    # The identifier is still worked out as usual
+    assert service.url_id()
+
+    # ...but everything it remembers is kept in memory
+    assert service.store.mode is PersistentStoreMode.MEMORY
+
+    service.store.set("key", "value")
+    service.flush_store()
+    assert os.listdir(str(tmpdir)) == []
+
+    # ...and the setting is written back out so it survives a round trip
+    assert "store=no" in service.url()
+
+
+def test_persistent_storage_writes_to_disk_when_left_on(tmpdir):
+    """The same service with storage left on does use the disk."""
+    asset = AppriseAsset(
+        storage_path=str(tmpdir), storage_mode=PersistentStoreMode.FLUSH
+    )
+
+    service = Apprise.instantiate("json://localhost/", asset=asset)
+    service.store.set("key", "value")
+    service.flush_store()
+
+    assert os.listdir(str(tmpdir)) == [service.url_id()]

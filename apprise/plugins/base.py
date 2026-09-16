@@ -658,14 +658,12 @@ class NotifyBase(URLBase):
                 self.logger.warning(err)
                 raise AppriseImproperlyConfigured(err) from None
 
-        # Prepare our Persistent Storage switch
+        # Prepare our Persistent Storage switch.  Turning it off keeps the
+        # URL identifier working; it only stops anything being written to
+        # disk for it (see the store property below).
         self.persistent_storage = parse_bool(
             kwargs.get("store", NotifyBase.persistent_storage)
         )
-        if not self.persistent_storage:
-            # Enforce the disabling of cache (ortherwise defaults are use)
-            self.url_identifier = False
-            self.__cached_url_identifier = None
 
     def image_url(
         self,
@@ -1617,11 +1615,17 @@ class NotifyBase(URLBase):
          del self.store['key']
         """
         if self.__store is None:
-            # Initialize our persistent store for use
+            # Initialize our persistent store for use.  With storage turned
+            # off the store still works, it simply keeps everything in
+            # memory so nothing is written to disk for this URL.
             self.__store = PersistentStore(
                 namespace=self.url_id(),
                 path=self.asset.storage_path,
-                mode=self.asset.storage_mode,
+                mode=(
+                    self.asset.storage_mode
+                    if self.persistent_storage
+                    else PersistentStoreMode.MEMORY
+                ),
             )
 
         return self.__store
