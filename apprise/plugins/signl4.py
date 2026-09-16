@@ -301,7 +301,7 @@ class NotifySIGNL4(NotifyBase):
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
-        url = "{schema}://{secret}"
+        url = "{schema}://{secret}/?{params}"
 
         return url.format(
             schema=self.secure_protocol,
@@ -349,10 +349,8 @@ class NotifySIGNL4(NotifyBase):
 
         if "filtering" in results["qsd"] and len(results["qsd"]["filtering"]):
             results["filtering"] = parse_bool(
-                NotifySIGNL4.unquote(
-                    results["qsd"]["filtering"],
-                    NotifySIGNL4.template_args["filtering"]["default"],
-                )
+                NotifySIGNL4.unquote(results["qsd"]["filtering"]),
+                NotifySIGNL4.template_args["filtering"]["default"],
             )
 
         if "external_id" in results["qsd"] and len(
