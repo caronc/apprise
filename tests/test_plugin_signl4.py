@@ -32,7 +32,7 @@ import logging
 
 from helpers import AppriseURLTester
 
-from apprise import Apprise
+from apprise import Apprise, NotifyFormat
 from apprise.plugins.signl4 import (
     NotifySIGNL4,
     NotifyType,
@@ -219,8 +219,23 @@ def test_plugin_signl4_url_round_trip():
     assert new_obj.status == obj.status == "new"
 
     # Our base settings survive too
-    assert new_obj.notify_format == obj.notify_format
+    assert new_obj.notify_format == obj.notify_format == NotifyFormat.MARKDOWN
     assert new_obj.verify_certificate is obj.verify_certificate is False
 
     # A second pass produces the exact same URL
     assert new_obj.url() == obj.url()
+
+
+def test_plugin_signl4_filtering_parsing():
+    """NotifySIGNL4() filtering= survives a percent encoded value."""
+
+    # An escaped percent sign reaches the plugin still encoded, so the
+    # value has to make it through unquote() without tripping over it
+    obj = Apprise.instantiate("signl4://secret/?filtering=%2579es")
+    assert isinstance(obj, NotifySIGNL4)
+    assert obj.filtering is True
+
+    # An unparseable value falls back on the documented default
+    obj = Apprise.instantiate("signl4://secret/?filtering=%25zz")
+    assert isinstance(obj, NotifySIGNL4)
+    assert obj.filtering is NotifySIGNL4.template_args["filtering"]["default"]
