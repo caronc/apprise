@@ -202,10 +202,13 @@ class NotifyDingTalk(NotifyBase):
         }
 
         if self.notify_format == NotifyFormat.MARKDOWN:
+            # Markdown support
             payload["markdown"] = {
-                "title": title,
+                # A title is mandatory for markdown messages
+                "title": title if title else self.app_desc,
                 "text": body,
             }
+            payload["msgtype"] = "markdown"
 
         else:
             payload["text"] = {
