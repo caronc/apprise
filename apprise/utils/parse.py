@@ -207,8 +207,28 @@ def is_ipaddr(addr, ipv4=True, ipv6=True):
         # IPV6 URLs should be enclosed in square brackets when placed on a URL
         #   Source: https://tools.ietf.org/html/rfc2732
         #   - For this reason, they are additionally checked for existance
+        #
+        # The brackets are taken off before matching so that the pattern
+        # below can be anchored at both ends. Anchoring matters: without a
+        # closing anchor the pattern is happy to match just the leading
+        # part of an address and hand that shortened value back, so
+        # something like 2001:db8::1 would come back as 2001:db8:: and
+        # point at a completely different machine.
+        ip = addr
+        if ip[:1] == "[":
+            if ip[-1:] != "]":
+                # Brackets have to come in pairs
+                return False
+
+            # Drop the brackets so the address can be matched on its own
+            ip = ip[1:-1]
+
+        elif ip[-1:] == "]":
+            # Brackets have to come in pairs
+            return False
+
         re_ipv6 = re.compile(
-            r"\[?(?P<ip>(([0-9a-f]{1,4}:){7,7}[0-9a-f]{1,4}|([0-9a-f]{1,4}:)"
+            r"^(?P<ip>(([0-9a-f]{1,4}:){7,7}[0-9a-f]{1,4}|([0-9a-f]{1,4}:)"
             r"{1,7}:|([0-9a-f]{1,4}:){1,6}:[0-9a-f]{1,4}|([0-9a-f]{1,4}:){1,5}"
             r"(:[0-9a-f]{1,4}){1,2}|([0-9a-f]{1,4}:){1,4}"
             r"(:[0-9a-f]{1,4}){1,3}|([0-9a-f]{1,4}:){1,3}"
@@ -220,11 +240,11 @@ def is_ipaddr(addr, ipv4=True, ipv6=True):
             r"|(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|"
             r"1{0,1}[0-9]){0,1}[0-9])|([0-9a-f]{1,4}:){1,4}:((25[0-5]|"
             r"(2[0-4]|1{0,1}[0-9]){0,1}[0-9])\.){3,3}(25[0-5]|(2[0-4]|"
-            r"1{0,1}[0-9]){0,1}[0-9])))\]?",
+            r"1{0,1}[0-9]){0,1}[0-9])))$",
             re.I,
         )
 
-        match = re_ipv6.match(addr)
+        match = re_ipv6.match(ip)
         if match is not None:
             # Return our matched IP between square brackets since that is
             # required for URL formatting as per RFC 2732.

@@ -2460,3 +2460,50 @@ def test_notify_matrix_dynamic_importing(tmpdir):
     )
 
     N_MGR.load_modules(path=str(base), name=module_name)
+
+
+def test_apprise_ipv6_host_preserved():
+    """
+    API: an IPv6 host in a URL reaches the plugin intact
+
+    """
+    # Compressed IPv6 addresses
+    for url, host in (
+        ("json://[2001:db8::1]:8080/path", "[2001:db8::1]"),
+        ("json://[fd00::5]:8080/path", "[fd00::5]"),
+        ("json://[::1]:8080/path", "[::1]"),
+        (
+            "form://[2001:db8:85a3::8a2e:370:7334]/p",
+            "[2001:db8:85a3::8a2e:370:7334]",
+        ),
+        (
+            "xml://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]/p",
+            "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]",
+        ),
+    ):
+        obj = Apprise.instantiate(url, suppress_exceptions=False)
+        assert obj is not None
+        assert obj.host == host
+
+        # The generated url carries the same address, so re-loading it keeps
+        # pointing at the same place
+        assert host in obj.url()
+
+        reloaded = Apprise.instantiate(obj.url(), suppress_exceptions=False)
+        assert reloaded.host == host
+        assert reloaded.url() == obj.url()
+
+
+def test_apprise_ipv6_host_invalid():
+    """
+    API: a malformed IPv6 host in a URL is refused
+
+    """
+    # More than one :: is not a valid address, so there is nothing sensible
+    # to deliver to
+    for url in (
+        "json://[2001:db8::1::2]:8080/path",
+        "json://[2001:db8::12345]/path",
+        "json://[not:an:address]/path",
+    ):
+        assert Apprise.instantiate(url, suppress_exceptions=True) is None
