@@ -635,7 +635,7 @@ def test_apprise_template_query_display():
     assert "${T}" in entry.url()
 
 
-def test_apprise_template_parse_time_validation(caplog):
+def test_apprise_template_parse_time_validation(logging_enabled, caplog):
     """Report services that must validate a field while parsing."""
     with caplog.at_level(logging.ERROR):
         services = parse(
@@ -757,7 +757,7 @@ def test_apprise_template_embedded_host_is_preserved(sent):
     assert service.fullpath == "/"
 
 
-def test_apprise_template_rejects_service_variable(caplog):
+def test_apprise_template_rejects_service_variable(logging_enabled, caplog):
     """The part before :// is settled when the config is written."""
     with caplog.at_level(logging.ERROR):
         services = parse("template:\n  - v\nurls:\n  - ${V}://host/\n")
@@ -766,7 +766,9 @@ def test_apprise_template_rejects_service_variable(caplog):
     assert "can not be used to choose the service" in caplog.text
 
 
-def test_apprise_template_rejects_mapping_service_variable(caplog):
+def test_apprise_template_rejects_mapping_service_variable(
+    logging_enabled, caplog
+):
     """The same holds when the URL is written as a YAML key."""
     with caplog.at_level(logging.ERROR):
         services = parse(
@@ -981,7 +983,9 @@ def test_apprise_template_hides_unknown_name_from_capture(
     assert "a_secret_name" not in blob
 
 
-def test_apprise_template_logs_unknown_name_locally(sent, caplog):
+def test_apprise_template_logs_unknown_name_locally(
+    sent, logging_enabled, caplog
+):
     """The local debug log names unused inputs without logging values."""
     with caplog.at_level(logging.DEBUG):
         list(
@@ -995,7 +999,7 @@ def test_apprise_template_logs_unknown_name_locally(sent, caplog):
     assert "do-not-log-this-value" not in caplog.text
 
 
-def test_apprise_template_unused_name_log_is_bounded(caplog):
+def test_apprise_template_unused_name_log_is_bounded(logging_enabled, caplog):
     """A large unused mapping cannot create an equally large log entry."""
     values = {"name{}".format(i): "secret{}".format(i) for i in range(25)}
 
@@ -1044,7 +1048,7 @@ def test_apprise_template_disabled_ignores_environment(sent, monkeypatch):
     assert next(apobj.find()).password == "${V}"
 
 
-def test_apprise_template_duplicate_setting_warns(caplog):
+def test_apprise_template_duplicate_setting_warns(logging_enabled, caplog):
     """A repeated ordinary key warns and keeps its last value."""
     with caplog.at_level(logging.WARNING):
         services = parse(
@@ -1058,7 +1062,9 @@ def test_apprise_template_duplicate_setting_warns(caplog):
     assert "last value is used" in caplog.text
 
 
-def test_apprise_template_duplicate_url_key_masks_credentials(caplog):
+def test_apprise_template_duplicate_url_key_masks_credentials(
+    logging_enabled, caplog
+):
     """A duplicate mapping-style URL warning never prints its password."""
     with caplog.at_level(logging.WARNING):
         services = parse(
@@ -1075,7 +1081,9 @@ def test_apprise_template_duplicate_url_key_masks_credentials(caplog):
 
 
 @pytest.mark.parametrize("section", ("template", "urls"))
-def test_apprise_template_duplicate_section_fails(section, caplog):
+def test_apprise_template_duplicate_section_fails(
+    section, logging_enabled, caplog
+):
     """A repeated root template or URL section is ambiguous."""
     content = (
         "template:\n  - v\nurls:\n  - json://localhost/${V}\n"
@@ -1088,7 +1096,9 @@ def test_apprise_template_duplicate_section_fails(section, caplog):
     assert "section is repeated" in caplog.text
 
 
-def test_apprise_template_late_declaration_is_recognized(caplog):
+def test_apprise_template_late_declaration_is_recognized(
+    logging_enabled, caplog
+):
     """A declaration may follow the service that uses it."""
     with caplog.at_level(logging.WARNING):
         services = parse(
@@ -1100,7 +1110,7 @@ def test_apprise_template_late_declaration_is_recognized(caplog):
     assert "not defined" not in caplog.text
 
 
-def test_apprise_template_undeclared_marker_warns(caplog):
+def test_apprise_template_undeclared_marker_warns(logging_enabled, caplog):
     """An undeclared marker stays literal and reports its source line."""
     with caplog.at_level(logging.WARNING):
         services = parse("urls:\n  - json://user:${MISSING}@localhost/\n")
@@ -1110,7 +1120,7 @@ def test_apprise_template_undeclared_marker_warns(caplog):
     assert "kept as written" in caplog.text
 
 
-def test_apprise_template_unused_declaration_warns(caplog):
+def test_apprise_template_unused_declaration_warns(logging_enabled, caplog):
     """An unused declaration is reported after the file is read."""
     with caplog.at_level(logging.WARNING):
         services = parse(
@@ -1121,7 +1131,9 @@ def test_apprise_template_unused_declaration_warns(caplog):
     assert "'unused' on line 2 is defined but not referenced" in caplog.text
 
 
-def test_apprise_template_disabled_marker_is_left_alone(caplog):
+def test_apprise_template_disabled_marker_is_left_alone(
+    logging_enabled, caplog
+):
     """Disabled templates add no marker or table warnings."""
     asset = AppriseAsset(allow_templates=False)
     with caplog.at_level(logging.DEBUG):
@@ -1136,7 +1148,9 @@ def test_apprise_template_disabled_marker_is_left_alone(caplog):
     assert "not referenced" not in caplog.text
 
 
-def test_apprise_template_disabled_ignores_repeated_sections(caplog):
+def test_apprise_template_disabled_ignores_repeated_sections(
+    logging_enabled, caplog
+):
     """A disabled template table is ignored even when repeated."""
     asset = AppriseAsset(allow_templates=False)
     with caplog.at_level(logging.WARNING):
@@ -1187,7 +1201,9 @@ def test_apprise_template_url_without_a_path():
     assert "${T}" in entry.url()
 
 
-def test_apprise_template_invalid_declaration_refuses_file(caplog):
+def test_apprise_template_invalid_declaration_refuses_file(
+    logging_enabled, caplog
+):
     """An unreadable template section stops the whole file."""
     with caplog.at_level(logging.ERROR):
         services = parse(
@@ -1198,7 +1214,7 @@ def test_apprise_template_invalid_declaration_refuses_file(caplog):
     assert "template section" in caplog.text.lower()
 
 
-def test_apprise_template_unusable_placeholder_prefix(caplog):
+def test_apprise_template_unusable_placeholder_prefix(logging_enabled, caplog):
     """Giving up on a placeholder prefix stops the whole file."""
     taken = "0" * 16
     with (
@@ -1215,7 +1231,7 @@ def test_apprise_template_unusable_placeholder_prefix(caplog):
     assert services == []
 
 
-def test_apprise_template_mapping_form_setting_name(caplog):
+def test_apprise_template_mapping_form_setting_name(logging_enabled, caplog):
     """A variable may not name a setting written beside a URL."""
     with caplog.at_level(logging.ERROR):
         services = parse(
@@ -1227,7 +1243,7 @@ def test_apprise_template_mapping_form_setting_name(caplog):
     assert "can not be used as a setting name" in caplog.text
 
 
-def test_apprise_template_mapping_form_bad_position(caplog):
+def test_apprise_template_mapping_form_bad_position(logging_enabled, caplog):
     """The positional refusal also covers the mapping form."""
     with caplog.at_level(logging.ERROR):
         services = parse(

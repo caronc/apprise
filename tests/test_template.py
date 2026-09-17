@@ -324,7 +324,15 @@ def test_template_converts_scalar_value(value, expected):
 
 @pytest.mark.parametrize(
     "payload",
-    ["${" * 50000, "$" * 200000, "${A" * 20000, "${" * 10000 + "}" * 10000],
+    [
+        # Short ids keep the node name readable. Without them the payload
+        # itself becomes the test id, and a single reported failure prints
+        # hundreds of kilobytes, which truncates the CI log it belongs to.
+        pytest.param("${" * 50000, id="open-markers"),
+        pytest.param("$" * 200000, id="bare-dollars"),
+        pytest.param("${A" * 20000, id="partial-names"),
+        pytest.param("${" * 10000 + "}" * 10000, id="unbalanced"),
+    ],
 )
 def test_template_regex_performance(payload):
     """Bound the pattern so input cannot make it hang."""
