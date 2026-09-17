@@ -1535,6 +1535,16 @@ def test_is_hostname():
     assert utils.parse.is_hostname("::1") == "[::1]"
     assert utils.parse.is_hostname("0:0:0:0:0:0:0:1") == "[0:0:0:0:0:0:0:1]"
 
+    # compressed addresses
+    assert utils.parse.is_hostname("2001:db8::1") == "[2001:db8::1]"
+    assert utils.parse.is_hostname("[2001:db8::1]") == "[2001:db8::1]"
+    assert utils.parse.is_hostname("fd00::5") == "[fd00::5]"
+    assert utils.parse.is_hostname("[fd00::5]") == "[fd00::5]"
+
+    # A malformed address is refused rather than partially accepted
+    assert utils.parse.is_hostname("2001:db8::1::2") is False
+    assert utils.parse.is_hostname("[2001:db8::1") is False
+
     # But not if we're not checking for this:
     assert (
         utils.parse.is_hostname(
@@ -1592,6 +1602,144 @@ def test_is_ipaddr():
     # localhost
     assert utils.parse.is_ipaddr("::1") == "[::1]"
     assert utils.parse.is_ipaddr("0:0:0:0:0:0:0:1") == "[0:0:0:0:0:0:0:1]"
+
+    # Compressed addresses
+    assert utils.parse.is_ipaddr("2001:db8::1") == "[2001:db8::1]"
+    assert utils.parse.is_ipaddr("[2001:db8::1]") == "[2001:db8::1]"
+    assert utils.parse.is_ipaddr("fd00::5") == "[fd00::5]"
+    assert utils.parse.is_ipaddr("fe80::1") == "[fe80::1]"
+    assert utils.parse.is_ipaddr("::") == "[::]"
+    assert utils.parse.is_ipaddr("1::") == "[1::]"
+    assert utils.parse.is_ipaddr("1::8") == "[1::8]"
+    assert utils.parse.is_ipaddr("2001:db8::8a2e:370:7334") == (
+        "[2001:db8::8a2e:370:7334]"
+    )
+    assert utils.parse.is_ipaddr("2001:db8:85a3::8a2e:370:7334") == (
+        "[2001:db8:85a3::8a2e:370:7334]"
+    )
+    assert utils.parse.is_ipaddr("2001:db8:0:0:1::1") == (
+        "[2001:db8:0:0:1::1]"
+    )
+
+    # IPv4 mapped and embedded forms
+    assert utils.parse.is_ipaddr("::ffff:192.0.2.1") == "[::ffff:192.0.2.1]"
+    assert utils.parse.is_ipaddr("::192.0.2.1") == "[::192.0.2.1]"
+    assert utils.parse.is_ipaddr("2001:db8::192.0.2.1") == (
+        "[2001:db8::192.0.2.1]"
+    )
+
+    # A link local address may carry a zone id
+    assert utils.parse.is_ipaddr("fe80::1%eth0") == "[fe80::1%eth0]"
+    assert utils.parse.is_ipaddr("[fe80::1%eth0]") == "[fe80::1%eth0]"
+
+    # Invalid IPv6 Addresses; more than one :: is not allowed
+    assert utils.parse.is_ipaddr("2001:db8::1::2") is False
+    assert utils.parse.is_ipaddr("::1::") is False
+
+    # Groups longer than four hex digits, or that are not hex at all
+    assert utils.parse.is_ipaddr("2001:db8::12345") is False
+    assert utils.parse.is_ipaddr("not:an:address") is False
+    assert utils.parse.is_ipaddr("2001:db8::xyz") is False
+
+    # Too many groups
+    assert utils.parse.is_ipaddr("1:2:3:4:5:6:7:8:9") is False
+
+    # Trailing and leading junk is not quietly dropped
+    assert utils.parse.is_ipaddr("2001:db8::1junk") is False
+    assert utils.parse.is_ipaddr("junk2001:db8::1") is False
+    assert utils.parse.is_ipaddr("2001:db8::1 ") is False
+    assert utils.parse.is_ipaddr(" 2001:db8::1") is False
+
+    # Brackets have to come in pairs
+    assert utils.parse.is_ipaddr("[2001:db8::1") is False
+    assert utils.parse.is_ipaddr("2001:db8::1]") is False
+    assert utils.parse.is_ipaddr("[::1") is False
+    assert utils.parse.is_ipaddr("::1]") is False
+
+    # An IPv6 address is not accepted when we are not looking for one
+    assert utils.parse.is_ipaddr("2001:db8::1", ipv6=False) is False
+    assert utils.parse.is_ipaddr("fd00::5", ipv6=False) is False
+
+    # ...and likewise for IPv4
+    assert utils.parse.is_ipaddr("127.0.0.1", ipv4=False) is False
+
+    # An IPv4 address is not an IPv6 one, brackets or not
+    assert utils.parse.is_ipaddr("[127.0.0.1]") is False
+
+
+def test_parse_url_ipv6_host():
+    """
+    API: parse_url() IPv6 host handling
+
+    """
+    # Compressed addresses
+    result = utils.parse.parse_url("https://[2001:db8::1]/path")
+    assert result["host"] == "[2001:db8::1]"
+    assert result["port"] is None
+    assert result["url"] == "https://[2001:db8::1]/path"
+
+    # ...and the port is kept separate from the address
+    result = utils.parse.parse_url("https://[2001:db8::1]:8443/path")
+    assert result["host"] == "[2001:db8::1]"
+    assert result["port"] == 8443
+    assert result["url"] == "https://[2001:db8::1]:8443/path"
+
+    # An address written without brackets and without a port also works
+    result = utils.parse.parse_url("https://fd00::5/path")
+    assert result["host"] == "[fd00::5]"
+    assert result["port"] is None
+    assert result["url"] == "https://[fd00::5]/path"
+
+    # A full length address is unchanged
+    result = utils.parse.parse_url(
+        "https://[2001:0db8:85a3:0000:0000:8a2e:0370:7334]:443/x"
+    )
+    assert result["host"] == "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]"
+    assert result["port"] == 443
+
+    # Credentials sit alongside an IPv6 host without disturbing it
+    result = utils.parse.parse_url("https://user:pass@[fd00::5]:8443/path")
+    assert result["host"] == "[fd00::5]"
+    assert result["port"] == 8443
+    assert result["user"] == "user"
+    assert result["password"] == "pass"
+
+    # A malformed bracketed address is refused.
+    assert utils.parse.parse_url("https://[2001:db8::1::2]/x") is None
+    assert (
+        utils.parse.parse_url("https://[2001:db8::1::2]/x", verify_host=False)
+        is None
+    )
+
+    # An address written without brackets
+    assert utils.parse.parse_url("https://2001:db8::1::2/x") is None
+
+    result = utils.parse.parse_url(
+        "https://2001:db8::1::2/x", verify_host=False
+    )
+    assert result["host"] == "2001:db8::1::2"
+
+
+def test_parse_url_ipv6_round_trip():
+    """
+    API: parse_url() IPv6 addresses survive a round trip
+
+    """
+    # ipv6 host checks
+    for host in (
+        "[2001:db8::1]",
+        "[fd00::5]",
+        "[::1]",
+        "[2001:db8:85a3::8a2e:370:7334]",
+        "[2001:0db8:85a3:0000:0000:8a2e:0370:7334]",
+    ):
+        url = f"https://{host}:8443/path"
+        first = utils.parse.parse_url(url)
+        assert first["host"] == host
+
+        second = utils.parse.parse_url(first["url"])
+        assert second["host"] == host
+        assert second["url"] == first["url"]
 
 
 def test_is_email():
