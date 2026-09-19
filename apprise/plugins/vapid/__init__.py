@@ -55,6 +55,8 @@ class VapidPushMode:
     GENERIC = "generic"
 
 
+# Published push-service URLs retained for compatibility and reference.
+# Delivery always uses the endpoint stored in each subscription.
 VAPID_API_LOOKUP = {
     VapidPushMode.CHROME: "https://fcm.googleapis.com/fcm/send",
     VapidPushMode.FIREFOX: (
@@ -135,6 +137,12 @@ class NotifyVapid(NotifyBase):
     # Subscription file
     vapid_subscription_file = "subscriptions.json"
 
+    # Remember expired endpoints when the subscription file cannot be updated.
+    vapid_retired_key = "retired"
+
+    # Expire the retired-endpoint cache after 30 days without updates.
+    vapid_retired_expiry_sec = 60 * 60 * 24 * 30
+
     # Allows the user to specify the NotifyImageSize object
     image_size = NotifyImageSize.XY_72
 
@@ -206,6 +214,13 @@ class NotifyVapid(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
+            # A newly expired subscription is non-fatal by default when
+            # another target succeeds. Set this to no to report the failure.
+            "ignore_expired": {
+                "name": _("Ignore Expired Subscriptions"),
+                "type": "bool",
+                "default": True,
+            },
         },
     )
 
@@ -218,6 +233,7 @@ class NotifyVapid(NotifyBase):
         subfile=None,
         include_image=None,
         ttl=None,
+        ignore_expired=None,
         **kwargs,
     ):
         """Initialize Vapid Messaging."""
@@ -254,6 +270,14 @@ class NotifyVapid(NotifyBase):
                 msg = f"The Vapid TTL specified ({self.ttl}) is out of range."
                 self.logger.warning(msg)
                 raise TypeError(msg)
+
+        # Ignore newly reported expirations when another target succeeds.
+        # Retrying may duplicate messages to healthy targets.
+        self.ignore_expired = (
+            self.template_args["ignore_expired"]["default"]
+            if ignore_expired is None
+            else ignore_expired
+        )
 
         # Place a thumbnail image inline with the message body
         self.include_image = (
@@ -292,6 +316,9 @@ class NotifyVapid(NotifyBase):
 
         # Our Subscription file
         self.subfile = subfile
+
+        # Keep explicit paths in generated URLs, but omit internal storage.
+        self.subfile_specified = subfile is not None
 
         # Prepare our PEM Object
         self.pem = _pem.ApprisePEMController(self.store.path, asset=self.asset)
@@ -372,17 +399,25 @@ class NotifyVapid(NotifyBase):
             )
             return False
 
-        # Prepare our notify URL (based on our mode)
-        notify_url = VAPID_API_LOOKUP[self.mode]
         headers = {
             "User-Agent": self.app_id,
             "TTL": str(self.ttl),
             "Content-Encoding": "aes128gcm",
             "Content-Type": "application/octet-stream",
-            "Authorization": f"vapid t={self.jwt_token}, k={self.public_key}",
         }
 
         has_error = False
+
+        # Collect expired subscriptions for removal after sending.
+        expired = []
+
+        # Skip endpoints retired from a read-only or remote file.
+        retired = self.store.get(self.vapid_retired_key, [])
+
+        # Track skipped targets, attempts, and push-service acceptances.
+        skipped = 0
+        attempted = 0
+        delivered = 0
 
         # Create a copy of the targets list
         targets = list(self.targets)
@@ -399,17 +434,41 @@ class NotifyVapid(NotifyBase):
                 has_error = True
                 continue
 
+            # Reuse the validated subscription details for this target.
+            entry = self.subscriptions[target]
+
+            if entry.endpoint in retired:
+                # The source could not be edited when this endpoint expired.
+                self.logger.debug(
+                    "Skipping retired Vapid subscription: %s", target
+                )
+                skipped += 1
+                continue
+
+            # Deliver to the browser-issued endpoint (RFC 8030).
+            notify_url = entry.endpoint
+
+            # Each endpoint origin needs its own token and headers (RFC 8292).
+            target_headers = {
+                **headers,
+                "Authorization": (
+                    f"vapid t={self._jwt_token(entry.origin)}, "
+                    f"k={self.public_key}"
+                ),
+            }
+
             # Encrypt our payload
             encrypted_payload = self.pem.encrypt_webpush(
                 body,
-                public_key=self.subscriptions[target].public_key,
-                auth_secret=self.subscriptions[target].auth_secret,
+                public_key=entry.public_key,
+                auth_secret=entry.auth_secret,
             )
 
             self.logger.debug(
-                "Vapid %s POST URL: %s (cert_verify=%r)",
+                "Vapid %s POST %s -> %s (cert_verify=%r)",
                 self.mode,
-                notify_url,
+                target,
+                entry.origin,
                 self.verify_certificate,
             )
             self.logger.debug(
@@ -418,18 +477,37 @@ class NotifyVapid(NotifyBase):
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
+            attempted += 1
             try:
                 r = requests.post(
                     notify_url,
                     data=encrypted_payload,
-                    headers=headers,
+                    headers=target_headers,
                     verify=self.verify_certificate,
                     timeout=self.request_timeout,
                     allow_redirects=self.redirects,
                 )
-                if r.status_code not in (
+                if r.status_code in (
+                    requests.codes.not_found,
+                    requests.codes.gone,
+                ):
+                    # RFC 8030 uses 404 for expired subscriptions; services
+                    # may also use 410. Remove either to avoid retrying it.
+                    self.logger.info(
+                        "Removing expired Vapid subscription: %s", target
+                    )
+                    expired.append(target)
+
+                    if not self.ignore_expired:
+                        # The caller chose to treat expiration as a failure.
+                        has_error = True
+
+                elif r.status_code not in (
                     requests.codes.ok,
                     requests.codes.no_content,
+                    # Services may acknowledge queued messages with 201 or 202.
+                    requests.codes.created,
+                    requests.codes.accepted,
                 ):
                     # We had a problem
                     status_str = NotifyBase.http_response_code_lookup(
@@ -454,6 +532,7 @@ class NotifyVapid(NotifyBase):
 
                 else:
                     self.logger.info("Sent %s Vapid notification.", self.mode)
+                    delivered += 1
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -462,6 +541,44 @@ class NotifyVapid(NotifyBase):
                 self.logger.debug("Socket Exception: %s", e)
 
                 has_error = True
+
+        # Make sure expired subscriptions stay gone.
+        if expired:
+            # Note the endpoints before we drop the entries holding them
+            endpoints = [self.subscriptions[name].endpoint for name in expired]
+
+            for name in expired:
+                self.subscriptions.remove(name)
+
+            # Remove only the expired entries from a writable local file.
+            pruned = (
+                self.subscriptions.prune(expired)
+                if self.subscriptions.writable
+                else False
+            )
+
+            if not pruned:
+                # Remember endpoints that could not be removed from the file.
+                self.logger.info(
+                    "Tracking %d retired Vapid endpoint(s) in persistent "
+                    "storage; the subscription file was not updated",
+                    len(endpoints),
+                )
+                self.store.set(
+                    self.vapid_retired_key,
+                    sorted(set(retired) | set(endpoints)),
+                    expires=self.vapid_retired_expiry_sec,
+                )
+
+        if not delivered:
+            # No push service accepted the message for any target.
+            self.logger.warning(
+                "No Vapid subscriptions could be notified "
+                "(%d skipped, %d attempted)",
+                skipped,
+                attempted,
+            )
+            return False
 
         return not has_error
 
@@ -481,14 +598,16 @@ class NotifyVapid(NotifyBase):
         params = {
             "mode": self.mode,
             "ttl": str(self.ttl),
+            "image": "yes" if self.include_image else "no",
+            "ignore_expired": "yes" if self.ignore_expired else "no",
         }
 
         if self.keyfile:
             # Include our keyfile if specified
             params["keyfile"] = self.keyfile
 
-        if self.subfile:
-            # Include our subfile if specified
+        if self.subfile and self.subfile_specified:
+            # Keep an explicit path, but omit machine-specific internal paths.
             params["subfile"] = self.subfile
 
         # Extend our parameters
@@ -567,6 +686,14 @@ class NotifyVapid(NotifyBase):
             )
         )
 
+        # Get our Ignore Expired Flag
+        results["ignore_expired"] = parse_bool(
+            results["qsd"].get(
+                "ignore_expired",
+                NotifyVapid.template_args["ignore_expired"]["default"],
+            )
+        )
+
         # The 'to' makes it easier to use yaml configuration
         if "to" in results["qsd"] and len(results["qsd"]["to"]):
             results["targets"] += NotifyVapid.parse_list(results["qsd"]["to"])
@@ -585,15 +712,18 @@ class NotifyVapid(NotifyBase):
 
         return results
 
-    @property
-    def jwt_token(self):
-        """Returns our VAPID Token based on class details."""
+    def _jwt_token(self, audience: str) -> str:
+        """Returns a VAPID token for the endpoint origin provided.
+
+        This internal helper requires an audience because each token is valid
+        only for the endpoint origin it names.
+        """
         # JWT header
         header = {"alg": "ES256", "typ": "JWT"}
 
         # JWT payload
         payload = {
-            "aud": VAPID_API_LOOKUP[self.mode],
+            "aud": audience,
             "exp": int(time.time()) + self.vapid_jwt_expiration_sec,
             "sub": f"mailto:{self.subscriber}",
         }
