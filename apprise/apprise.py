@@ -49,7 +49,7 @@ from .logger import logger
 from .manager_plugins import NotificationManager
 from .plugins.base import NotifyBase
 from .tag import AppriseTag
-from .utils.cwe312 import cwe312_url
+from .utils.cwe312 import cwe312_loggable
 from .utils.json import AppriseJSONEncoder
 from .utils.logic import is_exclusive_match
 from .utils.parse import parse_list, parse_urls
@@ -227,9 +227,7 @@ class Apprise:
 
             except Exception:
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    url if not asset.secure_logging else cwe312_url(url)
-                )
+                loggable_url = cwe312_loggable(url, asset.secure_logging)
 
                 # the arguments are invalid or can not be used.
                 logger.error(

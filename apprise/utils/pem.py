@@ -37,6 +37,7 @@ from ..asset import AppriseAsset
 from ..exception import ApprisePluginException
 from ..logger import logger
 from ..utils.base64 import base64_urldecode, base64_urlencode
+from ..utils.cwe312 import cwe312_loggable
 
 try:
     from cryptography.exceptions import InvalidTag
@@ -167,7 +168,10 @@ class ApprisePEMController:
 
         if not self._prv_keyfile.sync():
             # Early exit
-            logger.error(f"Could not access PEM Private Key {path}.")
+            logger.error(
+                "Could not access PEM Private Key %s.",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return False
 
         try:
@@ -186,11 +190,17 @@ class ApprisePEMController:
             return False
 
         except FileNotFoundError:
-            logger.debug("PEM Private Key file not found: %s", path)
+            logger.debug(
+                "PEM Private Key file not found: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return False
 
         except OSError as e:
-            logger.warning("Error accessing PEM Private Key file %s", path)
+            logger.warning(
+                "Error accessing PEM Private Key file %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             logger.debug(f"I/O Exception: {e}")
             return False
 
@@ -237,7 +247,10 @@ class ApprisePEMController:
 
         if not self._pub_keyfile.sync():
             # Early exit
-            logger.error(f"Could not access PEM Public Key {path}.")
+            logger.error(
+                "Could not access PEM Public Key %s.",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return False
 
         try:
@@ -255,11 +268,17 @@ class ApprisePEMController:
 
         except FileNotFoundError:
             # Generate keys
-            logger.debug("PEM Public Key file not found: %s", path)
+            logger.debug(
+                "PEM Public Key file not found: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return False
 
         except OSError as e:
-            logger.warning("Error accessing PEM Public Key file %s", path)
+            logger.warning(
+                "Error accessing PEM Public Key file %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             logger.debug(f"I/O Exception: {e}")
             return False
 

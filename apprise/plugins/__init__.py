@@ -37,7 +37,7 @@ from ..common import (
 from ..locale import LazyTranslation, gettext_lazy as _
 from ..logger import logger
 from ..manager_plugins import NotificationManager
-from ..utils.cwe312 import cwe312_url
+from ..utils.cwe312 import cwe312_loggable
 from ..utils.parse import GET_SCHEMA_RE, parse_list
 
 # Used for testing
@@ -426,7 +426,7 @@ def url_to_dict(url, secure_logging=True):
     url_ = url.replace("/#", "/%23")
 
     # CWE-312 (Secure Logging) Handling
-    loggable_url = url if not secure_logging else cwe312_url(url)
+    loggable_url = cwe312_loggable(url, secure_logging)
 
     # Attempt to acquire the schema at the very least to allow our plugins to
     # determine if they can make a better interpretation of a URL geared for

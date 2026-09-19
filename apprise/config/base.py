@@ -40,7 +40,7 @@ from ..manager_config import ConfigurationManager
 from ..manager_plugins import NotificationManager
 from ..tag import AppriseTag
 from ..url import URL_TOKEN_ALIASES, URLBase
-from ..utils.cwe312 import cwe312_url
+from ..utils.cwe312 import cwe312_loggable
 from ..utils.parse import (
     GET_SCHEMA_RE,
     QSD_FULL_MODE_KEYS,
@@ -273,9 +273,7 @@ class ConfigBase(URLBase):
                         continue
 
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    url if not asset.secure_logging else cwe312_url(url)
-                )
+                loggable_url = cwe312_loggable(url, asset.secure_logging)
 
                 # Parse our url details of the server object as dictionary
                 # containing all of the information parsed from our URL
@@ -337,9 +335,7 @@ class ConfigBase(URLBase):
 
             else:
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    url if not asset.secure_logging else cwe312_url(url)
-                )
+                loggable_url = cwe312_loggable(url, asset.secure_logging)
 
                 self.logger.debug(
                     "Recursion limit reached; ignoring Include URL: %s",
@@ -737,9 +733,7 @@ class ConfigBase(URLBase):
 
             if config:
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    config if not asset.secure_logging else cwe312_url(config)
-                )
+                loggable_url = cwe312_loggable(config, asset.secure_logging)
 
                 ConfigBase.logger.debug(f"Include URL: {loggable_url}")
 
@@ -748,7 +742,7 @@ class ConfigBase(URLBase):
                 continue
 
             # CWE-312 (Secure Logging) Handling
-            loggable_url = url if not asset.secure_logging else cwe312_url(url)
+            loggable_url = cwe312_loggable(url, asset.secure_logging)
 
             if assign:
                 groups = set(parse_list(result.group("tags"), cast=str))
@@ -1105,7 +1099,7 @@ class ConfigBase(URLBase):
             results = []
 
             # CWE-312 (Secure Logging) Handling
-            loggable_url = url if not asset.secure_logging else cwe312_url(url)
+            loggable_url = cwe312_loggable(url, asset.secure_logging)
 
             if isinstance(url, str):
                 # We're just a simple URL string...

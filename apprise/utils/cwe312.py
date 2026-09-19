@@ -28,6 +28,11 @@ import re
 
 from .parse import is_hostname, parse_url
 
+# Match the URL prefix even when malformed trailing content prevents parsing.
+LOGGABLE_SCHEMA_RE = re.compile(
+    r"^\s*(?P<schema>[a-z0-9]{1,32})://", re.IGNORECASE
+)
+
 
 def cwe312_word(word, force=False, advanced=True, threshold=5):
     """This function was written to help mask secure/private information that
@@ -219,3 +224,33 @@ def cwe312_url(url):
         fullpath=results["fullpath"] if results["fullpath"] else "",
         params=params,
     )
+
+
+def cwe312_loggable(value, secure=True):
+    """Return a log-safe string, masking URL secrets when ``secure`` is true.
+
+    Plain file paths stay readable, while empty values become ``"(none)"``.
+    Example: ``cwe312_loggable(path, asset.secure_logging)``.
+    """
+
+    if not value:
+        # Use a clear placeholder for missing values.
+        return "(none)"
+
+    if not isinstance(value, str):
+        # Normalize other values before checking for a URL.
+        value = str(value)
+
+    if not secure:
+        return value
+
+    schema = LOGGABLE_SCHEMA_RE.match(value)
+    if not schema:
+        # Keep local paths readable unless masking applies to a URL.
+        return value
+
+    if parse_url(value) is None:
+        # Never return an unparseable URL because it may still contain secrets.
+        return f"{schema.group('schema').lower()}://..."
+
+    return cwe312_url(value)

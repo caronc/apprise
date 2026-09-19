@@ -33,6 +33,7 @@ from ..apprise_attachment import AppriseAttachment
 from ..asset import AppriseAsset
 from ..exception import ApprisePluginException
 from ..logger import logger
+from ..utils.cwe312 import cwe312_loggable
 
 
 def _ensure_imghdr_shim():
@@ -461,23 +462,33 @@ class ApprisePGPController:
 
         except NameError:
             # PGPy not installed
-            logger.debug("PGPy not installed; skipping PGP signing: %s", path)
+            logger.debug(
+                "PGPy not installed; skipping PGP signing: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return None
 
         except FileNotFoundError:
             # File was found but disappeared before we could open it
-            logger.debug("PGP Private Key file not found: %s", path)
+            logger.debug(
+                "PGP Private Key file not found: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return None
 
         except OSError as e:
-            logger.warning("Error accessing PGP Private Key file %s", path)
+            logger.warning(
+                "Error accessing PGP Private Key file %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             logger.debug(f"I/O Exception: {e}")
             return None
 
         except Exception:
             # Malformed or non-PGP file content
             logger.warning(
-                "PGP Private Key file could not be parsed: %s", path
+                "PGP Private Key file could not be parsed: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
             )
             return None
 
@@ -655,22 +666,34 @@ class ApprisePGPController:
 
         except NameError:
             # PGPy not installed
-            logger.debug("PGPy not installed; skipping PGP support: %s", path)
+            logger.debug(
+                "PGPy not installed; skipping PGP support: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return None
 
         except FileNotFoundError:
             # Generate keys
-            logger.debug("PGP Public Key file not found: %s", path)
+            logger.debug(
+                "PGP Public Key file not found: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return None
 
         except OSError as e:
-            logger.warning("Error accessing PGP Public Key file %s", path)
+            logger.warning(
+                "Error accessing PGP Public Key file %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             logger.debug(f"I/O Exception: {e}")
             return None
 
         except Exception:
             # Malformed or non-PGP file content (e.g. pgpy.errors.PGPError)
-            logger.warning("PGP Public Key file could not be parsed: %s", path)
+            logger.warning(
+                "PGP Public Key file could not be parsed: %s",
+                cwe312_loggable(path, self.asset.secure_logging),
+            )
             return None
 
         self.__key_lookup[key] = {
