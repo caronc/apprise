@@ -750,7 +750,9 @@ class WebPushSubscriptionManager:
                 )
 
                 # Keep current ownership when it cannot be preserved.
-                with contextlib.suppress(OSError):
+                # Windows has no os.chown at all, so the attribute may
+                # simply not be there.
+                with contextlib.suppress(AttributeError, OSError):
                     os.chown(tmp_path, metadata.st_uid, metadata.st_gid)
 
             # Replace the old file with the completed JSON.

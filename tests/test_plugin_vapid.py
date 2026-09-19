@@ -59,6 +59,14 @@ SUBSCRIBER = "user@example.com"
 
 PLUGIN_ID = "vapid"
 
+# Windows has no POSIX file modes, so tests that check them are skipped
+# there.
+IS_WINDOWS = sys.platform == "win32"
+
+# Root ignores file permissions entirely, so a read-only file still tests
+# as writable. RPM builds run their test suite as root.
+IS_ROOT = hasattr(os, "geteuid") and os.geteuid() == 0
+
 # Our Testing URLs
 apprise_url_tests = (
     (
@@ -1284,6 +1292,7 @@ def test_plugin_vapid_subscription_atomic_write(tmpdir):
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+@pytest.mark.skipif(IS_WINDOWS, reason="Requires POSIX file modes")
 def test_plugin_vapid_write_keeps_permissions(tmpdir):
     """An existing subscription file keeps the permissions it had."""
 
@@ -1545,6 +1554,7 @@ def test_plugin_vapid_prune_reloads_file(tmpdir):
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+@pytest.mark.skipif(IS_ROOT, reason="Root can write read-only files")
 def test_plugin_vapid_readonly_file_respected(tmpdir):
     """A read-only subscription file is left alone."""
 
@@ -1571,6 +1581,7 @@ def test_plugin_vapid_readonly_file_respected(tmpdir):
 @pytest.mark.skipif(
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
+@pytest.mark.skipif(IS_ROOT, reason="Root can write read-only files")
 @mock.patch("requests.post")
 def test_plugin_vapid_retires_when_not_writable(mock_post, tmpdir):
     """An expired endpoint is tracked when its file cannot be updated."""
