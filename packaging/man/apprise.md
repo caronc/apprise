@@ -55,6 +55,15 @@ The Apprise options are as follows:
   `-T`, `--theme=`<VALUE>:
   Specify the default theme.
 
+  `-tv`, `--template-var=`<NAME=VALUE>:
+  Supply a value used by a YAML configuration written with `${NAME}`.
+  Specify this option more than once to supply more than one value, but
+  name each one only once.
+  A value not provided here is looked for in the environment variable
+  `APPRISE_TEMPLATE_<NAME>`, and failing that, in the default written in
+  the configuration's `template:` section.  A URL that still has no value
+  available is not loaded.
+
   `-g`, `--tag=`<VALUE>:
   Specify one or more tags to filter which services to notify:
 
@@ -349,6 +358,62 @@ configuration that you want and only specifically notify a subset of them:
         --body "Please go ahead and make dinner without me." \
         --tag=family
 
+### TEMPLATE VARIABLES
+
+A **YAML** configuration can leave a value out of a URL and have it filled in
+later.  Write `${NAME}` where the value belongs and declare every name you use
+in a `template:` section:
+
+    template:
+      # A value written here is used when nothing else supplies one
+      smtp_host: smtp.example.com
+      # No value, so this one must always be supplied
+      api_key:
+
+    urls:
+      - sendgrid://${API_KEY}:noreply@example.com/you@example.com:
+          - tag: alerts
+
+Values are looked for in this order, stopping at the first that answers:
+
+* a value given with `--template-var` (`-tv`)
+* the environment variable `APPRISE_TEMPLATE_<NAME>`
+* the default written in the `template:` section
+
+A URL with no value available is not loaded, and **apprise** exits with a
+status of **4** if others were notified, or **1** if none were.  Use
+`--dry-run` to see which values a configuration is still waiting for.
+
+`${NAME}` only means something when `NAME` appears in the `template:` section.
+Anywhere else it is ordinary text and is sent exactly as written, so a password
+containing `${...}` is never altered.  Names ignore case, and a name may be
+used as often as you like. Values may be up to 1,024 characters. Extra supplied
+names are accepted and ignored; their names appear only in the local debug log,
+never with their values.
+
+The configuration author may place a variable directly in a URL or in a named
+YAML setting below it. URL placement is intentionally unrestricted, supporting
+email addresses, `user:pass`, comma-separated targets, and other forms a
+service understands. A variable standing for the whole host also understands
+`user@host` and `user:pass@host`, filling in those fields unless the URL
+already spells out its own credentials. Because punctuation may affect that
+field, use a named setting when an untrusted caller should control only one
+specific option.
+
+The two placements differ in reach. A variable in the URL may fill in any field,
+the host included, and everything else that URL holds travels to whichever host
+the finished URL points at. A variable in a named setting only ever reaches that
+one option. Apprise deliberately leaves URL placement unrestricted for trusted
+administrators. Choose a named setting when a value may come from an untrusted
+caller or should affect only one option.
+
+A variable may not appear before `://`, may not be used for `tag:`/`tags:`, and
+may not be used as a setting's name. The service and tags are selected before
+values are filled in, so neither can be dynamic.
+
+This applies to **YAML** configuration only; **TEXT** configuration is passed
+through unchanged.
+
 [config]: https://appriseit.com/getting-started/configuration/
 [tagging]: https://appriseit.com/cli/usage/#tagging-and-filtering
 [pstorage]: https://appriseit.com/cli/persistent-storage/
@@ -369,6 +434,12 @@ configuration that you want and only specifically notify a subset of them:
 
   `APPRISE_STORAGE_PATH`:
   Explicitly specify the persistent storage path to use (overriding the default).
+
+  `APPRISE_TEMPLATE_<NAME>`:
+  Supply a value for a `${NAME}` used by a YAML configuration.  For example
+  `APPRISE_TEMPLATE_API_KEY` fills in `${API_KEY}`.  A value supplied with
+  `--template-var` (`-tv`) takes priority over this.  Setting it to an empty
+  string is itself a value, not a way to leave it unset.
 
   `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`:
   Standard proxy variables honored by the underlying `requests` library (not

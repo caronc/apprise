@@ -336,6 +336,81 @@ apprise -vv -t 'my title' -b 'my notification body' \
    --config=https://localhost/my/apprise/config
 ```
 
+## CLI Template Variables
+
+A YAML configuration can leave a value out of a URL and have it filled in
+later, which lets you keep the configuration in version control without the
+secrets in it.
+
+Write `${NAME}` where the value belongs and declare every name you use in a
+`template:` section:
+
+```yaml
+template:
+  # A default is used unless the call supplies a value
+  smtp_host: smtp.example.com
+  # No default: the call or environment must fill this name
+  api_key:
+
+urls:
+  - sendgrid://${API_KEY}:noreply@example.com/you@example.com:
+      - tag: alerts
+```
+
+Apprise looks for each value in this order and stops at the first answer:
+
+1. a value passed with `--template-var` (`-tv`)
+2. the default written in the `template:` section
+3. the environment variable `APPRISE_TEMPLATE_<NAME>`
+
+The environment is the last resort, so it only ever fills in a name the
+`template:` section declared without a default.
+
+Values supplied for a call or through the environment are trimmed. If one is
+blank afterwards, it reads as not supplied and the next source above applies.
+A default written in the configuration stays as written, including an empty
+default.
+
+```bash
+# Supply it directly
+apprise --config=apprise.yml --tag=alerts \
+   --template-var api_key=your-secret-key \
+   --body="Hello"
+
+# Or leave it in the environment
+export APPRISE_TEMPLATE_API_KEY=your-secret-key
+apprise --config=apprise.yml --tag=alerts --body="Hello"
+```
+
+A service missing a required value is skipped while other services continue;
+Apprise then exits with status `4`. Use `--dry-run` to check required values
+without sending anything.
+
+Only names declared under `template:` are replaced. Names ignore case, values
+keep their original case, and each value may be up to 1,024 characters.
+Undeclared `${...}` text remains unchanged, preventing similar text in an
+existing password from being replaced by accident. Extra supplied names are
+accepted and ignored.
+
+Variables may be placed directly in a URL or in a named YAML setting. URL
+placement is flexible, including email addresses, `user:pass`, and
+comma-separated targets. A variable standing for the whole host also
+understands `user@host` and `user:pass@host`, filling in those fields for you
+unless the URL already spells out its own credentials. Use a named setting when
+a caller should control only one option.
+
+The two placements differ in reach. A variable in the URL can fill in any field,
+the host included, and everything else that URL holds travels to whichever host
+the finished URL points at. A variable in a named setting only ever reaches that
+one option. Apprise deliberately does not restrict URL placement, giving trusted
+administrators full control. Use a named setting when a value may come from an
+untrusted caller or should affect only one option.
+
+Variables cannot replace the service before `://`, a setting name, or a
+`tag:`/`tags:` value. Services and tags must be known before values are filled
+in. Template variables apply only to YAML configuration; TEXT configuration
+is unchanged.
+
 ## CLI Tagging Support
 
 Apprise allows you to tag your services in your configuration to organize them (e.g., `family`, `devops`, `critical`). You can then filter which services to notify using the `--tag` (`-g`) switch.
@@ -454,6 +529,7 @@ Those using the Command Line Interface (CLI) can also leverage environment varia
 |  `APPRISE_CONFIG_PATH`  | Explicitly specify the config search path to use (overriding the default). The path(s) defined here must point to the absolute filename to open/reference. Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 |  `APPRISE_PLUGIN_PATH`  | Explicitly specify the custom plugin search path to use (overriding the default). Use a semi-colon (`;`), line-feed (`\n`), and/or carriage return (`\r`) to delimit multiple entries.
 |  `APPRISE_STORAGE_PATH` | Explicitly specify the persistent storage path to use (overriding the default).
+|  `APPRISE_TEMPLATE_<NAME>` | Supply a value for a `${NAME}` used by a YAML configuration. For example `APPRISE_TEMPLATE_API_KEY` fills in `${API_KEY}`. A value passed with `--template-var` (`-tv`) takes priority over this.
 
 # Developer API Usage
 
@@ -531,6 +607,37 @@ apobj.notify(
     tag='all',
 )
 ```
+
+## API Template Variables
+
+After loading a templated YAML configuration, developers can supply its values
+when sending:
+
+```python
+apobj.notify(
+    body='what a great notification service!',
+    title='my notification title',
+    template={'api_key': 'your-secret-key'},
+)
+```
+
+The per-call mapping takes priority over `APPRISE_TEMPLATE_<NAME>` environment
+variables and defaults in the YAML file. Names are case-insensitive, and extra
+names are accepted and ignored.
+
+Templates are enabled by default. To turn them off, use the same disabled asset
+for the configuration and its Apprise object:
+
+```python
+asset = apprise.AppriseAsset(allow_templates=False)
+config = apprise.AppriseConfig(asset=asset)
+apobj = apprise.Apprise(asset=asset)
+apobj.add(config)
+```
+
+When disabled, the `template:` section and template environment variables are
+ignored, and `${NAME}` remains unchanged. A configuration cannot enable this
+feature itself.
 
 ## API File Attachments
 

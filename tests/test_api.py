@@ -54,6 +54,7 @@ from apprise import (
     NotifyFormat,
     NotifyImageSize,
     NotifyType,
+    PersistentStoreMode,
     PrivacyMode,
     URLBase,
     __version__,
@@ -541,7 +542,10 @@ def apprise_test(do_notify):
     # Set our cache to be off
     plugin = a.instantiate("good://localhost?store=no", asset=asset)
     assert isinstance(plugin, NotifyBase)
-    assert plugin.url_id(lazy=False) is None
+    # The identifier still works; turning storage off only stops anything
+    # being written to disk for it
+    assert plugin.url_id(lazy=False)
+    assert plugin.store.mode is PersistentStoreMode.MEMORY
     # Verify our cache is disabled
     assert "store=no" in plugin.url()
 

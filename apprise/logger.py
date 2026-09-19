@@ -696,6 +696,10 @@ class _ServiceLogCapture(logging.Handler):
     def _emit(self, record: logging.LogRecord) -> None:
         """Process a record after the reentrancy check."""
         try:
+            if not getattr(record, "apprise_capture", True):
+                # Keep sensitive local messages out of results and streams.
+                return
+
             if self._service is not None:
                 # Per-service: only the exact active capture accepts.
                 if _active_capture.get() is not self:
