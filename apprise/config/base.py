@@ -184,9 +184,11 @@ def _yaml_markers(node) -> dict[str, set[int]]:
                 walk(item)
 
         elif isinstance(current, MappingNode):
-            # Inspect keys as well as values so invalid uses can be reported.
+            # URL keys may contain variables, but YAML setting names remain
+            # literal and do not count as template use.
             for key, value in current.value:
-                walk(key)
+                if isinstance(key, ScalarNode) and "://" in key.value:
+                    walk(key)
                 walk(value)
 
     walk(node)
@@ -256,70 +258,6 @@ def _yaml_key_label(key) -> str:
             return "<service URL>"
         return repr(key if len(key) <= 64 else key[:61] + "...")
     return "<{}>".format(type(key).__name__)
-
-
-def _templated_key(
-    obj: object, schema: TemplateSchema, memo=None
-) -> str | None:
-    """Return a declared variable used as a setting name, if any.
-
-    Variables may fill setting values, but may not choose setting names.
-    This scans the original ``${NAME}`` markers before substitution.
-    """
-
-    if not schema:
-        # With no declarations, every ${NAME} remains ordinary text.
-        return None
-
-    if memo is None:
-        memo = set()
-
-    if isinstance(obj, (list, tuple, set)):
-        # YAML settings can be nested in any supported collection.
-        for item in obj:
-            found = _templated_key(item, schema, memo)
-            if found:
-                return found
-        return None
-
-    if not isinstance(obj, dict):
-        return None
-
-    marker = id(obj)
-    if marker in memo:
-        # YAML aliases may revisit a mapping; inspect it only once.
-        return None
-    memo.add(marker)
-
-    for key, value in obj.items():
-        # Marker-bearing keys are forbidden even when deeply nested.
-        if isinstance(key, str):
-            for match in TEMPLATE_VAR_RE.finditer(key):
-                name = normalize_name(match.group("name"))
-                if name in schema.variables:
-                    return name
-
-        found = _templated_key(value, schema, memo)
-        if found:
-            return found
-
-    return None
-
-
-def _templated_schema(url: str, schema: TemplateSchema) -> str | None:
-    """Return a declared variable used to choose the URL service."""
-
-    if not schema or not isinstance(url, str):
-        return None
-
-    head = url.split("://", 1)[0]
-    # Only the text selecting the plugin is relevant to this check.
-    for match in TEMPLATE_VAR_RE.finditer(head):
-        name = normalize_name(match.group("name"))
-        if name in schema.variables:
-            return name
-
-    return None
 
 
 def _dropped_variable(
@@ -1265,10 +1203,8 @@ class ConfigBase(URLBase):
             return ([], [])
 
         # YAML Version
-        #
-        # Unversioned files use version 2; version 1 rejects templates.
-        version = result.get("version", 2)
-        if version not in (1, 2):
+        version = result.get("version", 1)
+        if version != 1:
             # Invalid syntax
             ConfigBase.logger.error(
                 f"Invalid Apprise YAML version specified {version}."
@@ -1292,17 +1228,17 @@ class ConfigBase(URLBase):
         if asset.allow_templates:
             # Disabled templates bypass the section and all marker checks.
             entries = result.get("template", None)
+
+        # Scan markers only when debug logging will show the resulting notes.
+        explain = asset.allow_templates and ConfigBase.logger.isEnabledFor(
+            logging.DEBUG
+        )
+        if explain:
             urls_node = _yaml_section_node(loader.root_node, "urls")
             template_node = _yaml_section_node(loader.root_node, "template")
             referenced_templates = _yaml_markers(urls_node)
 
         if entries is not None:
-            if version < 2:
-                ConfigBase.logger.error(
-                    "The Apprise YAML template section requires version: 2."
-                )
-                return ([], [])
-
             try:
                 template_schema = TemplateSchema.parse(entries)
 
@@ -1322,40 +1258,43 @@ class ConfigBase(URLBase):
                     ConfigBase.logger.error(str(e))
                     return ([], [])
 
-            # These checks wait until the complete template section is known,
-            # so it may appear before or after the service URLs.
-            undeclared = referenced_templates.keys() - set(
-                template_schema.names
-            )
-            for name in sorted(undeclared):
-                lines = ", ".join(
-                    str(line) for line in sorted(referenced_templates[name])
+            if explain:
+                # These notes wait until the complete template section is
+                # known, so it may appear before or after the service URLs.
+                undeclared = referenced_templates.keys() - set(
+                    template_schema.names
                 )
-                ConfigBase.logger.warning(
-                    "Template entry '{}' on line {} is not defined in the"
-                    " template section; it is kept as written.".format(
-                        name, lines
+                for name in sorted(undeclared):
+                    lines = ", ".join(
+                        str(line)
+                        for line in sorted(referenced_templates[name])
                     )
-                )
+                    ConfigBase.logger.debug(
+                        "Template entry '{}' on line {} is not defined in"
+                        " the template section; it is kept as"
+                        " written.".format(name, lines)
+                    )
 
-            declared_lines = _yaml_template_lines(template_node)
-            unused = set(template_schema.names) - referenced_templates.keys()
-            for name in sorted(unused):
-                line = declared_lines.get(name)
-                location = " on line {}".format(line) if line else ""
-                ConfigBase.logger.warning(
-                    "Template entry '{}'{} is defined but not referenced by"
-                    " a service entry.".format(name, location)
+                declared_lines = _yaml_template_lines(template_node)
+                unused = (
+                    set(template_schema.names) - referenced_templates.keys()
                 )
+                for name in sorted(unused):
+                    line = declared_lines.get(name)
+                    location = " on line {}".format(line) if line else ""
+                    ConfigBase.logger.debug(
+                        "Template entry '{}'{} is defined but not referenced"
+                        " by a service entry.".format(name, location)
+                    )
 
-        elif asset.allow_templates:
-            # A marker without a template section stays literal, but pointing
-            # it out helps catch spelling mistakes during startup.
+        elif explain:
+            # Without a template section, every ${NAME} remains literal; note
+            # this only for readers of the debug log.
             for name in sorted(referenced_templates):
                 lines = ", ".join(
                     str(line) for line in sorted(referenced_templates[name])
                 )
-                ConfigBase.logger.warning(
+                ConfigBase.logger.debug(
                     "Template entry '{}' on line {} is not defined in the"
                     " template section; it is kept as written.".format(
                         name, lines
@@ -1537,18 +1476,8 @@ class ConfigBase(URLBase):
 
             if isinstance(url, str):
                 # We're just a simple URL string...
-                offender = _templated_schema(url, template_schema)
-                if offender:
-                    ConfigBase.logger.error(
-                        "Template variable '{}' can not be used to choose"
-                        " the service (YAML entry #{})".format(
-                            offender, no + 1
-                        )
-                    )
-                    continue
-
                 if placeholders:
-                    url = placeholders.encode(url)
+                    url = placeholders.encode_url(url)
 
                 schema = GET_SCHEMA_RE.match(url)
                 if schema is None:
@@ -1616,17 +1545,13 @@ class ConfigBase(URLBase):
                 schema = None
 
                 for key, tokens_ in it:
-                    offender = _templated_schema(key, template_schema)
-                    if offender:
-                        ConfigBase.logger.error(
-                            "Template variable '{}' can not be used to"
-                            " choose the service (YAML entry #{})".format(
-                                offender, no + 1
-                            )
-                        )
-                        break
+                    encoded = (
+                        placeholders.encode_url(key) if placeholders else key
+                    )
 
-                    encoded = placeholders.encode(key) if placeholders else key
+                    if not isinstance(encoded, str):
+                        # Non-text sibling settings cannot identify a URL.
+                        continue
 
                     # Test our schema
                     schema_ = GET_SCHEMA_RE.match(encoded)
@@ -1688,23 +1613,20 @@ class ConfigBase(URLBase):
                     for k, v in url.items()
                     if k not in (url_key, "schema")
                 }
-                offender = _templated_key(
-                    sibling_tokens, template_schema
-                ) or _templated_key(tokens, template_schema)
-                if offender:
-                    ConfigBase.logger.error(
-                        "Template variable '{}' can not be used as a"
-                        " setting name (YAML entry #{})".format(
-                            offender, no + 1
-                        )
-                    )
-                    continue
-
                 if placeholders:
-                    # Only the values are touched here.  A variable may
-                    # never decide what a setting is called.
-                    sibling_tokens = placeholders.encode_obj(sibling_tokens)
-                    tokens = placeholders.encode_obj(tokens)
+                    # Template YAML values, but keep setting names literal.
+                    try:
+                        sibling_tokens = placeholders.encode_obj(
+                            sibling_tokens
+                        )
+                        tokens = placeholders.encode_obj(tokens)
+
+                    except AppriseTemplateError as e:
+                        ConfigBase.logger.error(
+                            "Could not prepare template values for entry"
+                            " #{}. {}".format(no + 1, e)
+                        )
+                        continue
 
                 results_ = plugins.url_to_dict(
                     url_, secure_logging=asset.secure_logging
@@ -1958,13 +1880,19 @@ class ConfigBase(URLBase):
                 for key in list(results_.keys()):
                     # Strip out any tokens we know that we can't accept and
                     # warn the user
-                    match = VALID_TOKEN.match(key)
+                    match = (
+                        VALID_TOKEN.match(key)
+                        if isinstance(key, str)
+                        else None
+                    )
                     if not match:
                         ConfigBase.logger.warning(
                             f"Ignoring invalid token ({key}) found in YAML "
                             f"configuration entry #{no + 1}, item #{entry}"
                         )
                         del results_[key]
+                        yaml_tokens_.pop(key, None)
+                        written_tokens_.pop(key, None)
 
                 if ConfigBase.logger.isEnabledFor(logging.TRACE):
                     ConfigBase.logger.trace(
@@ -2008,17 +1936,6 @@ class ConfigBase(URLBase):
                 # Keep the original query mapping available downstream.
                 if orig_qsd is not None:
                     results_["qsd"] = orig_qsd
-
-                if placeholders:
-                    offender = placeholders.keys_contain_placeholder(results_)
-                    if offender:
-                        # Variables may fill setting values, never their names.
-                        ConfigBase.logger.error(
-                            "Template variable '{}' can not be used as a"
-                            " setting name (YAML entry #{}, item"
-                            " #{})".format(offender, no + 1, entry)
-                        )
-                        continue
 
                 # Store our preloaded entries
                 preloaded.append(
@@ -2170,7 +2087,7 @@ class ConfigBase(URLBase):
             matches = {
                 k[1:]: str(v)
                 for k, v in tokens.items()
-                if k.startswith(prefix)
+                if isinstance(k, str) and k.startswith(prefix)
             }
 
             if not matches:
@@ -2183,7 +2100,9 @@ class ConfigBase(URLBase):
 
             # strip out processed tokens
             tokens = {
-                k: v for k, v in tokens.items() if not k.startswith(prefix)
+                k: v
+                for k, v in tokens.items()
+                if not isinstance(k, str) or not k.startswith(prefix)
             }
 
             # Update our entries

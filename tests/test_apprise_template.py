@@ -33,6 +33,7 @@ covered separately in ``test_apprise_template_placement.py``.
 # Disable logging for a cleaner testing output
 from collections import UserDict
 import logging
+import os
 from types import MappingProxyType
 from unittest import mock
 
@@ -83,31 +84,13 @@ def sent():
 def test_apprise_template_deferred_entry():
     """The service cannot be built while a value is missing."""
     services = parse(
-        "version: 2\ntemplate:\n  - target\n"
-        "urls:\n  - json://localhost/?to=${TARGET}\n"
+        "template:\n  - target\nurls:\n  - json://localhost/?to=${TARGET}\n"
     )
     assert len(services) == 1
     assert isinstance(services[0], NotifyTemplate)
     assert services[0].template_names == ("target",)
     assert services[0].template_required == ("target",)
     assert services[0].url_id() is None
-
-
-def test_apprise_template_requires_v2():
-    """An older configuration keeps its previous behaviour."""
-    content = "version: {}\ntemplate:\n  - a\nurls:\n  - json://localhost\n"
-    assert parse(content.format(2))
-    assert parse(content.format(1)) == []
-
-
-def test_apprise_template_v2_without_section():
-    """Bumping the version alone changes nothing else."""
-    assert len(parse("version: 2\nurls:\n  - json://localhost\n")) == 1
-
-
-def test_apprise_template_unknown_version():
-    """Only the versions we understand are allowed."""
-    assert parse("version: 3\nurls:\n  - json://localhost\n") == []
 
 
 def test_apprise_template_text_config():
@@ -133,31 +116,61 @@ def test_apprise_template_text_config():
 )
 def test_apprise_template_rejects_tag_variable(entry):
     """Query, singular, and plural tags all stay fixed."""
-    assert (
-        parse("version: 2\ntemplate:\n  - t\nurls:\n  - {}\n".format(entry))
-        == []
-    )
+    assert parse("template:\n  - t\nurls:\n  - {}\n".format(entry)) == []
 
 
-def test_apprise_template_rejects_setting_name():
-    """A variable fills in a value, never a setting name."""
-    assert (
-        parse(
-            "version: 2\ntemplate:\n  - t\n"
-            "urls:\n  - json://localhost/?${T}=1\n"
-        )
-        == []
-    )
+def test_apprise_template_fills_marker_after_schema():
+    """Every marker past :// is filled in, wherever it was written."""
+    entry = parse(
+        "template:\n  - t\nurls:\n  - json://localhost/?+${T}=1&+X=${T}\n"
+    )[0]
+
+    assert isinstance(entry, NotifyTemplate)
+    assert entry.template_names == ("t",)
+
+    # The parameter name and the value both take the supplied value
+    service = entry.resolve({"t": "REAL"})
+    assert service.headers == {"REAL": "1", "X": "REAL"}
+
+
+def test_apprise_template_preserves_yaml_setting_name():
+    """A marker written as a YAML setting name is not a variable.
+
+    Only values are replaced underneath a URL, so the name stays as the
+    configuration spelled it and Apprise reads it the usual way.
+    """
+    entry = parse(
+        "template:\n  - t\n"
+        "urls:\n  - json://localhost/:\n"
+        "      '+${T}': 1\n      '+X': ${T}\n"
+    )[0]
+
+    service = entry.resolve({"t": "REAL"})
+    assert service.headers == {"${T}": "1", "X": "REAL"}
 
 
 def test_apprise_template_bad_entry_isolated():
     """One refused entry leaves the rest of the file usable."""
     services = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://localhost/?${T}=1\n  - json://other/\n"
+        "template:\n  - t\n"
+        "urls:\n  - mailto://u:p@gmail.com:${T}\n  - json://other/\n"
     )
     assert len(services) == 1
     assert not isinstance(services[0], NotifyTemplate)
+
+
+def test_apprise_template_rejects_yaml_loop(logging_enabled, caplog):
+    """A recursive YAML value rejects its entry without escaping an error."""
+    with caplog.at_level(logging.ERROR):
+        services = parse(
+            "template:\n  - t\n"
+            "urls:\n  - json://user:${T}@localhost/:\n"
+            "    - headers: &loop [*loop]\n"
+            "  - json://localhost/\n"
+        )
+
+    assert len(services) == 1
+    assert "Looping structure" in caplog.text
 
 
 @pytest.mark.parametrize(
@@ -172,7 +185,7 @@ def test_apprise_template_bad_entry_isolated():
 )
 def test_apprise_template_url_fields(url):
     """Host, path, credentials and parameters all accept one."""
-    services = parse(f"version: 2\ntemplate:\n  - t\nurls:\n  - {url}\n")
+    services = parse(f"template:\n  - t\nurls:\n  - {url}\n")
     assert len(services) == 1
     assert isinstance(services[0], NotifyTemplate)
 
@@ -180,7 +193,7 @@ def test_apprise_template_url_fields(url):
 def test_apprise_template_yaml_setting():
     """A setting written under the URL may be templated too."""
     services = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://localhost/:\n    - to: ${T}\n      tag: work\n"
     )
     assert len(services) == 1
@@ -191,7 +204,7 @@ def test_apprise_template_yaml_setting():
 def test_apprise_template_yaml_url_key():
     """The mapping form is supported as well as the plain form."""
     services = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://localhost/${T}:\n    - tag: work\n"
     )
     assert len(services) == 1
@@ -200,10 +213,7 @@ def test_apprise_template_yaml_url_key():
 
 def test_apprise_template_value_encoding(sent):
     """Credential punctuation reaches the parsed password field unchanged."""
-    apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
-    )
+    apobj = load("template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n")
     hostile = "a b&c=d?e/f@g"
     assert apobj.notify(body="x", template={"t": hostile})
 
@@ -225,8 +235,7 @@ def test_apprise_template_undeclared_marker_literal():
     templated at all.
     """
     services = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${NOT_DECLARED}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${NOT_DECLARED}@localhost/\n"
     )
 
     assert len(services) == 1
@@ -238,8 +247,7 @@ def test_apprise_template_undeclared_marker_literal():
 def test_apprise_template_undeclared_marker_not_pending(sent):
     """The URL is sent exactly as written."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${NOPE}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${NOPE}@localhost/\n"
     )
 
     assert apobj.template_vars() == {}
@@ -249,7 +257,7 @@ def test_apprise_template_undeclared_marker_not_pending(sent):
 def test_apprise_template_success_status(sent):
     """A complete set of values delivers as normal."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://localhost/?:x=${T}\n  - json://other/\n"
     )
     result = apobj.notify(body="x", template={"t": "value"})
@@ -260,7 +268,7 @@ def test_apprise_template_success_status(sent):
 def test_apprise_template_partial_status(sent):
     """A skipped entry must not read as a clean success."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://localhost/?:x=${T}\n  - json://other/\n"
     )
     result = apobj.notify(body="x")
@@ -270,19 +278,14 @@ def test_apprise_template_partial_status(sent):
 
 def test_apprise_template_missing_all_status(sent):
     """Every match being held back is a failure, not a no-match."""
-    apobj = load(
-        "version: 2\ntemplate:\n  - t\nurls:\n  - json://localhost/?:x=${T}\n"
-    )
+    apobj = load("template:\n  - t\nurls:\n  - json://localhost/?:x=${T}\n")
     assert apobj.notify(body="x").status == AppriseResultStatus.FAILURE
 
 
 def test_apprise_template_environment_value(sent, monkeypatch):
     """A deployment can supply values without touching the config."""
     monkeypatch.setenv("APPRISE_TEMPLATE_T", "from-env")
-    apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
-    )
+    apobj = load("template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n")
     assert apobj.notify(body="x").status == AppriseResultStatus.SUCCESS
     assert next(apobj.find()).password == "from-env"
 
@@ -290,7 +293,7 @@ def test_apprise_template_environment_value(sent, monkeypatch):
 def test_apprise_template_tag_matching(sent):
     """Tags are known up front, so filtering is unaffected."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://user:${T}@localhost/:\n    - tag: work\n"
         "  - json://other/:\n    - tag: home\n"
     )
@@ -301,7 +304,7 @@ def test_apprise_template_tag_matching(sent):
 
 def test_apprise_template_pending_url_display():
     """Introspection reveals which values are still wanted."""
-    apobj = load("version: 2\ntemplate:\n  - t\nurls:\n  - json://host/${T}\n")
+    apobj = load("template:\n  - t\nurls:\n  - json://host/${T}\n")
     assert "${T}" in apobj.urls()[0]
     assert "${T}" in apobj.urls(privacy=True)[0]
 
@@ -309,8 +312,7 @@ def test_apprise_template_pending_url_display():
 def test_apprise_template_secret_masking():
     """A variable name is safe to show; a password is not."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:hunter2secret@host/${T}\n"
+        "template:\n  - t\nurls:\n  - json://user:hunter2secret@host/${T}\n"
     )
     shown = apobj.urls(privacy=True)[0]
     assert "${T}" in shown
@@ -320,8 +322,7 @@ def test_apprise_template_secret_masking():
 def test_apprise_template_service_reuse(sent):
     """Anything the service remembers survives between calls."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
     first = entry.resolve({"t": "x"})
     assert entry.resolve({"t": "x"}) is first
@@ -337,8 +338,7 @@ def test_apprise_template_cache_limit():
     from apprise.template import MAX_RESOLVE_CACHE
 
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
     for i in range(MAX_RESOLVE_CACHE + 10):
         entry.resolve({"t": f"value{i}"})
@@ -349,7 +349,7 @@ def test_apprise_template_cache_limit():
 def test_apprise_template_vars_summary():
     """Callers can ask what a configuration expects."""
     apobj = load(
-        "version: 2\ntemplate:\n  - needed\n  - other: a-default\n"
+        "template:\n  - needed\n  - other: a-default\n"
         "urls:\n  - json://host/${NEEDED}/${OTHER}\n"
     )
     report = apobj.template_vars()
@@ -367,7 +367,7 @@ def test_apprise_template_missing_name_not_captured(sent, logging_enabled):
     """Keep missing names out of logs returned to API callers."""
     captured = []
     apobj = load(
-        "version: 2\ntemplate:\n  - super_secret_name\n"
+        "template:\n  - super_secret_name\n"
         "urls:\n  - json://localhost/?:x=${SUPER_SECRET_NAME}\n"
         "  - json://other/\n"
     )
@@ -391,7 +391,7 @@ def test_apprise_template_config_not_captured(sent, logging_enabled):
     """A capture must never carry the configuration body."""
     captured = []
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://user:hunter2secret@localhost/?:x=${T}\n"
     )
     apobj.notify(
@@ -426,12 +426,11 @@ def test_apprise_template_included_declarations(sent, tmpdir):
     """Each file declares what it uses; values reach them all."""
     child = tmpdir.join("child.yml")
     child.write(
-        "version: 2\ntemplate:\n  - shared\n"
-        "urls:\n  - json://user:${SHARED}@child-host/\n"
+        "template:\n  - shared\nurls:\n  - json://user:${SHARED}@child-host/\n"
     )
     parent = tmpdir.join("parent.yml")
     parent.write(
-        "version: 2\ntemplate:\n  - shared\n"
+        "template:\n  - shared\n"
         f"include:\n  - {child!s}\n"
         "urls:\n  - json://user:${SHARED}@parent-host/\n"
     )
@@ -450,7 +449,7 @@ def test_apprise_template_included_declarations(sent, tmpdir):
 def test_apprise_template_shared_yaml_block(sent):
     """A YAML anchor used twice does not confuse the parser."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "shared: &shared\n  to: ${T}\n"
         "urls:\n  - json://first/:\n    <<: *shared\n"
         "  - json://second/:\n    <<: *shared\n"
@@ -465,10 +464,7 @@ def test_apprise_template_cli_value(tmpdir, sent):
     from apprise import cli
 
     config = tmpdir.join("apprise.yml")
-    config.write(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
-    )
+    config.write("template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n")
 
     result = CliRunner().invoke(
         cli.main,
@@ -484,7 +480,7 @@ def test_apprise_template_cli_invalid_value(tmpdir):
     from apprise import cli
 
     config = tmpdir.join("apprise.yml")
-    config.write("version: 2\nurls:\n  - json://localhost\n")
+    config.write("urls:\n  - json://localhost\n")
 
     result = CliRunner().invoke(
         cli.main,
@@ -502,7 +498,7 @@ def test_apprise_template_cli_dry_run(tmpdir):
 
     config = tmpdir.join("apprise.yml")
     config.write(
-        "version: 2\ntemplate:\n  - t\n  - other: a-default\n"
+        "template:\n  - t\n  - other: a-default\n"
         "urls:\n  - json://host/${T}/${OTHER}\n"
     )
 
@@ -517,7 +513,7 @@ def test_apprise_template_cli_dry_run(tmpdir):
 def test_apprise_template_pending_repr():
     """It stands in for a service, so it answers the same questions."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://user:${T}@localhost/:\n"
         "    - tag: work\n      retry: 2\n"
     )[0]
@@ -534,8 +530,7 @@ def test_apprise_template_pending_repr():
 def test_apprise_template_unknown_service_metadata():
     """A schema we do not carry is answered for safely."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
     entry.results["schema"] = "not-a-real-schema"
 
@@ -547,7 +542,7 @@ def test_apprise_template_unknown_service_metadata():
 def test_apprise_template_setting_display():
     """A setting is listed so it is clear a value is wanted."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailto://user:pass@gmail.com:\n    - to: ${T}\n"
     )
     shown = apobj.urls()[0]
@@ -559,7 +554,7 @@ def test_apprise_template_setting_display():
 def test_apprise_template_repeated_name(sent):
     """A variable may be written as many times as you like."""
     apobj = load(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://user:${T}@localhost/${T}/:\n    - to: ${T}\n"
     )
 
@@ -573,8 +568,7 @@ def test_apprise_template_url_size_limit(monkeypatch):
     import apprise.template as template_module
 
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
     monkeypatch.setattr(template_module, "MAX_RESOLVED_URL_LEN", 10)
     assert entry.resolve({"t": "a-value-well-over-ten-characters"}) is None
@@ -583,8 +577,7 @@ def test_apprise_template_url_size_limit(monkeypatch):
 def test_apprise_template_build_failure():
     """A value the service rejects skips the entry, not the run."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
 
     from apprise.template import N_MGR
@@ -600,8 +593,7 @@ def test_apprise_template_build_failure():
 def test_apprise_template_substitution_failure():
     """A failure while filling values in is handled quietly."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
+        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
 
     with mock.patch.object(
@@ -613,7 +605,7 @@ def test_apprise_template_substitution_failure():
 def test_apprise_template_adjacent_text_masking():
     """Only the variable name is safe to show; the rest is not."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://user:prefix${T}suffix@localhost/\n"
     )[0]
 
@@ -629,8 +621,7 @@ def test_apprise_template_adjacent_text_masking():
 def test_apprise_template_query_display():
     """A parameter waiting on a value is visible in the URL."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://localhost/?:custom=${T}\n"
+        "template:\n  - t\nurls:\n  - json://localhost/?:custom=${T}\n"
     )[0]
     assert "${T}" in entry.url()
 
@@ -639,7 +630,7 @@ def test_apprise_template_parse_time_validation(logging_enabled, caplog):
     """Report services that must validate a field while parsing."""
     with caplog.at_level(logging.ERROR):
         services = parse(
-            "version: 2\ntemplate:\n  - t\n"
+            "template:\n  - t\n"
             "urls:\n  - sendgrid://SG.abcdefghij:${T}/to@example.com\n"
         )
 
@@ -652,7 +643,7 @@ def test_apprise_template_parse_time_validation(logging_enabled, caplog):
 def test_apprise_template_valid_service_position():
     """The limitation is the position, not the service."""
     services = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - sendgrid://${T}:from@example.com/to@example.com\n"
     )
     assert len(services) == 1
@@ -668,27 +659,9 @@ def test_apprise_template_service_coverage():
         "twilio://sid:token@${T}/+15551234567",
         "tgram://123456789:${T}/-1001234567890",
     ):
-        services = parse(f"version: 2\ntemplate:\n  - t\nurls:\n  - {url}\n")
+        services = parse(f"template:\n  - t\nurls:\n  - {url}\n")
         assert len(services) == 1, url
         assert isinstance(services[0], NotifyTemplate), url
-
-
-def test_apprise_template_default_version():
-    """Template support does not need the version spelled out."""
-    services = parse(
-        "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
-    )
-    assert len(services) == 1
-    assert isinstance(services[0], NotifyTemplate)
-
-
-def test_apprise_template_v1_compatibility():
-    """An older file is still read the way it always was."""
-    assert (
-        parse("version: 1\ntemplate:\n  - t\nurls:\n  - json://localhost\n")
-        == []
-    )
-    assert len(parse("version: 1\nurls:\n  - json://localhost\n")) == 1
 
 
 def test_apprise_template_many_url_variables(sent):
@@ -757,26 +730,87 @@ def test_apprise_template_embedded_host_is_preserved(sent):
     assert service.fullpath == "/"
 
 
-def test_apprise_template_rejects_service_variable(logging_enabled, caplog):
-    """The part before :// is settled when the config is written."""
-    with caplog.at_level(logging.ERROR):
-        services = parse("template:\n  - v\nurls:\n  - ${V}://host/\n")
+@pytest.mark.parametrize(
+    "entry",
+    [
+        # Written on its own
+        "${V}://host/",
+        # Written as a YAML key with settings under it
+        "${V}://host/:\n    - tag: work",
+        # A marker standing in for the schema and its separator
+        "${V}user:pass@host/",
+        # Trailing text after the marker, as in a secure variant
+        "${V}s://host/",
+        # Leading text before the marker
+        "json${V}://host/",
+        # ...and the same the other way around
+        "${V}json://host/",
+        # Buried in the middle of an otherwise real schema
+        "js${V}on://host/",
+        # A secure variant built from both
+        "mailto${V}s://host/",
+        # No separator at all
+        "${V}",
+        # A separator that is not quite one
+        "${V}//host/",
+    ],
+)
+def test_apprise_template_preserves_schema(entry):
+    """Nothing before :// is ever replaced.
 
-    assert services == []
-    assert "can not be used to choose the service" in caplog.text
+    The schema decides which service reads the URL, and that is settled
+    long before a value is known. Apprise turns the URL down the way it
+    would any other one it cannot read.
+    """
+    assert parse("template:\n  - v\nurls:\n  - {}\n".format(entry)) == []
 
 
-def test_apprise_template_rejects_mapping_service_variable(
-    logging_enabled, caplog
-):
-    """The same holds when the URL is written as a YAML key."""
-    with caplog.at_level(logging.ERROR):
-        services = parse(
-            "template:\n  - v\nurls:\n  - ${V}://host/:\n    - tag: work\n"
+def test_apprise_template_dollar_is_literal():
+    """A "$" before a marker is just a "$".
+
+    There is no escape syntax. To keep a ${NAME} literal, simply do not
+    declare that name.
+    """
+    entry = parse("template:\n  - t\nurls:\n  - json://l/?+X=$${T}\n")[0]
+
+    service = entry.resolve({"t": "abc"})
+    assert service.headers == {"X": "$abc"}
+
+
+def test_apprise_template_default_marker_is_literal():
+    """A default is used exactly as written, markers and all.
+
+    One declaration never builds on another. ``key`` below is the text
+    ``${value}``, not ``34``. Assemble values in the URL instead.
+    """
+    apobj = load(
+        "template:\n  value: 34\n  key: ${value}\n"
+        "urls:\n  - json://l/?+K=${KEY}&+V=${VALUE}\n"
+    )
+
+    # K keeps the marker; V shows that 'value' really does resolve to 34
+    assert next(apobj.find()).headers == {"K": "${value}", "V": "34"}
+
+
+def test_apprise_template_supplied_marker_is_literal():
+    """A value handed in for one call is not looked at again either."""
+    apobj = load(
+        "template:\n  value: 34\n  key:\n"
+        "urls:\n  - json://l/?+K=${KEY}&+V=${VALUE}\n"
+    )
+    service = next(apobj.find(template={"key": "${value}"}))
+
+    assert service.headers == {"K": "${value}", "V": "34"}
+
+
+def test_apprise_template_environment_marker_is_literal():
+    """An environment value is taken as written in the same way."""
+    with mock.patch.dict(os.environ, {"APPRISE_TEMPLATE_KEY": "${value}"}):
+        apobj = load(
+            "template:\n  value: 34\n  key:\n"
+            "urls:\n  - json://l/?+K=${KEY}&+V=${VALUE}\n"
         )
-
-    assert services == []
-    assert "can not be used to choose the service" in caplog.text
+        assert next(apobj.find()).headers == {"K": "${value}", "V": "34"}
 
 
 def test_apprise_template_bad_schema_isolated(sent):
@@ -1100,7 +1134,7 @@ def test_apprise_template_late_declaration_is_recognized(
     logging_enabled, caplog
 ):
     """A declaration may follow the service that uses it."""
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.DEBUG):
         services = parse(
             "urls:\n  - json://user:${LATE}@localhost/\ntemplate:\n  - late\n"
         )
@@ -1110,25 +1144,120 @@ def test_apprise_template_late_declaration_is_recognized(
     assert "not defined" not in caplog.text
 
 
-def test_apprise_template_undeclared_marker_warns(logging_enabled, caplog):
-    """An undeclared marker stays literal and reports its source line."""
-    with caplog.at_level(logging.WARNING):
+def test_apprise_template_logs_undeclared_marker(logging_enabled, caplog):
+    """An undeclared marker stays literal and is noted only at debug."""
+    with caplog.at_level(logging.DEBUG):
         services = parse("urls:\n  - json://user:${MISSING}@localhost/\n")
 
     assert services[0].password == "${MISSING}"
     assert "'missing' on line 2 is not defined" in caplog.text
     assert "kept as written" in caplog.text
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
-def test_apprise_template_unused_declaration_warns(logging_enabled, caplog):
+def test_apprise_template_undeclared_marker_beside_a_section(
+    logging_enabled, caplog
+):
+    """A name missing from an existing template section is noted too."""
+    with caplog.at_level(logging.DEBUG):
+        services = parse(
+            "template:\n  - used\n"
+            "urls:\n  - json://user:${MISSING}@localhost/?to=${USED}\n"
+        )
+
+    assert services[0].results["password"] == "${MISSING}"
+    assert "'missing' on line 4 is not defined" in caplog.text
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_apprise_template_logs_unused_name(logging_enabled, caplog):
     """An unused declaration is reported after the file is read."""
-    with caplog.at_level(logging.WARNING):
+    with caplog.at_level(logging.DEBUG):
         services = parse(
             "template:\n  - unused\nurls:\n  - json://localhost/\n"
         )
 
     assert len(services) == 1
     assert "'unused' on line 2 is defined but not referenced" in caplog.text
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_apprise_template_yaml_name_is_not_a_use(logging_enabled, caplog):
+    """A literal YAML setting name does not use its matching variable."""
+    with caplog.at_level(logging.DEBUG):
+        services = parse(
+            "template:\n  - unused\n"
+            "urls:\n  - json://localhost/:\n"
+            "      '+${UNUSED}': literal\n"
+        )
+
+    assert len(services) == 1
+    assert "'unused' on line 2 is defined but not referenced" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "section",
+    [
+        # A mapping of name to default
+        "template:\n  t: a-default\n",
+        # A list entry carrying a default
+        "template:\n  - t: a-default\n",
+        # A list entry that is just a name
+        "template:\n  - t\n",
+    ],
+)
+def test_apprise_template_finds_declaration_line(
+    section, logging_enabled, caplog
+):
+    """Each way of declaring a name reports the line it was written on."""
+    with caplog.at_level(logging.DEBUG):
+        services = parse(section + "urls:\n  - json://localhost/\n")
+
+    assert len(services) == 1
+    assert "'t' on line 2 is defined but not referenced" in caplog.text
+
+
+def test_apprise_template_scans_shared_anchor_once(logging_enabled, caplog):
+    """A YAML anchor pointing back at one entry is not walked twice."""
+    with caplog.at_level(logging.DEBUG):
+        services = parse(
+            "template:\n  - t\n"
+            "urls:\n  - &shared json://localhost/?to=${T}\n  - *shared\n"
+        )
+
+    # Both entries load and both still wait on the same value
+    assert len(services) == 2
+    assert all(isinstance(s, NotifyTemplate) for s in services)
+    assert "not defined" not in caplog.text
+
+
+def test_apprise_template_section_without_urls(logging_enabled, caplog):
+    """A file may declare a name and define no services at all."""
+    with caplog.at_level(logging.DEBUG):
+        services = parse("template:\n  - t\n")
+
+    assert services == []
+    assert "'t' on line 2 is defined but not referenced" in caplog.text
+
+
+def test_apprise_template_skips_notes_without_debug(logging_enabled, caplog):
+    """Nothing is scanned or said when no one is reading a debug log.
+
+    Walking the YAML tree only feeds these notes, so it is skipped
+    entirely at a higher logging level.
+    """
+    for content in (
+        # A name that was never declared
+        "urls:\n  - json://user:${MISSING}@localhost/\n",
+        # ...and a declaration nothing uses
+        "template:\n  - unused\nurls:\n  - json://localhost/\n",
+    ):
+        caplog.clear()
+        with caplog.at_level(logging.INFO):
+            assert len(parse(content)) == 1
+
+        assert "not defined" not in caplog.text
+        assert "not referenced" not in caplog.text
 
 
 def test_apprise_template_disabled_marker_is_left_alone(
@@ -1146,6 +1275,57 @@ def test_apprise_template_disabled_marker_is_left_alone(
     assert "template variables are disabled" in caplog.text
     assert "not defined" not in caplog.text
     assert "not referenced" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("label", "content"),
+    [
+        (
+            "marker used as a query name",
+            "template:\n  - t\nurls:\n  - json://localhost/?+${T}=1\n",
+        ),
+        (
+            "marker used as a value",
+            "template:\n  - t\nurls:\n  - json://localhost/?+X=${T}\n",
+        ),
+        (
+            "marker used as a YAML setting name",
+            "template:\n  - t\n"
+            "urls:\n  - json://localhost/:\n      '+${T}': 1\n",
+        ),
+        (
+            "marker in the credentials",
+            "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n",
+        ),
+        (
+            "no template section at all",
+            "urls:\n  - json://localhost/?+X=${T}\n",
+        ),
+    ],
+)
+def test_apprise_template_disabled_matches_no_section(label, content):
+    """Disabled templates leave declared markers as literal text."""
+    asset = AppriseAsset(allow_templates=False)
+    services, _ = ConfigBase.config_parse_yaml(content, asset=asset)
+
+    assert len(services) == 1
+
+    # A real service, never an entry waiting on a value
+    assert not isinstance(services[0], NotifyTemplate)
+
+
+def test_apprise_template_disabled_ignores_the_environment(monkeypatch):
+    """A disabled file never reads APPRISE_TEMPLATE_ values."""
+    monkeypatch.setenv("APPRISE_TEMPLATE_T", "from-the-environment")
+    content = "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
+
+    services, _ = ConfigBase.config_parse_yaml(
+        content, asset=AppriseAsset(allow_templates=False)
+    )
+    assert services[0].password == "${T}"
+
+    # With the feature on, the same file uses that value
+    assert next(load(content).find()).password == "from-the-environment"
 
 
 def test_apprise_template_disabled_ignores_repeated_sections(
@@ -1175,6 +1355,15 @@ def test_apprise_template_url_handles_a_non_text_setting():
 
     # It renders without complaint, and the marker still shows
     assert "${T}" in entry.url()
+
+
+@pytest.mark.parametrize("declaration", ("", "template:\n  - t\n"))
+def test_config_skips_non_text_sibling_before_url(declaration):
+    """A non-text sibling cannot be mistaken for the URL key."""
+    services = parse(
+        declaration + "urls:\n  - 1: ignored\n    json://localhost/:\n"
+    )
+    assert len(services) == 1
 
 
 def test_apprise_template_url_shows_every_field_using_a_name():
@@ -1232,15 +1421,26 @@ def test_apprise_template_unusable_placeholder_prefix(logging_enabled, caplog):
 
 
 def test_apprise_template_mapping_form_setting_name(logging_enabled, caplog):
-    """A variable may not name a setting written beside a URL."""
-    with caplog.at_level(logging.ERROR):
+    """A marker naming a YAML setting is left to the usual token check.
+
+    Apprise already refuses a setting name it does not recognise, so the
+    marker takes the same path any other unusable name would.
+    """
+    with caplog.at_level(logging.WARNING):
         services = parse(
             "template:\n  - t\n"
             "urls:\n  - json://localhost/:\n    - ${T}: value\n"
         )
 
-    assert services == []
-    assert "can not be used as a setting name" in caplog.text
+    assert len(services) == 1
+    assert "Ignoring invalid token (${T})" in caplog.text
+
+    # A file that never declared the name is treated the same way
+    with caplog.at_level(logging.WARNING):
+        plain = parse("urls:\n  - json://localhost/:\n    - ${T}: value\n")
+
+    assert len(plain) == 1
+    assert "Ignoring invalid token (${T})" in caplog.text
 
 
 def test_apprise_template_mapping_form_bad_position(logging_enabled, caplog):
@@ -1293,51 +1493,10 @@ def test_apprise_asset_allow_templates_must_be_a_flag():
 
 
 def schema_for(*names):
-    """A declared schema to check setting names against."""
+    """A declared schema to check a URL's service choice against."""
     from apprise.utils.template import TemplateSchema
 
     return TemplateSchema.parse(list(names))
-
-
-def test_apprise_template_setting_name_scan_handles_odd_shapes():
-    """The scan walks whatever YAML happens to produce."""
-    from apprise.config.base import _templated_key
-
-    schema = schema_for("t")
-
-    # A number used as a key: nothing to read
-    assert _templated_key({1: "x"}, schema) is None
-
-    # A marker that was never declared is ordinary text
-    assert _templated_key({"${other}": "x"}, schema) is None
-
-    # ...and one that was is reported, however deeply it sits
-    assert _templated_key([{"a": [{"${T}": "x"}]}], schema) == "t"
-
-    # The same mapping seen twice is walked once
-    shared = {"fine": 1}
-    assert _templated_key([shared, shared], schema) is None
-
-    # A structure pointing back at itself does not spin
-    loop = {"fine": 1}
-    loop["self"] = [loop]
-    assert _templated_key(loop, schema) is None
-
-    # No declarations at all means nothing to look for
-    assert _templated_key({"${T}": "x"}, schema_for()) is None
-
-
-def test_apprise_template_service_choice_scan_ignores_undeclared():
-    """Only a declared name may not choose the service."""
-    from apprise.config.base import _templated_schema
-
-    schema = schema_for("t")
-    assert _templated_schema("${T}://host/", schema) == "t"
-    assert _templated_schema("${other}://host/", schema) is None
-    assert _templated_schema("json://host/", schema) is None
-
-    # Not a string at all
-    assert _templated_schema(None, schema) is None
 
 
 @pytest.mark.parametrize(
@@ -1720,7 +1879,7 @@ def test_apprise_template_cli_unusable_name(tmpdir, entry):
     from apprise import cli
 
     config = tmpdir.join("apprise.yml")
-    config.write("version: 2\nurls:\n  - json://localhost\n")
+    config.write("urls:\n  - json://localhost\n")
 
     result = CliRunner().invoke(
         cli.main, ["-b", "x", f"--config={config!s}", "-tv", entry]
@@ -1736,10 +1895,7 @@ def test_apprise_template_cli_repeated_name(tmpdir):
     from apprise import cli
 
     config = tmpdir.join("apprise.yml")
-    config.write(
-        "version: 2\ntemplate:\n  - t\n"
-        "urls:\n  - json://user:${T}@localhost/\n"
-    )
+    config.write("template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n")
 
     result = CliRunner().invoke(
         cli.main,
@@ -1754,7 +1910,7 @@ def test_apprise_template_reads_a_configuration_once():
     apobj = Apprise()
     config = AppriseConfig(cache=False)
     assert config.add_config(
-        "version: 2\ntemplate:\n  - t\nurls:\n  - json://localhost/?to=${T}\n",
+        "template:\n  - t\nurls:\n  - json://localhost/?to=${T}\n",
         format="yaml",
     )
     assert apobj.add(config)
@@ -1794,7 +1950,7 @@ def test_apprise_template_cli_error_hides_value(tmpdir):
     from apprise import cli
 
     config = tmpdir.join("apprise.yml")
-    config.write("version: 2\nurls:\n  - json://localhost\n")
+    config.write("urls:\n  - json://localhost\n")
 
     result = CliRunner().invoke(
         cli.main,
@@ -1866,6 +2022,22 @@ def test_apprise_template_url_shows_a_grouped_setting():
     assert service.headers == {"X-Token": "abc123"}
 
 
+def test_apprise_template_url_skips_non_string_group_key():
+    """Skip grouped settings whose YAML keys are not strings.
+
+    YAML parses a bare ``1:`` as a number, which cannot name a URL header.
+    """
+    entry = parse(
+        "template:\n  - t\n"
+        "urls:\n  - json://localhost:\n"
+        "      headers:\n        1: fixed\n        X-Token: ${T}\n"
+    )[0]
+
+    url = entry.url()
+    assert "X-Token=${T}" in url
+    assert "fixed" not in url
+
+
 def test_apprise_template_url_does_not_repeat_a_header_from_the_url():
     """A header written in the URL is listed once, not twice."""
     entry = parse(
@@ -1934,7 +2106,7 @@ def test_apprise_template_url_rejects_unparsed_marker(logging_enabled, caplog):
     for entry in entries:
         caplog.clear()
         with caplog.at_level(logging.ERROR):
-            services = parse("version: 2\ntemplate:\n  - t\n" + entry)
+            services = parse("template:\n  - t\n" + entry)
 
         assert services == []
         assert "can not be used at this position" in caplog.text
@@ -1969,7 +2141,7 @@ def test_apprise_template_url_grouped_setting_replaces_the_group():
     of them under the URL drops the ones the URL carried.
     """
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - json://localhost/?+X-Token=unused:\n"
         "      '+Other': ${T}\n"
     )[0]
@@ -2010,9 +2182,7 @@ def test_apprise_template_marker_is_never_escaped(placement, entry):
     caller can search for and replace, in both privacy modes.
     """
     suffix = "" if entry.endswith("\n") else "\n"
-    services = parse(
-        "version: 2\ntemplate:\n  - v\nurls:\n  - " + entry + suffix
-    )
+    services = parse("template:\n  - v\nurls:\n  - " + entry + suffix)
     entry_obj = services[0]
 
     for url in (entry_obj.url(), entry_obj.url(privacy=True)):
@@ -2027,7 +2197,7 @@ def test_apprise_template_undeclared_marker_stays_readable():
     it readable is what shows the author why the entry never asks for it.
     """
     entry = parse(
-        "version: 2\ntemplate:\n  - v\n"
+        "template:\n  - v\n"
         "urls:\n  - json://localhost/?a=${undeclared}&b=${V}\n"
     )[0]
 
@@ -2046,7 +2216,7 @@ def test_apprise_template_url_lists_a_setting_under_its_written_name():
     mean different things, so the listing must not rename one to the other.
     """
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n      name: ${T}\n"
     )[0]
 
@@ -2064,7 +2234,7 @@ def test_apprise_template_url_setting_replaces_the_url_query():
     from the configuration it came from.
     """
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com?from=someone@example.com:\n"
         "      name: ${T}\n"
     )[0]
@@ -2077,7 +2247,7 @@ def test_apprise_template_url_setting_replaces_the_url_query():
 def test_apprise_template_url_last_written_setting_wins():
     """When two names fill one field, the later one is the one listed."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n"
         "      from: real@example.com\n      name: ${T}\n"
     )[0]
@@ -2094,7 +2264,7 @@ def test_apprise_template_url_reloads_into_the_saved_configuration():
     is lost when the URL is filled in and loaded on its own.
     """
     config = (
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n"
         "      to: rcpt@example.com\n      name: ${T}\n"
     )
@@ -2152,7 +2322,7 @@ def test_apprise_template_flatten_stops_at_the_nesting_limit():
 def test_apprise_template_url_omits_a_setting_with_nothing_to_say():
     """An empty list, or a value no URL can carry, is left out."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n"
         "      to: []\n      cc: null\n      name: ${T}\n"
     )[0]
@@ -2181,7 +2351,7 @@ def test_apprise_template_url_args_without_a_usable_plugin():
 def test_apprise_template_settable_needs_a_known_service():
     """A schema with no plugin behind it can carry no settings."""
     entry = parse(
-        "version: 2\ntemplate:\n  - t\n"
+        "template:\n  - t\n"
         "urls:\n  - mailtos://u:p@gmail.com:\n      name: ${T}\n"
     )[0]
 

@@ -126,6 +126,51 @@ def test_template_replaces_declared_names_only():
 
 
 @pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        # A "$" in front is ordinary text kept beside the value
+        ("$${A}", "$real"),
+        # ...as is any other text either side of the marker
+        ("x-$${A}-y", "x-$real-y"),
+        # Two of them are simply two
+        ("$$${A}", "$$real"),
+    ],
+)
+def test_template_dollar_is_literal(text, expected):
+    """There is no escape syntax; a "$" is just a "$"."""
+    placeholders = TemplatePlaceholderMap(schema_of("a"), "")
+    encoded = placeholders.encode(text)
+
+    assert placeholders.used(encoded) == {"a"}
+    assert placeholders.substitute(encoded, {"a": "real"}) == expected
+
+
+def test_template_marker_value_is_not_expanded():
+    """A value is dropped in as it is, markers and all.
+
+    Only the original text is scanned, so a value that happens to contain
+    ${NAME} is never looked at a second time.
+    """
+    placeholders = TemplatePlaceholderMap(schema_of("a", "b"), "")
+    encoded = placeholders.encode("${A}")
+
+    # The value for 'a' mentions 'b', and stays exactly that text
+    result = placeholders.substitute(encoded, {"a": "${B}", "b": "34"})
+    assert result == "${B}"
+
+
+def test_template_default_marker_is_literal():
+    """One declaration never builds on another."""
+    schema = TemplateSchema.parse([{"value": "34"}, {"key": "${value}"}])
+
+    assert schema.variables["key"].default == "${value}"
+    assert resolve_values(schema, None, {}) == {
+        "value": "34",
+        "key": "${value}",
+    }
+
+
+@pytest.mark.parametrize(
     "secret",
     ["p${a}ss", "$${x}", "${}", "${toolong" + "g" * 40 + "}", "$", "${"],
     ids=["inline", "double-dollar", "empty", "over-long", "bare", "unclosed"],
@@ -177,12 +222,16 @@ def test_template_preserves_setting_names():
     assert value != "${TARGET}"
 
 
-def test_template_detects_variable_setting_name():
-    """A placeholder sitting in a key is found and named."""
+def test_template_fills_mapping_name():
+    """A placeholder sitting in a name is filled in like any other text."""
     placeholders = TemplatePlaceholderMap(schema_of("target"), "")
-    bad = {placeholders.encode("${TARGET}"): 1}
-    assert placeholders.keys_contain_placeholder(bad) == "target"
-    assert placeholders.keys_contain_placeholder({"fine": 1}) is None
+    # A parsed URL keeps its query names under "qsd", not at the top
+    entry = {"qsd": {placeholders.encode("${TARGET}"): 1}}
+
+    assert placeholders.used(entry) == {"target"}
+    assert placeholders.substitute(entry, {"target": "real"}) == {
+        "qsd": {"real": 1}
+    }
 
 
 def test_template_rejects_loop():
@@ -270,6 +319,12 @@ def test_template_supplied_name_case_insensitive():
     assert resolve_values(schema, {"TaRgEt": "x"}, {}) == {"target": "x"}
 
 
+def test_template_converts_number_to_text():
+    """Convert a numeric input to text."""
+    schema = schema_of("target")
+    assert resolve_values(schema, {"target": 42}, {}) == {"target": "42"}
+
+
 def test_template_ignores_unrelated_name():
     """Each configuration ignores names that it does not use."""
     schema = schema_of({"target": "a-default"})
@@ -332,14 +387,32 @@ def test_template_converts_scalar_value(value, expected):
         pytest.param("$" * 200000, id="bare-dollars"),
         pytest.param("${A" * 20000, id="partial-names"),
         pytest.param("${" * 10000 + "}" * 10000, id="unbalanced"),
+        pytest.param("${A}" * 100000, id="many-real-markers"),
+        pytest.param("${" + "A" * 100000 + "}", id="over-long-name"),
+        pytest.param("${" * 1000 + "A" + "}" * 1000, id="wrapped-braces"),
+        pytest.param("json://h/?" + "x=${A}&" * 50000, id="long-url-tail"),
+        pytest.param(
+            ("a" + "0" * 16 + "t" + "9" * 5000 + "z") * 20,
+            id="placeholder-lookalikes",
+        ),
     ],
 )
 def test_template_regex_performance(payload):
-    """Bound the pattern so input cannot make it hang."""
+    """Bound every scan so input cannot make one hang.
+
+    Each pattern uses bounded quantifiers with nothing that can backtrack,
+    so an unhelpful configuration costs time in proportion to its size and
+    no more.
+    """
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
-    start = time.monotonic()
-    placeholders.encode(payload)
-    assert time.monotonic() - start < 2
+    for scan in (
+        placeholders.encode,
+        placeholders.encode_url,
+        placeholders.pattern.findall,
+    ):
+        start = time.monotonic()
+        scan(payload)
+        assert time.monotonic() - start < 2
 
 
 def test_template_rejects_invalid_declaration():
@@ -392,11 +465,11 @@ def test_template_shared_branch():
 
 
 def test_template_nested_setting_name():
-    """A placeholder in a key is reported wherever it is nested."""
+    """A placeholder in a name is found however deeply it sits."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     nested = [{placeholders.encode("${A}"): 1}]
-    assert placeholders.keys_contain_placeholder(nested) == "a"
-    assert placeholders.keys_contain_placeholder([{"fine": 1}]) is None
+    assert placeholders.used(nested) == {"a"}
+    assert placeholders.used([{"fine": 1}]) == set()
 
 
 @pytest.mark.parametrize("value", [42, None, True])
@@ -418,15 +491,16 @@ def test_template_shared_setting_branch():
     """The same mapping seen twice is not walked twice."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     shared = {"fine": 1}
-    assert placeholders.keys_contain_placeholder([shared, shared]) is None
+    assert placeholders.used([shared, shared]) == set()
 
 
 def test_template_setting_loop():
-    """A loop is walked once rather than followed forever."""
+    """A loop is refused rather than followed forever."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
     loop = {"fine": 1}
     loop["self"] = [loop]
-    assert placeholders.keys_contain_placeholder(loop) is None
+    with pytest.raises(AppriseTemplateError):
+        placeholders.used(loop)
 
 
 def test_template_missing_host():
@@ -550,4 +624,48 @@ def test_template_leaves_a_setting_value_alone():
 def test_template_ignores_non_text_setting_keys():
     """YAML allows a number as a key; there is nothing to look at."""
     placeholders = TemplatePlaceholderMap(schema_of("a"), "")
-    assert placeholders.keys_contain_placeholder({1: "x", 2.5: "y"}) is None
+    entry = {1: "x", 2.5: "y"}
+    assert placeholders.used(entry) == set()
+    assert placeholders.substitute(entry, {}) == {1: "x", 2.5: "y"}
+
+
+def test_template_fills_name_beside_text():
+    """A name mixing a marker with fixed text keeps the fixed part."""
+    placeholders = TemplatePlaceholderMap(schema_of("a"), "")
+    entry = {"qsd": {"x-" + placeholders.encode("${A}"): 1}}
+    assert placeholders.substitute(entry, {"a": "real"}) == {
+        "qsd": {"x-real": 1}
+    }
+
+
+def test_template_preserves_yaml_names():
+    """A marker written as a YAML setting name stays plain text."""
+    placeholders = TemplatePlaceholderMap(schema_of("a"), "")
+    encoded = placeholders.encode_obj({"${A}": "${A}"})
+
+    # The name is untouched while the value became a placeholder
+    assert list(encoded) == ["${A}"]
+    assert placeholders.used(encoded) == {"a"}
+
+
+@pytest.mark.parametrize(
+    ("url", "expected_names"),
+    [
+        # Everything after :// is fair game
+        ("json://${A}/path?x=${A}", {"a"}),
+        # ...and nothing before it is
+        ("${A}://host/", set()),
+        # A URL with no separator at all has nothing to read
+        ("${A}user:pass@host/", set()),
+    ],
+)
+def test_template_encode_url_preserves_schema(url, expected_names):
+    """Only the text past :// is ever replaced."""
+    placeholders = TemplatePlaceholderMap(schema_of("a"), "")
+    assert placeholders.used(placeholders.encode_url(url)) == expected_names
+
+
+def test_template_encode_url_passes_non_text_through():
+    """There is no URL to read inside a number."""
+    placeholders = TemplatePlaceholderMap(schema_of("a"), "")
+    assert placeholders.encode_url(42) == 42

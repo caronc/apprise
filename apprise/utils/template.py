@@ -347,6 +347,23 @@ class TemplatePlaceholderMap:
         # a value cannot be expanded a second time.
         return TEMPLATE_VAR_RE.sub(replace, text)
 
+    def encode_url(self, url: Any) -> Any:
+        """Replace declared variables after a URL's ``://`` separator.
+
+        The schema stays literal so a supplied value cannot select the
+        service.
+        """
+
+        if not isinstance(url, str):
+            return url
+
+        schema, separator, remainder = url.partition("://")
+        if not separator:
+            # Nothing says where a schema ends, so there is no URL to read.
+            return url
+
+        return schema + separator + self.encode(remainder)
+
     def encode_obj(self, obj: Any, memo: Optional[dict] = None) -> Any:
         """Replace variables in YAML values without changing setting names."""
         return self._walk(obj, self.encode, memo)
@@ -356,8 +373,13 @@ class TemplatePlaceholderMap:
         obj: Any,
         fn,
         memo: Optional[dict] = None,
+        names: bool = False,
     ) -> Any:
-        """Rebuild a nested value, running ``fn`` over each string."""
+        """Rebuild a nested value, running ``fn`` over each string.
+
+        ``names`` also transforms mapping names. Parsed URL fields enable it
+        for query names, while YAML setting names remain literal.
+        """
 
         if isinstance(obj, str):
             # Leaf strings are the only values that can hold placeholders.
@@ -383,16 +405,20 @@ class TemplatePlaceholderMap:
         memo[marker] = None
 
         if isinstance(obj, dict):
-            # Mapping keys are deliberately preserved; only values are walked.
-            result = {k: self._walk(v, fn, memo) for k, v in obj.items()}
+            result = {
+                (self._walk(k, fn, memo, names) if names else k): self._walk(
+                    v, fn, memo, names
+                )
+                for k, v in obj.items()
+            }
 
         elif isinstance(obj, set):
             # Preserve the collection type while rebuilding its members.
-            result = {self._walk(v, fn, memo) for v in obj}
+            result = {self._walk(v, fn, memo, names) for v in obj}
 
         else:
             # Lists and tuples share traversal but keep their original type.
-            built = [self._walk(v, fn, memo) for v in obj]
+            built = [self._walk(v, fn, memo, names) for v in obj]
             result = tuple(built) if isinstance(obj, tuple) else built
 
         memo[marker] = result
@@ -403,8 +429,12 @@ class TemplatePlaceholderMap:
         """A regex matching any placeholder this map handed out."""
         if not hasattr(self, "_pattern"):
             # The random nonce limits matches to this configuration instance.
+            # Bounded quantifiers keep scans linear. Placeholder indexes are
+            # always far shorter than ten digits.
             self._pattern = re.compile(
-                r"a{}{}\d+z".format(re.escape(self.nonce), PLACEHOLDER_VAR)
+                r"a{}{}\d{{1,10}}z".format(
+                    re.escape(self.nonce), PLACEHOLDER_VAR
+                )
             )
         return self._pattern
 
@@ -420,41 +450,8 @@ class TemplatePlaceholderMap:
                 found.add(self.placeholders[token.group(0)])
             return text
 
-        self._walk(obj, collect)
+        self._walk(obj, collect, names=True)
         return found
-
-    def keys_contain_placeholder(self, obj: Any, memo=None) -> Optional[str]:
-        """Return a variable used as a setting name, if any."""
-
-        if memo is None:
-            # Object identities stop aliases and loops from being revisited.
-            memo = set()
-
-        if not isinstance(obj, dict):
-            if isinstance(obj, (list, tuple, set)):
-                for item in obj:
-                    name = self.keys_contain_placeholder(item, memo)
-                    if name:
-                        return name
-            return None
-
-        marker = id(obj)
-        if marker in memo:
-            return None
-        memo.add(marker)
-
-        for key, value in obj.items():
-            # A placeholder in a key would let a caller choose a setting name.
-            if isinstance(key, str):
-                match = self.pattern.search(key)
-                if match:
-                    return self.placeholders[match.group(0)]
-
-            name = self.keys_contain_placeholder(value, memo)
-            if name:
-                return name
-
-        return None
 
     def display(self, text: Any) -> Any:
         """Put ``${NAME}`` back in place of a placeholder."""
@@ -484,9 +481,11 @@ class TemplatePlaceholderMap:
         if isinstance(obj, dict):
             # Substitute every parsed field without filtering its characters.
             # The configuration author chooses the URL position and accepts
-            # that position's normal service-specific meaning.
+            # that position's normal service-specific meaning.  A query name
+            # is filled in the same way; it came from the same URL text.
             result = {
-                key: self._walk(item, replace) for key, item in obj.items()
+                key: self._walk(item, replace, names=True)
+                for key, item in obj.items()
             }
 
             # A marker owning the whole authority may use the familiar

@@ -200,20 +200,41 @@ def test_url_and_setting_scope(sent):
         "json://localhost/?tag=${V}",
         "json://localhost/:\n    - tag: ${V}",
         "${V}://localhost/",
-        "json://localhost/?${V}=1",
     ],
 )
 def test_disallowed_variable_positions(position):
-    """Do not let values choose a service, tag, or setting name.
+    """Do not let values choose a service or a tag.
 
     These fields are read before template values are applied.
     """
     apobj = Apprise()
     config = AppriseConfig()
     config.add_config(
-        "version: 2\ntemplate:\n  - v\nurls:\n  - {}\n".format(position),
+        "template:\n  - v\nurls:\n  - {}\n".format(position),
         format="yaml",
     )
     apobj.add(config)
 
     assert list(apobj.find(template={"v": "anything"})) == []
+
+
+def test_yaml_setting_name_stays_literal():
+    """Only values are replaced underneath a URL, never the names.
+
+    A setting is called whatever the configuration file called it, so a
+    marker written as one stays plain text.
+    """
+    apobj = Apprise()
+    config = AppriseConfig()
+    config.add_config(
+        "template:\n  - v\n"
+        "urls:\n  - json://localhost/:\n"
+        "      '+${V}': 1\n      '+X': ${V}\n",
+        format="yaml",
+    )
+    apobj.add(config)
+
+    service = next(apobj.find(template={"v": "supplied"}))
+
+    # The name kept its marker; only the value took the supplied text
+    assert service.headers == {"${V}": "1", "X": "supplied"}
