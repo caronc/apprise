@@ -33,6 +33,7 @@ See CWE-312 for the related cleartext-storage weakness.
 import logging
 import os
 from unittest import mock
+from urllib.parse import urlparse
 
 import pytest
 import requests
@@ -83,16 +84,17 @@ def test_pem_private_keyfile_credentials(logs, unreachable, tmpdir):
     pem = utils.pem.ApprisePEMController(path=str(tmpdir))
     assert pem.load_private_key(SECRET_KEY_URL) is False
 
-    # The failure is reported...
+    # The failure is reported without the password.
     assert "Could not access PEM Private Key" in logs.text
-
-    # ...without the password
     assert SECRET not in logs.text
 
-    # The host is still there, so an operator can tell which url failed
-    assert "example.com" in logs.text
+    # Parse logged URLs before checking which host was retained.
+    urls_in_logs = [token for token in logs.text.split() if "://" in token]
+    assert any(
+        urlparse(token).hostname == "example.com" for token in urls_in_logs
+    )
 
-    # The masked form is what was written
+    # The masked form is what was written.
     assert "user:p...3@example.com" in logs.text
 
 
