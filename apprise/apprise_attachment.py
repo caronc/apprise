@@ -34,6 +34,7 @@ from .common import ContentLocation
 from .logger import logger
 from .manager_attachment import AttachmentManager
 from .url import URLBase
+from .utils.cwe312 import cwe312_loggable
 from .utils.parse import GET_SCHEMA_RE
 
 # Grant access to our Notification Manager Singleton
@@ -163,6 +164,10 @@ class AppriseAttachment:
             # prepare default asset
             asset = self.asset
 
+        secure_logging = (
+            asset.secure_logging if isinstance(asset, AppriseAsset) else True
+        )
+
         if isinstance(attachments, (AttachBase, str)):
             # store our instance
             attachments = (attachments,)
@@ -178,13 +183,17 @@ class AppriseAttachment:
         for attachment in attachments:
             if self.location == ContentLocation.INACCESSIBLE:
                 logger.warning(
-                    f"Attachments are disabled; ignoring {attachment}"
+                    "Attachments are disabled; ignoring %s",
+                    cwe312_loggable(attachment, secure_logging),
                 )
                 return_status = False
                 continue
 
             if isinstance(attachment, str):
-                logger.debug(f"Loading attachment: {attachment}")
+                logger.debug(
+                    "Loading attachment: %s",
+                    cwe312_loggable(attachment, secure_logging),
+                )
                 # Instantiate ourselves an object, this function throws or
                 # returns None if it fails
                 instance = AppriseAttachment.instantiate(
@@ -251,6 +260,10 @@ class AppriseAttachment:
 
         A specified cache value will over-ride anything set
         """
+        # Prepare the asset before any URL can be written to a log.
+        asset = asset if isinstance(asset, AppriseAsset) else AppriseAsset()
+        loggable_url = cwe312_loggable(url, asset.secure_logging)
+
         # Attempt to acquire the schema at the very least to allow our
         # attachment based urls.
         schema = GET_SCHEMA_RE.match(url)
@@ -274,13 +287,11 @@ class AppriseAttachment:
 
         if not results:
             # Failed to parse the server URL
-            logger.warning(f"Unparseable URL {url}.")
+            logger.warning(f"Unparseable URL {loggable_url}.")
             return None
 
         # Prepare our Asset Object
-        results["asset"] = (
-            asset if isinstance(asset, AppriseAsset) else AppriseAsset()
-        )
+        results["asset"] = asset
 
         if cache is not None:
             # Force an over-ride of the cache value to what we have specified
@@ -294,7 +305,7 @@ class AppriseAttachment:
 
             except Exception:
                 # the arguments are invalid or can not be used.
-                logger.warning(f"Could not load URL: {url}")
+                logger.warning(f"Could not load URL: {loggable_url}")
                 return None
 
         else:

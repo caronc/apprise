@@ -35,7 +35,7 @@ from .config.base import ConfigBase
 from .logger import logger
 from .manager_config import ConfigurationManager
 from .url import URLBase
-from .utils.cwe312 import cwe312_url
+from .utils.cwe312 import cwe312_loggable
 from .utils.logic import is_exclusive_match
 from .utils.parse import GET_SCHEMA_RE, parse_list
 
@@ -186,6 +186,10 @@ class AppriseConfig:
             # prepare default asset
             asset = self.asset
 
+        secure_logging = (
+            asset.secure_logging if isinstance(asset, AppriseAsset) else True
+        )
+
         if isinstance(configs, ConfigBase):
             # Go ahead and just add our configuration into our list
             self.configs.append(configs)
@@ -217,7 +221,10 @@ class AppriseConfig:
                 return_status = False
                 continue
 
-            logger.debug(f"Loading configuration: {config}")
+            logger.debug(
+                "Loading configuration: %s",
+                cwe312_loggable(config, secure_logging),
+            )
 
             # Instantiate ourselves an object, this function throws or
             # returns None if it fails
@@ -404,7 +411,7 @@ class AppriseConfig:
                 if isinstance(asset, AppriseAsset)
                 else True
             )
-            loggable_url = url if not secure_logging else cwe312_url(url)
+            loggable_url = cwe312_loggable(url, secure_logging)
             logger.error(f"Unparseable URL {loggable_url}.")
             return None
 
@@ -435,10 +442,8 @@ class AppriseConfig:
             except Exception:
                 # the arguments are invalid or can not be used.
                 # CWE-312 (Secure Logging) Handling
-                loggable_url = (
-                    url
-                    if not results["asset"].secure_logging
-                    else cwe312_url(url)
+                loggable_url = cwe312_loggable(
+                    url, results["asset"].secure_logging
                 )
                 logger.error(f"Could not load URL: {loggable_url}")
                 return None

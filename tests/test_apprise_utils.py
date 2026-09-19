@@ -3540,6 +3540,79 @@ def test_cwe312_url():
     )
 
 
+def test_cwe312_loggable():
+    """utils: cwe312_loggable() testing"""
+
+    # A url carrying credentials is masked
+    assert (
+        utils.cwe312.cwe312_loggable("http://user:pass123@localhost")
+        == "http://user:p...3@localhost"
+    )
+    assert (
+        utils.cwe312.cwe312_loggable(
+            "https://user:pass123@example.com/private_key.pem"
+        )
+        == "https://user:p...3@example.com/p...m"
+    )
+
+    # Masking can be switched off, which is what secure_logging=False does
+    assert (
+        utils.cwe312.cwe312_loggable(
+            "http://user:pass123@localhost", secure=False
+        )
+        == "http://user:pass123@localhost"
+    )
+
+    # Keep local paths readable so failures identify the affected file.
+    for path in (
+        "/etc/apprise/private_key.pem",
+        "~/keys/private_key.pem",
+        "./subscriptions.json",
+        "subscriptions.json",
+        "private_key.pem",
+        "C:\\keys\\private.pem",
+    ):
+        assert utils.cwe312.cwe312_loggable(path) == path
+        assert utils.cwe312.cwe312_loggable(path, secure=False) == path
+
+    # Nothing to print reads as a placeholder rather than 'None'
+    assert utils.cwe312.cwe312_loggable(None) == "(none)"
+    assert utils.cwe312.cwe312_loggable("") == "(none)"
+    assert utils.cwe312.cwe312_loggable(0) == "(none)"
+    assert utils.cwe312.cwe312_loggable(None, secure=False) == "(none)"
+
+    # Anything that is not a string is turned into one rather than raising
+    assert utils.cwe312.cwe312_loggable(42) == "42"
+    assert utils.cwe312.cwe312_loggable(4.2) == "4.2"
+
+    # Dictionaries remain available for administrator-facing diagnostics.
+    details = {"password": "pass123"}
+    assert utils.cwe312.cwe312_loggable(details) == str(details)
+    assert utils.cwe312.cwe312_loggable(details, secure=False) == str(details)
+
+    # Mask by default when the caller omits the setting.
+    url = "http://user:pass123@localhost"
+    assert utils.cwe312.cwe312_loggable(url) != url
+
+    # Malformed URLs fail closed instead of returning credentials unchanged.
+    for url in (
+        "http://user:pass123@[",
+        "http://user:pass123@example.com:bad",
+        "http://user:pass123@example.com\nforged",
+    ):
+        result = utils.cwe312.cwe312_loggable(url)
+        assert "pass123" not in result
+        assert "\n" not in result
+
+    assert (
+        utils.cwe312.cwe312_loggable("http://user:pass123@[") == "http://..."
+    )
+    assert (
+        utils.cwe312.cwe312_loggable("http://user:pass123@example.com:bad")
+        == "http://..."
+    )
+
+
 def test_base64_encode_decode():
     """Utils:Base64:URLEncode & Decode."""
     assert utils.base64.base64_urlencode(None) is None
