@@ -182,31 +182,6 @@ def _url_args(plugin: Any) -> tuple:
 class NotifyTemplate:
     """A configuration entry awaiting one or more template values."""
 
-    # Parts of a parsed URL that are rebuilt directly, plus internal
-    # bookkeeping.  Anything else holding a placeholder came from a
-    # YAML setting and is shown as a query parameter instead.
-    STRUCTURAL_KEYS = frozenset(
-        (
-            "asset",
-            "fullpath",
-            "host",
-            "password",
-            "path",
-            "port",
-            "qsd",
-            "qsd+",
-            "qsd-",
-            "qsd:",
-            "query",
-            "schema",
-            "secure",
-            "tag",
-            "url",
-            "user",
-            "verify",
-        )
-    )
-
     # Query string names whose value is always treated as a secret.
     # Kept in step with the masking done for regular URLs.
     SECRET_KEYS = (
@@ -265,6 +240,11 @@ class NotifyTemplate:
 
         # Protect cache reads and writes when notifications run in parallel.
         self._lock = threading.Lock()
+
+    @property
+    def location(self) -> str:
+        """Name the YAML lines this entry was read from."""
+        return "YAML entry #{}, item #{}".format(self.entry, self.item)
 
     @property
     def schema(self) -> str:
@@ -612,7 +592,9 @@ class NotifyTemplate:
 
         except Exception as e:
             logger.error(
-                "Could not apply template variables to %s://", self.schema
+                "Could not apply template variables to %s:// (%s)",
+                self.schema,
+                self.location,
             )
             logger.debug("Template Exception: %s", e)
             return None
@@ -625,7 +607,9 @@ class NotifyTemplate:
         url = results.get("url")
         if isinstance(url, str) and len(url) > MAX_RESOLVED_URL_LEN:
             logger.error(
-                "A template built an over-sized %s:// URL", self.schema
+                "A template built an over-sized %s:// URL (%s)",
+                self.schema,
+                self.location,
             )
             return None
 
@@ -635,8 +619,10 @@ class NotifyTemplate:
 
         except Exception as e:
             logger.error(
-                "Could not load %s:// once template variables were applied",
+                "Could not load %s:// once template variables were applied"
+                " (%s)",
                 self.schema,
+                self.location,
             )
             logger.debug("Loading Exception: %s", e)
             return None

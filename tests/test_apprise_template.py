@@ -563,7 +563,7 @@ def test_apprise_template_repeated_name(sent):
     assert "/same/" in service.url()
 
 
-def test_apprise_template_url_size_limit(monkeypatch):
+def test_apprise_template_url_size_limit(monkeypatch, logging_enabled, caplog):
     """A built URL is capped no matter what values arrive."""
     import apprise.template as template_module
 
@@ -571,10 +571,15 @@ def test_apprise_template_url_size_limit(monkeypatch):
         "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
     monkeypatch.setattr(template_module, "MAX_RESOLVED_URL_LEN", 10)
-    assert entry.resolve({"t": "a-value-well-over-ten-characters"}) is None
+
+    with caplog.at_level(logging.ERROR):
+        assert entry.resolve({"t": "a-value-well-over-ten-characters"}) is None
+
+    # The message says which lines of the file to go and look at
+    assert "YAML entry #1, item #1" in caplog.text
 
 
-def test_apprise_template_build_failure():
+def test_apprise_template_build_failure(logging_enabled, caplog):
     """A value the service rejects skips the entry, not the run."""
     entry = parse(
         "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
@@ -582,24 +587,50 @@ def test_apprise_template_build_failure():
 
     from apprise.template import N_MGR
 
-    with mock.patch.object(
-        type(N_MGR),
-        "__getitem__",
-        side_effect=TypeError("the value was refused"),
+    with (
+        mock.patch.object(
+            type(N_MGR),
+            "__getitem__",
+            side_effect=TypeError("the value was refused"),
+        ),
+        caplog.at_level(logging.ERROR),
     ):
         assert entry.resolve({"t": "x"}) is None
 
+    assert "YAML entry #1, item #1" in caplog.text
 
-def test_apprise_template_substitution_failure():
+
+def test_apprise_template_substitution_failure(logging_enabled, caplog):
     """A failure while filling values in is handled quietly."""
     entry = parse(
         "template:\n  - t\nurls:\n  - json://user:${T}@localhost/\n"
     )[0]
 
-    with mock.patch.object(
-        entry.placeholders, "substitute", side_effect=RuntimeError("nope")
+    with (
+        mock.patch.object(
+            entry.placeholders, "substitute", side_effect=RuntimeError("nope")
+        ),
+        caplog.at_level(logging.ERROR),
     ):
         assert entry.resolve({"t": "x"}) is None
+
+    assert "YAML entry #1, item #1" in caplog.text
+
+
+def test_apprise_template_location_counts_each_expansion():
+    """One URL block that becomes several services numbers them apart."""
+    services = parse(
+        "template:\n  - t\n"
+        "urls:\n  - mailto://user:pass@gmail.com:\n"
+        "    - to: one@example.com\n      cc: ${T}\n"
+        "    - to: two@example.com\n      cc: ${T}\n"
+    )
+
+    # Both came from the first block under urls:, as separate items
+    assert [s.location for s in services] == [
+        "YAML entry #1, item #1",
+        "YAML entry #1, item #2",
+    ]
 
 
 def test_apprise_template_adjacent_text_masking():
