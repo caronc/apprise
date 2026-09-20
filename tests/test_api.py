@@ -2582,9 +2582,12 @@ def test_apprise_details_plugin_verification():
                         try:
                             re.compile(arg["regex"][0])
 
-                        except:
-                            assert "{} is an invalid regex".format(
-                                arg["regex"][0]
+                        except Exception as e:
+                            # Treat any compilation failure as invalid.
+                            pytest.fail(
+                                "{} is an invalid regex ({}: {})".format(
+                                    arg["regex"][0], type(e).__name__, e
+                                )
                             )
 
                         # Regex should always start and/or end with ^/$
