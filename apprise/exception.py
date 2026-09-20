@@ -56,6 +56,18 @@ class AppriseImproperlyConfigured(
         super().__init__(message, error_code=error_code)
 
 
+class AppriseTemplateError(AppriseImproperlyConfigured):
+    """Raised for undeclared, missing, or invalid template values.
+
+    ``variable`` is for local logs only because it may reveal configuration
+    details.
+    """
+
+    def __init__(self, message, variable=None, error_code=errno.EINVAL):
+        super().__init__(message, error_code=error_code)
+        self.variable = variable
+
+
 class AppriseDiskIOError(AppriseException, OSError):
     """Raised when a disk I/O operation fails."""
 

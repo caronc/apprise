@@ -189,7 +189,7 @@ def test_plugin_dingtalk_msgtype(mock_post):
     # Text is our default format
     aobj = Apprise()
     assert aobj.add("dingtalk://{}".format("a" * 8))
-    assert aobj.notify(title="title", body="body") is True
+    assert bool(aobj.notify(title="title", body="body")) is True
     assert mock_post.call_count == 1
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
@@ -202,7 +202,7 @@ def test_plugin_dingtalk_msgtype(mock_post):
     # Markdown must flip the msgtype over as well
     aobj = Apprise()
     assert aobj.add("dingtalk://{}?format=markdown".format("a" * 8))
-    assert aobj.notify(title="title", body="body") is True
+    assert bool(aobj.notify(title="title", body="body")) is True
     assert mock_post.call_count == 1
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
@@ -228,3 +228,94 @@ def test_plugin_dingtalk_markdown_no_title(mock_post):
 
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["markdown"]["title"] == obj.app_desc
+
+
+@mock.patch("requests.post")
+def test_plugin_dingtalk_multi_format(mock_post):
+    """NotifyDingTalk(): markdown input aligns without an override."""
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+
+    # DingTalk declares both text and markdown, so a caller supplying a
+    # Markdown body is delivered as markdown with no ?format= needed
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}".format("a" * 8))
+    assert (
+        bool(
+            aobj.notify(
+                body="**hello** *world*",
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["msgtype"] == "markdown"
+    assert payload["markdown"]["text"] == "**hello** *world*"
+
+    mock_post.reset_mock()
+
+    # A plain text body still arrives as text
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}".format("a" * 8))
+    assert (
+        bool(aobj.notify(body="hello world", body_format=NotifyFormat.TEXT))
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["msgtype"] == "text"
+    assert payload["text"]["content"] == "hello world"
+
+    mock_post.reset_mock()
+
+    # An explicit ?format=text override wins over a Markdown body
+    aobj = Apprise()
+    assert aobj.add("dingtalk://{}?format=text".format("a" * 8))
+    assert (
+        bool(
+            aobj.notify(
+                body="**hello** *world*",
+                body_format=NotifyFormat.MARKDOWN,
+            )
+        )
+        is True
+    )
+    assert mock_post.call_count == 1
+
+    payload = loads(mock_post.call_args_list[0][1]["data"])
+    assert payload["msgtype"] == "text"
+
+
+def test_plugin_dingtalk_title_maxlen():
+    """NotifyDingTalk(): a title field only exists in markdown mode."""
+
+    # Text is our default, so the framework folds the title into the body
+    obj = Apprise.instantiate("dingtalk://{}".format("a" * 8))
+    assert obj.title_maxlen == 0
+
+    # Markdown carries its own title field
+    obj = Apprise.instantiate("dingtalk://{}?format=markdown".format("a" * 8))
+    assert obj.title_maxlen > 0
+
+
+def test_plugin_dingtalk_url_format_round_trip():
+    """NotifyDingTalk(): an explicit format= survives a round trip."""
+
+    # Without an override, format= is left off so the URL stays flexible
+    obj = Apprise.instantiate("dingtalk://{}".format("a" * 8))
+    assert "format=" not in obj.url()
+
+    # An explicit override is always preserved
+    obj = Apprise.instantiate("dingtalk://{}?format=markdown".format("a" * 8))
+    assert "format=markdown" in obj.url()
+
+    # Re-loading the generated URL gives us the same object back
+    obj2 = Apprise.instantiate(obj.url())
+    assert obj2.url_identifier == obj.url_identifier
+    assert obj2.title_maxlen == obj.title_maxlen

@@ -44,6 +44,7 @@ from . import (
     AppriseConfig,
     AppriseResultStatus,
     NotificationManager,
+    NotifyTemplate,
     PersistentStore,
     __copyright__,
     __license__,
@@ -67,6 +68,7 @@ from .common import (
 from .logger import logger
 from .utils.disk import bytes_to_str, dir_size, path_decode
 from .utils.parse import GET_SCHEMA_RE, parse_list
+from .utils.template import TEMPLATE_NAME_RE, normalize_name
 
 # By default we allow looking 1 level down recursively in Apprise configuration
 # files.
@@ -690,6 +692,22 @@ def _force_exit(apobj: Apprise, status: AppriseResultStatus) -> None:
     help="Specify the default theme.",
 )
 @click.option(
+    "--template-var",
+    "-tv",
+    "template_var",
+    default=None,
+    type=str,
+    multiple=True,
+    metavar="NAME=VALUE",
+    help=(
+        "Supply a value used by a YAML configuration written with "
+        "${NAME}. Use multiple --template-var (-tv) entries for more "
+        "than one. A value not given here is looked for in the "
+        "configuration's own default and then in "
+        "APPRISE_TEMPLATE_<NAME>."
+    ),
+)
+@click.option(
     "--tag",
     "-g",
     default=None,
@@ -805,6 +823,7 @@ def main(
     urls,
     notification_type,
     theme,
+    template_var,
     tag,
     input_format,
     dry_run,
@@ -1201,6 +1220,39 @@ def main(
     # Each --tag value is a comma-separated AND group; values are ORed.
     tags = None if not tag else [parse_list(t) for t in tag]
 
+    # Split once so equals signs remain valid inside the value.
+    template_vars = {}
+
+    # Names are matched without regard to case, so track what we have seen.
+    template_seen = set()
+    for entry in template_var:
+        name, sep, value = entry.partition("=")
+        name = name.strip()
+        if not sep or not TEMPLATE_NAME_RE.match(name):
+            # Only the name is echoed; the rest of the entry may be a
+            # secret and must not reach the screen or a captured log.
+            click.echo(
+                "The --template-var (-tv) name '{}' is not in the"
+                " expected NAME=VALUE format.".format(name)
+            )
+            click.echo("Try 'apprise --help' for more information.")
+
+            # Match Click's exit code for invalid parameters.
+            ctx.exit(2)
+
+        if normalize_name(name) in template_seen:
+            click.echo(
+                "The --template-var (-tv) name '{}' was provided more than"
+                " once.".format(name)
+            )
+            click.echo("Try 'apprise --help' for more information.")
+
+            # Match Click's exit code for invalid parameters.
+            ctx.exit(2)
+
+        template_seen.add(normalize_name(name))
+        template_vars[name] = value
+
     # Determine if we're dealing with URLs or url_ids based on the first
     # entry provided.
     if storage_action:
@@ -1421,6 +1473,7 @@ def main(
             notify_type=notification_type,
             tag=tags,
             attach=attach,
+            template=template_vars,
             timeout=limit,
         )
 
@@ -1449,7 +1502,18 @@ def main(
         # we iterated at least once in the loop.
         url = None
 
-        for idx, service in enumerate(a.find(tag=tags)):
+        # Count matching entries that a real run would skip.
+        unresolved = 0
+
+        # Show pending entries and the values they still need.
+        for idx, service in enumerate(a.find(tag=tags, resolve=False)):
+            entry = service
+            if isinstance(service, NotifyTemplate):
+                # Resolve supplied values or display the pending entry.
+                built = Apprise._resolve_template(service, template_vars)
+                if built is not None:
+                    service = built
+
             url = service.url(privacy=True)
             click.echo(
                 "{: 4d}. {}".format(
@@ -1463,12 +1527,18 @@ def main(
             )
 
             # Share our URL ID
-            click.echo(
-                "{:>10}: {}".format(
-                    "uid",
-                    "- n/a -" if not service.url_id() else service.url_id(),
-                )
-            )
+            if service.url_id():
+                uid = service.url_id()
+
+            elif isinstance(service, NotifyTemplate):
+                # Explain why this pending entry has no identifier.
+                uid = "- template; unresolved, would not send -"
+                unresolved += 1
+
+            else:
+                uid = "- n/a -"
+
+            click.echo("{:>10}: {}".format("uid", uid))
 
             if service.tags:
                 click.echo(
@@ -1478,12 +1548,46 @@ def main(
                     )
                 )
 
+            names = getattr(entry, "template_names", ())
+            if names:
+                required = set(getattr(entry, "template_required", ()))
+                click.echo(
+                    "{:>10}: {}".format(
+                        "template",
+                        ", ".join(
+                            "{} ({})".format(
+                                name,
+                                "required"
+                                if name in required
+                                else "has default",
+                            )
+                            for name in names
+                        ),
+                    )
+                )
+
+        if unresolved:
+            click.echo()
+            click.echo(
+                "{} of {} matched entries could not be resolved and would"
+                " not be sent. Check the log for the reason.".format(
+                    unresolved, idx + 1
+                )
+            )
+
         # Dry-run has no AppriseResult, so map its outcome to the same enum.
-        status = (
-            AppriseResultStatus.NOMATCH
-            if url is None
-            else AppriseResultStatus.SUCCESS
-        )
+        # A missing value maps to the same outcome a real run would give.
+        if url is None:
+            status = AppriseResultStatus.NOMATCH
+
+        elif not unresolved:
+            status = AppriseResultStatus.SUCCESS
+
+        elif unresolved == idx + 1:
+            status = AppriseResultStatus.FAILURE
+
+        else:
+            status = AppriseResultStatus.PARTIAL
 
     if status == AppriseResultStatus.TIMEOUT and not _wait_for_abandoned_calls(
         CLI_TIMEOUT_EXIT_GRACE_SECONDS
