@@ -78,6 +78,10 @@ class NotifyDingTalk(NotifyBase):
     # based message or a text based one.
     # title_maxlen = see below @propery defined
 
+    # DingTalk renders both plain text and markdown natively. Text is
+    # listed first, making it the default when nothing else applies.
+    notify_format = (NotifyFormat.TEXT, NotifyFormat.MARKDOWN)
+
     # Define object templates
     templates = (
         "{schema}://{token}/",
@@ -191,7 +195,14 @@ class NotifyDingTalk(NotifyBase):
         signature = NotifyDingTalk.quote(base64.b64encode(hmac_code), safe="")
         return timestamp, signature
 
-    def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
+    def send(
+        self,
+        body,
+        title="",
+        notify_type=NotifyType.INFO,
+        body_format=None,
+        **kwargs,
+    ):
         """Perform DingTalk Notification."""
 
         payload = {
@@ -202,7 +213,7 @@ class NotifyDingTalk(NotifyBase):
             },
         }
 
-        if self.notify_format == NotifyFormat.MARKDOWN:
+        if body_format == NotifyFormat.MARKDOWN:
             # Markdown support
             payload["markdown"] = {
                 # A title is mandatory for markdown messages
@@ -288,21 +299,22 @@ class NotifyDingTalk(NotifyBase):
     @property
     def title_maxlen(self):
         """The title isn't used when not in markdown mode."""
+        # Only a markdown message carries its own title field. In text
+        # mode we return 0 so the framework folds the title into the
+        # body for us before send() is ever called.
         return (
             NotifyBase.title_maxlen
-            if self.notify_format == NotifyFormat.MARKDOWN
+            if self.resolve_format() == NotifyFormat.MARKDOWN
             else 0
         )
 
     def url(self, privacy=False, *args, **kwargs):
         """Returns the URL built dynamically based on specified arguments."""
 
-        # Define any arguments set
-        args = {
-            "format": self.notify_format,
-            "overflow": self.overflow_mode,
-            "verify": "yes" if self.verify_certificate else "no",
-        }
+        # Define any arguments set. url_parameters() knows how to
+        # serialize format= for a multi-format plugin; it is only
+        # emitted when the user asked for an explicit override.
+        args = self.url_parameters(privacy=privacy, *args, **kwargs)
 
         return "{schema}://{secret}{token}/{targets}/?{args}".format(
             schema=self.secure_protocol,

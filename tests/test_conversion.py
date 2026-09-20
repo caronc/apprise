@@ -3734,10 +3734,18 @@ def test_conversion_split_dialect_chunk():
     assert "".join(pieces) == body.replace("*", "\\*")
     assert elapsed < 45.0
 
-    # Exercise real Slack-sized splits and the shared repair path. This checks
-    # whole-message splitting; matcher scaling has a focused test below.
-    small_n = 40000
-    large_n = 80000
+    # Exercise one real Slack-sized split and the shared repair path.
+    slack_body = ("*a " * ((80000 + 2) // 3))[:80000]
+    start = default_timer()
+    split_dialect_chunk(slack_body, 35000, NotifySlack._commonmark_to_slack)
+    elapsed = default_timer() - start
+
+    # Generous bound -- see the note on the equivalent check above.
+    assert elapsed < 90.0
+
+    # Confirm the cost does not grow with the square of the body.
+    small_n = 4000
+    large_n = 16000
     small_body = ("*a " * ((small_n + 2) // 3))[:small_n]
     large_body = ("*a " * ((large_n + 2) // 3))[:large_n]
 
@@ -3746,25 +3754,21 @@ def test_conversion_split_dialect_chunk():
     small_time = large_time = None
     for _ in range(2):
         start = default_timer()
-        split_dialect_chunk(
-            small_body, 35000, NotifySlack._commonmark_to_slack
-        )
+        split_dialect_chunk(small_body, 200, NotifySlack._commonmark_to_slack)
         elapsed = default_timer() - start
         small_time = (
             elapsed if small_time is None else min(small_time, elapsed)
         )
 
         start = default_timer()
-        split_dialect_chunk(
-            large_body, 35000, NotifySlack._commonmark_to_slack
-        )
+        split_dialect_chunk(large_body, 200, NotifySlack._commonmark_to_slack)
         elapsed = default_timer() - start
         large_time = (
             elapsed if large_time is None else min(large_time, elapsed)
         )
 
-    # Doubling the body should not approach four times the runtime.
-    assert large_time < small_time * 3.5 + 1.0
+    # Quadrupling the body must stay far below the square of the cost.
+    assert large_time < small_time * 8.0 + 1.0
 
 
 def test_conversion_split_keeps_only_first_empty_piece():

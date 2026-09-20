@@ -2488,6 +2488,28 @@ urls:
     assert result[0].verify_certificate is True
 
 
+def test_yaml_reapply_preserves_tags_and_asset():
+    """The final YAML pass must not undo values assembled by ConfigBase.
+
+    Both spellings of tags are normalized into one set and combined with the
+    global tags. The asset is supplied by the caller and cannot be replaced by
+    a same-named YAML option.
+    """
+    asset = AppriseAsset()
+    result, _ = ConfigBase.config_parse_yaml(
+        "tag: global\n"
+        "urls:\n"
+        "  - json://localhost/:\n"
+        "      tags: local\n"
+        "      asset: untrusted-value\n",
+        asset=asset,
+    )
+
+    assert len(result) == 1
+    assert result[0].tags == {"global", "local"}
+    assert result[0].asset is asset
+
+
 def test_yaml_priority_all_urlbase_globals_via_plugin_details():
     """
     API: ConfigBase - YAML priority verified dynamically for every
