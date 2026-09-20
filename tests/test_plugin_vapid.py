@@ -41,12 +41,13 @@ import requests
 
 from apprise import Apprise, asset, exception, url
 from apprise.common import PersistentStoreMode
-from apprise.plugins.vapid import VAPID_API_LOOKUP, NotifyVapid, subscription
+from apprise.plugins.vapid import VAPID_API_LOOKUP, NotifyVapid
 from apprise.plugins.vapid.subscription import (
     WebPushSubscription,
     WebPushSubscriptionManager,
     webpush_origin,
 )
+from apprise.utils.cwe312 import cwe312_loggable
 from apprise.utils.pem import ApprisePEMController
 
 logging.disable(logging.CRITICAL)
@@ -1812,18 +1813,16 @@ def test_plugin_vapid_logging_masks_secrets(tmpdir):
     secret = "cH1s-Is-A-SeCr3t-RegIstratIon-Id"
 
     # An endpoint token is sensitive and must not appear in logs.
-    masked = subscription.loggable_file(
-        f"https://fcm.googleapis.com/fcm/send/{secret}"
-    )
+    masked = cwe312_loggable(f"https://fcm.googleapis.com/fcm/send/{secret}")
     assert secret not in masked
 
     # A missing value is reported rather than blowing up
-    assert subscription.loggable_file(None) == "(none)"
-    assert subscription.loggable_file("") == "(none)"
+    assert cwe312_loggable(None) == "(none)"
+    assert cwe312_loggable("") == "(none)"
 
     # Keep local paths readable for troubleshooting.
     assert (
-        subscription.loggable_file("/etc/apprise/subscriptions.json")
+        cwe312_loggable("/etc/apprise/subscriptions.json")
         == "/etc/apprise/subscriptions.json"
     )
 

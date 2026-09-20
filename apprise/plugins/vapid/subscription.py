@@ -40,7 +40,7 @@ from ...common import ContentLocation
 from ...exception import AppriseInvalidData
 from ...logger import logger
 from ...utils.base64 import base64_urldecode
-from ...utils.cwe312 import cwe312_url
+from ...utils.cwe312 import cwe312_loggable
 from ...utils.parse import is_hostname
 
 try:
@@ -52,15 +52,6 @@ try:
 except ImportError:
     # Cryptography Support disabled
     CRYPTOGRAPHY_SUPPORT = False
-
-
-def loggable_file(path: Optional[str], secure: bool = True) -> str:
-    """Returns a log-safe path or URL, masking remote credentials."""
-
-    if not path:
-        return "(none)"
-
-    return cwe312_url(path) if secure else path
 
 
 def webpush_origin(endpoint: Optional[str]) -> Optional[str]:
@@ -190,7 +181,7 @@ class WebPushSubscription:
         if not origin:
             logger.debug(
                 "Vapid subscription endpoint is unusable: %s",
-                loggable_file(endpoint),
+                cwe312_loggable(endpoint),
             )
             return False
 
@@ -249,7 +240,7 @@ class WebPushSubscription:
         except OSError as e:
             logger.warning(
                 "Error writing Vapid subscription file %s",
-                loggable_file(path),
+                cwe312_loggable(path),
             )
             logger.debug("I/O Exception: %s", e)
             return False
@@ -424,7 +415,7 @@ class WebPushSubscriptionManager:
 
     def loggable_path(self, path: Optional[str]) -> str:
         """Returns a path that is safe to log, honouring secure_logging."""
-        return loggable_file(path, self.asset.secure_logging)
+        return cwe312_loggable(path, self.asset.secure_logging)
 
     @property
     def path(self) -> Optional[str]:
