@@ -24,24 +24,11 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-"""Test where ``${NAME}`` may be written and what each placement reaches.
+"""Test where template values may be placed and what they can change.
 
-A configuration author may put a variable in one of two places:
-
-1. **Directly in a URL.** It can fill in any field, the host included.
-   Everything else that URL holds -- credentials, path, query parameters,
-   headers, payload fields, and any setting written underneath -- is sent
-   to whichever host the finished URL points at. A value placed in the
-   host therefore decides who receives the rest.
-
-2. **In a named YAML setting under the URL.** It only ever reaches that
-   one option. The rest of the URL stays exactly as written, so the
-   destination cannot move.
-
-URL placement is deliberately unrestricted so configuration authors can
-reuse one setup across several servers. Named settings are safer when a
-less-trusted caller should control only one option. The Apprise API follows
-the same placement rules for every access level.
+URL markers can change any field, including the destination. Markers in named
+YAML settings change only that setting, making them safer for untrusted input.
+The Apprise API uses the same rules at every access level.
 """
 
 # Disable logging for a cleaner testing output

@@ -368,8 +368,8 @@ The environment is the last resort, so it only ever fills in a name the
 
 Values supplied for a call or through the environment are trimmed. If one is
 blank afterwards, it reads as not supplied and the next source above applies.
-A default written in the configuration stays as written, including an empty
-default.
+A default written in the configuration stays as written. Use `name: ""` for an
+explicit empty-string default; `name:` means the value is required.
 
 ```bash
 # Supply it directly
@@ -393,18 +393,9 @@ existing password from being replaced by accident. Extra supplied names are
 accepted and ignored.
 
 Variables may be placed directly in a URL or in a named YAML setting. URL
-placement is flexible, including email addresses, `user:pass`, and
-comma-separated targets. A variable standing for the whole host also
-understands `user@host` and `user:pass@host`, filling in those fields for you
-unless the URL already spells out its own credentials. Use a named setting when
-a caller should control only one option.
-
-The two placements differ in reach. A variable in the URL can fill in any field,
-the host included, and everything else that URL holds travels to whichever host
-the finished URL points at. A variable in a named setting only ever reaches that
-one option. Apprise deliberately does not restrict URL placement, giving trusted
-administrators full control. Use a named setting when a value may come from an
-untrusted caller or should affect only one option.
+markers can change any field, including the destination; whole-host markers
+also accept `user@host` and `user:pass@host`. A named setting changes only its
+option, so prefer it for values supplied by less-trusted callers.
 
 Variables cannot replace the service before `://`, a setting name, or a
 `tag:`/`tags:` value. Services and tags must be known before values are filled

@@ -133,19 +133,17 @@ def _destination(details: dict, arg: str) -> str:
     return target.get("map_to", map_to)
 
 
-def _url_args(plugin: Any) -> tuple:
-    """Relate a service's fields and the URL arguments that set them.
+def _url_args(plugin: Any) -> dict:
+    """Relate each URL argument to the service field it fills.
 
-    YAML may store a field as ``smtp_host`` while its URL uses ``smtp=``.
-    Returns two lookups: one from a field to the argument that sets it, and
-    one from an argument back to the field it fills.  Several arguments can
-    share a field, so the second is needed to spot a query entry the
-    configuration has since overridden.
+    YAML may store ``smtp_host`` while its URL uses ``smtp=``. Several
+    arguments may share one field, so this lookup also reveals when YAML has
+    overridden a URL query value.
     """
 
     if plugin is None:
         # No plugin means there are no service-specific URL arguments.
-        return {}, {}
+        return {}
 
     if plugin in URL_ARGS_CACHE:
         # Plugin argument names do not change between entries.
@@ -154,29 +152,20 @@ def _url_args(plugin: Any) -> tuple:
     # Imported here because the plugin package loads this module.
     from . import plugins
 
-    to_arg, to_field = {}, {}
+    to_field = {}
     try:
-        # Describe each argument once in both directions.
+        # Describe each argument once.
         details = plugins.details(plugin)
         for arg in details["args"]:
-            field = _destination(details, arg)
-            # This direction identifies old query spellings to replace.
-            to_field[arg] = field
-            if field == arg:
-                # Prefer the field's own argument over an alias.
-                to_arg[arg] = arg
-
-            else:
-                # Keep the first usable alias unless the field's own name wins.
-                to_arg.setdefault(field, arg)
+            to_field[arg] = _destination(details, arg)
 
     except Exception:
         # A service we cannot describe simply gets no translation.
-        to_arg, to_field = {}, {}
+        to_field = {}
 
-    # Reuse the completed pair for every entry of this service.
-    URL_ARGS_CACHE[plugin] = (to_arg, to_field)
-    return to_arg, to_field
+    # Reuse the completed lookup for every entry of this service.
+    URL_ARGS_CACHE[plugin] = to_field
+    return to_field
 
 
 class NotifyTemplate:
@@ -338,10 +327,10 @@ class NotifyTemplate:
     ) -> Optional[str]:
         """Render a YAML setting as the text a URL argument carries.
 
-        Every setting is written out, not only the ones holding a marker,
-        so the listed URL reloads into the configuration it came from.
-        ``privacy`` masks stored text; ``secret`` forces masking around a
-        marker. Return ``None`` for a value no URL argument can carry.
+        Every representable setting is included, even without a marker, so the
+        URL can recreate the configuration. ``privacy`` masks stored text and
+        ``secret`` always masks it, including text around a marker. ``None``
+        means the value cannot be carried by a URL argument.
         """
 
         if isinstance(value, bool):
@@ -379,9 +368,9 @@ class NotifyTemplate:
     def _grouped_query(self, privacy: bool, qsd: dict) -> None:
         """Show grouped settings, such as headers, with their URL prefixes.
 
-        A header written under the URL replaces the one the URL itself
-        carried, matching the order the configuration applies them in.
-        Each stored member keeps the prefix the URL uses for its group.
+        A grouped YAML setting replaces matching members already present in
+        the URL, following normal configuration precedence. Each stored member
+        is then written with the group's URL prefix.
         """
 
         groups = getattr(self._plugin, "template_kwargs", None) or {}
@@ -410,9 +399,9 @@ class NotifyTemplate:
     def _settable(self, key: str) -> bool:
         """Report whether a URL can carry a setting of this name.
 
-        Only options accepted by the service's URL arguments or grouped
-        options belong in a listed URL. Unsupported YAML settings were
-        ignored before and would be ignored when that URL reloads.
+        Only options accepted by the service as ordinary URL arguments or
+        grouped options are included. Unsupported YAML settings were ignored
+        when loaded and would also be ignored when this URL is loaded again.
         """
 
         plugin = self._plugin
@@ -431,9 +420,9 @@ class NotifyTemplate:
     def _readable_var(self, match: re.Match) -> str:
         """Turn an escaped ``%24%7BNAME%7D`` back into ``${NAME}``.
 
-        Declared names can be filled; undeclared ones stay literal. Showing
-        both helps an author spot a missing declaration. The URL reads the
-        same either way because URL parsing decodes the escaped marker.
+        Declared names can be supplied later, while undeclared names remain
+        literal. Showing both helps authors spot missing declarations. URL
+        parsing decodes the escaped and readable forms the same way.
         """
 
         # Keep the spelling captured from the assembled URL.
@@ -464,9 +453,8 @@ class NotifyTemplate:
         self._grouped_query(privacy, qsd)
 
         # List the YAML settings under their written names; two names can
-        # feed one field, so the parsed field name is not enough.  The
-        # second lookup relates each name to the field it fills.
-        _, to_field = _url_args(self._plugin)
+        # feed one field, so the parsed field name is not enough.
+        to_field = _url_args(self._plugin)
 
         def field_of(name: str) -> str:
             """The field a name fills, or the name when nothing maps it."""
@@ -596,7 +584,11 @@ class NotifyTemplate:
                 self.schema,
                 self.location,
             )
-            logger.debug("Template Exception: %s", e)
+            logger.debug(
+                "Template Exception: %s",
+                e,
+                extra={"apprise_capture": False},
+            )
             return None
 
         # Put non-templated shared objects back into the constructor fields.
@@ -624,7 +616,11 @@ class NotifyTemplate:
                 self.schema,
                 self.location,
             )
-            logger.debug("Loading Exception: %s", e)
+            logger.debug(
+                "Loading Exception: %s",
+                e,
+                extra={"apprise_capture": False},
+            )
             return None
 
         # Remember the service and discard the oldest when the cache fills.

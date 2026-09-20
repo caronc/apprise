@@ -114,9 +114,50 @@ def test_apprise_template_text_config():
         "json://localhost/:\n    - tags: ${T}",
     ),
 )
-def test_apprise_template_rejects_tag_variable(entry):
+def test_apprise_template_rejects_tag_variable(entry, logging_enabled, caplog):
     """Query, singular, and plural tags all stay fixed."""
-    assert parse("template:\n  - t\nurls:\n  - {}\n".format(entry)) == []
+    with caplog.at_level(logging.ERROR):
+        assert parse("template:\n  - t\nurls:\n  - {}\n".format(entry)) == []
+
+    assert "not permitted in tag/tags" in caplog.text
+
+
+@pytest.mark.parametrize(
+    "tags",
+    ("tag: ${T}", "tags: ${T}", 'tags: [fixed, "${T}"]'),
+)
+def test_apprise_template_rejects_global_tag_variable(
+    tags, logging_enabled, caplog
+):
+    """Global routing tags must also be known before resolution."""
+    with caplog.at_level(logging.ERROR):
+        services = parse(
+            f"template:\n  - t\n{tags}\nurls:\n  - json://localhost/\n"
+        )
+
+    assert services == []
+    assert "not permitted in tag/tags" in caplog.text
+
+
+def test_apprise_template_disabled_keeps_global_tag_marker():
+    """A tag marker is ordinary text when template support is disabled."""
+    services, _ = ConfigBase.config_parse_yaml(
+        "template:\n  - t\ntag: ${T}\nurls:\n  - json://localhost/\n",
+        asset=AppriseAsset(allow_templates=False),
+    )
+
+    assert len(services) == 1
+    assert {str(tag) for tag in services[0].tags} == {"${t}"}
+
+
+def test_apprise_template_keeps_undeclared_global_tag_marker():
+    """Only declared variables are forbidden in routing tags."""
+    services = parse(
+        "template:\n  - other\ntag: ${T}\nurls:\n  - json://localhost/\n"
+    )
+
+    assert len(services) == 1
+    assert {str(tag) for tag in services[0].tags} == {"${t}"}
 
 
 def test_apprise_template_fills_marker_after_schema():
@@ -617,6 +658,39 @@ def test_apprise_template_substitution_failure(logging_enabled, caplog):
     assert "YAML entry #1, item #1" in caplog.text
 
 
+def test_apprise_template_exception_detail_is_never_captured(
+    logging_enabled, caplog
+):
+    """A rejected value is not handed back through the result log."""
+    apobj = Apprise()
+    config = AppriseConfig()
+    config.add_config(
+        "template:\n  - key\n"
+        "urls:\n  - sendgrid://${KEY}:user@example.com/to@example.com\n",
+        format="yaml",
+    )
+    apobj.add(config)
+
+    captured = []
+
+    with caplog.at_level(logging.DEBUG, logger="apprise"):
+        apobj.notify(
+            body="x",
+            # Refused by the service, which names it in the error it raises
+            template={"key": "SECRET!!!KEY"},
+            log_callback=lambda entry, plugin: captured.append(entry),
+            log_level=logging.DEBUG,
+        )
+
+    messages = [str(getattr(entry, "message", entry)) for entry in captured]
+
+    # The entry was skipped, and said so without naming the value
+    assert any("Could not load" in m for m in messages)
+
+    # The service's own exception text never reaches the caller
+    assert not [m for m in messages if "Loading Exception" in m]
+
+
 def test_apprise_template_location_counts_each_expansion():
     """One URL block that becomes several services numbers them apart."""
     services = parse(
@@ -784,16 +858,29 @@ def test_apprise_template_embedded_host_is_preserved(sent):
         "${V}",
         # A separator that is not quite one
         "${V}//host/",
+        # A later separator does not hide a variable in the schema position
+        "${V}/path://later",
+        # The mapping form must make the same decision
+        "${V}/path://later:\n    - tag: work",
+        # A URL hidden in a query value cannot provide the schema boundary
+        "${V}localhost/?url=http://bad.actor.com",
+        # A backslash before :// does not make a variable schema acceptable
+        r"abc${V}s\://localhost",
     ],
 )
-def test_apprise_template_preserves_schema(entry):
-    """Nothing before :// is ever replaced.
+def test_apprise_template_rejects_schema_variable(
+    entry, logging_enabled, caplog
+):
+    """Nothing before :// can be a template variable.
 
     The schema decides which service reads the URL, and that is settled
-    long before a value is known. Apprise turns the URL down the way it
-    would any other one it cannot read.
+    long before a value is known, so this is a configuration error rather
+    than an unresolved notification service.
     """
-    assert parse("template:\n  - v\nurls:\n  - {}\n".format(entry)) == []
+    with caplog.at_level(logging.ERROR):
+        assert parse("template:\n  - v\nurls:\n  - {}\n".format(entry)) == []
+
+    assert "not permitted in URL schemas" in caplog.text
 
 
 def test_apprise_template_dollar_is_literal():
@@ -1113,52 +1200,23 @@ def test_apprise_template_disabled_ignores_environment(sent, monkeypatch):
     assert next(apobj.find()).password == "${V}"
 
 
-def test_apprise_template_duplicate_setting_warns(logging_enabled, caplog):
-    """A repeated ordinary key warns and keeps its last value."""
-    with caplog.at_level(logging.WARNING):
-        services = parse(
-            "urls:\n  - json://localhost/:\n"
-            "    - method: GET\n      method: POST\n"
-        )
+def test_apprise_template_duplicate_setting_uses_last_value():
+    """PyYAML's normal last-value behavior applies below root sections."""
+    services = parse(
+        "urls:\n  - json://localhost/:\n"
+        "    - method: GET\n      method: POST\n"
+    )
 
     assert len(services) == 1
     assert services[0].method == "POST"
-    assert "repeated on line 4" in caplog.text
-    assert "last value is used" in caplog.text
 
 
-def test_apprise_template_duplicate_url_key_masks_credentials(
-    logging_enabled, caplog
-):
-    """A duplicate mapping-style URL warning never prints its password."""
-    with caplog.at_level(logging.WARNING):
-        services = parse(
-            "urls:\n"
-            "  - json://user:very-secret@localhost/:\n"
-            "      method: GET\n"
-            "    json://user:very-secret@localhost/:\n"
-            "      method: POST\n"
-        )
+def test_config_yaml_duplicate_section_uses_last_value():
+    """Repeated root sections retain PyYAML's last-value behavior."""
+    services = parse("urls:\n  - json://first/\nurls:\n  - json://second/\n")
 
     assert len(services) == 1
-    assert "service URL" in caplog.text
-    assert "very-secret" not in caplog.text
-
-
-@pytest.mark.parametrize("section", ("template", "urls"))
-def test_apprise_template_duplicate_section_fails(
-    section, logging_enabled, caplog
-):
-    """A repeated root template or URL section is ambiguous."""
-    content = (
-        "template:\n  - v\nurls:\n  - json://localhost/${V}\n"
-        f"{section}:\n  - json://other/\n"
-    )
-    with caplog.at_level(logging.ERROR):
-        services = parse(content)
-
-    assert services == []
-    assert "section is repeated" in caplog.text
+    assert services[0].host == "second"
 
 
 def test_apprise_template_late_declaration_is_recognized(
@@ -1175,21 +1233,21 @@ def test_apprise_template_late_declaration_is_recognized(
     assert "not defined" not in caplog.text
 
 
-def test_apprise_template_logs_undeclared_marker(logging_enabled, caplog):
-    """An undeclared marker stays literal and is noted only at debug."""
+def test_apprise_template_keeps_undeclared_marker(logging_enabled, caplog):
+    """An undeclared marker remains literal and receives a debug hint."""
     with caplog.at_level(logging.DEBUG):
         services = parse("urls:\n  - json://user:${MISSING}@localhost/\n")
 
     assert services[0].password == "${MISSING}"
-    assert "'missing' on line 2 is not defined" in caplog.text
+    assert "'missing' is not defined" in caplog.text
     assert "kept as written" in caplog.text
     assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
 
 
-def test_apprise_template_undeclared_marker_beside_a_section(
+def test_apprise_template_keeps_undeclared_marker_beside_declared_one(
     logging_enabled, caplog
 ):
-    """A name missing from an existing template section is noted too."""
+    """Declaring one marker does not activate other marker-like text."""
     with caplog.at_level(logging.DEBUG):
         services = parse(
             "template:\n  - used\n"
@@ -1197,24 +1255,45 @@ def test_apprise_template_undeclared_marker_beside_a_section(
         )
 
     assert services[0].results["password"] == "${MISSING}"
-    assert "'missing' on line 4 is not defined" in caplog.text
-    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert "'missing' is not defined" in caplog.text
 
 
-def test_apprise_template_logs_unused_name(logging_enabled, caplog):
-    """An unused declaration is reported after the file is read."""
+def test_apprise_template_reports_unused_declaration(logging_enabled, caplog):
+    """Debug inspection warns about declarations unused by service entries."""
     with caplog.at_level(logging.DEBUG):
         services = parse(
             "template:\n  - unused\nurls:\n  - json://localhost/\n"
         )
 
     assert len(services) == 1
-    assert "'unused' on line 2 is defined but not referenced" in caplog.text
-    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+    assert "'unused' is defined but not referenced" in caplog.text
+    assert any(
+        record.levelno == logging.WARNING
+        and "'unused' is defined but not referenced" in record.message
+        for record in caplog.records
+    )
 
 
-def test_apprise_template_yaml_name_is_not_a_use(logging_enabled, caplog):
-    """A literal YAML setting name does not use its matching variable."""
+def test_apprise_template_yaml_value_counts_as_reference(
+    logging_enabled, caplog
+):
+    """A marker in a YAML option value counts as a real use."""
+    with caplog.at_level(logging.DEBUG):
+        services = parse(
+            "template:\n  - used\n"
+            "urls:\n  - json://localhost/:\n"
+            "      headers:\n        X-Test: ${USED}\n"
+        )
+
+    assert len(services) == 1
+    assert isinstance(services[0], NotifyTemplate)
+    assert "not referenced" not in caplog.text
+
+
+def test_apprise_template_yaml_name_is_not_a_reference(
+    logging_enabled, caplog
+):
+    """YAML setting names stay literal and do not count as variable use."""
     with caplog.at_level(logging.DEBUG):
         services = parse(
             "template:\n  - unused\n"
@@ -1223,78 +1302,43 @@ def test_apprise_template_yaml_name_is_not_a_use(logging_enabled, caplog):
         )
 
     assert len(services) == 1
-    assert "'unused' on line 2 is defined but not referenced" in caplog.text
+    assert "'unused' is defined but not referenced" in caplog.text
 
 
-@pytest.mark.parametrize(
-    "section",
-    [
-        # A mapping of name to default
-        "template:\n  t: a-default\n",
-        # A list entry carrying a default
-        "template:\n  - t: a-default\n",
-        # A list entry that is just a name
-        "template:\n  - t\n",
-    ],
-)
-def test_apprise_template_finds_declaration_line(
-    section, logging_enabled, caplog
+def test_apprise_template_skips_reference_scan_without_debug(
+    logging_enabled, caplog
 ):
-    """Each way of declaring a name reports the line it was written on."""
-    with caplog.at_level(logging.DEBUG):
-        services = parse(section + "urls:\n  - json://localhost/\n")
+    """Reference discovery adds no work when debug logging is disabled."""
+    with (
+        mock.patch(
+            "apprise.config.base.template_references",
+            side_effect=AssertionError("unexpected template scan"),
+        ),
+        caplog.at_level(logging.INFO),
+    ):
+        services = parse(
+            "template:\n  - unused\nurls:\n  - json://localhost/\n"
+        )
 
     assert len(services) == 1
-    assert "'t' on line 2 is defined but not referenced" in caplog.text
 
 
-def test_apprise_template_scans_shared_anchor_once(logging_enabled, caplog):
-    """A YAML anchor pointing back at one entry is not walked twice."""
-    with caplog.at_level(logging.DEBUG):
-        services = parse(
-            "template:\n  - t\n"
-            "urls:\n  - &shared json://localhost/?to=${T}\n  - *shared\n"
-        )
+def test_apprise_template_supports_shared_yaml_anchor():
+    """A YAML anchor may reuse an entry containing a template marker."""
+    services = parse(
+        "template:\n  - t\n"
+        "urls:\n  - &shared json://localhost/?to=${T}\n  - *shared\n"
+    )
 
     # Both entries load and both still wait on the same value
     assert len(services) == 2
     assert all(isinstance(s, NotifyTemplate) for s in services)
-    assert "not defined" not in caplog.text
-
-
-def test_apprise_template_section_without_urls(logging_enabled, caplog):
-    """A file may declare a name and define no services at all."""
-    with caplog.at_level(logging.DEBUG):
-        services = parse("template:\n  - t\n")
-
-    assert services == []
-    assert "'t' on line 2 is defined but not referenced" in caplog.text
-
-
-def test_apprise_template_skips_notes_without_debug(logging_enabled, caplog):
-    """Nothing is scanned or said when no one is reading a debug log.
-
-    Walking the YAML tree only feeds these notes, so it is skipped
-    entirely at a higher logging level.
-    """
-    for content in (
-        # A name that was never declared
-        "urls:\n  - json://user:${MISSING}@localhost/\n",
-        # ...and a declaration nothing uses
-        "template:\n  - unused\nurls:\n  - json://localhost/\n",
-    ):
-        caplog.clear()
-        with caplog.at_level(logging.INFO):
-            assert len(parse(content)) == 1
-
-        assert "not defined" not in caplog.text
-        assert "not referenced" not in caplog.text
 
 
 def test_apprise_template_disabled_marker_is_left_alone(
     logging_enabled, caplog
 ):
-    """Disabled templates add no marker or table warnings."""
+    """Disabled templates neither inspect nor change marker-like text."""
     asset = AppriseAsset(allow_templates=False)
     with caplog.at_level(logging.DEBUG):
         services, _ = ConfigBase.config_parse_yaml(
@@ -1303,7 +1347,6 @@ def test_apprise_template_disabled_marker_is_left_alone(
         )
 
     assert services[0].password == "${V}"
-    assert "template variables are disabled" in caplog.text
     assert "not defined" not in caplog.text
     assert "not referenced" not in caplog.text
 
@@ -1359,21 +1402,17 @@ def test_apprise_template_disabled_ignores_the_environment(monkeypatch):
     assert next(load(content).find()).password == "from-the-environment"
 
 
-def test_apprise_template_disabled_ignores_repeated_sections(
-    logging_enabled, caplog
-):
-    """A disabled template table is ignored even when repeated."""
+def test_apprise_template_disabled_ignores_repeated_sections():
+    """A disabled template table follows PyYAML's last-value behavior."""
     asset = AppriseAsset(allow_templates=False)
-    with caplog.at_level(logging.WARNING):
-        services, _ = ConfigBase.config_parse_yaml(
-            "template:\n  first: one\n  first: two\n"
-            "urls:\n  - json://localhost/\n"
-            "template:\n  - second\n",
-            asset=asset,
-        )
+    services, _ = ConfigBase.config_parse_yaml(
+        "template:\n  first: one\n  first: two\n"
+        "urls:\n  - json://localhost/\n"
+        "template:\n  - second\n",
+        asset=asset,
+    )
 
     assert len(services) == 1
-    assert "template" not in caplog.text.lower()
 
 
 def test_apprise_template_url_handles_a_non_text_setting():
@@ -1598,137 +1637,28 @@ def test_apprise_template_email_address_as_a_setting(sent):
     assert [target[1] for target in service.targets] == ["you@example.ca"]
 
 
-# --- The YAML reading helpers added alongside template support -----------
-#
-# These are small, defensive shapes that the ordinary configuration path
-# never reaches, so they are exercised directly.
-
-
-def yaml_root(content):
-    """Parse content into the node tree these helpers walk."""
-    from apprise.config.base import _AppriseYamlLoader
-
-    loader = _AppriseYamlLoader(content)
-    try:
-        return loader.get_single_node()
-
-    finally:
-        loader.dispose()
-
-
-def test_config_yaml_loader_needs_a_mapping():
-    """The loader is only ever asked to build a mapping."""
-    from yaml.constructor import ConstructorError
-    from yaml.nodes import ScalarNode
-
-    from apprise.config.base import _AppriseYamlLoader
-
-    loader = _AppriseYamlLoader("a: 1")
-    try:
-        with pytest.raises(ConstructorError):
-            loader.construct_mapping(ScalarNode("tag:yaml.org,2002:str", "x"))
-
-    finally:
-        loader.dispose()
-
-
 def test_config_yaml_rejects_an_unusable_key():
     """Reject a YAML key that cannot be looked up."""
     # A list written as a key; there is nothing to index a mapping by
     assert ConfigBase.config_parse_yaml("? [a, b]\n: value\n") == ([], [])
 
 
-def test_config_yaml_section_lookup_needs_a_mapping():
-    """A document that is not a mapping has no sections to find."""
-    from apprise.config.base import _yaml_line_in_section, _yaml_section_node
-
-    root = yaml_root("- one\n- two\n")
-    assert _yaml_section_node(root, "template") is None
-    assert _yaml_line_in_section(root, "template", 1) is False
-
-
-def test_config_yaml_section_lookup_skips_other_sections():
-    """Only the section asked for is considered."""
-    from apprise.config.base import _yaml_line_in_section, _yaml_section_node
-
-    root = yaml_root("urls:\n  - json://localhost/\n")
-    assert _yaml_section_node(root, "template") is None
-
-    # A line belonging to another section is not claimed
-    assert _yaml_line_in_section(root, "template", 2) is False
-
-
-def test_config_yaml_section_lookup_finds_its_own_lines():
-    """A line inside the section is claimed; one outside is not."""
-    from apprise.config.base import _yaml_line_in_section
-
-    root = yaml_root("template:\n  - a\nurls:\n  - json://localhost/\n")
-    assert _yaml_line_in_section(root, "template", 2) is True
-    assert _yaml_line_in_section(root, "template", 4) is False
-
-
-def test_config_yaml_template_lines_handles_odd_sections():
-    """A section written as something other than a list or mapping."""
-    from apprise.config.base import _yaml_template_lines
-
-    # Plain text where a declaration list was expected
-    root = yaml_root("template: just-text\n")
-    section = root.value[0][1]
-    assert _yaml_template_lines(section) == {}
-
-
-def test_config_yaml_template_lines_skips_invalid_entries():
-    """Entries that are not names are left for the parser to report."""
-    from apprise.config.base import _yaml_template_lines
-
-    root = yaml_root("template:\n  - [nested, list]\n  - not-a-name\n  - ok\n")
-    section = root.value[0][1]
-
-    # Only the usable name is recorded; the rest are reported later
-    assert list(_yaml_template_lines(section)) == ["ok"]
-
-
-@pytest.mark.parametrize(
-    ("key", "expected"),
-    [
-        ("plain", "'plain'"),
-        ("json://user:pass@host/", "<service URL>"),
-        (7, "<int>"),
-        (None, "<NoneType>"),
-    ],
-)
-def test_config_yaml_key_label(key, expected):
-    """A duplicate key is named without giving away a credential."""
-    from apprise.config.base import _yaml_key_label
-
-    assert _yaml_key_label(key) == expected
-
-
-def test_config_yaml_key_label_shortens_a_long_key():
-    """A very long key is trimmed before it reaches a log line."""
-    from apprise.config.base import _yaml_key_label
-
-    label = _yaml_key_label("x" * 200)
-    assert label.endswith("...'")
-    assert len(label) < 80
-
-
 def test_config_query_tag_check_without_templates():
     """With nothing templated there is no query to examine."""
-    from apprise.config.base import _templated_query_tag
+    from apprise.utils.yaml import templated_tag
 
-    assert _templated_query_tag({"qsd": {}}, None) is False
-    assert _templated_query_tag("not a mapping", None) is False
+    assert templated_tag({"qsd": {}}, None) is False
+    assert templated_tag("not a mapping", None) is False
 
 
 def test_config_query_tag_check_skips_unusable_buckets(sent):
     """A query bucket that is not a mapping is passed over."""
-    from apprise.config.base import _templated_query_tag
     from apprise.utils.template import TemplatePlaceholderMap, TemplateSchema
+    from apprise.utils.yaml import templated_tag
 
     placeholders = TemplatePlaceholderMap(TemplateSchema.parse(["t"]), "")
     results = {"qsd": None, "qsd+": {}, "qsd-": {}, "qsd:": {}}
-    assert _templated_query_tag(results, placeholders) is False
+    assert templated_tag(results, placeholders) is False
 
 
 def test_apprise_template_rejects_invalid_supplied_name(sent):
@@ -1807,9 +1737,9 @@ def test_apprise_cli_dry_run_failure(tmpdir):
 
 
 def test_config_yaml_loader_failure_is_reported():
-    """A loader that never gets built leaves nothing to clean up."""
+    """A YAML loader failure returns an empty configuration."""
     with mock.patch(
-        "apprise.config.base._AppriseYamlLoader",
+        "apprise.config.base.yaml.load",
         side_effect=AttributeError("no loader"),
     ):
         assert ConfigBase.config_parse_yaml("urls:\n  - json://a/\n") == (
@@ -2006,7 +1936,7 @@ def test_apprise_template_url_shows_a_list_setting():
     assert "to=${T}" in entry.url()
 
 
-def test_apprise_template_url_shows_every_member_of_a_list_setting():
+def test_apprise_template_url_lists_all_members():
     """A list mixing a marker with fixed members keeps them all."""
     entry = parse(
         "template:\n  - t\n"
@@ -2069,7 +1999,7 @@ def test_apprise_template_url_skips_non_string_group_key():
     assert "fixed" not in url
 
 
-def test_apprise_template_url_does_not_repeat_a_header_from_the_url():
+def test_apprise_template_url_deduplicates_header():
     """A header written in the URL is listed once, not twice."""
     entry = parse(
         "template:\n  - t\nurls:\n  - json://localhost/?+X-Token=${T}\n"
@@ -2240,7 +2170,7 @@ def test_apprise_template_undeclared_marker_stays_readable():
     assert entry.template_names == ("v",)
 
 
-def test_apprise_template_url_lists_a_setting_under_its_written_name():
+def test_apprise_template_url_uses_written_name():
     """A setting keeps the name it was written under, not an alias.
 
     mailto's ``from`` and ``name`` both end up in ``from_addr``, yet they
@@ -2256,13 +2186,11 @@ def test_apprise_template_url_lists_a_setting_under_its_written_name():
     assert "from=" not in url
 
 
-def test_apprise_template_url_setting_replaces_the_url_query():
-    """A setting under the URL drops what the URL's query said.
+def test_apprise_template_url_setting_precedence():
+    """A YAML setting replaces a URL alias for the same field.
 
-    ``name:`` and ``from=`` both fill ``from_addr``, and the setting written
-    under the URL is the only one that takes effect. Listing both would
-    show an address that is never used and make the URL reload differently
-    from the configuration it came from.
+    Here, ``name:`` and ``from=`` both fill ``from_addr``. Listing only the
+    YAML setting ensures the displayed URL behaves like the configuration.
     """
     entry = parse(
         "template:\n  - t\n"
@@ -2288,7 +2216,7 @@ def test_apprise_template_url_last_written_setting_wins():
     assert "real%40example.com" not in url
 
 
-def test_apprise_template_url_reloads_into_the_saved_configuration():
+def test_apprise_template_url_round_trip():
     """A listed URL resolves to what the saved configuration resolves to.
 
     Settings that hold no marker are listed too, so nothing the entry needs
@@ -2327,7 +2255,7 @@ def test_apprise_template_flatten_reads_nested_lists():
     assert _flatten({"b", "a"}) == ["a", "b"]
 
 
-def test_apprise_template_flatten_rejects_values_a_url_cannot_carry():
+def test_apprise_template_flatten_rejects_non_text():
     """Anything that is not text makes the whole setting unusable."""
     from apprise.template import _flatten
 
@@ -2350,7 +2278,7 @@ def test_apprise_template_flatten_stops_at_the_nesting_limit():
     assert _flatten(loop) is None
 
 
-def test_apprise_template_url_omits_a_setting_with_nothing_to_say():
+def test_apprise_template_url_omits_empty_setting():
     """An empty list, or a value no URL can carry, is left out."""
     entry = parse(
         "template:\n  - t\n"
@@ -2369,14 +2297,14 @@ def test_apprise_template_url_args_without_a_usable_plugin():
     from apprise.template import _url_args
 
     # Nothing to describe at all
-    assert _url_args(None) == ({}, {})
+    assert _url_args(None) == {}
 
     # ...and a plugin whose details cannot be read is treated the same way
     class Broken:
         """Stands in for a service that cannot be described."""
 
     with mock.patch("apprise.plugins.details", side_effect=ValueError("nope")):
-        assert _url_args(Broken) == ({}, {})
+        assert _url_args(Broken) == {}
 
 
 def test_apprise_template_settable_needs_a_known_service():

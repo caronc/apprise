@@ -59,9 +59,8 @@ The Apprise options are as follows:
   Supply a value used by a YAML configuration written with `${NAME}`.
   Specify this option more than once to supply more than one value, but
   name each one only once.
-  A value not provided here is looked for in the environment variable
-  `APPRISE_TEMPLATE_<NAME>`, and failing that, in the default written in
-  the configuration's `template:` section.  A URL that still has no value
+  A value not provided here uses the default in the configuration's
+  `template:` section, then `APPRISE_TEMPLATE_<NAME>`. A URL that still has no value
   available is not loaded.
 
   `-g`, `--tag=`<VALUE>:
@@ -377,8 +376,8 @@ in a `template:` section:
 Values are looked for in this order, stopping at the first that answers:
 
 * a value given with `--template-var` (`-tv`)
-* the environment variable `APPRISE_TEMPLATE_<NAME>`
 * the default written in the `template:` section
+* the environment variable `APPRISE_TEMPLATE_<NAME>`
 
 A URL with no value available is not loaded, and **apprise** exits with a
 status of **4** if others were notified, or **1** if none were.  Use
@@ -392,20 +391,10 @@ names are accepted and ignored; their names appear only in the local debug log,
 never with their values.
 
 The configuration author may place a variable directly in a URL or in a named
-YAML setting below it. URL placement is intentionally unrestricted, supporting
-email addresses, `user:pass`, comma-separated targets, and other forms a
-service understands. A variable standing for the whole host also understands
-`user@host` and `user:pass@host`, filling in those fields unless the URL
-already spells out its own credentials. Because punctuation may affect that
-field, use a named setting when an untrusted caller should control only one
-specific option.
-
-The two placements differ in reach. A variable in the URL may fill in any field,
-the host included, and everything else that URL holds travels to whichever host
-the finished URL points at. A variable in a named setting only ever reaches that
-one option. Apprise deliberately leaves URL placement unrestricted for trusted
-administrators. Choose a named setting when a value may come from an untrusted
-caller or should affect only one option.
+YAML setting below it. URL markers can change any field, including the
+destination; whole-host markers also accept `user@host` and `user:pass@host`.
+A named setting changes only its option, so prefer it for values supplied by
+less-trusted callers.
 
 A variable may not appear before `://`, may not be used for `tag:`/`tags:`, and
 may not be used as a setting's name. The service and tags are selected before
@@ -438,8 +427,8 @@ through unchanged.
   `APPRISE_TEMPLATE_<NAME>`:
   Supply a value for a `${NAME}` used by a YAML configuration.  For example
   `APPRISE_TEMPLATE_API_KEY` fills in `${API_KEY}`.  A value supplied with
-  `--template-var` (`-tv`) takes priority over this.  Setting it to an empty
-  string is itself a value, not a way to leave it unset.
+  `--template-var` (`-tv`) and a configuration default both take priority.
+  Blank values are ignored.
 
   `HTTP_PROXY`, `HTTPS_PROXY`, `NO_PROXY`:
   Standard proxy variables honored by the underlying `requests` library (not

@@ -27,14 +27,11 @@
 from __future__ import annotations
 
 from collections import deque
-from collections.abc import Hashable
 import os
 import re
 import time
 
 import yaml
-from yaml.constructor import ConstructorError
-from yaml.nodes import MappingNode, ScalarNode, SequenceNode
 
 from .. import common, plugins
 from ..asset import AppriseAsset
@@ -54,255 +51,26 @@ from ..utils.parse import (
     parse_urls,
 )
 from ..utils.template import (
-    TEMPLATE_NAME_RE,
-    TEMPLATE_VAR_RE,
     TemplatePlaceholderMap,
     TemplateSchema,
-    normalize_name,
 )
 from ..utils.time import zoneinfo
+from ..utils.yaml import (
+    YAML_REAPPLY_SKIP,
+    dropped_template,
+    template_in_schema,
+    template_references,
+    templated_tag,
+)
 
 # Test whether token is valid or not
 VALID_TOKEN = re.compile(r"(?P<token>[a-z0-9][a-z0-9_]+)", re.I)
-
-# Keys excluded from the YAML-token re-apply that happens after
-# post_process_parse_url_results() inside config_parse_yaml().
-#
-# 'tag'/'tags': assembled as a merged set (YAML tags + global_tags) by the
-# while loop before post_process runs; re-applying the raw YAML string would
-# replace the set with a string.  YAML accepts both spellings ('tag:' and
-# 'tags:'); both are excluded so neither overwrites the assembled set.
-#
-# 'asset': written programmatically from the Python asset parameter at
-# that point in the while loop; VALID_TOKEN does not strip it, so a
-# user-written YAML 'asset:' key would otherwise overwrite the object.
-_YAML_REAPPLY_SKIP = frozenset(("tag", "tags", "asset"))
 
 # Grant access to our Notification Manager Singleton
 N_MGR = NotificationManager()
 
 # Grant access to our Configuration Manager Singleton
 C_MGR = ConfigurationManager()
-
-
-class _AppriseYamlLoader(yaml.SafeLoader):
-    """Load YAML safely while recording duplicate mapping keys."""
-
-    def __init__(self, stream):
-        """Initialize the safe loader and its duplicate-key records."""
-        # SafeLoader keeps arbitrary Python objects out of configuration data.
-        super().__init__(stream)
-
-        # The root node lets us distinguish duplicate sections from ordinary
-        # repeated settings deeper in the file.
-        self.root_node = None
-        self.duplicate_keys = []
-
-    def get_single_data(self):
-        """Construct one YAML document and retain its root node."""
-        self.root_node = self.get_single_node()
-        if self.root_node is not None:
-            return self.construct_document(self.root_node)
-        return None
-
-    def construct_mapping(self, node, deep=False):
-        """Build a mapping with last-value-wins duplicate tracking."""
-        if not isinstance(node, MappingNode):
-            raise ConstructorError(
-                None,
-                None,
-                "expected a mapping node, but found {}".format(node.id),
-                node.start_mark,
-            )
-
-        # Record only keys written in this mapping. YAML merge keys may add
-        # inherited values, and overriding those is normal rather than a typo.
-        first_lines = {}
-        for key_node, _ in node.value:
-            if key_node.tag == "tag:yaml.org,2002:merge":
-                continue
-
-            key = self.construct_object(key_node, deep=deep)
-            if not isinstance(key, Hashable):
-                raise ConstructorError(
-                    "while constructing a mapping",
-                    node.start_mark,
-                    "found unhashable key",
-                    key_node.start_mark,
-                )
-
-            line = key_node.start_mark.line + 1
-            if key in first_lines:
-                self.duplicate_keys.append(
-                    {
-                        "key": key,
-                        "line": line,
-                        "first_line": first_lines[key],
-                        "root": node is self.root_node,
-                    }
-                )
-            else:
-                first_lines[key] = line
-
-        # Expand YAML anchors after checking the keys written by the user.
-        self.flatten_mapping(node)
-
-        mapping = {}
-        for key_node, value_node in node.value:
-            key = self.construct_object(key_node, deep=deep)
-
-            # YAML mappings traditionally keep the last value written.
-            mapping[key] = self.construct_object(value_node, deep=deep)
-
-        return mapping
-
-
-def _yaml_markers(node) -> dict[str, set[int]]:
-    """Return template names and source lines below a YAML node."""
-    markers = {}
-    visited = set()
-
-    def walk(current):
-        """Visit YAML nodes once and record every marker-bearing scalar."""
-        # Alias nodes may point back to an object already visited.
-        marker = id(current)
-        if marker in visited:
-            return
-        visited.add(marker)
-
-        if isinstance(current, ScalarNode):
-            # A scalar may contain more than one distinct template marker.
-            for match in TEMPLATE_VAR_RE.finditer(current.value):
-                name = normalize_name(match.group("name"))
-                markers.setdefault(name, set()).add(
-                    current.start_mark.line + 1
-                )
-
-        elif isinstance(current, SequenceNode):
-            # Lists may nest mappings or other lists at any depth.
-            for item in current.value:
-                walk(item)
-
-        elif isinstance(current, MappingNode):
-            # URL keys may contain variables, but YAML setting names remain
-            # literal and do not count as template use.
-            for key, value in current.value:
-                if isinstance(key, ScalarNode) and "://" in key.value:
-                    walk(key)
-                walk(value)
-
-    walk(node)
-    return markers
-
-
-def _yaml_section_node(root, name: str):
-    """Return the last root section node with the requested name."""
-    if not isinstance(root, MappingNode):
-        return None
-
-    found = None
-    for key, value in root.value:
-        # Keep the last node, matching YAML's last-value-wins behavior.
-        if isinstance(key, ScalarNode) and key.value == name:
-            found = value
-    return found
-
-
-def _yaml_line_in_section(root, name: str, line: int) -> bool:
-    """Return whether a source line belongs to a named root section."""
-    if not isinstance(root, MappingNode):
-        return False
-
-    for key, value in root.value:
-        if not isinstance(key, ScalarNode) or key.value != name:
-            continue
-
-        # YAML end marks point just beyond the section's content.
-        if value.start_mark.line + 1 <= line < value.end_mark.line + 1:
-            return True
-
-    return False
-
-
-def _yaml_template_lines(node) -> dict[str, int]:
-    """Return declared template names and their YAML source lines."""
-    lines = {}
-    if isinstance(node, MappingNode):
-        # Mapping declarations store each name directly as a key.
-        entries = node.value
-    elif isinstance(node, SequenceNode):
-        # List declarations may use either a bare name or one-item mapping.
-        entries = []
-        for item in node.value:
-            if isinstance(item, MappingNode):
-                entries.extend(item.value)
-            elif isinstance(item, ScalarNode):
-                entries.append((item, None))
-    else:
-        return lines
-
-    for key, _ in entries:
-        # Invalid names are reported later by TemplateSchema.parse().
-        if isinstance(key, ScalarNode) and TEMPLATE_NAME_RE.match(key.value):
-            lines.setdefault(
-                normalize_name(key.value), key.start_mark.line + 1
-            )
-    return lines
-
-
-def _yaml_key_label(key) -> str:
-    """Return a short, log-safe label for a duplicate YAML key."""
-    if isinstance(key, str):
-        if "://" in key:
-            # A mapping-style URL key may contain credentials.
-            return "<service URL>"
-        return repr(key if len(key) <= 64 else key[:61] + "...")
-    return "<{}>".format(type(key).__name__)
-
-
-def _dropped_variable(
-    url: str, results: dict, placeholders: TemplatePlaceholderMap | None
-) -> str | None:
-    """Find a declared marker the URL parser did not retain.
-
-    A marker in a field such as the port can disappear during parsing and
-    damage nearby fields. Return one missing name so the caller can reject
-    that entry; return ``None`` when all markers survived.
-    """
-
-    if not placeholders:
-        # Ordinary URLs have no template markers to compare.
-        return None
-
-    # Ignore the saved URL text; it still contains every original marker.
-    parsed = placeholders.used(
-        {key: value for key, value in results.items() if key != "url"}
-    )
-
-    # Compare the markers originally written with those in parsed fields.
-    missing = placeholders.used(url) - parsed
-    # Pick a stable name when more than one marker was lost.
-    return sorted(missing)[0] if missing else None
-
-
-def _templated_query_tag(
-    results: object, placeholders: TemplatePlaceholderMap | None
-) -> bool:
-    """Return whether a parsed URL query templates tag or tags."""
-    if not placeholders or not isinstance(results, dict):
-        return False
-
-    # Query modifiers keep separate mappings, but none may make routing
-    # dynamic through tag or tags.
-    for bucket in ("qsd", "qsd+", "qsd-", "qsd:"):
-        values = results.get(bucket)
-        if not isinstance(values, dict):
-            continue
-
-        if any(placeholders.used(values.get(key)) for key in ("tag", "tags")):
-            return True
-
-    return False
 
 
 class ConfigBase(URLBase):
@@ -1131,15 +899,9 @@ class ConfigBase(URLBase):
         preloaded = []
 
         try:
-            # Keep the parsed YAML nodes long enough to report useful lines.
-            loader = _AppriseYamlLoader(content)
-            try:
-                result = loader.get_single_data()
-
-            finally:
-                # Only reached once the loader exists, so there is always
-                # something to tidy up here.
-                loader.dispose()
+            # Load our data safely. PyYAML keeps the last value when a mapping
+            # repeats a key, matching Apprise's long-standing behavior.
+            result = yaml.load(content, Loader=yaml.SafeLoader)
 
         except (
             AttributeError,
@@ -1158,42 +920,6 @@ class ConfigBase(URLBase):
                 "enabled" if asset.allow_templates else "disabled"
             )
         )
-
-        # Repeating an active root section is ambiguous and must be corrected.
-        duplicate_sections = [
-            duplicate
-            for duplicate in loader.duplicate_keys
-            if duplicate["root"]
-            and (
-                duplicate["key"] == "urls"
-                or (asset.allow_templates and duplicate["key"] == "template")
-            )
-        ]
-        if duplicate_sections:
-            duplicate = duplicate_sections[0]
-            ConfigBase.logger.error(
-                "The Apprise YAML '{}' section is repeated on line {}.".format(
-                    duplicate["key"], duplicate["line"]
-                )
-            )
-            return ([], [])
-
-        # Other duplicate keys keep YAML's usual last-value-wins behavior.
-        for duplicate in loader.duplicate_keys:
-            if not asset.allow_templates and (
-                (duplicate["root"] and duplicate["key"] == "template")
-                or _yaml_line_in_section(
-                    loader.root_node, "template", duplicate["line"]
-                )
-            ):
-                # A disabled template section is entirely ignored.
-                continue
-            ConfigBase.logger.warning(
-                "The YAML key {} is repeated on line {}; the last value"
-                " is used.".format(
-                    _yaml_key_label(duplicate["key"]), duplicate["line"]
-                )
-            )
 
         if not isinstance(result, dict):
             # Invalid content
@@ -1223,20 +949,9 @@ class ConfigBase(URLBase):
         placeholders = None
 
         entries = None
-        referenced_templates = {}
-        template_node = None
         if asset.allow_templates:
-            # Disabled templates bypass the section and all marker checks.
+            # Disabled templates leave the section and markers untouched.
             entries = result.get("template", None)
-
-        # Scan markers only when debug logging will show the resulting notes.
-        explain = asset.allow_templates and ConfigBase.logger.isEnabledFor(
-            logging.DEBUG
-        )
-        if explain:
-            urls_node = _yaml_section_node(loader.root_node, "urls")
-            template_node = _yaml_section_node(loader.root_node, "template")
-            referenced_templates = _yaml_markers(urls_node)
 
         if entries is not None:
             try:
@@ -1257,49 +972,6 @@ class ConfigBase(URLBase):
                 except AppriseTemplateError as e:
                     ConfigBase.logger.error(str(e))
                     return ([], [])
-
-            if explain:
-                # These notes wait until the complete template section is
-                # known, so it may appear before or after the service URLs.
-                undeclared = referenced_templates.keys() - set(
-                    template_schema.names
-                )
-                for name in sorted(undeclared):
-                    lines = ", ".join(
-                        str(line)
-                        for line in sorted(referenced_templates[name])
-                    )
-                    ConfigBase.logger.debug(
-                        "Template entry '{}' on line {} is not defined in"
-                        " the template section; it is kept as"
-                        " written.".format(name, lines)
-                    )
-
-                declared_lines = _yaml_template_lines(template_node)
-                unused = (
-                    set(template_schema.names) - referenced_templates.keys()
-                )
-                for name in sorted(unused):
-                    line = declared_lines.get(name)
-                    location = " on line {}".format(line) if line else ""
-                    ConfigBase.logger.debug(
-                        "Template entry '{}'{} is defined but not referenced"
-                        " by a service entry.".format(name, location)
-                    )
-
-        elif explain:
-            # Without a template section, every ${NAME} remains literal; note
-            # this only for readers of the debug log.
-            for name in sorted(referenced_templates):
-                lines = ", ".join(
-                    str(line) for line in sorted(referenced_templates[name])
-                )
-                ConfigBase.logger.debug(
-                    "Template entry '{}' on line {} is not defined in the"
-                    " template section; it is kept as written.".format(
-                        name, lines
-                    )
-                )
 
         # Prepare our default timezone
         default_timezone = asset.tzinfo
@@ -1465,6 +1137,32 @@ class ConfigBase(URLBase):
             # Not a problem; we simply have no urls
             urls = []
 
+        # Explaining declaration mistakes requires walking every URL value.
+        # Keep that optional work behind DEBUG even though an unused
+        # declaration is emitted as a warning within a debugging session.
+        explain = asset.allow_templates and ConfigBase.logger.isEnabledFor(
+            logging.DEBUG
+        )
+        if explain:
+            # This is guidance only: undeclared ${NAME} text remains literal,
+            # and unused declarations are valid. Inspect the already-parsed
+            # URL values so helpful diagnostics do not require a custom YAML
+            # loader or a second parse solely to recover source locations.
+            referenced = template_references(urls)
+            declared = set(template_schema.names)
+
+            for name in sorted(referenced - declared):
+                ConfigBase.logger.debug(
+                    "Template entry '{}' is not defined in the template"
+                    " section; it is kept as written.".format(name)
+                )
+
+            for name in sorted(declared - referenced):
+                ConfigBase.logger.warning(
+                    "Template entry '{}' is defined but not referenced by a"
+                    " service entry.".format(name)
+                )
+
         # Iterate over each URL
         for no, url in enumerate(urls):
             # Our results object is what we use to instantiate our object if
@@ -1476,6 +1174,18 @@ class ConfigBase(URLBase):
 
             if isinstance(url, str):
                 # We're just a simple URL string...
+                if placeholders and template_in_schema(
+                    url, template_schema.names
+                ):
+                    # The schema selects the temporary plugin parser before a
+                    # template value exists. Allowing it to vary would make the
+                    # same configuration change type at notification time.
+                    ConfigBase.logger.error(
+                        "Template variables are not permitted in URL schemas"
+                        " (YAML entry #{})".format(no + 1)
+                    )
+                    continue
+
                 if placeholders:
                     url = placeholders.encode_url(url)
 
@@ -1513,7 +1223,7 @@ class ConfigBase(URLBase):
                     continue
 
                 # Parsing can succeed while silently dropping a marker.
-                offender = _dropped_variable(url, results_, placeholders)
+                offender = dropped_template(url, results_, placeholders)
                 if offender:
                     # Do not keep a partially parsed template entry.
                     ConfigBase.logger.error(
@@ -1544,7 +1254,31 @@ class ConfigBase(URLBase):
                 # Track last acquired schema
                 schema = None
 
+                # Distinguish a forbidden variable schema from an ordinary
+                # mapping that simply contains no recognizable URL key.
+                invalid_schema = False
+
                 for key, tokens_ in it:
+                    if (
+                        placeholders
+                        and isinstance(key, str)
+                        and "://" in key
+                        and template_in_schema(key, template_schema.names)
+                    ):
+                        # Mapping-style URL keys obey the same fixed-schema
+                        # rule as plain URL strings. The quick separator check
+                        # only distinguishes URL-shaped keys from literal YAML
+                        # setting names. template_in_schema() locates the first
+                        # separator itself and rejects a declared marker only
+                        # when that marker occurs before it, so a later :// in
+                        # the path cannot bypass this check.
+                        ConfigBase.logger.error(
+                            "Template variables are not permitted in URL"
+                            " schemas (YAML entry #{})".format(no + 1)
+                        )
+                        invalid_schema = True
+                        break
+
                     encoded = (
                         placeholders.encode_url(key) if placeholders else key
                     )
@@ -1575,6 +1309,9 @@ class ConfigBase(URLBase):
                     # We're done
                     break
 
+                if invalid_schema:
+                    continue
+
                 if url_ is None:
                     # the loop above failed to match anything
                     ConfigBase.logger.warning(
@@ -1582,22 +1319,16 @@ class ConfigBase(URLBase):
                     )
                     continue
 
-                # Collect sibling tokens from the entire mapping,
-                # excluding only the URL key itself.  Using the full
-                # url.items() dict (rather than the remaining iterator)
-                # ensures siblings that appear *before* the URL key in
-                # the YAML mapping are captured too.  YAML does not
-                # guarantee key order within a mapping, so order must
-                # not matter here.
+                # Read sibling settings from the whole mapping, not just the
+                # items that follow the URL key. YAML mapping order must not
+                # affect the result.
                 #
-                # In YAML, keys at the same indentation level as
-                # the schema URL key become siblings in the same
-                # mapping dict rather than children of the URL key.
-                # We treat these sibling keys as token overrides
-                # that sit above URL-parsed values (priority 3) and
-                # below explicitly-nested child tokens (priority 1).
+                # Settings are applied from highest to lowest priority:
+                #   1. Child settings nested below the URL
+                #   2. Sibling settings beside the URL
+                #   3. Values parsed from the URL and its query string
                 #
-                # This means both YAML forms produce the same result:
+                # This lets both of the following YAML forms work:
                 #
                 #   # sibling form (same indentation)
                 #   - mailtos://_:
@@ -1650,7 +1381,7 @@ class ConfigBase(URLBase):
 
                 else:
                     # Check the parsed URL before applying YAML settings.
-                    offender = _dropped_variable(url_, results_, placeholders)
+                    offender = dropped_template(url_, results_, placeholders)
                     if offender:
                         # Settings underneath cannot repair a lost URL marker.
                         ConfigBase.logger.error(
@@ -1667,9 +1398,9 @@ class ConfigBase(URLBase):
                     # so a listing must show which name was written.
                     written_ = dict(sibling_tokens) if sibling_tokens else {}
 
-                    # Pre-process sibling tokens once before the loop
-                    # so each per-entry copy already has template
-                    # mappings resolved (smtp -> smtp_host, etc.)
+                    # Normalize shared sibling settings once before expanding
+                    # the list. Each entry then starts with the same mapped
+                    # values, such as smtp becoming smtp_host.
                     if sibling_tokens and schema in N_MGR:
                         sibling_tokens = ConfigBase._special_token_handler(
                             schema, sibling_tokens
@@ -1706,9 +1437,10 @@ class ConfigBase(URLBase):
                             # Extend our dictionary with our new entries
                             r.update(entries)
 
-                            # Record the YAML contributions for this entry
-                            # so post_process_parse_url_results() cannot
-                            # overwrite them (enforces YAML > qsd priority).
+                            # Keep every YAML contribution together so later
+                            # URL post-processing cannot overwrite it. Child
+                            # values are added last and therefore keep priority
+                            # over sibling values.
                             yaml_ = {}
                             if sibling_tokens:
                                 yaml_.update(sibling_tokens)
@@ -1718,21 +1450,17 @@ class ConfigBase(URLBase):
                             results.append((r, yaml_, written_entry))
 
                 elif isinstance(tokens, dict):
-                    # Strip 'schema' from child tokens -- it is determined
-                    # by the URL key's own schema and must not be overridden
-                    # by a child dict value (matching the list-expansion
-                    # branch that does the same via del entries["schema"]).
+                    # The URL key selects the schema. A child setting must not
+                    # replace it, matching the list-expansion path above.
                     tokens.pop("schema", None)
 
                     # Record the names as written before any mapping.
                     written_ = dict(sibling_tokens) if sibling_tokens else {}
                     written_.update(tokens)
 
-                    # Normalize sibling and child token dicts
-                    # independently before merging, so that an alias key
-                    # in sibling tokens (e.g. 'smtp' -> 'smtp_host') can
-                    # never overwrite a canonical key already set in the
-                    # higher-priority child tokens.
+                    # Normalize siblings and children separately before they
+                    # are merged. Otherwise a sibling alias such as smtp could
+                    # map onto smtp_host and replace an explicit child value.
                     if schema in N_MGR:
                         if sibling_tokens:
                             sibling_tokens = ConfigBase._special_token_handler(
@@ -1743,9 +1471,8 @@ class ConfigBase(URLBase):
                             schema, tokens
                         )
 
-                    # Merge sibling tokens as the lower-priority base
-                    # and let the child token dict (the indented value
-                    # of the URL key) override on a per-key basis.
+                    # Merge from lowest to highest YAML priority: siblings
+                    # first, then the settings nested below the URL.
                     if sibling_tokens:
                         merged = sibling_tokens.copy()
                         merged.update(tokens)
@@ -1762,11 +1489,9 @@ class ConfigBase(URLBase):
                     results.append((r, dict(tokens), written_))
 
                 elif sibling_tokens:
-                    # The URL key had a null child value, but sibling
-                    # keys supply token overrides. Process them the
-                    # same way as a child token dict.
-                    #
-                    # Record the names as written before any mapping.
+                    # A URL with a null child can still receive settings from
+                    # sibling keys. Preserve their written names before aliases
+                    # and plugin-specific names are normalized.
                     written_ = dict(sibling_tokens)
                     if schema in N_MGR:
                         sibling_tokens = ConfigBase._special_token_handler(
@@ -1847,13 +1572,7 @@ class ConfigBase(URLBase):
                     # Just use the global settings
                     results_["tag"] = global_tags
 
-                if placeholders and (
-                    _templated_query_tag(results_, placeholders)
-                    or any(
-                        placeholders.pattern.search(str(t))
-                        for t in results_["tag"]
-                    )
-                ):
+                if templated_tag(results_, placeholders):
                     # Template values must not choose notification recipients.
                     ConfigBase.logger.error(
                         "Template variables are not permitted in tag/tags"
@@ -1908,15 +1627,15 @@ class ConfigBase(URLBase):
                 # Prepare our Asset Object
                 results_["asset"] = asset
 
-                # Full URL parsers applied qsd before YAML settings overrode
-                # it, so hide qsd during the second normalization pass.
-                # Minimal @notify parsers keep qsd because they still need
-                # that pass. Restore the original mapping afterward.
+                # Full URL parsers have already applied the query string. Hide
+                # qsd during their second normalization pass so those lower-
+                # priority values cannot overwrite YAML settings. Minimal
+                # @notify results keep qsd because they still need that pass.
                 orig_qsd = results_.get("qsd")
                 if all(
                     k in results_ for k in QSD_FULL_MODE_KEYS
                 ) and isinstance(orig_qsd, dict):
-                    # Extended qsd keys reliably identify the full parser.
+                    # These extra fields reliably identify a full parse result.
                     del results_["qsd"]
 
                 # Handle post processing of result set
@@ -1929,7 +1648,7 @@ class ConfigBase(URLBase):
                         {
                             k: v
                             for k, v in yaml_tokens_.items()
-                            if k not in _YAML_REAPPLY_SKIP
+                            if k not in YAML_REAPPLY_SKIP
                         }
                     )
 
@@ -2044,39 +1763,30 @@ class ConfigBase(URLBase):
         schema: str,
         tokens: dict[str, object],
     ) -> dict[str, object]:
-        """This function takes a list of tokens and updates them to no longer
-        include any special tokens such as +,-, and :
+        """Prepare parsed YAML settings for a notification plugin.
 
-        - schema must be a valid schema of a supported plugin type
-        - tokens must be a dictionary containing the yaml entries parsed.
+        Common aliases, plugin-specific names, and prefixed groups such as
+        headers are mapped to the arguments expected by ``schema``. Explicit
+        canonical names take priority over their aliases.
 
-        The idea here is we can post process a set of tokens provided in
-        a YAML file where the user provided some of the special keywords.
-
-        We effectivley look up what these keywords map to their appropriate
-        value they're expected
+        - ``schema`` identifies a supported notification plugin.
+        - ``tokens`` contains the settings parsed from YAML.
         """
         # Create a copy of our dictionary
         tokens = tokens.copy()
 
-        # Apply URL_TOKEN_ALIASES so shorthand keys (e.g. 'pass') are
-        # normalized to the canonical kwarg name ('password') before any
-        # plugin-specific template_args mapping runs.  YAML tokens bypass
-        # parse_url() and its initial post_process_parse_url_results() call
-        # inside url_to_dict(), so the same alias table must be applied here.
+        # YAML settings bypass the URL parser, so apply its common aliases here
+        # before processing plugin-specific names and grouped settings.
         for alias, canonical in URL_TOKEN_ALIASES.items():
             if alias in tokens and (
                 canonical not in tokens or tokens[canonical] is None
             ):
-                # Canonical absent or explicitly null -- promote alias.
-                # A null canonical (e.g. password: with no value) is treated
-                # as "not provided", consistent with how
-                # post_process_parse_url_results() handles None credentials.
+                # Promote the alias when its canonical setting is absent or
+                # explicitly null. A null value means "not provided" here.
                 tokens[canonical] = tokens.pop(alias)
 
             elif alias in tokens:
-                # canonical key already set to a non-None value -- discard
-                # the alias so the explicit canonical is not overwritten
+                # A non-null canonical setting has priority over its alias.
                 del tokens[alias]
 
         for kw, meta in N_MGR[schema].template_kwargs.items():

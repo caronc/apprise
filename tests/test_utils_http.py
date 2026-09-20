@@ -475,8 +475,10 @@ def test_session_connects_through_policy_adapter():
         with HTTPPolicySession(
             HTTPPolicy(address_filter=lambda _address: True)
         ) as session:
+            # Address the socket the server bound; "localhost" resolves to
+            # ::1 first on a dual-stack host and has to fail over.
             response = session.get(
-                f"http://localhost:{server.server_port}/",
+                f"http://127.0.0.1:{server.server_port}/",
                 timeout=2,
             )
             assert response.status_code == requests.codes.ok
@@ -523,8 +525,9 @@ def test_session_validates_redirect_before_second_request():
             HTTPPolicySession(policy) as session,
             pytest.raises(requests.exceptions.InvalidURL),
         ):
+            # Address the socket the server bound, as above
             session.get(
-                f"http://localhost:{server.server_port}/start",
+                f"http://127.0.0.1:{server.server_port}/start",
                 timeout=2,
             )
 
