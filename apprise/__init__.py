@@ -78,6 +78,7 @@ from .result import (
     NotifyResult,
 )
 from .tag import AppriseTag
+from .template import NotifyTemplate
 from .url import PrivacyMode, URLBase
 
 # Set default logging handler to avoid "No handler found" warnings.
@@ -119,6 +120,7 @@ __all__ = [
     "NotifyImageSize",
     "NotifyLogEntry",
     "NotifyResult",
+    "NotifyTemplate",
     # Reference
     "NotifyType",
     "OverflowMode",
