@@ -1265,11 +1265,12 @@ class NotifySlack(NotifyBase):
                 )
             )
 
-            # The message is visible now, even if a later attachment fails.
+            # Keep the channel or DM ID for a later attachment upload
             channel_id = response.get("channel")
             if channel_id:
                 attach_channel_list.append((message_key, channel_id))
 
+            # The message is visible now, even if a later upload fails
             self.mark_delivered(message_key)
 
             if track_attachments and not channel_id:

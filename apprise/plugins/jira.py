@@ -667,8 +667,7 @@ class NotifyJira(NotifyBase):
             length = len(self.targets) if self.targets else 1
             indices = range(0, length, self.batch_size)
 
-            # A fresh delivery replaces old IDs. A retry keeps IDs returned by
-            # successful batches from earlier attempts.
+            # Start a new ID list unless an earlier attempt completed a batch
             if not any(self.is_delivered(index) for index in indices):
                 request_ids = []
 

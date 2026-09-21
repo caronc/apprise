@@ -255,19 +255,26 @@ def test_unhashable_keys_stay_distinct():
         _delivery_tracker.reset(token)
 
 
-def test_equal_values_of_different_types_stay_distinct():
-    """Python-equal values with different types remain separate targets."""
+@pytest.mark.parametrize(
+    "marked, look_alike",
+    [
+        (False, 0),
+        (1, "1"),
+        (1, True),
+        ((0,), (False,)),
+        ("1", b"1"),
+    ],
+)
+def test_look_alike_keys_stay_distinct(marked, look_alike):
+    """A key keeps its type, so values Python calls equal stay apart."""
 
     obj = _Dummy()
     token = _delivery_tracker.set(set())
     try:
-        obj.mark_delivered(False)
-        obj.mark_delivered((0,))
+        obj.mark_delivered(marked)
 
-        assert obj.is_delivered(False) is True
-        assert obj.is_delivered(0) is False
-        assert obj.is_delivered((0,)) is True
-        assert obj.is_delivered((False,)) is False
+        assert obj.is_delivered(marked) is True
+        assert obj.is_delivered(look_alike) is False
 
     finally:
         _delivery_tracker.reset(token)
@@ -470,7 +477,7 @@ def test_async_delivery_tracking():
     assert _delivery_tracker.get() is None
 
 
-def test_the_same_value_under_two_kinds_is_not_confused():
+def test_destination_kinds_stay_distinct():
     """A phone number used two ways is two separate destinations."""
 
     obj = _Dummy()
@@ -492,24 +499,7 @@ def test_the_same_value_under_two_kinds_is_not_confused():
         _delivery_tracker.reset(token)
 
 
-def test_a_number_and_its_text_are_not_confused():
-    """A value keeps its type, so 1 and "1" stay separate."""
-
-    obj = _Dummy()
-    token = _delivery_tracker.set(set())
-    try:
-        obj.mark_delivered(1)
-        assert obj.is_delivered(1) is True
-        assert obj.is_delivered("1") is False
-
-        # True is not 1 either, even though Python compares them equal
-        assert obj.is_delivered(True) is False
-
-    finally:
-        _delivery_tracker.reset(token)
-
-
-def test_batch_positions_are_tracked_separately():
+def test_batch_positions_stay_distinct():
     """Each batch of recipients is its own delivery."""
 
     obj = _Dummy()

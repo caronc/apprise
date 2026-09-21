@@ -1033,8 +1033,8 @@ class NotifyMatrix(NotifyBase):
                 )
                 return False
 
-        # Keep the configured target with each room so delivery is recorded
-        # only after the room receives all of its content.
+        # Pair each room with its configured target and record delivery only
+        # after all content for that room arrives
         rooms = [(("room", room), room) for room in self.rooms]
 
         # Initialize our error tracking
@@ -1085,7 +1085,7 @@ class NotifyMatrix(NotifyBase):
         attachments_ready = False
 
         while len(rooms) > 0:
-            # Get the configured target and its resolved room.
+            # Get the resolved room and its configured target
             delivery_key, room = rooms.pop(0)
             if self.is_delivered(delivery_key):
                 continue
@@ -1114,6 +1114,7 @@ class NotifyMatrix(NotifyBase):
                         body_format,
                         body_passthrough,
                     ):
+                        # Mark our failure
                         has_error = True
                         continue
 
@@ -1134,6 +1135,7 @@ class NotifyMatrix(NotifyBase):
                             continue
 
                         if not attachment:
+                            # Mark our failure
                             has_error = True
                             target_error = True
                             break
@@ -1189,12 +1191,13 @@ class NotifyMatrix(NotifyBase):
                         path, payload=image_payload, method="PUT"
                     )
                     if not postokay:
+                        # Mark our failure
                         has_error = True
                         continue
 
                     self.mark_delivered(image_key, per_message=True)
 
-                    # Increment the transaction ID for the next event.
+                    # Advance the transaction ID so the next send is unique
                     if self.access_token != self.password:
                         self.transaction_id += 1
                         self.store.set(
@@ -1221,6 +1224,7 @@ class NotifyMatrix(NotifyBase):
                     attachment["room_id"] = room_id
                     attachment["type"] = "m.room.message"
 
+                    # Post the attachment event
                     postokay, _, _ = self._fetch(
                         path, payload=attachment, method="PUT"
                     )
@@ -1240,6 +1244,7 @@ class NotifyMatrix(NotifyBase):
                         )
 
                     if not postokay:
+                        # Mark our failure
                         has_error = True
                         target_error = True
                         continue
@@ -1283,12 +1288,12 @@ class NotifyMatrix(NotifyBase):
                 )
 
             if not self.is_delivered(message_key):
-                # Post the user-visible message.
+                # Post the visible message
                 postokay, _, _ = self._fetch(
                     path, payload=payload, method="PUT"
                 )
 
-                # Increment the transaction ID for the next event.
+                # Advance the transaction ID so Matrix accepts the next event
                 if self.access_token != self.password:
                     self.transaction_id += 1
                     self.store.set(
@@ -1298,9 +1303,12 @@ class NotifyMatrix(NotifyBase):
                     )
 
                 if not postokay:
+                    # Report the failed room
                     self.logger.warning(
                         f"Could not send notification Matrix room {room}."
                     )
+
+                    # Mark our failure
                     has_error = True
                     continue
 

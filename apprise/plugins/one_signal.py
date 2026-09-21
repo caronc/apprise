@@ -459,6 +459,9 @@ class NotifyOneSignal(NotifyBase):
                 # deliver it to those recipients twice.  The category is
                 # part of the key because each one is batched separately.
                 if self.is_delivered((category, index)):
+                    # Count an earlier delivery so this retry remains
+                    # successful
+                    sent_count += len(targets[index : index + self.batch_size])
                     continue
 
                 payload[category] = targets[index : index + self.batch_size]

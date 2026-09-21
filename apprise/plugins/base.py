@@ -832,7 +832,7 @@ class NotifyBase(URLBase):
         if tracker is None:
             return False
 
-        return (self._piece(per_message), self._delivery_key(key)) in tracker
+        return self._slot(key, per_message) in tracker
 
     def mark_delivered(self, key: Any, per_message: bool = False) -> None:
         """Record a successful target for the current message piece.
@@ -845,27 +845,18 @@ class NotifyBase(URLBase):
         """
         tracker = _delivery_tracker.get()
         if tracker is not None:
-            # Include the piece so each part of a split message is independent.
-            tracker.add((self._piece(per_message), self._delivery_key(key)))
+            tracker.add(self._slot(key, per_message))
 
     @staticmethod
-    def _piece(per_message: bool) -> Any:
-        """Return the slot a key is recorded under.
+    def _slot(key: Any, per_message: bool) -> tuple[Optional[int], Any]:
+        """Return the entry ``key`` is recorded under.
 
-        A long message is delivered in pieces, and each piece is tracked on
-        its own. Something sent once for the whole notification, such as an
-        icon, uses a slot of its own so it is not repeated for every piece.
+        Split-message pieces use separate slots. ``per_message`` instead
+        shares one slot across the notification. Including the type keeps
+        look-alike values distinct, while ``repr`` supports container keys.
         """
-        return None if per_message else _delivery_index.get()
-
-    @staticmethod
-    def _delivery_key(key: Any) -> Any:
-        """Return a trackable form of ``key``.
-
-        Include the type so look-alikes such as ``False`` and ``0`` remain
-        distinct. The representation also supports container keys.
-        """
-        return (type(key), repr(key))
+        piece = None if per_message else _delivery_index.get()
+        return (piece, (type(key), repr(key)))
 
     def _timed_send(self, **kwargs2: Any) -> bool:
         """Send one prepared call and log its duration at DEBUG.

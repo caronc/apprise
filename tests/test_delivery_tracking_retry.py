@@ -275,7 +275,7 @@ TRACKED = {
 # These need more of their service emulated than a shared fixture can
 # offer: a signed handshake, a stored key pair, a session or channel
 # listing, or a multi-step upload.  Their delivery tracking is exercised
-# by test_delivery_tracking_coverage.py, and their own suites cover the
+# by test_delivery_tracking_paths.py, and their own suites cover the
 # rest of their behaviour.
 NEEDS_ITS_OWN_SERVICE = {
     "aprs": "needs an APRS-IS login handshake",
@@ -342,14 +342,18 @@ def _protocol_stubs(work):
         import paho.mqtt.client  # noqa: F401
 
         published = mock.Mock(**{"rc": 0, "is_published.return_value": True})
+
+        def publish(*args, **kwargs):
+            """Count the call and hand back a published message."""
+            work.plain()
+            return published
+
         client = mock.Mock(
             **{
                 "connect.return_value": 0,
                 "reconnect.return_value": 0,
                 "is_connected.return_value": True,
-                "publish.side_effect": lambda *a, **kw: (
-                    work.plain() and published
-                ),
+                "publish.side_effect": publish,
             }
         )
         stubs.append(
@@ -398,14 +402,18 @@ def _watched(work):
         mock.patch("smtplib.SMTP_SSL") as smtps,
         contextlib.ExitStack() as extra,
     ):
+
+        def sendmail(*args, **kwargs):
+            """Count the call; an empty mapping means everything arrived."""
+            work.plain()
+            return {}
+
         # sendmail() reports the addresses it could NOT reach, so an
         # empty mapping is what success looks like.
         for server in (smtp, smtps):
             session = server.return_value.__enter__.return_value
-            session.sendmail.side_effect = lambda *a, **kw: work.plain() and {}
-            server.return_value.sendmail.side_effect = (
-                session.sendmail.side_effect
-            )
+            session.sendmail.side_effect = sendmail
+            server.return_value.sendmail.side_effect = sendmail
 
         for stub in _protocol_stubs(work):
             extra.enter_context(stub)
@@ -413,17 +421,15 @@ def _watched(work):
         yield
 
 
-def _pass(obj, work, notify_type=NotifyType.INFO):
+def _deliver(obj, work, notify_type=NotifyType.INFO):
     """Deliver once; report whether it worked and what it cost."""
     before = work.count
-    outcome = False
-    with contextlib.suppress(Exception):
-        outcome = obj.send(
-            body="test",
-            title="test",
-            notify_type=notify_type,
-            attach=AppriseAttachment(ATTACHMENT),
-        )
+    outcome = obj.send(
+        body="test",
+        title="test",
+        notify_type=notify_type,
+        attach=AppriseAttachment(ATTACHMENT),
+    )
 
     return bool(outcome), work.count - before
 
@@ -443,15 +449,17 @@ def test_retry_does_not_repeat_delivery(name):
             # Built inside the patches; a service that opens its own
             # client in __init__ has to pick up the stub, not a real one.
             obj = Apprise.instantiate(TRACKED[name], suppress_exceptions=True)
-            assert obj is not None, f"{name}: URL no longer loads"
+            if obj is None:
+                # The service needs a package this build does not have
+                pytest.skip(f"{name}: not available in this build")
 
             kind = NOTIFY_TYPES.get(name, NotifyType.INFO)
-            delivered, first = _pass(obj, work, kind)
+            delivered, first = _deliver(obj, work, kind)
 
             # Watch what the second pass records; the first one already
             # delivered everything, so it should record nothing at all.
             with delivery_marks() as repeated:
-                _, second = _pass(obj, work, kind)
+                still_ok, second = _deliver(obj, work, kind)
 
     finally:
         _delivery_tracker.reset(token)
@@ -469,6 +477,14 @@ def test_retry_does_not_repeat_delivery(name):
     assert delivered, (
         f"{name}: the first attempt reported failure, so this case"
         " cannot show whether a retry repeats itself"
+    )
+
+    # Skipping what already arrived is still a success.  A service
+    # that reports failure here would turn a healthy retry into an
+    # error the caller never had before.
+    assert still_ok, (
+        f"{name}: the second attempt reported failure even though"
+        " everything had already been delivered"
     )
 
     # Whatever work is left on the second pass, it is not a delivery.

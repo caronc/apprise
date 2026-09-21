@@ -404,11 +404,7 @@ def test_slack_stops_after_upload_failure(tracker):
         mock.patch("requests.post", side_effect=ok_response),
         mock.patch("requests.get", side_effect=ok_response),
         mock.patch("apprise.plugins.base.time.sleep"),
-        mock.patch.object(
-            NotifyBase,
-            "is_delivered",
-            side_effect=lambda key, per_message=False: False,
-        ),
+        mock.patch.object(NotifyBase, "is_delivered", return_value=False),
         mock.patch.object(type(obj), "_send", side_effect=answer),
     ):
         assert (
@@ -419,6 +415,18 @@ def test_slack_stops_after_upload_failure(tracker):
             )
             is False
         )
+
+
+def test_slack_skips_sent_channel(tracker):
+    """Slack leaves a channel alone once its message has arrived."""
+
+    obj = _build("slack://xoxb-1234-1234-abc123/#chan1")
+
+    with _offline(_everything) as (work, _recorded):
+        _send_attached(obj)
+
+    # The message and its upload both arrived on an earlier attempt
+    assert work() == 0
 
 
 def test_aprs_skips_sent_callsign(tracker):
@@ -435,11 +443,7 @@ def test_aprs_skips_sent_callsign(tracker):
         mock.patch.object(type(obj), "aprsis_login", return_value=True),
         mock.patch.object(type(obj), "socket_reset"),
         mock.patch("apprise.plugins.base.time.sleep"),
-        mock.patch.object(
-            NotifyBase,
-            "is_delivered",
-            side_effect=lambda key, per_message=False: True,
-        ),
+        mock.patch.object(NotifyBase, "is_delivered", return_value=True),
     ):
         obj.send(body="test", title="test")
 
@@ -447,7 +451,7 @@ def test_aprs_skips_sent_callsign(tracker):
     assert stand_in.sendall.call_count == 0
 
 
-def test_vapid_counts_sent_endpoint(tracker, tmpdir):
+def test_vapid_skips_sent_endpoint(tracker, tmpdir):
     """Vapid counts a skipped endpoint so a retry still reports success."""
 
     pytest.importorskip("cryptography")
@@ -492,11 +496,7 @@ def test_vapid_counts_sent_endpoint(tracker, tmpdir):
     with (
         mock.patch("requests.post", side_effect=ok_response) as posted,
         mock.patch("apprise.plugins.base.time.sleep"),
-        mock.patch.object(
-            NotifyBase,
-            "is_delivered",
-            side_effect=lambda key, per_message=False: True,
-        ),
+        mock.patch.object(NotifyBase, "is_delivered", return_value=True),
     ):
         # The endpoint was reached on an earlier attempt.  It still
         # counts, so this reports success instead of "nothing was sent".
