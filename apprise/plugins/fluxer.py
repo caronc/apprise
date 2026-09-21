@@ -585,6 +585,7 @@ class NotifyFluxer(NotifyBase):
             prefix = f"{schema}://{self.host}"
             if isinstance(self.port, int):
                 prefix += f":{self.port}"
+            prefix += "/api"
 
         notify_url = self.notify_url.format(
             prefix=prefix,
