@@ -391,8 +391,17 @@ class NotifySessionOGS(NotifyBase):
         # Send to each configured room in turn.
         has_error = False
         for room in self.rooms:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(room):
+                continue
+
             if not self._post(room, body_bytes):
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(room)
 
         return not has_error
 

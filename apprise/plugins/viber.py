@@ -226,6 +226,11 @@ class NotifyViber(NotifyBase):
         has_error = False
 
         for dest in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(dest):
+                continue
+
             payload["receiver"] = dest
 
             self.throttle()
@@ -298,6 +303,9 @@ class NotifyViber(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(dest)
 
         return not has_error
 

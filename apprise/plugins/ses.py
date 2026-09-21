@@ -442,6 +442,11 @@ class NotifySES(NotifyBase):
             # Get our email to notify
             to_name, to_addr = emails.pop(0)
 
+            # Skip a recipient that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(to_addr):
+                continue
+
             # Strip target out of cc list if in To or Bcc
             cc = self.cc - self.bcc - {to_addr}
 
@@ -571,6 +576,9 @@ class NotifySES(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this recipient.
+            self.mark_delivered(to_addr)
 
         return not has_error
 

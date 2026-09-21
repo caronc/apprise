@@ -465,6 +465,11 @@ class NotifyNtfy(NotifyBase):
             # Retrieve our topic
             topic = topics.pop()
 
+            # Skip a topic that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(topic):
+                continue
+
             if attach and self.attachment_support:
                 # We need to upload our payload first so that we can source it
                 # in remaining messages
@@ -505,6 +510,10 @@ class NotifyNtfy(NotifyBase):
                 if not okay:
                     # Mark our failure, but contiue to move on
                     has_error = True
+                    continue
+
+            # Delivered; a retry can safely skip this topic.
+            self.mark_delivered(topic)
 
         return not has_error
 

@@ -225,6 +225,11 @@ class NotifyEight00com(NotifyBase):
             # Pop the next recipient
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Build the E.164-style sender and recipient strings
             sender = "+{}".format(self.source)
             recipient = "+{}".format(target)
@@ -241,11 +246,15 @@ class NotifyEight00com(NotifyBase):
                     sender, recipient, body, attach, headers
                 ):
                     has_error = True
+                    continue
 
-            else:
+            elif not self._send_sms(sender, recipient, body, headers):
                 # Send as a plain SMS
-                if not self._send_sms(sender, recipient, body, headers):
-                    has_error = True
+                has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

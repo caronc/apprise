@@ -499,6 +499,11 @@ class NotifyReddit(NotifyBase):
             # Retrieve our subreddit
             subreddit = subreddits.pop()
 
+            # Skip a subreddit that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(subreddit):
+                continue
+
             # Prepare our payload
             payload = {
                 "ad": bool(self.advertisement),
@@ -541,6 +546,9 @@ class NotifyReddit(NotifyBase):
 
             # If we reach here, we were successful
             self.logger.info(f"Sent Reddit notification to {subreddit}")
+
+            # Delivered; a retry can safely skip this subreddit.
+            self.mark_delivered(subreddit)
 
         return not has_error
 

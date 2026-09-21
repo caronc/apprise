@@ -288,6 +288,11 @@ class NotifyNotifiarr(NotifyBase):
                     mentions["content"].append(f"<@{no}>")
 
         for _idx, channel in enumerate(self.targets["channels"]):
+            # Skip a channel that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             # prepare Notifiarr Object
             payload = {
                 "source": self.source if self.source else self.app_id,
@@ -337,6 +342,10 @@ class NotifyNotifiarr(NotifyBase):
 
             if not self._send(payload):
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel)
 
         return not has_error
 

@@ -51,6 +51,7 @@ from apprise.exception import (
     AppriseInvalidData,
     ApprisePluginException,
 )
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.matrix import (
     MatrixDiscoveryException,
     NotifyMatrix,
@@ -7479,6 +7480,102 @@ def test_plugin_matrix_dm_send_notification(mock_post, mock_get, mock_put):
         ),
     ):
         assert obj.send(body="hello DM") is True
+
+
+def test_plugin_matrix_failed_dm_is_retried():
+    """A resolved DM is recorded only after its message succeeds."""
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["@alice"],
+        discovery=False,
+        e2ee=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        with (
+            mock.patch.object(
+                obj,
+                "_dm_room_find_or_create",
+                return_value="!dm:h",
+            ) as resolve,
+            mock.patch.object(obj, "_room_join", return_value="!dm:h"),
+            mock.patch.object(
+                obj,
+                "_fetch",
+                side_effect=[
+                    (False, {}, requests.codes.bad_request),
+                    (True, {}, requests.codes.ok),
+                ],
+            ),
+        ):
+            assert obj.send(body="hello") is False
+            assert obj.is_delivered(("user", "@alice")) is False
+
+            assert obj.send(body="hello") is True
+            assert resolve.call_count == 2
+            assert obj.is_delivered(("user", "@alice")) is True
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+
+def test_plugin_matrix_retry_does_not_repeat_attachment_message():
+    """Retry the failed body without repeating a visible attachment."""
+
+    obj = NotifyMatrix(
+        host="h",
+        user="u",
+        password="pass",
+        targets=["#general"],
+        discovery=False,
+        e2ee=False,
+    )
+    obj.access_token = "tok"
+    obj.user_id = "@u:h"
+    obj.home_server = "h"
+
+    attachment_payload = {
+        "msgtype": "m.file",
+        "body": "report.pdf",
+        "url": "mxc://h/file",
+    }
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        with (
+            mock.patch.object(obj, "_room_join", return_value="!room:h"),
+            mock.patch.object(
+                obj,
+                "_send_attachments",
+                return_value=[attachment_payload.copy()],
+            ),
+            mock.patch.object(
+                obj,
+                "_fetch",
+                side_effect=[
+                    (True, {}, requests.codes.ok),
+                    (False, {}, requests.codes.bad_request),
+                    (True, {}, requests.codes.ok),
+                ],
+            ) as fetch,
+        ):
+            assert obj.send(body="hello", attach=[mock.Mock()]) is False
+            assert obj.send(body="hello", attach=[mock.Mock()]) is True
+
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+    attachment_calls = [
+        call
+        for call in fetch.call_args_list
+        if call.kwargs.get("payload", {}).get("msgtype") == "m.file"
+    ]
+    assert len(attachment_calls) == 1
 
 
 @mock.patch("requests.put")

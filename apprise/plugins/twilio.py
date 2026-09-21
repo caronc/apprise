@@ -417,6 +417,15 @@ class NotifyTwilio(NotifyBase):
             # Get our target to notify
             (mode, target) = targets.pop(0)
 
+            # The same phone number can be reached over more than one
+            # mode, so the mode forms part of what identifies it.
+            delivery_key = (mode, target)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(delivery_key):
+                continue
+
             # Prepare our user
             if mode is TwilioMessageMode.TEXT:
                 payload["From"] = self.source
@@ -508,6 +517,9 @@ class NotifyTwilio(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(delivery_key)
 
         return not has_error
 

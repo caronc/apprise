@@ -1179,9 +1179,24 @@ class NotifySlack(NotifyBase):
         # Create a copy of the channel list
         channels = list(self.channels)
 
+        track_attachments = (
+            attach and self.attachment_support and self.mode is SlackMode.BOT
+        )
         attach_channel_list = []
         while len(channels):
             channel = channels.pop(0)
+            message_key = ("message", channel)
+
+            if self.is_delivered(message_key):
+                # Never repost a visible message. Without retained API state,
+                # an unfinished attachment remains a failure.
+                if track_attachments and not all(
+                    self.is_delivered(("attachment", no, message_key))
+                    for no, _ in enumerate(attach, start=1)
+                ):
+                    has_error = True
+                continue
+
             if channel is not None:
                 # We'll perform a user lookup if we detect an email
                 email = is_email(channel)
@@ -1244,25 +1259,36 @@ class NotifySlack(NotifyBase):
                 has_error = True
                 continue
 
-            # Store the valid channel or chat ID (for DMs) that will
-            # be accepted by Slack's attachment method later.
-            if response.get("channel"):
-                attach_channel_list.append(response.get("channel"))
-
             self.logger.info(
                 "Sent Slack notification{}.".format(
                     f" to {channel}" if channel is not None else ""
                 )
             )
 
-        if (
-            attach
-            and self.attachment_support
-            and self.mode is SlackMode.BOT
-            and attach_channel_list
-        ):
+            # The message is visible now, even if a later attachment fails.
+            channel_id = response.get("channel")
+            if channel_id:
+                attach_channel_list.append((message_key, channel_id))
+
+            self.mark_delivered(message_key)
+
+            if track_attachments and not channel_id:
+                self.logger.error(
+                    "Slack did not identify the attachment channel."
+                )
+                has_error = True
+
+        if track_attachments and attach_channel_list:
             # Send our attachments (can only be done in bot mode)
             for no, attachment in enumerate(attach, start=1):
+                pending_channels = [
+                    (message_key, channel_id)
+                    for message_key, channel_id in attach_channel_list
+                    if not self.is_delivered(("attachment", no, message_key))
+                ]
+                if not pending_channels:
+                    continue
+
                 # Perform some simple error checking
                 if not attachment:
                     # We could not access the attachment
@@ -1304,10 +1330,12 @@ class NotifySlack(NotifyBase):
 
                 # Upload file
                 response = self._send(upload_url, {}, attach=attachment)
+                if not response:
+                    return False
 
                 # Send file to channels
                 # https://api.slack.com/methods/files.completeUploadExternal
-                for channel_id in attach_channel_list:
+                for message_key, channel_id in pending_channels:
                     payload_ = {
                         "files": [
                             {
@@ -1334,6 +1362,9 @@ class NotifySlack(NotifyBase):
                         # We failed to send the file to the channel,
                         # take an early exit
                         return False
+
+                    # This attachment is now visible in the channel.
+                    self.mark_delivered(("attachment", no, message_key))
 
         return not has_error
 

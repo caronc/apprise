@@ -545,6 +545,11 @@ class NotifyEmby(NotifyBase):
         has_error = False
 
         for session in sessions:
+            # Skip a session that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(session):
+                continue
+
             # Update our session
             session_url = url % session
 
@@ -603,6 +608,9 @@ class NotifyEmby(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this session.
+            self.mark_delivered(session)
 
         return not has_error
 

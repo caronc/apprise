@@ -220,13 +220,6 @@ class NotifyVapid(NotifyBase):
                 "default": True,
                 "map_to": "include_image",
             },
-            # A newly expired subscription is non-fatal by default when
-            # another target succeeds. Set this to no to report the failure.
-            "ignore_expired": {
-                "name": _("Ignore Expired Subscriptions"),
-                "type": "bool",
-                "default": True,
-            },
         },
     )
 
@@ -239,7 +232,6 @@ class NotifyVapid(NotifyBase):
         subfile=None,
         include_image=None,
         ttl=None,
-        ignore_expired=None,
         **kwargs,
     ):
         """Initialize Vapid Messaging."""
@@ -276,14 +268,6 @@ class NotifyVapid(NotifyBase):
                 msg = f"The Vapid TTL specified ({self.ttl}) is out of range."
                 self.logger.warning(msg)
                 raise AppriseImproperlyConfigured(msg)
-
-        # Ignore newly reported expirations when another target succeeds.
-        # Retrying may duplicate messages to healthy targets.
-        self.ignore_expired = (
-            self.template_args["ignore_expired"]["default"]
-            if ignore_expired is None
-            else ignore_expired
-        )
 
         # Place a thumbnail image inline with the message body
         self.include_image = (
@@ -429,6 +413,14 @@ class NotifyVapid(NotifyBase):
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
+
+            # An endpoint reached on an earlier attempt is left alone, but
+            # it still counts as delivered so a retry does not report that
+            # nothing was sent.
+            if self.is_delivered(target):
+                delivered += 1
+                continue
+
             if target not in self.subscriptions:
                 self.logger.warning(
                     "Dropped Vapid user "
@@ -504,9 +496,9 @@ class NotifyVapid(NotifyBase):
                     )
                     expired.append(target)
 
-                    if not self.ignore_expired:
-                        # The caller chose to treat expiration as a failure.
-                        has_error = True
+                    # The endpoint is gone for good.  It is pruned below,
+                    # so no retry will reach for it again.
+                    has_error = True
 
                 elif r.status_code not in (
                     requests.codes.ok,
@@ -539,6 +531,9 @@ class NotifyVapid(NotifyBase):
                 else:
                     self.logger.info("Sent %s Vapid notification.", self.mode)
                     delivered += 1
+
+                    # Delivered; a retry can safely skip this endpoint.
+                    self.mark_delivered(target)
 
             except requests.RequestException as e:
                 self.logger.warning(
@@ -605,7 +600,6 @@ class NotifyVapid(NotifyBase):
             "mode": self.mode,
             "ttl": str(self.ttl),
             "image": "yes" if self.include_image else "no",
-            "ignore_expired": "yes" if self.ignore_expired else "no",
         }
 
         if self.keyfile:
@@ -689,14 +683,6 @@ class NotifyVapid(NotifyBase):
         results["include_image"] = parse_bool(
             results["qsd"].get(
                 "image", NotifyVapid.template_args["image"]["default"]
-            )
-        )
-
-        # Get our Ignore Expired Flag
-        results["ignore_expired"] = parse_bool(
-            results["qsd"].get(
-                "ignore_expired",
-                NotifyVapid.template_args["ignore_expired"]["default"],
             )
         )
 

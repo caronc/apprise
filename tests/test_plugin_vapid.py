@@ -1061,8 +1061,9 @@ def test_plugin_vapid_prunes_expired_subscriptions(mock_post, tmpdir):
         name="prune",
     )
 
-    # One accepted target makes the ignored expiration non-fatal.
-    assert obj.send("test") is True
+    # An expired endpoint is reported honestly as a failure, even though
+    # another target was accepted.
+    assert obj.send("test") is False
 
     # Remove only the expired subscriptions from disk.
     with open(subfile) as f:
@@ -1964,8 +1965,8 @@ def test_plugin_vapid_write_unreadable_mode(tmpdir):
     "cryptography" not in sys.modules, reason="Requires cryptography"
 )
 @mock.patch("requests.post")
-def test_plugin_vapid_ignore_expired(mock_post, tmpdir):
-    """An expired subscription does not fail the send by default."""
+def test_plugin_vapid_expired_is_reported(mock_post, tmpdir):
+    """An expired subscription is reported as a failure."""
 
     def respond(url, *args, **kwargs):
         # One device is gone, the other is fine
@@ -1984,56 +1985,13 @@ def test_plugin_vapid_ignore_expired(mock_post, tmpdir):
             "dead": "https://web.push.apple.com/DEAD",
         },
         ["live", "dead"],
-        name="ignoreexp",
+        name="expreport",
     )
 
-    # The accepted target makes the ignored expiration non-fatal.
-    assert obj.ignore_expired is True
-    assert obj.send("test") is True
-
-
-@pytest.mark.skipif(
-    "cryptography" not in sys.modules, reason="Requires cryptography"
-)
-@mock.patch("requests.post")
-def test_plugin_vapid_ignore_expired_disabled(mock_post, tmpdir):
-    """Turning the flag off reports an expired subscription as a failure."""
-
-    def respond(url, *args, **kwargs):
-        return _mk_resp(
-            requests.codes.gone
-            if url.endswith("DEAD")
-            else requests.codes.created
-        )
-
-    mock_post.side_effect = respond
-
-    tmpdir0 = tmpdir.mkdir("noignore")
-    subfile = os.path.join(str(tmpdir0), "subscriptions.json")
-    _write_subscriptions(
-        subfile,
-        {
-            "live": "https://web.push.apple.com/LIVE",
-            "dead": "https://web.push.apple.com/DEAD",
-        },
-    )
-
-    obj = NotifyVapid(
-        "user@example.ca",
-        targets=["live", "dead"],
-        subfile=subfile,
-        ignore_expired=False,
-        asset=asset.AppriseAsset(
-            storage_mode=PersistentStoreMode.FLUSH,
-            storage_path=str(tmpdir0),
-            pem_autogen=True,
-        ),
-    )
-
-    assert obj.ignore_expired is False
-
-    # The caller requested a failure even when another target was accepted.
+    # The expired endpoint is a real failure; it is pruned below so no
+    # retry will reach for it again.
     assert obj.send("test") is False
+    assert "dead" not in obj.subscriptions
 
 
 @pytest.mark.skipif(
@@ -2052,38 +2010,8 @@ def test_plugin_vapid_all_expired_still_fails(mock_post, tmpdir):
         name="allexp",
     )
 
-    # Every target expired, so the message went nowhere. Ignoring expired
-    # subscriptions must not turn that into a success.
-    assert obj.ignore_expired is True
+    # Every target expired, so the message went nowhere.
     assert obj.send("test") is False
-
-
-@pytest.mark.skipif(
-    "cryptography" not in sys.modules, reason="Requires cryptography"
-)
-def test_plugin_vapid_ignore_expired_url(tmpdir):
-    """The flag survives a round trip through the URL."""
-
-    tmpdir0 = tmpdir.mkdir("expurl")
-    asset_ = asset.AppriseAsset(
-        storage_mode=PersistentStoreMode.FLUSH,
-        storage_path=str(tmpdir0),
-        pem_autogen=True,
-    )
-
-    obj = Apprise.instantiate("vapid://user@example.ca/abc123", asset=asset_)
-    assert obj.ignore_expired is True
-    assert "ignore_expired=yes" in obj.url()
-
-    off = Apprise.instantiate(
-        "vapid://user@example.ca/abc123?ignore_expired=no", asset=asset_
-    )
-    assert off.ignore_expired is False
-    assert "ignore_expired=no" in off.url()
-
-    # ...and re-loading the generated url keeps the setting
-    assert Apprise.instantiate(off.url()).ignore_expired is False
-    assert Apprise.instantiate(obj.url()).ignore_expired is True
 
 
 @pytest.mark.skipif(

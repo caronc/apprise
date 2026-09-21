@@ -664,11 +664,20 @@ class NotifyJira(NotifyBase):
             if self.user:
                 payload["user"] = self.user
 
-            # reset our request IDs - we will re-populate them
-            request_ids = []
-
             length = len(self.targets) if self.targets else 1
+            indices = range(0, length, self.batch_size)
+
+            # A fresh delivery replaces old IDs. A retry keeps IDs returned by
+            # successful batches from earlier attempts.
+            if not any(self.is_delivered(index) for index in indices):
+                request_ids = []
+
             for index in range(0, length, self.batch_size):
+                # Skip a batch that already accepted this message so
+                # a retry does not deliver it twice.
+                if self.is_delivered(index):
+                    continue
+
                 if self.targets:
                     # If there were no targets identified, then we simply
                     # just iterate once without the responders set
@@ -685,6 +694,10 @@ class NotifyJira(NotifyBase):
 
                 else:
                     has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this batch.
+                self.mark_delivered(index)
 
             # Store our entries for a maximum of 60 days
             self.store.set(key, request_ids, expires=60 * 60 * 24 * 60)

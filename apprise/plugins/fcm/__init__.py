@@ -401,6 +401,11 @@ class NotifyFCM(NotifyBase):
         while len(targets):
             recipient = targets.pop(0)
 
+            # Skip a recipient that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(recipient):
+                continue
+
             if self.mode == FCMMode.OAuth2:
                 payload = {
                     "message": {
@@ -517,6 +522,7 @@ class NotifyFCM(NotifyBase):
                     )
 
                     has_error = True
+                    continue
 
                 else:
                     self.logger.info("Sent %s FCM notification.", self.mode)
@@ -528,6 +534,10 @@ class NotifyFCM(NotifyBase):
                 self.logger.debug("Socket Exception: %s", e)
 
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this recipient.
+            self.mark_delivered(recipient)
 
         return not has_error
 

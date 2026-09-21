@@ -624,6 +624,11 @@ class NotifyAprs(NotifyBase):
 
         # send the message to our target call sign(s)
         for index in range(0, len(targets)):
+            # Skip a callsign that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(targets[index]):
+                continue
+
             # prepare the output string
             # Format:
             # Device ID/TOCALL - our call sign - target call sign - body
@@ -640,6 +645,9 @@ class NotifyAprs(NotifyBase):
             if not self.socket_send(buffer):
                 has_error = True
                 break
+
+            # Delivered; a retry can safely skip this callsign.
+            self.mark_delivered(targets[index])
 
             # Finally, reset our socket buffer
             # we DO NOT read from the socket as we

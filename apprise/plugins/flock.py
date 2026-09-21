@@ -239,12 +239,21 @@ class NotifyFlock(NotifyBase):
                 # Get our first item
                 target = targets.pop(0)
 
+                # Skip a target that already accepted this message so
+                # a retry does not deliver it twice.
+                if self.is_delivered(target):
+                    continue
+
                 # Copy and update our payload
                 payload_ = payload.copy()
                 payload_["to"] = target
 
                 if not self._post(self.notify_api, headers, payload_):
                     has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this target.
+                self.mark_delivered(target)
 
         else:
             # Webhook

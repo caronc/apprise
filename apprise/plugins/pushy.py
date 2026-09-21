@@ -204,9 +204,19 @@ class NotifyPushy(NotifyBase):
         content = {}
 
         # Create a copy of targets (topics and devices)
-        targets = list(self.topics) + list(self.devices)
+        # Topics and devices are stored without their prefix, so the
+        # kind forms part of what identifies each one.
+        targets = [("topic", x) for x in self.topics] + [
+            ("device", x) for x in self.devices
+        ]
         while len(targets):
-            target = targets.pop(0)
+            delivery_key = targets.pop(0)
+            target = delivery_key[1]
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(delivery_key):
+                continue
 
             # prepare JSON Object
             payload = {
@@ -314,6 +324,9 @@ class NotifyPushy(NotifyBase):
 
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(delivery_key)
 
         return not has_error
 

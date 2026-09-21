@@ -495,6 +495,12 @@ class NotifySMSEagle(NotifyBase):
 
             targets = getattr(self, f"target_{category}s")
             for index in range(0, len(targets), batch_size):
+                # Skip a batch that already went out so a retry does
+                # not deliver it to those recipients twice.
+                delivery_key = (category, index)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 # Prepare our recipients
                 payload["params"][notify_by[category]["target"]] = ",".join(
                     targets[index : index + batch_size]
@@ -631,6 +637,9 @@ class NotifySMSEagle(NotifyBase):
                     # Mark our failure
                     has_error = True
                     continue
+
+                # Delivered; a retry can safely skip this batch.
+                self.mark_delivered(delivery_key)
 
         return not has_error
 

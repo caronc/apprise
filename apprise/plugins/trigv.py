@@ -301,6 +301,11 @@ class NotifyTrigv(NotifyBase):
         has_error = False
 
         for channel in self.targets:
+            # Skip a channel that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             # Prepare our payload
             payload = {
                 "channel": channel,
@@ -379,6 +384,10 @@ class NotifyTrigv(NotifyBase):
                 )
                 self.logger.debug(f"Socket Exception: {e!s}")
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel)
 
         return not has_error
 

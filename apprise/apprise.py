@@ -57,7 +57,11 @@ from .exception import AppriseImproperlyConfigured, AppriseTemplateError
 from .locale import AppriseLocale
 from .logger import NotifyLogEntry, _ServiceLogCapture, logger
 from .manager_plugins import NotificationManager
-from .plugins.base import _PAYLOAD_PRECAPPED, NotifyBase
+from .plugins.base import (
+    _PAYLOAD_PRECAPPED,
+    NotifyBase,
+    _delivery_tracker,
+)
 from .result import (
     AppriseResult,
     AppriseResultStatus,
@@ -447,78 +451,88 @@ def _call_with_retry(
     log_level = kwargs.pop("_log_level", None)
 
     attempts: list[NotifyAttempt] = []
-    for attempt in range(retry + 1):
-        if deadline is not None and time.monotonic() >= deadline:
-            # Record that no further attempt was started.
+
+    # Remember successful targets only while retries are active.
+    tracker_token = _delivery_tracker.set(set()) if retry else None
+    try:
+        for attempt in range(retry + 1):
+            if deadline is not None and time.monotonic() >= deadline:
+                # Record that no further attempt was started.
+                logger.trace(
+                    "Deadline already passed for '%s'; skipping "
+                    "attempt %d/%d.",
+                    service.service_name,
+                    attempt + 1,
+                    retry + 1,
+                )
+                attempts.append(_build_timeout_attempt(service.service_name))
+                break
+
+            attempt_start = time.monotonic()
             logger.trace(
-                "Deadline already passed for '%s'; skipping attempt %d/%d.",
-                service.service_name,
+                "Starting attempt %d/%d for '%s'.",
                 attempt + 1,
                 retry + 1,
+                service.service_name,
             )
-            attempts.append(_build_timeout_attempt(service.service_name))
-            break
+            # Treat validation errors and plugin crashes as retriable failures.
+            with _ServiceLogCapture(
+                service,
+                log_callback=log_callback,
+                level=log_level if log_level is not None else logging.WARNING,
+            ) as capture:
+                try:
+                    result = service.notify(**kwargs)
+                except TypeError:
+                    result = False
+                except Exception as e:
+                    logger.warning(
+                        "Notification service '%s' raised an exception.",
+                        service.service_name,
+                    )
+                    logger.debug("Notification Exception: %s", str(e))
+                    result = False
 
-        attempt_start = time.monotonic()
-        logger.trace(
-            "Starting attempt %d/%d for '%s'.",
-            attempt + 1,
-            retry + 1,
-            service.service_name,
-        )
-        # Treat validation errors and plugin crashes as retriable failures.
-        with _ServiceLogCapture(
-            service,
-            log_callback=log_callback,
-            level=log_level if log_level is not None else logging.WARNING,
-        ) as capture:
-            try:
-                result = service.notify(**kwargs)
-            except TypeError:
-                result = False
-            except Exception as e:
+            attempt_elapsed = time.monotonic() - attempt_start
+            logger.trace(
+                "Attempt %d/%d for '%s' finished in %.3fs: %s.",
+                attempt + 1,
+                retry + 1,
+                service.service_name,
+                attempt_elapsed,
+                "success" if result else "failure",
+            )
+            attempts.append(
+                NotifyAttempt(
+                    status=_attempt_status(result),
+                    elapsed=attempt_elapsed,
+                    logs=capture.entries,
+                )
+            )
+
+            if result:
+                break
+
+            if attempt < retry:
                 logger.warning(
-                    "Notification service '%s' raised an exception.",
+                    "Attempt %d/%d for '%s' failed; trying again.",
+                    attempt + 1,
+                    retry + 1,
                     service.service_name,
                 )
-                logger.debug("Notification Exception: %s", str(e))
-                result = False
+                if wait > 0:
+                    sleep_for = wait
+                    if deadline is not None:
+                        sleep_for = min(
+                            wait, max(0.0, deadline - time.monotonic())
+                        )
+                    if sleep_for > 0:
+                        time.sleep(sleep_for)
 
-        attempt_elapsed = time.monotonic() - attempt_start
-        logger.trace(
-            "Attempt %d/%d for '%s' finished in %.3fs: %s.",
-            attempt + 1,
-            retry + 1,
-            service.service_name,
-            attempt_elapsed,
-            "success" if result else "failure",
-        )
-        attempts.append(
-            NotifyAttempt(
-                status=_attempt_status(result),
-                elapsed=attempt_elapsed,
-                logs=capture.entries,
-            )
-        )
-
-        if result:
-            break
-
-        if attempt < retry:
-            logger.warning(
-                "Attempt %d/%d for '%s' failed; trying again.",
-                attempt + 1,
-                retry + 1,
-                service.service_name,
-            )
-            if wait > 0:
-                sleep_for = wait
-                if deadline is not None:
-                    sleep_for = min(
-                        wait, max(0.0, deadline - time.monotonic())
-                    )
-                if sleep_for > 0:
-                    time.sleep(sleep_for)
+    finally:
+        # Always drop the tracker so it cannot outlive this call.
+        if tracker_token is not None:
+            _delivery_tracker.reset(tracker_token)
 
     return _finalize_service_result(service, retry, attempts)
 
@@ -2362,89 +2376,99 @@ class Apprise:
             log_level = kwargs.pop("_log_level", None)
 
             attempts: list[NotifyAttempt] = []
-            for attempt in range(retry + 1):
-                if deadline is not None and time.monotonic() >= deadline:
-                    # Out of time -- record a zero-elapsed TIMEOUT attempt
-                    # marking the decision to stop, and do not start
-                    # another one.
+            # Remember successful targets only while retries are active.
+            tracker_token = _delivery_tracker.set(set()) if retry else None
+            try:
+                for attempt in range(retry + 1):
+                    if deadline is not None and time.monotonic() >= deadline:
+                        # Out of time -- record a zero-elapsed TIMEOUT attempt
+                        # marking the decision to stop, and do not start
+                        # another one.
+                        logger.trace(
+                            "Deadline already passed for '%s'; skipping "
+                            "attempt %d/%d.",
+                            service.service_name,
+                            attempt + 1,
+                            retry + 1,
+                        )
+                        attempts.append(
+                            _build_timeout_attempt(service.service_name)
+                        )
+                        break
+
+                    attempt_start = time.monotonic()
                     logger.trace(
-                        "Deadline already passed for '%s'; skipping "
-                        "attempt %d/%d.",
-                        service.service_name,
+                        "Starting attempt %d/%d for '%s'.",
                         attempt + 1,
                         retry + 1,
+                        service.service_name,
+                    )
+                    # Treat validation and plugin exceptions as failed
+                    # attempts, matching synchronous delivery.
+                    with _ServiceLogCapture(
+                        service,
+                        log_callback=log_callback,
+                        level=(
+                            log_level
+                            if log_level is not None
+                            else logging.WARNING
+                        ),
+                    ) as capture:
+                        try:
+                            result = await service.async_notify(**kwargs)
+
+                        except TypeError:
+                            result = False
+
+                        except Exception as e:
+                            logger.warning(
+                                "Notification service '%s' raised an"
+                                " exception.",
+                                service.service_name,
+                            )
+                            logger.debug("Notification Exception: %s", str(e))
+                            result = False
+
+                    attempt_elapsed = time.monotonic() - attempt_start
+                    logger.trace(
+                        "Attempt %d/%d for '%s' finished in %.3fs: %s.",
+                        attempt + 1,
+                        retry + 1,
+                        service.service_name,
+                        attempt_elapsed,
+                        "success" if result else "failure",
                     )
                     attempts.append(
-                        _build_timeout_attempt(service.service_name)
+                        NotifyAttempt(
+                            status=_attempt_status(result),
+                            elapsed=attempt_elapsed,
+                            logs=capture.entries,
+                        )
                     )
-                    break
 
-                attempt_start = time.monotonic()
-                logger.trace(
-                    "Starting attempt %d/%d for '%s'.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
-                )
-                # Mirror the exception handling from the synchronous paths:
-                # Treat validation and plugin exceptions as failed attempts.
-                # The retry loop can still continue for this service.
-                with _ServiceLogCapture(
-                    service,
-                    log_callback=log_callback,
-                    level=(
-                        log_level if log_level is not None else logging.WARNING
-                    ),
-                ) as capture:
-                    try:
-                        result = await service.async_notify(**kwargs)
+                    if result:
+                        break
 
-                    except TypeError:
-                        result = False
-
-                    except Exception as e:
+                    if attempt < retry:
                         logger.warning(
-                            "Notification service '%s' raised an exception.",
+                            "Attempt %d/%d for '%s' failed; trying again.",
+                            attempt + 1,
+                            retry + 1,
                             service.service_name,
                         )
-                        logger.debug("Notification Exception: %s", str(e))
-                        result = False
+                        if wait > 0:
+                            sleep_for = wait
+                            if deadline is not None:
+                                sleep_for = min(
+                                    wait, max(0.0, deadline - time.monotonic())
+                                )
+                            if sleep_for > 0:
+                                await asyncio.sleep(sleep_for)
 
-                attempt_elapsed = time.monotonic() - attempt_start
-                logger.trace(
-                    "Attempt %d/%d for '%s' finished in %.3fs: %s.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
-                    attempt_elapsed,
-                    "success" if result else "failure",
-                )
-                attempts.append(
-                    NotifyAttempt(
-                        status=_attempt_status(result),
-                        elapsed=attempt_elapsed,
-                        logs=capture.entries,
-                    )
-                )
-
-                if result:
-                    break
-
-                if attempt < retry:
-                    logger.warning(
-                        "Attempt %d/%d for '%s' failed; trying again.",
-                        attempt + 1,
-                        retry + 1,
-                        service.service_name,
-                    )
-                    if wait > 0:
-                        sleep_for = wait
-                        if deadline is not None:
-                            sleep_for = min(
-                                wait, max(0.0, deadline - time.monotonic())
-                            )
-                        if sleep_for > 0:
-                            await asyncio.sleep(sleep_for)
+            finally:
+                # Always drop the tracker so it cannot outlive this call.
+                if tracker_token is not None:
+                    _delivery_tracker.reset(tracker_token)
 
             return _finalize_service_result(service, retry, attempts)
 

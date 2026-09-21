@@ -492,11 +492,21 @@ class NotifyRocketChat(NotifyBase):
         while len(channels) > 0:
             # Get Channel
             channel = channels.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             payload["channel"] = channel
 
             if not self._send(payload, notify_type=notify_type, **kwargs):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(channel)
 
         # Create a copy of our room id's to notify against
         rooms = list(self.rooms)
@@ -504,11 +514,21 @@ class NotifyRocketChat(NotifyBase):
         while len(rooms):
             # Get Room
             room = rooms.pop(0)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(room):
+                continue
+
             payload["roomId"] = room
 
             if not self._send(payload, notify_type=notify_type, **kwargs):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(room)
 
         if self.mode == RocketChatAuthMode.BASIC:
             # logout

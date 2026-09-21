@@ -1264,6 +1264,12 @@ class NotifyTelegram(NotifyBase):
         targets = list(self.targets)
         while len(targets):
             target = targets.pop(0)
+
+            # Skip a chat that already accepted this message on an
+            # earlier attempt so a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             chat_id, topic = target
 
             # Printable chat_id details
@@ -1274,14 +1280,22 @@ class NotifyTelegram(NotifyBase):
             if topic:
                 base_payload["message_thread_id"] = topic
 
-            if self.include_image is True and not self.send_media(
-                target, notify_type
+            # The image is posted as its own message and belongs to the
+            # whole notification, so it goes out once no matter how many
+            # pieces the body is split into.
+            image_key = ("image", target)
+            if self.include_image is True and not self.is_delivered(
+                image_key, per_message=True
             ):
-                # We failed to send the image associated with our
-                # notify_type
-                self.logger.warning(
-                    "Failed to send Telegram attachment to {}.", pchat_id
-                )
+                if self.send_media(target, notify_type):
+                    self.mark_delivered(image_key, per_message=True)
+
+                else:
+                    # We failed to send the image associated with our
+                    # notify_type
+                    self.logger.warning(
+                        "Failed to send Telegram attachment to {}.", pchat_id
+                    )
 
             if (
                 attach
@@ -1300,15 +1314,21 @@ class NotifyTelegram(NotifyBase):
 
                 if not has_body:
                     # Nothing more to do; move along to the next attachment
+                    self.mark_delivered(target)
                     continue
 
             if caption_payload:
                 # nothing further to do; move along to the next attachment
+                self.mark_delivered(target)
                 continue
 
             # Send every expanded piece so overflow splitting loses no content.
             target_failed = False
-            for piece in bodies:
+            for piece_no, piece in enumerate(bodies):
+                piece_key = ("body", target, piece_no)
+                if self.is_delivered(piece_key):
+                    continue
+
                 payload = base_payload.copy()
                 payload["text"] = piece
 
@@ -1378,6 +1398,7 @@ class NotifyTelegram(NotifyBase):
                     continue
 
                 self.logger.info("Sent Telegram notification.")
+                self.mark_delivered(piece_key)
 
             if target_failed:
                 continue
@@ -1397,6 +1418,9 @@ class NotifyTelegram(NotifyBase):
                 has_error = True
                 continue
 
+            # This chat is done; a retry can safely skip over it.
+            self.mark_delivered(target)
+
         return not has_error
 
     def _send_attachments(self, target, notify_type, attach, payload=None):
@@ -1406,6 +1430,10 @@ class NotifyTelegram(NotifyBase):
         has_error = False
         # Send our attachments now (if specified and if it exists)
         for no, attachment in enumerate(attach, start=1):
+            attachment_key = ("attachment", target, no)
+            if self.is_delivered(attachment_key):
+                continue
+
             payload = payload if payload and no == 1 else {}
             payload.update(
                 {
@@ -1425,6 +1453,7 @@ class NotifyTelegram(NotifyBase):
                 break
 
             self.logger.info(f"Sent Telegram attachment: {attachment}.")
+            self.mark_delivered(attachment_key)
 
         return not has_error
 

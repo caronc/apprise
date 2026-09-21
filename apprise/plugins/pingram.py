@@ -855,6 +855,11 @@ class NotifyPingram(NotifyBase):
                 or payload["to"].get("email")
             )
 
+            # Skip a recipient that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(target_desc):
+                continue
+
             # Perform our post
             self.logger.debug(
                 "Pingram POST URL: {} (cert_verify={!r})".format(
@@ -921,6 +926,7 @@ class NotifyPingram(NotifyBase):
 
                     # Record our failure
                     has_error = True
+                    continue
 
                 else:
                     self.logger.info(
@@ -938,6 +944,10 @@ class NotifyPingram(NotifyBase):
 
                 # Record our failure
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this recipient.
+            self.mark_delivered(target_desc)
 
         return not has_error
 

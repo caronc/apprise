@@ -37,6 +37,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.twitter import NotifyTwitter
 
 # Disable logging for a cleaner testing output
@@ -764,17 +765,21 @@ def test_plugin_twitter_dm_attachments_basic(
     attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
 
     # Send our notification.
-    assert (
-        bool(
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert (
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
+            is True
         )
-        is True
-    )
+    finally:
+        _delivery_tracker.reset(tracker_token)
 
     # Test call counts.
     assert mock_get.call_count == 1
@@ -927,17 +932,21 @@ def test_plugin_twitter_dm_attachments_multiple(
     # Create application objects.
     obj = Apprise.instantiate(twitter_url)
 
-    assert (
-        bool(
-            obj.notify(
-                body="body",
-                title="title",
-                notify_type=NotifyType.INFO,
-                attach=attach,
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert (
+            bool(
+                obj.notify(
+                    body="body",
+                    title="title",
+                    notify_type=NotifyType.INFO,
+                    attach=attach,
+                )
             )
+            is True
         )
-        is True
-    )
+    finally:
+        _delivery_tracker.reset(tracker_token)
 
     assert mock_post.call_count == 8
     # First 4 calls are v2 media uploads
