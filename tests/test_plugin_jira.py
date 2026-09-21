@@ -32,6 +32,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 import apprise
@@ -562,3 +563,12 @@ def test_plugin_jira_mapping(mock_post):
     assert bool(instance3.notify("body", "title", NotifyType.INFO)) is True
     assert mock_post.call_count == 1
     assert mock_post.call_args[0][0] == base_url
+
+
+def test_plugin_jira_non_string_region():
+    """Verify a region that isn't a string is rejected cleanly."""
+
+    # Reject non-string regions with the plugin's configuration error.
+    for region in (42, 4.2, True, b"us", ["us"], {"region": "us"}, object()):
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyJira(apikey="a" * 32, targets=["user"], region_name=region)

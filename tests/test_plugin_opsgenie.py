@@ -32,6 +32,7 @@ import logging
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 import apprise
@@ -484,3 +485,14 @@ def test_plugin_opsgenie_edge_case(mock_post):
     # new key is new index
     assert bool(instance.notify("test", "key2", NotifyType.FAILURE)) is True
     assert len(instance.store.keys()) == 2
+
+
+def test_plugin_opsgenie_non_string_region():
+    """Verify a region that isn't a string is rejected cleanly."""
+
+    # Reject non-string regions with the plugin's configuration error.
+    for region in (42, 4.2, True, b"us", ["us"], {"region": "us"}, object()):
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyOpsgenie(
+                apikey="a" * 32, targets=["user"], region_name=region
+            )
