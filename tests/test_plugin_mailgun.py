@@ -31,6 +31,7 @@ import os
 from unittest import mock
 
 from helpers import AppriseURLTester
+import pytest
 import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
@@ -614,3 +615,18 @@ def test_plugin_mailgun_cc_bcc_invalid_branch():
     # Valid BCC entry was added; invalid one was silently dropped
     assert "bcc@example.com" in obj.bcc
     assert len(obj.bcc) == 1
+
+
+def test_plugin_mailgun_non_string_region():
+    """Verify a region that isn't a string is rejected cleanly."""
+
+    # Reject non-string regions with the plugin's configuration error.
+    for region in (42, 4.2, True, b"us", ["us"], {"region": "us"}, object()):
+        with pytest.raises(AppriseImproperlyConfigured):
+            NotifyMailgun(
+                host="localhost.localdomain",
+                user="user",
+                apikey="a" * 32,
+                targets=["user@example.com"],
+                region_name=region,
+            )

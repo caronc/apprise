@@ -258,22 +258,20 @@ class NotifyMailgun(NotifyBase):
         # Prepare Batch Mode Flag
         self.batch = batch
 
-        # Store our region
-        try:
-            self.region_name = (
-                NotifyMailgun.template_args["region"]["default"]
-                if region_name is None
-                else region_name.lower()
+        # Normalize string regions; reject all other values below.
+        self.region_name = (
+            NotifyMailgun.template_args["region"]["default"]
+            if region_name is None
+            else (
+                region_name.lower() if isinstance(region_name, str) else None
             )
+        )
 
-            if self.region_name not in MAILGUN_REGIONS:
-                # allow the outer except to handle this common response
-                raise
-        except:
+        if self.region_name not in MAILGUN_REGIONS:
             # Invalid region specified
             msg = f"The Mailgun region specified ({region_name}) is invalid."
             self.logger.warning(msg)
-            raise AppriseImproperlyConfigured(msg) from None
+            raise AppriseImproperlyConfigured(msg)
 
         # Get our From username (if specified)
         self.from_addr = [self.app_id, f"{self.user}@{self.host}"]

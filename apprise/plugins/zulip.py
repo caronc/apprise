@@ -131,7 +131,7 @@ class NotifyZulip(NotifyBase):
                 "name": _("Organization"),
                 "type": "string",
                 "required": True,
-                "regex": (r"^[A-Z0-9_-]{1,32})$", "i"),
+                "regex": (r"^[A-Z0-9_-]{1,32}$", "i"),
             },
             "token": {
                 "name": _("Token"),

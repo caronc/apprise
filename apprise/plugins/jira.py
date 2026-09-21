@@ -367,24 +367,22 @@ class NotifyJira(NotifyBase):
             )
         )
 
-        # Store our region
-        try:
-            self.region_name = (
-                self.jira_default_region
-                if region_name is None
-                else region_name.lower()
+        # Normalize string regions; reject all other values below.
+        self.region_name = (
+            self.jira_default_region
+            if region_name is None
+            else (
+                region_name.lower() if isinstance(region_name, str) else None
             )
+        )
 
-            if self.region_name not in JIRA_REGIONS:
-                # allow the outer except to handle this common response
-                raise
-        except:
+        if self.region_name not in JIRA_REGIONS:
             # Invalid region specified
             msg = "The Jira region specified ({}) is invalid.".format(
                 region_name
             )
             self.logger.warning(msg)
-            raise AppriseImproperlyConfigured(msg) from None
+            raise AppriseImproperlyConfigured(msg)
 
         if action and isinstance(action, str):
             self.action = next(

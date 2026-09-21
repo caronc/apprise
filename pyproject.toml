@@ -342,7 +342,6 @@ ignore = [
   "D100",    # missing docstring in public module
   "D104",    # missing docstring in public package
   "B008",    # do not call `dict()` with keyword args
-  "E722",    # bare except (Apprise uses it reasonably)
   "E741",    # Ambiguous variable name (e.g., l, O, I)
   "W605",    # Invalid escape sequence
   "B026",    # Star-arg play a big part of Apprise; must be accepted for now
