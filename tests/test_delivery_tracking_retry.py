@@ -25,28 +25,20 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Checks that a second attempt does not repeat completed work.
+"""Ensure a second attempt does not repeat completed deliveries.
 
-Every service that records its deliveries is driven twice against one
-shared tracker, which is exactly what the retry loop in
-``apprise/apprise.py`` does. The first pass delivers; the second pass
-must do strictly less, because everything it wanted to send has already
-gone out.
-
-A plugin that forgot to record its successes repeats everything on the
-second pass and is caught here. This works for services that send one
-request per target and for those that send one request per batch, so it
-covers every plugin rather than only the ones with separable targets.
+Each service runs twice against one tracker. The first pass delivers;
+the second may repeat setup work but must not deliver again.
 """
 
 # Disable logging for a cleaner testing output
 import contextlib
 from json import dumps, loads
 import logging
-import os
 import socket
 from unittest import mock
 
+from helpers import ATTACHMENT, OK_BODY, delivery_marks
 import pytest
 import requests
 
@@ -54,38 +46,6 @@ from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.plugins.base import _delivery_tracker
 
 logging.disable(logging.CRITICAL)
-
-# Attachment Directory
-TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
-ATTACHMENT = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
-
-# A response wide enough that most services accept it and carry on to
-# their target list.  Without one they stop at the first status check.
-OK_BODY = dumps(
-    {
-        "ok": True,
-        "success": True,
-        "status": "success",
-        "id": "1",
-        "code": 0,
-        "errcode": 0,
-        "error": None,
-        "channel": "C1",
-        "access_token": "abc",
-        "expires_in": 3600,
-        "upload_url": "https://localhost/upload",
-        "file_id": "F1",
-        "content_uri": "mxc://localhost/1",
-        "event_id": "e1",
-        "room_id": "!r:localhost",
-        "user_id": "@u:localhost",
-        "post": {"id": 1},
-        "result": {"message_id": 1, "id": "1"},
-        "data": {"id": "1"},
-        "json": {"errors": []},
-        "messages": [{"status": "0", "message-id": "1"}],
-    }
-)
 
 # What a particular service needs to see before it calls a delivery a
 # success.  "body" is merged over OK_BODY, "status" replaces the HTTP
@@ -470,7 +430,7 @@ def _pass(obj, work, notify_type=NotifyType.INFO):
 
 @pytest.mark.filterwarnings("ignore::ResourceWarning")
 @pytest.mark.parametrize("name", TRACKED_IDS)
-def test_a_second_attempt_does_not_repeat_itself(name):
+def test_retry_does_not_repeat_delivery(name):
     """A retry only picks up what the first attempt did not finish."""
 
     if name in NEEDS_ITS_OWN_SERVICE:
@@ -487,7 +447,11 @@ def test_a_second_attempt_does_not_repeat_itself(name):
 
             kind = NOTIFY_TYPES.get(name, NotifyType.INFO)
             delivered, first = _pass(obj, work, kind)
-            _, second = _pass(obj, work, kind)
+
+            # Watch what the second pass records; the first one already
+            # delivered everything, so it should record nothing at all.
+            with delivery_marks() as repeated:
+                _, second = _pass(obj, work, kind)
 
     finally:
         _delivery_tracker.reset(token)
@@ -505,6 +469,12 @@ def test_a_second_attempt_does_not_repeat_itself(name):
     assert delivered, (
         f"{name}: the first attempt reported failure, so this case"
         " cannot show whether a retry repeats itself"
+    )
+
+    # Whatever work is left on the second pass, it is not a delivery.
+    # A recorded target means that target heard from us twice.
+    assert not repeated, (
+        f"{name}: the second attempt delivered to {repeated[0]!r} again"
     )
 
     # Everything the first pass sent is recorded, so the second pass has

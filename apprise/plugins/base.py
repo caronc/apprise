@@ -84,9 +84,9 @@ _PAYLOAD_PRECAPPED = _PayloadPrecappedToken()
 
 # Remembers successful targets during retries. It remains unused when retries
 # are disabled, preserving the original plugin behavior.
-_delivery_tracker: contextvars.ContextVar[Optional[set[tuple[int, Any]]]] = (
-    contextvars.ContextVar("apprise_delivery_tracker", default=None)
-)
+_delivery_tracker: contextvars.ContextVar[
+    Optional[set[tuple[Optional[int], Any]]]
+] = contextvars.ContextVar("apprise_delivery_tracker", default=None)
 
 # Identifies the current message piece so split messages are tracked one piece
 # at a time.

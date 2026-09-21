@@ -25,77 +25,27 @@
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
 
-"""Exercises the skip path of every plugin that tracks its deliveries.
+"""Check that every tracking plugin reaches its target-skip path.
 
-``tests/test_delivery_tracking_fleet.py`` proves the behaviour is right.
-This file makes sure the branch is actually reached for every service,
-including the ones the fleet harness cannot drive end to end.
-
-Each plugin is loaded from one of its own test URLs, then told that every
-target has already been reached.  ``send()`` should walk its targets,
-skip them all, and come back without contacting anything.
+Each service is told its targets were already reached. It must check the
+tracker and avoid making another delivery request.
 """
 
 # Disable logging for a cleaner testing output
 import contextlib
-from json import dumps
 import logging
-import os
 import socket
 from unittest import mock
 
+from helpers import ATTACHMENT, ok_response
 import pytest
-import requests
 
 from apprise import Apprise, AppriseAttachment
 from apprise.plugins.base import NotifyBase, _delivery_tracker
 
 logging.disable(logging.CRITICAL)
 
-# Attachment Directory
-TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
-ATTACHMENT = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
-
-# A response wide enough that most services accept it and carry on to
-# their target list.  Without one they stop at the first status check and
-# never reach the part under test.
-OK_BODY = dumps(
-    {
-        "ok": True,
-        "success": True,
-        "status": "success",
-        "id": "1",
-        "code": 0,
-        "errcode": 0,
-        "error": None,
-        "channel": "C1",
-        "access_token": "abc",
-        "expires_in": 3600,
-        "upload_url": "https://localhost/upload",
-        "file_id": "F1",
-        "content_uri": "mxc://localhost/1",
-        "event_id": "e1",
-        "room_id": "!r:localhost",
-        "user_id": "@u:localhost",
-        "post": {"id": 1},
-        "result": {"message_id": 1, "id": "1"},
-        "data": {"id": "1"},
-        "json": {"errors": []},
-        "messages": [{"status": "0", "message-id": "1"}],
-    }
-)
-
-
-def _ok_response(*args, **kwargs):
-    """Return a response a plugin will treat as a success."""
-    response = requests.Request()
-    response.status_code = requests.codes.ok
-    response.content = OK_BODY
-    response.text = OK_BODY
-    response.headers = {"Content-Type": "application/json"}
-    return response
-
-
+# Shared helpers provide an attachment and broadly accepted responses.
 # One URL per service that tracks deliveries.  Each is taken from that
 # plugin's own test suite so it stays valid as the plugin changes.
 TRACKED = {
@@ -297,7 +247,7 @@ TRACKED_IDS = sorted(TRACKED)
 # refuses it; the object is discarded unused.
 @pytest.mark.filterwarnings("ignore::ResourceWarning")
 @pytest.mark.parametrize("name", TRACKED_IDS)
-def test_every_target_can_be_skipped(name):
+def test_all_targets_can_be_skipped(name):
     """send() walks its targets and skips ones already delivered."""
 
     if name in CANNOT_REACH_TARGETS:
@@ -315,10 +265,10 @@ def test_every_target_can_be_skipped(name):
             mock.patch.object(
                 NotifyBase, "is_delivered", return_value=True
             ) as asked,
-            mock.patch("requests.post", side_effect=_ok_response) as post,
-            mock.patch("requests.get", side_effect=_ok_response) as get,
-            mock.patch("requests.put", side_effect=_ok_response) as put,
-            mock.patch("requests.patch", side_effect=_ok_response) as patch,
+            mock.patch("requests.post", side_effect=ok_response) as post,
+            mock.patch("requests.get", side_effect=ok_response) as get,
+            mock.patch("requests.put", side_effect=ok_response) as put,
+            mock.patch("requests.patch", side_effect=ok_response) as patch,
             mock.patch("apprise.plugins.base.time.sleep"),
             # Keep the test off the network entirely
             mock.patch.object(socket.socket, "connect", side_effect=OSError),

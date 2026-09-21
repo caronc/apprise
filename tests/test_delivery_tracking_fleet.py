@@ -44,6 +44,7 @@ from json import dumps
 import logging
 from unittest import mock
 
+from helpers import OK_FIELDS
 import pytest
 import requests
 
@@ -56,24 +57,6 @@ RETRY = 2
 
 # Stand-in credentials; long enough to satisfy the usual token checks.
 TOKEN = "a" * 32
-
-# A general response body for most services. The table's ``body`` column
-# supplies any service-specific fields.
-DEFAULT_BODY = {
-    "ok": True,
-    "success": True,
-    "id": "1",
-    "code": 0,
-    "errcode": 0,
-    "error": None,
-    "uuid": "1",
-    "sid": "1",
-    "requestId": "1",
-    "message_id": 1,
-    "result": {"message_id": 1, "id": "1"},
-    "data": {"id": "1"},
-    "messages": [{"status": "0", "message-id": "1"}],
-}
 
 # Each entry drives one service.
 #
@@ -391,7 +374,7 @@ def _drive(url, body, bad=None):
     every target succeed.
     """
     calls = []
-    payload = dict(DEFAULT_BODY)
+    payload = dict(OK_FIELDS)
     payload.update(body)
 
     # Some services only accept a specific success code

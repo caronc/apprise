@@ -26,48 +26,24 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 
-"""Keys that look alike must stay apart.
+"""Ensure similar values remain distinct delivery targets.
 
-A service can reach the same value in more than one way: a phone number
-by SMS and by WhatsApp, a channel by name and by ID, an account key and a
-group key that read the same.  Each of those is a separate destination,
-so each needs its own delivery key.  If a key drops the kind, one
-delivery hides the other and a retry never reaches it.
+The same value may identify different target types, such as SMS and
+WhatsApp. Each type needs its own key so neither hides the other.
 """
 
 # Disable logging for a cleaner testing output
 import contextlib
-from json import dumps
 import logging
 from unittest import mock
 
+from helpers import ATTACHMENT, ok_response
 import pytest
-import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.plugins.base import NotifyBase, _delivery_tracker
 
 logging.disable(logging.CRITICAL)
-
-# Attachment used by the MMS case below
-TEST_VAR_DIR = __file__.rsplit("/", 1)[0] + "/var"
-ATTACHMENT = TEST_VAR_DIR + "/apprise-test.gif"
-
-# A response wide enough that a service accepts it and carries on.
-OK_BODY = dumps(
-    {
-        "ok": True,
-        "success": True,
-        "status": "success",
-        "code": 0,
-        "id": "1",
-        "error": None,
-        "sid": "1",
-        "items": [{"id": "1"}],
-        "data": {"id": "1"},
-        "result": {"message_id": 1, "id": "1"},
-    }
-)
 
 # Each URL below names the same value twice, once under each kind of
 # target the service understands.
@@ -91,16 +67,6 @@ LOOK_ALIKE = {
 }
 
 
-def _ok(*args, **kwargs):
-    """Return a response a plugin will treat as a success."""
-    response = requests.Request()
-    response.status_code = requests.codes.ok
-    response.content = OK_BODY
-    response.text = OK_BODY
-    response.headers = {"Content-Type": "application/json"}
-    return response
-
-
 @contextlib.contextmanager
 def _watched():
     """Run with the network replaced and every key asked about recorded."""
@@ -112,10 +78,10 @@ def _watched():
         return False
 
     with (
-        mock.patch("requests.post", side_effect=_ok),
-        mock.patch("requests.get", side_effect=_ok),
-        mock.patch("requests.put", side_effect=_ok),
-        mock.patch("requests.patch", side_effect=_ok),
+        mock.patch("requests.post", side_effect=ok_response),
+        mock.patch("requests.get", side_effect=ok_response),
+        mock.patch("requests.put", side_effect=ok_response),
+        mock.patch("requests.patch", side_effect=ok_response),
         mock.patch("apprise.plugins.base.time.sleep"),
         mock.patch.object(NotifyBase, "is_delivered", side_effect=answer),
     ):
@@ -123,7 +89,7 @@ def _watched():
 
 
 @pytest.mark.parametrize("name", sorted(LOOK_ALIKE))
-def test_look_alike_targets_stay_distinct(name):
+def test_target_kinds_stay_distinct(name):
     """The same value under two kinds produces two different keys."""
 
     obj = Apprise.instantiate(LOOK_ALIKE[name], suppress_exceptions=True)
@@ -143,7 +109,7 @@ def test_look_alike_targets_stay_distinct(name):
     )
 
 
-def test_serwersms_marks_an_mms_delivery():
+def test_serwersms_mms_tracking():
     """An MMS that arrives is recorded just like a plain message."""
 
     obj = Apprise.instantiate(
@@ -155,7 +121,7 @@ def test_serwersms_marks_an_mms_delivery():
     token = _delivery_tracker.set(set())
     try:
         with (
-            mock.patch("requests.post", side_effect=_ok) as post,
+            mock.patch("requests.post", side_effect=ok_response) as post,
             mock.patch("apprise.plugins.base.time.sleep"),
         ):
             attach = AppriseAttachment(ATTACHMENT)
@@ -171,7 +137,7 @@ def test_serwersms_marks_an_mms_delivery():
         _delivery_tracker.reset(token)
 
 
-def test_home_assistant_sends_every_batch():
+def test_home_assistant_batch_tracking():
     """Each batch of devices is its own delivery."""
 
     # The ":" form gives one service several devices, and those are what
@@ -185,7 +151,7 @@ def test_home_assistant_sends_every_batch():
     token = _delivery_tracker.set(set())
     try:
         with (
-            mock.patch("requests.post", side_effect=_ok) as post,
+            mock.patch("requests.post", side_effect=ok_response) as post,
             mock.patch("apprise.plugins.base.time.sleep"),
         ):
             assert obj.send(body="test", title="test") is True
@@ -197,7 +163,7 @@ def test_home_assistant_sends_every_batch():
         _delivery_tracker.reset(token)
 
 
-def test_smpp_sends_every_segment():
+def test_smpp_segment_tracking():
     """Each part of a long message is its own delivery."""
 
     smpplib = pytest.importorskip("smpplib")
