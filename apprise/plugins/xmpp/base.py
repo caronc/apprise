@@ -423,33 +423,50 @@ class NotifyXMPP(NotifyBase):
 
         subject = title if self.subject else ""
 
+        # Leave out anything that was already reached on an earlier attempt
+        # so a retry does not deliver the same message twice.
+        targets = [t for t in self.targets if not self.is_delivered(t)]
+        if self.targets and not targets:
+            # They all arrived the first time around
+            return True
+
         try:
             if self.keepalive and self._adapter:
                 # Reuse existing adapter
-                return self._adapter.send_message(
-                    targets=self.targets,
+                result = self._adapter.send_message(
+                    targets=targets,
                     subject=subject,
                     body=body,
                 )
 
-            adapter_kwargs = {
-                "config": config,
-                "targets": self.targets,
-                "subject": subject,
-                "body": body,
-                "timeout": self.socket_connect_timeout,
-                "roster": self.roster,
-                "keepalive": self.keepalive,
-                "want_muc": self.want_muc,
-                "default_nickname": self.name,
-            }
-            if not self.keepalive:
-                # One-shot mode: Create, process, and discard
-                return SlixmppAdapter(**adapter_kwargs).process()
+            else:
+                adapter_kwargs = {
+                    "config": config,
+                    "targets": targets,
+                    "subject": subject,
+                    "body": body,
+                    "timeout": self.socket_connect_timeout,
+                    "roster": self.roster,
+                    "keepalive": self.keepalive,
+                    "want_muc": self.want_muc,
+                    "default_nickname": self.name,
+                }
+                if not self.keepalive:
+                    # One-shot mode: Create, process, and discard
+                    result = SlixmppAdapter(**adapter_kwargs).process()
 
-            # Keepalive mode, reuse a single adapter instance
-            self._adapter = SlixmppAdapter(**adapter_kwargs)
-            return self._adapter.send_message()
+                else:
+                    # Keepalive mode, reuse a single adapter instance
+                    self._adapter = SlixmppAdapter(**adapter_kwargs)
+                    result = self._adapter.send_message()
+
+            if result:
+                # Our sender works through the list in one pass, so a good
+                # result means every one of them was written out.
+                for target in targets:
+                    self.mark_delivered(target)
+
+            return result
 
         except XMPPChannelBindingError:
             # The server rejected SASL SCRAM-PLUS channel binding.

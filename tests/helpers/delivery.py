@@ -92,6 +92,17 @@ def ok_response(*args, **kwargs):
     response.content = OK_BODY
     response.text = OK_BODY
     response.headers = {"Content-Type": "application/json"}
+
+    def iter_content(chunk_size=None):
+        # A bounded read pulls the body in chunks, the way requests does
+        return iter([OK_BODY.encode("utf-8")])
+
+    def close():
+        # Nothing to release on a stand-in
+        pass
+
+    response.iter_content = iter_content
+    response.close = close
     return response
 
 

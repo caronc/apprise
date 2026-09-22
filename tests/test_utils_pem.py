@@ -27,12 +27,12 @@
 
 import logging
 import os
-import sys
 from unittest import mock
 
 import pytest
 
 from apprise import AppriseAsset, PersistentStoreMode, utils
+from apprise.utils.pem import PEM_SUPPORT
 
 # Disable logging for a cleaner testing output
 logging.disable(logging.CRITICAL)
@@ -41,9 +41,7 @@ logging.disable(logging.CRITICAL)
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
 
 
-@pytest.mark.skipif(
-    "cryptography" not in sys.modules, reason="Requires cryptography"
-)
+@pytest.mark.skipif(not PEM_SUPPORT, reason="Requires cryptography")
 def test_utils_pem_general(tmpdir):
     """Utils:PEM."""
 
@@ -492,11 +490,11 @@ def test_utils_pem_general(tmpdir):
 
 
 @pytest.mark.skipif(
-    "cryptography" in sys.modules,
+    PEM_SUPPORT,
     reason="Requires that cryptography NOT be installed",
 )
-def test_utils_pem_general_without_c(tmpdir):
-    """Utils:PEM Without cryptography."""
+def test_utils_pem_without_cryptography(tmpdir):
+    """Verify PEM operations fail cleanly without cryptography."""
 
     tmpdir0 = tmpdir.mkdir("tmp00")
 
@@ -512,7 +510,7 @@ def test_utils_pem_general_without_c(tmpdir):
     # Create a PEM Controller
     pem_c = utils.pem.ApprisePEMController(path=None, asset=asset)
 
-    # cryptography library missing poses issues with library useage
+    # PEM operations require the cryptography library
     with pytest.raises(utils.pem.ApprisePEMException):
         pem_c.public_keyfile()
 

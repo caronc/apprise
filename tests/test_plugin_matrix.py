@@ -60,6 +60,18 @@ from apprise.plugins.matrix import (
 
 logging.disable(logging.CRITICAL)
 
+
+class _Response(mock.Mock):
+    """Mock an HTTP response that supports Requests-style chunked reads."""
+
+    def iter_content(self, chunk_size=None):
+        content = self.content
+        if isinstance(content, str):
+            content = content.encode("utf-8")
+
+        return iter([content] if content else [])
+
+
 MATRIX_GOOD_RESPONSE = dumps(
     {
         "room_id": "!abc123:localhost",
@@ -399,7 +411,7 @@ def test_plugin_matrix_general(mock_post, mock_get, mock_put):
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -578,7 +590,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
     def fetch_failed(url, *args, **kwargs):
 
         # Default configuration
-        request = mock.Mock()
+        request = _Response()
         request.status_code = requests.codes.ok
         request.content = dumps(response_obj)
 
@@ -630,7 +642,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
     mock_post.side_effect = None
     mock_put.side_effect = None
 
-    request = mock.Mock()
+    request = _Response()
     request.status_code = requests.codes.ok
     request.content = dumps(response_obj)
     mock_post.return_value = request
@@ -691,7 +703,7 @@ def test_plugin_matrix_fetch(mock_post, mock_get, mock_put):
 @mock.patch("requests.post")
 def test_plugin_matrix_shared_retry_budget(mock_post, mock_get, mock_put):
     """Every 429 response draws from one shared retry-wait budget."""
-    request = mock.Mock()
+    request = _Response()
     request.status_code = 429
     request.content = dumps({"retry_after_ms": 999999})
     mock_post.return_value = request
@@ -743,7 +755,7 @@ def test_plugin_matrix_exhausted_retry_budget(mock_post, mock_get, mock_put):
     Once no time remains, a 429 must not be followed by another sleep and
     another request; it must give up immediately instead.
     """
-    request = mock.Mock()
+    request = _Response()
     request.status_code = 429
     request.content = dumps({"retry_after_ms": 999999})
     mock_post.return_value = request
@@ -794,7 +806,7 @@ def test_plugin_matrix_retry_sleep_exhausts_budget(
     wait that lands exactly on (or past) the deadline must not be
     followed by one more request.
     """
-    request = mock.Mock()
+    request = _Response()
     request.status_code = 429
     request.content = dumps({"retry_after_ms": 999999})
     mock_post.return_value = request
@@ -837,11 +849,7 @@ def test_plugin_matrix_retry_sleep_exhausts_budget(
 @mock.patch("requests.get")
 @mock.patch("requests.post")
 def test_plugin_matrix_fetch_response_limit(mock_post, mock_get, mock_put):
-    """A response larger than max_response_bytes is discarded, not parsed.
-
-    The connection is closed instead of reading (and buffering) the rest
-    of a response that has already exceeded the caller's limit.
-    """
+    """Discard and close a response that exceeds the caller's limit."""
     request = mock.Mock()
     request.status_code = requests.codes.ok
     request.iter_content.return_value = iter([b"x" * 1000, b"x" * 1001])
@@ -868,11 +876,7 @@ def test_plugin_matrix_fetch_response_limit(mock_post, mock_get, mock_put):
 def test_plugin_matrix_fetch_response_within_limit(
     mock_post, mock_get, mock_put
 ):
-    """A response at or under max_response_bytes is parsed normally.
-
-    An empty chunk (which a real stream can yield) is skipped rather
-    than counted or appended.
-    """
+    """Parse a bounded response while ignoring empty stream chunks."""
     request = mock.Mock()
     request.status_code = requests.codes.ok
     request.iter_content.return_value = iter(
@@ -939,7 +943,7 @@ def test_plugin_matrix_auth(mock_post, mock_get, mock_put):
     }
 
     # Default configuration
-    request = mock.Mock()
+    request = _Response()
     request.status_code = requests.codes.ok
     request.content = dumps(response_obj)
     mock_post.return_value = request
@@ -1088,7 +1092,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     }
 
     # Default configuration
-    request = mock.Mock()
+    request = _Response()
     request.status_code = requests.codes.ok
     request.content = dumps(response_obj)
     mock_post.return_value = request
@@ -1130,7 +1134,7 @@ def test_plugin_matrix_rooms(mock_post, mock_get, mock_put):
     obj.hsreq = False
 
     def _join_side_effect(url, *args, **kwargs):
-        r = mock.Mock()
+        r = _Response()
 
         # With hsreq disabled, only the raw form should be attempted:
         if url.endswith("/_matrix/client/v3/join/%21abc123"):
@@ -1411,7 +1415,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
             "home_server": "localhost",
         }
 
-        request = mock.Mock()
+        request = _Response()
         request.content = dumps(response_obj)
         request.status_code = requests.codes.ok
 
@@ -1457,7 +1461,7 @@ def test_plugin_matrix_image_errors(mock_post, mock_get, mock_put):
             "home_server": "localhost",
         }
 
-        request = mock.Mock()
+        request = _Response()
         request.content = dumps(response_obj)
         request.status_code = requests.codes.ok
 
@@ -1491,12 +1495,12 @@ def test_plugin_matrix_attachments_api_v3(mock_post, mock_put):
     """NotifyMatrix() Attachment Checks (v3)"""
 
     # Prepare a good response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
     # Prepare a bad response
-    bad_response = mock.Mock()
+    bad_response = _Response()
     bad_response.status_code = requests.codes.internal_server_error
 
     # Prepare Mock return object
@@ -1627,12 +1631,12 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     """NotifyMatrix() Discovery Service."""
 
     # Prepare a good response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
     # Prepare a good response
-    bad_response = mock.Mock()
+    bad_response = _Response()
     bad_response.status_code = requests.codes.unauthorized
     bad_response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
@@ -1647,7 +1651,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     )
     assert bool(obj.notify("body")) is True
 
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.unavailable
     resp = loads(MATRIX_GOOD_RESPONSE)
 
@@ -1757,7 +1761,7 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
     assert obj.identity_url == "https://nuxref.com/base"
 
     # restore
-    resp["m.identity_server"] = {"base_url": '"https://vector.im'}
+    resp["m.identity_server"] = {"base_url": "https://vector.im"}
     response.content = dumps(resp).encode("utf-8")
 
     # Not found is an acceptable response (no exceptions thrown)
@@ -1827,16 +1831,77 @@ def test_plugin_matrix_discovery_service(mock_post, mock_get, mock_put):
 @mock.patch("requests.put")
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+def test_plugin_matrix_rejects_unsafe_discovery(mock_post, mock_get, mock_put):
+    """Reject unsafe addresses returned by Matrix discovery."""
+
+    # Prepare a good response
+    response = _Response()
+    response.status_code = requests.codes.ok
+    response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
+
+    mock_post.return_value = response
+    mock_get.return_value = response
+    mock_put.return_value = response
+
+    obj = Apprise.instantiate(
+        "matrixs://user:pass@example.com/#general?v=2&discovery=yes"
+    )
+
+    # Each of these is an address we refuse to send our token to
+    for base_url in (
+        # An unencrypted address
+        "http://matrix.example.com",
+        # Embedded credentials
+        "https://attacker:secret@matrix.example.com",
+        # Not a host we can make sense of
+        "https://-nope-.example.com",
+    ):
+        resp = loads(MATRIX_GOOD_RESPONSE)
+        resp["m.homeserver"] = {"base_url": base_url}
+        response.content = dumps(resp).encode("utf-8")
+        obj.store.clear(
+            NotifyMatrix.discovery_base_key,
+            NotifyMatrix.discovery_identity_key,
+        )
+
+        with pytest.raises(MatrixDiscoveryException):
+            _ = obj.base_url
+
+        # Nothing is cached from a failed discovery
+        assert NotifyMatrix.discovery_base_key not in obj.store
+        assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    # The identity server address is held to the same standard
+    resp = loads(MATRIX_GOOD_RESPONSE)
+    resp["m.identity_server"] = {"base_url": "http://identity.example.com"}
+    response.content = dumps(resp).encode("utf-8")
+    obj.store.clear(
+        NotifyMatrix.discovery_base_key, NotifyMatrix.discovery_identity_key
+    )
+
+    with pytest.raises(MatrixDiscoveryException):
+        _ = obj.base_url
+
+    assert NotifyMatrix.discovery_base_key not in obj.store
+    assert NotifyMatrix.discovery_identity_key not in obj.store
+
+    del obj
+    _force_del_cleanup()
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
     """NotifyMatrix() Attachment Checks (v2)"""
 
     # Prepare a good response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
     # Prepare a bad response
-    bad_response = mock.Mock()
+    bad_response = _Response()
     bad_response.status_code = requests.codes.internal_server_error
 
     # Prepare Mock return object
@@ -2037,7 +2102,7 @@ def test_plugin_matrix_attachments_api_v2(mock_post, mock_get, mock_put):
 def test_plugin_matrix_v2_compliance(mock_post, mock_put):
     """NotifyMatrix() Verify V2 uses PUT and TID for standard messages."""
     # Setup compliant response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
     mock_post.return_value = response
@@ -2064,7 +2129,7 @@ def test_plugin_matrix_v2_token_mode_no_txn_increment(
     mock_post, mock_get, mock_put
 ):
     """Token mode (access_token == password) skips transaction ID increment."""
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
     mock_post.return_value = response
@@ -2098,7 +2163,7 @@ def test_plugin_matrix_parse_native_url_no_match():
 def test_plugin_matrix_hookshot_webhook(mock_post):
     """matrix-hookshot webhook mode uses hookshot URL/payload conventions."""
 
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = b"{}"
     mock_post.return_value = response
@@ -2127,7 +2192,7 @@ def test_plugin_matrix_hookshot_webhook_empty_title(mock_post):
     """Hookshot webhook mode avoids extra separators for empty titles."""
     from apprise.common import NotifyFormat
 
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = b"{}"
     mock_post.return_value = response
@@ -2156,7 +2221,7 @@ def test_plugin_matrix_slack_webhook_markdown_untouched(mock_post):
     """Slack webhooks forward CommonMark for Slack to render."""
     from apprise.common import NotifyFormat
 
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = b"{}"
     mock_post.return_value = response
@@ -2192,7 +2257,7 @@ def test_plugin_matrix_hookshot_path_normalization():
 def test_plugin_matrix_hookshot_root_path_text(mock_post):
     """Hookshot root paths and text mode stay literal."""
 
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = b"{}"
     mock_post.return_value = response
@@ -2221,12 +2286,12 @@ def test_plugin_matrix_transaction_ids_api_v3_no_cache(
     """NotifyMatrix() Transaction ID Checks (v3)"""
 
     # Prepare a good response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
     # Prepare a bad response
-    bad_response = mock.Mock()
+    bad_response = _Response()
     bad_response.status_code = requests.codes.internal_server_error
 
     # Prepare Mock return object
@@ -2322,12 +2387,12 @@ def test_plugin_matrix_transaction_ids_api_v3_w_cache(
     """NotifyMatrix() Transaction ID Checks (v3)"""
 
     # Prepare a good response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
     # Prepare a bad response
-    bad_response = mock.Mock()
+    bad_response = _Response()
     bad_response.status_code = requests.codes.internal_server_error
 
     # Prepare Mock return object
@@ -2441,7 +2506,7 @@ def test_plugin_matrix_v3_url_with_port_assembly(
     """NotifyMatrix() URL with Port Assembly Checks (v3)"""
 
     # Prepare a good response
-    response = mock.Mock()
+    response = _Response()
     response.status_code = requests.codes.ok
     response.content = MATRIX_GOOD_RESPONSE.encode("utf-8")
 
@@ -2533,7 +2598,7 @@ def test_plugin_matrix_no_room_create_on_non_not_found_join(
     """
 
     def _resp(status_code: int, content: Union[str, bytes]) -> mock.Mock:
-        r = mock.Mock()
+        r = _Response()
         r.status_code = status_code
         if isinstance(content, str):
             r.content = content.encode("utf-8")
@@ -2590,7 +2655,7 @@ def test_plugin_matrix_room_create_on_not_found_join(
     """Attempt room creation only when join reports 404 / M_NOT_FOUND."""
 
     def _resp(status_code: int, content: Union[str, bytes]) -> mock.Mock:
-        r = mock.Mock()
+        r = _Response()
         r.status_code = status_code
         if isinstance(content, str):
             r.content = content.encode("utf-8")
@@ -2681,7 +2746,7 @@ def test_plugin_matrix_room_create_e2ee_initial_state(
         "home_server": "localhost",
         "room_id": "!abc123",
     }
-    r = mock.Mock()
+    r = _Response()
     r.status_code = requests.codes.ok
     r.content = dumps(response_obj).encode()
     mock_post.return_value = r
@@ -5554,7 +5619,7 @@ def test_plugin_matrix_e2ee_url_roundtrip():
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_insecure_connection(mock_post, mock_get, mock_put):
     """e2ee=yes over insecure (matrix://) falls back to unencrypted."""
-    resp = mock.Mock()
+    resp = _Response()
     resp.status_code = requests.codes.ok
     resp.content = dumps(
         {
@@ -5588,7 +5653,7 @@ def test_plugin_matrix_e2ee_insecure_connection(mock_post, mock_get, mock_put):
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_no_support(mock_post, mock_get, mock_put):
     """e2ee=yes with MATRIX_E2EE_SUPPORT=False sends unencrypted."""
-    resp = mock.Mock()
+    resp = _Response()
     resp.status_code = requests.codes.ok
     resp.content = dumps(
         {
@@ -5657,7 +5722,7 @@ def test_plugin_matrix_e2ee_send(mock_post, mock_get, mock_put):
     }
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -5713,7 +5778,7 @@ def test_plugin_matrix_e2ee_send_cached_session(mock_post, mock_get, mock_put):
     }
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -5912,7 +5977,7 @@ def test_plugin_matrix_e2ee_upload_keys_http_fail(
     """_e2ee_upload_keys returns False on HTTP error."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
 
-    resp = mock.Mock()
+    resp = _Response()
     resp.status_code = 500
     resp.content = dumps({}).encode()
     mock_post.return_value = resp
@@ -5942,7 +6007,7 @@ def test_plugin_matrix_e2ee_upload_keys_success_marks_published(
     """Successful upload clears the current unpublished OTK batch."""
     from apprise.plugins.matrix.e2ee import MatrixOlmAccount
 
-    resp = mock.Mock()
+    resp = _Response()
     resp.status_code = requests.codes.ok
     resp.content = dumps(
         {
@@ -5986,7 +6051,7 @@ def test_plugin_matrix_whoami(mock_post, mock_get, mock_put):
     """_whoami() resolves user_id and device_id from GET /account/whoami."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -6131,7 +6196,7 @@ def test_plugin_matrix_e2ee_room_encrypted(mock_post, mock_get, mock_put):
     """_e2ee_room_encrypted: cached, GET success, GET failure paths."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -6175,7 +6240,7 @@ def test_plugin_matrix_e2ee_room_members(mock_post, mock_get, mock_put):
     """_e2ee_room_members handles HTTP failures and empty rooms."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -6249,7 +6314,7 @@ def test_plugin_matrix_e2ee_share_room_key_branches(
     )
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -6497,7 +6562,7 @@ def test_plugin_matrix_e2ee_replenish_otks(mock_post):
     otk_threshold = NotifyMatrix.default_e2ee_otk_replenish_threshold
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -6594,7 +6659,7 @@ def test_plugin_matrix_e2ee_send_to_room_formats(
     )
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -6673,7 +6738,7 @@ def test_plugin_matrix_e2ee_send_to_room_formats(
 @pytest.mark.skipif(not CRYPTOGRAPHY_AVAILABLE, reason="Requires cryptography")
 def test_plugin_matrix_e2ee_setup_failure(mock_post, mock_get, mock_put):
     """When E2EE setup fails, send falls back to unencrypted."""
-    resp = mock.Mock()
+    resp = _Response()
     resp.status_code = requests.codes.ok
     resp.content = dumps(
         {
@@ -6685,7 +6750,7 @@ def test_plugin_matrix_e2ee_setup_failure(mock_post, mock_get, mock_put):
         }
     ).encode()
     # upload keys call fails
-    fail_resp = mock.Mock()
+    fail_resp = _Response()
     fail_resp.status_code = 500
     fail_resp.content = dumps({}).encode()
     mock_put.return_value = resp
@@ -6730,7 +6795,7 @@ def test_plugin_matrix_e2ee_attachment_encrypted(
     upload_resp = {"content_uri": "mxc://h/enc123"}
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -6793,7 +6858,7 @@ def test_plugin_matrix_e2ee_send_attachment_errors(
     )
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -6854,7 +6919,7 @@ def test_plugin_matrix_e2ee_send_attachment_errors(
 
         # Upload succeeds but response body is not valid JSON -> treated as
         # missing content_uri -> False
-        bad_json_resp = mock.Mock()
+        bad_json_resp = _Response()
         bad_json_resp.status_code = requests.codes.ok
         bad_json_resp.content = b"not-json"
         with mock.patch("requests.post", return_value=bad_json_resp):
@@ -6964,7 +7029,7 @@ def test_plugin_matrix_e2ee_send_attachment_invalid(
     }
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -7053,7 +7118,7 @@ def test_plugin_matrix_e2ee_send_room_failure(mock_post, mock_get, mock_put):
     }
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -7092,7 +7157,7 @@ def test_plugin_matrix_e2ee_send_room_failure(mock_post, mock_get, mock_put):
 @mock.patch("requests.post")
 def test_plugin_matrix_register_with_device_id(mock_post, mock_get, mock_put):
     """Registration response that includes device_id persists it."""
-    r = mock.Mock()
+    r = _Response()
     r.status_code = requests.codes.ok
     r.content = dumps(
         {
@@ -7115,7 +7180,7 @@ def test_plugin_matrix_register_with_device_id(mock_post, mock_get, mock_put):
 @mock.patch("requests.post")
 def test_plugin_matrix_login_reuses_device_id(mock_post, mock_get, mock_put):
     """Login payload reuses the stored device ID when present."""
-    r = mock.Mock()
+    r = _Response()
     r.status_code = requests.codes.ok
     r.content = dumps(
         {
@@ -7142,7 +7207,7 @@ def test_plugin_matrix_register_reuses_device_id(
     mock_post, mock_get, mock_put
 ):
     """Register payload reuses the stored device ID when present."""
-    r = mock.Mock()
+    r = _Response()
     r.status_code = requests.codes.ok
     r.content = dumps(
         {
@@ -7249,7 +7314,7 @@ def test_plugin_matrix_dm_room_find_cached(mock_post, mock_get, mock_put):
     """_dm_room_find_or_create returns cached room ID without HTTP calls."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7286,7 +7351,7 @@ def test_plugin_matrix_dm_room_find_via_mdirect(mock_post, mock_get, mock_put):
     """_dm_room_find_or_create finds existing room from m.direct data."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7324,7 +7389,7 @@ def test_plugin_matrix_dm_room_create_new(mock_post, mock_get, mock_put):
     """_dm_room_find_or_create creates a new room when none exists."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7363,7 +7428,7 @@ def test_plugin_matrix_dm_room_create_failure(mock_post, mock_get, mock_put):
     """_dm_room_find_or_create returns None when createRoom fails."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7397,7 +7462,7 @@ def test_plugin_matrix_dm_room_create_no_room_id(
     """_dm_room_find_or_create returns None when createRoom omits room_id."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7445,7 +7510,7 @@ def test_plugin_matrix_dm_send_notification(mock_post, mock_get, mock_put):
     """Sending to @user target resolves DM room and delivers message."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7587,7 +7652,7 @@ def test_plugin_matrix_dm_only_users_no_rooms_skips_joined(
     """When only @user targets are present, _joined_rooms is not queried."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7628,7 +7693,7 @@ def test_plugin_matrix_dm_room_create_mdirect_get_fails(
     """_dm_room_find_or_create still creates room if m.direct GET fails."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7663,7 +7728,7 @@ def test_plugin_matrix_dm_room_create_no_user_id(
     the m.direct GET and PUT)."""
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7701,7 +7766,7 @@ def test_plugin_matrix_dm_room_create_e2ee(mock_post, mock_get, mock_put):
         pytest.skip("cryptography package not installed")
 
     def _mk_resp(d, code=requests.codes.ok):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = code
         r.content = dumps(d).encode()
         return r
@@ -7810,7 +7875,7 @@ def test_plugin_matrix_whoami_recovers_home_server_from_user_id(
 ):
     """_whoami() extracts home_server from user_id when the server does not
     return a home_server field and self.home_server is unset."""
-    r = mock.Mock()
+    r = _Response()
     r.status_code = requests.codes.ok
     r.content = dumps(
         {"user_id": "@u:whoami.example.com", "device_id": "DEVX"}
@@ -7906,7 +7971,7 @@ def test_plugin_matrix_html_plain_fallback(mock_post, mock_get, mock_put):
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -7953,7 +8018,7 @@ def test_plugin_matrix_html_passthrough_untouched(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -7988,7 +8053,7 @@ def test_plugin_matrix_e2ee_html_plain_fallback(mock_post, mock_get, mock_put):
     )
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -8189,7 +8254,7 @@ def test_plugin_matrix_concentrated_density_split(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -8231,7 +8296,7 @@ def test_plugin_matrix_json_escape_heavy_split(mock_post, mock_get, mock_put):
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -8274,7 +8339,7 @@ def test_plugin_matrix_mixed_escape_and_unicode_split(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -8320,7 +8385,7 @@ def test_plugin_matrix_html_dual_representation_split(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -8360,7 +8425,7 @@ def test_plugin_matrix_e2ee_html_split(mock_post, mock_get, mock_put):
     from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -8432,7 +8497,7 @@ def test_plugin_matrix_e2ee_long_device_id_and_title(
     from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -8592,7 +8657,7 @@ def test_plugin_matrix_surrogate_sanitized_end_to_end(
     from apprise.plugins.matrix.e2ee import MatrixMegOlmSession
 
     def _mk_resp(d):
-        r = mock.Mock()
+        r = _Response()
         r.status_code = requests.codes.ok
         r.content = dumps(d).encode()
         return r
@@ -8674,7 +8739,7 @@ def test_plugin_matrix_caps_before_scanning_density(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -8710,7 +8775,7 @@ def test_plugin_matrix_caps_before_sanitizing(mock_post, mock_get, mock_put):
     from apprise.asset import AppriseAsset
     from apprise.plugins.matrix.base import MatrixWebhookMode
 
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps({})
     request.status_code = requests.codes.ok
     mock_post.return_value = request
@@ -8816,7 +8881,7 @@ def test_plugin_matrix_whitespace_title_does_not_steal_cap(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
     mock_get.return_value = request
@@ -8902,7 +8967,7 @@ def test_plugin_matrix_truncation_warning_fires(mock_post, mock_get, mock_put):
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
     mock_get.return_value = request
@@ -8984,7 +9049,7 @@ def test_plugin_matrix_emoji_split_preserves_content(
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -9027,7 +9092,7 @@ def test_plugin_matrix_emoji_split_counters(mock_post, mock_get, mock_put):
         "access_token": "abcd1234",
         "home_server": "localhost",
     }
-    request = mock.Mock()
+    request = _Response()
     request.content = dumps(response_obj)
     request.status_code = requests.codes.ok
 
@@ -9055,3 +9120,43 @@ def test_plugin_matrix_emoji_split_counters(mock_post, mock_get, mock_put):
     digits = len(str(total))
     last_payload = loads(mock_put.call_args_list[-1].kwargs["data"])
     assert f"[{total:0{digits}d}/{total:0{digits}d}]" in last_payload["body"]
+
+
+@mock.patch("requests.put")
+@mock.patch("requests.get")
+@mock.patch("requests.post")
+def test_plugin_matrix_discovery_is_unauthenticated(
+    mock_post, mock_get, mock_put
+):
+    """Keep the access token out of every discovery request."""
+
+    def _resp(payload):
+        response = _Response()
+        response.status_code = requests.codes.ok
+        response.content = dumps(payload).encode("utf-8")
+        response.headers = {}
+        return response
+
+    well_known = {
+        "m.homeserver": {"base_url": "https://matrix.example.com"},
+        "m.identity_server": {"base_url": "https://identity.example.com"},
+    }
+    mock_get.side_effect = [_resp(well_known), _resp({}), _resp({})]
+    mock_post.return_value = _resp({})
+    mock_put.return_value = _resp({})
+
+    obj = Apprise.instantiate(
+        "matrixs://user:pass@example.com/#general?v=2&discovery=yes"
+    )
+
+    # Pretend we already hold a session from an earlier notification
+    obj.access_token = "secret-token"
+    assert obj.base_url == "https://matrix.example.com"
+
+    # The well-known lookup and both probes went out without it
+    assert mock_get.call_count == 3
+    for call in mock_get.call_args_list:
+        assert "Authorization" not in call[1]["headers"]
+
+    del obj
+    _force_del_cleanup()

@@ -41,7 +41,7 @@ from ...exception import AppriseInvalidData
 from ...logger import logger
 from ...utils.base64 import base64_urldecode
 from ...utils.cwe312 import cwe312_loggable
-from ...utils.parse import is_hostname
+from ...utils.http import is_secure_http_url
 
 try:
     from cryptography.hazmat.primitives.asymmetric import ec
@@ -55,54 +55,19 @@ except ImportError:
 
 
 def webpush_origin(endpoint: Optional[str]) -> Optional[str]:
-    """Validates an endpoint and returns its JWT audience origin.
+    """Return the HTTPS origin used as the Web Push JWT audience.
 
-    Web Push requires HTTPS, and the token names the endpoint's origin. The
-    origin includes a non-default port when present.
-
-    ``None`` is returned when the endpoint:
-     - is not a string or valid URL
-     - does not use HTTPS
-     - has no hostname
-     - contains a username or password, even an empty one
-     - uses an invalid port
-     - has a hostname that is not a valid host or IP address
-
-    Private and loopback addresses remain valid for self-hosted services.
-    Callers should load subscription data only from trusted sources.
+    Invalid endpoints and URLs containing credentials return ``None``. A
+    non-default port is included, and private hosts remain available for
+    trusted self-hosted subscriptions.
     """
 
-    if not isinstance(endpoint, str):
+    if not is_secure_http_url(endpoint):
         return None
 
-    try:
-        results = urlparse(endpoint)
-
-        # Parsing malformed IPv6 or reading an invalid port raises ValueError.
-        port = results.port
-
-    except ValueError:
-        return None
-
-    # Web Push requires HTTPS.
-    if results.scheme.lower() != "https":
-        return None
-
-    # Reject URLs without a destination host.
+    results = urlparse(endpoint)
+    port = results.port
     hostname = results.hostname
-    if not hostname:
-        return None
-
-    # Reject credentials embedded in the endpoint. Compare against None so
-    # that an empty "https://@example.com" is caught too.
-    if results.username is not None or results.password is not None:
-        return None
-
-    # Validate the host; this covers hostnames, IPv4 and IPv6 alike. Only
-    # the yes or no answer is used, because is_hostname() shortens a
-    # compressed IPv6 address when it hands one back.
-    if not is_hostname(hostname):
-        return None
 
     # Restore the IPv6 brackets that the URL parser stripped off.
     host = f"[{hostname}]" if ":" in hostname else hostname
@@ -157,7 +122,11 @@ class WebPushSubscription:
             try:
                 content = json.loads(content)
 
-            except (json.decoder.JSONDecodeError, TypeError) as e:
+            except (
+                json.decoder.JSONDecodeError,
+                RecursionError,
+                TypeError,
+            ) as e:
                 # A string supplied here must contain valid JSON.
                 logger.debug("Vapid subscription is not valid JSON: %s", e)
                 return False
@@ -198,6 +167,16 @@ class WebPushSubscription:
 
         except KeyError as e:
             logger.debug("Vapid subscription is missing a %s entry", e)
+            return False
+
+        except TypeError as e:
+            # The keys entry is not a readable object.
+            logger.debug("Vapid subscription keys are not usable: %s", e)
+            return False
+
+        except ValueError as e:
+            # Reject invalid base64, including values from the starter file.
+            logger.debug("Vapid subscription keys are not base64: %s", e)
             return False
 
         try:
@@ -333,14 +312,35 @@ class WebPushSubscriptionManager:
     # the file is bad
     max_load_failure_count = 3
 
-    def __init__(self, asset: Optional["AppriseAsset"] = None) -> None:
-        """Webpush Subscription Manager."""
+    # The file we work with when we are not pointed at a specific one
+    default_filename = "subscriptions.json"
+
+    def __init__(
+        self,
+        path: Optional[str] = None,
+        subfile: Optional[str] = None,
+        asset: Optional["AppriseAsset"] = None,
+    ) -> None:
+        """Manage Web Push subscriptions.
+
+        ``path`` is the default storage directory. ``subfile`` overrides it
+        with a specific local or remote subscription file.
+        """
 
         # Our subscriptions
         self.__subscriptions = {}
 
         # Remote sources have no local file to update.
-        self.__path = None
+        self.__local = None
+
+        # Set once a load has been attempted
+        self.__loaded = False
+
+        # Directory we can work with
+        self.path = path
+
+        # A specific file we were pointed at
+        self.subfile = subfile
 
         # Prepare our Asset Object
         self.asset = (
@@ -422,9 +422,55 @@ class WebPushSubscriptionManager:
         return cwe312_loggable(path, self.asset.secure_logging)
 
     @property
-    def path(self) -> Optional[str]:
+    def local_file(self) -> Optional[str]:
         """The local file we loaded from, or None if there was not one."""
-        return self.__path
+        return self.__local
+
+    @property
+    def subscription_file(self) -> Optional[str]:
+        """Return the configured file or our directory's default file.
+
+        Returns ``None`` when neither is available.
+        """
+        if self.subfile:
+            return self.subfile
+
+        return (
+            os.path.join(self.path, self.default_filename)
+            if self.path
+            else None
+        )
+
+    @property
+    def loaded(self) -> bool:
+        """True once a load has been attempted, successful or not."""
+        return self.__loaded
+
+    @property
+    def template(self) -> dict:
+        """An example entry showing what a subscription looks like."""
+        return {"user@example.com": WebPushSubscription().dict}
+
+    def autogen(self) -> bool:
+        """Creates a starter subscription file for our user to fill in.
+
+        Nothing is written when we were pointed at a specific file, when we
+        have no directory to work with, or when the file already exists.
+        """
+        path = None if self.subfile else self.subscription_file
+        if not path or os.path.exists(path):
+            return False
+
+        if not self.__write(self.template, path):
+            return False
+
+        logger.info(
+            "Vapid auto-generated %s/%s",
+            os.path.basename(self.path),
+            self.default_filename,
+        )
+
+        return True
 
     @property
     def writable(self) -> bool:
@@ -432,10 +478,10 @@ class WebPushSubscriptionManager:
 
         Remote and read-only files cannot be changed.
         """
-        if not self.__path:
+        if not self.__local:
             return False
 
-        return os.access(self.__path, os.W_OK)
+        return os.access(self.__local, os.W_OK)
 
     def prune(self, names: "Iterable[str]", indent: int = 2) -> bool:
         """Removes named subscriptions from the current file on disk.
@@ -447,28 +493,32 @@ class WebPushSubscriptionManager:
             # Respect remote sources and read-only files.
             logger.debug(
                 "Vapid subscription file not pruned, reason=%s",
-                "no-local-file" if not self.__path else "read-only",
+                "no-local-file" if not self.__local else "read-only",
             )
             return False
 
         try:
-            with open(self.__path, encoding="utf-8") as f:
+            with open(self.__local, encoding="utf-8") as f:
                 content = json.load(f)
 
         except FileNotFoundError:
             # The file disappeared after it was loaded.
             logger.debug(
                 "Vapid subscription file not found: %s",
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
             return False
 
-        except (json.decoder.JSONDecodeError, TypeError) as e:
+        except (
+            json.decoder.JSONDecodeError,
+            RecursionError,
+            TypeError,
+        ) as e:
             # Preserve content that can no longer be parsed.
             logger.warning(
                 "Vapid subscription file does not hold valid JSON; not"
                 " pruning: %s",
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
             logger.debug("JSON Exception: %s", e)
             return False
@@ -476,7 +526,7 @@ class WebPushSubscriptionManager:
         except OSError as e:
             logger.warning(
                 "Error accessing Vapid subscription file %s",
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
             logger.debug("I/O Exception: %s", e)
             return False
@@ -484,7 +534,7 @@ class WebPushSubscriptionManager:
         if not isinstance(content, dict):
             logger.warning(
                 "Vapid subscription file does not hold an object: %s",
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
             return False
 
@@ -493,7 +543,7 @@ class WebPushSubscriptionManager:
             logger.debug(
                 "Vapid subscription file holds a single entry; nothing to"
                 " prune: %s",
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
             return False
 
@@ -511,17 +561,17 @@ class WebPushSubscriptionManager:
                 "Vapid subscription file already free of %d expired "
                 "entry(s): %s",
                 len(wanted),
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
             return True
 
-        if not self.__write(remaining, self.__path, indent=indent):
+        if not self.__write(remaining, self.__local, indent=indent):
             return False
 
         logger.info(
             "Pruned %d expired Vapid subscription(s) from %s",
             len(content) - len(remaining),
-            self.loggable_path(self.__path),
+            self.loggable_path(self.__local),
         )
 
         return True
@@ -535,18 +585,29 @@ class WebPushSubscriptionManager:
             else {}
         )
 
-    def load(self, path: str, byte_limit=0) -> bool:
+    def load(self, path: Optional[str] = None, byte_limit=0) -> bool:
         """Loads subscriptions from a local path or remote URL.
 
+        Our own subscription file is used when a path is not provided.
         Remote files are temporary and read-only. A zero ``byte_limit``
         disables the size limit.
         """
+
+        # Note that we tried, so a failure is not retried on every send
+        self.__loaded = True
 
         # Reset our object
         self.clear()
 
         # A remote or failed load must not retain an earlier local path.
-        self.__path = None
+        self.__local = None
+
+        if path is None:
+            path = self.subscription_file
+            if not path:
+                # There is nothing for us to read
+                logger.debug("No Vapid subscription file to load")
+                return False
 
         # Create our attachment object
         attach = AppriseAttachment(asset=self.asset)
@@ -584,7 +645,11 @@ class WebPushSubscriptionManager:
             )
             return False
 
-        except (json.decoder.JSONDecodeError, TypeError) as e:
+        except (
+            json.decoder.JSONDecodeError,
+            RecursionError,
+            TypeError,
+        ) as e:
             # We read it, but there is no JSON object in there
             logger.warning(
                 "Vapid subscription file does not hold valid JSON: %s",
@@ -611,10 +676,10 @@ class WebPushSubscriptionManager:
 
         # Remember only local files so expired entries can be removed later.
         if attach[0].location == ContentLocation.LOCAL:
-            self.__path = attach[0].path
+            self.__local = attach[0].path
             logger.trace(
                 "Vapid subscriptions are local: %s",
-                self.loggable_path(self.__path),
+                self.loggable_path(self.__local),
             )
 
         else:

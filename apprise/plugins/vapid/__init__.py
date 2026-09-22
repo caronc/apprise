@@ -28,7 +28,6 @@
 import contextlib
 from itertools import chain
 from json import dumps
-import os
 import time
 
 import requests
@@ -140,9 +139,6 @@ class NotifyVapid(NotifyBase):
     # 43200 = 12 hours
     vapid_jwt_expiration_sec = 43200
 
-    # Subscription file
-    vapid_subscription_file = "subscriptions.json"
-
     # Remember expired endpoints when the subscription file cannot be updated.
     vapid_retired_key = "retired"
 
@@ -251,7 +247,6 @@ class NotifyVapid(NotifyBase):
 
         # default subscriptions
         self.subscriptions = {}
-        self.subscriptions_loaded = False
         self.private_key_loaded = False
 
         # Set our Time to Live Flag
@@ -304,36 +299,30 @@ class NotifyVapid(NotifyBase):
         # Our Private keyfile
         self.keyfile = keyfile
 
-        # Our Subscription file
-        self.subfile = subfile
-
         # Keep explicit paths in generated URLs, but omit internal storage.
         self.subfile_specified = subfile is not None
 
         # Prepare our PEM Object
         self.pem = _pem.ApprisePEMController(self.store.path, asset=self.asset)
 
-        # Create our subscription object
-        self.subscriptions = subscription.WebPushSubscriptionManager(
-            asset=self.asset
+        # Memory-only setups have no storage directory
+        store_path = (
+            None
+            if self.store.mode == PersistentStoreMode.MEMORY
+            else self.store.path
         )
 
-        if (
-            self.subfile is None
-            and self.store.mode != PersistentStoreMode.MEMORY
-            and self.asset.pem_autogen
-        ):
-            self.subfile = os.path.join(
-                self.store.path, self.vapid_subscription_file
-            )
-            if not os.path.exists(self.subfile) and self.subscriptions.write(
-                self.subfile
-            ):
-                self.logger.info(
-                    "Vapid auto-generated %s/%s",
-                    os.path.basename(self.store.path),
-                    self.vapid_subscription_file,
-                )
+        # Use the storage directory unless the user supplied a file
+        self.subscriptions = subscription.WebPushSubscriptionManager(
+            store_path, subfile=subfile, asset=self.asset
+        )
+
+        if self.asset.pem_autogen:
+            # Leave a starter file behind to fill in
+            self.subscriptions.autogen()
+
+        # Our Subscription file (there may not be one)
+        self.subfile = self.subscriptions.subscription_file
 
         # Acquire our targets for parsing
         self.targets = parse_list(targets)
@@ -345,34 +334,38 @@ class NotifyVapid(NotifyBase):
 
     def send(self, body, title="", notify_type=NotifyType.INFO, **kwargs):
         """Perform Vapid Notification."""
-        if not self.private_key_loaded and (
-            (
-                self.keyfile
-                and not self.pem.private_key(autogen=False, autodetect=False)
-                and not self.pem.load_private_key(self.keyfile)
-            )
-            or (not self.keyfile and not self.pem)
-        ):
-            self.logger.warning(
-                "Provided Vapid/WebPush (PEM) Private Key file could "
-                "not be loaded."
-            )
+        if not self.private_key_loaded:
+            # Load the key only on the first notification
             self.private_key_loaded = True
-            return False
-        else:
-            self.private_key_loaded = True
+
+            loaded = (
+                (
+                    self.pem.private_key(autogen=False, autodetect=False)
+                    or self.pem.load_private_key(self.keyfile)
+                )
+                if self.keyfile
+                else bool(self.pem)
+            )
+
+            if not loaded:
+                self.logger.warning(
+                    "Provided Vapid/WebPush (PEM) Private Key file could "
+                    "not be loaded."
+                )
+                return False
 
         if not self.targets:
             # There is no one to notify; we're done
             self.logger.warning("There are no Vapid targets to notify")
             return False
 
-        if not self.subscriptions_loaded and self.subfile:
-            # Toggle our loaded flag to prevent trying again later
-            self.subscriptions_loaded = True
-            if not self.subscriptions.load(
-                self.subfile, byte_limit=self.max_vapid_subfile_size
-            ):
+        if self.subfile and not self.subscriptions.loaded:
+            # A failed load is not attempted again on the next notification
+            loaded = self.subscriptions.load(
+                byte_limit=self.max_vapid_subfile_size
+            )
+
+            if not loaded:
                 self.logger.warning(
                     "Provided Vapid/WebPush subscriptions file could not be "
                     "loaded."

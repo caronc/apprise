@@ -49,6 +49,8 @@ from urllib3.exceptions import (
 from urllib3.poolmanager import PoolManager
 from urllib3.util.connection import allowed_gai_family
 
+from .parse import is_hostname
+
 # Keep this sentinel local because urllib3's private equivalent varies by
 # version and is absent from the widely used 1.26.x series.
 _DEFAULT_TIMEOUT = object()
@@ -124,17 +126,83 @@ def is_public_ip_address(value):
 
 
 def is_secure_http_url(url):
-    """Return true for an HTTPS URL with a host and no embedded credentials."""
+    """Validate a URL before it is used as a request target.
+
+    A valid URL:
+     - uses HTTPS
+     - points at a valid hostname or IP address
+     - carries no username or password, even an empty one
+     - has a usable port
+     - has no fragment, which would not reach the server
+
+    Private hosts remain valid for self-hosted services. Returns ``True``
+    when all checks pass and ``False`` otherwise.
+    """
+
+    if not isinstance(url, str):
+        return False
+
     try:
         parsed = urlsplit(url)
-        credentials = (parsed.username, parsed.password)
-        return bool(
-            parsed.scheme.lower() == "https"
-            and parsed.hostname
-            and credentials == (None, None)
-        )
-    except (TypeError, ValueError):
+
+        # Reading an invalid port, or a malformed IPv6 address, raises a
+        # ValueError here.
+        port = parsed.port
+
+    except ValueError:
         return False
+
+    # Port zero cannot be connected to.
+    if port == 0:
+        return False
+
+    # A fragment is never sent to a server. An empty one still counts, so
+    # the character itself is what we look for.
+    if "#" in url:
+        return False
+
+    # Anything that is not HTTPS is refused.
+    if parsed.scheme.lower() != "https":
+        return False
+
+    # A URL with no destination host is of no use to us.
+    hostname = parsed.hostname
+    if not hostname:
+        return False
+
+    # Reject credentials embedded in the URL. The comparison is against
+    # None so that an empty https://@example.com is caught too.
+    if parsed.username is not None or parsed.password is not None:
+        return False
+
+    # Confirm the host itself is sane. This covers hostnames, IPv4 and
+    # IPv6 alike; only the yes or no answer is needed here.
+    return bool(is_hostname(hostname))
+
+
+def read_bounded_response(r, max_bytes, chunk_size=65536):
+    """Read and close a streamed response.
+
+    Return ``None`` if the response exceeds ``max_bytes``; otherwise,
+    return the bytes read.
+    """
+    chunks = []
+    total = 0
+    try:
+        for chunk in r.iter_content(chunk_size=chunk_size):
+            if not chunk:
+                continue
+
+            total += len(chunk)
+            if total > max_bytes:
+                return None
+
+            chunks.append(chunk)
+
+        return b"".join(chunks)
+
+    finally:
+        r.close()
 
 
 def _release_dns_slot(_future):
