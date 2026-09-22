@@ -520,6 +520,15 @@ class NotifyMattermost(NotifyBase):
             targets = [(None, None)]
 
         for kind, value in targets:
+            # A named channel and a channel ID are different targets even
+            # when their text matches, so the kind is part of the key.
+            delivery_key = (kind, value)
+
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(delivery_key):
+                continue
+
             target = value
             if kind == "#" and self.mode == MattermostMode.BOT:
                 target = self._channel_lookup(value)
@@ -703,6 +712,9 @@ class NotifyMattermost(NotifyBase):
                 self.logger.debug("Socket Exception: %s", e)
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(delivery_key)
 
         # Return our overall status
         return not has_error

@@ -307,6 +307,11 @@ class NotifySinch(NotifyBase):
             # Get our target to notify
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Prepare our user
             payload["to"] = [target]
 
@@ -401,6 +406,9 @@ class NotifySinch(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

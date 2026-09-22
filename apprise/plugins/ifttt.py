@@ -225,6 +225,11 @@ class NotifyIFTTT(NotifyBase):
             # Retrive an entry off of our event list
             event = events.pop(0)
 
+            # Skip an event that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(event):
+                continue
+
             # URL to transmit content via
             url = self.notify_url.format(
                 webhook_id=self.webhook_id,
@@ -291,6 +296,9 @@ class NotifyIFTTT(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this event.
+            self.mark_delivered(event)
 
         return not has_error
 

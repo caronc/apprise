@@ -455,6 +455,15 @@ class NotifyOneSignal(NotifyBase):
             # Create a pointer to our list of targets for specified category
             targets = self.targets[category]
             for index in range(0, len(targets), self.batch_size):
+                # Skip a batch that already went out so a retry does not
+                # deliver it to those recipients twice.  The category is
+                # part of the key because each one is batched separately.
+                if self.is_delivered((category, index)):
+                    # Count an earlier delivery so this retry remains
+                    # successful
+                    sent_count += len(targets[index : index + self.batch_size])
+                    continue
+
                 payload[category] = targets[index : index + self.batch_size]
 
                 # Track our sent count
@@ -502,6 +511,7 @@ class NotifyOneSignal(NotifyBase):
                         )
 
                         has_error = True
+                        continue
 
                     else:
                         self.logger.info("Sent OneSignal notification.")
@@ -514,6 +524,10 @@ class NotifyOneSignal(NotifyBase):
                     self.logger.debug("Socket Exception: %s", e)
 
                     has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this batch.
+                self.mark_delivered((category, index))
 
         if not sent_count:
             # There is no one to notify; we need to capture this and not

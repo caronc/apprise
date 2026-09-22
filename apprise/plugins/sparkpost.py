@@ -618,6 +618,11 @@ class NotifySparkPost(NotifyBase):
         emails = list(self.targets)
 
         for index in range(0, len(emails), batch_size):
+            # Skip a batch that already went out so a retry does
+            # not deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             # Generate our email listing
             payload["recipients"] = []
 
@@ -694,6 +699,10 @@ class NotifySparkPost(NotifyBase):
             # Failed
             if status_code != requests.codes.ok:
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 

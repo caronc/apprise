@@ -1033,17 +1033,24 @@ class NotifyMatrix(NotifyBase):
                 )
                 return False
 
-        # Create a copy of our rooms to join and message
-        rooms = list(self.rooms)
+        # Pair each room with its configured target and record delivery only
+        # after all content for that room arrives
+        rooms = [(("room", room), room) for room in self.rooms]
 
         # Initialize our error tracking
         has_error = False
 
         # Resolve DM user targets (@user) to room IDs
         for _user in self.users:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            delivery_key = ("user", _user)
+            if self.is_delivered(delivery_key):
+                continue
+
             dm_room_id = self._dm_room_find_or_create(_user)
             if dm_room_id:
-                rooms.append(dm_room_id)
+                rooms.append((delivery_key, dm_room_id))
             else:
                 self.logger.warning(
                     "Could not find or create a DM room for Matrix user %s.",
@@ -1078,8 +1085,13 @@ class NotifyMatrix(NotifyBase):
         attachments_ready = False
 
         while len(rooms) > 0:
-            # Get our room
-            room = rooms.pop(0)
+            # Get the resolved room and its configured target
+            delivery_key, room = rooms.pop(0)
+            if self.is_delivered(delivery_key):
+                continue
+
+            target_error = False
+            message_key = ("message", delivery_key)
 
             # Get our room_id from our response
             room_id = self._room_join(room)
@@ -1093,27 +1105,52 @@ class NotifyMatrix(NotifyBase):
 
             if e2ee_capable and self._e2ee_room_encrypted(room_id):
                 # E2EE path: encrypt message and any attachments
-                if not self._e2ee_send_to_room(
-                    room_id,
-                    body,
-                    title,
-                    notify_type,
-                    body_format,
-                    body_passthrough,
-                ):
-                    has_error = True
-                    continue
+                if not self.is_delivered(message_key):
+                    if not self._e2ee_send_to_room(
+                        room_id,
+                        body,
+                        title,
+                        notify_type,
+                        body_format,
+                        body_passthrough,
+                    ):
+                        # Mark our failure
+                        has_error = True
+                        continue
+
+                    # The encrypted message is visible now.
+                    self.mark_delivered(message_key)
 
                 if attach and self.attachment_support:
                     session = self._e2ee_get_megolm(room_id)
-                    for attachment in attach:
+                    for attachment_no, attachment in enumerate(
+                        attach, start=1
+                    ):
+                        attachment_key = (
+                            "attachment",
+                            delivery_key,
+                            attachment_no,
+                        )
+                        if self.is_delivered(attachment_key):
+                            continue
+
                         if not attachment:
+                            # Mark our failure
                             has_error = True
+                            target_error = True
                             break
                         if not self._e2ee_send_attachment(
                             attachment, room_id, session
                         ):
                             has_error = True
+                            target_error = True
+                            continue
+
+                        # The encrypted attachment event is visible now.
+                        self.mark_delivered(attachment_key)
+
+                if not target_error:
+                    self.mark_delivered(delivery_key)
                 continue
 
             # --- Unencrypted path (existing behaviour) ---
@@ -1138,40 +1175,56 @@ class NotifyMatrix(NotifyBase):
             )
 
             if image_url and self.version == MatrixVersion.V2:
-                # Define our payload
-                image_payload = {
-                    "msgtype": "m.image",
-                    "url": image_url,
-                    "body": f"{title if title else notify_type}",
-                }
+                # The image is its own event and belongs to the whole
+                # notification, so it is only ever posted once.
+                image_key = ("image", delivery_key)
+                if not self.is_delivered(image_key, per_message=True):
+                    # Define our payload
+                    image_payload = {
+                        "msgtype": "m.image",
+                        "url": image_url,
+                        "body": f"{title if title else notify_type}",
+                    }
 
-                # Post our content
-                postokay, _, _ = self._fetch(
-                    path, payload=image_payload, method="PUT"
-                )
-                if not postokay:
-                    # Mark our failure
-                    has_error = True
-                    continue
+                    # Post our content
+                    postokay, _, _ = self._fetch(
+                        path, payload=image_payload, method="PUT"
+                    )
+                    if not postokay:
+                        # Mark our failure
+                        has_error = True
+                        continue
 
-                # Increment transaction ID so subsequent sends
-                # don't reuse the same path
-                if self.access_token != self.password:
-                    self.transaction_id += 1
-                    self.store.set(
-                        "transaction_id",
-                        self.transaction_id,
-                        expires=self.default_cache_expiry_sec,
-                    )
-                    path = "/rooms/{}/send/m.room.message/{}".format(
-                        NotifyMatrix.quote(room_id), self.transaction_id
-                    )
+                    self.mark_delivered(image_key, per_message=True)
+
+                    # Advance the transaction ID so the next send is unique
+                    if self.access_token != self.password:
+                        self.transaction_id += 1
+                        self.store.set(
+                            "transaction_id",
+                            self.transaction_id,
+                            expires=self.default_cache_expiry_sec,
+                        )
+                        path = "/rooms/{}/send/m.room.message/{}".format(
+                            NotifyMatrix.quote(room_id), self.transaction_id
+                        )
 
             if attachments:
-                for attachment in attachments:
+                for attachment_no, attachment in enumerate(
+                    attachments, start=1
+                ):
+                    attachment_key = (
+                        "attachment",
+                        delivery_key,
+                        attachment_no,
+                    )
+                    if self.is_delivered(attachment_key):
+                        continue
+
                     attachment["room_id"] = room_id
                     attachment["type"] = "m.room.message"
 
+                    # Post the attachment event
                     postokay, _, _ = self._fetch(
                         path, payload=attachment, method="PUT"
                     )
@@ -1193,7 +1246,11 @@ class NotifyMatrix(NotifyBase):
                     if not postokay:
                         # Mark our failure
                         has_error = True
+                        target_error = True
                         continue
+
+                    # The attachment reference is now visible in this room.
+                    self.mark_delivered(attachment_key)
 
             # Matrix clients use this fallback when they cannot display HTML.
             plain_body = self._matrix_plain_fallback(
@@ -1230,28 +1287,35 @@ class NotifyMatrix(NotifyBase):
                     }
                 )
 
-            # Post our content
-            postokay, _, _ = self._fetch(path, payload=payload, method="PUT")
-
-            # Increment the transaction ID to avoid future messages being
-            # recognized as retransmissions and ignored
-            if self.access_token != self.password:
-                self.transaction_id += 1
-                self.store.set(
-                    "transaction_id",
-                    self.transaction_id,
-                    expires=self.default_cache_expiry_sec,
+            if not self.is_delivered(message_key):
+                # Post the visible message
+                postokay, _, _ = self._fetch(
+                    path, payload=payload, method="PUT"
                 )
 
-            if not postokay:
-                # Notify our user
-                self.logger.warning(
-                    f"Could not send notification Matrix room {room}."
-                )
+                # Advance the transaction ID so Matrix accepts the next event
+                if self.access_token != self.password:
+                    self.transaction_id += 1
+                    self.store.set(
+                        "transaction_id",
+                        self.transaction_id,
+                        expires=self.default_cache_expiry_sec,
+                    )
 
-                # Mark our failure
-                has_error = True
-                continue
+                if not postokay:
+                    # Report the failed room
+                    self.logger.warning(
+                        f"Could not send notification Matrix room {room}."
+                    )
+
+                    # Mark our failure
+                    has_error = True
+                    continue
+
+                self.mark_delivered(message_key)
+
+            if not target_error:
+                self.mark_delivered(delivery_key)
 
         successful = not has_error
         if (

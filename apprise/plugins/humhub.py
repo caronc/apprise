@@ -241,7 +241,21 @@ class NotifyHumHub(NotifyBase):
 
         # Post to each container in turn
         for container_id in self.targets:
-            # Build the HumHub post creation URL for this container
+            message_key = ("message", container_id)
+            post_id = None
+
+            if self.is_delivered(message_key):
+                # Never recreate a visible post. Missing uploads cannot be
+                # retried because only the creation response has its post ID.
+                if attach and not all(
+                    self.is_delivered(("attachment", container_id, no))
+                    for no in range(1, len(attach) + 1)
+                ):
+                    has_error = True
+
+                continue
+
+            # Build the post URL for this container
             url = "{}://{}{}/api/v1/post/container/{}".format(
                 self.schema, self.host, port, container_id
             )
@@ -258,17 +272,21 @@ class NotifyHumHub(NotifyBase):
                 container_id,
             )
 
-            # Skip attachment handling if no attachments were provided
+            if attach:
+                # Read the post ID needed for attachment uploads
+                try:
+                    response = loads(content)
+                    post_id = response.get("id")
+
+                except (AttributeError, TypeError, ValueError):
+                    post_id = None
+
+            # The post is visible now, even if an upload later fails
+            self.mark_delivered(message_key)
+
+            # Skip attachment handling when there is nothing to upload
             if not attach:
                 continue
-
-            # Parse the post ID from the creation response so we can
-            # attach files to the newly created post
-            try:
-                response = loads(content)
-                post_id = response.get("id")
-            except (AttributeError, TypeError, ValueError):
-                post_id = None
 
             if not post_id:
                 self.logger.warning(
@@ -285,8 +303,16 @@ class NotifyHumHub(NotifyBase):
                 self.schema, self.host, port, post_id
             )
 
-            # Upload each attachment to the newly created post
-            for attachment in attach:
+            # Upload each attachment to the new post
+            for attachment_no, attachment in enumerate(attach, start=1):
+                attachment_key = (
+                    "attachment",
+                    container_id,
+                    attachment_no,
+                )
+                if self.is_delivered(attachment_key):
+                    continue
+
                 # Verify the attachment is accessible before uploading
                 if not attachment:
                     self.logger.warning(
@@ -308,6 +334,10 @@ class NotifyHumHub(NotifyBase):
                 if not ok:
                     # Mark our failure
                     has_error = True
+                    continue
+
+                # The attachment is now visible on the existing post.
+                self.mark_delivered(attachment_key)
 
         return not has_error
 

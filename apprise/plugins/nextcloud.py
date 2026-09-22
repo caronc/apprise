@@ -430,6 +430,11 @@ class NotifyNextcloud(NotifyBase):
             return False
 
         for target in targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Prepare our Payload
             payload = {
                 "shortMessage": title if title else self.app_desc,
@@ -443,6 +448,10 @@ class NotifyNextcloud(NotifyBase):
             if not is_okay:
                 # Toggle our status
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

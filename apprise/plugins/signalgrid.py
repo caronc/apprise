@@ -181,8 +181,17 @@ class NotifySignalgrid(NotifyBase):
         # Track whether any channel notification failed
         has_error = False
         for channel in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(channel):
+                continue
+
             if not self._send_to_channel(body, title, notify_type, channel):
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(channel)
 
         return not has_error
 

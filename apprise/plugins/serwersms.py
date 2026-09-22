@@ -281,6 +281,11 @@ class NotifySerwerSMS(NotifyBase):
         ]
 
         for label, extra in calls:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(label):
+                continue
+
             # Assemble the per-target fields
             fields = dict(base_fields)
             fields.update(extra)
@@ -292,6 +297,10 @@ class NotifySerwerSMS(NotifyBase):
                 # Delegate to the MMS helper
                 if not self._send_mms(label, fields, attach, headers):
                     has_error = True
+                    continue
+
+                # Delivered; a retry can safely skip this target.
+                self.mark_delivered(label)
                 continue
 
             # Debug logging
@@ -384,6 +393,9 @@ class NotifySerwerSMS(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(label)
 
         return not has_error
 

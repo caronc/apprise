@@ -742,6 +742,11 @@ class NotifyOffice365(NotifyBase):
             # Get our email to notify
             to_name, to_addr = emails.pop(0)
 
+            # Skip a recipient that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(to_addr):
+                continue
+
             # Strip target out of cc list if in To or Bcc
             cc = self.cc - self.bcc - {to_addr}
 
@@ -837,8 +842,9 @@ class NotifyOffice365(NotifyBase):
             # Test if we were okay
             if not postokay:
                 has_error = True
+                continue
 
-            elif large_attachments:
+            if large_attachments:
                 # We have large attachments now to upload and associate with
                 # our message. We need to prepare a draft message; acquire
                 # the message-id associated with it and then attach the file
@@ -893,6 +899,9 @@ class NotifyOffice365(NotifyBase):
                     )
                     has_error = True
                     continue
+
+            # Delivered; a retry can safely skip this recipient.
+            self.mark_delivered(to_addr)
 
         # Memory management
         del small_attachments

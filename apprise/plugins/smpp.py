@@ -252,13 +252,24 @@ class NotifySMPP(NotifyBase):
             return False
 
         for target in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             parts, encoding, msg_type = smpplib.gsm.make_parts(body)
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
 
             try:
-                for payload in parts:
+                for part_no, payload in enumerate(parts):
+                    # Each segment is sent on its own, so a retry only
+                    # repeats the segments that did not make it.
+                    part_key = ("part", target, part_no)
+                    if self.is_delivered(part_key):
+                        continue
+
                     client.send_message(
                         source_addr_ton=smpplib.consts.SMPP_TON_INTL,
                         source_addr=self.source,
@@ -269,6 +280,8 @@ class NotifySMPP(NotifyBase):
                         esm_class=msg_type,
                         registered_delivery=True,
                     )
+
+                    self.mark_delivered(part_key)
             except Exception as e:
                 self.logger.warning(f"Failed to send SMPP notification: {e}")
                 # Mark our failure
@@ -276,6 +289,9 @@ class NotifySMPP(NotifyBase):
                 continue
 
             self.logger.info("Sent SMPP notification to %s", target)
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         client.unbind()
         client.disconnect()

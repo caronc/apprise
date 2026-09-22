@@ -374,8 +374,17 @@ class NotifyWebexTeams(NotifyBase):
 
         has_error = False
         for room_id in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(room_id):
+                continue
+
             if not self._post_to_room(body, room_id, attach=attach):
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(room_id)
 
         return not has_error
 

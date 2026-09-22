@@ -326,6 +326,11 @@ class NotifyOctopush(NotifyBase):
         }
 
         for index in range(0, len(self.targets), batch_size):
+            # Skip a batch that already went out so a retry does
+            # not deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             recipients = [
                 {"phone_number": phone_no}
                 for phone_no in self.targets[index : index + batch_size]
@@ -403,6 +408,9 @@ class NotifyOctopush(NotifyBase):
 
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 

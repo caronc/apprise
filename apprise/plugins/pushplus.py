@@ -359,6 +359,11 @@ class NotifyPushplus(NotifyBase):
         has_error = False
 
         for topic in topics_to_notify:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(topic):
+                continue
+
             # Build the payload for this particular topic
             payload = {
                 # Authentication token
@@ -480,6 +485,9 @@ class NotifyPushplus(NotifyBase):
                 "Sent PushPlus notification%s.",
                 " to topic {}".format(topic) if topic else "",
             )
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(topic)
 
         return not has_error
 

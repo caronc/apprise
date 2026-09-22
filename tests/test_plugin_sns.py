@@ -36,6 +36,7 @@ import requests
 
 from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.sns import NotifySNS, SNSMode
 
 logging.disable(logging.CRITICAL)
@@ -741,6 +742,46 @@ def test_plugin_sns_detailed_failures(mocker):
 
     # Should return False because Publish failed
     assert bool(obj_topic.notify(body="test")) is False
+
+
+def test_plugin_sns_failed_publish_is_retried():
+    """A failed topic publish is not recorded as delivered."""
+
+    obj = NotifySNS(
+        access_key_id="key",
+        secret_access_key="secret",
+        region_name="us-east-1",
+        targets=["#MyTopic"],
+    )
+    topic = obj.topics[0]
+
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        with mock.patch.object(
+            obj,
+            "_post",
+            side_effect=[
+                (True, {"topic_arn": "arn:test"}),
+                (False, {}),
+            ],
+        ):
+            assert obj.send(body="test") is False
+
+        assert obj.is_delivered(topic) is False
+
+        with mock.patch.object(
+            obj,
+            "_post",
+            side_effect=[
+                (True, {"topic_arn": "arn:test"}),
+                (True, {}),
+            ],
+        ):
+            assert obj.send(body="test") is True
+
+        assert obj.is_delivered(topic) is True
+    finally:
+        _delivery_tracker.reset(tracker_token)
 
 
 def test_plugin_sns_mode_detection():

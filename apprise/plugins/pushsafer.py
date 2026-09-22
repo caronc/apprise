@@ -641,6 +641,11 @@ class NotifyPushSafer(NotifyBase):
         while len(targets):
             recipient = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(recipient):
+                continue
+
             # prepare payload
             payload = {
                 "t": title,
@@ -674,36 +679,52 @@ class NotifyPushSafer(NotifyBase):
             else:
                 # Create a copy of our payload object
                 payload_ = payload.copy()
+                attachments_ok = True
 
                 for idx in range(0, len(attachments), len(PICTURE_PARAMETER)):
-                    # Send our attachments to our same user (already prepared
-                    # as our payload object)
-                    for c, attachment in enumerate(
-                        attachments[idx : idx + len(PICTURE_PARAMETER)]
-                    ):
-                        # Get our attachment information
-                        filename, dataurl = attachment
-                        payload_.update({PICTURE_PARAMETER[c]: dataurl})
+                    # Skip images that already went out so a retry does
+                    # not deliver them twice.
+                    attachment_key = ("attachment", recipient, idx)
+                    if not self.is_delivered(attachment_key):
+                        # Send our attachments to our same user (already
+                        # prepared as our payload object)
+                        for c, attachment in enumerate(
+                            attachments[idx : idx + len(PICTURE_PARAMETER)]
+                        ):
+                            # Get our attachment information
+                            filename, dataurl = attachment
+                            payload_.update({PICTURE_PARAMETER[c]: dataurl})
 
-                        self.logger.debug(
-                            f'Added attachment ({filename}) to "{recipient}".'
+                            self.logger.debug(
+                                f"Added attachment ({filename}) to"
+                                f' "{recipient}".'
+                            )
+
+                        okay, _response = self._send(payload_)
+                        if not okay:
+                            # Mark our failure
+                            has_error = True
+                            attachments_ok = False
+                            continue
+
+                        self.logger.info(
+                            f"Sent PushSafer attachment ({filename}) to"
+                            f' "{recipient}".'
                         )
 
-                    okay, _response = self._send(payload_)
-                    if not okay:
-                        has_error = True
-                        continue
+                        # Delivered; a retry can safely skip these images.
+                        self.mark_delivered(attachment_key)
 
-                    self.logger.info(
-                        f"Sent PushSafer attachment ({filename}) to"
-                        f' "{recipient}".'
-                    )
-
-                    # More then the maximum messages shouldn't cause all of
-                    # the text to loop on future iterations
+                    # Only the first attachment batch carries the message text
                     payload_ = payload.copy()
                     payload_["t"] = ""
                     payload_["m"] = "..."
+
+                if not attachments_ok:
+                    continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(recipient)
 
         return not has_error
 

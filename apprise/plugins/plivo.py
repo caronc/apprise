@@ -236,6 +236,11 @@ class NotifyPlivo(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
 
         for index in range(0, len(self.targets), batch_size):
+            # Skip a batch that already went out so a retry does
+            # not deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             # Prepare our phone no (< delimits more then one)
             payload["recipients"] = ",".join(
                 self.targets[index : index + batch_size]
@@ -315,6 +320,9 @@ class NotifyPlivo(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 

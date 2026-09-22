@@ -482,6 +482,11 @@ class NotifyGoogleChat(NotifyBase):
 
         # Send every expanded piece so overflow splitting loses no content.
         for piece in bodies:
+            # Skip a piece that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(piece):
+                continue
+
             payload = {
                 # Our Message
                 "text": piece,
@@ -542,6 +547,9 @@ class NotifyGoogleChat(NotifyBase):
                 self.logger.debug(f"Socket Exception: {e!s}")
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this piece.
+            self.mark_delivered(piece)
 
         return not has_error
 

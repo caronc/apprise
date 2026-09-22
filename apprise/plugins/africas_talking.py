@@ -300,6 +300,11 @@ class NotifyAfricasTalking(NotifyBase):
 
         # Create a copy of the target list
         for index in range(0, len(self.targets), batch_size):
+            # Skip a batch that already went out so a retry does
+            # not deliver it to those recipients twice.
+            if self.is_delivered(index):
+                continue
+
             # Prepare our payload
             payload = {
                 "username": self.appuser,
@@ -391,6 +396,9 @@ class NotifyAfricasTalking(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this batch.
+            self.mark_delivered(index)
 
         return not has_error
 
