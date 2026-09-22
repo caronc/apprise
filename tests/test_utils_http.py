@@ -107,12 +107,50 @@ def test_transition_address_categories():
 
 
 def test_secure_url_classification():
-    """Secure URLs require HTTPS, a host, and no credentials."""
-    assert is_secure_http_url("https://example.com/key")
-    assert not is_secure_http_url("http://example.com/key")
-    assert not is_secure_http_url("https:///key")
-    assert not is_secure_http_url("https://user:pass@example.com/key")
-    assert not is_secure_http_url("https://[broken/key")
+    """Secure URLs require HTTPS, a valid host, and no credentials."""
+    # Well formed addresses we accept
+    assert is_secure_http_url("https://example.com/key") is True
+    assert is_secure_http_url("HTTPS://Example.com") is True
+    assert is_secure_http_url("https://example.com:8443/path") is True
+    assert is_secure_http_url("https://localhost") is True
+
+    # Private and loopback addresses are fine for self hosted services
+    assert is_secure_http_url("https://127.0.0.1:8080") is True
+    assert is_secure_http_url("https://[2001:db8::1]:8443/p") is True
+
+    # We must be given a string
+    assert is_secure_http_url(None) is False
+    assert is_secure_http_url(42) is False
+    assert is_secure_http_url(b"https://example.com") is False
+
+    # Only HTTPS gets through
+    assert is_secure_http_url("http://example.com/key") is False
+    assert is_secure_http_url("ftp://example.com") is False
+    assert is_secure_http_url("example.com") is False
+
+    # There has to be a host to talk to
+    assert is_secure_http_url("https:///key") is False
+
+    # Credentials are never accepted, not even empty ones
+    assert is_secure_http_url("https://user:pass@example.com/key") is False
+    assert is_secure_http_url("https://user@example.com") is False
+    assert is_secure_http_url("https://@example.com") is False
+    assert is_secure_http_url("https://:@example.com") is False
+
+    # A port we cannot read, or cannot connect to, and an unterminated
+    # IPv6 address
+    assert is_secure_http_url("https://example.com:notaport") is False
+    assert is_secure_http_url("https://example.com:65536") is False
+    assert is_secure_http_url("https://example.com:0") is False
+    assert is_secure_http_url("https://[broken/key") is False
+
+    # The host itself still has to make sense
+    assert is_secure_http_url("https://-bad-.example.com") is False
+    assert is_secure_http_url("https://exa mple.com") is False
+
+    # A fragment never reaches a server, so it is not a request target
+    assert is_secure_http_url("https://example.com/base#frag") is False
+    assert is_secure_http_url("https://example.com/#") is False
 
 
 def test_policy_filters_and_preserves_dns_answers():

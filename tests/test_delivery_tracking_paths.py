@@ -588,3 +588,56 @@ def test_matrix_skips_sent_image(tracker):
             ("_whoami", {}),
         ],
     )
+
+
+def test_xmpp_skips_sent_targets(tracker):
+    """XMPP leaves a target alone once it has the message."""
+
+    pytest.importorskip("slixmpp")
+
+    from apprise.plugins.xmpp import base as xmpp_base
+
+    handed = []
+
+    class _Adapter:
+        def __init__(self, config, **kwargs):
+            handed.append(kwargs.get("targets"))
+
+        def process(self):
+            return True
+
+    with mock.patch.object(xmpp_base, "SlixmppAdapter", _Adapter):
+        obj = _build("xmpps://user:pass@example.com/joe/sally")
+        assert obj.send(body="test", title="test") is True
+
+        # Both targets were handed over the first time
+        assert len(handed[0]) == 2
+
+        # ...and neither is offered again
+        assert obj.send(body="test", title="test") is True
+        assert len(handed) == 1
+
+
+def test_xmpp_retries_targets_after_failure(tracker):
+    """XMPP offers its targets again when the send did not work."""
+
+    pytest.importorskip("slixmpp")
+
+    from apprise.plugins.xmpp import base as xmpp_base
+
+    handed = []
+
+    class _Adapter:
+        def __init__(self, config, **kwargs):
+            handed.append(kwargs.get("targets"))
+
+        def process(self):
+            return False
+
+    with mock.patch.object(xmpp_base, "SlixmppAdapter", _Adapter):
+        obj = _build("xmpps://user:pass@example.com/joe/sally")
+        assert obj.send(body="test", title="test") is False
+        assert obj.send(body="test", title="test") is False
+
+    # Nothing was marked, so both attempts carried both targets
+    assert [len(x) for x in handed] == [2, 2]

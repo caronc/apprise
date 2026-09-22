@@ -55,6 +55,7 @@ from ...conversion import html_to_text
 from ...exception import AppriseImproperlyConfigured, ApprisePluginException
 from ...locale import gettext_lazy as _
 from ...url import PrivacyMode
+from ...utils.http import is_secure_http_url, read_bounded_response
 from ...utils.parse import (
     is_hostname,
     parse_bool,
@@ -275,6 +276,10 @@ class NotifyMatrix(NotifyBase):
 
     # Defines how long we cache our discovery for
     discovery_cache_length_sec = 86400
+
+    # Discovery and login answers are a few hundred bytes, so we cap what
+    # we are willing to read back from them.
+    max_response_bytes = 1024 * 1024
 
     # Define object templates
     templates = (
@@ -1519,8 +1524,13 @@ class NotifyMatrix(NotifyBase):
             )
             return False
 
-        # Build our URL
-        postokay, response, _ = self._fetch("/login", payload=payload)
+        # Keep the password out of logs and redirected requests
+        postokay, response, _ = self._fetch(
+            "/login",
+            payload=payload,
+            credentials=True,
+            max_response_bytes=self.max_response_bytes,
+        )
         if not (postokay and isinstance(response, dict)):
             # Failed to login
             return False
@@ -1974,27 +1984,21 @@ class NotifyMatrix(NotifyBase):
 
         return None
 
-    @staticmethod
-    def _truncated_content(content):
-        """Return enough response content for a useful debug log entry."""
-        return (content or b"")[:2000]
+    def _loggable_content(self, content, credentials=False):
+        """Return enough of a reply for a useful debug log entry.
 
-    @staticmethod
-    def _read_bounded(r, max_bytes):
-        """Read and close a response, returning ``None`` if it is too large."""
-        chunks = []
-        total = 0
-        try:
-            for chunk in r.iter_content(chunk_size=65536):
-                if not chunk:
-                    continue
-                total += len(chunk)
-                if total > max_bytes:
-                    return None
-                chunks.append(chunk)
-            return b"".join(chunks)
-        finally:
-            r.close()
+        A reply to a request that carried our password is held back while
+        secure logging is on.
+        """
+        if credentials and self.asset.secure_logging:
+            return "<hidden>"
+
+        if not isinstance(content, (bytes, str)):
+            # Nothing worth showing, and this is called while handling an
+            # error, so it must not raise one of its own.
+            return b""
+
+        return content[:2000]
 
     def _fetch(
         self,
@@ -2008,12 +2012,19 @@ class NotifyMatrix(NotifyBase):
         timeout=None,
         max_retry_wait=None,
         max_response_bytes=None,
+        credentials=False,
+        auth=True,
     ):
         """Send a Matrix HTTP request and normalize its result.
 
         Returns ``(success, response, status_code)``. Invalid JSON uses an
         empty response. Optional arguments accept expected status codes and
         limit request time, retry delays, or response size.
+
+        Set ``credentials`` when the payload contains a password. This hides
+        the payload from logs and prevents redirects to another server.
+
+        Set ``auth`` to False for probes that must not carry our access token.
         """
 
         # Define our headers
@@ -2025,7 +2036,7 @@ class NotifyMatrix(NotifyBase):
             "Accept": "application/json",
         }
 
-        if self.access_token is not None:
+        if auth and self.access_token is not None:
             headers["Authorization"] = f"Bearer {self.access_token}"
 
         # Server Discovery / Well-known URI
@@ -2103,7 +2114,14 @@ class NotifyMatrix(NotifyBase):
                     self.verify_certificate,
                 )
             )
-            self.logger.debug(f"Matrix Payload: {payload!s}")
+            self.logger.debug(
+                "Matrix Payload: %s",
+                (
+                    "<hidden>"
+                    if credentials and self.asset.secure_logging
+                    else f"{payload!s}"
+                ),
+            )
 
             # Initialize our response object
             r = None
@@ -2127,7 +2145,7 @@ class NotifyMatrix(NotifyBase):
                         if timeout is not None
                         else self.request_timeout
                     ),
-                    allow_redirects=self.redirects,
+                    allow_redirects=(False if credentials else self.redirects),
                     stream=max_response_bytes is not None,
                 )
 
@@ -2135,7 +2153,7 @@ class NotifyMatrix(NotifyBase):
                 status_code = r.status_code
 
                 if max_response_bytes is not None:
-                    content = self._read_bounded(r, max_response_bytes)
+                    content = read_bounded_response(r, max_response_bytes)
                     if content is None:
                         self.logger.warning(
                             "Matrix response exceeded %d bytes; "
@@ -2149,7 +2167,7 @@ class NotifyMatrix(NotifyBase):
                 self.logger.debug(
                     "Matrix Response: code=%s, %s",
                     r.status_code,
-                    self._truncated_content(content),
+                    self._loggable_content(content, credentials),
                 )
                 response = loads(content)
 
@@ -2223,18 +2241,18 @@ class NotifyMatrix(NotifyBase):
 
                     self.logger.debug(
                         "Response Details:\r\n%r",
-                        (content or b"")[:2000],
+                        self._loggable_content(content, credentials),
                     )
 
                     # Return; we're done
                     return (False, response, status_code)
 
-            except (AttributeError, TypeError, ValueError):
+            except (AttributeError, RecursionError, TypeError, ValueError):
                 # Reject missing or invalid JSON responses.
                 self.logger.warning("Invalid response from Matrix server.")
                 self.logger.debug(
                     "Response Details:\r\n%r",
-                    content or b"",
+                    self._loggable_content(content, credentials),
                 )
                 return (False, {}, status_code)
 
@@ -3678,7 +3696,12 @@ class NotifyMatrix(NotifyBase):
         )
 
         _, response, status_code = self._fetch(
-            None, method="GET", url_override=verify_url
+            None,
+            method="GET",
+            url_override=verify_url,
+            max_response_bytes=self.max_response_bytes,
+            # A probe; our token does not belong here
+            auth=False,
         )
 
         # Output may look as follows:
@@ -3746,7 +3769,9 @@ class NotifyMatrix(NotifyBase):
         #
         try:
             base_url = response["m.homeserver"]["base_url"].rstrip("/")
-            results = NotifyBase.parse_url(base_url, verify_host=True)
+            # Discovery chooses where the access token is sent. Accept only
+            # an HTTPS address without embedded credentials.
+            results = is_secure_http_url(base_url) and "?" not in base_url
 
         except (AttributeError, TypeError, KeyError):
             # AttributeError: result wasn't a string (rstrip failed)
@@ -3757,7 +3782,7 @@ class NotifyMatrix(NotifyBase):
         if not results:
             msg = "Matrix Well-Known Base URI Discovery Failed"
             self.logger.warning(
-                "%s - m.homeserver payload is missing or invalid: %s",
+                "%s - m.homeserver payload is missing or invalid: %.200s",
                 msg,
                 response,
             )
@@ -3770,7 +3795,12 @@ class NotifyMatrix(NotifyBase):
         verify_url = f"{base_url}/_matrix/client/versions"
         # Post our content
         _, _, status_code = self._fetch(
-            None, method="GET", url_override=verify_url
+            None,
+            method="GET",
+            url_override=verify_url,
+            max_response_bytes=self.max_response_bytes,
+            # A probe; our token does not belong here
+            auth=False,
         )
         if status_code != requests.codes.ok:
             # We're done early as we couldn't load the results
@@ -3791,7 +3821,11 @@ class NotifyMatrix(NotifyBase):
                 identity_url = response["m.identity_server"][
                     "base_url"
                 ].rstrip("/")
-                results = NotifyBase.parse_url(identity_url, verify_host=True)
+                # Checked the same way as the homeserver address above.
+                results = (
+                    is_secure_http_url(identity_url)
+                    and "?" not in identity_url
+                )
 
             except (AttributeError, TypeError, KeyError):
                 # AttributeError: result wasn't a string (rstrip failed)
@@ -3802,7 +3836,8 @@ class NotifyMatrix(NotifyBase):
             if not results:
                 msg = "Matrix Well-Known Identity URI Discovery Failed"
                 self.logger.warning(
-                    "%s - m.identity_server payload is missing or invalid: %s",
+                    "%s - m.identity_server payload is missing or"
+                    " invalid: %.200s",
                     msg,
                     response,
                 )
@@ -3815,7 +3850,12 @@ class NotifyMatrix(NotifyBase):
 
             # Post our content
             _postokay, _, status_code = self._fetch(
-                None, method="GET", url_override=verify_url
+                None,
+                method="GET",
+                url_override=verify_url,
+                max_response_bytes=self.max_response_bytes,
+                # A probe; our token does not belong here
+                auth=False,
             )
             if status_code != requests.codes.ok:
                 # We're done early as we couldn't load the results

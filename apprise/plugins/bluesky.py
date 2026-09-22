@@ -43,6 +43,7 @@ from ..common import NotifyType
 from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
+from ..utils.http import is_secure_http_url, read_bounded_response
 from .base import NotifyBase
 
 # For parsing handles
@@ -102,6 +103,10 @@ class NotifyBlueSky(NotifyBase):
 
     # The default BlueSky host to use if one isn't specified
     bluesky_default_host = "bsky.social"
+
+    # Identity and DID documents are small, so we cap what we will read
+    # back from the servers that hand them to us.
+    max_response_bytes = 1024 * 1024
 
     # Our message body size
     body_maxlen = 280
@@ -289,7 +294,7 @@ class NotifyBlueSky(NotifyBase):
                 return False
         return True
 
-    def get_identifier(self, user=None, login=False):
+    def get_identifier(self, user=None):
         """Performs a Decentralized User Lookup and returns the identifier."""
 
         if user is None:
@@ -309,80 +314,33 @@ class NotifyBlueSky(NotifyBase):
         url = f"https://public.api.bsky.app{self.xrpc_suffix_did}"
         params = {"handle": user}
 
-        # Send Login Information
+        # Resolve the handle to a DID
         postokay, response = self._fetch(
             url,
             params=params,
             method="GET",
-            # We set this boolean so internal recursion doesn't take place.
-            login=login,
+            # A public service; our token does not belong here
+            auth=False,
+            max_response_bytes=self.max_response_bytes,
         )
 
-        if not postokay or not response or "did" not in response:
+        if not postokay or not isinstance(response, dict):
             # We failed
             return (False, False)
 
         # Store our DID
         did = response.get("did")
+        if not isinstance(did, str):
+            self.logger.warning("An unparseable BlueSky DID was returned")
+            return (False, False)
 
         # Step 2: Use DID to find the PDS
         if did.startswith("did:plc:"):
-            pds_url = self.plc_directory.format(did=did)
-
-            # PDS Query
-            postokay, service_response = self._fetch(
-                pds_url,
-                method="GET",
-                # We set this boolean so internal recursion doesn't take place.
-                login=login,
-            )
-            if (
-                not postokay
-                or not service_response
-                or "service" not in service_response
-            ):
-                # We failed
-                return (False, False)
-
-            endpoint = next(
-                (
-                    s["serviceEndpoint"]
-                    for s in service_response.get("service", [])
-                    if s["type"] == "AtprotoPersonalDataServer"
-                ),
-                None,
-            )
+            did_url = self.plc_directory.format(did=did)
 
         elif did.startswith("did:web:"):
             # Convert to domain
-            domain = did[8:]
-            web_did_url = f"https://{domain}/.well-known/did.json"
-            postokay, service_response = self._fetch(
-                web_did_url,
-                method="GET",
-                # We set this boolean so internal recursion doesn't take place.
-                login=login,
-            )
-            if (
-                not postokay
-                or not service_response
-                or "service" not in service_response
-            ):
-                # We failed
-                self.logger.warning(
-                    "Could not fetch DID document for did:web identity "
-                    f"{did}; ensure {web_did_url} is available."
-                )
-                return (False, False)
-
-            endpoint = next(
-                (
-                    s["serviceEndpoint"]
-                    for s in service_response.get("service", [])
-                    if s["type"] == "AtprotoPersonalDataServer"
-                ),
-                None,
-            )
+            did_url = f"https://{did[8:]}/.well-known/did.json"
 
         else:
             self.logger.warning(
@@ -390,9 +348,42 @@ class NotifyBlueSky(NotifyBase):
             )
             return (False, False)
 
+        # Acquire our DID document
+        postokay, service_response = self._fetch(
+            did_url,
+            method="GET",
+            # The document can live on any host at all
+            auth=False,
+            max_response_bytes=self.max_response_bytes,
+        )
+        if not postokay or not isinstance(service_response, dict):
+            # We failed
+            self.logger.warning(
+                f"Could not fetch the DID document for {did}; "
+                f"ensure {did_url} is available."
+            )
+            return (False, False)
+
+        # Extract the list of services from the DID document.
+        services = service_response.get("service")
+        if not isinstance(services, list):
+            services = []
+
+        endpoint = next(
+            (
+                s.get("serviceEndpoint")
+                for s in services
+                if isinstance(s, dict)
+                and s.get("type") == "AtprotoPersonalDataServer"
+            ),
+            None,
+        )
+
         # Step 3: Send to correct endpoint
-        if not endpoint:
-            self.logger.warning("Failed to resolve BlueSky PDS endpoint")
+        if not is_secure_http_url(endpoint) or "?" in endpoint:
+            self.logger.warning(
+                "Failed to resolve a usable BlueSky PDS endpoint"
+            )
             return (False, False)
 
         self.store.set(did_key, did)
@@ -403,7 +394,7 @@ class NotifyBlueSky(NotifyBase):
         """A simple wrapper to authenticate with the BlueSky Server."""
 
         # Acquire our Decentralized Identitifer
-        did, self.__endpoint = self.get_identifier(self.user, login=True)
+        did, self.__endpoint = self.get_identifier(self.user)
         if not did:
             return False
 
@@ -418,8 +409,9 @@ class NotifyBlueSky(NotifyBase):
         postokay, response = self._fetch(
             url,
             payload=json.dumps(payload),
-            # We set this boolean so internal recursion doesn't take place.
-            login=True,
+            # Our password is in the payload above
+            credentials=True,
+            max_response_bytes=self.max_response_bytes,
         )
 
         # Our response object looks like this (content has been altered for
@@ -489,6 +481,22 @@ class NotifyBlueSky(NotifyBase):
         )
         return True
 
+    def _loggable_content(self, body, credentials=False):
+        """Return enough of a reply for a useful debug log entry.
+
+        A reply to a request that carried our password is held back while
+        secure logging is on.
+        """
+        if credentials and self.asset.secure_logging:
+            return "<hidden>"
+
+        if not isinstance(body, (bytes, str)):
+            # Nothing worth showing, and this is called while handling an
+            # error, so it must not raise one of its own.
+            return b""
+
+        return body[:2000]
+
     def _fetch(
         self,
         url,
@@ -496,9 +504,20 @@ class NotifyBlueSky(NotifyBase):
         params=None,
         method="POST",
         content_type=None,
-        login=False,
+        credentials=False,
+        auth=True,
+        max_response_bytes=None,
     ):
-        """Wrapper to BlueSky API requests object."""
+        """Wrapper to BlueSky API requests object.
+
+        Set ``credentials`` when the payload contains a password. This hides
+        the payload from logs and prevents redirects to another server.
+
+        Set ``auth`` to False for lookups made against somebody else's
+        server, so our session token is not handed to them.
+
+        Set ``max_response_bytes`` to discard replies larger than the limit.
+        """
 
         # use what was specified, otherwise build headers dynamically
         headers = {
@@ -514,7 +533,7 @@ class NotifyBlueSky(NotifyBase):
             ),
         }
 
-        if self.__access_token:
+        if auth and self.__access_token:
             # Set our token
             headers["Authorization"] = f"Bearer {self.__access_token}"
 
@@ -523,14 +542,17 @@ class NotifyBlueSky(NotifyBase):
             f"BlueSky {method} URL:"
             f" {url} (cert_verify={self.verify_certificate})"
         )
-        self.logger.debug(
-            "BlueSky Payload: %s",
-            (
-                str(payload)
-                if not isinstance(payload, AttachBase)
-                else "attach: " + payload.name
-            ),
-        )
+        if credentials and self.asset.secure_logging:
+            # Our login payload holds the account password.
+            loggable_payload = "<hidden>"
+
+        elif isinstance(payload, AttachBase):
+            loggable_payload = "attach: " + payload.name
+
+        else:
+            loggable_payload = str(payload)
+
+        self.logger.debug("BlueSky Payload: %s", loggable_payload)
 
         # By default set wait to None
         wait = None
@@ -569,21 +591,43 @@ class NotifyBlueSky(NotifyBase):
                 headers=headers,
                 verify=self.verify_certificate,
                 timeout=self.request_timeout,
-                allow_redirects=self.redirects,
+                # Never redirect a request carrying credentials
+                allow_redirects=False if credentials else self.redirects,
+                stream=max_response_bytes is not None,
             )
+
+            if max_response_bytes is None:
+                body = r.content
+
+            else:
+                body = read_bounded_response(r, max_response_bytes)
+                if body is None:
+                    self.logger.warning(
+                        "BlueSky reply from %s passed %d bytes; discarding"
+                        " it.",
+                        url,
+                        max_response_bytes,
+                    )
+                    return (False, {})
 
             # Get our JSON content if it's possible
             try:
-                content = json.loads(r.content)
+                content = json.loads(body)
 
-            except (TypeError, ValueError, AttributeError):
-                # TypeError = r.content is not a String
-                # ValueError = r.content is Unparsable
-                # AttributeError = r.content is None
+            except (
+                AttributeError,
+                RecursionError,
+                TypeError,
+                ValueError,
+            ):
+                # TypeError = body is not a String
+                # ValueError = body is Unparsable
+                # AttributeError = body is None
+                # RecursionError = body is nested too deeply to parse
                 content = {}
                 self.logger.debug(
                     "Failed to parse BlueSky JSON response; body: %r",
-                    (r.content or b"")[:2000],
+                    self._loggable_content(body, credentials),
                 )
 
             # Rate limit handling... our header objects at this point are:
@@ -618,7 +662,8 @@ class NotifyBlueSky(NotifyBase):
                 )
 
                 self.logger.debug(
-                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                    "Response Details:\r\n%r",
+                    self._loggable_content(body, credentials),
                 )
 
                 # Mark our failure
