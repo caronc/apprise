@@ -41,16 +41,19 @@
 #  This plugin will simply work using the url of:
 #     fluxer://WEBHOOK_ID/WEBHOOK_TOKEN
 #
-#  A self-hosted Fluxer server usually puts its API behind a path on the
-#  same hostname as the web app, such as:
+#  Self-hosted Fluxer uses /api by default:
 #     https://fluxer.example.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
 #
-#  Place that path in your Apprise URL ahead of the webhook details:
-#     fluxers://fluxer.example.com/api/WEBHOOK_ID/WEBHOOK_TOKEN
+#  Apprise adds /api when no path is given:
+#     fluxers://fluxer.example.com/WEBHOOK_ID/WEBHOOK_TOKEN
 #
-#  Any path works, so an instance reachable at /custom/api/webhooks/ is
-#  simply:
+#  Add a custom path before the webhook details when needed:
 #     fluxers://fluxer.example.com/custom/api/WEBHOOK_ID/WEBHOOK_TOKEN
+#
+#  Use path=/ when the API is served from the host root:
+#     fluxers://fluxer.example.com/WEBHOOK_ID/WEBHOOK_TOKEN?path=/
+#
+#  Paths apply only to self-hosted servers and are ignored in cloud mode.
 #
 from __future__ import annotations
 
@@ -152,6 +155,9 @@ class NotifyFluxer(NotifyBase):
     # Default upstream/cloud host if none is defined
     cloud_notify_host = "https://api.fluxer.app"
 
+    # Default API path for self-hosted servers; a URL path overrides it.
+    default_private_notify_path = "/api/"
+
     # Webhook URLs used by the Fluxer API.
     notify_url = "{prefix}/webhooks/{webhook_id}/{webhook_token}"
 
@@ -184,7 +190,7 @@ class NotifyFluxer(NotifyBase):
                 "name": _("Path"),
                 "type": "string",
                 "map_to": "fullpath",
-                "default": "/",
+                "default": "/api/",
             },
             "botname": {
                 "name": _("Bot Name"),
@@ -217,6 +223,9 @@ class NotifyFluxer(NotifyBase):
                 "type": "choice:string",
                 "values": FLUXER_MODES,
                 "default": FluxerMode.CLOUD,
+            },
+            "path": {
+                "alias_of": "path",
             },
             "tts": {
                 "name": _("Text To Speech"),
@@ -328,16 +337,6 @@ class NotifyFluxer(NotifyBase):
             self.logger.warning(msg)
             raise TypeError(msg)
 
-        # The base path a self-hosted Fluxer server is reachable on. A
-        # value of "/" means the API sits at the root of the hostname,
-        # which is how this plugin has always behaved. Set it to "/api/"
-        # (or anything else) to match how your instance is published.
-        self.fullpath = (
-            "/"
-            if not isinstance(fullpath, str) or not fullpath.strip()
-            else fullpath.strip()
-        )
-
         # Prepare our mode
         self.mode = (
             mode.strip().lower()
@@ -367,6 +366,29 @@ class NotifyFluxer(NotifyBase):
                 self.mode,
                 self.host,
             )
+
+        # Self-hosted servers default to /api. Use "/" for the host root.
+        path = fullpath.strip() if isinstance(fullpath, str) else ""
+
+        if self.mode != FluxerMode.PRIVATE:
+            # Cloud mode always uses the fixed Fluxer API address.
+            if path.strip("/"):
+                self.logger.warning(
+                    "Ignoring the Fluxer path (%s) specified; cloud mode "
+                    "always posts to %s",
+                    path,
+                    self.cloud_notify_host,
+                )
+
+            path = "/"
+
+        elif not path:
+            path = self.default_private_notify_path
+
+        # Wrap the path in slashes before joining it to the webhook URL.
+        self.fullpath = "/" + path.strip("/")
+        if not self.fullpath.endswith("/"):
+            self.fullpath += "/"
 
         # Text To Speech
         self.tts = (
@@ -618,7 +640,7 @@ class NotifyFluxer(NotifyBase):
             if isinstance(self.port, int):
                 prefix += f":{self.port}"
 
-            # Apply the base path the instance is published under
+            # Add the configured API path.
             prefix += self.fullpath.rstrip("/")
 
         notify_url = self.notify_url.format(
@@ -853,6 +875,10 @@ class NotifyFluxer(NotifyBase):
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 
         if self.mode == FluxerMode.PRIVATE:
+            # Preserve the root path; otherwise parsing defaults to /api.
+            if self.fullpath == "/":
+                params["path"] = "/"
+
             default_port = 443 if self.secure else 80
             port = (
                 ""
@@ -1035,11 +1061,15 @@ class NotifyFluxer(NotifyBase):
         results["webhook_token"] = None if not tokens else tokens.pop()
         results["webhook_id"] = None if not tokens else tokens.pop()
 
-        # Whatever is left (beyond the hostname) is the base path the
-        # self-hosted instance publishes its API on.
+        # Remaining segments form the self-hosted API path. An omitted path
+        # stays unset so initialization can apply the /api default.
         results["fullpath"] = (
-            "/" if len(tokens) <= 1 else "/{}/".format("/".join(tokens[1:]))
+            None if len(tokens) <= 1 else "/{}/".format("/".join(tokens[1:]))
         )
+
+        # path= overrides URL segments and can explicitly select the host root.
+        if "path" in results["qsd"] and results["qsd"]["path"]:
+            results["fullpath"] = NotifyFluxer.unquote(results["qsd"]["path"])
 
         return results
 
