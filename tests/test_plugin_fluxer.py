@@ -42,7 +42,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.common import OverflowMode
-from apprise.plugins.fluxer import NotifyFluxer
+from apprise.plugins.fluxer import FluxerMode, NotifyFluxer
 
 logging.disable(logging.CRITICAL)
 
@@ -152,6 +152,23 @@ apprise_url_tests = (
     ),
     (
         "fluxer://example.ca:123/{}/{}".format(*_tokens()),
+        {
+            "instance": NotifyFluxer,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
+    # Use /api on a self-hosted instance.
+    (
+        "fluxers://example.ca/api/{}/{}".format(*_tokens()),
+        {
+            "instance": NotifyFluxer,
+            "requests_response_code": requests.codes.no_content,
+            "privacy_url": "fluxers://example.ca/api/0...0/B...B/",
+        },
+    ),
+    # Use a custom path on a self-hosted instance.
+    (
+        "fluxers://example.ca:8443/custom/api/{}/{}".format(*_tokens()),
         {
             "instance": NotifyFluxer,
             "requests_response_code": requests.codes.no_content,
@@ -320,6 +337,118 @@ def test_plugin_fluxer_urls() -> None:
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_fluxer_self_hosted_path(mock_post: mock.MagicMock) -> None:
+    """Verify a self-hosted base path is honoured end to end."""
+
+    webhook_id, webhook_token = _tokens()
+
+    # Configure a successful response.
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
+    mock_post.return_value.headers = {}
+
+    # Map each Apprise URL to its expected request endpoint.
+    tests = (
+        (
+            f"fluxer://{webhook_id}/{webhook_token}",
+            f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        # An omitted path defaults to /api.
+        (
+            f"fluxers://example.ca/{webhook_id}/{webhook_token}",
+            f"https://example.ca/api/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        (
+            f"fluxers://example.ca/api/{webhook_id}/{webhook_token}",
+            f"https://example.ca/api/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        (
+            f"fluxers://example.ca:8443/custom/api"
+            f"/{webhook_id}/{webhook_token}",
+            "https://example.ca:8443/custom/api"
+            f"/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        # path= overrides the path embedded in the URL.
+        (
+            f"fluxers://example.ca/{webhook_id}/{webhook_token}?path=/",
+            f"https://example.ca/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        (
+            f"fluxers://example.ca/api/{webhook_id}/{webhook_token}"
+            "?path=/other",
+            f"https://example.ca/other/webhooks/{webhook_id}/{webhook_token}",
+        ),
+    )
+
+    for url, endpoint in tests:
+        mock_post.reset_mock()
+
+        obj = Apprise.instantiate(url)
+        assert isinstance(obj, NotifyFluxer)
+        assert obj.notify(body="body", title="title") is True
+
+        assert mock_post.call_count == 1
+        assert mock_post.call_args_list[0][0][0] == endpoint
+
+    # Preserve the path through URL serialization and parsing.
+    for url, _endpoint in tests:
+        obj = Apprise.instantiate(url)
+        obj2 = Apprise.instantiate(obj.url())
+        assert isinstance(obj2, NotifyFluxer)
+        assert obj2.fullpath == obj.fullpath
+        assert obj2.url_identifier == obj.url_identifier
+
+    # Treat different paths as different connections.
+    root = Apprise.instantiate(
+        f"fluxers://example.ca/{webhook_id}/{webhook_token}?path=/"
+    )
+    under_api = Apprise.instantiate(
+        f"fluxers://example.ca/api/{webhook_id}/{webhook_token}"
+    )
+    assert root.url_identifier != under_api.url_identifier
+
+    # The implicit and explicit /api paths identify the same connection.
+    assert (
+        Apprise.instantiate(
+            f"fluxers://example.ca/{webhook_id}/{webhook_token}"
+        ).url_identifier
+        == under_api.url_identifier
+    )
+
+    # Normalize leading and trailing slashes.
+    for entry in ("api", "/api", "api/", "/api/"):
+        obj = NotifyFluxer(
+            host="example.ca",
+            mode=FluxerMode.PRIVATE,
+            fullpath=entry,
+            webhook_id=webhook_id,
+            webhook_token=webhook_token,
+        )
+        assert obj.fullpath == "/api/"
+
+    # Cloud mode has no configurable path.
+    obj = Apprise.instantiate(f"fluxer://{webhook_id}/{webhook_token}")
+    assert obj.fullpath == "/"
+
+    # A fluxer.app host forces cloud mode and discards its supplied path.
+    mock_post.reset_mock()
+    obj = Apprise.instantiate(
+        f"fluxers://api.fluxer.app/anything/{webhook_id}/{webhook_token}"
+        "?mode=private"
+    )
+    assert isinstance(obj, NotifyFluxer)
+    assert obj.mode == FluxerMode.CLOUD
+    assert obj.fullpath == "/"
+    assert obj.notify(body="body", title="title") is True
+    assert mock_post.call_count == 1
+    assert (
+        mock_post.call_args_list[0][0][0]
+        == f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}"
+    )
 
 
 @mock.patch("requests.post")
