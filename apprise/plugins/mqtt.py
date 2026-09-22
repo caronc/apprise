@@ -419,6 +419,11 @@ class NotifyMQTT(NotifyBase):
                 # Retrieve our subreddit
                 topic = topics.pop()
 
+                # Skip a topic that already accepted this message so a
+                # retry does not deliver it twice.
+                if self.is_delivered(topic):
+                    continue
+
                 # For logging:
                 url = f"{self.host}:{self.port}/{topic}"
 
@@ -472,6 +477,10 @@ class NotifyMQTT(NotifyBase):
                                 "The MQTT message could not be delivered"
                             )
                             has_error = True
+
+                if not has_error:
+                    # Delivered; a retry can safely skip this topic.
+                    self.mark_delivered(topic)
 
                 # if we reach here; we're at the bottom of our loop
                 # we loop around and do the next topic now

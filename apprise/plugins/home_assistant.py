@@ -313,6 +313,11 @@ class NotifyHomeAssistant(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
 
         for target in self.targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Use a unique ID so we don't over-write the last message we
             # posted. Otherwise use the notification id specified
             if has_targets:
@@ -331,6 +336,12 @@ class NotifyHomeAssistant(NotifyBase):
                 if target[2]:
                     _payload = payload.copy()
                     for index in range(0, len(target[2]), batch_size):
+                        # Each batch is its own delivery, so a retry only
+                        # repeats the batches that did not make it.
+                        batch_key = ("batch", target, index)
+                        if self.is_delivered(batch_key):
+                            continue
+
                         _payload["targets"] = target[2][
                             index : index + batch_size
                         ]
@@ -339,6 +350,10 @@ class NotifyHomeAssistant(NotifyBase):
                         ):
                             return False
 
+                        self.mark_delivered(batch_key)
+
+                    # Delivered; a retry can safely skip this target.
+                    self.mark_delivered(target)
                     continue
 
             if not self._ha_post(
@@ -349,6 +364,9 @@ class NotifyHomeAssistant(NotifyBase):
                 persistent=not has_targets,
             ):
                 return False
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return True
 

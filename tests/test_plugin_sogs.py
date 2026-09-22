@@ -37,6 +37,7 @@ import requests
 from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
 from apprise.plugins import sogs
+from apprise.plugins.base import NotifyBase
 from apprise.plugins.sogs import (
     NotifySessionOGS,
     _build_session_message,
@@ -255,6 +256,28 @@ def test_plugin_sogs_disabled_dependency(monkeypatch):
     with mock.patch("requests.post") as mock_post:
         assert direct.send("test") is False
         mock_post.assert_not_called()
+
+
+@pytest.mark.skipif(
+    "cryptography" not in sys.modules,
+    reason="Requires cryptography",
+)
+@mock.patch("requests.post")
+def test_plugin_sogs_skips_delivered_room(mock_post):
+    """A room that already has the message is left alone on a retry."""
+
+    obj = NotifySessionOGS(
+        public_key=PUBLIC_KEY,
+        seed=SEED,
+        targets=[ROOM],
+        host="open.getsession.org",
+    )
+
+    with mock.patch.object(NotifyBase, "is_delivered", return_value=True):
+        assert obj.send(body="test", title="test") is True
+
+    # Nothing was posted a second time
+    assert mock_post.call_count == 0
 
 
 @pytest.mark.skipif(

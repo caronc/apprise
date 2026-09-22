@@ -596,6 +596,11 @@ class NotifyTwist(NotifyBase):
             # We need both the workspace/team id and channel id
             channel_id = int(result.group("channel"))
 
+            # Skip a channel that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(channel_id):
+                continue
+
             # Prepare our payload
             payload = {
                 "channel_id": channel_id,
@@ -618,6 +623,9 @@ class NotifyTwist(NotifyBase):
             self.logger.info(
                 "Sent Twist notification to {}.".format(result.group("name"))
             )
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(channel_id)
 
         return not has_error
 

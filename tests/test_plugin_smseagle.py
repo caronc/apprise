@@ -37,6 +37,7 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.smseagle import NotifySMSEagle
 
 logging.disable(logging.CRITICAL)
@@ -53,6 +54,29 @@ SMSEAGLE_BAD_RESPONSE = dumps(
         }
     }
 )
+
+
+@mock.patch("requests.post")
+def test_plugin_smseagle_tracking_separates_categories(mock_post):
+    """Equal batch positions in different categories remain independent."""
+
+    response = requests.Request()
+    response.status_code = requests.codes.ok
+    response.content = SMSEAGLE_GOOD_RESPONSE
+    mock_post.return_value = response
+
+    obj = Apprise.instantiate(
+        "smseagle://token@localhost/12512222222/@contact/%23group"
+    )
+    assert isinstance(obj, NotifySMSEagle)
+
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.send(body="test") is True
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+    assert mock_post.call_count == 3
 
 
 # Attachment Directory

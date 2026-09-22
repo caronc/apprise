@@ -331,6 +331,11 @@ class NotifySNS(NotifyBase):
             # Get Phone No
             no = phone.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(no):
+                continue
+
             # In topic mode the framework passes the title through
             # separately; SMS has no Subject field so the title is
             # prepended to the body manually when present
@@ -350,11 +355,20 @@ class NotifySNS(NotifyBase):
             (result, _) = self._post(payload=payload, to=no)
             if not result:
                 error_count += 1
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(no)
 
         # Send all our defined topic id's
         while len(topics):
             # Get Topic
             topic = topics.pop(0)
+
+            # Skip a topic that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(topic):
+                continue
 
             # First ensure our topic exists, if it doesn't, it gets created
             payload = {
@@ -393,6 +407,10 @@ class NotifySNS(NotifyBase):
             (result, _) = self._post(payload=payload, to=topic)
             if not result:
                 error_count += 1
+                continue
+
+            # Delivered; a retry can safely skip this topic.
+            self.mark_delivered(topic)
 
         return error_count == 0
 

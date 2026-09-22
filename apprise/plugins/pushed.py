@@ -222,11 +222,20 @@ class NotifyPushed(NotifyBase):
             # Get Channel
             payload_["target_alias"] = channels.pop(0)
 
+            # Skip a channel that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(("alias", payload_["target_alias"])):
+                continue
+
             if not self._send(
                 payload=payload_, notify_type=notify_type, **kwargs
             ):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this channel.
+            self.mark_delivered(("alias", payload_["target_alias"]))
 
         # Copy our payload
         payload_ = dict(payload)
@@ -237,11 +246,20 @@ class NotifyPushed(NotifyBase):
             # Get User's Pushed ID
             payload_["pushed_id"] = users.pop(0)
 
+            # Skip a user that already accepted this message so a retry
+            # does not deliver it twice.
+            if self.is_delivered(("user", payload_["pushed_id"])):
+                continue
+
             if not self._send(
                 payload=payload_, notify_type=notify_type, **kwargs
             ):
                 # toggle flag
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this user.
+            self.mark_delivered(("user", payload_["pushed_id"]))
 
         return not has_error
 

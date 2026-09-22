@@ -40,12 +40,24 @@ import requests
 
 from apprise import Apprise, AppriseAttachment, NotifyFormat, NotifyType
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.slack import NotifySlack, SlackMode
 
 logging.disable(logging.CRITICAL)
 
 # Attachment Directory
 TEST_VAR_DIR = os.path.join(os.path.dirname(__file__), "var")
+
+# A complete successful response keeps generic bot-mode attachment checks
+# representative of Slack's message and file-upload APIs.
+SLACK_BOT_GOOD_RESPONSE = {
+    "ok": True,
+    "message": "",
+    "channel": "C123456",
+    "file_id": "F123ABC456",
+    "upload_url": "https://files.slack.test/upload",
+    "files": [{"id": "F123ABC456", "title": "apprise-test"}],
+}
 
 # Our Testing URLs
 apprise_url_tests = (
@@ -117,10 +129,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
         },
     ),
     (
@@ -130,10 +139,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
         },
     ),
     # Test using a rotating bot-token as argument
@@ -144,10 +150,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
             "privacy_url": "slack://test@x...4/nuxref/",
         },
     ),
@@ -232,10 +235,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
         },
     ),
     (
@@ -245,10 +245,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
         },
     ),
     (
@@ -258,10 +255,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
         },
     ),
     (
@@ -271,10 +265,7 @@ apprise_url_tests = (
         ),
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
         },
     ),
     # Testing modes
@@ -351,10 +342,7 @@ apprise_url_tests = (
         "slack://?token=xoxb-1234-1234-abc124&to=#nuxref&footer=no&user=test",
         {
             "instance": NotifySlack,
-            "requests_response_text": {
-                "ok": True,
-                "message": "",
-            },
+            "requests_response_text": SLACK_BOT_GOOD_RESPONSE,
             # Our expected url(privacy=True) startswith() response:
             "privacy_url": "slack://test@x...4/nuxref/",
         },
@@ -1393,6 +1381,53 @@ def test_plugin_slack_file_upload_success(mock_request):
         )
         is True
     )
+
+
+@mock.patch("requests.request")
+def test_plugin_slack_failed_attachment_is_retried(mock_request):
+    """An attachment failure does not repost the visible message."""
+
+    def response(data):
+        return mock.Mock(
+            content=dumps(data) if isinstance(data, dict) else data,
+            status_code=requests.codes.ok,
+        )
+
+    message = {"ok": True, "channel": "C123456"}
+    upload = {
+        "ok": True,
+        "upload_url": "https://files.slack.com/upload/v1/ABC123",
+        "file_id": "F123ABC456",
+    }
+    mock_request.side_effect = [
+        response(message),
+        response(upload),
+        response(b"OK"),
+        response({"ok": False}),
+    ]
+
+    obj = NotifySlack(
+        access_token="xoxb-1234-1234-abc124",
+        targets=["#general"],
+    )
+    attach = AppriseAttachment(os.path.join(TEST_VAR_DIR, "apprise-test.gif"))
+
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.notify(body="body", attach=attach) is False
+        assert obj.is_delivered(("message", "#general")) is True
+
+        assert obj.notify(body="body", attach=attach) is False
+        assert not obj.is_delivered(("attachment", 1, ("message", "#general")))
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+    message_calls = [
+        call
+        for call in mock_request.call_args_list
+        if call.args[1] == "https://slack.com/api/chat.postMessage"
+    ]
+    assert len(message_calls) == 1
 
 
 @mock.patch("requests.request")

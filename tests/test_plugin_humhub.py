@@ -35,6 +35,7 @@ import requests
 
 from apprise import Apprise
 from apprise.exception import AppriseImproperlyConfigured
+from apprise.plugins.base import _delivery_tracker
 from apprise.plugins.humhub import NotifyHumHub
 
 logging.disable(logging.CRITICAL)
@@ -607,6 +608,42 @@ def test_plugin_humhub_attachment_upload_failure(mock_post):
     obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
     assert obj.send(body="msg", attach=[attachment]) is False
     assert mock_post.call_count == 2
+
+
+@mock.patch("requests.post")
+def test_plugin_humhub_attachment_failure_does_not_repeat_post(mock_post):
+    """An attachment failure does not create a duplicate post."""
+    from io import BytesIO
+
+    create_resp = requests.Request()
+    create_resp.status_code = requests.codes.ok
+    create_resp.content = b'{"id": 3}'
+
+    failed_upload = requests.Request()
+    failed_upload.status_code = requests.codes.internal_server_error
+    failed_upload.content = b"error"
+
+    mock_post.side_effect = [create_resp, failed_upload]
+
+    attachment = mock.MagicMock()
+    attachment.__bool__ = mock.MagicMock(return_value=True)
+    attachment.name = "report.pdf"
+    attachment.open = mock.MagicMock(return_value=BytesIO(b"pdf data"))
+
+    obj = NotifyHumHub(user="token", host="localhost", targets=["1"])
+    tracker_token = _delivery_tracker.set(set())
+    try:
+        assert obj.send(body="msg", attach=[attachment]) is False
+        assert obj.send(body="msg", attach=[attachment]) is False
+    finally:
+        _delivery_tracker.reset(tracker_token)
+
+    create_calls = [
+        call
+        for call in mock_post.call_args_list
+        if "/api/v1/post/container/1" in call.args[0]
+    ]
+    assert len(create_calls) == 1
 
 
 @mock.patch("requests.post")

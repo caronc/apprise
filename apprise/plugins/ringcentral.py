@@ -562,6 +562,11 @@ class NotifyRingCentral(NotifyBase):
         targets = list(self.targets) if self.targets else [self.source]
 
         for target in targets:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Message metadata for this recipient
             metadata = {
                 "from": {"phoneNumber": "+" + self.source},
@@ -655,6 +660,10 @@ class NotifyRingCentral(NotifyBase):
             else:
                 # Mark failure and continue to remaining targets
                 has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

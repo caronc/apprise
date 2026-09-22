@@ -419,6 +419,11 @@ class NotifyEvolution(NotifyBase):
 
         has_error = False
         for number in self.phone:
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(number):
+                continue
+
             url = f"{base_url}/message/sendText/{self.instance}"
             payload = {
                 "number": number,
@@ -481,6 +486,9 @@ class NotifyEvolution(NotifyBase):
                 self.logger.debug(f"Socket Exception: {e!s}")
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(number)
 
         return not has_error
 

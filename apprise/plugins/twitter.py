@@ -605,6 +605,12 @@ class NotifyTwitter(NotifyBase):
 
         for no, payload in enumerate(payloads, start=1):
             for screen_name, user_id in targets.items():
+                # Skip a recipient that already accepted this message so
+                # a retry does not deliver it twice.
+                delivery_key = (no, user_id)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 # v2 DM endpoint embeds the recipient user_id in the URL
                 url = self.twitter_dm.format(user_id)
 
@@ -620,6 +626,9 @@ class NotifyTwitter(NotifyBase):
                     f"Sent [{no:02d}/{len(payloads):02d}] "
                     f"Twitter DM notification to @{screen_name}."
                 )
+
+                # Delivered; a retry can safely skip this recipient.
+                self.mark_delivered(delivery_key)
 
         return not has_error
 

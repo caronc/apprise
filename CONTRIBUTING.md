@@ -26,6 +26,8 @@ merge your contributions smoothly.
 
 
 - ✔️ You followed the plugin template (if adding a new plugin).
+- ✔️ A new or changed multi-target plugin records each success with
+  `mark_delivered()`.
 - ✔️ You included inline docstrings and respected the BSD 2-Clause license.
 - ✔️ Your commit message is descriptive.
 

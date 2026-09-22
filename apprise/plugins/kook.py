@@ -409,6 +409,14 @@ class NotifyKook(NotifyBase):
         ]
 
         for endpoint, target_id in targets:
+            # A channel and a direct message use different endpoints,
+            # so the endpoint forms part of what identifies the target.
+            body_key = ("body", endpoint, target_id)
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(body_key):
+                continue
+
             # Prepare the message payload for this target
             payload = {
                 "type": kook_type,
@@ -484,9 +492,12 @@ class NotifyKook(NotifyBase):
                 has_error = True
                 continue
 
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(body_key)
+
         # Handle file attachments after the text message is sent
         if attach and self.attachment_support and not has_error:
-            for attachment in attach:
+            for attachment_no, attachment in enumerate(attach):
                 # Upload each attachment to the Kook CDN and post a
                 # follow-up message per target referencing the returned URL
                 cdn_url = self._upload(attachment)
@@ -502,6 +513,14 @@ class NotifyKook(NotifyBase):
                 )
 
                 for endpoint, target_id in targets:
+                    attachment_key = (
+                        "attachment",
+                        attachment_no,
+                        target_id,
+                    )
+                    if self.is_delivered(attachment_key):
+                        continue
+
                     # Prepare the attachment message payload
                     payload = {
                         "type": attach_type,
@@ -565,6 +584,9 @@ class NotifyKook(NotifyBase):
                                 content.get("message", "Unknown"),
                             )
                             has_error = True
+                            continue
+
+                        self.mark_delivered(attachment_key)
 
                     except requests.RequestException as e:
                         self.logger.warning(

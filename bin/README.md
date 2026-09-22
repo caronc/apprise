@@ -164,6 +164,8 @@ Linting **must pass** before PRs can be merged.
 
 ## 🧠 Developer Tips
 
-- Add new plugins by following [`demo.py`](https://github.com/caronc/apprise/blob/master/apprise/plugins/demo.py) as a template.
+- Add new plugins by following the samples in the [Plugin guide](https://appriseit.com/library/plugin/).
+- Multi-target plugins must record each success with `mark_delivered()` so
+  retries do not notify the same target twice.
 - Write unit tests under `tests/` using the `AppriseURLTester` pattern.
 - All new plugins must include test coverage and pass linting.

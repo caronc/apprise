@@ -82,6 +82,19 @@ class _PayloadPrecappedToken:
 _PAYLOAD_PRECAPPED = _PayloadPrecappedToken()
 
 
+# Remembers successful targets during retries. It remains unused when retries
+# are disabled, preserving the original plugin behavior.
+_delivery_tracker: contextvars.ContextVar[
+    Optional[set[tuple[Optional[int], Any]]]
+] = contextvars.ContextVar("apprise_delivery_tracker", default=None)
+
+# Identifies the current message piece so split messages are tracked one piece
+# at a time.
+_delivery_index: contextvars.ContextVar[int] = contextvars.ContextVar(
+    "apprise_delivery_index", default=0
+)
+
+
 class NotifyBase(URLBase):
     """This is the base class for all notification services."""
 
@@ -795,6 +808,56 @@ class NotifyBase(URLBase):
 
         return formats[0]
 
+    def is_delivered(self, key: Any, per_message: bool = False) -> bool:
+        """Return whether ``key`` accepted the current message piece.
+
+        Use a stable target identifier, such as a phone number, room ID,
+        token, or email address. This always returns ``False`` when retries
+        are disabled. Pair it with :meth:`mark_delivered`::
+
+            for target in self.targets:
+                if self.is_delivered(target):
+                    continue
+
+                if self._post(target, body):
+                    self.mark_delivered(target)
+
+        A long message is delivered in pieces, and each piece is tracked on
+        its own. Set ``per_message`` for something sent once for the whole
+        notification, such as an icon, so it is not repeated for every
+        piece.
+        """
+        tracker = _delivery_tracker.get()
+        # No tracker means retries are off; nothing has been recorded.
+        if tracker is None:
+            return False
+
+        return self._slot(key, per_message) in tracker
+
+    def mark_delivered(self, key: Any, per_message: bool = False) -> None:
+        """Record a successful target for the current message piece.
+
+        Call this only after the target accepts the message. A later retry
+        can then skip it. See :meth:`is_delivered` for an example.
+
+        Set ``per_message`` for something that belongs to the whole
+        notification rather than one piece of it.
+        """
+        tracker = _delivery_tracker.get()
+        if tracker is not None:
+            tracker.add(self._slot(key, per_message))
+
+    @staticmethod
+    def _slot(key: Any, per_message: bool) -> tuple[Optional[int], Any]:
+        """Return the entry ``key`` is recorded under.
+
+        Split-message pieces use separate slots. ``per_message`` instead
+        shares one slot across the notification. Including the type keeps
+        look-alike values distinct, while ``repr`` supports container keys.
+        """
+        piece = None if per_message else _delivery_index.get()
+        return (piece, (type(key), repr(key)))
+
     def _timed_send(self, **kwargs2: Any) -> bool:
         """Send one prepared call and log its duration at DEBUG.
 
@@ -804,8 +867,17 @@ class NotifyBase(URLBase):
         fn = getattr(self, f"send_{resolved.value}", None)
         send_fn = fn if callable(fn) else self.send
 
+        # Track each piece of a split message separately.
+        index_token = _delivery_index.set(kwargs2.get("index", 0))
+
         send_start = time.monotonic()
-        result = send_fn(**kwargs2)
+        try:
+            result = send_fn(**kwargs2)
+
+        finally:
+            # Always restore the previous piece, even if send() raised.
+            _delivery_index.reset(index_token)
+
         self.logger.debug(
             "%s send() completed in %.2fs.",
             self.service_name,

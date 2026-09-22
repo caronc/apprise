@@ -690,10 +690,18 @@ class NotifyEmail(NotifyBase):
                     inline=self.inline,
                     tzinfo=self.tzinfo,
                 ):
+                    # Skip a recipient that already accepted this message
+                    # so a retry does not deliver it twice.
+                    if self.is_delivered(message.recipient):
+                        continue
+
                     if smtp.sendmail(
                         self.from_addr[1], message.to_addrs, message.body
                     ):
                         self.logger.info("Sent Email to %s", message.recipient)
+
+                        # Delivered; a retry can safely skip this one.
+                        self.mark_delivered(message.recipient)
 
                     else:
                         self.logger.warning(

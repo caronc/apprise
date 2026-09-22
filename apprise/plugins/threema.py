@@ -234,6 +234,11 @@ class NotifyThreema(NotifyBase):
             # Get our target to notify
             key, target = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Prepare a payload object
             payload = payload_.copy()
 
@@ -299,6 +304,9 @@ class NotifyThreema(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 

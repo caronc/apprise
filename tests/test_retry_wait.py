@@ -3073,15 +3073,16 @@ class TestServiceTimeout:
     def test_timeout_logs_include_error_entry(self):
         """A TIMEOUT attempt includes a matching ERROR log entry.
 
-        Generous timing keeps this reliable on busy test hosts. Two attempts
-        may start before the timeout, but a third cannot.
+        Each attempt takes one second, so the 1.5-second deadline expires
+        during the second. The half-second margin keeps the timing reliable
+        on busy test hosts.
         """
         N_MGR["slow"] = _SlowNotify
 
         try:
-            asset = AppriseAsset(async_mode=False, service_timeout=0.75)
+            asset = AppriseAsset(async_mode=False, service_timeout=1.5)
             service = _SlowNotify(host="x", asset=asset, retry=2)
-            service.send = lambda **kw: (time.sleep(0.5), False)[1]
+            service.send = lambda **kw: (time.sleep(1.0), False)[1]
             a = Apprise(asset=asset)
             a.add(service)
 

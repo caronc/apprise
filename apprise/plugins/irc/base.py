@@ -341,6 +341,10 @@ class NotifyIRC(NotifyBase):
             message = body if not title else f"{title} {body}".strip()
 
             for c, key in self.channels.items():
+                delivery_key = ("channel", c)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 chan = normalise_channel(c)
                 if self.join or key:
                     client.join(
@@ -360,8 +364,15 @@ class NotifyIRC(NotifyBase):
                     c,
                     client.nickname,
                 )
+                self.mark_delivered(delivery_key)
 
             for u in self.users:
+                # Skip a target that already accepted this message so
+                # a retry does not deliver it twice.
+                delivery_key = ("user", u)
+                if self.is_delivered(delivery_key):
+                    continue
+
                 target = u.lstrip("@")
                 client.privmsg(
                     target=target,
@@ -373,6 +384,9 @@ class NotifyIRC(NotifyBase):
                     u,
                     client.nickname,
                 )
+
+                # Delivered; a retry can safely skip this target.
+                self.mark_delivered(delivery_key)
 
             client.quit(message=self.app_desc, timeout=self.send_timeout)
             return True

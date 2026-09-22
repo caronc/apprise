@@ -622,28 +622,44 @@ class NotifyPushover(NotifyBase):
         # Build per-target payloads:
         #  - devices: one call with user=user_key, device=dev1,dev2,...
         #  - groups: one call per group with user=group_key
+        # Each entry is paired with what identifies it, because a group
+        # key and an account key could otherwise read the same.
         payloads = []
         if self.devices:
             payloads.append(
-                {
-                    **base_payload,
-                    "user": self.user_key,
-                    "device": ",".join(self.devices),
-                }
+                (
+                    ("account", self.user_key),
+                    {
+                        **base_payload,
+                        "user": self.user_key,
+                        "device": ",".join(self.devices),
+                    },
+                )
             )
         for group_key in self.groups:
             payloads.append(
-                {
-                    **base_payload,
-                    "user": group_key,
-                }
+                (
+                    ("group", group_key),
+                    {
+                        **base_payload,
+                        "user": group_key,
+                    },
+                )
             )
 
         has_error = False
-        for payload in payloads:
+        for recipient, payload in payloads:
+            # Skip a recipient that already accepted this message so a
+            # retry does not deliver it twice.
+            if self.is_delivered(recipient):
+                continue
+
             if attach and self.attachment_support:
                 # Create a copy of our payload
                 payload_ = payload.copy()
+
+                # Tracks whether every attachment made it out
+                attach_ok = True
 
                 # Send with attachments
                 for no, attachment in enumerate(attach):
@@ -651,9 +667,18 @@ class NotifyPushover(NotifyBase):
                         # To handle multiple attachments, clean up our message
                         payload_["message"] = attachment.name
 
+                    attachment_key = ("attachment", recipient, no)
+                    if self.is_delivered(attachment_key):
+                        payload_["title"] = ""
+                        payload_["sound"] = PushoverSound.NONE
+                        continue
+
                     if not self._send(payload_, attachment):
                         # Mark our failure
                         has_error = True
+                        attach_ok = False
+                    else:
+                        self.mark_delivered(attachment_key)
 
                     # Clear our title if previously set
                     payload_["title"] = ""
@@ -662,9 +687,16 @@ class NotifyPushover(NotifyBase):
                     # uploaded afterwards
                     payload_["sound"] = PushoverSound.NONE
 
-            else:
-                if not self._send(payload):
-                    has_error = True
+                if not attach_ok:
+                    # Leave this recipient unmarked so a retry tries again
+                    continue
+
+            elif not self._send(payload):
+                has_error = True
+                continue
+
+            # Delivered; a retry can safely skip this recipient.
+            self.mark_delivered(recipient)
 
         return not has_error
 

@@ -464,6 +464,11 @@ class NotifyWhatsApp(NotifyBase):
             # Get our target to notify
             target = targets.pop(0)
 
+            # Skip a target that already accepted this message so
+            # a retry does not deliver it twice.
+            if self.is_delivered(target):
+                continue
+
             # Group targets are stored with a '#' prefix; phone numbers
             # are stored in E.164 format ('+' prefix).
             if target.startswith("#"):
@@ -564,6 +569,9 @@ class NotifyWhatsApp(NotifyBase):
                 # Mark our failure
                 has_error = True
                 continue
+
+            # Delivered; a retry can safely skip this target.
+            self.mark_delivered(target)
 
         return not has_error
 
