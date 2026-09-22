@@ -157,6 +157,23 @@ apprise_url_tests = (
             "requests_response_code": requests.codes.no_content,
         },
     ),
+    # A self-hosted instance published under /api
+    (
+        "fluxers://example.ca/api/{}/{}".format(*_tokens()),
+        {
+            "instance": NotifyFluxer,
+            "requests_response_code": requests.codes.no_content,
+            "privacy_url": "fluxers://example.ca/api/0...0/B...B/",
+        },
+    ),
+    # A self-hosted instance published under a deeper path
+    (
+        "fluxers://example.ca:8443/custom/api/{}/{}".format(*_tokens()),
+        {
+            "instance": NotifyFluxer,
+            "requests_response_code": requests.codes.no_content,
+        },
+    ),
     (
         # Invalid Mode
         "fluxer://jack@{}/{}?mode=invalid".format(*_tokens()),
@@ -320,6 +337,68 @@ def test_plugin_fluxer_urls() -> None:
 
     # Run our general tests
     AppriseURLTester(tests=apprise_url_tests).run_all()
+
+
+@mock.patch("requests.post")
+def test_plugin_fluxer_self_hosted_path(mock_post: mock.MagicMock) -> None:
+    """Verify a self-hosted base path is honoured end to end."""
+
+    webhook_id, webhook_token = _tokens()
+
+    # Prepare Mock
+    mock_post.return_value = requests.Request()
+    mock_post.return_value.status_code = requests.codes.ok
+    mock_post.return_value.content = b""
+    mock_post.return_value.headers = {}
+
+    # Each URL and the endpoint we expect it to post to
+    tests = (
+        (
+            f"fluxer://{webhook_id}/{webhook_token}",
+            f"https://api.fluxer.app/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        (
+            f"fluxers://example.ca/{webhook_id}/{webhook_token}",
+            f"https://example.ca/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        (
+            f"fluxers://example.ca/api/{webhook_id}/{webhook_token}",
+            f"https://example.ca/api/webhooks/{webhook_id}/{webhook_token}",
+        ),
+        (
+            f"fluxers://example.ca:8443/custom/api"
+            f"/{webhook_id}/{webhook_token}",
+            "https://example.ca:8443/custom/api"
+            f"/webhooks/{webhook_id}/{webhook_token}",
+        ),
+    )
+
+    for url, endpoint in tests:
+        mock_post.reset_mock()
+
+        obj = Apprise.instantiate(url)
+        assert isinstance(obj, NotifyFluxer)
+        assert obj.notify(body="body", title="title") is True
+
+        assert mock_post.call_count == 1
+        assert mock_post.call_args_list[0][0][0] == endpoint
+
+    # Our path survives a round trip through url()
+    for url, _endpoint in tests:
+        obj = Apprise.instantiate(url)
+        obj2 = Apprise.instantiate(obj.url())
+        assert isinstance(obj2, NotifyFluxer)
+        assert obj2.fullpath == obj.fullpath
+        assert obj2.url_identifier == obj.url_identifier
+
+    # Two instances that differ only by path are different connections
+    root = Apprise.instantiate(
+        f"fluxers://example.ca/{webhook_id}/{webhook_token}"
+    )
+    under_api = Apprise.instantiate(
+        f"fluxers://example.ca/api/{webhook_id}/{webhook_token}"
+    )
+    assert root.url_identifier != under_api.url_identifier
 
 
 @mock.patch("requests.post")

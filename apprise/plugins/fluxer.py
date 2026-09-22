@@ -41,6 +41,17 @@
 #  This plugin will simply work using the url of:
 #     fluxer://WEBHOOK_ID/WEBHOOK_TOKEN
 #
+#  A self-hosted Fluxer server usually puts its API behind a path on the
+#  same hostname as the web app, such as:
+#     https://fluxer.example.com/api/webhooks/WEBHOOK_ID/WEBHOOK_TOKEN
+#
+#  Place that path in your Apprise URL ahead of the webhook details:
+#     fluxers://fluxer.example.com/api/WEBHOOK_ID/WEBHOOK_TOKEN
+#
+#  Any path works, so an instance reachable at /custom/api/webhooks/ is
+#  simply:
+#     fluxers://fluxer.example.com/custom/api/WEBHOOK_ID/WEBHOOK_TOKEN
+#
 from __future__ import annotations
 
 import contextlib
@@ -56,6 +67,7 @@ from ..attachment.base import AttachBase
 from ..common import NotifyFormat, NotifyImageSize, NotifyType
 from ..locale import gettext_lazy as _
 from ..utils.parse import (
+    URL_PATH_SAFE_CHARS,
     is_hostname,
     is_ipaddr,
     parse_bool,
@@ -147,8 +159,11 @@ class NotifyFluxer(NotifyBase):
         "{schema}://{webhook_id}/{webhook_token}",
         "{schema}://{host}/{webhook_id}/{webhook_token}",
         "{schema}://{host}:{port}/{webhook_id}/{webhook_token}",
+        "{schema}://{host}{path}{webhook_id}/{webhook_token}",
+        "{schema}://{host}:{port}{path}{webhook_id}/{webhook_token}",
         "{schema}://{botname}@{webhook_id}/{webhook_token}",
         "{schema}://{botname}@{host}:{port}/{webhook_id}/{webhook_token}",
+        "{schema}://{botname}@{host}:{port}{path}{webhook_id}/{webhook_token}",
     )
 
     # Define our template tokens
@@ -164,6 +179,12 @@ class NotifyFluxer(NotifyBase):
                 "type": "int",
                 "min": 1,
                 "max": 65535,
+            },
+            "path": {
+                "name": _("Path"),
+                "type": "string",
+                "map_to": "fullpath",
+                "default": "/",
             },
             "botname": {
                 "name": _("Bot Name"),
@@ -266,6 +287,7 @@ class NotifyFluxer(NotifyBase):
         self,
         webhook_id: str,
         webhook_token: str,
+        fullpath: str | None = None,
         mode: str | None = None,
         tts: bool = False,
         avatar: bool = True,
@@ -305,6 +327,16 @@ class NotifyFluxer(NotifyBase):
             )
             self.logger.warning(msg)
             raise TypeError(msg)
+
+        # The base path a self-hosted Fluxer server is reachable on. A
+        # value of "/" means the API sits at the root of the hostname,
+        # which is how this plugin has always behaved. Set it to "/api/"
+        # (or anything else) to match how your instance is published.
+        self.fullpath = (
+            "/"
+            if not isinstance(fullpath, str) or not fullpath.strip()
+            else fullpath.strip()
+        )
 
         # Prepare our mode
         self.mode = (
@@ -585,7 +617,9 @@ class NotifyFluxer(NotifyBase):
             prefix = f"{schema}://{self.host}"
             if isinstance(self.port, int):
                 prefix += f":{self.port}"
-            prefix += "/api"
+
+            # Apply the base path the instance is published under
+            prefix += self.fullpath.rstrip("/")
 
         notify_url = self.notify_url.format(
             prefix=prefix,
@@ -828,12 +862,15 @@ class NotifyFluxer(NotifyBase):
 
             schema = self.secure_protocol if self.secure else self.protocol
             return (
-                "{schema}://{bname}{host}{port}/{webhook_id}/{webhook_token}"
-                "/?{params}".format(
+                "{schema}://{bname}{host}{port}{fullpath}{webhook_id}"
+                "/{webhook_token}/?{params}".format(
                     schema=schema,
                     bname=botname,
                     host=self.host,
                     port=port,
+                    fullpath=NotifyFluxer.quote(
+                        self.fullpath, safe=URL_PATH_SAFE_CHARS
+                    ),
                     webhook_id=self.pprint(self.webhook_id, privacy, safe=""),
                     webhook_token=self.pprint(
                         self.webhook_token, privacy, safe=""
@@ -869,6 +906,11 @@ class NotifyFluxer(NotifyBase):
                 ""
                 if self.mode == FluxerMode.CLOUD
                 else (self.port if self.port else (443 if self.secure else 80))
+            ),
+            (
+                ""
+                if self.mode == FluxerMode.CLOUD
+                else self.fullpath.rstrip("/")
             ),
             self.webhook_id,
             self.webhook_token,
@@ -992,6 +1034,12 @@ class NotifyFluxer(NotifyBase):
         # Pop our tokens from back to front
         results["webhook_token"] = None if not tokens else tokens.pop()
         results["webhook_id"] = None if not tokens else tokens.pop()
+
+        # Whatever is left (beyond the hostname) is the base path the
+        # self-hosted instance publishes its API on.
+        results["fullpath"] = (
+            "/" if len(tokens) <= 1 else "/{}/".format("/".join(tokens[1:]))
+        )
 
         return results
 
