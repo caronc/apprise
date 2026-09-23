@@ -870,7 +870,9 @@ class NotifyFluxer(NotifyBase):
         if self.ping:
             params["ping"] = ",".join(self.ping)
 
-        botname = f"{self.user}@" if self.user else ""
+        botname = (
+            f"{NotifyFluxer.quote(self.user, safe='')}@" if self.user else ""
+        )
 
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))
 

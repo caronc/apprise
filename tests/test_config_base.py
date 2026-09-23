@@ -2568,3 +2568,75 @@ def test_yaml_priority_all_urlbase_globals_via_plugin_details():
                 name, yaml_val, qsd_val, actual, attr_name
             )
         )
+
+
+def test_yaml_url_token_map_to():
+    """ConfigBase maps named URL parts used as YAML keys."""
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - discord://1234567890/abcdefghijklmnopqrstuvwxyz/:
+      - tag: test1
+        botname: App 1
+        avatar_url: https://localhost/app1.png
+      - tag: test2
+        botname: App 2
+        avatar_url: https://localhost/app2.png
+""")
+
+    assert len(result) == 2
+    assert result[0].user == "App 1"
+    assert result[0].avatar_url == "https://localhost/app1.png"
+    assert result[1].user == "App 2"
+    assert result[1].avatar_url == "https://localhost/app2.png"
+
+    # The sibling (non-indented) form works the same way
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - discord://1234567890/abcdefghijklmnopqrstuvwxyz/:
+    botname: App 3
+""")
+
+    assert len(result) == 1
+    assert result[0].user == "App 3"
+
+    # A YAML key that is neither an argument nor a URL token is left alone
+    tokens = ConfigBase._special_token_handler(
+        "discord", {"botname": "App 4", "not-a-token": "ignored"}
+    )
+    assert tokens["user"] == "App 4"
+    assert "botname" not in tokens
+    assert tokens["not-a-token"] == "ignored"
+
+
+def test_yaml_token_alias_chains():
+    """ConfigBase follows YAML aliases to constructor arguments."""
+    # sogs `key` -> `user` (URL token) -> `public_key` (constructor arg)
+    tokens = ConfigBase._special_token_handler("sogs", {"key": "abc"})
+    assert tokens == {"public_key": "abc"}
+
+    # The URL token name itself resolves to the same place
+    tokens = ConfigBase._special_token_handler("sogs", {"user": "abc"})
+    assert tokens == {"public_key": "abc"}
+
+    # ringcentral `from_phone` (URL token) -> `source` (constructor arg)
+    tokens = ConfigBase._special_token_handler(
+        "ringc", {"from_phone": "+15551234567"}
+    )
+    assert tokens == {"source": "+15551234567"}
+
+
+def test_yaml_token_multi_alias():
+    """ConfigBase skips shortcuts that represent several URL values."""
+    tokens = ConfigBase._special_token_handler(
+        "slack", {"token": "T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ"}
+    )
+    assert tokens == {}
+
+    # The same key in a real configuration does not break the parse
+    result, _ = ConfigBase.config_parse_yaml("""
+urls:
+  - slack://T1JJ3T3L2/A1BRTD4JD/TIiajkdnlazkcOXrIdevi7FQ/#general:
+      token: ignored
+""")
+
+    assert len(result) == 1
