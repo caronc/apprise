@@ -655,10 +655,12 @@ def test_plugin_ntfy_attach_filename():
     assert isinstance(results, dict)
     assert results["filename"] == "file.jpg"
 
-    # An attach= url without a path does not provide a filename
+    # An attach= url that has no usable last path element gives us
+    # nothing to name the attachment with
     for url in (
         "ntfy://localhost/topic1/?attach=http://example.com",
         "ntfy://localhost/topic1/?attach=http://example.com/",
+        "ntfy://localhost/topic1/?attach=http://example.com/dir/",
     ):
         results = NotifyNtfy.parse_url(url)
         assert isinstance(results, dict)
@@ -671,6 +673,14 @@ def test_plugin_ntfy_attach_filename():
     assert isinstance(obj, NotifyNtfy)
     assert obj.filename is None
     assert "filename=" not in obj.url()
+
+    # The detected filename is preserved through a url() round-trip
+    obj = apprise.Apprise.instantiate(
+        "ntfy://localhost/topic1/?attach=http://example.com/file.jpg"
+    )
+    assert isinstance(obj, NotifyNtfy)
+    assert obj.filename == "file.jpg"
+    assert "filename=file.jpg" in obj.url()
 
     # A filename= over-ride survives a url() round-trip
     obj = apprise.Apprise.instantiate(

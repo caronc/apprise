@@ -786,6 +786,7 @@ class NotifyNtfy(NotifyBase):
         if self.attach is not None:
             params["attach"] = self.attach
 
+            # Keep our filename so it survives a url() round trip
             if self.filename:
                 params["filename"] = self.filename
 
@@ -877,10 +878,10 @@ class NotifyNtfy(NotifyBase):
             results["attach"] = NotifyNtfy.unquote(results["qsd"]["attach"])
             results_ = NotifyBase.parse_url(results["attach"])
             if results_:
+                # Use the last element of the attachment path as our
+                # filename.
                 results["filename"] = (
-                    basename(results_["fullpath"]) or None
-                    if results_["fullpath"]
-                    else None
+                    basename(results_["fullpath"] or "") or None
                 )
 
             if "filename" in results["qsd"] and len(
