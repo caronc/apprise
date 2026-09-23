@@ -645,6 +645,58 @@ def test_plugin_custom_ntfy_edge_cases(mock_post):
     assert "X-Markdown" in mock_post.call_args_list[0][1]["headers"]
 
 
+def test_plugin_ntfy_attach_filename():
+    """NotifyNtfy() attach= filename detection and url() round-trip."""
+
+    # The filename is taken from the path of the attach= url
+    results = NotifyNtfy.parse_url(
+        "ntfy://localhost/topic1/?attach=http://example.com/file.jpg"
+    )
+    assert isinstance(results, dict)
+    assert results["filename"] == "file.jpg"
+
+    # An attach= url that has no usable last path element gives us
+    # nothing to name the attachment with
+    for url in (
+        "ntfy://localhost/topic1/?attach=http://example.com",
+        "ntfy://localhost/topic1/?attach=http://example.com/",
+        "ntfy://localhost/topic1/?attach=http://example.com/dir/",
+    ):
+        results = NotifyNtfy.parse_url(url)
+        assert isinstance(results, dict)
+        assert results["filename"] is None
+
+    # Loading such a url must not fail
+    obj = apprise.Apprise.instantiate(
+        "ntfy://localhost/topic1/?attach=http://example.com"
+    )
+    assert isinstance(obj, NotifyNtfy)
+    assert obj.filename is None
+    assert "filename=" not in obj.url()
+
+    # The detected filename is preserved through a url() round-trip
+    obj = apprise.Apprise.instantiate(
+        "ntfy://localhost/topic1/?attach=http://example.com/file.jpg"
+    )
+    assert isinstance(obj, NotifyNtfy)
+    assert obj.filename == "file.jpg"
+    assert "filename=file.jpg" in obj.url()
+
+    # A filename= over-ride survives a url() round-trip
+    obj = apprise.Apprise.instantiate(
+        "ntfy://localhost/topic1/"
+        "?attach=http://example.com/file.jpg&filename=smoke.jpg"
+    )
+    assert isinstance(obj, NotifyNtfy)
+    assert obj.filename == "smoke.jpg"
+    assert "filename=smoke.jpg" in obj.url()
+
+    obj = apprise.Apprise.instantiate(obj.url())
+    assert isinstance(obj, NotifyNtfy)
+    assert obj.attach == "http://example.com/file.jpg"
+    assert obj.filename == "smoke.jpg"
+
+
 @mock.patch("requests.post")
 @mock.patch("requests.get")
 def test_plugin_ntfy_config_files(mock_post, mock_get):
