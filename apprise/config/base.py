@@ -536,10 +536,13 @@ class ConfigBase(URLBase):
         # Define what a valid line should look like.
         # The tag group allows an optional "N:" priority prefix so that
         # "2:endpoint=ntfy://..." is recognised as TEXT format.
+        # A tag group assignment such as "family=me,wife" carries tags instead
+        # of a URL on the right hand side; it is TEXT format as well.
         valid_line_re = re.compile(
             r"^\s*(?P<line>([;#]+(?P<comment>.*))|"
             r"(?P<text>((?P<tag>[ \t,a-z0-9_:-]+)=)?[a-z0-9]+://.*)|"
-            r"((?P<yaml>[a-z0-9]+):.*))?$",
+            r"((?P<yaml>[a-z0-9]+):.*)|"
+            r"(?P<assign>[ \t,a-z0-9_:-]+=[a-z0-9, \t_-]+))?$",
             re.I,
         )
 
@@ -577,7 +580,7 @@ class ConfigBase(URLBase):
                 )
                 break
 
-            elif result.group("text"):
+            elif result.group("text") or result.group("assign"):
                 config_format = common.ConfigFormat.TEXT
                 ConfigBase.logger.debug(
                     f"Detected TEXT configuration based on line {line}."
