@@ -786,6 +786,9 @@ class NotifyNtfy(NotifyBase):
         if self.attach is not None:
             params["attach"] = self.attach
 
+            if self.filename:
+                params["filename"] = self.filename
+
         if self.click is not None:
             params["click"] = self.click
 
@@ -875,9 +878,9 @@ class NotifyNtfy(NotifyBase):
             results_ = NotifyBase.parse_url(results["attach"])
             if results_:
                 results["filename"] = (
-                    None
+                    basename(results_["fullpath"]) or None
                     if results_["fullpath"]
-                    else basename(results_["fullpath"])
+                    else None
                 )
 
             if "filename" in results["qsd"] and len(
