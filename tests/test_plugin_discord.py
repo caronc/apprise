@@ -1825,3 +1825,24 @@ def test_plugin_discord_attach_multi_batch(mock_post):
     assert mock_post.call_count == 3
     mock_post.side_effect = None
     obj.discord_max_attachments = 10
+
+
+def test_plugin_discord_botname_round_trip():
+    """NotifyDiscord() bot names survive a URL round trip."""
+
+    webhook_id = "A" * 24
+    webhook_token = "B" * 64
+
+    for botname in ("App 1", "a/b:c", "you&me"):
+        obj = Apprise.instantiate(
+            f"discord://{NotifyDiscord.quote(botname, safe='')}"
+            f"@{webhook_id}/{webhook_token}/"
+        )
+        assert isinstance(obj, NotifyDiscord)
+        assert obj.user == botname
+
+        # Our generated URL can be loaded back with the bot name intact
+        obj2 = Apprise.instantiate(obj.url())
+        assert isinstance(obj2, NotifyDiscord)
+        assert obj2.user == botname
+        assert obj.url_identifier == obj2.url_identifier

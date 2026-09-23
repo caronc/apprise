@@ -1535,3 +1535,35 @@ def test_plugin_fluxer_html_to_markdown_format(mock_post):
     # not as stripped plain text
     payload = loads(mock_post.call_args_list[0][1]["data"])
     assert payload["embeds"][0]["description"] == "**hello** *world*"
+
+
+def test_plugin_fluxer_botname_round_trip() -> None:
+    """NotifyFluxer() bot names survive a URL round trip."""
+
+    webhook_id, webhook_token = _tokens()
+
+    for botname in ("App 1", "a/b:c", "you&me"):
+        obj = Apprise.instantiate(
+            f"fluxer://{NotifyFluxer.quote(botname, safe='')}"
+            f"@{webhook_id}/{webhook_token}/"
+        )
+        assert isinstance(obj, NotifyFluxer)
+        assert obj.user == botname
+
+        # Our generated URL can be loaded back with the bot name intact
+        obj2 = Apprise.instantiate(obj.url())
+        assert isinstance(obj2, NotifyFluxer)
+        assert obj2.user == botname
+        assert obj.url_identifier == obj2.url_identifier
+
+    # The same holds true in self-hosted (private) mode
+    obj = Apprise.instantiate(
+        f"fluxers://a%2Fb@example.ca/{webhook_id}/{webhook_token}/"
+    )
+    assert isinstance(obj, NotifyFluxer)
+    assert obj.mode == FluxerMode.PRIVATE
+    assert obj.user == "a/b"
+
+    obj2 = Apprise.instantiate(obj.url())
+    assert isinstance(obj2, NotifyFluxer)
+    assert obj2.user == "a/b"

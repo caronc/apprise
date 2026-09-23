@@ -968,7 +968,9 @@ class NotifyDiscord(NotifyBase):
         params.update({f":{k}": v for k, v in self.tokens.items()})
 
         # Ensure our botname is set
-        botname = f"{self.user}@" if self.user else ""
+        botname = (
+            f"{NotifyDiscord.quote(self.user, safe='')}@" if self.user else ""
+        )
 
         # Extend our parameters
         params.update(self.url_parameters(privacy=privacy, *args, **kwargs))

@@ -1579,39 +1579,25 @@ class ConfigBase(URLBase):
         schema: str,
         tokens: dict[str, object],
     ) -> dict[str, object]:
-        """This function takes a list of tokens and updates them to no longer
-        include any special tokens such as +,-, and :
+        """Normalize YAML keys before constructing a notification plugin.
 
-        - schema must be a valid schema of a supported plugin type
-        - tokens must be a dictionary containing the yaml entries parsed.
-
-        The idea here is we can post process a set of tokens provided in
-        a YAML file where the user provided some of the special keywords.
-
-        We effectivley look up what these keywords map to their appropriate
-        value they're expected
+        Applies common aliases, collects prefixed template values, and maps
+        plugin argument or URL-token names to constructor arguments.
         """
         # Create a copy of our dictionary
         tokens = tokens.copy()
 
-        # Apply URL_TOKEN_ALIASES so shorthand keys (e.g. 'pass') are
-        # normalized to the canonical kwarg name ('password') before any
-        # plugin-specific template_args mapping runs.  YAML tokens bypass
-        # parse_url() and its initial post_process_parse_url_results() call
-        # inside url_to_dict(), so the same alias table must be applied here.
+        # Normalize common aliases such as `pass` before plugin-specific keys.
+        # YAML input does not pass through the equivalent URL parsing step.
         for alias, canonical in URL_TOKEN_ALIASES.items():
             if alias in tokens and (
                 canonical not in tokens or tokens[canonical] is None
             ):
-                # Canonical absent or explicitly null -- promote alias.
-                # A null canonical (e.g. password: with no value) is treated
-                # as "not provided", consistent with how
-                # post_process_parse_url_results() handles None credentials.
+                # Use the alias when the standard key is absent or null.
                 tokens[canonical] = tokens.pop(alias)
 
             elif alias in tokens:
-                # canonical key already set to a non-None value -- discard
-                # the alias so the explicit canonical is not overwritten
+                # Keep the explicitly set standard key instead of its alias.
                 del tokens[alias]
 
         for kw, meta in N_MGR[schema].template_kwargs.items():
@@ -1641,76 +1627,82 @@ class ConfigBase(URLBase):
             # Update our entries
             tokens[kw].update(matches)
 
-        # Now map our tokens accordingly to the class templates defined by
-        # each service.
-        #
-        # This is specifically used for YAML file parsing.  It allows a user to
-        # define an entry such as:
+        # Map YAML keys through the templates defined by each service. For
+        # example, an email recipient can be supplied as a YAML sub-key:
         #
         # urls:
         #   - mailto://user:pass@domain:
         #       - to: user1@hotmail.com
         #       - to: user2@hotmail.com
         #
-        # Under the hood, the NotifyEmail() class does not parse the `to`
-        # argument. It's contents needs to be mapped to `targets`.  This is
-        # defined in the class via the `template_args` and template_tokens`
-        # section.
-        #
-        # This function here allows these mappings to take place within the
-        # YAML file as independant arguments.
+        # The email template maps `to` to the constructor's `targets` value.
         class_templates = plugins.details(N_MGR[schema])
 
         for key in list(tokens.keys()):
-            if key not in class_templates["args"]:
+            # Keys may match query arguments or named URL parts. Arguments
+            # take priority when both templates define the same name.
+            if key in class_templates["args"]:
+                entry = class_templates["args"][key]
+
+            elif key in class_templates["tokens"]:
+                entry = class_templates["tokens"][key]
+
+            else:
                 # No need to handle non-arg entries
                 continue
 
-            # get our `map_to` and/or 'alias_of' value (if it exists)
-            map_to = class_templates["args"][key].get(
-                "alias_of", class_templates["args"][key].get("map_to", "")
-            )
+            # Prefer an alias, then fall back to a constructor mapping.
+            map_to = entry.get("alias_of", entry.get("map_to", ""))
 
             if map_to == key:
                 # We're already good as we are now
                 continue
 
-            if map_to in class_templates["tokens"]:
-                meta = class_templates["tokens"][map_to]
-
-            else:
-                meta = class_templates["args"].get(
-                    map_to, class_templates["args"][key]
+            if not isinstance(map_to, str):
+                # Some URL shortcuts represent several values. Only the
+                # plugin's URL parser can split them safely.
+                ConfigBase.logger.warning(
+                    f"The {schema}:// {key} keyword can only be defined"
+                    " from within a URL; ignoring it."
                 )
+                del tokens[key]
+                continue
 
-            # Perform a translation/mapping if our code reaches here
+            # Use the destination's type details when available.
+            meta = class_templates["tokens"].get(
+                map_to, class_templates["args"].get(map_to)
+            )
+            if not isinstance(meta, dict) or "type" not in meta:
+                meta = entry
+
+            # Untyped aliases pass their value through as a string.
+            arg_type = meta.get("type", "string")
+
+            # Remove the original key before adding its mapped value.
             value = tokens[key]
             del tokens[key]
 
-            # Detect if we're dealign with a list or not
-            is_list = re.search(r"^list:.*", meta.get("type"), re.IGNORECASE)
-
-            if map_to not in tokens:
-                tokens[map_to] = [] if is_list else meta.get("default")
-
-            elif is_list and not isinstance(tokens.get(map_to), list):
-                # Convert ourselves to a list if we aren't already
-                tokens[map_to] = [tokens[map_to]]
-
-            # Type Conversion
-            if re.search(
-                r"^(choice:)?string", meta.get("type"), re.IGNORECASE
-            ) and not isinstance(value, str):
-                # Ensure our format is as expected
-                value = str(value)
-
-            # Apply any further translations if required (absolute map)
-            # This is the case when an arg maps to a token which further
-            # maps to a different function arg on the class constructor
+            # Follow one additional mapping to the constructor argument.
             abs_map = meta.get("map_to", map_to)
 
-            # Set our token as how it was provided by the configuration
-            if isinstance(tokens.get(map_to), list):
+            # List destinations collect repeated YAML values.
+            is_list = re.search(r"^list:.*", arg_type, re.IGNORECASE)
+
+            if abs_map not in tokens:
+                tokens[abs_map] = [] if is_list else meta.get("default")
+
+            elif is_list and not isinstance(tokens.get(abs_map), list):
+                # Preserve an existing scalar before appending another value.
+                tokens[abs_map] = [tokens[abs_map]]
+
+            # Convert string fields supplied with another YAML scalar type.
+            if re.search(
+                r"^(choice:)?string", arg_type, re.IGNORECASE
+            ) and not isinstance(value, str):
+                value = str(value)
+
+            # Store the value under its constructor argument name.
+            if isinstance(tokens.get(abs_map), list):
                 tokens[abs_map].append(value)
 
             else:
