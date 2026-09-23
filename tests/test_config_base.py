@@ -188,6 +188,34 @@ def test_config_base_detect_config_format():
     # Just a whole lot of blank lines...
     assert ConfigBase.detect_config_format("\n\n\n") is ConfigFormat.TEXT
 
+    # A tag group assignment carries tags instead of a URL, but it is still
+    # TEXT format; detection must not stop at the first one it encounters
+    assert (
+        ConfigBase.detect_config_format("""
+    # A group lets one name stand for several others
+    family=me,wife,kids
+    me=mailto://userb:pass@gmail.com
+    """)
+        is ConfigFormat.TEXT
+    )
+
+    # A group assignment that carries a priority prefixed tag
+    assert (
+        ConfigBase.detect_config_format("""
+    1:alerts,me=ntfy://ntfy.sh/chris-phone
+    """)
+        is ConfigFormat.TEXT
+    )
+
+    # A colon in the key still identifies YAML when no URL or tag list
+    # follows it
+    assert (
+        ConfigBase.detect_config_format("""
+    version: 1
+    """)
+        is ConfigFormat.YAML
+    )
+
     # Invalid Config
     assert ConfigBase.detect_config_format("3") is None
 
