@@ -44,6 +44,7 @@
 #   https://mobilemessage.com.au/api-documentation
 from __future__ import annotations
 
+from hashlib import sha256
 from json import dumps, loads
 import re
 from typing import Any, Optional
@@ -52,6 +53,7 @@ from uuid import uuid4
 import requests
 
 from ..common import NotifyType
+from ..exception import AppriseImproperlyConfigured
 from ..locale import gettext_lazy as _
 from ..url import PrivacyMode
 from ..utils.parse import (
@@ -203,7 +205,7 @@ class NotifyMobileMessage(NotifyBase):
                 "A Mobile Message API username and password must be specified."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         # Validate the registered Sender ID
         self.source = validate_regex(
@@ -215,7 +217,7 @@ class NotifyMobileMessage(NotifyBase):
                 " invalid."
             )
             self.logger.warning(msg)
-            raise TypeError(msg)
+            raise AppriseImproperlyConfigured(msg)
 
         if IS_NUMERIC_SENDER.match(self.source):
             # Send numeric Sender IDs as digits only
@@ -247,7 +249,7 @@ class NotifyMobileMessage(NotifyBase):
                     f" ({max_parts}) is invalid."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg) from None
+                raise AppriseImproperlyConfigured(msg) from None
 
             if not (
                 self.template_args["max_parts"]["min"]
@@ -259,7 +261,7 @@ class NotifyMobileMessage(NotifyBase):
                     f" ({max_parts}) must be between 1 and 99."
                 )
                 self.logger.warning(msg)
-                raise TypeError(msg)
+                raise AppriseImproperlyConfigured(msg)
 
         # Optional reference returned by the service
         self.ref = validate_regex(ref) if ref else None
@@ -331,8 +333,18 @@ class NotifyMobileMessage(NotifyBase):
         batch_size = 1 if not self.batch else self.default_batch_size
 
         for index in range(0, len(self.targets), batch_size):
-            # The recipients handled by this request
-            targets = self.targets[index : index + batch_size]
+            # The service reports on each recipient separately, so a retry
+            # only has to carry the ones it has not already taken.
+            targets = [
+                target
+                for target in self.targets[index : index + batch_size]
+                if not self.is_delivered(target)
+            ]
+
+            if not targets:
+                # Every recipient in this batch was taken on an earlier
+                # attempt
+                continue
 
             # One message entry per recipient
             messages = []
@@ -355,13 +367,25 @@ class NotifyMobileMessage(NotifyBase):
                 "max_parts": self.max_parts,
             }
 
-            # Give each batch a unique key; the service remembers it for 24
-            # hours.
+            # Serialize once so the sent data also identifies this request.
+            data = dumps(payload)
+
+            # Identical serialized requests share the same fingerprint.
+            fingerprint = sha256(data.encode("utf-8")).hexdigest()
+
+            # Reuse the key when retrying an unanswered request so the
+            # service does not send or charge for it twice.
+            idempotency_key = self.recall(fingerprint)
+            if idempotency_key is None:
+                idempotency_key = str(uuid4())
+                self.remember(fingerprint, idempotency_key)
+
+            # Prepare our headers
             headers = {
                 "User-Agent": self.app_id,
                 "Accept": "application/json",
                 "Content-Type": "application/json",
-                "Idempotency-Key": str(uuid4()),
+                "Idempotency-Key": idempotency_key,
             }
 
             # Some Debug Logging
@@ -370,7 +394,12 @@ class NotifyMobileMessage(NotifyBase):
                 self.notify_url,
                 self.verify_certificate,
             )
-            self.logger.debug("Mobile Message Payload: %s", payload)
+            # Log one representative entry instead of up to 10,000 copies.
+            self.logger.debug(
+                "Mobile Message Payload: %s (x%d recipient(s))",
+                {**payload, "messages": messages[:1]},
+                len(messages),
+            )
 
             # Always call throttle before any remote server i/o is made
             self.throttle()
@@ -378,7 +407,7 @@ class NotifyMobileMessage(NotifyBase):
             try:
                 r = requests.post(
                     self.notify_url,
-                    data=dumps(payload),
+                    data=data,
                     headers=headers,
                     auth=auth,
                     verify=self.verify_certificate,
@@ -409,11 +438,6 @@ class NotifyMobileMessage(NotifyBase):
                     has_error = True
                     continue
 
-                self.logger.info(
-                    "Sent Mobile Message notification to %d target(s).",
-                    len(targets),
-                )
-
             except requests.RequestException as e:
                 self.logger.warning(
                     "A Connection error occurred sending Mobile Message"
@@ -430,30 +454,65 @@ class NotifyMobileMessage(NotifyBase):
                 content = loads(r.content)
 
             except (AttributeError, TypeError, ValueError):
-                # A successful HTTP status is enough if the body is unreadable
-                content = {}
+                # A body we can not read tells us nothing at all
+                content = None
 
-            # Check each recipient result for rejected messages
-            results = (
-                content.get("results") if isinstance(content, dict) else None
-            )
-            for result in results if isinstance(results, list) else []:
-                if (
-                    not isinstance(result, dict)
-                    or result.get("status") == "success"
-                ):
-                    # Nothing to report for this entry
+            # Anything but an object leaves us nothing to inspect
+            content = content if isinstance(content, dict) else {}
+
+            # A processed batch always comes back as "complete" with one
+            # result per message we sent.
+            results = content.get("results")
+            if (
+                content.get("status") != "complete"
+                or not isinstance(results, list)
+                or len(results) != len(targets)
+            ):
+                # An answer we cannot read leaves it unclear what the
+                # service did, so the key stays put for a retry to reuse
+                self.logger.warning(
+                    "Mobile Message did not report back on every one of"
+                    " the %d target(s) sent.",
+                    len(targets),
+                )
+
+                self.logger.debug(
+                    "Response Details:\r\n%r", (r.content or b"")[:2000]
+                )
+
+                # Mark our failure
+                has_error = True
+                continue
+
+            # Check each recipient result for rejected messages.  A success
+            # means the service took the message, not that the handset has
+            # it yet.
+            accepted = 0
+            for target, result in zip(targets, results):
+                # An entry we can not read confirms nothing, so treat it
+                # the same way as a refusal
+                result = result if isinstance(result, dict) else {}
+                if result.get("status") == "success":
+                    # Taken by the service, so a retry can skip this one
+                    self.mark_delivered(target)
+                    accepted += 1
                     continue
 
                 self.logger.warning(
                     "Mobile Message did not accept %s: %s (status=%s).",
-                    result.get("to", "a recipient"),
+                    target,
                     result.get("error", "no reason was given"),
                     result.get("status", "unknown"),
                 )
 
                 # Mark our failure
                 has_error = True
+
+            self.logger.info(
+                "Sent Mobile Message notification to %d of %d target(s).",
+                accepted,
+                len(targets),
+            )
 
         return not has_error
 

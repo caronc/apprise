@@ -88,6 +88,12 @@ _delivery_tracker: contextvars.ContextVar[
     Optional[set[tuple[Optional[int], Any]]]
 ] = contextvars.ContextVar("apprise_delivery_tracker", default=None)
 
+# Holds state that ``remember()`` and ``recall()`` share across attempts.
+# It stays unset when retries are disabled because nothing will read it.
+_delivery_memo: contextvars.ContextVar[Optional[dict[Any, Any]]] = (
+    contextvars.ContextVar("apprise_delivery_memo", default=None)
+)
+
 # Identifies the current message piece so split messages are tracked one piece
 # at a time.
 _delivery_index: contextvars.ContextVar[int] = contextvars.ContextVar(
@@ -847,6 +853,36 @@ class NotifyBase(URLBase):
         if tracker is not None:
             tracker.add(self._slot(key, per_message))
 
+    def remember(
+        self, key: Any, value: Any, per_message: bool = False
+    ) -> None:
+        """Keep ``value`` available to later attempts of this notification.
+
+        Values expire with the notification and are separate for each split
+        piece. Set ``per_message`` to share one value across all pieces. With
+        retries off, nothing is stored.
+        """
+        memo = _delivery_memo.get()
+        # Without retries, no later attempt needs this value.
+        if memo is not None:
+            memo[self._slot(key, per_message)] = value
+
+    def recall(
+        self, key: Any, default: Any = None, per_message: bool = False
+    ) -> Any:
+        """Return what :meth:`remember` stored, else ``default``.
+
+        An earlier attempt of this same notification is the only thing
+        that can have stored it. Pass the same ``per_message`` that
+        :meth:`remember` was given.
+        """
+        memo = _delivery_memo.get()
+        # An absent memo reads the same way as one that was never written.
+        if memo is None:
+            return default
+
+        return memo.get(self._slot(key, per_message), default)
+
     @staticmethod
     def _slot(key: Any, per_message: bool) -> tuple[Optional[int], Any]:
         """Return the entry ``key`` is recorded under.
@@ -858,21 +894,21 @@ class NotifyBase(URLBase):
         piece = None if per_message else _delivery_index.get()
         return (piece, (type(key), repr(key)))
 
-    def _timed_send(self, **kwargs2: Any) -> bool:
+    def _timed_send(self, **kwargs: Any) -> bool:
         """Send one prepared call and log its duration at DEBUG.
 
         Prefer a format-specific sender when available, otherwise use send().
         """
-        resolved = kwargs2.get("body_format")
+        resolved = kwargs.get("body_format")
         fn = getattr(self, f"send_{resolved.value}", None)
         send_fn = fn if callable(fn) else self.send
 
         # Track each piece of a split message separately.
-        index_token = _delivery_index.set(kwargs2.get("index", 0))
+        index_token = _delivery_index.set(kwargs.get("index", 0))
 
         send_start = time.monotonic()
         try:
-            result = send_fn(**kwargs2)
+            result = send_fn(**kwargs)
 
         finally:
             # Always restore the previous piece, even if send() raised.
