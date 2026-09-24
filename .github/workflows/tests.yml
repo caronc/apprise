@@ -73,6 +73,9 @@ jobs:
           name: coverage-${{ matrix.os }}-${{ matrix.python-version }}-${{ matrix.tox_env }}
           path: .coverage
           include-hidden-files: true
+          # The codecov job below consumes these in the same run,
+          # Prevent them from lasting for the default of 90 days
+          retention-days: 7
 
   codecov:
     name: Upload merged coverage to Codecov
