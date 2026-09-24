@@ -355,7 +355,8 @@ class NotifyMobileMessage(NotifyBase):
                 "max_parts": self.max_parts,
             }
 
-            # Give each batch a unique key; the service remembers it for 24 hours.
+            # Give each batch a unique key; the service remembers it for 24
+            # hours.
             headers = {
                 "User-Agent": self.app_id,
                 "Accept": "application/json",
