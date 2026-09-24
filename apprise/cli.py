@@ -52,8 +52,8 @@ from . import (
     __version__,
 )
 from .apprise import (
-    _abandoned_call_descriptions,
-    _any_abandoned_calls_still_running,
+    abandoned_call_descriptions,
+    any_abandoned_calls_still_running,
 )
 from .common import (
     NOTIFY_FORMATS,
@@ -498,9 +498,9 @@ def _wait_for_abandoned_calls(timeout: float) -> bool:
 
     Return ``True`` once no tracked calls remain.
     """
-    # Log privacy-masked descriptions at DEBUG. Plugin-managed background
-    # resources are not tracked here.
-    descriptions = _abandoned_call_descriptions()
+    # Log descriptions with private URL details hidden. Background work owned
+    # entirely by a plugin is not tracked here.
+    descriptions = abandoned_call_descriptions()
     logger.debug(
         "One or more services timed out. Waiting up to %.1fs more for "
         "these services to finish: %s",
@@ -509,25 +509,30 @@ def _wait_for_abandoned_calls(timeout: float) -> bool:
         if descriptions
         else "(no services are still running)",
     )
+    # Count our short waits so the CLI never exceeds the grace period.
     elapsed = 0.0
     while elapsed < timeout:
-        if not _any_abandoned_calls_still_running():
+        # Stop early as soon as every background call is done.
+        if not any_abandoned_calls_still_running():
             logger.debug(
                 "Timed-out service calls finished after %.2fs.",
                 elapsed,
             )
             return True
+        # The final sleep may be shorter than the normal polling interval.
         sleep_for = min(CLI_TIMEOUT_EXIT_POLL_INTERVAL, timeout - elapsed)
         time.sleep(sleep_for)
         elapsed += sleep_for
 
-    still_running = _any_abandoned_calls_still_running()
+    # Check once more in case the final call ended during the last sleep.
+    still_running = any_abandoned_calls_still_running()
     if still_running:
         logger.debug(
             "%.1fs elapsed and some timed-out services are still running; "
             "exiting now.",
             timeout,
         )
+    # Tell the caller whether normal shutdown is now safe.
     return not still_running
 
 

@@ -587,6 +587,14 @@ class _NotifyLogStore:
         self, index: Union[int, slice]
     ) -> Union[NotifyLogEntry, list[NotifyLogEntry]]:
         """Return an entry or slice using normal sequence behavior."""
+        with self._lock:
+            # Return simple in-memory indexes without reading saved entries.
+            if isinstance(index, int) and 0 <= index < len(self._memory):
+                # The lock keeps another thread from changing the list here.
+                return self._memory[index]
+
+        # Slices, negative indexes, and saved entries need the full list.
+        # Iteration already joins memory, saved entries, and warning data.
         return list(self)[index]
 
     def __eq__(self, other: object) -> bool:

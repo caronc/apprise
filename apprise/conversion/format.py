@@ -47,17 +47,8 @@ def convert_between(from_format, to_format, content):
     The original content is returned when no converter exists for the pair.
     """
 
-    # Map each supported format pair to its converter
-    converters = {
-        (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
-        (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
-        (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
-        (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
-        (NotifyFormat.TEXT, NotifyFormat.MARKDOWN): text_to_markdown,
-    }
-
     # Fetch the converter registered for this format pair.
-    convert = converters.get((from_format, to_format))
+    convert = CONVERTERS.get((from_format, to_format))
 
     # Preserve the original content when no conversion is available
     return convert(content) if convert else content
@@ -87,6 +78,7 @@ def text_to_markdown(content):
     plain text renders literally in Markdown destinations.
     """
 
+    # Prefix each Markdown control character so it stays ordinary text.
     return _COMMONMARK_ESCAPABLE_RE.sub(r"\\\1", content)
 
 
@@ -116,3 +108,14 @@ def html_to_markdown(content):
 
     # Return the finalized parser output.
     return parser.converted
+
+
+# Map each supported format pair to the function that converts it.
+CONVERTERS = {
+    # Each key describes the input format followed by the requested output.
+    (NotifyFormat.MARKDOWN, NotifyFormat.HTML): markdown_to_html,
+    (NotifyFormat.TEXT, NotifyFormat.HTML): text_to_html,
+    (NotifyFormat.HTML, NotifyFormat.TEXT): html_to_text,
+    (NotifyFormat.HTML, NotifyFormat.MARKDOWN): html_to_markdown,
+    (NotifyFormat.TEXT, NotifyFormat.MARKDOWN): text_to_markdown,
+}
