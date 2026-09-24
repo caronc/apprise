@@ -2959,82 +2959,76 @@ def test_apprise_async_mode(mock_threadpool, mock_gather, mock_request):
         "json://localhost",
     ]
 
-    # Default Async Mode is to be enabled
+    # Services use asynchronous mode by default.
     asset = AppriseAsset()
     assert asset.async_mode is True
 
-    # Load our asset
+    # Build an Apprise object with that shared asset.
     a = Apprise(asset=asset)
 
-    # add our services
+    # Add both test services.
     a.add(services=services)
 
-    # 2 services loaded
+    # Both service URLs should load.
     assert len(a) == 2
 
-    # Our services should carry this flag
+    # Both services share the asset's asynchronous setting.
     for service in a:
         assert service.asset.async_mode is True
 
-    # _notify_parallel_threadpool() shares one ThreadPoolExecutor across
-    # every call for the life of the process (apprise.py's
-    # _get_shared_executor()) rather than creating a new one each time,
-    # so it can only ever be *constructed* once here regardless of how
-    # many dispatches follow. Reset to None so this test observes that
-    # first construction deterministically rather than possibly reusing
-    # one an earlier test already created; mock.patch restores whatever
-    # was actually there once this block exits.
+    # Reset the process-wide pool so this test observes its first creation.
+    # mock.patch restores any pool that an earlier test created.
     with mock.patch("apprise.apprise._shared_executor", None):
-        # Send Notifications Asyncronously
+        # Send both notifications asynchronously.
         assert bool(a.notify("async")) is True
 
-        # Verify our thread pool was created
+        # The first send creates the shared worker pool once.
         assert mock_threadpool.call_count == 1
         mock_threadpool.reset_mock()
 
-        # Provide an over-ride now
+        # Repeat the test with asynchronous mode disabled.
         asset = AppriseAsset(async_mode=False)
         assert asset.async_mode is False
 
-        # Load our asset
+        # Build a fresh Apprise object with the new asset.
         a = Apprise(asset=asset)
 
-        # Verify our configuration kept
+        # The new object keeps the disabled setting.
         assert a.asset.async_mode is False
 
-        # add our services
+        # Add both test services again.
         a.add(services=services)
 
-        # 2 services loaded
+        # Both service URLs should load.
         assert len(a) == 2
 
-        # Our services should carry this flag
+        # Both services now use ordered delivery.
         for service in a:
             assert service.asset.async_mode is False
 
-        # Send Notifications Syncronously
+        # Send both notifications one at a time.
         assert bool(a.notify("sync")) is True
-        # Sequential send doesn't require a gather
+        # Ordered delivery does not need asyncio.gather().
         assert mock_gather.call_count == 0
         mock_gather.reset_mock()
 
-        # another way of looking a our false set asset configuration
+        # Each loaded service exposes the same disabled setting.
         assert a[0].asset.async_mode is False
         assert a[1].asset.async_mode is False
 
-        # Adjust 1 of the services async_mode settings
+        # Changing the shared asset through one service affects both.
         a[0].asset.async_mode = True
         assert a[0].asset.async_mode is True
 
-        # They all share the same object, so this gets toggled too
+        # The second service sees the same shared asset change.
         assert a[1].asset.async_mode is True
 
-        # We'll just change this one
+        # Give only the second service its own asset.
         a[1].asset = AppriseAsset(async_mode=False)
         assert a[0].asset.async_mode is True
         assert a[1].asset.async_mode is False
 
-        # Send 1 Notification Syncronously, the other Asyncronously
+        # Send one service each way in the same batch.
         assert bool(a.notify("a mixed batch")) is True
 
         # The single async-mode service still goes through the thread

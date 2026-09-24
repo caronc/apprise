@@ -677,33 +677,37 @@ class TestAppriseTag:
 
 
 class TestStaticHelpers:
-    """Tests for _extract_filter_retry and _filter_has_explicit_priority
-    covering the nested-list branches not reached by integration tests."""
+    """Cover priority helpers not reached by integration tests."""
 
-    def test_extract_retry_from_nested_list(self):
-        """A retry suffix is found inside a nested list entry."""
-        # tag = [["alerts:3"]] -- outer list, inner list as AND group
-        result = Apprise._extract_filter_retry([["alerts:3"]])
-        assert result == 3
+    def test_set_filter_tokens_are_ordered(self):
+        """A set filter yields the same token order every run.
 
-    def test_extract_retry_from_list_of_strings(self):
-        """A retry suffix is found in a plain-string list entry."""
-        result = Apprise._extract_filter_retry(["alerts:3"])
-        assert result == 3
-
-    def test_extract_retry_none_when_absent(self):
-        """Returns None when no retry suffix is present."""
-        assert Apprise._extract_filter_retry("alerts") is None
-        assert Apprise._extract_filter_retry(["alerts"]) is None
-
-    def test_extract_retry_none_from_nested_list_no_suffix(self):
-        """Nested list without retry suffix returns None.
-
-        Covers the 'if ft.retry is not None' False branch and the
-        inner for-loop completing without returning.
+        Sorting prevents Python's changing set order from selecting a
+        different retry value in another process.
         """
-        result = Apprise._extract_filter_retry([["alerts"]])
-        assert result is None
+        tokens = Apprise._parse_filter_tokens({"b:2", "a:1", "c:3"})
+        assert [str(t) for t in tokens] == ["a", "b", "c"]
+
+        # The same filter written as a list keeps the caller's own order.
+        tokens = Apprise._parse_filter_tokens(["b:2", "a:1", "c:3"])
+        assert [str(t) for t in tokens] == ["b", "a", "c"]
+
+    def test_set_filter_chains_are_ordered(self):
+        """A set filter puts a service in the same chain every run.
+
+        A service with several matching tags must not move between chains
+        when the process restarts.
+        """
+
+        class _MultiTagged:
+            """Service carrying both tags the filter names."""
+
+            tags = {"alpha", "beta"}
+
+        chains = Apprise._build_tag_chains(
+            [(_MultiTagged(), {})], {"beta", "alpha"}
+        )
+        assert sorted(chains) == ["alpha"]
 
     def test_service_priority_for_tag_name_absent(self):
         """Returns 0 when no tag in service.tags matches tag_name."""
@@ -758,8 +762,8 @@ class TestStaticHelpers:
 
     def test_resolve_retry_count_clamps_override(self):
         """Clamp tag retry overrides to the same limit as plugin URLs."""
-        from apprise.apprise import _resolve_retry_count
         from apprise.common import APPRISE_MAX_SERVICE_RETRY
+        from apprise.dispatch import resolve_retry_count
 
         service = mock.Mock()
         service.retry = 0
@@ -767,41 +771,41 @@ class TestStaticHelpers:
         # A huge override is clamped down to the documented ceiling.
         kwargs = {"_retry_override": 1000000000}
         assert (
-            _resolve_retry_count(service, kwargs) == APPRISE_MAX_SERVICE_RETRY
+            resolve_retry_count(service, kwargs) == APPRISE_MAX_SERVICE_RETRY
         )
         # The override key is always consumed, even when clamped.
         assert "_retry_override" not in kwargs
 
         # A negative override is clamped up to zero, not left negative.
-        assert _resolve_retry_count(service, {"_retry_override": -5}) == 0
+        assert resolve_retry_count(service, {"_retry_override": -5}) == 0
 
         # A within-range override passes through unchanged.
-        assert _resolve_retry_count(service, {"_retry_override": 3}) == 3
+        assert resolve_retry_count(service, {"_retry_override": 3}) == 3
 
         # No override at all falls back to the plugin's own (already
         # clamped) retry attribute.
         service.retry = 4
-        assert _resolve_retry_count(service, {}) == 4
+        assert resolve_retry_count(service, {}) == 4
 
         # Invalid overrides fall back to the service's retry value.
         service.retry = 2
-        assert _resolve_retry_count(service, {"_retry_override": "x"}) == 2
+        assert resolve_retry_count(service, {"_retry_override": "x"}) == 2
 
     def test_configured_max_attempts_preserves_override(self):
         """Read timeout metadata without consuming the worker's override."""
-        from apprise.apprise import _configured_max_attempts
+        from apprise.dispatch import configured_max_attempts
 
         service = mock.Mock()
         service.retry = 1
 
         # The timeout result and worker must see the same retry limit.
         kwargs = {"_retry_override": 3}
-        assert _configured_max_attempts(service, kwargs) == 4
+        assert configured_max_attempts(service, kwargs) == 4
         assert kwargs == {"_retry_override": 3}
 
     def test_configured_max_attempts_handles_bad_metadata(self):
         """Leave invalid plugin metadata for the worker safety net."""
-        from apprise.apprise import _configured_max_attempts
+        from apprise.dispatch import configured_max_attempts
 
         class BrokenRetry:
             @property
@@ -809,7 +813,7 @@ class TestStaticHelpers:
                 # A plugin property may fail before its worker starts.
                 raise RuntimeError("bad retry metadata")
 
-        assert _configured_max_attempts(BrokenRetry(), {}) == 1
+        assert configured_max_attempts(BrokenRetry(), {}) == 1
 
     def test_retry_override_end_to_end_is_bounded(self):
         """Prevent a huge tag retry suffix from creating an unbounded loop."""
@@ -838,10 +842,6 @@ class TestStaticHelpers:
             )
         finally:
             N_MGR.unload_modules()
-
-    def test_extract_retry_none_for_match_all(self):
-        assert Apprise._extract_filter_retry(MATCH_ALL_TAG) is None
-        assert Apprise._extract_filter_retry(None) is None
 
     def test_apprise_tag_parse_rejects_absurd_digit_runs(self):
         """Ignore numeric tag fields that exceed Python's conversion limit."""
@@ -872,7 +872,7 @@ class TestStaticHelpers:
 
     def test_service_metadata_survives_bad_tag_str(self):
         """Fall back safely when a custom tag cannot convert to text."""
-        from apprise.apprise import _service_metadata
+        from apprise.dispatch import service_metadata
 
         class _BadTag:
             def __str__(self):
@@ -885,7 +885,7 @@ class TestStaticHelpers:
         service.__len__ = mock.Mock(return_value=1)
         service.tags = {_BadTag()}
 
-        name, url, url_id, tag, weight = _service_metadata(service)
+        name, url, url_id, tag, weight = service_metadata(service)
         assert name == "Test"
         assert url == "test://"
         assert url_id == "abc"
@@ -1214,6 +1214,218 @@ class TestRetryWarningMessage:
         finally:
             logging.disable(logging.CRITICAL)
             N_MGR.unload_modules()
+
+
+class TestDispatchSafetyNets:
+    """Dispatch crashes are reported as failures, never raised at callers."""
+
+    class _ExplodingAsset(AppriseAsset):
+        """Asset whose mode lookup fails inside batch dispatch."""
+
+        @property
+        def async_mode(self):
+            """Raise the injected failure when dispatch reads mode."""
+            raise RuntimeError("injected async_mode access")
+
+    def _tagged_service(self):
+        """Build one tagged service whose dispatch will raise."""
+        # Reading async_mode later will trigger the test failure.
+        service = _FailThenSucceedNotify(
+            host="solo", asset=self._ExplodingAsset(), fail_times=0
+        )
+        service.tags = {"alerts"}
+
+        # Return the public object used by both sync and async tests.
+        a = Apprise()
+        a.add(service)
+        return a
+
+    def test_flat_dispatch_exception(self):
+        """A crash during flat dispatch becomes a failed result.
+
+        An explicit priority skips the escalation chain, so this batch has
+        no later group to fall back on.
+        """
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            # An exact priority uses flat dispatch instead of escalation.
+            result = self._tagged_service().notify(body="test", tag="0:alerts")
+            # The caller receives a normal failed result, not an exception.
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_async_flat_dispatch_exception(self):
+        """The asynchronous flat dispatch contains a crash the same way."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+            # The asynchronous public API must provide the same safe result.
+            result = asyncio.run(
+                self._tagged_service().async_notify(
+                    body="test", tag="0:alerts"
+                )
+            )
+            # The caller receives a normal failed result, not an exception.
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_async_base_exception_result(self):
+        """A BaseException from one service still produces its result.
+
+        asyncio.gather() hands back BaseException subclasses, and
+        CancelledError is the one seen in practice. These are not Exception
+        subclasses, so they must not reach tuple unpacking.
+        """
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+
+            class _Fatal(BaseException):
+                """Stands in for CancelledError, which is not Exception."""
+
+            class _FatalNotify(_FailThenSucceedNotify):
+                """Plugin whose asynchronous send raises a BaseException."""
+
+                async def async_notify(self, **kwargs):
+                    """Fail in a way ordinary handlers do not catch."""
+                    raise _Fatal("plugin cancelled")
+
+            # Use asynchronous mode so gather() receives the raised object.
+            service = _FatalNotify(
+                host="solo",
+                asset=AppriseAsset(async_mode=True),
+                fail_times=0,
+            )
+
+            # Exercise the batch helper directly to inspect its result list.
+            ok, results = asyncio.run(
+                Apprise._notify_parallel_asyncio((service, {"body": "test"}))
+            )
+
+            # The crash is recorded rather than losing the service entirely.
+            assert ok is False
+            assert len(results) == 1
+        finally:
+            N_MGR.unload_modules()
+
+    def test_bad_metadata_fallbacks(self):
+        """Result building tolerates a plugin whose metadata raises.
+
+        These helpers exist to describe an already-misbehaving plugin, so
+        they must not raise a second time while doing it.
+        """
+        from apprise.dispatch import (
+            RetryRunner,
+            finalize_service_result,
+            resolve_retry_count,
+            service_crashed,
+            service_metadata,
+            timeout_result,
+        )
+        from apprise.result import NotifyAttempt
+
+        class _Hostile:
+            """Stand-in whose every plugin-supplied detail raises."""
+
+            @property
+            def service_name(self):
+                """Raise instead of naming the service."""
+                raise RuntimeError("no name")
+
+            @property
+            def optional(self):
+                """Raise instead of reporting optional status."""
+                raise RuntimeError("no optional")
+
+            @property
+            def retry(self):
+                """Raise instead of reporting a retry count."""
+                raise RuntimeError("no retry")
+
+            @property
+            def wait(self):
+                """Raise instead of reporting a retry wait."""
+                raise RuntimeError("no wait")
+
+            @property
+            def tags(self):
+                """Raise instead of listing tags."""
+                raise RuntimeError("no tags")
+
+            def url(self, **kwargs):
+                """Raise instead of returning a URL."""
+                raise RuntimeError("no url")
+
+            def url_id(self):
+                """Raise instead of returning a URL identifier."""
+                raise RuntimeError("no url_id")
+
+            def __len__(self):
+                """Raise instead of reporting a target count."""
+                raise RuntimeError("no length")
+
+        # Every result helper below receives the same broken plugin.
+        service = _Hostile()
+        failed = [NotifyAttempt(status=AppriseResultStatus.FAILURE)]
+
+        # The metadata helper supplies its documented safe values.
+        assert service_metadata(service) == (
+            "Unknown",
+            "unknown://",
+            None,
+            (),
+            1,
+        )
+
+        # Error results remain required failures when optional cannot be read.
+        assert bool(service_crashed(service, ValueError("boom"))) is False
+
+        # The timeout and completed-attempt paths fall back the same way.
+        assert timeout_result(service, 1.0, 1).optional is False
+
+        ok, result = finalize_service_result(service, 0, failed)
+        assert ok is False
+        assert result.optional is False
+
+        # A broken retry property must not throw away a valid override.
+        assert resolve_retry_count(service, {"_retry_override": 3}) == 3
+        assert resolve_retry_count(service, {}) == 0
+        assert resolve_retry_count(service, {"_retry_override": "x"}) == 0
+
+        class _BadRetryValue:
+            """Plugin whose retry is readable but not a usable number."""
+
+            retry = "bad"
+
+        # A non-numeric retry is treated as none rather than reaching the
+        # comparison that clamps it.
+        bad = _BadRetryValue()
+        assert resolve_retry_count(bad, {}) == 0
+        assert resolve_retry_count(bad, {"_retry_override": "x"}) == 0
+        assert resolve_retry_count(bad, {"_retry_override": 2}) == 2
+
+        class _InfiniteRetry:
+            """Plugin whose retry has no whole-number form."""
+
+            retry = float("inf")
+
+        # Infinity and NaN have no integer form, so they clamp to none too.
+        infinite = _InfiniteRetry()
+        assert resolve_retry_count(infinite, {}) == 0
+        assert (
+            resolve_retry_count(infinite, {"_retry_override": float("inf")})
+            == 0
+        )
+        assert (
+            resolve_retry_count(infinite, {"_retry_override": float("nan")})
+            == 0
+        )
+
+        # The runner reads the name once, so its log lines stay usable.
+        assert RetryRunner(service, {}, None).name == "Unknown"
 
 
 class TestExceptionHandling:
@@ -2135,6 +2347,66 @@ class TestMultiTagDispatch:
         finally:
             N_MGR.unload_modules()
 
+    def test_single_chain_exception(self):
+        """Treat a direct-dispatch chain exception as a failure."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+
+            class _ExplodingAsset(AppriseAsset):
+                """Asset whose mode lookup fails inside chain dispatch."""
+
+                @property
+                def async_mode(self):
+                    """Raise the injected failure when dispatch reads mode."""
+                    raise RuntimeError("injected async_mode access")
+
+            # One untagged chain dispatches without the coordinator pool.
+            service = _FailThenSucceedNotify(
+                host="solo", asset=_ExplodingAsset(), fail_times=0
+            )
+
+            a = Apprise()
+            a.add(service)
+
+            result = a.notify(body="test")
+
+            # The chain raised instead of returning True -- overall False.
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
+    def test_async_chain_base_exception(self):
+        """Treat a BaseException returned by gather() as a chain failure."""
+        N_MGR["failpass"] = _FailThenSucceedNotify
+
+        try:
+
+            class _FatalDispatch(BaseException):
+                """Stands in for CancelledError, which is not Exception."""
+
+            class _CancellingAsset(AppriseAsset):
+                """Asset whose mode lookup fails inside chain dispatch."""
+
+                @property
+                def async_mode(self):
+                    """Raise the injected failure when dispatch reads mode."""
+                    raise _FatalDispatch("injected chain cancellation")
+
+            service = _FailThenSucceedNotify(
+                host="solo", asset=_CancellingAsset(), fail_times=0
+            )
+
+            a = Apprise()
+            a.add(service)
+
+            result = asyncio.run(a.async_notify(body="test"))
+
+            # The chain escalated instead of the result being unpacked.
+            assert bool(result) is False
+        finally:
+            N_MGR.unload_modules()
+
 
 class TestAbortOnChainFailure:
     """Exercise optional early exit when one tag chain is exhausted.
@@ -2605,18 +2877,23 @@ class TestAsyncioSafetyNet:
     """Cover async safety nets for exceptions that escape do_call."""
 
     def test_exception_outside_try_block_triggers_safety_net(self):
-        """A retry-property failure is reported beside a good service."""
+        """An escaped property failure is reported beside a good service."""
 
-        class _RaisingRetryService:
-            """Service whose retry property fails before delivery starts."""
+        class _RaisingLoggerService:
+            """Service whose logger fails before delivery starts."""
 
             service_name = "raiser"
             asset = AppriseAsset(async_mode=True)
             optional = False
 
             @property
-            def retry(self):
-                """Raise before per-attempt handling to test the safety net."""
+            def logger(self):
+                """Raise while the attempt's log capture is being built.
+
+                Result-building reads are guarded, so this uses one that is
+                not: the capture reads the service's own logger before any
+                per-attempt handling exists to catch it.
+                """
                 # This escapes do_call and is captured by asyncio.gather.
                 raise RuntimeError("injected: property raised outside try")
 
@@ -2648,7 +2925,7 @@ class TestAsyncioSafetyNet:
                 """Report immediate successful asynchronous delivery."""
                 return True
 
-        raiser = _RaisingRetryService()
+        raiser = _RaisingLoggerService()
         good = _GoodService()
         # Exercise both the escaped-exception and successful-result branches.
         ok, results = asyncio.run(
@@ -3723,7 +4000,7 @@ class TestServiceTimeout:
 
         class _MalformedSlowService:
             """A service missing url()/url_id()/__len__ that never finishes
-            in time, exercising _timeout_result's defensive except paths.
+            in time, exercising timeout_result's defensive except paths.
             """
 
             service_name = "malformed"
@@ -3921,11 +4198,11 @@ class TestServiceTimeout:
 
             # The 0.5s send() is still running in the background --
             # notify() only gave up waiting on it, it did not stop it.
-            assert apprise_module._any_abandoned_calls_still_running() is True
+            assert apprise_module.any_abandoned_calls_still_running() is True
 
             # Give it a generous window to actually finish.
             time.sleep(0.7)
-            assert apprise_module._any_abandoned_calls_still_running() is False
+            assert apprise_module.any_abandoned_calls_still_running() is False
         finally:
             N_MGR.unload_modules()
 
@@ -3946,13 +4223,13 @@ class TestServiceTimeout:
             result = a.notify(body="test")
             assert result.status == AppriseResultStatus.TIMEOUT
 
-            descriptions = apprise_module._abandoned_call_descriptions()
+            descriptions = apprise_module.abandoned_call_descriptions()
             assert len(descriptions) == 1
             assert "slow://descriptionhost" in descriptions[0]
 
             # Once the service finishes, its abandoned-call description clears.
             time.sleep(0.7)
-            assert apprise_module._abandoned_call_descriptions() == []
+            assert apprise_module.abandoned_call_descriptions() == []
         finally:
             N_MGR.unload_modules()
 
@@ -3976,7 +4253,7 @@ class TestServiceTimeout:
             # Queued futures are cancelled before they ever touch the tracked
             # abandoned-call list; any running work should settle quickly.
             time.sleep(0.5)
-            assert apprise_module._any_abandoned_calls_still_running() is False
+            assert apprise_module.any_abandoned_calls_still_running() is False
         finally:
             N_MGR.unload_modules()
 
@@ -4119,18 +4396,18 @@ class TestAsyncAbandonedCallTracking:
             assert result.status == AppriseResultStatus.TIMEOUT
 
             # The sleeping worker remains visible after the timeout.
-            assert apprise_module._any_abandoned_calls_still_running() is True
-            descriptions = apprise_module._abandoned_call_descriptions()
+            assert apprise_module.any_abandoned_calls_still_running() is True
+            descriptions = apprise_module.abandoned_call_descriptions()
             assert any("x" in d or "slowthreaded" in d for d in descriptions)
 
             # Once the real delay elapses, it drops out of the list.
             deadline = time.monotonic() + 2.0
             while (
-                apprise_module._any_abandoned_calls_still_running()
+                apprise_module.any_abandoned_calls_still_running()
                 and time.monotonic() < deadline
             ):
                 time.sleep(0.02)
-            assert apprise_module._any_abandoned_calls_still_running() is False
+            assert apprise_module.any_abandoned_calls_still_running() is False
             assert service.calls == 1
         finally:
             N_MGR.unload_modules()
@@ -4149,7 +4426,7 @@ class TestAsyncAbandonedCallTracking:
 
         try:
             with mock.patch(
-                "apprise.apprise._get_shared_executor",
+                "apprise.apprise.get_shared_executor",
                 return_value=busy_executor,
             ):
                 asset = AppriseAsset(async_mode=True, service_timeout=0.05)
@@ -4161,7 +4438,7 @@ class TestAsyncAbandonedCallTracking:
                 assert result.status == AppriseResultStatus.TIMEOUT
 
             # The queued call never started, so it is not abandoned work.
-            assert apprise_module._any_abandoned_calls_still_running() is False
+            assert apprise_module.any_abandoned_calls_still_running() is False
             assert service.calls == 0
         finally:
             block_event.set()
@@ -4171,7 +4448,7 @@ class TestAsyncAbandonedCallTracking:
 
 
 class TestSharedExecutorRace:
-    """_get_shared_executor() must reuse an executor created during locking."""
+    """get_shared_executor() must reuse an executor created during locking."""
 
     def test_inner_check_skips_creation_if_already_set(self):
         """The inner lock check returns the executor another thread created."""
@@ -4194,7 +4471,7 @@ class TestSharedExecutorRace:
             mock.patch("apprise.apprise._shared_executor_lock", _RaceLock()),
             mock.patch("apprise.apprise.cf.ThreadPoolExecutor") as mock_pool,
         ):
-            result = apprise_module._get_shared_executor()
+            result = apprise_module.get_shared_executor()
 
         assert result is sentinel
         mock_pool.assert_not_called()
@@ -4222,7 +4499,7 @@ class TestSharedExecutorRace:
             ),
             mock.patch("apprise.apprise.cf.ThreadPoolExecutor") as mock_pool,
         ):
-            result = apprise_module._get_coordinator_executor()
+            result = apprise_module.get_coordinator_executor()
 
         assert result is sentinel
         mock_pool.assert_not_called()

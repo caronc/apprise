@@ -35,7 +35,6 @@ from functools import partial
 from itertools import chain
 import json
 import logging
-import math
 import os
 import threading
 import time
@@ -46,12 +45,25 @@ from .apprise_attachment import AppriseAttachment
 from .apprise_config import AppriseConfig
 from .asset import AppriseAsset
 from .common import (
-    APPRISE_MAX_SERVICE_RETRY,
     JSON_COMPACT_SEPARATORS,
     ContentLocation,
 )
 from .config.base import ConfigBase
 from .conversion import convert_between
+from .dispatch import (
+    RetryRunner,
+    TagChain,
+    aggregate_status,
+    call_with_retry,
+    compute_deadline,
+    configured_max_attempts,
+    dispatch_crashed,
+    service_crashed,
+    service_metadata,
+    template_status,
+    timeout_result,
+    validate_timeout,
+)
 from .emojis import apply_emojis
 from .exception import AppriseImproperlyConfigured, AppriseTemplateError
 from .locale import AppriseLocale
@@ -60,12 +72,10 @@ from .manager_plugins import NotificationManager
 from .plugins.base import (
     _PAYLOAD_PRECAPPED,
     NotifyBase,
-    _delivery_tracker,
 )
 from .result import (
     AppriseResult,
     AppriseResultStatus,
-    NotifyAttempt,
     NotifyResult,
 )
 from .tag import AppriseTag
@@ -96,13 +106,16 @@ _shared_executor: Optional[cf.ThreadPoolExecutor] = None
 _shared_executor_lock = threading.Lock()
 
 
-def _get_shared_executor() -> cf.ThreadPoolExecutor:
-    """Return the shared leaf-call thread pool, creating it on first use."""
+def get_shared_executor() -> cf.ThreadPoolExecutor:
+    """Return the shared service worker pool, creating it when first used."""
     global _shared_executor
+    # Avoid taking the lock after the pool has already been created.
     if _shared_executor is None:
         with _shared_executor_lock:
+            # Another thread may have created the pool while we waited.
             if _shared_executor is None:
                 _shared_executor = cf.ThreadPoolExecutor()
+    # Every notification call reuses this same bounded pool.
     return _shared_executor
 
 
@@ -112,22 +125,26 @@ _coordinator_executor: Optional[cf.ThreadPoolExecutor] = None
 _coordinator_executor_lock = threading.Lock()
 
 
-def _get_coordinator_executor() -> cf.ThreadPoolExecutor:
+def get_coordinator_executor() -> cf.ThreadPoolExecutor:
     """Return the shared coordinator thread pool, creating it on first use."""
     global _coordinator_executor
+    # Avoid taking the lock after the pool has already been created.
     if _coordinator_executor is None:
         with _coordinator_executor_lock:
+            # Another thread may have created the pool while we waited.
             if _coordinator_executor is None:
                 _coordinator_executor = cf.ThreadPoolExecutor()
+    # Keep batch coordination separate from service calls it waits for.
     return _coordinator_executor
 
 
-def _submit_with_context(
+def submit_with_context(
     executor: cf.Executor, function: Callable, *args: Any
 ) -> cf.Future:
     """Submit work with a copy of the caller's logging context."""
     # The copied context lets worker logs find the current call capture.
     context = contextvars.copy_context()
+    # Run the function inside that copied context on a worker thread.
     return executor.submit(context.run, function, *args)
 
 
@@ -137,404 +154,37 @@ _abandoned_futures: list[tuple[cf.Future, str, str]] = []
 _abandoned_futures_lock = threading.Lock()
 
 
-def _track_abandoned_future(future: cf.Future, name: str, url: str) -> None:
+def track_abandoned_future(future: cf.Future, name: str, url: str) -> None:
     """Record one abandoned-but-still-running service call."""
     with _abandoned_futures_lock:
+        # Remove completed work before adding the newly abandoned call.
         _abandoned_futures[:] = [
             entry for entry in _abandoned_futures if not entry[0].done()
         ]
+        # Keep safe display details beside the future for CLI reporting.
         _abandoned_futures.append((future, name, url))
 
 
-def _any_abandoned_calls_still_running() -> bool:
+def any_abandoned_calls_still_running() -> bool:
     """True if any abandoned service call is still actually running."""
     with _abandoned_futures_lock:
+        # Completed calls no longer need to delay CLI shutdown.
         _abandoned_futures[:] = [
             entry for entry in _abandoned_futures if not entry[0].done()
         ]
+        # A non-empty list means at least one worker remains busy.
         return bool(_abandoned_futures)
 
 
-def _abandoned_call_descriptions() -> list[str]:
+def abandoned_call_descriptions() -> list[str]:
     """Return "name (url)" for each still-running abandoned call."""
     with _abandoned_futures_lock:
+        # Do not show calls that finished since the last check.
         _abandoned_futures[:] = [
             entry for entry in _abandoned_futures if not entry[0].done()
         ]
+        # URLs were privacy-masked before being stored here.
         return [f"{name} ({url})" for _, name, url in _abandoned_futures]
-
-
-def _service_metadata(
-    service: NotifyBase,
-) -> tuple[str, str, Optional[str], tuple[str, ...], int]:
-    """Safely gather one service's identifying metadata.
-
-    Plugin metadata helpers can raise. This helper keeps result-building
-    defensive and returns (name, url, url_id, tag, weight).
-    """
-    name = getattr(service, "service_name", "Unknown")
-
-    try:
-        url = service.url(privacy=True)
-
-    except Exception:
-        url = "unknown://"
-
-    try:
-        url_id = service.url_id()
-
-    except Exception:
-        url_id = None
-
-    try:
-        weight = len(service)
-
-    except Exception:
-        weight = 1
-
-    try:
-        # Sort tags for stable output. Custom tag objects may fail during
-        # conversion, so use the same fallback as the metadata above.
-        tag = tuple(sorted(str(t) for t in getattr(service, "tags", ())))
-
-    except Exception:
-        tag = ()
-
-    return name, url, url_id, tag, weight
-
-
-def _safe_error_result(service: NotifyBase) -> NotifyResult:
-    """Build a best-effort result when a plugin fails outside dispatch."""
-    name, url, url_id, tag, weight = _service_metadata(service)
-
-    return NotifyResult(
-        name=name,
-        url=url,
-        url_id=url_id,
-        tag=tag,
-        optional=getattr(service, "optional", False),
-        weight=weight,
-        max_attempts=1,
-        # No real attempt data exists here, so keep one synthetic failure.
-        # NotifyResult still applies the service's optional flag.
-        attempts=[NotifyAttempt(status=AppriseResultStatus.FAILURE)],
-    )
-
-
-def _compute_deadline(
-    service: NotifyBase, call_deadline: Optional[float]
-) -> Optional[float]:
-    """Return the monotonic deadline for one service dispatch.
-
-    The earlier of these limits wins:
-
-    - The service's ``service_timeout`` setting.
-    - The shared deadline created by ``notify(timeout=...)`` for the call.
-
-    The caller shares this deadline with the worker so queueing does not
-    change the time limit. ``None`` means neither limit is enabled.
-    """
-    service_timeout = getattr(
-        service.asset,
-        "_service_timeout",
-        AppriseAsset._service_timeout,
-    )
-    deadline = time.monotonic() + service_timeout if service_timeout else None
-    if call_deadline is not None:
-        deadline = (
-            call_deadline if deadline is None else min(deadline, call_deadline)
-        )
-
-    # TRACE keeps large batches from spamming normal DEBUG output.
-    logger.trace(
-        "Deadline for '%s': %s",
-        getattr(service, "service_name", "Unknown"),
-        "none"
-        if deadline is None
-        else "{:.3f}s from now".format(deadline - time.monotonic()),
-    )
-    return deadline
-
-
-def _timeout_result(
-    service: NotifyBase,
-    elapsed: float,
-    max_attempts: int,
-) -> NotifyResult:
-    """Build the result for a service that exceeded the outer wait.
-
-    The worker may still be running. Record only what Apprise knows here:
-    it stopped waiting, and optional handling still belongs to NotifyResult.
-    """
-    name, url, url_id, tag, weight = _service_metadata(service)
-
-    return NotifyResult(
-        name=name,
-        url=url,
-        url_id=url_id,
-        tag=tag,
-        optional=getattr(service, "optional", False),
-        weight=weight,
-        # Preserve the configured retry count even when the outer wait wins.
-        max_attempts=max_attempts,
-        attempts=[
-            NotifyAttempt(
-                status=AppriseResultStatus.TIMEOUT,
-                elapsed=elapsed,
-                logs=[_timeout_log_entry(name, elapsed)],
-            )
-        ],
-    )
-
-
-def _timeout_log_entry(name: str, elapsed: float) -> NotifyLogEntry:
-    """Log and return the error entry describing a service timeout.
-
-    All timeout paths use this helper so every TIMEOUT attempt carries the
-    same useful diagnostic instead of only a status value.
-    """
-    message = f"Service '{name}' did not finish within {elapsed:.3f}s."
-    logger.error(message)
-    return NotifyLogEntry(level="ERROR", message=message)
-
-
-def _validate_timeout(value: Union[int, float]) -> float:
-    """Validate a timeout value shared by notify()/async_notify()."""
-    if not isinstance(value, (int, float)) or isinstance(value, bool):
-        raise AppriseImproperlyConfigured("timeout must be an int or float.")
-
-    # inf/nan rejected: use 0 to mean "unbounded" instead.
-    if not math.isfinite(value) or value < 0:
-        raise AppriseImproperlyConfigured("timeout must be >= 0 and finite.")
-
-    return float(value)
-
-
-def _aggregate_status(
-    ok: bool, results: list[NotifyResult]
-) -> AppriseResultStatus:
-    """Roll a batch's per-service results up into one overall status.
-
-    All succeeded -> SUCCESS. Some genuinely delivered, some didn't ->
-    PARTIAL. Nothing delivered -> FAILURE beats TIMEOUT.
-    """
-    if ok:
-        return AppriseResultStatus.SUCCESS
-
-    # Real success only -- ignores optional=yes services being forgiven.
-    if any(
-        attempt.status == AppriseResultStatus.SUCCESS
-        for result in results
-        for attempt in result.attempts
-    ):
-        return AppriseResultStatus.PARTIAL
-
-    if any(r.status == AppriseResultStatus.FAILURE for r in results):
-        return AppriseResultStatus.FAILURE
-
-    if any(r.status == AppriseResultStatus.TIMEOUT for r in results):
-        return AppriseResultStatus.TIMEOUT
-
-    return AppriseResultStatus.FAILURE
-
-
-def _template_status(
-    status: AppriseResultStatus,
-    skipped: list,
-) -> AppriseResultStatus:
-    """Account for template entries that could not be built.
-
-    The caller is told something was skipped rather than receiving a clean
-    success for an incomplete delivery.
-    """
-    if not skipped:
-        return status
-
-    if status == AppriseResultStatus.SUCCESS:
-        return AppriseResultStatus.PARTIAL
-
-    if status == AppriseResultStatus.NOMATCH:
-        # Every matching template entry was skipped before dispatch.
-        return AppriseResultStatus.FAILURE
-
-    return status
-
-
-def _resolve_retry_count(service: NotifyBase, kwargs: dict[str, Any]) -> int:
-    """Consume and validate a call-specific retry override.
-
-    Tag filters such as ``alerts:999`` bypass URL parsing, so clamp their
-    retry count to the same limit used by plugin URLs.
-    """
-    retry = kwargs.pop("_retry_override", getattr(service, "retry", 0))
-    try:
-        retry = int(retry)
-    except (TypeError, ValueError):
-        # Not a usable number; treat it the same as "no override".
-        retry = getattr(service, "retry", 0)
-    return max(0, min(retry, APPRISE_MAX_SERVICE_RETRY))
-
-
-def _configured_max_attempts(
-    service: NotifyBase, kwargs: dict[str, Any]
-) -> int:
-    """Return the attempt limit without consuming a call override."""
-    try:
-        # Resolve a copy so the worker receives the original private override.
-        return _resolve_retry_count(service, dict(kwargs)) + 1
-
-    except Exception:
-        # Let the worker's safety net report invalid plugin metadata.
-        return 1
-
-
-def _attempt_status(success: bool) -> AppriseResultStatus:
-    """Map one attempt's plain success/failure into the shared enum."""
-    return (
-        AppriseResultStatus.SUCCESS if success else AppriseResultStatus.FAILURE
-    )
-
-
-def _build_timeout_attempt(service_name: str) -> NotifyAttempt:
-    """Build the timeout attempt used when no new delivery can start."""
-    return NotifyAttempt(
-        status=AppriseResultStatus.TIMEOUT,
-        logs=[_timeout_log_entry(service_name, 0.0)],
-    )
-
-
-def _finalize_service_result(
-    service: NotifyBase,
-    retry: int,
-    attempts: list[NotifyAttempt],
-) -> tuple[bool, NotifyResult]:
-    """Build one service result from its completed delivery attempts."""
-    # Optional services can fail quietly, but keep a log breadcrumb.
-    optional = getattr(service, "optional", False)
-    succeeded = any(a.status == AppriseResultStatus.SUCCESS for a in attempts)
-    if not succeeded and optional:
-        logger.info(
-            "Optional service '%s' did not send successfully; continuing.",
-            service.service_name,
-        )
-
-    # Metadata helpers belong to plugins and may raise.
-    name, url, url_id, tag, weight = _service_metadata(service)
-    notify_result = NotifyResult(
-        name=name,
-        url=url,
-        url_id=url_id,
-        tag=tag,
-        optional=optional,
-        weight=weight,
-        max_attempts=retry + 1,
-        attempts=attempts,
-    )
-
-    return bool(notify_result), notify_result
-
-
-def _call_with_retry(
-    service: NotifyBase,
-    kwargs: dict[str, Any],
-    deadline: Optional[float],
-) -> tuple[bool, NotifyResult]:
-    """Run one service with retries, waits, logging, and deadlines.
-
-    Sequential and thread-pool dispatch share this path. ``deadline`` is the
-    caller's absolute time limit and must remain unchanged in the worker.
-    """
-    # Pop the per-call overrides so they stay internal.
-    retry = _resolve_retry_count(service, kwargs)
-    wait = getattr(service, "wait", 0.0)
-    log_callback = kwargs.pop("_log_callback", None)
-    log_level = kwargs.pop("_log_level", None)
-
-    attempts: list[NotifyAttempt] = []
-
-    # Remember successful targets only while retries are active.
-    tracker_token = _delivery_tracker.set(set()) if retry else None
-    try:
-        for attempt in range(retry + 1):
-            if deadline is not None and time.monotonic() >= deadline:
-                # Record that no further attempt was started.
-                logger.trace(
-                    "Deadline already passed for '%s'; skipping "
-                    "attempt %d/%d.",
-                    service.service_name,
-                    attempt + 1,
-                    retry + 1,
-                )
-                attempts.append(_build_timeout_attempt(service.service_name))
-                break
-
-            attempt_start = time.monotonic()
-            logger.trace(
-                "Starting attempt %d/%d for '%s'.",
-                attempt + 1,
-                retry + 1,
-                service.service_name,
-            )
-            # Treat validation errors and plugin crashes as retriable failures.
-            with _ServiceLogCapture(
-                service,
-                log_callback=log_callback,
-                level=log_level if log_level is not None else logging.WARNING,
-            ) as capture:
-                try:
-                    result = service.notify(**kwargs)
-                except TypeError:
-                    result = False
-                except Exception as e:
-                    logger.warning(
-                        "Notification service '%s' raised an exception.",
-                        service.service_name,
-                    )
-                    logger.debug("Notification Exception: %s", str(e))
-                    result = False
-
-            attempt_elapsed = time.monotonic() - attempt_start
-            logger.trace(
-                "Attempt %d/%d for '%s' finished in %.3fs: %s.",
-                attempt + 1,
-                retry + 1,
-                service.service_name,
-                attempt_elapsed,
-                "success" if result else "failure",
-            )
-            attempts.append(
-                NotifyAttempt(
-                    status=_attempt_status(result),
-                    elapsed=attempt_elapsed,
-                    logs=capture.entries,
-                )
-            )
-
-            if result:
-                break
-
-            if attempt < retry:
-                logger.warning(
-                    "Attempt %d/%d for '%s' failed; trying again.",
-                    attempt + 1,
-                    retry + 1,
-                    service.service_name,
-                )
-                if wait > 0:
-                    sleep_for = wait
-                    if deadline is not None:
-                        sleep_for = min(
-                            wait, max(0.0, deadline - time.monotonic())
-                        )
-                    if sleep_for > 0:
-                        time.sleep(sleep_for)
-
-    finally:
-        # Always drop the tracker so it cannot outlive this call.
-        if tracker_token is not None:
-            _delivery_tracker.reset(tracker_token)
-
-    return _finalize_service_result(service, retry, attempts)
 
 
 class Apprise:
@@ -1054,29 +704,49 @@ class Apprise:
         return service.resolve(values)
 
     @staticmethod
-    def _extract_filter_retry(tag):
-        """Return the retry override embedded in a filter tag, or None.
+    def _filter_entries(tag):
+        """Return top-level filter entries in a stable order.
 
-        A filter like "3:endpoint:2" or "endpoint:2" carries ":2" as the
-        call-level retry count.  When present it overrides each matched
-        service's configured retry for this single notify() call.
+        Sets are sorted because they have no order. Lists and tuples keep the
+        order supplied by the caller.
+        """
+        if isinstance(tag, (str, AppriseTag)):
+            # A lone filter is the only entry there is.
+            return [tag]
+
+        if isinstance(tag, (set, frozenset)):
+            # Sets have no fixed order and may appear differently each run.
+            return sorted(tag, key=str)
+
+        # Lists and tuples keep the order the caller wrote them in.
+        return list(tag)
+
+    @staticmethod
+    def _parse_filter_tokens(tag):
+        """Return a flat list of parsed tokens from any supported tag filter.
+
+        Filters may be strings, :class:`AppriseTag` objects, lists, or nested
+        AND groups. Match-all filters return an empty list.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
-            return None
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            if isinstance(entry, (list, tuple, set)):
-                for tok in parse_list(entry):
-                    ft = AppriseTag.parse(tok)
-                    if ft.retry is not None:
-                        return ft.retry
+            # Match-all does not name any individual tag.
+            return []
 
-            else:
-                ft = AppriseTag.parse(str(entry))
-                if ft.retry is not None:
-                    return ft.retry
-        return None
+        # parse_list() sorts comma-separated tokens. Use separate list entries
+        # when their order decides which retry value wins.
+        tokens = []
+        for entry in Apprise._filter_entries(tag):
+            # Split comma-separated text and flatten any inner group.
+            raw = (
+                parse_list(entry)
+                if isinstance(entry, (list, tuple, set))
+                else parse_list(str(entry))
+            )
+            # Parsing once here lets later helpers reuse the same metadata.
+            tokens.extend(AppriseTag.parse(tok) for tok in raw)
+
+        # Callers can now inspect names, priorities, and retry counts.
+        return tokens
 
     @staticmethod
     def _filter_has_explicit_priority(tag):
@@ -1084,21 +754,9 @@ class Apprise:
 
         Exact priorities use flat dispatch; other filters use escalation.
         """
-        if tag is None or tag == common.MATCH_ALL_TAG:
-            return False
-
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            if isinstance(entry, (list, tuple, set)):
-                for tok in parse_list(entry):
-                    if AppriseTag.parse(tok).has_priority:
-                        return True
-            else:
-                for tok in parse_list(str(entry)):
-                    if AppriseTag.parse(tok).has_priority:
-                        return True
-        return False
+        return any(
+            token.has_priority for token in Apprise._parse_filter_tokens(tag)
+        )
 
     @staticmethod
     def _service_priority_for_tag_name(service, tag_name):
@@ -1114,25 +772,12 @@ class Apprise:
     @staticmethod
     def _parse_retry_filter_tokens(tag):
         """Parse retry-bearing filter tokens once for all matched services."""
-        if tag is None or tag == common.MATCH_ALL_TAG:
-            return []
-
-        retry_tokens = []
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            tokens = (
-                parse_list(entry)
-                if isinstance(entry, (list, tuple, set))
-                else parse_list(str(entry))
-            )
-
-            for tok in tokens:
-                ft = AppriseTag.parse(tok)
-                if ft.retry is not None:
-                    retry_tokens.append(ft)
-
-        return retry_tokens
+        # Keep only the tokens that actually carry a ":retry" suffix.
+        return [
+            token
+            for token in Apprise._parse_filter_tokens(tag)
+            if token.retry is not None
+        ]
 
     @staticmethod
     def _match_service_retry(service, retry_tokens):
@@ -1162,17 +807,23 @@ class Apprise:
     @staticmethod
     def _inject_per_service_retries(all_calls, tag):
         """Add the first matching retry override to each service call."""
+        # Parse the filter once instead of repeating the work per service.
         retry_tokens = Apprise._parse_retry_filter_tokens(tag)
         if not retry_tokens:
             # No service can match when the filter has no retry override.
             return all_calls
 
+        # Build new call pairs without changing the caller's list.
         result = []
         for service, kwargs in all_calls:
+            # The first matching filter token decides this service's override.
             retry = Apprise._match_service_retry(service, retry_tokens)
             if retry is not None:
+                # Copy kwargs so other services keep their original options.
                 kwargs = dict(kwargs, _retry_override=retry)
             result.append((service, kwargs))
+
+        # Keep service ordering exactly as it was received.
         return result
 
     @staticmethod
@@ -1220,19 +871,18 @@ class Apprise:
         use ``""``. Match-all filters create one ``""`` chain.
         """
         if tag is None or tag == common.MATCH_ALL_TAG:
+            # Match-all has no tag priority, so every service uses one chain.
             chain: dict[int, list] = {}
             for service, kwargs in all_calls:
-                p = Apprise._service_priority_for_filter(service, tag)
-                chain.setdefault(p, []).append((service, kwargs))
+                chain.setdefault(0, []).append((service, kwargs))
             return {"": chain}
 
         # Flatten OR tokens while keeping true AND groups in the catch-all
         # chain. The CLI wraps a single --tag value in a one-item list, so
         # treat that form as an OR token rather than an AND group.
+        # Use the same order as retry matching so sets behave consistently.
         or_tag_names: list[str] = []
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
+        for entry in Apprise._filter_entries(tag):
             if isinstance(entry, (list, tuple, set)):
                 flat = parse_list(*entry) if entry else []
                 if len(flat) == 1:
@@ -1246,6 +896,11 @@ class Apprise:
                 for tok in parse_list(str(entry)):
                     or_tag_names.append(str(AppriseTag.parse(tok)))
 
+        # Reuse these names when assigning services without an OR chain.
+        filter_names = {
+            str(token) for token in Apprise._parse_filter_tokens(tag)
+        }
+
         chains: dict[str, dict[int, list]] = {}
         for service, kwargs in all_calls:
             for chain_key in or_tag_names:
@@ -1258,42 +913,20 @@ class Apprise:
                     )
                     break
             else:
-                # fallback: use global priority
-                p = Apprise._service_priority_for_filter(service, tag)
+                # No named OR chain matched, so use the catch-all chain.
+                # Choose the most urgent matching priority, or zero if none
+                # of the service's tags appear in the filter.
+                priorities = [
+                    stag.priority if isinstance(stag, AppriseTag) else 0
+                    for stag in service.tags
+                    if str(stag) in filter_names
+                ]
+                p = min(priorities) if priorities else 0
                 chains.setdefault("", {}).setdefault(p, []).append(
                     (service, kwargs)
                 )
 
         return chains
-
-    @staticmethod
-    def _service_priority_for_filter(service, tag):
-        """Return the effective dispatch priority for *service* given *tag*.
-
-        Return the highest-precedence matching tag priority, or zero when no
-        priority tag matches.
-        """
-        if tag is None or tag == common.MATCH_ALL_TAG:
-            return 0
-
-        # Flatten the filter to a set of bare lowercase tag names.
-        filter_names = set()
-        for entry in (
-            [tag] if isinstance(tag, (str, AppriseTag)) else list(tag)
-        ):
-            if isinstance(entry, (list, tuple, set)):
-                for t in parse_list(entry):
-                    filter_names.add(str(AppriseTag.parse(t)))
-            else:
-                for t in parse_list(str(entry)):
-                    filter_names.add(str(AppriseTag.parse(t)))
-
-        priorities = [
-            stag.priority if isinstance(stag, AppriseTag) else 0
-            for stag in service.tags
-            if str(stag) in filter_names
-        ]
-        return min(priorities) if priorities else 0
 
     @staticmethod
     def _split_and_dispatch(
@@ -1304,14 +937,15 @@ class Apprise:
         Results keep the caller's original order. ``call_deadline`` is passed
         through to the dispatch helpers.
         """
-        # Tag each entry with its position in *batch* before splitting so
-        # the two dispatched subsets can be recombined in original order.
-        indexed = list(enumerate(batch))
-        sequential = [
-            (i, s, k) for i, (s, k) in indexed if not s.asset.async_mode
-        ]
-        parallel = [(i, s, k) for i, (s, k) in indexed if s.asset.async_mode]
+        # Remember positions while splitting so results retain input order.
+        sequential: list = []
+        parallel: list = []
+        for index, (service, kwargs) in enumerate(batch):
+            # Each service's own asset decides how it gets dispatched.
+            group = parallel if service.asset.async_mode else sequential
+            group.append((index, service, kwargs))
 
+        # Run services that require ordered, one-at-a-time delivery.
         seq_ok, seq_results = (
             Apprise._notify_sequential(
                 *[(s, k) for _, s, k in sequential],
@@ -1320,6 +954,7 @@ class Apprise:
             if sequential
             else (True, [])
         )
+        # Run services that allow worker-thread delivery.
         par_ok, par_results = (
             Apprise._notify_parallel_threadpool(
                 *[(s, k) for _, s, k in parallel], call_deadline=call_deadline
@@ -1328,14 +963,18 @@ class Apprise:
             else (True, [])
         )
 
-        # Recombine by original index so the returned list matches the
-        # order entries appeared in *batch*, regardless of which subset
-        # (sequential/parallel) each one was dispatched through.
-        indexed_results = list(zip((i for i, _, _ in sequential), seq_results))
-        indexed_results += list(zip((i for i, _, _ in parallel), par_results))
-        indexed_results.sort(key=lambda entry: entry[0])
+        # Restore each subset's results to their original positions.
+        merged: list[NotifyResult] = [None] * len(batch)
+        for (index, _, _), result in zip(sequential, seq_results):
+            # Put each ordered result back where its service began.
+            merged[index] = result
 
-        return seq_ok and par_ok, [r for _, r in indexed_results]
+        for (index, _, _), result in zip(parallel, par_results):
+            # Do the same for results from the worker pool.
+            merged[index] = result
+
+        # Both subsets must succeed for the complete batch to succeed.
+        return seq_ok and par_ok, merged
 
     @staticmethod
     async def _split_and_dispatch_async(
@@ -1346,16 +985,18 @@ class Apprise:
         Both subsets run together without blocking the event loop. Results
         retain their original order.
         """
-        # Preserve each entry's original position before dividing the work.
-        indexed = list(enumerate(batch))
-        sequential = [
-            (i, s, k) for i, (s, k) in indexed if not s.asset.async_mode
-        ]
-        parallel = [(i, s, k) for i, (s, k) in indexed if s.asset.async_mode]
+        # Remember positions while splitting so results retain input order.
+        sequential: list = []
+        parallel: list = []
+        for index, (service, kwargs) in enumerate(batch):
+            # Each service's own asset decides how it gets dispatched.
+            group = parallel if service.asset.async_mode else sequential
+            group.append((index, service, kwargs))
 
+        # Use the caller's active event loop for the blocking subset.
         loop = asyncio.get_running_loop()
         # Run the blocking coordinator outside the leaf-call pool it awaits.
-        executor = _get_coordinator_executor()
+        executor = get_coordinator_executor()
 
         # Start the blocking batch in the executor so both subsets overlap
         # without blocking this event loop.
@@ -1373,6 +1014,7 @@ class Apprise:
             else None
         )
 
+        # Start and await services that support asynchronous delivery.
         par_ok, par_results = (
             await Apprise._notify_parallel_asyncio(
                 *[(s, k) for _, s, k in parallel], call_deadline=call_deadline
@@ -1384,12 +1026,18 @@ class Apprise:
         # Collect the blocking batch, which may already be complete.
         seq_ok, seq_results = await seq_future if seq_future else (True, [])
 
-        # Merge both result streams back into the caller's batch order.
-        indexed_results = list(zip((i for i, _, _ in sequential), seq_results))
-        indexed_results += list(zip((i for i, _, _ in parallel), par_results))
-        indexed_results.sort(key=lambda entry: entry[0])
+        # Restore each subset's results to their original positions.
+        merged: list[NotifyResult] = [None] * len(batch)
+        for (index, _, _), result in zip(sequential, seq_results):
+            # Put each ordered result back where its service began.
+            merged[index] = result
 
-        return seq_ok and par_ok, [r for _, r in indexed_results]
+        for (index, _, _), result in zip(parallel, par_results):
+            # Do the same for asynchronously delivered results.
+            merged[index] = result
+
+        # Both subsets must succeed for the complete batch to succeed.
+        return seq_ok and par_ok, merged
 
     def notify(
         self,
@@ -1477,7 +1125,7 @@ class Apprise:
         WARNING, or INFO when a log_callback is active. Use DEBUG or TRACE for
         more detail.
         """
-        timeout = _validate_timeout(timeout)
+        timeout = validate_timeout(timeout)
         effective_log_callback = (
             log_callback if log_callback is not None else self._log_callback
         )
@@ -1537,7 +1185,7 @@ class Apprise:
             if not all_calls:
                 # Tag filter matched nothing, or no services are loaded at all.
                 return AppriseResult(
-                    status=_template_status(
+                    status=template_status(
                         AppriseResultStatus.NOMATCH, skipped
                     ),
                     results=[],
@@ -1554,12 +1202,18 @@ class Apprise:
 
             if Apprise._filter_has_explicit_priority(tag):
                 # An explicit priority sends one flat batch without escalation.
-                ok, results = Apprise._split_and_dispatch(
-                    all_calls, call_deadline=call_deadline
-                )
+                try:
+                    ok, results = Apprise._split_and_dispatch(
+                        all_calls, call_deadline=call_deadline
+                    )
+
+                except Exception as e:
+                    # Safety net; report the crash instead of raising it.
+                    dispatch_crashed(e)
+                    ok, results = False, []
                 return AppriseResult(
-                    status=_template_status(
-                        _aggregate_status(ok, results), skipped
+                    status=template_status(
+                        aggregate_status(ok, results), skipped
                     ),
                     results=results,
                     elapsed=time.monotonic() - start,
@@ -1573,18 +1227,9 @@ class Apprise:
             # - Active chains run concurrently.
             chains = Apprise._build_tag_chains(all_calls, tag)
 
-            # Per-chain state: priorities (sorted), groups dict, current
-            # index, and a flag marking whether a successful group has
-            # been found.
-            chain_states = {
-                key: {
-                    "priorities": sorted(groups),
-                    "groups": groups,
-                    "idx": 0,
-                    "succeeded": False,
-                }
-                for key, groups in chains.items()
-            }
+            chain_states = [
+                TagChain(key, groups) for key, groups in chains.items()
+            ]
 
             # Every NotifyResult actually dispatched across every chain and
             # every priority-group attempt, in the order each batch was run.
@@ -1597,12 +1242,12 @@ class Apprise:
                 # completion even if one has already failed, so every
                 # defined URL gets an attempt.
                 if self.asset.abort_on_chain_failure and any(
-                    not st["succeeded"] and st["idx"] >= len(st["priorities"])
-                    for st in chain_states.values()
+                    not chain.succeeded and chain.exhausted
+                    for chain in chain_states
                 ):
                     return AppriseResult(
-                        status=_template_status(
-                            _aggregate_status(False, all_results),
+                        status=template_status(
+                            aggregate_status(False, all_results),
                             skipped,
                         ),
                         results=all_results,
@@ -1612,87 +1257,58 @@ class Apprise:
 
                 # Collect chains that still need to try their next
                 # priority group.
-                active = [
-                    (key, st)
-                    for key, st in chain_states.items()
-                    if not st["succeeded"]
-                    and st["idx"] < len(st["priorities"])
-                ]
+                active = [chain for chain in chain_states if chain.pending]
                 if not active:
                     break  # every chain has either succeeded or been exhausted
 
                 if len(active) == 1:
                     # Single active chain: dispatch directly, no thread
                     # overhead.
-                    key, st = active[0]
-                    priority = st["priorities"][st["idx"]]
-                    batch = st["groups"][priority]
-                    ok, batch_results = Apprise._split_and_dispatch(
-                        batch, call_deadline=call_deadline
-                    )
-                    all_results.extend(batch_results)
-                    if ok:
-                        logger.trace(
-                            "Chain '%s' priority group %s succeeded.",
-                            key,
-                            priority,
+                    chain = active[0]
+                    try:
+                        ok, batch_results = Apprise._split_and_dispatch(
+                            chain.batch, call_deadline=call_deadline
                         )
-                        st["succeeded"] = True
-                    else:
-                        logger.trace(
-                            "Chain '%s' priority group %s failed; escalating.",
-                            key,
-                            priority,
-                        )
-                        st["idx"] += 1  # escalate to next priority
-                else:
-                    # Run active chains in the coordinator pool so their
-                    # service calls can use the shared worker pool.
-                    executor = _get_coordinator_executor()
-                    future_map = {
-                        _submit_with_context(
-                            executor,
-                            Apprise._split_and_dispatch,
-                            st["groups"][st["priorities"][st["idx"]]],
-                            call_deadline,
-                        ): (key, st)
-                        for key, st in active
-                    }
-                    # Collect in submission order so results are stable
-                    # even when chains finish in a different order.
-                    for future, (key, st) in future_map.items():
-                        try:
-                            ok, batch_results = future.result()
-                        except Exception as e:
-                            logger.warning(
-                                "Notification chain '%s' priority group "
-                                "%s raised an exception.",
-                                key,
-                                st["priorities"][st["idx"]],
-                            )
-                            logger.debug("Notification Exception: %s", str(e))
-                            ok, batch_results = False, []
-                        all_results.extend(batch_results)
-                        if ok:
-                            logger.trace(
-                                "Chain '%s' priority group %s succeeded.",
-                                key,
-                                st["priorities"][st["idx"]],
-                            )
-                            st["succeeded"] = True
-                        else:
-                            logger.trace(
-                                "Chain '%s' priority group %s failed; "
-                                "escalating.",
-                                key,
-                                st["priorities"][st["idx"]],
-                            )
-                            st["idx"] += 1  # escalate to next priority
 
-            success = all(st["succeeded"] for st in chain_states.values())
+                    except Exception as e:
+                        # Safety net; a crash escalates like a failure.
+                        chain.crashed(e)
+                        continue
+
+                    all_results.extend(batch_results)
+                    chain.settle(ok)
+                    continue
+
+                # Run active chains in the coordinator pool so their
+                # service calls can use the shared worker pool.
+                executor = get_coordinator_executor()
+                future_map = {
+                    submit_with_context(
+                        executor,
+                        Apprise._split_and_dispatch,
+                        chain.batch,
+                        call_deadline,
+                    ): chain
+                    for chain in active
+                }
+                # Collect in submission order so results are stable
+                # even when chains finish in a different order.
+                for future, chain in future_map.items():
+                    try:
+                        ok, batch_results = future.result()
+
+                    except Exception as e:
+                        # Safety net; a crash escalates like a failure.
+                        chain.crashed(e)
+                        continue
+
+                    all_results.extend(batch_results)
+                    chain.settle(ok)
+
+            success = all(chain.succeeded for chain in chain_states)
             return AppriseResult(
-                status=_template_status(
-                    _aggregate_status(success, all_results), skipped
+                status=template_status(
+                    aggregate_status(success, all_results), skipped
                 ),
                 results=all_results,
                 elapsed=time.monotonic() - start,
@@ -1708,9 +1324,7 @@ class Apprise:
         tag = kwargs.get("tag", common.MATCH_ALL_TAG)
 
         # Pop these -- none is a _create_notify_gen() parameter.
-        timeout: Union[int, float] = _validate_timeout(
-            kwargs.pop("timeout", 0)
-        )
+        timeout: Union[int, float] = validate_timeout(kwargs.pop("timeout", 0))
         log_callback: Optional[
             Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
         ] = kwargs.pop("log_callback", None)
@@ -1761,7 +1375,7 @@ class Apprise:
             if not all_calls:
                 # Tag filter matched nothing, or no services are loaded at all.
                 return AppriseResult(
-                    status=_template_status(
+                    status=template_status(
                         AppriseResultStatus.NOMATCH, skipped
                     ),
                     results=[],
@@ -1779,12 +1393,18 @@ class Apprise:
 
             if Apprise._filter_has_explicit_priority(tag):
                 # Explicit priority prefix: flat dispatch, no escalation.
-                ok, results = await Apprise._split_and_dispatch_async(
-                    all_calls, call_deadline=call_deadline
-                )
+                try:
+                    ok, results = await Apprise._split_and_dispatch_async(
+                        all_calls, call_deadline=call_deadline
+                    )
+
+                except Exception as e:
+                    # Safety net; report the crash instead of raising it.
+                    dispatch_crashed(e)
+                    ok, results = False, []
                 return AppriseResult(
-                    status=_template_status(
-                        _aggregate_status(ok, results), skipped
+                    status=template_status(
+                        aggregate_status(ok, results), skipped
                     ),
                     results=results,
                     elapsed=time.monotonic() - start,
@@ -1795,15 +1415,9 @@ class Apprise:
             # groups run together; only a failed chain advances.
             chains = Apprise._build_tag_chains(all_calls, tag)
 
-            chain_states = {
-                key: {
-                    "priorities": sorted(groups),
-                    "groups": groups,
-                    "idx": 0,
-                    "succeeded": False,
-                }
-                for key, groups in chains.items()
-            }
+            chain_states = [
+                TagChain(key, groups) for key, groups in chains.items()
+            ]
 
             # Every NotifyResult actually dispatched across every chain and
             # every priority-group attempt, in the order each batch was run.
@@ -1812,12 +1426,12 @@ class Apprise:
             while True:
                 # Same abort_on_chain_failure guard as notify().
                 if self.asset.abort_on_chain_failure and any(
-                    not st["succeeded"] and st["idx"] >= len(st["priorities"])
-                    for st in chain_states.values()
+                    not chain.succeeded and chain.exhausted
+                    for chain in chain_states
                 ):
                     return AppriseResult(
-                        status=_template_status(
-                            _aggregate_status(False, all_results),
+                        status=template_status(
+                            aggregate_status(False, all_results),
                             skipped,
                         ),
                         results=all_results,
@@ -1825,12 +1439,7 @@ class Apprise:
                         call_logs=call_capture.entries,
                     )
 
-                active = [
-                    (key, st)
-                    for key, st in chain_states.items()
-                    if not st["succeeded"]
-                    and st["idx"] < len(st["priorities"])
-                ]
+                active = [chain for chain in chain_states if chain.pending]
                 if not active:
                     break  # every chain has either succeeded or been exhausted
 
@@ -1839,48 +1448,29 @@ class Apprise:
                 gathered = await asyncio.gather(
                     *(
                         Apprise._split_and_dispatch_async(
-                            st["groups"][st["priorities"][st["idx"]]],
-                            call_deadline=call_deadline,
+                            chain.batch, call_deadline=call_deadline
                         )
-                        for _, st in active
+                        for chain in active
                     ),
                     return_exceptions=True,
                 )
 
-                for (key, st), item in zip(active, gathered):
-                    if isinstance(item, Exception):
-                        # Escaped exception -- safety net; treat as failure.
-                        logger.warning(
-                            "Notification chain '%s' priority group %s "
-                            "raised an exception.",
-                            key,
-                            st["priorities"][st["idx"]],
-                        )
-                        logger.debug("Notification Exception: %s", str(item))
-                        st["idx"] += 1
-                    else:
-                        ok, batch_results = item
-                        all_results.extend(batch_results)
-                        if ok:
-                            logger.trace(
-                                "Chain '%s' priority group %s succeeded.",
-                                key,
-                                st["priorities"][st["idx"]],
-                            )
-                            st["succeeded"] = True
-                        else:
-                            logger.trace(
-                                "Chain '%s' priority group %s failed; "
-                                "escalating.",
-                                key,
-                                st["priorities"][st["idx"]],
-                            )
-                            st["idx"] += 1  # escalate to next priority group
+                for chain, item in zip(active, gathered):
+                    # gather() hands back BaseException, so a cancellation
+                    # lands here too instead of being unpacked as a result.
+                    if isinstance(item, BaseException):
+                        # Safety net; a crash escalates like a failure.
+                        chain.crashed(item)
+                        continue
 
-            success = all(st["succeeded"] for st in chain_states.values())
+                    ok, batch_results = item
+                    all_results.extend(batch_results)
+                    chain.settle(ok)
+
+            success = all(chain.succeeded for chain in chain_states)
             return AppriseResult(
-                status=_template_status(
-                    _aggregate_status(success, all_results), skipped
+                status=template_status(
+                    aggregate_status(success, all_results), skipped
                 ),
                 results=all_results,
                 elapsed=time.monotonic() - start,
@@ -2130,13 +1720,13 @@ class Apprise:
 
         for service, kwargs in services_kwargs:
             # The outer wait needs a deadline before submission.
-            deadline = _compute_deadline(service, call_deadline)
+            deadline = compute_deadline(service, call_deadline)
 
             # Preserve retry metadata before the worker consumes its override.
-            max_attempts = _configured_max_attempts(service, kwargs)
+            max_attempts = configured_max_attempts(service, kwargs)
 
             if deadline is None:
-                ok, notify_result = _call_with_retry(service, kwargs, None)
+                ok, notify_result = call_with_retry(service, kwargs, None)
                 success = success and ok
                 results.append(notify_result)
                 continue
@@ -2152,9 +1742,9 @@ class Apprise:
                 service.service_name,
             )
 
-            executor = _get_shared_executor()
-            future = _submit_with_context(
-                executor, _call_with_retry, service, kwargs, deadline
+            executor = get_shared_executor()
+            future = submit_with_context(
+                executor, call_with_retry, service, kwargs, deadline
             )
             try:
                 # Keep a final guard for unexpected executor failures.
@@ -2173,8 +1763,8 @@ class Apprise:
                 # Track only work that already started and cannot be cancelled.
                 cancelled = future.cancel()
                 if not cancelled:
-                    name, url, _, _, _ = _service_metadata(service)
-                    _track_abandoned_future(future, name, url)
+                    name, url, _, _, _ = service_metadata(service)
+                    track_abandoned_future(future, name, url)
                 logger.trace(
                     "Stopped waiting for '%s' after %.3fs (%s).",
                     service.service_name,
@@ -2184,7 +1774,7 @@ class Apprise:
                     else "its worker thread may still be running in the "
                     "background",
                 )
-                notify_result = _timeout_result(
+                notify_result = timeout_result(
                     service,
                     wait_elapsed,
                     max_attempts,
@@ -2192,12 +1782,8 @@ class Apprise:
                 ok = bool(notify_result)
 
             except Exception as e:
-                logger.warning(
-                    "Notification service '%s' raised an exception.",
-                    service.service_name,
-                )
-                logger.debug("Notification Exception: %s", str(e))
-                notify_result = _safe_error_result(service)
+                # Safety net; one crash must not sink the whole batch.
+                notify_result = service_crashed(service, e)
                 ok = bool(notify_result)
 
             # One required failure means the whole batch cannot succeed.
@@ -2229,7 +1815,7 @@ class Apprise:
             # plain blocking call is strictly cheaper and behaves
             # identically. Otherwise fall through to the thread-pool path
             # below so the deadline can actually be enforced.
-            if _compute_deadline(service, call_deadline) is None:
+            if compute_deadline(service, call_deadline) is None:
                 return Apprise._notify_sequential(
                     services_kwargs[0], call_deadline=call_deadline
                 )
@@ -2238,29 +1824,29 @@ class Apprise:
         logger.info("Notifying %d service(s).", len(services_kwargs))
 
         # Keep output ordered by input, though threads finish out of order.
-        # This is the shared, process-wide pool (see _get_shared_executor()),
+        # This is the shared, process-wide pool (see get_shared_executor()),
         # not a fresh one per call -- never shut down here, it persists for
         # the life of the process so a chronically hanging endpoint cannot
         # leak one more permanently-running thread with every call.
-        executor = _get_shared_executor()
+        executor = get_shared_executor()
         success = True
         results: list[Optional[NotifyResult]] = [None] * n_calls
 
         # Snapshot every service's deadline once, right at submission
         # time (they all start at essentially the same instant here).
         deadlines: list[Optional[float]] = [
-            _compute_deadline(service, call_deadline)
+            compute_deadline(service, call_deadline)
             for service, kwargs in services_kwargs
         ]
 
         # Preserve retry metadata before workers consume private overrides.
         max_attempts = [
-            _configured_max_attempts(service, kwargs)
+            configured_max_attempts(service, kwargs)
             for service, kwargs in services_kwargs
         ]
         future_to_idx: dict[cf.Future, int] = {
-            _submit_with_context(
-                executor, _call_with_retry, service, kwargs, deadlines[i]
+            submit_with_context(
+                executor, call_with_retry, service, kwargs, deadlines[i]
             ): i
             for i, (service, kwargs) in enumerate(services_kwargs)
         }
@@ -2286,7 +1872,7 @@ class Apprise:
             )
             try:
                 # future.result() re-raises any exception that escaped
-                # _call_with_retry (should not happen given the inner
+                # call_with_retry (should not happen given the inner
                 # try/except, but guard here as a safety net).
                 ok, notify_result = future.result(timeout=wait_for)
                 logger.trace(
@@ -2305,8 +1891,8 @@ class Apprise:
                 # Already running -> cancel() fails, so track it instead.
                 cancelled = future.cancel()
                 if not cancelled:
-                    name, url, _, _, _ = _service_metadata(service)
-                    _track_abandoned_future(future, name, url)
+                    name, url, _, _, _ = service_metadata(service)
+                    track_abandoned_future(future, name, url)
                 logger.trace(
                     "Stopped waiting for '%s' after %.3fs (%s).",
                     service.service_name,
@@ -2316,7 +1902,7 @@ class Apprise:
                     else "its worker thread may still be running in the "
                     "background",
                 )
-                notify_result = _timeout_result(
+                notify_result = timeout_result(
                     service,
                     wait_elapsed,
                     max_attempts[idx],
@@ -2324,12 +1910,8 @@ class Apprise:
                 ok = bool(notify_result)
 
             except Exception as e:
-                logger.warning(
-                    "Notification service '%s' raised an exception.",
-                    service.service_name,
-                )
-                logger.debug("Notification Exception: %s", str(e))
-                notify_result = _safe_error_result(service)
+                # Safety net; one crash must not sink the whole batch.
+                notify_result = service_crashed(service, e)
                 ok = bool(notify_result)
 
             success = success and ok
@@ -2369,51 +1951,16 @@ class Apprise:
             Plugin errors become failed attempts so retries can continue.
             Reuse the caller's deadline so the outer wait and worker agree.
             """
-            # Pop the per-call overrides so they stay internal.
-            retry = _resolve_retry_count(service, kwargs)
-            wait = getattr(service, "wait", 0.0)
-            log_callback = kwargs.pop("_log_callback", None)
-            log_level = kwargs.pop("_log_level", None)
-
-            attempts: list[NotifyAttempt] = []
-            # Remember successful targets only while retries are active.
-            tracker_token = _delivery_tracker.set(set()) if retry else None
+            runner = RetryRunner(service, kwargs, deadline)
             try:
-                for attempt in range(retry + 1):
-                    if deadline is not None and time.monotonic() >= deadline:
-                        # Out of time -- record a zero-elapsed TIMEOUT attempt
-                        # marking the decision to stop, and do not start
-                        # another one.
-                        logger.trace(
-                            "Deadline already passed for '%s'; skipping "
-                            "attempt %d/%d.",
-                            service.service_name,
-                            attempt + 1,
-                            retry + 1,
-                        )
-                        attempts.append(
-                            _build_timeout_attempt(service.service_name)
-                        )
+                for attempt in range(runner.total):
+                    started = runner.begin(attempt)
+                    if started is None:
                         break
 
-                    attempt_start = time.monotonic()
-                    logger.trace(
-                        "Starting attempt %d/%d for '%s'.",
-                        attempt + 1,
-                        retry + 1,
-                        service.service_name,
-                    )
-                    # Treat validation and plugin exceptions as failed
-                    # attempts, matching synchronous delivery.
-                    with _ServiceLogCapture(
-                        service,
-                        log_callback=log_callback,
-                        level=(
-                            log_level
-                            if log_level is not None
-                            else logging.WARNING
-                        ),
-                    ) as capture:
+                    # Treat validation errors and plugin crashes as retriable
+                    # failures, matching synchronous delivery.
+                    with runner.capture() as capture:
                         try:
                             result = await service.async_notify(**kwargs)
 
@@ -2421,56 +1968,20 @@ class Apprise:
                             result = False
 
                         except Exception as e:
-                            logger.warning(
-                                "Notification service '%s' raised an"
-                                " exception.",
-                                service.service_name,
-                            )
-                            logger.debug("Notification Exception: %s", str(e))
+                            runner.crashed(e)
                             result = False
 
-                    attempt_elapsed = time.monotonic() - attempt_start
-                    logger.trace(
-                        "Attempt %d/%d for '%s' finished in %.3fs: %s.",
-                        attempt + 1,
-                        retry + 1,
-                        service.service_name,
-                        attempt_elapsed,
-                        "success" if result else "failure",
-                    )
-                    attempts.append(
-                        NotifyAttempt(
-                            status=_attempt_status(result),
-                            elapsed=attempt_elapsed,
-                            logs=capture.entries,
-                        )
-                    )
-
-                    if result:
+                    if runner.record(attempt, result, started, capture):
                         break
 
-                    if attempt < retry:
-                        logger.warning(
-                            "Attempt %d/%d for '%s' failed; trying again.",
-                            attempt + 1,
-                            retry + 1,
-                            service.service_name,
-                        )
-                        if wait > 0:
-                            sleep_for = wait
-                            if deadline is not None:
-                                sleep_for = min(
-                                    wait, max(0.0, deadline - time.monotonic())
-                                )
-                            if sleep_for > 0:
-                                await asyncio.sleep(sleep_for)
+                    delay = runner.delay(attempt)
+                    if delay > 0:
+                        await asyncio.sleep(delay)
 
             finally:
-                # Always drop the tracker so it cannot outlive this call.
-                if tracker_token is not None:
-                    _delivery_tracker.reset(tracker_token)
+                runner.close()
 
-            return _finalize_service_result(service, retry, attempts)
+            return runner.result()
 
         async def do_call_bounded(
             service: NotifyBase,
@@ -2529,7 +2040,7 @@ class Apprise:
                     service.service_name,
                     wait_elapsed,
                 )
-                notify_result = _timeout_result(
+                notify_result = timeout_result(
                     service,
                     wait_elapsed,
                     max_attempts,
@@ -2539,13 +2050,13 @@ class Apprise:
         # Snapshot outer wait deadlines before launching the async workers;
         # do_call() reuses the same value instead of recomputing its own.
         deadlines: list[Optional[float]] = [
-            _compute_deadline(service, call_deadline)
+            compute_deadline(service, call_deadline)
             for service, kwargs in services_kwargs
         ]
 
         # Preserve retry metadata before coroutines consume private overrides.
         max_attempts = [
-            _configured_max_attempts(service, kwargs)
+            configured_max_attempts(service, kwargs)
             for service, kwargs in services_kwargs
         ]
 
@@ -2566,14 +2077,11 @@ class Apprise:
         results: list[NotifyResult] = []
         for idx, item in enumerate(gathered):
             service = services_kwargs[idx][0]
-            if isinstance(item, Exception):
+            # gather() hands back BaseException, so a cancellation lands
+            # here too instead of being unpacked as a result pair.
+            if isinstance(item, BaseException):
                 # Safety net: an exception escaped do_call's own try/except.
-                logger.warning(
-                    "Notification service '%s' raised an exception.",
-                    service.service_name,
-                )
-                logger.debug("Notification Exception: %s", str(item))
-                notify_result = _safe_error_result(service)
+                notify_result = service_crashed(service, item)
                 success = success and bool(notify_result)
                 results.append(notify_result)
 

@@ -3115,7 +3115,7 @@ def test_wait_for_abandoned_calls_polls_full_grace_period():
     with (
         mock.patch("apprise.cli.time.sleep") as mock_sleep,
         mock.patch(
-            "apprise.cli._any_abandoned_calls_still_running",
+            "apprise.cli.any_abandoned_calls_still_running",
             return_value=True,
         ) as mock_still_running,
     ):
@@ -3136,11 +3136,11 @@ def test_wait_for_abandoned_calls_logs_masked_services():
     with (
         mock.patch("apprise.cli.time.sleep"),
         mock.patch(
-            "apprise.cli._any_abandoned_calls_still_running",
+            "apprise.cli.any_abandoned_calls_still_running",
             return_value=False,
         ),
         mock.patch(
-            "apprise.cli._abandoned_call_descriptions",
+            "apprise.cli.abandoned_call_descriptions",
             return_value=["dummy (dummy://masked@host)"],
         ),
         mock.patch("apprise.cli.logger.debug") as mock_debug,
@@ -3152,16 +3152,12 @@ def test_wait_for_abandoned_calls_logs_masked_services():
 
 
 def test_wait_for_abandoned_calls_exits_early_when_calls_finish():
-    """_wait_for_abandoned_calls() returns True as soon as
-    _any_abandoned_calls_still_running() reports False, rather than
-    always waiting out the full grace period -- the whole point of
-    polling instead of a single fixed sleep.
-    """
+    """Stop polling as soon as every abandoned call finishes."""
     # Two busy checks produce two short sleeps before completion.
     with (
         mock.patch("apprise.cli.time.sleep") as mock_sleep,
         mock.patch(
-            "apprise.cli._any_abandoned_calls_still_running",
+            "apprise.cli.any_abandoned_calls_still_running",
             side_effect=[True, True, False],
         ) as mock_still_running,
     ):
@@ -3181,7 +3177,7 @@ def test_wait_for_abandoned_calls_finishes_right_as_grace_period_ends():
     with (
         mock.patch("apprise.cli.time.sleep"),
         mock.patch(
-            "apprise.cli._any_abandoned_calls_still_running",
+            "apprise.cli.any_abandoned_calls_still_running",
             # Four in-loop polls still report running. The final check
             # sees that the abandoned work has just finished.
             side_effect=[True, True, True, True, False],

@@ -914,18 +914,17 @@ class NotifyBase(URLBase):
         else:
             # Deferred import to dodge a circular import (apprise.apprise
             # loads this module first). Fine by call time.
-            from ..apprise import _get_shared_executor
+            from ..apprise import get_shared_executor
 
             # Use Apprise's own shared pool, not the loop's default one --
             # keeps a stuck send() from starving unrelated executor work.
             # TODO: let plugins supply a native async_send() instead.
-            executor = _get_shared_executor()
+            executor = get_shared_executor()
 
             async def do_send(**kwargs2):
                 """Run one prepared send() call in the executor."""
                 send = partial(self._timed_send, **kwargs2)
-                # Carries our log-capture ContextVar into the worker
-                # thread -- run_in_executor() doesn't do this on its own.
+                # Copy the current logging details into the worker thread.
                 ctx = contextvars.copy_context()
                 # Submit directly so cancellation still leaves access to the
                 # worker future. A running send cannot be interrupted, so its
@@ -935,19 +934,21 @@ class NotifyBase(URLBase):
                     result = await asyncio.wrap_future(cf_future)
 
                 except asyncio.CancelledError:
+                    # Cancellation stops waiting, but cannot stop a running
+                    # function inside a worker thread.
                     if cf_future.running():
-                        # Import here to avoid a circular import. The shared
-                        # helper also protects this cancellation path from
-                        # plugin metadata errors.
-                        from ..apprise import (
-                            _service_metadata,
-                            _track_abandoned_future,
-                        )
+                        # Import here to avoid modules loading each other
+                        # before they are ready.
+                        from ..apprise import track_abandoned_future
+                        from ..dispatch import service_metadata
 
-                        name, url, _, _, _ = _service_metadata(self)
-                        _track_abandoned_future(cf_future, name, url)
+                        # Keep a safe description until the worker finishes.
+                        name, url, _, _, _ = service_metadata(self)
+                        track_abandoned_future(cf_future, name, url)
+                    # Let the caller continue handling the cancellation.
                     raise
 
+                # Forward the normal send result to async_notify().
                 return result
 
             # Await this plugin's pieces in order so split text and attachments
@@ -955,7 +956,9 @@ class NotifyBase(URLBase):
             # and each blocking send remains in the shared executor.
             results = []
             for kwargs2 in send_calls:
+                # Wait for each piece before starting the next one.
                 results.append(await do_send(**kwargs2))
+            # Every prepared piece must succeed for this service to succeed.
             return all(results)
 
     def _build_send_calls(

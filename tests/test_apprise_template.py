@@ -1544,14 +1544,14 @@ def test_apprise_template_vars_reports_a_disagreement(sent):
 
 def test_apprise_template_status_other_outcomes():
     """Only a clean run and a no-match are reworded."""
-    from apprise.apprise import _template_status
+    from apprise.dispatch import template_status
 
     for status in (
         AppriseResultStatus.FAILURE,
         AppriseResultStatus.PARTIAL,
         AppriseResultStatus.TIMEOUT,
     ):
-        assert _template_status(status, ["skipped"]) == status
+        assert template_status(status, ["skipped"]) == status
 
 
 def test_apprise_asset_allow_templates_must_be_a_flag():

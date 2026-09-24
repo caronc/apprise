@@ -81,6 +81,28 @@ class _ParaBreak:
         self.in_quote = in_quote
 
 
+def default_frame():
+    """Build the default settings for a new or empty frame stack."""
+    return {
+        # No HTML tag owns the root frame.
+        "tag": None,
+        # Store normal text unless an inner tag changes this setting.
+        "do_store": True,
+        # Normal text can combine carriage returns.
+        "preserve_cr": False,
+        # The root is outside ordered and unordered lists.
+        "list_type": None,
+        "depth": 0,
+        "counter": None,
+        # List text is stored unless a nested frame disables it.
+        "list_do_store": True,
+        # Quotes and list indentation both begin at the outer level.
+        "quote_depth": 0,
+        "list_indent": "",
+        "list_indent_base": "",
+    }
+
+
 class HTMLConverter(HTMLParser):
     """An HTML to plain text converter tuned for email messages."""
 
@@ -377,41 +399,14 @@ class HTMLMarkdownConverter(HTMLConverter):
         #                            full text up front to size a
         #                            delimiter that cannot collide with
         #                            backticks already in the content
-        self._stack = [
-            {
-                "tag": None,
-                "do_store": True,
-                "preserve_cr": False,
-                "list_type": None,
-                "depth": 0,
-                "counter": None,
-                "list_do_store": True,
-                "quote_depth": 0,
-                "list_indent": "",
-                "list_indent_base": "",
-            }
-        ]
+        # The root frame gives every child a complete set of settings.
+        self._stack = [default_frame()]
 
     def _make_frame(self, tag, **overrides):
         """Create a frame from the current context."""
 
-        # Inherit frame defaults from the parent context.
-        parent = (
-            self._stack[-1]
-            if self._stack
-            else {
-                "tag": None,
-                "do_store": True,
-                "preserve_cr": False,
-                "list_type": None,
-                "depth": 0,
-                "counter": None,
-                "list_do_store": True,
-                "quote_depth": 0,
-                "list_indent": "",
-                "list_indent_base": "",
-            }
-        )
+        # Use defaults only if a caller cleared the normal root frame.
+        parent = self._stack[-1] if self._stack else default_frame()
         # Build the new frame by inheriting all context keys from the parent.
         # Callers pass **overrides to replace only the keys they need changed.
         frame = {
