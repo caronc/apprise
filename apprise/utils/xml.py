@@ -24,11 +24,34 @@
 # CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
 # ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 # POSSIBILITY OF SUCH DAMAGE.
-import re
-from xml.etree import ElementTree
+
+from __future__ import annotations
+
+from typing import Any, Optional
+from xml.parsers import expat
 
 
-def flatten_xml_response(xml_response, keep_map, defaults=None):
+class _Element:
+    """One element that has been opened but not yet closed."""
+
+    __slots__ = ("leaf", "tag", "text")
+
+    def __init__(self, tag: str) -> None:
+        # The element's name, exactly as the document spells it.
+        self.tag = tag
+
+        # Text arrives in one or more pieces and is joined on close.
+        self.text: list[str] = []
+
+        # Cleared the moment a child element opens beneath this one.
+        self.leaf = True
+
+
+def flatten_xml_response(
+    xml_response: Optional[str],
+    keep_map: dict[str, str],
+    defaults: Optional[dict[str, Any]] = None,
+) -> dict[str, Any]:
     """Turns a small, flat XML response (like the ones AWS SES/SNS send
     back) into a plain dictionary.
 
@@ -38,10 +61,13 @@ def flatten_xml_response(xml_response, keep_map, defaults=None):
       so callers can guarantee certain keys always exist even when the
       response never mentions them. `type` is always set to the name
       of the root tag.
-    - Any surrounding XML namespace on the root tag is stripped first,
-      since it otherwise has to be repeated on every tag name we look
-      for.
-    - Walks the tree with an explicit stack instead of recursion, so
+    - Tags are read exactly as the document spells them, so a default
+      XML namespace on the root does not have to be repeated on every
+      tag name we look for.
+    - A document carrying a DTD is refused outright. A handful of
+      nested entity definitions can otherwise expand into megabytes of
+      text before the parser gives up, and AWS never sends one.
+    - Walks the document as it is read instead of building a tree, so
       an unusually deep response can't blow up with a RecursionError.
     - A tag with no text at all (e.g. `<Message/>`) is treated as an
       empty string rather than raising.
@@ -52,29 +78,61 @@ def flatten_xml_response(xml_response, keep_map, defaults=None):
     response = dict(defaults) if defaults else {}
     response["type"] = None
 
-    try:
-        # Strip any surrounding XML namespace from the root tag.
-        root = ElementTree.fromstring(
-            re.sub(r' xmlns="[^"]+"', "", xml_response, count=1)
-        )
+    # Collected separately so a response that fails partway through
+    # leaves the defaults above exactly as they were.
+    found: dict[str, Any] = {}
+    root_tag: Optional[str] = None
 
-    except (ElementTree.ParseError, TypeError):
+    # Every element opened but not yet closed, outermost first.
+    stack: list[_Element] = []
+
+    def start_element(tag: str, attrs: dict[str, str]) -> None:
+        """Open an element and note that its parent is not a leaf."""
+        nonlocal root_tag
+
+        if stack:
+            # An element holding another element is a branch, not a leaf.
+            stack[-1].leaf = False
+
+        else:
+            # The outermost tag names the kind of response this is.
+            root_tag = tag
+
+        stack.append(_Element(tag))
+
+    def character_data(data: str) -> None:
+        """Collect one piece of the open element's text."""
+        # A parser may hand a single element's text over in several calls.
+        stack[-1].text.append(data)
+
+    def end_element(tag: str) -> None:
+        """Close an element and keep its text if it was asked for."""
+        element = stack.pop()
+
+        # Only a leaf holds a value worth keeping.
+        if element.leaf and element.tag in keep_map:
+            found[keep_map[element.tag]] = "".join(element.text).strip()
+
+    def start_doctype(*args: Any) -> None:
+        """Refuse a document that carries a DTD."""
+        # Raising here stops the parse before any entity is expanded.
+        raise expat.ExpatError("A DTD is not permitted in a response.")
+
+    parser = expat.ParserCreate()
+    parser.StartDoctypeDeclHandler = start_doctype
+    parser.StartElementHandler = start_element
+    parser.EndElementHandler = end_element
+    parser.CharacterDataHandler = character_data
+
+    try:
+        parser.Parse(xml_response, True)
+
+    except (expat.ExpatError, TypeError):
         # bad data just causes us to generate a bad response
         return response
 
-    # Set the response type to the root tag name.
-    response["type"] = str(root.tag)
-
-    # Walk the tree with an explicit stack instead of recursion.
-    stack = [root]
-    while stack:
-        element = stack.pop()
-        if len(element) > 0:
-            # Reverse children so the stack still visits them in document
-            # order, matching the original recursive parser.
-            stack.extend(reversed(element))
-
-        elif element.tag in keep_map:
-            response[keep_map[element.tag]] = (element.text or "").strip()
+    # The document was read in full, so its values can be trusted.
+    response["type"] = str(root_tag)
+    response.update(found)
 
     return response
