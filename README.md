@@ -29,6 +29,12 @@ System Administrators and DevOps who wish to send a notification now no longer n
 
 Visit the [Official Documentation](https://appriseit.com/getting-started/) site for more information on Apprise.
 
+# How It Works
+
+Apprise provides one consistent URL format and notification interface for your apps, automation, and infrastructure. Use the CLI or core library directly, or relay through Apprise API, to deliver notifications to a very [large amount of supported services](https://appriseit.com/services/).
+
+[![Apprise overview showing notification sources, entry points, and supported destinations](Apprise-overview.png)](Apprise-overview.png)
+
 # Table of Contents
 <!--ts-->
 * [Supported Notifications](#supported-notifications)
