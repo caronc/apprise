@@ -32,10 +32,11 @@ This module handles retries, priority groups, time limits, and failures.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 import logging
 import math
 import time
-from typing import Any, Optional, Union
+from typing import TYPE_CHECKING, Any, Callable, Optional, Union
 
 from .asset import AppriseAsset
 from .common import APPRISE_MAX_SERVICE_RETRY
@@ -46,7 +47,26 @@ from .plugins.base import (
     _delivery_memo,
     _delivery_tracker,
 )
-from .result import AppriseResultStatus, NotifyAttempt, NotifyResult
+from .result import (
+    AppriseResult,
+    AppriseResultStatus,
+    NotifyAttempt,
+    NotifyResult,
+)
+
+if TYPE_CHECKING:
+    # Import Apprise only for static analysis. CallState reaches it through
+    # the instance it is given, so importing it here at runtime would only
+    # create a cycle back through this module.
+    from .apprise import Apprise
+
+# One (service, notify()-kwargs) pair as produced by _create_notify_gen()
+# and threaded through every dispatch primitive below.
+ServiceCall = tuple[NotifyBase, dict[str, Any]]
+
+# What dispatching one batch produced: its (ok, results), or the exception
+# that stopped it.
+BatchOutcome = Union[tuple[bool, list[NotifyResult]], BaseException]
 
 
 def safe_attr(service: NotifyBase, name: str, default: Any) -> Any:
@@ -224,10 +244,10 @@ def timeout_log_entry(name: str, elapsed: float) -> NotifyLogEntry:
     # Use the same readable message in application logs and the result.
     message = f"Service '{name}' did not finish within {elapsed:.3f}s."
 
-    # Keep this out of the call-level capture.  The caller stores the entry
-    # below on the attempt itself, so capturing it too would list the same
-    # timeout twice in the merged result logs.
-    logger.error(message, extra={"apprise_capture": False})
+    # A live log_callback still sees this, but the capture does not keep a
+    # copy: the caller stores the entry below on the attempt itself, and
+    # keeping both would list the same timeout twice in the merged logs.
+    logger.error(message, extra={"apprise_store": False})
 
     # Store the level as text because NotifyLogEntry is public result data.
     return NotifyLogEntry(level="ERROR", message=message)
@@ -364,6 +384,201 @@ def finalize_service_result(
 
     # Return both the convenient boolean and the detailed result.
     return bool(notify_result), notify_result
+
+
+class CallState:
+    """Everything one notify() or async_notify() call shares.
+
+    Both entry points settle their options, take the same early exits,
+    escalate the same way, and build their results the same way. Only the
+    dispatch of a batch differs, so that is all each one keeps for itself.
+
+    This is the outermost of three tiers: one whole call here, one
+    priority chain in ``TagChain``, one service's attempts in
+    ``RetryRunner``. Tag filtering stays with the ``Apprise`` instance,
+    so the few helpers needed for it are reached through ``apprise``.
+    """
+
+    __slots__ = (
+        "apprise",
+        "capture",
+        "chains",
+        "deadline",
+        "log_callback",
+        "log_level",
+        "results",
+        "skipped",
+        "start",
+        "tag",
+    )
+
+    def __init__(
+        self,
+        apprise: Apprise,
+        tag: Any,
+        timeout: Union[int, float],
+        log_callback: Optional[
+            Callable[[NotifyLogEntry, Optional[NotifyBase]], None]
+        ],
+        log_level: Optional[int],
+    ) -> None:
+        """Settle every per-call option the two entry points share."""
+        # Reject an unusable time limit before any work begins.
+        timeout = validate_timeout(timeout)
+
+        # The instance being notified, and the filter it was given.
+        self.apprise = apprise
+        self.tag = tag
+
+        # A value passed to this call wins over the instance default.
+        self.log_callback = (
+            log_callback if log_callback is not None else apprise._log_callback
+        )
+        self.log_level = apprise._resolve_call_level(
+            log_level if log_level is not None else apprise._log_level,
+            self.log_callback,
+        )
+
+        # Entries held back because a template value was never supplied.
+        self.skipped: list[NotifyBase] = []
+
+        # Every NotifyResult dispatched across every chain and priority
+        # group, in the order each batch was run.
+        self.results: list[NotifyResult] = []
+
+        # The escalation chains; escalate() fills this in.
+        self.chains: list[TagChain] = []
+
+        # Wall-clock start for AppriseResult.elapsed -- covers the entire
+        # call, including argument validation, not just service dispatch.
+        self.start = time.monotonic()
+
+        # Apply the call timeout without replacing each service's own limit.
+        self.deadline: Optional[float] = (
+            self.start + timeout if timeout else None
+        )
+
+        # Capture orchestration logs not owned by a service attempt.
+        # The capture reads its limits from the asset already held by Apprise.
+        self.capture = _ServiceLogCapture(
+            service=None,
+            log_callback=self.log_callback,
+            level=self.log_level,
+            memory_size=apprise.asset.result_log_memory_size,
+            disk_size=apprise.asset.result_log_disk_size,
+        )
+
+    def __enter__(self) -> CallState:
+        """Begin capturing this call's orchestration logs."""
+        # The capture stays attached for the whole call, early exits included.
+        self.capture.__enter__()
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        """Stop capturing once the call is over."""
+        self.capture.__exit__(*args)
+
+    def result(self, status: AppriseResultStatus) -> AppriseResult:
+        """Build this call's result, timed from when the call started."""
+        # A skipped template entry keeps a clean success from being reported.
+        return AppriseResult(
+            status=template_status(status, self.skipped),
+            results=self.results,
+            elapsed=time.monotonic() - self.start,
+            call_logs=self.capture.entries,
+        )
+
+    def prepare(self, all_calls: list[ServiceCall]) -> list[ServiceCall]:
+        """Apply the per-call overrides every service call carries."""
+        # The first retry suffix its tag filter matches wins per service.
+        all_calls = self.apprise._inject_per_service_retries(
+            all_calls, self.tag
+        )
+
+        # Every service is told the capture level, and the callback when
+        # one is active.  Build the pair once, outside the rebuild below.
+        internal: dict[str, Any] = {"_log_level": self.log_level}
+        if self.log_callback is not None:
+            internal["_log_callback"] = self.log_callback
+
+        # One pass rebuilds each service's kwargs with both keys added.
+        return [
+            (service, dict(kwargs, **internal))
+            for service, kwargs in all_calls
+        ]
+
+    def escalate(self, all_calls: list[ServiceCall]) -> None:
+        """Turn the matched services into independent escalation chains."""
+        # Each OR tag becomes its own chain, starting at its top priority.
+        chains = self.apprise._build_tag_chains(all_calls, self.tag)
+        self.chains = [TagChain(key, groups) for key, groups in chains.items()]
+
+    def rounds(self) -> Iterator[list[TagChain]]:
+        """Yield each round of chains that still have a group to try.
+
+        The caller dispatches the chains it is handed and reports each one
+        back through ``settle()``, then builds its result with ``finish()``.
+        """
+        while True:
+            if self.apprise.asset.abort_on_chain_failure and any(
+                not chain.succeeded and chain.exhausted
+                for chain in self.chains
+            ):
+                # Stop as soon as one chain is out of priority groups.  The
+                # default instead lets every chain run to completion, so
+                # every defined URL gets an attempt.
+                return
+
+            active = [chain for chain in self.chains if chain.pending]
+            if not active:
+                # Every chain has either succeeded or been exhausted.
+                return
+
+            yield active
+
+    def settle(self, chain: TagChain, outcome: BatchOutcome) -> None:
+        """Record one chain's batch, whether it ran or crashed.
+
+        ``outcome`` is the ``(ok, results)`` the dispatch returned, or the
+        exception it raised.
+        """
+        if isinstance(outcome, BaseException):
+            # Safety net; a crash escalates like a failure.
+            chain.crashed(outcome)
+            return
+
+        ok, batch_results = outcome
+        self.results.extend(batch_results)
+        chain.settle(ok)
+
+    def unprepared(self, e: Exception) -> AppriseResult:
+        """Explain a call that never reached a service, and fail it.
+
+        This is for a problem with the call itself: a bad argument, or a
+        message Apprise cannot use. A single service that fails is
+        reported against that service instead and never comes here.
+        """
+        # Say what went wrong; a silent FAILURE is impossible to diagnose.
+        logger.warning("Could not prepare the notification: %s", e)
+        logger.debug("Notification Exception: %r", e)
+        return self.result(AppriseResultStatus.FAILURE)
+
+    def flat(self, outcome: BatchOutcome) -> AppriseResult:
+        """Build the result for one batch sent without escalation."""
+        if isinstance(outcome, BaseException):
+            # Safety net; report the crash instead of raising it.
+            dispatch_crashed(outcome)
+            outcome = (False, [])
+
+        ok, results = outcome
+        self.results.extend(results)
+        return self.result(aggregate_status(ok, self.results))
+
+    def finish(self) -> AppriseResult:
+        """Build the result once the chains have nothing left to run."""
+        # A chain that never succeeded leaves the whole call unsuccessful.
+        success = all(chain.succeeded for chain in self.chains)
+        return self.result(aggregate_status(success, self.results))
 
 
 class TagChain:
@@ -619,6 +834,26 @@ class RetryRunner:
         return finalize_service_result(self.service, self.retry, self.attempts)
 
 
+def prepared_failure(
+    service: NotifyBase, kwargs: dict[str, Any]
+) -> Optional[tuple[bool, NotifyResult]]:
+    """Return a failed result for a service that never became callable.
+
+    ``None`` means the service is ready and should be delivered normally.
+    """
+    # The error rides along with the call rather than being reported when
+    # it happened, so a fallback an escalation never reaches is never
+    # blamed for it.
+    error = kwargs.pop("_prepare_error", None)
+    if error is None:
+        return None
+
+    # Report it exactly like a plugin that raised while being called, so
+    # an optional service stays optional and a chain still escalates.
+    notify_result = service_crashed(service, error)
+    return bool(notify_result), notify_result
+
+
 def call_with_retry(
     service: NotifyBase,
     kwargs: dict[str, Any],
@@ -628,6 +863,11 @@ def call_with_retry(
 
     Ordered and worker-thread delivery share this path.
     """
+    # A service that could not be prepared is never called at all.
+    failed = prepared_failure(service, kwargs)
+    if failed is not None:
+        return failed
+
     # Keep shared retry state in one small helper object.
     runner = RetryRunner(service, kwargs, deadline)
     try:
@@ -637,14 +877,11 @@ def call_with_retry(
             if started is None:
                 break
 
-            # Treat validation errors and plugin crashes as retriable
-            # failures so the next attempt still gets a turn.
+            # Treat validation errors and plugin crashes alike: report
+            # them, then let the next attempt still get a turn.
             with runner.capture() as capture:
                 try:
                     result = service.notify(**kwargs)
-
-                except TypeError:
-                    result = False
 
                 except Exception as e:
                     runner.crashed(e)
