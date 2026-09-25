@@ -41,7 +41,11 @@ from .asset import AppriseAsset
 from .common import APPRISE_MAX_SERVICE_RETRY
 from .exception import AppriseImproperlyConfigured
 from .logger import NotifyLogEntry, _ServiceLogCapture, logger
-from .plugins.base import NotifyBase, _delivery_tracker
+from .plugins.base import (
+    NotifyBase,
+    _delivery_memo,
+    _delivery_tracker,
+)
 from .result import AppriseResultStatus, NotifyAttempt, NotifyResult
 
 
@@ -478,6 +482,9 @@ class RetryRunner:
         # Remember successful targets only while retries are active.
         self._token = _delivery_tracker.set(set()) if self.retry else None
 
+        # Somewhere for a plugin to park work its own retries can reuse.
+        self._memo_token = _delivery_memo.set({}) if self.retry else None
+
     @property
     def total(self) -> int:
         """Total attempts allowed, counting the first one."""
@@ -601,6 +608,10 @@ class RetryRunner:
         if self._token is not None:
             # Restore the previous tracking state for this thread or task.
             _delivery_tracker.reset(self._token)
+
+        if self._memo_token is not None:
+            # The notification is over; its working state goes with it.
+            _delivery_memo.reset(self._memo_token)
 
     def result(self) -> tuple[bool, NotifyResult]:
         """Return the finished (success, NotifyResult) pair."""

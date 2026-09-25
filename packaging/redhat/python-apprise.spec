@@ -73,7 +73,7 @@ notification services. It supports sending alerts to platforms such as: \
 `MailerSend`, \
 `Mastodon`, \
 `Mattermost`, `Matrix`, `MessageBird`, `Microsoft Windows`, \
-`Microsoft Teams`, `Misskey`, \
+`Microsoft Teams`, `Misskey`, `Mobile Message`, \
 `MQTT`, `MSG91`, `MyAndroid`, `Nexmo`, `Nextcloud`, \
 `NextcloudTalk`, `Notica`, `Notifiarr`, `Notifico`, \
 `Notifyre`, \
