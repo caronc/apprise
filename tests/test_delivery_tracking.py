@@ -40,6 +40,7 @@ from apprise import Apprise, NotifyType
 from apprise.plugins.base import (
     NotifyBase,
     _delivery_index,
+    _delivery_memo,
     _delivery_tracker,
 )
 from apprise.plugins.jira import NotifyJira
@@ -127,6 +128,125 @@ def test_tracker_remembers_marked_targets():
 
     finally:
         _delivery_tracker.reset(token)
+
+
+def test_memo_is_inert_without_retries():
+    """Nothing is kept when there is no later attempt to read it."""
+
+    obj = _Dummy()
+
+    obj.remember("key", "value")
+    assert obj.recall("key") is None
+    assert obj.recall("key", "fallback") == "fallback"
+
+
+def test_memo_carries_a_value_between_attempts():
+    """What one attempt remembers, the next one reads back."""
+
+    obj = _Dummy()
+    token = _delivery_memo.set({})
+    try:
+        assert obj.recall("key") is None
+
+        obj.remember("key", "value")
+        assert obj.recall("key") == "value"
+
+        # Writing again replaces what was there
+        obj.remember("key", "other")
+        assert obj.recall("key") == "other"
+
+        # An unrelated entry is untouched
+        assert obj.recall("elsewhere") is None
+
+    finally:
+        _delivery_memo.reset(token)
+
+
+def test_memo_pieces_keep_their_own_value():
+    """Part two of a split message does not read part one's value.
+
+    Two pieces can hold identical content, so sharing by default would
+    hand the second piece whatever the first stored under the same key.
+    """
+
+    obj = _Dummy()
+    memo_token = _delivery_memo.set({})
+    piece_token = _delivery_index.set(0)
+    try:
+        obj.remember("key", "first piece")
+
+        # The second piece starts with nothing of its own
+        _delivery_index.set(1)
+        assert obj.recall("key") is None
+
+        obj.remember("key", "second piece")
+        assert obj.recall("key") == "second piece"
+
+        # ... and the first piece still reads back its own
+        _delivery_index.set(0)
+        assert obj.recall("key") == "first piece"
+
+    finally:
+        _delivery_index.reset(piece_token)
+        _delivery_memo.reset(memo_token)
+
+
+def test_memo_per_message_spans_pieces():
+    """``per_message`` shares one value across the whole notification."""
+
+    obj = _Dummy()
+    memo_token = _delivery_memo.set({})
+    piece_token = _delivery_index.set(0)
+    try:
+        obj.remember("upload", "media-1", per_message=True)
+
+        # Every piece of the message cites the same upload
+        _delivery_index.set(1)
+        assert obj.recall("upload", per_message=True) == "media-1"
+
+        # The per-piece slot of the same key is untouched
+        assert obj.recall("upload") is None
+
+    finally:
+        _delivery_index.reset(piece_token)
+        _delivery_memo.reset(memo_token)
+
+
+def test_memo_keys_stay_distinct():
+    """Look-alike keys of different types do not collide."""
+
+    obj = _Dummy()
+    token = _delivery_memo.set({})
+    try:
+        obj.remember(1, "number")
+        obj.remember("1", "text")
+        obj.remember(["1"], "list")
+
+        assert obj.recall(1) == "number"
+        assert obj.recall("1") == "text"
+        assert obj.recall(["1"]) == "list"
+
+    finally:
+        _delivery_memo.reset(token)
+
+
+def test_memo_does_not_outlive_its_notification():
+    """A second notification never reads the first one's working state."""
+
+    obj = _Dummy()
+
+    token = _delivery_memo.set({})
+    obj.remember("key", "first")
+    assert obj.recall("key") == "first"
+    _delivery_memo.reset(token)
+
+    # A fresh notification starts with nothing carried over
+    token = _delivery_memo.set({})
+    try:
+        assert obj.recall("key") is None
+
+    finally:
+        _delivery_memo.reset(token)
 
 
 def test_message_pieces_are_tracked_separately():

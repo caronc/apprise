@@ -97,6 +97,15 @@ FLEET = (
         {},
     ),
     (
+        "mobilemessage",
+        # Batching is on by default; this drives one call per recipient so
+        # each target can be answered separately.
+        "mobilemessage://user:pass@ALERTS/0412345678/0498765432?batch=no",
+        "61412345678",
+        "61498765432",
+        {"status": "complete", "results": [{"status": "success"}]},
+    ),
+    (
         "zulip",
         f"zulip://botname@apprise/{'b' * 32}/channel1/channel999",
         "channel1",
