@@ -556,21 +556,28 @@ class _RaisingNotify(NotifyBase):
 
 
 class _BadFormatNotify(NotifyBase):
-    """Plugin that raises TypeError while its content is prepared.
+    """Plugin that raises while its content is prepared.
 
-    The failure lands before any service is dispatched, which is the one
-    path notify() catches as TypeError.
+    The failure lands before any service is dispatched. ``error`` picks
+    what resolve_format() raises, so a test can show the guard is not
+    limited to TypeError.
     """
 
     app_id = "BadFormatApp"
     app_desc = "Test"
+    service_name = "BadFormat"
     notify_url = "badformat://"
     title_maxlen = 250
     body_maxlen = 32768
 
+    def __init__(self, error=None, **kwargs):
+        """Initialize with the exception preparation should raise."""
+        super().__init__(**kwargs)
+        self._error = error or TypeError("bad format resolution")
+
     def resolve_format(self, body_format=None):
         """Fail the way a buggy plugin would, before anything is sent."""
-        raise TypeError("bad format resolution")
+        raise self._error
 
     def url(self, *args, **kwargs):
         """Return the stable URL for this misbehaving test plugin."""
@@ -1857,12 +1864,16 @@ class TestExceptionHandling:
             N_MGR.unload_modules()
 
         assert result.status == AppriseResultStatus.FAILURE
-        assert len(result.results) == 0
+
+        # The service that broke reports itself rather than vanishing.
+        assert [(r.name, r.status) for r in result.results] == [
+            ("BadFormat", AppriseResultStatus.FAILURE)
+        ]
 
         # The reason has to reach the caller; a silent FAILURE here used
         # to leave nothing at all behind to diagnose.
         assert any(
-            "bad format resolution" in e.message for e in result.call_logs()
+            "raised an exception" in e.message for e in result.call_logs()
         )
 
     def test_async_notify_preparation_typeerror(self):
@@ -1880,9 +1891,11 @@ class TestExceptionHandling:
             N_MGR.unload_modules()
 
         assert result.status == AppriseResultStatus.FAILURE
-        assert len(result.results) == 0
+        assert [(r.name, r.status) for r in result.results] == [
+            ("BadFormat", AppriseResultStatus.FAILURE)
+        ]
         assert any(
-            "bad format resolution" in e.message for e in result.call_logs()
+            "raised an exception" in e.message for e in result.call_logs()
         )
 
     def test_async_notify_unknown_argument(self):
@@ -1902,6 +1915,361 @@ class TestExceptionHandling:
         assert result.status == AppriseResultStatus.FAILURE
         assert len(result.results) == 0
         assert any("bogus" in e.message for e in result.call_logs())
+
+    def test_notify_preparation_crash(self):
+        """A plugin crashing during preparation fails the call, not the
+        caller."""
+        N_MGR["badformat"] = _BadFormatNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            a = Apprise(asset=asset)
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            with apprise_logs_enabled():
+                result = a.notify(body="test", log_level=logging.DEBUG)
+        finally:
+            N_MGR.unload_modules()
+
+        # Anything raised while preparing content belongs in the result,
+        # not thrown at whoever called notify().
+        assert result.status == AppriseResultStatus.FAILURE
+        assert [(r.name, r.status) for r in result.results] == [
+            ("BadFormat", AppriseResultStatus.FAILURE)
+        ]
+
+        # DEBUG carries the original text behind the summary warning.
+        assert any("plugin blew up" in e.message for e in result.call_logs())
+
+    def test_async_notify_preparation_crash(self):
+        """The asynchronous path contains a preparation crash too."""
+        N_MGR["badformat"] = _BadFormatNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            a = Apprise(asset=asset)
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            with apprise_logs_enabled():
+                result = asyncio.run(
+                    a.async_notify(body="test", log_level=logging.DEBUG)
+                )
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+        assert [(r.name, r.status) for r in result.results] == [
+            ("BadFormat", AppriseResultStatus.FAILURE)
+        ]
+        assert any("plugin blew up" in e.message for e in result.call_logs())
+
+    def test_delivery_typeerror_reported(self):
+        """A TypeError raised while delivering is reported like any crash."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            def _raise_type_error(**kwargs):
+                """Fail the way a plugin with a signature bug would."""
+                raise TypeError("delivery-time type error")
+
+            service.send = _raise_type_error
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            with apprise_logs_enabled():
+                result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+
+        # A failed result with no logs at all cannot be diagnosed.
+        messages = [e.message for r in result.results for e in r.logs()]
+        assert any("raised an exception" in m for m in messages)
+
+    def test_async_delivery_typeerror_reported(self):
+        """Native async delivery reports a TypeError the same way."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            service = _SlowNotify(host="x", asset=asset, delay=0.0)
+
+            async def _raise_type_error(**kwargs):
+                """Fail the way a plugin with a signature bug would."""
+                raise TypeError("delivery-time type error")
+
+            service.async_notify = _raise_type_error
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            with apprise_logs_enabled():
+                result = asyncio.run(a.async_notify(body="test"))
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+
+        messages = [e.message for r in result.results for e in r.logs()]
+        assert any("raised an exception" in m for m in messages)
+
+    def test_preparation_crash_isolated(self):
+        """One plugin failing preparation does not silence the others."""
+        N_MGR["badformat"] = _BadFormatNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            healthy = _SlowNotify(host="a", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(healthy)
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        # The healthy service was still contacted.
+        assert healthy.calls == 1
+
+        # Mixed outcome: one real delivery, one service that never ran.
+        assert result.status == AppriseResultStatus.PARTIAL
+        statuses = {r.name: r.status for r in result.results}
+        assert statuses["BadFormat"] == AppriseResultStatus.FAILURE
+        assert len(result.results) == 2
+
+    def test_async_preparation_crash_isolated(self):
+        """The asynchronous path isolates a preparation crash too."""
+        N_MGR["badformat"] = _BadFormatNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            healthy = _SlowNotify(host="a", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(healthy)
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            result = asyncio.run(a.async_notify(body="test"))
+        finally:
+            N_MGR.unload_modules()
+
+        assert healthy.calls == 1
+        assert result.status == AppriseResultStatus.PARTIAL
+        assert len(result.results) == 2
+
+    def test_flat_dispatch_preparation_crash(self):
+        """An explicit priority filter isolates a crash the same way."""
+        N_MGR["badformat"] = _BadFormatNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            healthy = _SlowNotify(host="a", asset=asset, delay=0.0, tag="ops")
+            a = Apprise(asset=asset)
+            a.add(healthy)
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    tag="ops",
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            # A priority prefix sends one flat batch, skipping escalation.
+            result = a.notify(body="test", tag="0:ops")
+        finally:
+            N_MGR.unload_modules()
+
+        assert healthy.calls == 1
+
+        # The batch itself succeeded, but a broken service still counts.
+        assert result.status == AppriseResultStatus.PARTIAL
+        assert len(result.results) == 2
+
+    def test_every_service_broken(self):
+        """A call where nothing could be prepared is a failure, not a
+        no-match."""
+        N_MGR["badformat"] = _BadFormatNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            a = Apprise(asset=asset)
+            for _ in range(2):
+                a.add(
+                    _BadFormatNotify(
+                        host="localhost",
+                        asset=asset,
+                        error=RuntimeError("plugin blew up"),
+                    )
+                )
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        # Nothing was dispatched, but services did match, so NOMATCH would
+        # be misleading here.
+        assert result.status == AppriseResultStatus.FAILURE
+        assert len(result.results) == 2
+
+    def test_bad_content_still_stops_everything(self):
+        """Content Apprise cannot use is the caller's error, not a
+        service's."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            healthy = _SlowNotify(host="a", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(healthy)
+
+            # A list cannot be escaped; that is a mistake in the call, so
+            # no service is blamed and none is contacted.
+            result = a.notify(
+                body=["not", "a", "string"], interpret_escapes=True
+            )
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+        assert len(result.results) == 0
+        assert healthy.calls == 0
+
+    def test_unreached_fallback_not_blamed(self):
+        """A broken fallback escalation never reaches is never reported."""
+        N_MGR["badformat"] = _BadFormatNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            primary = _SlowNotify(
+                host="a", asset=asset, delay=0.0, tag="1:ops"
+            )
+            a = Apprise(asset=asset)
+            a.add(primary)
+            # Only ever tried if the priority-1 group fails.
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    tag="9:ops",
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            result = a.notify(body="test", tag="ops")
+        finally:
+            N_MGR.unload_modules()
+
+        assert primary.calls == 1
+
+        # The chain stopped at the group that worked, so the broken
+        # fallback is neither dispatched nor counted against the call.
+        assert result.status == AppriseResultStatus.SUCCESS
+        assert len(result.results) == 1
+        assert "BadFormat" not in [r.name for r in result.results]
+
+    def test_optional_service_preparation_crash(self):
+        """A broken optional service stays optional."""
+        N_MGR["badformat"] = _BadFormatNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            required = _SlowNotify(host="a", asset=asset, delay=0.0)
+            a = Apprise(asset=asset)
+            a.add(required)
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    optional=True,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+
+            result = a.notify(body="test")
+
+            # Alone, it must not drag the call down either.
+            b = Apprise(asset=asset)
+            b.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    optional=True,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+            alone = b.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        assert required.calls == 1
+
+        # An optional service that fails is allowed to, so the overall
+        # status must agree with the entry's own SUCCESS.
+        assert result.status == AppriseResultStatus.SUCCESS
+        assert all(bool(r) for r in result.results)
+        assert alone.status == AppriseResultStatus.SUCCESS
+
+    def test_preparation_crash_keeps_position(self):
+        """A broken service stays where it was added, not first."""
+        N_MGR["badformat"] = _BadFormatNotify
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            a = Apprise(asset=asset)
+            a.add(_SlowNotify(host="first", asset=asset, delay=0.0))
+            a.add(
+                _BadFormatNotify(
+                    host="localhost",
+                    asset=asset,
+                    error=RuntimeError("plugin blew up"),
+                )
+            )
+            a.add(_SlowNotify(host="third", asset=asset, delay=0.0))
+
+            result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        # Results follow dispatch order, so the broken one is in the
+        # middle where it was added.
+        assert [r.status for r in result.results] == [
+            AppriseResultStatus.SUCCESS,
+            AppriseResultStatus.FAILURE,
+            AppriseResultStatus.SUCCESS,
+        ]
 
 
 class TestConfigTagRetry:
@@ -4401,6 +4769,40 @@ class TestServiceTimeout:
             for e in result.call_logs()
             if "did not finish within" in e.message
         ]
+
+    def test_timeout_reaches_log_callback(self):
+        """A live callback still sees the timeout the result stores once."""
+        N_MGR["slow"] = _SlowNotify
+        received = []
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            # The delay is well past the limit so the wait always wins.
+            service = _SlowNotify(host="x", asset=asset, delay=2.0)
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            with apprise_logs_enabled():
+                result = a.notify(
+                    body="test",
+                    timeout=0.25,
+                    log_callback=lambda entry, svc: received.append(
+                        entry.message
+                    ),
+                )
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.TIMEOUT
+
+        # Delivered live exactly once, and kept exactly once.  Suppressing
+        # the stored copy must not cost the callback its notice.
+        stored = [
+            e for e in result.logs() if "did not finish within" in e.message
+        ]
+        delivered = [m for m in received if "did not finish within" in m]
+        assert len(stored) == 1
+        assert len(delivered) == 1
 
 
 class _SlowFailNotify(NotifyBase):

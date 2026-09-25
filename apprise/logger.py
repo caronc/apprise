@@ -730,8 +730,11 @@ class _ServiceLogCapture(logging.Handler):
                 time=datetime.fromtimestamp(record.created, tz=timezone.utc),
             )
 
-            # Retain the entry before notifying a live callback.
-            self._entries.append(entry)
+            # Retain the entry before notifying a live callback.  A record
+            # marked apprise_store=False is delivered live but not kept,
+            # for a message the caller already stores somewhere itself.
+            if getattr(record, "apprise_store", True):
+                self._entries.append(entry)
 
             # Copy the reference in case application code later replaces it.
             callback = self._log_callback

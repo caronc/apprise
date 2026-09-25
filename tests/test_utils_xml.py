@@ -168,3 +168,35 @@ def test_flatten_xml_response_unmapped_tags_are_ignored():
 
     assert "Extra" not in response
     assert "extra" not in response
+
+
+def test_flatten_xml_response_rejects_a_dtd():
+    """A response carrying a DTD is refused before entities expand."""
+    response = flatten_xml_response(
+        """<?xml version="1.0"?>
+        <!DOCTYPE PublishResponse [
+          <!ENTITY a "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa">
+          <!ENTITY b "&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;&a;">
+          <!ENTITY c "&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;&b;">
+          <!ENTITY d "&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;&c;">
+          <!ENTITY e "&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;&d;">
+        ]>
+        <PublishResponse><MessageId>&e;</MessageId></PublishResponse>""",
+        KEEP_MAP,
+        defaults={"message_id": None},
+    )
+
+    assert response["type"] is None
+    assert response["message_id"] is None
+
+
+def test_flatten_xml_response_truncated_xml_returns_defaults():
+    """A response that ends early contributes nothing, not a partial read."""
+    response = flatten_xml_response(
+        "<PublishResponse><RequestId>req-456</RequestId>",
+        KEEP_MAP,
+        defaults={"request_id": None},
+    )
+
+    assert response["type"] is None
+    assert response["request_id"] is None
