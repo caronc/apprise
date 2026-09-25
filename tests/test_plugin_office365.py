@@ -1096,6 +1096,67 @@ def test_plugin_office365_attachments(mock_post, mock_get, mock_put):
 
 @mock.patch("requests.get")
 @mock.patch("requests.post")
+def test_plugin_office365_inline_attachment_content_type(mock_post, mock_get):
+    """NotifyOffice365() inline attachments carry their real MIME type."""
+
+    # Initialize some generic (but valid) tokens
+    source = "user@example.net"
+    tenant = "ff-gg-hh-ii-jj"
+    client_id = "aa-bb-cc-dd-ee"
+    secret = "abcd/1234/abcd@ajd@/test"
+    targets = "target@example.com"
+
+    payload = {
+        "token_type": "Bearer",
+        "expires_in": 6000,
+        "access_token": "abcd1234",
+    }
+    okay_response = mock.Mock()
+    okay_response.content = dumps(payload)
+    okay_response.status_code = requests.codes.ok
+    mock_post.return_value = okay_response
+    mock_get.return_value = okay_response
+
+    obj = Apprise.instantiate(
+        f"azure://{source}/{tenant}/{client_id}{secret}/{targets}"
+    )
+    assert isinstance(obj, NotifyOffice365)
+
+    path = os.path.join(TEST_VAR_DIR, "apprise-test.gif")
+    attach = AppriseAttachment(path)
+
+    # Attachment is small enough to be sent inline (base64) with sendMail
+    assert len(attach[0]) < obj.outlook_attachment_inline_max
+    assert (
+        obj.notify(
+            body="body",
+            title="title",
+            notify_type=NotifyType.INFO,
+            attach=attach,
+        )
+        is True
+    )
+
+    # call 0 is the token request; call 1 is the sendMail
+    assert mock_post.call_count == 2
+    assert (
+        mock_post.call_args_list[1][0][0]
+        == f"https://graph.microsoft.com/v1.0/users/{source}/sendMail"
+    )
+
+    posted = loads(mock_post.call_args_list[1][1]["data"])
+    attachments = posted["message"]["attachments"]
+    assert len(attachments) == 1
+
+    # The attachment must advertise the file's real MIME type; not a
+    # placeholder.  The large-attachment path (upload_attachment()) already
+    # sends attachment.mimetype here.
+    assert attachments[0]["contentType"] == attach[0].mimetype
+    assert attachments[0]["contentType"] == "image/gif"
+
+
+@mock.patch("requests.get")
+@mock.patch("requests.post")
 def test_plugin_office365_reply_to(mock_post, mock_get):
     """NotifyOffice365() reply_to parameter support."""
 
