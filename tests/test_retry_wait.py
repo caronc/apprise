@@ -26,6 +26,7 @@
 # POSSIBILITY OF SUCH DAMAGE.
 
 import asyncio
+from contextlib import contextmanager
 import logging
 import threading
 import time
@@ -48,6 +49,25 @@ from apprise.tag import AppriseTag
 logging.disable(logging.CRITICAL)
 
 N_MGR = NotificationManager()
+
+
+@contextmanager
+def apprise_logs_enabled(level=logging.TRACE):
+    """Re-enable apprise logging so a test can inspect captured entries."""
+    # This module silences logging outright, which would keep every record
+    # away from the captures a result is built from.
+    apprise_logger = logging.getLogger(LOGGER_NAME)
+    restore_level = apprise_logger.level
+    apprise_logger.setLevel(level)
+    logging.disable(logging.NOTSET)
+
+    try:
+        yield
+
+    finally:
+        # Put the module back the way the rest of the file expects it.
+        logging.disable(logging.CRITICAL)
+        apprise_logger.setLevel(restore_level)
 
 
 class _TestNotify(NotifyBase):
@@ -528,6 +548,37 @@ class _RaisingNotify(NotifyBase):
     async def async_notify(self, **kwargs):
         """Raise a delivery error for asynchronous exception tests."""
         raise RuntimeError("plugin exploded async")
+
+    @staticmethod
+    def parse_url(url):
+        """Parse the synthetic URL without requiring a real host."""
+        return NotifyBase.parse_url(url, verify_host=False)
+
+
+class _BadFormatNotify(NotifyBase):
+    """Plugin that raises TypeError while its content is prepared.
+
+    The failure lands before any service is dispatched, which is the one
+    path notify() catches as TypeError.
+    """
+
+    app_id = "BadFormatApp"
+    app_desc = "Test"
+    notify_url = "badformat://"
+    title_maxlen = 250
+    body_maxlen = 32768
+
+    def resolve_format(self, body_format=None):
+        """Fail the way a buggy plugin would, before anything is sent."""
+        raise TypeError("bad format resolution")
+
+    def url(self, *args, **kwargs):
+        """Return the stable URL for this misbehaving test plugin."""
+        return "badformat://localhost"
+
+    def send(self, **kwargs):
+        """Never reached; preparation fails before delivery starts."""
+        return True
 
     @staticmethod
     def parse_url(url):
@@ -1790,6 +1841,67 @@ class TestExceptionHandling:
             assert good2._calls == 1
         finally:
             N_MGR.unload_modules()
+
+    def test_notify_preparation_typeerror(self):
+        """A TypeError raised while preparing content explains itself."""
+        N_MGR["badformat"] = _BadFormatNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            a = Apprise(asset=asset)
+            a.add(_BadFormatNotify(host="localhost", asset=asset))
+
+            with apprise_logs_enabled():
+                result = a.notify(body="test")
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+        assert len(result.results) == 0
+
+        # The reason has to reach the caller; a silent FAILURE here used
+        # to leave nothing at all behind to diagnose.
+        assert any(
+            "bad format resolution" in e.message for e in result.call_logs()
+        )
+
+    def test_async_notify_preparation_typeerror(self):
+        """The asynchronous path explains a preparation TypeError too."""
+        N_MGR["badformat"] = _BadFormatNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            a = Apprise(asset=asset)
+            a.add(_BadFormatNotify(host="localhost", asset=asset))
+
+            with apprise_logs_enabled():
+                result = asyncio.run(a.async_notify(body="test"))
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+        assert len(result.results) == 0
+        assert any(
+            "bad format resolution" in e.message for e in result.call_logs()
+        )
+
+    def test_async_notify_unknown_argument(self):
+        """async_notify() names the argument it could not accept."""
+        N_MGR["test"] = _TestNotify
+
+        try:
+            asset = AppriseAsset(async_mode=True)
+            a = Apprise(asset=asset)
+            a.add(_TestNotify(host="localhost", asset=asset))
+
+            with apprise_logs_enabled():
+                result = asyncio.run(a.async_notify(body="test", bogus=1))
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.FAILURE
+        assert len(result.results) == 0
+        assert any("bogus" in e.message for e in result.call_logs())
 
 
 class TestConfigTagRetry:
@@ -4256,6 +4368,39 @@ class TestServiceTimeout:
             assert apprise_module.any_abandoned_calls_still_running() is False
         finally:
             N_MGR.unload_modules()
+
+    def test_timeout_logged_once(self):
+        """A service timeout is reported once, not once per capture."""
+        N_MGR["slow"] = _SlowNotify
+
+        try:
+            asset = AppriseAsset(async_mode=False)
+            # The delay is well past the limit so the wait always wins.
+            service = _SlowNotify(host="x", asset=asset, delay=2.0)
+            a = Apprise(asset=asset)
+            a.add(service)
+
+            with apprise_logs_enabled():
+                result = a.notify(body="test", timeout=0.25)
+        finally:
+            N_MGR.unload_modules()
+
+        assert result.status == AppriseResultStatus.TIMEOUT
+
+        timeouts = [
+            e.message
+            for e in result.logs()
+            if "did not finish within" in e.message
+        ]
+        assert len(timeouts) == 1
+
+        # The entry belongs to the service attempt.  Capturing the logged
+        # copy as well would list the same timeout twice above.
+        assert not [
+            e
+            for e in result.call_logs()
+            if "did not finish within" in e.message
+        ]
 
 
 class _SlowFailNotify(NotifyBase):

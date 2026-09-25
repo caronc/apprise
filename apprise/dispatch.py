@@ -219,7 +219,12 @@ def timeout_log_entry(name: str, elapsed: float) -> NotifyLogEntry:
     """Log and return a consistent error entry for a service timeout."""
     # Use the same readable message in application logs and the result.
     message = f"Service '{name}' did not finish within {elapsed:.3f}s."
-    logger.error(message)
+
+    # Keep this out of the call-level capture.  The caller stores the entry
+    # below on the attempt itself, so capturing it too would list the same
+    # timeout twice in the merged result logs.
+    logger.error(message, extra={"apprise_capture": False})
+
     # Store the level as text because NotifyLogEntry is public result data.
     return NotifyLogEntry(level="ERROR", message=message)
 
