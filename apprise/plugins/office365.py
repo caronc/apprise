@@ -708,7 +708,7 @@ class NotifyOffice365(NotifyBase):
                                 else f"file{no:03}.dat"
                             ),
                             # MIME type of the attachment
-                            "contentType": "attachment.mimetype",
+                            "contentType": attachment.mimetype,
                             # Base64 Content
                             "contentBytes": attachment.base64(),
                         }
